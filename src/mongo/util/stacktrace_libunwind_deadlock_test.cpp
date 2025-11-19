@@ -141,7 +141,7 @@ TEST(DlIteratePhdrDeadlockTest, NormalStacktrace) {
  * Confirms that our signal handler stack traces are not blocked
  * by any concurrent `dl_iterate_phdr` operations.
  */
-DEATH_TEST(DlIteratePhdrDeadlockTest, SignalHandler, "Aborted") {
+DEATH_TEST(DlIteratePhdrDeadlockTestDeathTest, SignalHandler, "Aborted") {
     ConcurrentPhdrIteration iter;
     iter.wait();
     std::abort();

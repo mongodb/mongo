@@ -325,7 +325,8 @@ TEST_F(PartitionIteratorTest, OutsideOfPartitionAccessShouldNotTassert) {
     ASSERT_FALSE(accessor[2]);
 }
 
-DEATH_TEST_F(PartitionIteratorTest, RequestExpiredDocument, "Requested expired document") {
+using PartitionIteratorTestDeathTest = PartitionIteratorTest;
+DEATH_TEST_F(PartitionIteratorTestDeathTest, RequestExpiredDocument, "Requested expired document") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = exec::agg::MockStage::createForTest(docs, getExpCtx());

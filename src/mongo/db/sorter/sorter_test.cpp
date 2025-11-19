@@ -279,15 +279,16 @@ std::vector<SorterRange> SorterMakeFromExistingRangesTest::makeSampleRanges() {
     return ranges;
 }
 
+using SorterMakeFromExistingRangesTestDeathTest = SorterMakeFromExistingRangesTest;
 DEATH_TEST_F(
-    SorterMakeFromExistingRangesTest,
+    SorterMakeFromExistingRangesTestDeathTest,
     NonZeroLimit,
     "Creating a Sorter from existing ranges is only available with the NoLimitSorter (limit 0)") {
     auto opts = SortOptions().Limit(1ULL);
     IWSorter::makeFromExistingRanges("", {}, opts, IWComparator(ASC));
 }
 
-DEATH_TEST_F(SorterMakeFromExistingRangesTest, EmptyFileName, "!fileName.empty()") {
+DEATH_TEST_F(SorterMakeFromExistingRangesTestDeathTest, EmptyFileName, "!fileName.empty()") {
     std::string fileName;
     auto opts = SortOptions().TempDir("unused_temp_dir");
     IWSorter::makeFromExistingRanges(fileName, {}, opts, IWComparator(ASC));
@@ -516,7 +517,7 @@ TEST_F(SorterMakeFromExistingRangesTest, IncompleteReadDoesNotReportChecksumErro
     // it's destructor doesn't check the checksum since we didn't use everything
 }
 
-DEATH_TEST_F(SorterMakeFromExistingRangesTest,
+DEATH_TEST_F(SorterMakeFromExistingRangesTestDeathTest,
              CompleteReadReportsChecksumError,
              "Data read from disk does not match what was written to disk.") {
     unittest::TempDir tempDir = makeTempDir();
@@ -528,7 +529,7 @@ DEATH_TEST_F(SorterMakeFromExistingRangesTest,
     // it's destructor ends up checking the checksum and aborts due to it being wrong
 }
 
-DEATH_TEST_F(SorterMakeFromExistingRangesTest,
+DEATH_TEST_F(SorterMakeFromExistingRangesTestDeathTest,
              CompleteReadReportsChecksumErrorFromIncorrectChecksumVersion,
              "Data read from disk does not match what was written to disk.") {
     unittest::TempDir tempDir = makeTempDir();

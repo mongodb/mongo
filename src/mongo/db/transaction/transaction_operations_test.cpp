@@ -279,7 +279,7 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoEmptyOps) {
     ASSERT_FALSE(info.prepare);
 }
 
-DEATH_TEST(TransactionOperationsTest,
+DEATH_TEST(TransactionOperationsTestDeathTest,
            LogOplogEntriesInsufficientSlots,
            "Wrong number of oplogSlots reserved") {
     TransactionOperations ops;
@@ -301,7 +301,7 @@ DEATH_TEST(TransactionOperationsTest,
                         &imageToWrite);
 }
 
-DEATH_TEST(TransactionOperationsTest,
+DEATH_TEST(TransactionOperationsTestDeathTest,
            LogOplogEntriesTooManySlots,
            "Wrong number of oplogSlots reserved") {
     TransactionOperations ops;
@@ -938,7 +938,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsRetryableWrite)
     ASSERT_EQ(numEntries, 3U);
 }
 
-DEATH_TEST(TransactionOperationsTest,
+DEATH_TEST(TransactionOperationsTestDeathTest,
            LogOplogEntriesInsufficientApplyOpsEntries,
            "Not enough \\\"applyOps\\\" entries") {
     TransactionOperations ops;

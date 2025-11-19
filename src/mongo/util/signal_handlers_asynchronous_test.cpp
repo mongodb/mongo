@@ -85,7 +85,8 @@ private:
 
 // We use a death test here because the asynchronous signal processing thread runs as detached
 // thread, so we kill the process in which it spawns so the thread doesn't live in other tests.
-DEATH_TEST_F(LogRotateSignalTest, LogRotateSignal, "Ending LogRotateSignalTest") {
+using LogRotateSignalTestDeathTest = LogRotateSignalTest;
+DEATH_TEST_F(LogRotateSignalTestDeathTest, LogRotateSignal, "Ending LogRotateSignalTest") {
     unittest::LogCaptureGuard logs;
     kill(getpid(), SIGUSR1);
     waitUntilLogRotatorCalled();
@@ -109,16 +110,16 @@ void doSignalShutdownTest(int sig) {
     waitForShutdown();
 }
 
-DEATH_TEST(AsynchronousSignalTest, ShutdownHup, "Shutdown called") {
+DEATH_TEST(AsynchronousSignalTestDeathTest, ShutdownHup, "Shutdown called") {
     doSignalShutdownTest(SIGHUP);
 }
-DEATH_TEST(AsynchronousSignalTest, ShutdownInt, "Shutdown called") {
+DEATH_TEST(AsynchronousSignalTestDeathTest, ShutdownInt, "Shutdown called") {
     doSignalShutdownTest(SIGINT);
 }
-DEATH_TEST(AsynchronousSignalTest, ShutdownTerm, "Shutdown called") {
+DEATH_TEST(AsynchronousSignalTestDeathTest, ShutdownTerm, "Shutdown called") {
     doSignalShutdownTest(SIGTERM);
 }
-DEATH_TEST(AsynchronousSignalTest, ShutdownXcpu, "Shutdown called") {
+DEATH_TEST(AsynchronousSignalTestDeathTest, ShutdownXcpu, "Shutdown called") {
     doSignalShutdownTest(SIGXCPU);
 }
 

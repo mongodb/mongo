@@ -2531,8 +2531,9 @@ REGISTER_DOCUMENT_SOURCE(testWithPrivs,
                          AllowedWithApiStrict::kAlways);
 
 //  Multitenancy disabled
+using AuthorizationSessionTestDeathTest = AuthorizationSessionTest;
 DEATH_TEST_F(
-    AuthorizationSessionTest,
+    AuthorizationSessionTestDeathTest,
     AggStageFailsRequiresAuthzChecksWithNoPrivilegesAndNoOptOutMultitenancyDisabled,
     "Must specify authorization checks for this stage: $testNoPrivsWithAuthzChecks or manually "
     "opt out by overriding requiresAuthzChecks to false") {
@@ -2552,7 +2553,7 @@ DEATH_TEST_F(
 
 //  Multitenancy enabled
 DEATH_TEST_F(
-    AuthorizationSessionTest,
+    AuthorizationSessionTestDeathTest,
     AggStageFailsRequiresAuthzChecksWithNoPrivilegesAndNoOptOutMultitenancyEnabled,
     "Must specify authorization checks for this stage: $testNoPrivsWithAuthzChecks or manually "
     "opt out by overriding requiresAuthzChecks to false") {

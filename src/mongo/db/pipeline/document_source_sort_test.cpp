@@ -568,7 +568,8 @@ TEST_F(DocumentSourceSortExecutionZeroChunkTest, CurOpStatsDoNotChunk) {
 /**
  * Sort tasserts on control event.
  */
-DEATH_TEST_REGEX_F(DocumentSourceSortExecutionTest,
+using DocumentSourceSortExecutionTestDeathTest = DocumentSourceSortExecutionTest;
+DEATH_TEST_REGEX_F(DocumentSourceSortExecutionTestDeathTest,
                    CannotHandleControlEvent,
                    "Tripwire assertion.*10358905") {
     MutableDocument doc(Document{{"_id", 0}});

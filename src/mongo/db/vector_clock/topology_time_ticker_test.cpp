@@ -134,7 +134,8 @@ TEST_F(TopologyTimeTickerConfigServer, GossipingNewTopologyTimesWhenMajorityComm
         sc, kCommitTimePostTicks, _ticks.back().topologyTime);
 }
 
-DEATH_TEST_F(TopologyTimeTickerConfigServer,
+using TopologyTimeTickerConfigServerDeathTest = TopologyTimeTickerConfigServer;
+DEATH_TEST_F(TopologyTimeTickerConfigServerDeathTest,
              InvalidonNewLocallyCommittedTopologyTimeAvailable,
              "invariant") {
     // This test verifies that the internal elements on the tick point vector are sorted.

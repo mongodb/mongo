@@ -91,7 +91,10 @@ class OplogWriterTest : public ServiceContextMongoDTest {};
  * happens it's useful to give the user a human-readable
  * log message alongside the backtrace.
  */
-DEATH_TEST_F(OplogWriterTest, ThrowingInRunLoopLogsUsefulError, "OplogWriter threw a DBException") {
+using OplogWriterTestDeathTest = OplogWriterTest;
+DEATH_TEST_F(OplogWriterTestDeathTest,
+             ThrowingInRunLoopLogsUsefulError,
+             "OplogWriter threw a DBException") {
     executor::ThreadPoolMock::Options threadPoolMockOptions;
 
     executor::ThreadPoolExecutorTest executorFixture{threadPoolMockOptions};

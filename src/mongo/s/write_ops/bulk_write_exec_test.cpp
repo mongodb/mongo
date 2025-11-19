@@ -1578,7 +1578,8 @@ TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_WriteConcernError) {
 // This isn't truly a death test but is written as one in order to isolate test execution in its
 // own process. This is needed because otherwise calling shutdownNoTerminate() would lead any
 // future tests run in the same process to also have the shutdown flag set.
-DEATH_TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_ShutdownError, "8100600") {
+using BulkWriteOpTestDeathTest = BulkWriteOpTest;
+DEATH_TEST_F(BulkWriteOpTestDeathTest, NoteWriteOpFinalResponse_ShutdownError, "8100600") {
     ShardId shardIdA("shardA");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1))},
@@ -2157,7 +2158,10 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalCallbackCanceledErrorNotInShutdown) 
 // This isn't truly a death test but is written as one in order to isolate test execution in its
 // own process. This is needed because otherwise calling shutdownNoTerminate() would lead any
 // future tests run in the same process to also have the shutdown flag set.
-DEATH_TEST_F(BulkWriteOpChildBatchErrorTest, LocalCallbackCanceledErrorInShutdown, "12345") {
+using BulkWriteOpChildBatchErrorTestDeathTest = BulkWriteOpChildBatchErrorTest;
+DEATH_TEST_F(BulkWriteOpChildBatchErrorTestDeathTest,
+             LocalCallbackCanceledErrorInShutdown,
+             "12345") {
     BulkWriteOp bulkWriteOp(_opCtx, request);
     auto targeted = targetOp(bulkWriteOp, request.getOrdered());
 

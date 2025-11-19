@@ -708,7 +708,8 @@ TEST_F(TxnParticipantTest, AutocommitRequiredOnEveryTxnOp) {
                                    TransactionParticipant::TransactionActions::kContinue);
 }
 
-DEATH_TEST_F(TxnParticipantTest, AutocommitCannotBeTrue3, "invariant") {
+using TxnParticipantTestDeathTest = TxnParticipantTest;
+DEATH_TEST_F(TxnParticipantTestDeathTest, AutocommitCannotBeTrue3, "invariant") {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
@@ -2081,7 +2082,7 @@ TEST_F(TxnParticipantTest, ThrowDuringUnpreparedOnTransactionAbort) {
         txnParticipant.abortTransaction(opCtx()), AssertionException, ErrorCodes::OperationFailed);
 }
 
-DEATH_TEST_F(TxnParticipantTest,
+DEATH_TEST_F(TxnParticipantTestDeathTest,
              ThrowDuringPreparedOnTransactionAbortIsFatal,
              "Caught exception during abort of transaction") {
     auto sessionCheckout = checkOutSession();
@@ -4564,7 +4565,10 @@ TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterAbort) {
     ASSERT_BSONOBJ_EQ(testTransactionInfo, expectedTransactionInfo);
 }
 
-DEATH_TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogWithNoLockerInfoStats, "invariant") {
+using TransactionsMetricsTestDeathTest = TransactionsMetricsTest;
+DEATH_TEST_F(TransactionsMetricsTestDeathTest,
+             TestTransactionInfoForLogWithNoLockerInfoStats,
+             "invariant") {
     auto sessionCheckout = checkOutSession();
 
     APIParameters apiParameters = APIParameters();
@@ -5166,7 +5170,7 @@ TEST_F(TxnParticipantTest, CommitPreparedTransactionAsSecondarySetsTheFinishOpTi
     ASSERT_TRUE(txnParticipant.transactionIsCommitted());
 }
 
-DEATH_TEST_F(TxnParticipantTest,
+DEATH_TEST_F(TxnParticipantTestDeathTest,
              CommitPreparedTransactionAsSecondaryWithNullCommitOplogEntryOpTimeShouldFail,
              "invariant") {
     repl::ReplClientInfo::forClient(opCtx()->getClient()).clearLastOp();
@@ -5190,7 +5194,7 @@ DEATH_TEST_F(TxnParticipantTest,
     txnParticipant.commitPreparedTransaction(opCtx(), commitTimestamp, {});
 }
 
-DEATH_TEST_F(TxnParticipantTest,
+DEATH_TEST_F(TxnParticipantTestDeathTest,
              CommitPreparedTransactionAsPrimaryWithNonNullCommitOplogEntryOpTimeShouldFail,
              "invariant") {
     repl::ReplClientInfo::forClient(opCtx()->getClient()).clearLastOp();
@@ -5494,7 +5498,8 @@ TEST_F(TxnParticipantTest, CanOnlySpecifyTxnRetryCounterInShardedClusters) {
         ErrorCodes::InvalidOptions);
 }
 
-DEATH_TEST_F(ShardTxnParticipantTest,
+using ShardTxnParticipantTestDeathTest = ShardTxnParticipantTest;
+DEATH_TEST_F(ShardTxnParticipantTestDeathTest,
              CannotSpecifyNegativeTxnRetryCounter,
              "Cannot specify a negative txnRetryCounter") {
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
@@ -5506,7 +5511,7 @@ DEATH_TEST_F(ShardTxnParticipantTest,
                                    TransactionParticipant::TransactionActions::kStart);
 }
 
-DEATH_TEST_F(ShardTxnParticipantTest,
+DEATH_TEST_F(ShardTxnParticipantTestDeathTest,
              CannotSpecifyTxnRetryCounterForRetryableWrite,
              "Cannot specify a txnRetryCounter for retryable write") {
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());

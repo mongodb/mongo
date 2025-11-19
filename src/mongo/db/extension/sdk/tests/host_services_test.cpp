@@ -150,7 +150,8 @@ TEST_F(HostServicesTest, userAsserted) {
     ASSERT_EQ(status.getReason(), "");
 }
 
-DEATH_TEST_REGEX_F(HostServicesTest, tripwireAsserted, "22222") {
+using HostServicesTestDeathTest = HostServicesTest;
+DEATH_TEST_REGEX_F(HostServicesTestDeathTest, tripwireAsserted, "22222") {
     auto errmsg = "fatal error";
     int errorCode = 22222;
     BSONObj errInfo = BSON("message" << errmsg << "errorCode" << errorCode);

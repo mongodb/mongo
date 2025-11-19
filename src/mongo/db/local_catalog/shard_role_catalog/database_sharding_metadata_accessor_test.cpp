@@ -111,7 +111,8 @@ TEST_F(DatabaseShardingMetadataAccessorTest, UnsafeSetterBypassesAccessControl) 
     ASSERT_EQ(*cache.getDbVersion(opCtx.get()), version);
 }
 
-DEATH_TEST_F(DatabaseShardingMetadataAccessorTest,
+using DatabaseShardingMetadataAccessorTestDeathTest = DatabaseShardingMetadataAccessorTest;
+DEATH_TEST_F(DatabaseShardingMetadataAccessorTestDeathTest,
              MutatorsRequireWriteAccess,
              "Tripwire assertion") {
     auto opCtx = cc().makeOperationContext();
@@ -123,7 +124,7 @@ DEATH_TEST_F(DatabaseShardingMetadataAccessorTest,
     cache.setDbMetadata(opCtx.get(), primaryShard, version);
 }
 
-DEATH_TEST_F(DatabaseShardingMetadataAccessorTest,
+DEATH_TEST_F(DatabaseShardingMetadataAccessorTestDeathTest,
              AccessorsDisallowedDuringWrite,
              "Tripwire assertion") {
     auto opCtx = cc().makeOperationContext();
@@ -155,7 +156,7 @@ TEST_F(DatabaseShardingMetadataAccessorTest, BypassReadAccessCheck) {
     cache.getDbVersion(opCtx.get());
 }
 
-DEATH_TEST_F(DatabaseShardingMetadataAccessorTest,
+DEATH_TEST_F(DatabaseShardingMetadataAccessorTestDeathTest,
              BypassWriteAccessDeniedWithReadBypass,
              "Tripwire assertion") {
     auto opCtx = cc().makeOperationContext();
@@ -168,7 +169,7 @@ DEATH_TEST_F(DatabaseShardingMetadataAccessorTest,
     cache.setDbMetadata(opCtx.get(), primaryShard, version);
 }
 
-DEATH_TEST_F(DatabaseShardingMetadataAccessorTest,
+DEATH_TEST_F(DatabaseShardingMetadataAccessorTestDeathTest,
              BypassReadAccessDeniedWithWriteBypass,
              "Tripwire assertion") {
     auto opCtx = cc().makeOperationContext();

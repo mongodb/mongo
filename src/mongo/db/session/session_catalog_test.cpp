@@ -407,7 +407,8 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenSessionIsIdle)
     ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
 }
 
-DEATH_TEST_F(SessionCatalogTestWithDefaultOpCtx,
+using SessionCatalogTestWithDefaultOpCtxDeathTest = SessionCatalogTestWithDefaultOpCtx;
+DEATH_TEST_F(SessionCatalogTestWithDefaultOpCtxDeathTest,
              ScanSessionDoesNotSupportReaping,
              "Cannot reap a session via 'scanSession'") {
     auto lsid = makeLogicalSessionIdForTest();
@@ -733,7 +734,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenChildSessionIs
     runTest(true /* hangAfterIncrementingNumWaitingToCheckOut */);
 }
 
-DEATH_TEST_F(SessionCatalogTestWithDefaultOpCtx,
+DEATH_TEST_F(SessionCatalogTestWithDefaultOpCtxDeathTest,
              ScanSessionsDoesNotSupportReaping,
              "Cannot reap a session via 'scanSessions'") {
     {

@@ -46,12 +46,12 @@
 
 namespace mongo {
 
-DEATH_TEST(MirroringSamplerTest, ValidateNegativeGeneralRatio, "invariant") {
+DEATH_TEST(MirroringSamplerTestDeathTest, ValidateNegativeGeneralRatio, "invariant") {
     auto dummyHello = std::make_shared<mongo::repl::HelloResponse>();
     MirroringSampler::getGeneralMirroringTargets(dummyHello, -1, 0);
 }
 
-DEATH_TEST(MirroringSamplerTest, ValidateLargeGeneralRatio, "invariant") {
+DEATH_TEST(MirroringSamplerTestDeathTest, ValidateLargeGeneralRatio, "invariant") {
     auto dummyHello = std::make_shared<mongo::repl::HelloResponse>();
     MirroringSampler::getGeneralMirroringTargets(dummyHello, 1.1, 0);
 }
@@ -61,11 +61,11 @@ TEST(MirroringSamplerTest, ValidateMissingHello) {
     ASSERT_EQ(targets.size(), 0);
 }
 
-DEATH_TEST(MirroringSamplerTest, ValidateNegativeTargetedRatio, "invariant") {
+DEATH_TEST(MirroringSamplerTestDeathTest, ValidateNegativeTargetedRatio, "invariant") {
     MirroringSampler::SamplingParameters(0, -1);
 }
 
-DEATH_TEST(MirroringSamplerTest, ValidateLargeTargetedRatio, "invariant") {
+DEATH_TEST(MirroringSamplerTestDeathTest, ValidateLargeTargetedRatio, "invariant") {
     MirroringSampler::SamplingParameters(0, 1.1);
 }
 

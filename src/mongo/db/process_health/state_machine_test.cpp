@@ -238,7 +238,8 @@ TEST_F(StateMachineTestFixture, MoveWorks) {
     ASSERT_TRUE(MachineState::B == stateMachine2.state());
 }
 
-DEATH_TEST_F(StateMachineTestFixture, CrashIfHooksAreRegisteredAfterStart, "5936505") {
+using StateMachineTestFixtureDeathTest = StateMachineTestFixture;
+DEATH_TEST_F(StateMachineTestFixtureDeathTest, CrashIfHooksAreRegisteredAfterStart, "5936505") {
     auto hook = []() {
         return [](MachineState oldState, MachineState newState, const SM::OptionalMessageType& m) {
         };
@@ -247,19 +248,19 @@ DEATH_TEST_F(StateMachineTestFixture, CrashIfHooksAreRegisteredAfterStart, "5936
     subject()->on(MachineState::B)->enter(hook())->exit(hook());
 }
 
-DEATH_TEST_F(StateMachineTestFixture, CrashOnInvalidTransition, "5936506") {
+DEATH_TEST_F(StateMachineTestFixtureDeathTest, CrashOnInvalidTransition, "5936506") {
     subject()->start();
     subject()->accept(Message{MachineState::C});
 }
 
-DEATH_TEST_F(StateMachineTestFixture, CrashOnUndefinedHandler, "invariant") {
+DEATH_TEST_F(StateMachineTestFixtureDeathTest, CrashOnUndefinedHandler, "invariant") {
     auto hook = [](MachineState oldState, MachineState newState, const SM::OptionalMessageType& m) {
     };
     subject()->on(MachineState::NoHandlerDefined)->enter(hook);
     subject()->start();
 }
 
-DEATH_TEST_F(StateMachineTestFixture, CrashIfHookThrowsException, "9894901") {
+DEATH_TEST_F(StateMachineTestFixtureDeathTest, CrashIfHookThrowsException, "9894901") {
     auto hook = [](MachineState oldState, MachineState newState, const SM::OptionalMessageType& m) {
         throw std::runtime_error("exception");
     };

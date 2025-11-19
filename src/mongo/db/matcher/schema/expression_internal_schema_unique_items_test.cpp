@@ -52,7 +52,7 @@ TEST(InternalSchemaUniqueItemsMatchExpression, EquivalentFunctionTest) {
     ASSERT_FALSE(uniqueItems1.equivalent(&uniqueItems2));
 }
 
-DEATH_TEST_REGEX(InternalSchemaUniqueItemsMatchExpression,
+DEATH_TEST_REGEX(InternalSchemaUniqueItemsMatchExpressionDeathTest,
                  GetChildFailsIndexLargerThanZero,
                  "Tripwire assertion.*6400219") {
     InternalSchemaUniqueItemsMatchExpression uniqueItems("foo"_sd);

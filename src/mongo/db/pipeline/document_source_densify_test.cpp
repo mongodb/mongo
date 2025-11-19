@@ -112,7 +112,7 @@ bool isOnStepRelativeTo(DensifyValue testVal, DensifyValue base, RangeStatement 
     return false;
 }
 
-DEATH_TEST(DensifyGeneratorTest, ErrorsIfMinOverMax, "lower or equal to max") {
+DEATH_TEST(DensifyGeneratorTestDeathTest, ErrorsIfMinOverMax, "lower or equal to max") {
     Document doc{{"a", 1}};
     size_t counter = 0;
     GenClass(Value(1),
@@ -126,7 +126,7 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsIfMinOverMax, "lower or equal to max") {
              false);
 }
 
-DEATH_TEST(DensifyGeneratorTest, ErrorsIfStepIsZero, "be positive") {
+DEATH_TEST(DensifyGeneratorTestDeathTest, ErrorsIfStepIsZero, "be positive") {
     Document doc{{"a", 1}};
     size_t counter = 0;
     GenClass(Value(0),
@@ -140,7 +140,7 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsIfStepIsZero, "be positive") {
              false);
 }
 
-DEATH_TEST(DensifyGeneratorTest, ErrorsOnMixedValues, "same type") {
+DEATH_TEST(DensifyGeneratorTestDeathTest, ErrorsOnMixedValues, "same type") {
     Document doc{{"a", 1}};
     size_t counter = 0;
     GenClass(Date_t::max(),
@@ -154,7 +154,7 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsOnMixedValues, "same type") {
              false);
 }
 
-DEATH_TEST(DensifyGeneratorTest, ErrorsIfFieldExistsInDocument, "cannot include field") {
+DEATH_TEST(DensifyGeneratorTestDeathTest, ErrorsIfFieldExistsInDocument, "cannot include field") {
     Document doc{{"path", 1}};
     size_t counter = 0;
     GenClass(Value(0),
@@ -168,7 +168,7 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsIfFieldExistsInDocument, "cannot include 
              false);
 }
 
-DEATH_TEST(DensifyGeneratorTest, ErrorsIfFieldExistsButIsArray, "cannot include field") {
+DEATH_TEST(DensifyGeneratorTestDeathTest, ErrorsIfFieldExistsButIsArray, "cannot include field") {
     Document doc{{"path", 1}};
     std::vector<Document> docArray;
     docArray.push_back(doc);
@@ -399,7 +399,7 @@ TEST(DensifyGeneratorTest, GeneratesAtDottedPathCorrectly) {
     ASSERT_TRUE(generator.done());
 }
 
-DEATH_TEST(DensifyGeneratorTest, FailsIfDatesAndUnitNotProvided, "date step") {
+DEATH_TEST(DensifyGeneratorTestDeathTest, FailsIfDatesAndUnitNotProvided, "date step") {
     size_t counter = 0;
     GenClass(makeDate("2021-01-01T00:00:00.000Z"),
              RangeStatement(Value(1),
@@ -415,7 +415,7 @@ DEATH_TEST(DensifyGeneratorTest, FailsIfDatesAndUnitNotProvided, "date step") {
              false);
 }
 
-DEATH_TEST(DensifyGeneratorTest, FailsIfNumberAndUnitProvided, "non-date") {
+DEATH_TEST(DensifyGeneratorTestDeathTest, FailsIfNumberAndUnitProvided, "non-date") {
     size_t counter = 0;
     GenClass(Value(1),
              RangeStatement(Value(1), ExplicitBounds(Value(1), Value(10)), TimeUnit::second),
@@ -428,7 +428,7 @@ DEATH_TEST(DensifyGeneratorTest, FailsIfNumberAndUnitProvided, "non-date") {
              false);
 }
 
-DEATH_TEST(DensifyGeneratorTest, DateMinMustBeLessThanMax, "lower or equal to") {
+DEATH_TEST(DensifyGeneratorTestDeathTest, DateMinMustBeLessThanMax, "lower or equal to") {
     size_t counter = 0;
     GenClass(makeDate("2021-01-01T00:00:02.000Z"),
              RangeStatement(Value(1),
@@ -444,7 +444,7 @@ DEATH_TEST(DensifyGeneratorTest, DateMinMustBeLessThanMax, "lower or equal to") 
              false);
 }
 
-DEATH_TEST(DensifyGeneratorTest, DateStepMustBeInt, "whole number") {
+DEATH_TEST(DensifyGeneratorTestDeathTest, DateStepMustBeInt, "whole number") {
     size_t counter = 0;
     GenClass(makeDate("2021-01-01T00:00:00.000Z"),
              RangeStatement(Value(1.5),

@@ -77,7 +77,7 @@ TEST(InternalSchemaRootDocEqMatchExpression, EquivalentToClone) {
     ASSERT_TRUE(rootDocEq.getMatchExpression()->equivalent(clone.get()));
 }
 
-DEATH_TEST_REGEX(InternalSchemaRootDocEqMatchExpression,
+DEATH_TEST_REGEX(InternalSchemaRootDocEqMatchExpressionDeathTest,
                  GetChildFailsIndexLargerThanZero,
                  "Tripwire assertion.*6400218") {
     InternalSchemaRootDocEqMatchExpression rootDocEq(BSON("a" << 1 << "b" << BSON("c" << 1)));

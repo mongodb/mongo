@@ -133,7 +133,8 @@ TEST_F(OperationContextTest, SessionIdAndTransactionNumber) {
     ASSERT_EQUALS(5, *opCtx->getTxnNumber());
 }
 
-DEATH_TEST_F(OperationContextTest,
+using OperationContextTestDeathTest = OperationContextTest;
+DEATH_TEST_F(OperationContextTestDeathTest,
              SettingTransactionNumberWithoutSessionIdShouldCrash,
              "invariant") {
     auto client = makeClient();
@@ -142,14 +143,14 @@ DEATH_TEST_F(OperationContextTest,
     opCtx->setTxnNumber(5);
 }
 
-DEATH_TEST_F(OperationContextTest, CallingMarkKillWithExtraInfoCrashes, "invariant") {
+DEATH_TEST_F(OperationContextTestDeathTest, CallingMarkKillWithExtraInfoCrashes, "invariant") {
     auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
     opCtx->markKilled(ErrorCodes::ForTestingErrorExtraInfo);
 }
 
-DEATH_TEST_F(OperationContextTest, CallingSetDeadlineWithExtraInfoCrashes, "invariant") {
+DEATH_TEST_F(OperationContextTestDeathTest, CallingSetDeadlineWithExtraInfoCrashes, "invariant") {
     auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 

@@ -264,7 +264,10 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
     }
 }
 
-DEATH_TEST_F(StorageEngineTest, DirectWritesInsertRequiresStorageTransaction, "invariant") {
+using StorageEngineTestDeathTest = StorageEngineTest;
+DEATH_TEST_F(StorageEngineTestDeathTest,
+             DirectWritesInsertRequiresStorageTransaction,
+             "invariant") {
     auto opCtx = cc().makeOperationContext();
     auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
 
@@ -288,7 +291,9 @@ DEATH_TEST_F(StorageEngineTest, DirectWritesInsertRequiresStorageTransaction, "i
     }
 }
 
-DEATH_TEST_F(StorageEngineTest, DirectWritesDeleteRequiresStorageTransaction, "invariant") {
+DEATH_TEST_F(StorageEngineTestDeathTest,
+             DirectWritesDeleteRequiresStorageTransaction,
+             "invariant") {
     auto opCtx = cc().makeOperationContext();
     auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
 

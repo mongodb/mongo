@@ -585,7 +585,8 @@ TEST_F(ShardRoleTest, AcquireLocalCatalogOnlyWithPotentialDataLossSharded) {
     ASSERT_EQ(nssShardedCollection1, acquisition.getCollectionPtr()->ns());
 }
 
-DEATH_TEST_REGEX_F(ShardRoleTest,
+using ShardRoleTestDeathTest = ShardRoleTest;
+DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
                    AcquireLocalCatalogOnlyWithPotentialDataLossForbiddenToAccessDescription,
                    "Tripwire assertion.*10566704") {
     auto acquisition = acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
@@ -594,7 +595,7 @@ DEATH_TEST_REGEX_F(ShardRoleTest,
     (void)acquisition.getShardingDescription();
 }
 
-DEATH_TEST_REGEX_F(ShardRoleTest,
+DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
                    AcquireLocalCatalogOnlyWithPotentialDataLossForbiddenToAccessFilter,
                    "Tripwire assertion.*7740800") {
     auto acquisition = acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
@@ -880,7 +881,7 @@ TEST_F(ShardRoleTest,
     }
 }
 
-DEATH_TEST_REGEX_F(ShardRoleTest,
+DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
                    AcquireInMultiDocumentTransactionMissingPlacementConflictTime_version_unsharded,
                    "Tripwire assertion.*10206300") {
     PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
@@ -899,7 +900,7 @@ DEATH_TEST_REGEX_F(ShardRoleTest,
                       MODE_IS);
 }
 
-DEATH_TEST_REGEX_F(ShardRoleTest,
+DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
                    AcquireInMultiDocumentTransactionMissingPlacementConflictTime_version_sharded,
                    "Tripwire assertion.*10206300") {
     PlacementConcern placementConcern{dbVersionTestDb, shardVersionShardedCollection1};
@@ -1140,7 +1141,7 @@ TEST_F(ShardRoleTest, AcquireCollectionMaybeLockFreeDoesNotTakeLocksWhenNotInMul
             ->isLockHeldForMode(ResourceId{RESOURCE_COLLECTION, nssUnshardedCollection1}, MODE_IS));
 }
 
-DEATH_TEST_REGEX_F(ShardRoleTest,
+DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
                    AcquireCollectionMaybeLockFreeAllowedOnlyForRead,
                    "Tripwire assertion") {
     ASSERT_THROWS_CODE(acquireCollectionMaybeLockFree(operationContext(),
@@ -1212,7 +1213,7 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsWithIncorrectPlacementConcernThr
         });
 }
 
-DEATH_TEST_REGEX_F(ShardRoleTest,
+DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
                    ForbiddenToAcquireMultipleCollectionsOnDifferentDatabases,
                    "Tripwire assertion") {
     ASSERT_THROWS_CODE(
@@ -2805,7 +2806,7 @@ TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWRollbackAfterANotherClient
     ASSERT_TRUE(acquisition.exists());
 }
 
-DEATH_TEST_F(ShardRoleTest,
+DEATH_TEST_F(ShardRoleTestDeathTest,
              CannotAcquireWhileYielded,
              "Cannot obtain TransactionResources as they've been detached from the opCtx") {
     const NamespaceString nss =
@@ -2828,7 +2829,7 @@ DEATH_TEST_F(ShardRoleTest,
                       MODE_IX);
 }
 
-DEATH_TEST_F(ShardRoleTest,
+DEATH_TEST_F(ShardRoleTestDeathTest,
              FailedStateCannotAcceptAcquisitions,
              "Cannot make a new acquisition in the FAILED state") {
     const auto nss = nssShardedCollection1;
@@ -3424,7 +3425,8 @@ ShardRoleTestForResharding::ReshardingInfo ShardRoleTestForResharding::startResh
     return ReshardingInfo{tempNss, newShardVersion};
 }
 
-DEATH_TEST_REGEX_F(ShardRoleTestForResharding,
+using ShardRoleTestForReshardingDeathTest = ShardRoleTestForResharding;
+DEATH_TEST_REGEX_F(ShardRoleTestForReshardingDeathTest,
                    AcquireCollectionUnshardedForbiddenReshardingPlacementAccess,
                    "Tripwire assertion.*11178204") {
     auto acquisition = acquireCollection(
@@ -3436,7 +3438,7 @@ DEATH_TEST_REGEX_F(ShardRoleTestForResharding,
     (void)acquisition.getPostReshardingPlacement();
 }
 
-DEATH_TEST_REGEX_F(ShardRoleTestForResharding,
+DEATH_TEST_REGEX_F(ShardRoleTestForReshardingDeathTest,
                    AcquireCollectionForReadForbiddenReshardingPlacementAccess,
                    "Tripwire assertion.*11178205") {
     PlacementConcern placementConcern{{}, shardVersionShardedCollection1};

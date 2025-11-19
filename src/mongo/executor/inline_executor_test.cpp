@@ -250,7 +250,8 @@ public:
     }
 };
 
-DEATH_TEST_F(SleepableExecutorTest, NoExecutor, "invariant") {
+using SleepableExecutorTestDeathTest = SleepableExecutorTest;
+DEATH_TEST_F(SleepableExecutorTestDeathTest, NoExecutor, "invariant") {
     InlineExecutor ie;
     auto se = ie.getSleepableExecutor(nullptr);
 }

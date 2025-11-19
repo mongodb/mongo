@@ -72,7 +72,7 @@ TEST(ComparisonMatchExpression, ComparisonMatchExpressionsWithEqualCollatorsAreE
     ASSERT(eq1.equivalent(&eq2));
 }
 
-DEATH_TEST_REGEX(EqOp, InvalidEooOperand, "failure.*eoo") {
+DEATH_TEST_REGEX(EqOpDeathTest, InvalidEooOperand, "failure.*eoo") {
     try {
         BSONObj operand;
         EqualityMatchExpression eq(""_sd, operand.firstElement());
@@ -92,7 +92,7 @@ TEST(EqOp, Equality1) {
     ASSERT(!eq1.equivalent(&eq3));
 }
 
-DEATH_TEST_REGEX(LtOp, InvalidEooOperand, "failure.*eoo") {
+DEATH_TEST_REGEX(LtOpDeathTest, InvalidEooOperand, "failure.*eoo") {
     try {
         BSONObj operand;
         LTMatchExpression lt(""_sd, operand.firstElement());
@@ -101,7 +101,7 @@ DEATH_TEST_REGEX(LtOp, InvalidEooOperand, "failure.*eoo") {
     }
 }
 
-DEATH_TEST_REGEX(LteOp, InvalidEooOperand, "failure.*eoo") {
+DEATH_TEST_REGEX(LteOpDeathTest, InvalidEooOperand, "failure.*eoo") {
     try {
         BSONObj operand;
         LTEMatchExpression lte(""_sd, operand.firstElement());
@@ -110,7 +110,7 @@ DEATH_TEST_REGEX(LteOp, InvalidEooOperand, "failure.*eoo") {
     }
 }
 
-DEATH_TEST_REGEX(GtOp, InvalidEooOperand, "failure.*eoo") {
+DEATH_TEST_REGEX(GtOpDeathTest, InvalidEooOperand, "failure.*eoo") {
     try {
         BSONObj operand;
         GTMatchExpression gt(""_sd, operand.firstElement());
@@ -119,7 +119,7 @@ DEATH_TEST_REGEX(GtOp, InvalidEooOperand, "failure.*eoo") {
     }
 }
 
-DEATH_TEST_REGEX(GteOp, InvalidEooOperand, "failure.*eoo") {
+DEATH_TEST_REGEX(GteOpDeathTest, InvalidEooOperand, "failure.*eoo") {
     try {
         BSONObj operand;
         GTEMatchExpression gte(""_sd, operand.firstElement());
@@ -359,7 +359,7 @@ TEST(InMatchExpression, SerializeToQueryShapeSingleElementList) {
     ASSERT_BSONOBJ_EQ(serializeToQueryShape(matchExpression), fromjson("{ a: { $in: [1] } }"));
 }
 
-DEATH_TEST_REGEX(RegexMatchExpression,
+DEATH_TEST_REGEX(RegexMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400209") {
     BSONObj match = BSON("a" << "b");
@@ -370,7 +370,7 @@ DEATH_TEST_REGEX(RegexMatchExpression,
     ASSERT_THROWS_CODE(regex.getChild(0), AssertionException, 6400209);
 }
 
-DEATH_TEST_REGEX(ModMatchExpression,
+DEATH_TEST_REGEX(ModMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400209") {
     ModMatchExpression mod("a"_sd, 5, 2);
@@ -379,7 +379,7 @@ DEATH_TEST_REGEX(ModMatchExpression,
     ASSERT_THROWS_CODE(mod.getChild(0), AssertionException, 6400209);
 }
 
-DEATH_TEST_REGEX(ExistsMatchExpression,
+DEATH_TEST_REGEX(ExistsMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400209") {
     ExistsMatchExpression exists("a"_sd);
@@ -388,7 +388,7 @@ DEATH_TEST_REGEX(ExistsMatchExpression,
     ASSERT_THROWS_CODE(exists.getChild(0), AssertionException, 6400209);
 }
 
-DEATH_TEST_REGEX(InMatchExpression,
+DEATH_TEST_REGEX(InMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400209") {
     InMatchExpression in("a"_sd);
@@ -397,7 +397,7 @@ DEATH_TEST_REGEX(InMatchExpression,
     ASSERT_THROWS_CODE(in.getChild(0), AssertionException, 6400209);
 }
 
-DEATH_TEST_REGEX(BitTestMatchExpression,
+DEATH_TEST_REGEX(BitTestMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400209") {
     long long bitMask = 54;
@@ -408,7 +408,7 @@ DEATH_TEST_REGEX(BitTestMatchExpression,
     ASSERT_THROWS_CODE(balls.getChild(0), AssertionException, 6400209);
 }
 
-DEATH_TEST_REGEX(ComparisonMatchExpression,
+DEATH_TEST_REGEX(ComparisonMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400209") {
     BSONObj operand = BSON("a" << "string");

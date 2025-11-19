@@ -154,7 +154,7 @@ TEST(Commands, appendCommandStatusErrorExtraInfo) {
     ASSERT_BSONOBJ_EQ(actualResult.obj(), expectedResult.obj());
 }
 
-DEATH_TEST(Commands, appendCommandStatusInvalidOkValue, "invariant") {
+DEATH_TEST(CommandsDeathTest, appendCommandStatusInvalidOkValue, "invariant") {
     BSONObjBuilder actualResult;
     actualResult.append("a", "b");
     actualResult.append("c", "d");
@@ -165,7 +165,7 @@ DEATH_TEST(Commands, appendCommandStatusInvalidOkValue, "invariant") {
     CommandHelpers::appendCommandStatusNoThrow(actualResult, status);
 }
 
-DEATH_TEST(Commands, appendCommandStatusNoCodeName, "invariant") {
+DEATH_TEST(CommandsDeathTest, appendCommandStatusNoCodeName, "invariant") {
     BSONObjBuilder actualResult;
     actualResult.append("a", "b");
     actualResult.append("code", ErrorCodes::InvalidLength);

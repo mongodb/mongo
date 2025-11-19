@@ -183,7 +183,8 @@ TEST_F(TransactionCoordinatorCatalogTest,
                        ErrorCodes::NoSuchTransaction);
 }
 
-DEATH_TEST_F(TransactionCoordinatorCatalogTest,
+using TransactionCoordinatorCatalogTestDeathTest = TransactionCoordinatorCatalogTest;
+DEATH_TEST_F(TransactionCoordinatorCatalogTestDeathTest,
              CreatingACoordinatorWithASessionIdTxnNumberAndRetryCounterThatAlreadyExistFails,
              "Invariant failure") {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();

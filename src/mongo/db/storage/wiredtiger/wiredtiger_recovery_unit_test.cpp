@@ -483,7 +483,8 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, SnapshotIsolation) {
 }
 
 
-DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
+using WiredTigerRecoveryUnitTestFixtureDeathTest = WiredTigerRecoveryUnitTestFixture;
+DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
                    PrepareTimestampOlderThanStableTimestamp,
                    "prepare timestamp .* is not newer than the stable timestamp") {
     ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
@@ -493,7 +494,7 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
     ru1->prepareUnitOfWork();
 }
 
-DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
+DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
                    CommitTimestampOlderThanPrepareTimestamp,
                    "commit timestamp .* is less than the prepare timestamp") {
     ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
@@ -1127,7 +1128,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CacheSizeEstimatesTransactionBytes) {
     ASSERT_EQ(ru1->getCacheDirtyBytes(), 0);
 }
 
-DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
+DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
                    MultiTimestampConstraints,
                    "Fatal assertion.*4877100") {
     Timestamp ts1(1, 1);
@@ -1165,7 +1166,7 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
     writeTest();
 }
 
-DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,
+DEATH_TEST_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
              SetDurableTimestampTwice,
              "Trying to reset durable timestamp when it was already set.") {
     Timestamp ts1(3, 3);
@@ -1174,7 +1175,7 @@ DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,
     ru1->setDurableTimestamp(ts2);
 }
 
-DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,
+DEATH_TEST_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
              RollbackHandlerAbortsOnTxnOpen,
              "rollback handler reopened transaction") {
     ASSERT(ru1->getSession());
@@ -1185,7 +1186,7 @@ DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,
     }
 }
 
-DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,
+DEATH_TEST_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
              MayNotChangeReadSourceWhilePinned,
              "Cannot change ReadSource as it is pinned.") {
 

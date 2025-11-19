@@ -445,7 +445,8 @@ TEST_F(WatchdogMonitorTest, SleepyHungCheck) {
 }
 
 // Positive: Make sure watchdog monitor terminates the process if a check is unresponsive
-DEATH_TEST_F(WatchdogMonitorTest, Death, "") {
+using WatchdogMonitorTestDeathTest = WatchdogMonitorTest;
+DEATH_TEST_F(WatchdogMonitorTestDeathTest, Death, "") {
     auto sleepyCheck = std::make_unique<SleepyCheck>();
 
     std::vector<std::unique_ptr<WatchdogCheck>> checks;

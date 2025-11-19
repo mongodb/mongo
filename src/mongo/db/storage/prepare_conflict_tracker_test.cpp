@@ -109,24 +109,25 @@ TEST_F(PrepareConflictTrackerTest, ManyPrepareConflictsWithUpdates) {
 }
 
 // Enforce the begin -> update(s) -> end ordering of the tracker.
-DEATH_TEST_F(PrepareConflictTrackerTest, RejectBeginBeforeEnd, "invariant") {
+using PrepareConflictTrackerTestDeathTest = PrepareConflictTrackerTest;
+DEATH_TEST_F(PrepareConflictTrackerTestDeathTest, RejectBeginBeforeEnd, "invariant") {
     _pct->beginPrepareConflict(*_tickSource);
     _pct->beginPrepareConflict(*_tickSource);
 }
 
-DEATH_TEST_F(PrepareConflictTrackerTest, RejectBeginBeforeEndWithUpdate, "invariant") {
+DEATH_TEST_F(PrepareConflictTrackerTestDeathTest, RejectBeginBeforeEndWithUpdate, "invariant") {
     _pct->beginPrepareConflict(*_tickSource);
     _pct->updatePrepareConflict(*_tickSource);
     _pct->beginPrepareConflict(*_tickSource);
 }
 
-DEATH_TEST_F(PrepareConflictTrackerTest, RejectUpdateBeforeBeginSteadyState, "invariant") {
+DEATH_TEST_F(PrepareConflictTrackerTestDeathTest, RejectUpdateBeforeBeginSteadyState, "invariant") {
     _pct->beginPrepareConflict(*_tickSource);
     _pct->endPrepareConflict(*_tickSource);
     _pct->updatePrepareConflict(*_tickSource);
 }
 
-DEATH_TEST_F(PrepareConflictTrackerTest, RejectEndBeforeBegin, "invariant") {
+DEATH_TEST_F(PrepareConflictTrackerTestDeathTest, RejectEndBeforeBegin, "invariant") {
     _pct->beginPrepareConflict(*_tickSource);
     _pct->endPrepareConflict(*_tickSource);
     _pct->endPrepareConflict(*_tickSource);

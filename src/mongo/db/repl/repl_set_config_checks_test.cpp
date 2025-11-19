@@ -199,7 +199,8 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_SelfMustBeElectable) {
             .getStatus());
 }
 
-DEATH_TEST_REGEX_F(ServiceContextTest,
+using ServiceContextTestDeathTest = ServiceContextTest;
+DEATH_TEST_REGEX_F(ServiceContextTestDeathTest,
                    ValidateConfigForInitiate_NonDefaultGetLastErrorDefaults,
                    "Fatal assertion.*5624101") {
     ReplSetConfig config;
@@ -871,7 +872,7 @@ TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigValid) {
                   .getStatus());
 }
 
-DEATH_TEST_REGEX_F(ServiceContextTest,
+DEATH_TEST_REGEX_F(ServiceContextTestDeathTest,
                    ValidateConfigForStartUp_NewConfigNonDefaultGetLastErrorDefaults,
                    "Fatal assertion.*5624100") {
     // The new config contains an unsatisfiable write concern.  We don't allow these configs to be
@@ -932,7 +933,7 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigValid) {
             .getStatus());
 }
 
-DEATH_TEST_REGEX_F(ServiceContextTest,
+DEATH_TEST_REGEX_F(ServiceContextTestDeathTest,
                    ValidateConfigForHeartbeatReconfig_NonDefaultGetLastErrorDefaults,
                    "Tripwire assertion.*5624103") {
     // The new config contains an unsatisfiable write concern.  We don't allow these configs to be

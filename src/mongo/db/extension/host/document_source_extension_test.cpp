@@ -525,7 +525,8 @@ TEST_F(DocumentSourceExtensionTest, ExpandToMaxDepthSucceeds) {
     ASSERT_EQ(leaf->getParseTimeName(), std::string(kDepthLeafName));
 }
 
-DEATH_TEST_F(DocumentSourceExtensionTest, ExpandExceedsMaxDepthFails, "10955800") {
+using DocumentSourceExtensionTestDeathTest = DocumentSourceExtensionTest;
+DEATH_TEST_F(DocumentSourceExtensionTestDeathTest, ExpandExceedsMaxDepthFails, "10955800") {
     auto depth = host::DocumentSourceExtension::LiteParsedExpandable::kMaxExpansionDepth + 1;
     auto* rootParseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<DepthChainParseNode>(depth));
@@ -1079,7 +1080,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandableToMultipleMixedChildrenUnionsRequi
     ASSERT_TRUE(lp.requiresAuthzChecks());
 }
 
-DEATH_TEST_F(DocumentSourceExtensionTest,
+DEATH_TEST_F(DocumentSourceExtensionTestDeathTest,
              EmptyActionsArrayRequiredPrivilegesAggStageAstNodeFails,
              "11350600") {
     auto astNode = new sdk::ExtensionAggStageAstNode(

@@ -560,7 +560,7 @@ TEST(ArrayAPI, SimpleNumericArray) {
     ASSERT_FALSE(e1[1].ok());
 }
 
-DEATH_TEST_REGEX(ArrayAPI,
+DEATH_TEST_REGEX(ArrayAPIDeathTest,
                  FindFirstChildNamedOnDeserializedArray,
                  R"#(Invariant failure.*getType\(\) != BSONType::array)#") {
     mmb::Document doc;
@@ -570,7 +570,7 @@ DEATH_TEST_REGEX(ArrayAPI,
     array.findFirstChildNamed("0");
 }
 
-DEATH_TEST_REGEX(ArrayAPI,
+DEATH_TEST_REGEX(ArrayAPIDeathTest,
                  FindFirstChildNamedOnSerializedArray,
                  R"#(Invariant failure.*getType\(\) != BSONType::array)#") {
     auto obj = fromjson("{a: [0, 1]}");

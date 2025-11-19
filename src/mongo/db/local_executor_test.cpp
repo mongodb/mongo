@@ -57,7 +57,10 @@ TEST_F(ProcessInterfaceStandaloneTest, StandaloneExecutorCanExecuteTasks) {
     ASSERT_TRUE(ran);
 }
 
-DEATH_TEST_F(ProcessInterfaceStandaloneTest, StandaloneExecutorThrowsOnRemoteExecution, "") {
+using ProcessInterfaceStandaloneTestDeathTest = ProcessInterfaceStandaloneTest;
+DEATH_TEST_F(ProcessInterfaceStandaloneTestDeathTest,
+             StandaloneExecutorThrowsOnRemoteExecution,
+             "") {
     auto cr = executor::RemoteCommandRequest(
         HostAndPort("localhost"), DatabaseName::kAdmin, BSON("isMaster" << 1), BSONObj(), nullptr);
 

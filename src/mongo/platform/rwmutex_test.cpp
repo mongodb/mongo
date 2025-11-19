@@ -297,7 +297,7 @@ TEST(RWMutex, NewReaderWaitsForWriter) {
     reader.join();
 }
 
-DEATH_TEST(RWMutex, TooManyReaders, "invariant") {
+DEATH_TEST(RWMutexDeathTest, TooManyReaders, "invariant") {
     RWMutex mutex;
     addReaders_forTest(mutex, RWMutex::kReadersOverflowMask - 1);
     // The following must hit an invariant since it exceeds the maximum number of readers locks.

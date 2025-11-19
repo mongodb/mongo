@@ -45,7 +45,8 @@ namespace {
 
 class IngressAdmissionControllerTest : public ServiceContextTest {};
 
-DEATH_TEST_F(IngressAdmissionControllerTest,
+using IngressAdmissionControllerTestDeathTest = IngressAdmissionControllerTest;
+DEATH_TEST_F(IngressAdmissionControllerTestDeathTest,
              SameOpCannotAcquireMultipleTickets,
              "Tripwire assertion") {
     auto opCtx = makeOperationContext();

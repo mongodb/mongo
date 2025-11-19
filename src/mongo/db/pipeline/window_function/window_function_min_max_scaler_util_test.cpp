@@ -226,7 +226,8 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultWindowIntermediateWithDo
 
 // Tests that if the current value is less than the windowMin,
 // min_max_scaler::computeResult() tasserts.
-DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTest,
+using WindowFunctionMinMaxScalerUtilTestDeathTest = WindowFunctionMinMaxScalerUtilTest;
+DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTestDeathTest,
              ComputeResultCurrentValueLTWindowMinThrowsTest,
              "") {
     // currentValue < windowMin < windowMax
@@ -242,7 +243,7 @@ DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTest,
 
 // Tests that if the current value is greater than the windowMax,
 // min_max_scaler::computeResult() tasserts.
-DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTest,
+DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTestDeathTest,
              ComputeResultCurrentValueGTWindowMaxThrowsTest,
              "") {
     // windowMin < windowMax < currentValue
@@ -366,7 +367,9 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, MinAndMaxEqualTest) {
 }
 
 // Test that trying to construct a MinAndMax with a min greater than max throws.
-DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTest, MinAndMaxConstructMinGTMaxThrowsTest, "") {
+DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTestDeathTest,
+             MinAndMaxConstructMinGTMaxThrowsTest,
+             "") {
     // max < min
     int max = getRandomBetweenBounds(1, 1000);
     int min = max + getRandomBetweenBounds(1, 1000);
@@ -376,7 +379,9 @@ DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTest, MinAndMaxConstructMinGTMaxThrow
 }
 
 // Test that trying to fetch the min value from an empty MinAndMax throws.
-DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTest, MinAndMaxEmptyConstructionFetchMinThrowsTest, "") {
+DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTestDeathTest,
+             MinAndMaxEmptyConstructionFetchMinThrowsTest,
+             "") {
     const auto minAndMax = min_max_scaler::MinAndMax();
 
     // Hits tassert 9522901.
@@ -384,7 +389,9 @@ DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTest, MinAndMaxEmptyConstructionFetch
 }
 
 // Test that trying to fetch the max value from an empty MinAndMax throws.
-DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTest, MinAndMaxEmptyConstructionFetchMaxThrowsTest, "") {
+DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTestDeathTest,
+             MinAndMaxEmptyConstructionFetchMaxThrowsTest,
+             "") {
     const auto minAndMax = min_max_scaler::MinAndMax();
 
     // Hits tassert 9522902.
@@ -393,7 +400,9 @@ DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTest, MinAndMaxEmptyConstructionFetch
 
 // Test that trying to fetch the min value from MinAndMax constructed with inital values.
 // throws after reset.
-DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTest, MinAndMaxFetchMinAfterResetThrowsTest, "") {
+DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTestDeathTest,
+             MinAndMaxFetchMinAfterResetThrowsTest,
+             "") {
     int min = getRandomBetweenBounds(1, 1000);
     int max = min + getRandomBetweenBounds(0, 1000);
 
@@ -406,7 +415,9 @@ DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTest, MinAndMaxFetchMinAfterResetThro
 
 // Test that trying to fetch the max value from MinAndMax constructed with inital values.
 // throws after reset.
-DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTest, MinAndMaxFetchMaxAfterResetThrowsTest, "") {
+DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTestDeathTest,
+             MinAndMaxFetchMaxAfterResetThrowsTest,
+             "") {
     int min = getRandomBetweenBounds(1, 1000);
     int max = min + getRandomBetweenBounds(0, 1000);
 

@@ -95,7 +95,8 @@ TEST_F(OpIdPoolTest, LeasePoolLoopsBackAround) {
     ASSERT_EQ(manager.issueForClient(tempClient.get()), 0);
 }
 
-DEATH_TEST_F(OpIdPoolTest, ExhaustAvailableLeases, "invariant") {
+using OpIdPoolTestDeathTest = OpIdPoolTest;
+DEATH_TEST_F(OpIdPoolTestDeathTest, ExhaustAvailableLeases, "invariant") {
     OperationIdManager& manager = OperationIdManager::get(getServiceContext());
 
     // Set a very large lease size so that we quickly run out of leases.

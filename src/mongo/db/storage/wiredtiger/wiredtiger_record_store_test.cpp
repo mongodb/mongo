@@ -498,7 +498,7 @@ TEST(WiredTigerRecordStoreTest, RangeTruncateTest) {
 TEST(WiredTigerRecordStoreTest, RangeTruncateSameValueTest) {
     testTruncateRange(100, 3, 3);
 }
-DEATH_TEST(WiredTigerRecordStoreTest,
+DEATH_TEST(WiredTigerRecordStoreTestDeathTest,
            RangeTruncateIncorrectOrderTest,
            "Start position cannot be after end position") {
     testTruncateRange(100, 4, 3);

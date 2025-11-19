@@ -236,18 +236,19 @@ TEST_F(OperationCPUTimerTest, TestOpCtxDecorationDestruction) {
     resetOpCtx();
 }
 
-DEATH_TEST_F(OperationCPUTimerTest, StopTimerBeforeStart, "Timer is not running") {
+using OperationCPUTimerTestDeathTest = OperationCPUTimerTest;
+DEATH_TEST_F(OperationCPUTimerTestDeathTest, StopTimerBeforeStart, "Timer is not running") {
     auto timer = makeTimer();
     timer->stop();
 }
 
-DEATH_TEST_F(OperationCPUTimerTest, StartTimerMultipleTimes, "Timer has already started") {
+DEATH_TEST_F(OperationCPUTimerTestDeathTest, StartTimerMultipleTimes, "Timer has already started") {
     auto timer = makeTimer();
     timer->start();
     timer->start();
 }
 
-DEATH_TEST_F(OperationCPUTimerTest,
+DEATH_TEST_F(OperationCPUTimerTestDeathTest,
              OnAttachForAttachedTimer,
              "PosixOperationCPUTimers has already been attached") {
     auto timer = makeTimer();
@@ -255,7 +256,7 @@ DEATH_TEST_F(OperationCPUTimerTest,
     getTimers()->onThreadAttach();
 }
 
-DEATH_TEST_F(OperationCPUTimerTest,
+DEATH_TEST_F(OperationCPUTimerTestDeathTest,
              OnDetachForDetachedTimer,
              "PosixOperationCPUTimers is not attached to current thread") {
     auto timer = makeTimer();
@@ -264,7 +265,7 @@ DEATH_TEST_F(OperationCPUTimerTest,
     getTimers()->onThreadDetach();
 }
 
-DEATH_TEST_F(OperationCPUTimerTest,
+DEATH_TEST_F(OperationCPUTimerTestDeathTest,
              GetElapsedForPausedTimer,
              "PosixOperationCPUTimers is not attached to current thread") {
     auto timer = makeTimer();

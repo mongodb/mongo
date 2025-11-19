@@ -146,14 +146,14 @@ TEST(ExecutorTest, InlineRecursiveCountingExecutor) {
     ASSERT_EQ(execB->tasksRun.load(), kCountB);
 }
 
-DEATH_TEST(ExecutorTest,
+DEATH_TEST(ExecutorTestDeathTest,
            GuaranteedExecutor_MainInvalid_FallbackInvalid,
            GuaranteedExecutor::kNoExecutorStr) {
     // If no executor was provided, then we invariant.
     const auto gwarExec = makeGuaranteedExecutor({});
 }
 
-DEATH_TEST(ExecutorTest,
+DEATH_TEST(ExecutorTestDeathTest,
            GuaranteedExecutor_MainInvalid_FallbackRejects,
            GuaranteedExecutor::kRejectedWorkStr) {
     // If we have a fallback and it rejects work, then we invariant.
@@ -174,7 +174,7 @@ TEST(ExecutorTest, GuaranteedExecutor_MainInvalid_FallbackAccepts) {
     ASSERT_EQ(countExec->tasksRun.load(), kCount);
 }
 
-DEATH_TEST(ExecutorTest,
+DEATH_TEST(ExecutorTestDeathTest,
            GuaranteedExecutor_MainRejects_FallbackInvalid,
            GuaranteedExecutor::kRejectedWorkStr) {
     // If we only have a main executor and it rejects work, then we invariant.
@@ -182,7 +182,7 @@ DEATH_TEST(ExecutorTest,
     gwarExec->schedule([](Status) { FAIL("Nothing should run the actual callback"); });
 }
 
-DEATH_TEST(ExecutorTest,
+DEATH_TEST(ExecutorTestDeathTest,
            GuaranteedExecutor_MainRejects_FallbackRejects,
            GuaranteedExecutor::kRejectedWorkStr) {
     // If we have a main and a fallback and both reject work, then we invariant.

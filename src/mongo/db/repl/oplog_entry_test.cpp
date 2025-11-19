@@ -1078,13 +1078,14 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
 // The caller is expected to only call parse on command entries with a command type of
 // startIndexBuild, commitIndexBuild, or abortIndexBuild.
-DEATH_TEST_F(OplogEntryTest, ParseNonCommandOperation, "kCommand") {
+using OplogEntryTestDeathTest = OplogEntryTest;
+DEATH_TEST_F(OplogEntryTestDeathTest, ParseNonCommandOperation, "kCommand") {
     // Deliberately create a NON-command op in the command namespace.
     auto entry = makeInsertDocumentOplogEntry(entryOpTime, nss.getCommandNS(), BSONObj{});
     IndexBuildOplogEntry::parse(_opCtx.get(), entry).getValue();
 }
 
-DEATH_TEST_F(OplogEntryTest, ParseWrongCommandOperation, "CommandType") {
+DEATH_TEST_F(OplogEntryTestDeathTest, ParseWrongCommandOperation, "CommandType") {
     // A valid command type, but not one supported by this function
     auto entry = makeCommandOplogEntry(
         entryOpTime, nss, BSON("applyOps" << "test.coll"), boost::none, UUID::gen());

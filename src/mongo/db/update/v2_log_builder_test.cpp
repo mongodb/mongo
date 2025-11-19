@@ -319,7 +319,7 @@ TEST(V2LogBuilder, ImplicityArrayElementCreationAllowed) {
         lb.serialize());
 }
 
-DEATH_TEST(V2LogBuilder, ImplicityArrayCreationDisallowed, "invariant") {
+DEATH_TEST(V2LogBuilderDeathTest, ImplicityArrayCreationDisallowed, "invariant") {
     mmb::Document doc;
     V2LogBuilder lb;
 

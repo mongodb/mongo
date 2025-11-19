@@ -5207,7 +5207,9 @@ TEST_F(ServiceContextTest, MinCoverInteraceTest_Precision_Equal) {
                                   {"00011111"});
 }
 
-DEATH_TEST_REGEX(MinCoverInterfaceTest, Error_MinMaxTypeMismatch, "Tripwire assertion.*6901300") {
+DEATH_TEST_REGEX(MinCoverInterfaceTestDeathTest,
+                 Error_MinMaxTypeMismatch,
+                 "Tripwire assertion.*6901300") {
     std::vector<BSONElement> elems;
     auto vals = BSON_ARRAY(10 << 11 << 4 << 11.5);
     vals.elems(elems);

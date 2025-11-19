@@ -306,12 +306,12 @@ TEST(Status, ExceptionToStatus) {
     ASSERT_TRUE(fromUnknownExceptionType.reason().find("unknown type") != std::string::npos);
 }
 
-DEATH_TEST_REGEX(ErrorExtraInfo, InvariantAllRegistered, "Invariant failure.*parsers::") {
+DEATH_TEST_REGEX(ErrorExtraInfoDeathTest, InvariantAllRegistered, "Invariant failure.*parsers::") {
     ErrorExtraInfo::invariantHaveAllParsers();
 }
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
-DEATH_TEST_REGEX(ErrorExtraInfo, DassertShouldHaveExtraInfo, "Fatal assertion.*40680") {
+DEATH_TEST_REGEX(ErrorExtraInfoDeathTest, DassertShouldHaveExtraInfo, "Fatal assertion.*40680") {
     (void)Status(ErrorCodes::ForTestingErrorExtraInfo, "");
 }
 #else

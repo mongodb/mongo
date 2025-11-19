@@ -118,7 +118,8 @@ protected:
 // General planning tests.
 //
 
-DEATH_TEST_F(QueryPlannerWildcardTest,
+using QueryPlannerWildcardTestDeathTest = QueryPlannerWildcardTest;
+DEATH_TEST_F(QueryPlannerWildcardTestDeathTest,
              CannotExpandPreExpandedWildcardIndexEntry,
              "Tripwire assertion") {
     addWildcardIndex(BSON("$**" << 1));

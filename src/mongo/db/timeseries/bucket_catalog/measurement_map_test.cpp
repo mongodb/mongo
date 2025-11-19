@@ -263,7 +263,8 @@ TEST_F(MeasurementMapTest, InitBuilders) {
     invariant(measurementMap.numFields() == 3);
 }
 
-DEATH_TEST_REGEX_F(MeasurementMapTest, GetTimeForNonexistentField, "Invariant failure.*") {
+using MeasurementMapTestDeathTest = MeasurementMapTest;
+DEATH_TEST_REGEX_F(MeasurementMapTestDeathTest, GetTimeForNonexistentField, "Invariant failure.*") {
     measurementMap.timeOfLastMeasurement(_timeField);
 }
 

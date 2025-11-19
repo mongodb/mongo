@@ -55,7 +55,7 @@ TEST(FieldPathTest, Simple) {
 }
 
 /** Accessing hashed field names from a FieldPath without precomputed hashes */
-DEATH_TEST_REGEX(FieldPathTest, AccessInvalidHashes, "Tripwire assertion.*11212700") {
+DEATH_TEST_REGEX(FieldPathTestDeathTest, AccessInvalidHashes, "Tripwire assertion.*11212700") {
     FieldPath path("foo.bar.baz", false /* precomputeHashes */);
     ASSERT_EQUALS(3U, path.getPathLength());
     ASSERT_EQUALS("foo", path.getFieldName(0));
@@ -282,7 +282,7 @@ TEST(FieldPathTest, ConcatFailsIfExceedsMaxDepth) {
     ASSERT_THROWS_CODE(firstHalf.concat(secondHalf), AssertionException, ErrorCodes::Overflow);
 }
 
-DEATH_TEST_REGEX(FieldPathTest,
+DEATH_TEST_REGEX(FieldPathTestDeathTest,
                  AccessHashesOfConcatenatedPathsThatAreNotComputed,
                  "Tripwire assertion.*11212700") {
     FieldPath head("some.long.path", false /* precomputeHashes */);
@@ -313,7 +313,7 @@ TEST(FieldPathTest, AccessHashesOfConcatenatedPathsThatAreFullyComputed) {
     ASSERT_EQ(FieldNameHasher()(path.getFieldName(4)), path.getFieldNameHashed(4).hash());
 }
 
-DEATH_TEST_REGEX(FieldPathTest,
+DEATH_TEST_REGEX(FieldPathTestDeathTest,
                  AccessHashesOfConcatenatedPathsOnlyHeadHasComputedHashes,
                  "Tripwire assertion.*11212700") {
     FieldPath head("some.long.path", true /* precomputeHashes */);
@@ -347,7 +347,7 @@ TEST(FieldPathTest, AccessHashesOfConcatenatedPathsOnlyTailHasComputedHashes) {
     ASSERT_EQ(FieldNameHasher()(path.getFieldName(4)), path.getFieldNameHashed(4).hash());
 }
 
-DEATH_TEST_REGEX(FieldPathTest,
+DEATH_TEST_REGEX(FieldPathTestDeathTest,
                  AccessHashesOfMultiConcatenatedFieldPaths,
                  "Tripwire assertion.*11212700") {
     FieldPath one("some.long.path", true /* precomputeHashes */);
@@ -397,7 +397,9 @@ TEST(FieldPathTest, SubstractPrefix) {
     ASSERT_EQ(fp.subtractPrefix(0).fullPath(), std::string("first.second.third"));
 }
 
-DEATH_TEST_REGEX(FieldPathTest, SubstractPrefix_TooLargeCut, "Tripwire assertion.*10985000") {
+DEATH_TEST_REGEX(FieldPathTestDeathTest,
+                 SubstractPrefix_TooLargeCut,
+                 "Tripwire assertion.*10985000") {
     FieldPath("first.second.third").subtractPrefix(3);
 }
 }  // namespace

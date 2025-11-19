@@ -412,7 +412,8 @@ TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateSortKeyFromWSMInIndexKeyStateW
     ASSERT_VALUE_EQ(Value("1gnirts"_sd), sortKey);
 }
 
-DEATH_TEST_REGEX_F(SortKeyGeneratorWorkingSetTest,
+using SortKeyGeneratorWorkingSetTestDeathTest = SortKeyGeneratorWorkingSetTest;
+DEATH_TEST_REGEX_F(SortKeyGeneratorWorkingSetTestDeathTest,
                    DeathOnAttemptToGetSortKeyFromIndexKeyWithMetadata,
                    "Invariant failure.*!_sortHasMeta") {
     BSONObj pattern = fromjson("{z: {$meta: 'textScore'}}");

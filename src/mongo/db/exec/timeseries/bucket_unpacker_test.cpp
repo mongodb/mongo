@@ -1019,7 +1019,10 @@ TEST_F(BucketUnpackerTest, SimpleGetNextBsonOnUncompressedBucket) {
     ASSERT_FALSE(unpacker.hasNext());
 }
 
-DEATH_TEST_REGEX_F(BucketUnpackerTest, GetNextBsonWhenExhausted, "Tripwire assertion.*7026801") {
+using BucketUnpackerTestDeathTest = BucketUnpackerTest;
+DEATH_TEST_REGEX_F(BucketUnpackerTestDeathTest,
+                   GetNextBsonWhenExhausted,
+                   "Tripwire assertion.*7026801") {
     std::set<std::string> fields{
         "_id", std::string{kUserDefinedMetaName}, std::string{kUserDefinedTimeName}, "a", "b"};
 
@@ -1045,7 +1048,7 @@ DEATH_TEST_REGEX_F(BucketUnpackerTest, GetNextBsonWhenExhausted, "Tripwire asser
 }
 
 
-DEATH_TEST_REGEX_F(BucketUnpackerTest,
+DEATH_TEST_REGEX_F(BucketUnpackerTestDeathTest,
                    GetNextBsonWhenMinTimeAsMetadataSet,
                    "Tripwire assertion.*7026802") {
     std::set<std::string> fields{
@@ -1070,7 +1073,7 @@ DEATH_TEST_REGEX_F(BucketUnpackerTest,
     unpacker.getNextBson();
 }
 
-DEATH_TEST_REGEX_F(BucketUnpackerTest,
+DEATH_TEST_REGEX_F(BucketUnpackerTestDeathTest,
                    GetNextBsonWhenMaxTimeAsMetadataSet,
                    "Tripwire assertion.*7026802") {
     std::set<std::string> fields{

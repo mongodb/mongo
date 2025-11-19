@@ -88,7 +88,7 @@ TEST(EncryptSchemaTypesParserTest, KeyIDPointerToBSON) {
     ASSERT_EQ(parsedPointer.jsonPointer().toString(), "/pointer");
 }
 
-DEATH_TEST(EncryptSchemaTypesParserTest, AccessPointerAsUuids, "tassert") {
+DEATH_TEST(EncryptSchemaTypesParserTestDeathTest, AccessPointerAsUuids, "tassert") {
     auto pointerBson = BSON("pointer" << "/pointer");
     EncryptSchemaKeyId parsedPointer =
         parsers::matcher::schema::parseEncryptSchemaKeyId(pointerBson["pointer"]);
@@ -117,7 +117,7 @@ TEST(EncryptSchemaTypesParserTest, KeyIDArrayToBSON) {
     ASSERT_EQ(parsedUUIDs[1], uuidList[1]);
 }
 
-DEATH_TEST(EncryptSchemaTypesParserTest, AccessUuidsAsPointer, "tassert") {
+DEATH_TEST(EncryptSchemaTypesParserTestDeathTest, AccessUuidsAsPointer, "tassert") {
     auto uuidsBson = BSON("array" << BSON_ARRAY(UUID::gen() << UUID::gen()));
     EncryptSchemaKeyId parsedArray =
         parsers::matcher::schema::parseEncryptSchemaKeyId(uuidsBson["array"]);

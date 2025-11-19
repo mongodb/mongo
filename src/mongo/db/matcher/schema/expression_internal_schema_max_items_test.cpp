@@ -44,7 +44,7 @@ namespace mongo {
 
 namespace {
 
-DEATH_TEST_REGEX(InternalSchemaMaxItemsMatchExpression,
+DEATH_TEST_REGEX(InternalSchemaMaxItemsMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400215") {
     InternalSchemaMaxItemsMatchExpression maxItems("a"_sd, 2);

@@ -181,7 +181,8 @@ TEST_F(ReshardingCoordinatorDaoFixture, TransitionToPreparingToDonatePhaseSuccee
                                               << "")});
 }
 
-DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
+using ReshardingCoordinatorDaoFixtureDeathTest = ReshardingCoordinatorDaoFixture;
+DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
              TransitionToPreparingToDonateFailsFromInvalidPreviousPhase,
              "invariant") {
     DonorShardContext donorContext;
@@ -228,7 +229,7 @@ TEST_F(ReshardingCoordinatorDaoFixture, TransitionToCloningPhaseSucceeds) {
                             << "metrics.documentCopy.start" << cloneStartTime)});
 }
 
-DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
+DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
              TransitionToCloningPhasePreviousStateInvariant,
              "invariant") {
     ReshardingApproxCopySize approxCopySize;
@@ -255,7 +256,7 @@ TEST_F(ReshardingCoordinatorDaoFixture, TransitionToApplyingPhaseSucceeds) {
                             << "metrics.oplogApplication.start" << applyStartTime)});
 }
 
-DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
+DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
              TransitionToApplyingFailsFromInvalidPreviousPhase,
              "invariant") {
     auto applyStartTime = _clock->now();
@@ -279,7 +280,7 @@ TEST_F(ReshardingCoordinatorDaoFixture, TransitionToBlockingWritesPhaseSucceeds)
                             << "metrics.oplogApplication.stop" << now)});
 }
 
-DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
+DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
              TransitionToBlockingWritesPhasePreviousStateInvariant,
              "invariant") {
     auto now = _clock->now();
@@ -344,7 +345,9 @@ TEST_F(ReshardingCoordinatorDaoFixture, TransitionToAbortPhaseEndsApplyingMetric
                             << "metrics.oplogApplication.stop" << now)});
 }
 
-DEATH_TEST_F(ReshardingCoordinatorDaoFixture, TransitionToAbortCannotHaveOkReason, "invariant") {
+DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
+             TransitionToAbortCannotHaveOkReason,
+             "invariant") {
     auto now = _clock->now();
     Status abortReason = Status::OK();
 
@@ -354,7 +357,7 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixture, TransitionToAbortCannotHaveOkReaso
         }});
 }
 
-DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
+DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
              TransitionToAbortPhasePreviousStateInvariant,
              "invariant") {
     auto now = _clock->now();

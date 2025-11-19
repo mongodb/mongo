@@ -174,7 +174,8 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
 }
 
 // null_initialize_function_bad_extension has a null initialization function.
-DEATH_TEST_F(LoadExtensionsTest, LoadExtensionNullInitialize, "10930101") {
+using LoadExtensionsTestDeathTest = LoadExtensionsTest;
+DEATH_TEST_F(LoadExtensionsTestDeathTest, LoadExtensionNullInitialize, "10930101") {
     ExtensionLoader::load(
         "null_initialize_function_bad_extension",
         test_util::makeEmptyExtensionConfig("libnull_initialize_function_bad_extension.so"));
@@ -327,7 +328,7 @@ TEST_F(LoadExtensionsTest, LoadExtensionInitializeVersionFails) {
                        10726600);
 }
 
-DEATH_TEST_F(LoadExtensionsTest, LoadExtensionNullStageDescriptor, "10596400") {
+DEATH_TEST_F(LoadExtensionsTestDeathTest, LoadExtensionNullStageDescriptor, "10596400") {
     ExtensionLoader::load(
         "null_stage_descriptor_bad_extension",
         test_util::makeEmptyExtensionConfig("libnull_stage_descriptor_bad_extension.so"));
@@ -490,7 +491,8 @@ TEST_F(ExtensionErrorsTest, ExtensionUasserts) {
     ASSERT_THROWS_WHAT(Pipeline::parse(pipeline, expCtx), AssertionException, "a new error");
 }
 
-DEATH_TEST_REGEX_F(ExtensionErrorsTest, ExtensionTasserts, "98765.*another new error") {
+using ExtensionErrorsTestDeathTest = ExtensionErrorsTest;
+DEATH_TEST_REGEX_F(ExtensionErrorsTestDeathTest, ExtensionTasserts, "98765.*another new error") {
     std::vector<BSONObj> pipeline = {
         BSON("$assert" << BSON("errmsg" << "another new error" << "code" << 98765 << "assertionType"
                                         << "tassert"))};

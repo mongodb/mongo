@@ -111,7 +111,8 @@ TEST(HostAstNodeTest, IsNotHostAllocated) {
     ASSERT_FALSE(host::HostAggStageAstNode::isHostAllocated(*handle.get()));
 }
 
-DEATH_TEST_F(HostAstNodeVTableTest, InvalidAstNodeVTableFailsGetName, "11217601") {
+using HostAstNodeVTableTestDeathTest = HostAstNodeVTableTest;
+DEATH_TEST_F(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsGetName, "11217601") {
     auto noOpAstNode = std::make_unique<host::HostAggStageAstNode>(NoOpHostAstNode::make({}));
     auto handle = TestHostAstNodeVTableHandle{noOpAstNode.release()};
 
@@ -120,7 +121,7 @@ DEATH_TEST_F(HostAstNodeVTableTest, InvalidAstNodeVTableFailsGetName, "11217601"
     handle.assertVTableConstraints(vtable);
 }
 
-DEATH_TEST_F(HostAstNodeVTableTest, InvalidAstNodeVTableFailsGetProperties, "11347800") {
+DEATH_TEST_F(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsGetProperties, "11347800") {
     auto noOpAstNode = std::make_unique<host::HostAggStageAstNode>(NoOpHostAstNode::make({}));
     auto handle = TestHostAstNodeVTableHandle{noOpAstNode.release()};
 
@@ -129,7 +130,7 @@ DEATH_TEST_F(HostAstNodeVTableTest, InvalidAstNodeVTableFailsGetProperties, "113
     handle.assertVTableConstraints(vtable);
 }
 
-DEATH_TEST_F(HostAstNodeVTableTest, InvalidAstNodeVTableFailsBind, "11113700") {
+DEATH_TEST_F(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsBind, "11113700") {
     auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
 
     auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
@@ -142,7 +143,7 @@ DEATH_TEST_F(HostAstNodeVTableTest, InvalidAstNodeVTableFailsBind, "11113700") {
     handle.assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(HostAstNodeTest, HostGetPropertiesUnimplemented, "11347801") {
+DEATH_TEST(HostAstNodeTestDeathTest, HostGetPropertiesUnimplemented, "11347801") {
     auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make({}));
     auto handle = AggStageAstNodeHandle{noOpAstNode};
 
@@ -150,7 +151,7 @@ DEATH_TEST(HostAstNodeTest, HostGetPropertiesUnimplemented, "11347801") {
     handle.vtable().get_properties(noOpAstNode, buf);
 }
 
-DEATH_TEST(HostAstNodeTest, HostBindUnimplemented, "11133600") {
+DEATH_TEST(HostAstNodeTestDeathTest, HostBindUnimplemented, "11133600") {
     auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make({}));
     auto handle = AggStageAstNodeHandle{noOpAstNode};
 

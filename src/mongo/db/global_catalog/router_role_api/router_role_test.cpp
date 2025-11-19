@@ -623,7 +623,8 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextRetryOnStaleConfigWitho
     ASSERT_EQ(tries, 2);
 }
 
-DEATH_TEST_F(RouterRoleTest,
+using RouterRoleTestDeathTest = RouterRoleTest;
+DEATH_TEST_F(RouterRoleTestDeathTest,
              CollectionRouterWithRoutingContextRetryOnStaleConfigWithoutValidation,
              "RoutingContext ended without validating routing tables for nss test.foo") {
     sharding::router::CollectionRouter router(getServiceContext(), _nss);
@@ -881,7 +882,8 @@ TEST_F(RouterRoleTestTxn, RoutingContextCreationAndDestruction) {
         });
 }
 
-DEATH_TEST_F(RouterRoleTestTxn,
+using RouterRoleTestTxnDeathTest = RouterRoleTestTxn;
+DEATH_TEST_F(RouterRoleTestTxnDeathTest,
              InvalidRoutingContextDestruction,
              "RoutingContext ended without validating routing tables for nss") {
     const auto opCtx = operationContext();
@@ -892,7 +894,7 @@ DEATH_TEST_F(RouterRoleTestTxn,
                        10446900);
 }
 
-DEATH_TEST_F(RouterRoleTestTxn,
+DEATH_TEST_F(RouterRoleTestTxnDeathTest,
              CannotDeclareDuplicateNssOnRoutingContext,
              "declared multiple times in RoutingContext") {
     const auto opCtx = operationContext();

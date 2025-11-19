@@ -148,27 +148,29 @@ TEST(CountNDV, DifferentNumericTypesAreNotDistinguished) {
                         fromjson("{a: NumberDecimal('1.00000')}")}));
 }
 
-DEATH_TEST(CountNDV, ThrowsOnEmptyArray, "unexpected array in NDV computation") {
+DEATH_TEST(CountNDVDeathTest, ThrowsOnEmptyArray, "unexpected array in NDV computation") {
     countNDV({"a"}, {fromjson("{a: []}")});
 }
 
-DEATH_TEST(CountNDV, ThrowsOnNonEmptyArray, "unexpected array in NDV computation") {
+DEATH_TEST(CountNDVDeathTest, ThrowsOnNonEmptyArray, "unexpected array in NDV computation") {
     countNDV({"a"}, {fromjson("{a: [1, 2, 3]}")});
 }
 
-DEATH_TEST(CountNDV, ThrowsOnNestedEmptyArray, "unexpected array in NDV computation") {
+DEATH_TEST(CountNDVDeathTest, ThrowsOnNestedEmptyArray, "unexpected array in NDV computation") {
     countNDV({"a.b"}, {fromjson("{a: {b: []}}")});
 }
 
-DEATH_TEST(CountNDV, ThrowsOnNestedArray, "unexpected array in NDV computation") {
+DEATH_TEST(CountNDVDeathTest, ThrowsOnNestedArray, "unexpected array in NDV computation") {
     countNDV({"a.b"}, {fromjson("{a: {b: [1, 2, 3]}}")});
 }
 
-DEATH_TEST(CountNDV, ThrowsOnEmptyArrayInTraversal, "unexpected array in NDV computation") {
+DEATH_TEST(CountNDVDeathTest,
+           ThrowsOnEmptyArrayInTraversal,
+           "unexpected array in NDV computation") {
     countNDV({"a.b"}, {fromjson("{a: []}")});
 }
 
-DEATH_TEST(CountNDV, ThrowsOnArrayInTraversal, "unexpected array in NDV computation") {
+DEATH_TEST(CountNDVDeathTest, ThrowsOnArrayInTraversal, "unexpected array in NDV computation") {
     countNDV({"a.b"}, {fromjson("{a: [{b: 1}]}")});
 }
 

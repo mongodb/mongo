@@ -448,7 +448,8 @@ TEST_F(FTDCControllerTest, TestStartStop) {
     releaseCheckpointAndStopController();
 }
 
-DEATH_TEST_REGEX_F(FTDCControllerTest,
+using FTDCControllerTestDeathTest = FTDCControllerTest;
+DEATH_TEST_REGEX_F(FTDCControllerTestDeathTest,
                    LogAndTerminateWhenCollectionFails,
                    "Fatal assertion.*9399800") {
     FTDCConfig config;
@@ -464,7 +465,7 @@ DEATH_TEST_REGEX_F(FTDCControllerTest,
     doCollection();
 }
 
-DEATH_TEST_REGEX_F(FTDCControllerTest,
+DEATH_TEST_REGEX_F(FTDCControllerTestDeathTest,
                    LogAndTerminateWhenExceptionThrown,
                    "9761500.*MockFailCollector.*size") {
     FTDCConfig config;
@@ -480,7 +481,7 @@ DEATH_TEST_REGEX_F(FTDCControllerTest,
     doCollection();
 }
 
-DEATH_TEST_REGEX_F(FTDCControllerTest,
+DEATH_TEST_REGEX_F(FTDCControllerTestDeathTest,
                    LogAndTerminateWhenLargeDataCollectionFails,
                    "10630200.*FTDC Entry.*name.*size") {
     FTDCConfig config;

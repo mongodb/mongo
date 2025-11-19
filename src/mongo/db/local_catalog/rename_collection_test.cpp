@@ -822,7 +822,8 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsRejectsRenameOpTimeIfWri
         renameCollectionForApplyOps(_opCtx.get(), boost::none, boost::none, cmd, renameOpTime));
 }
 
-DEATH_TEST_F(RenameCollectionTest,
+using RenameCollectionTestDeathTest = RenameCollectionTest;
+DEATH_TEST_F(RenameCollectionTestDeathTest,
              RenameCollectionForApplyOpsTriggersFatalAssertionIfLogOpReturnsValidOpTime,
              "unexpected renameCollection oplog entry written to the oplog") {
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());

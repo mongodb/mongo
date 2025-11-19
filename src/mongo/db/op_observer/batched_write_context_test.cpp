@@ -66,7 +66,8 @@ TEST_F(BatchedWriteContextTest, TestBatchingCondition) {
     ASSERT(!bwc.writesAreBatched());
 }
 
-DEATH_TEST_REGEX_F(BatchedWriteContextTest,
+using BatchedWriteContextTestDeathTest = BatchedWriteContextTest;
+DEATH_TEST_REGEX_F(BatchedWriteContextTestDeathTest,
                    TestDoesNotSupportAddingBatchedOperationWhileWritesAreNotBatched,
                    "Invariant failure.*_batchWrites") {
     auto opCtxRaii = makeOperationContext();
@@ -82,7 +83,7 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTest,
     bwc.addBatchedOperation(opCtx, op);
 }
 
-DEATH_TEST_REGEX_F(BatchedWriteContextTest,
+DEATH_TEST_REGEX_F(BatchedWriteContextTestDeathTest,
                    TestDoesNotSupportAddingBatchedOperationOutsideOfWUOW,
                    "Invariant failure.*inAWriteUnitOfWork()") {
     auto opCtxRaii = makeOperationContext();
@@ -98,7 +99,7 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTest,
     bwc.addBatchedOperation(opCtx, op);
 }
 
-DEATH_TEST_REGEX_F(BatchedWriteContextTest,
+DEATH_TEST_REGEX_F(BatchedWriteContextTestDeathTest,
                    TestCannotGroupDDLOperation,
                    "Invariant failure.*getOpType.*repl::OpTypeEnum::kDelete.*kInsert.*kUpdate") {
     auto opCtxRaii = makeOperationContext();
@@ -121,7 +122,7 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTest,
     bwc.addBatchedOperation(opCtx, op);
 }
 
-DEATH_TEST_REGEX_F(BatchedWriteContextTest,
+DEATH_TEST_REGEX_F(BatchedWriteContextTestDeathTest,
                    TestDoesNotSupportPreImagesInCollection,
                    "Invariant "
                    "failure.*getChangeStreamPreImageRecordingMode.*repl::ReplOperation::"
@@ -142,7 +143,7 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTest,
     bwc.addBatchedOperation(opCtx, op);
 }
 
-DEATH_TEST_REGEX_F(BatchedWriteContextTest,
+DEATH_TEST_REGEX_F(BatchedWriteContextTestDeathTest,
                    TestDoesNotSupportMultiDocTxn,
                    "Invariant failure.*!opCtx->inMultiDocumentTransaction()") {
     auto opCtxRaii = makeOperationContext();

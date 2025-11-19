@@ -395,7 +395,8 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnDat
     assertCriticalSectionLeftOnDisk(dbName, dbOpReason);
 }
 
-DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
+using ShardingRecoveryServiceTestOnPrimaryDeathTest = ShardingRecoveryServiceTestOnPrimary;
+DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
              FailBlockingWritesTwiceOnDatabaseWithDifferentReasons,
              "Location7032368") {
     ///////////////////////////////////////////
@@ -417,7 +418,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
-DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
+DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
              FailBlockingReadsOnDatabaseWithDifferentReasons,
              "Location7032362") {
     ///////////////////////////////////////////
@@ -443,7 +444,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
-DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
+DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
              FailUnblockingOperationsOnDatabaseWithDifferentReasons,
              "Location7032366") {
     ///////////////////////////////////////////
@@ -611,7 +612,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnCol
     assertCriticalSectionLeftOnDisk(collNss, collOpReason);
 }
 
-DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
+DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
              FailBlockingWritesTwiceOnCollectionWithDifferentReasons,
              "Location7032368") {
     ///////////////////////////////////////////
@@ -633,7 +634,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
-DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
+DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
              FailBlockingReadsOnCollectionWithDifferentReasons,
              "Location7032362") {
     ///////////////////////////////////////////
@@ -659,7 +660,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
-DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
+DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
              FailUnblockingOperationsOnCollectionWithDifferentReasons,
              "Location7032366") {
     ///////////////////////////////////////////

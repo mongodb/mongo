@@ -852,7 +852,8 @@ TEST_F(RollbackImplTest, RollbackReconcilesHistoryPins) {
     ASSERT(pin->reconciled);
 }
 
-DEATH_TEST_REGEX_F(RollbackImplTest,
+using RollbackImplTestDeathTest = RollbackImplTest;
+DEATH_TEST_REGEX_F(RollbackImplTestDeathTest,
                    RollbackFassertsIfRecoverToStableTimestampFails,
                    "Fatal assertion.*4584700") {
     auto op = makeOpAndRecordId(1);
@@ -959,7 +960,7 @@ TEST_F(RollbackImplTest,
     ASSERT(_reconstructedPreparedTransactions);
 }
 
-DEATH_TEST_F(RollbackImplTest,
+DEATH_TEST_F(RollbackImplTestDeathTest,
              RollbackUassertsAreFatalBetweenAbortingAndReconstructingPreparedTransactions,
              "UnknownError: error for test") {
     auto op = makeOpAndRecordId(1);
@@ -1064,7 +1065,7 @@ TEST_F(RollbackImplTest, RollbackSucceedsAndTruncatesOplog) {
     ASSERT_EQUALS(_truncatePoint, Timestamp(1, 1));
 }
 
-DEATH_TEST_REGEX_F(RollbackImplTest,
+DEATH_TEST_REGEX_F(RollbackImplTestDeathTest,
                    RollbackTriggersFatalAssertionOnFailingToTransitionFromRollbackToSecondary,
                    "Failed to perform replica set state transition") {
     _coordinator->failSettingFollowerMode(MemberState::RS_SECONDARY, ErrorCodes::IllegalOperation);
@@ -1357,7 +1358,7 @@ TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenCreateCollAndInsertsAreRo
                                SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
-DEATH_TEST_F(RollbackImplTest,
+DEATH_TEST_F(RollbackImplTestDeathTest,
              InvariantFailureIfNamespaceIsMissingWhenWritingRollbackFiles,
              "unexpectedly missing in the CollectionCatalog") {
     const auto commonOp = makeOpAndRecordId(1);
@@ -1385,7 +1386,7 @@ DEATH_TEST_F(RollbackImplTest,
     LOGV2(21652, "mongod did not crash when expected; status: {status}", "status"_attr = status);
 }
 
-DEATH_TEST_F(RollbackImplTest,
+DEATH_TEST_F(RollbackImplTestDeathTest,
              InvariantFailureIfNamespaceIsMissingWhenGettingCollectionSizes,
              "unexpectedly missing in the CollectionCatalog") {
     const auto commonOp = makeOpAndRecordId(1);
@@ -2380,7 +2381,8 @@ TEST_F(RollbackImplObserverInfoTest,
     ASSERT(expectedUUIDs == uuids);
 }
 
-DEATH_TEST_F(RollbackImplObserverInfoTest,
+using RollbackImplObserverInfoTestDeathTest = RollbackImplObserverInfoTest;
+DEATH_TEST_F(RollbackImplObserverInfoTestDeathTest,
              NamespacesForOpsInvariantsOnApplyOpsOplogEntry,
              "_namespacesAndUUIDsForOp does not handle 'applyOps' oplog entries.") {
     // Add one sub-op.

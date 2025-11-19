@@ -195,7 +195,8 @@ TEST_F(ServiceContextOpContextTest, MakeOperationContextCreatesOperationId) {
     ASSERT_TRUE(clientLock);
 }
 
-DEATH_TEST_F(ServiceContextOpContextTest,
+using ServiceContextOpContextTestDeathTest = ServiceContextOpContextTest;
+DEATH_TEST_F(ServiceContextOpContextTestDeathTest,
              MakeOperationContextFailsWhenAlreadyExists,
              "Tripwire assertion") {
     auto client = makeClient();
@@ -257,7 +258,9 @@ TEST_F(ServiceContextOpContextTest, DelistOperationWithOperationKey) {
     ASSERT_EQ(OperationKeyManager::get(client.get()).at(opKey), boost::none);
 }
 
-DEATH_TEST_F(ServiceContextOpContextTest, DelistOperationWrongServiceContext, "Invariant failure") {
+DEATH_TEST_F(ServiceContextOpContextTestDeathTest,
+             DelistOperationWrongServiceContext,
+             "Invariant failure") {
     auto otherServiceContext = ServiceContext::make();
     auto otherClient = otherServiceContext->getService()->makeClient("other client");
     auto opCtx = otherClient->makeOperationContext();
@@ -353,7 +356,7 @@ TEST_F(ServiceContextOpContextTest, SetKillAllOperationsExcludedClients) {
     ASSERT_EQ(countingKillOpListener.interruptAllCount, 1);
 }
 
-DEATH_TEST_F(ServiceContextOpContextTest,
+DEATH_TEST_F(ServiceContextOpContextTestDeathTest,
              DeleteServiceContextInvariantsWithActiveClients,
              "Invariant failure") {
     auto client = makeClient();

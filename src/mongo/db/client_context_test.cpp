@@ -91,7 +91,8 @@ TEST_F(ClientTest, SetAndReleaseCurrent) {
     ASSERT_EQ(clientUniq.get(), clientPtr);
 }
 
-DEATH_TEST_REGEX_F(ClientTest, OverwriteThreadsClient, "Invariant failure.*Client1") {
+using ClientTestDeathTest = ClientTest;
+DEATH_TEST_REGEX_F(ClientTestDeathTest, OverwriteThreadsClient, "Invariant failure.*Client1") {
     auto client1 = makeClient("Client1");
     auto client2 = makeClient("Client2");
 

@@ -482,7 +482,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, SuccessfullyInitializeMonitorWithStar
     awaitCompletion.get();
 }
 
-DEATH_TEST_REGEX_F(ReshardingChangeStreamsMonitorTest,
+using ReshardingChangeStreamsMonitorTestDeathTest = ReshardingChangeStreamsMonitorTest;
+DEATH_TEST_REGEX_F(ReshardingChangeStreamsMonitorTestDeathTest,
                    FailIfAwaitFinalEventBeforeStartMonitoring,
                    "Tripwire assertion.*1009073") {
     createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
@@ -494,7 +495,7 @@ DEATH_TEST_REGEX_F(ReshardingChangeStreamsMonitorTest,
     monitor->awaitFinalChangeEvent().get();
 }
 
-DEATH_TEST_REGEX_F(ReshardingChangeStreamsMonitorTest,
+DEATH_TEST_REGEX_F(ReshardingChangeStreamsMonitorTestDeathTest,
                    FailIfAwaitCleanupBeforeStartMonitoring,
                    "Tripwire assertion.*1006686") {
     createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);

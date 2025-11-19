@@ -262,7 +262,9 @@ TEST_F(MigrationBlockingOperationCoordinatorTest, EndSameOperationMultipleTimes)
     assertOperationCountOnDisk(1);
 }
 
-DEATH_TEST_F(MigrationBlockingOperationCoordinatorTest,
+using MigrationBlockingOperationCoordinatorTestDeathTest =
+    MigrationBlockingOperationCoordinatorTest;
+DEATH_TEST_F(MigrationBlockingOperationCoordinatorTestDeathTest,
              InvalidInitialStateDocument,
              "Operations should not be ongoing while migrations are running") {
     auto stateDocument = createStateDocument();
@@ -277,7 +279,7 @@ DEATH_TEST_F(MigrationBlockingOperationCoordinatorTest,
     Instance::getOrCreate(_opCtx, _service, stateDocument.toBSON());
 }
 
-DEATH_TEST_F(MigrationBlockingOperationCoordinatorTest,
+DEATH_TEST_F(MigrationBlockingOperationCoordinatorTestDeathTest,
              DuplicateOperationsOnDisk,
              "Duplicate operations found on disk with same UUID") {
     auto stateDocument = createStateDocument();

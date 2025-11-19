@@ -509,7 +509,8 @@ private:
 // be called, sending SIGSEGV. If the signal handler incorrectly invokes the logging subsystem, the
 // ConsumeSegfaultsBackend::consume function will be again invoked, failing the test since this
 // could result in deadlock.
-DEATH_TEST_F(LogV2Test, SIGSEGVDoesNotHang, "Got signal: ") {
+using LogV2TestDeathTest = LogV2Test;
+DEATH_TEST_F(LogV2TestDeathTest, SIGSEGVDoesNotHang, "Got signal: ") {
     auto sink = ConsumeSegfaultsBackend::create();
     attachSink(sink);
     LOGV2(6384304, "will SIGSEGV {str}", "str"_attr = "sigsegv");

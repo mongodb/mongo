@@ -99,14 +99,14 @@ TEST(ReadWriteConcernProvenanceTest, SetSourceFromSomethingToSame) {
     ASSERT_TRUE(ReadWriteConcernProvenance::Source::clientSupplied == provenance.getSource());
 }
 
-DEATH_TEST(ReadWriteConcernProvenanceTest,
+DEATH_TEST(ReadWriteConcernProvenanceTestDeathTest,
            SetSourceFromSomethingToUnset,
            "attempting to re-set provenance") {
     ReadWriteConcernProvenance provenance(ReadWriteConcernProvenance::Source::clientSupplied);
     provenance.setSource(boost::none);
 }
 
-DEATH_TEST(ReadWriteConcernProvenanceTest,
+DEATH_TEST(ReadWriteConcernProvenanceTestDeathTest,
            SetSourceFromSomethingToSomethingElse,
            "attempting to re-set provenance") {
     ReadWriteConcernProvenance provenance(ReadWriteConcernProvenance::Source::clientSupplied);

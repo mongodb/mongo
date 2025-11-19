@@ -277,7 +277,7 @@ TEST(RuleBasedRewriterTest, RunRulesThatHaveSpecificTags) {
     ASSERT_EQ(strings[0], "hello!!!");
 }
 
-DEATH_TEST(RuleBasedRewriterTest, EnqueueRuleFromRuleThenRequeue, "11010015") {
+DEATH_TEST(RuleBasedRewriterTestDeathTest, EnqueueRuleFromRuleThenRequeue, "11010015") {
     std::vector<std::string> strings = {{"1", "2", "3"}};
 
     RewriteEngine<TestRewriteContext> engine{{

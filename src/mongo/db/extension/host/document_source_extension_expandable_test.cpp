@@ -178,7 +178,10 @@ TEST_F(DocumentSourceExtensionExpandableTest, FullParseExpandRecursesMultipleLev
               std::string(sdk::shared_test_stages::kLeafDName));
 }
 
-DEATH_TEST_F(DocumentSourceExtensionExpandableTest, SerializeWithWrongOptsFails, "10978000") {
+using DocumentSourceExtensionExpandableTestDeathTest = DocumentSourceExtensionExpandableTest;
+DEATH_TEST_F(DocumentSourceExtensionExpandableTestDeathTest,
+             SerializeWithWrongOptsFails,
+             "10978000") {
     auto rawStage =
         BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true));
 

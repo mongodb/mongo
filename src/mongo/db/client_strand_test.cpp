@@ -364,7 +364,10 @@ TEST_F(ClientStrandTest, Executor) {
     ASSERT_EQ(i, kCount);
 }
 
-DEATH_TEST_F(ClientStrandTest, ReplaceCurrentAfterBind, ClientStrand::kUnableToRecoverClient) {
+using ClientStrandTestDeathTest = ClientStrandTest;
+DEATH_TEST_F(ClientStrandTestDeathTest,
+             ReplaceCurrentAfterBind,
+             ClientStrand::kUnableToRecoverClient) {
     auto strand = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
 
     assertStrandNotBound(strand);
@@ -382,7 +385,7 @@ DEATH_TEST_F(ClientStrandTest, ReplaceCurrentAfterBind, ClientStrand::kUnableToR
     guard.dismiss();
 }
 
-DEATH_TEST_F(ClientStrandTest, ReleaseCurrentAfterBind, "No client to release") {
+DEATH_TEST_F(ClientStrandTestDeathTest, ReleaseCurrentAfterBind, "No client to release") {
     auto strand = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
 
     assertStrandNotBound(strand);
@@ -396,7 +399,7 @@ DEATH_TEST_F(ClientStrandTest, ReleaseCurrentAfterBind, "No client to release") 
     guard.dismiss();
 }
 
-DEATH_TEST_F(ClientStrandTest, BindAfterBind, "Already have client on this thread") {
+DEATH_TEST_F(ClientStrandTestDeathTest, BindAfterBind, "Already have client on this thread") {
     auto strand1 = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
     auto strand2 = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName2));
 

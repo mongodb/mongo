@@ -57,7 +57,7 @@ std::unique_ptr<MatchExpression> restoreMatchExpression(
 }
 }  // namespace
 
-DEATH_TEST_REGEX(RestoreSingleMatchExpressionTests,
+DEATH_TEST_REGEX(RestoreSingleMatchExpressionTestsDeathTest,
                  AssertOnRestoringNegativeNodes,
                  "Tripwire assertion.*8163020") {
     auto operand = BSON("$gt" << 5);

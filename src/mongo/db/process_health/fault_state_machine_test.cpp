@@ -226,7 +226,10 @@ TEST_F(FaultManagerTest, OneFacetIsResolved) {
     ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
 }
 
-DEATH_TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeoutFromTransientFault, "Fatal") {
+using FaultManagerTestDeathTest = FaultManagerTest;
+DEATH_TEST_F(FaultManagerTestDeathTest,
+             TransitionsToActiveFaultAfterTimeoutFromTransientFault,
+             "Fatal") {
     auto faultFacetType = FaultFacetType::kMock1;
 
     registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
@@ -262,7 +265,9 @@ TEST_F(FaultManagerTest,
     ASSERT_EQ(manager().getFaultState(), FaultState::kTransientFault);
 }
 
-DEATH_TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeoutFromStartupCheck, "Fatal") {
+DEATH_TEST_F(FaultManagerTestDeathTest,
+             TransitionsToActiveFaultAfterTimeoutFromStartupCheck,
+             "Fatal") {
     auto faultFacetType = FaultFacetType::kMock1;
 
     registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });

@@ -92,7 +92,8 @@ TEST_F(VersionedValueTest, SnapshotRemainsValidAfterUpdate) {
     ASSERT_EQ(valuePtr.use_count(), 1);
 }
 
-DEATH_TEST_F(VersionedValueTest, CannotDereferenceUninitializedValue, "invariant") {
+using VersionedValueTestDeathTest = VersionedValueTest;
+DEATH_TEST_F(VersionedValueTestDeathTest, CannotDereferenceUninitializedValue, "invariant") {
     VersionedValue<bool> value;
     *value.makeSnapshot();
 }

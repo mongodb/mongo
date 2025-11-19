@@ -160,11 +160,12 @@ TEST_F(ResourceCatalogTest, CollisionTest) {
     ASSERT_EQ(boost::none, resource);
 }
 
-DEATH_TEST_F(ResourceCatalogTest, AddDatabaseInvalidResourceType, "invariant") {
+using ResourceCatalogTestDeathTest = ResourceCatalogTest;
+DEATH_TEST_F(ResourceCatalogTestDeathTest, AddDatabaseInvalidResourceType, "invariant") {
     catalog.add({RESOURCE_GLOBAL, 0}, DatabaseName::createDatabaseName_forTest(boost::none, "db"));
 }
 
-DEATH_TEST_F(ResourceCatalogTest, AddCollectionInvalidResourceType, "invariant") {
+DEATH_TEST_F(ResourceCatalogTestDeathTest, AddCollectionInvalidResourceType, "invariant") {
     catalog.add({RESOURCE_GLOBAL, 0}, NamespaceString::createNamespaceString_forTest("db.coll"));
 }
 

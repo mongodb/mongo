@@ -598,7 +598,8 @@ class WhenAllSucceedTest : public FutureUtilTest {};
 
 static const Status kErrorStatus = {ErrorCodes::InternalError, ""};
 
-DEATH_TEST_F(WhenAllSucceedTest,
+using WhenAllSucceedTestDeathTest = WhenAllSucceedTest;
+DEATH_TEST_F(WhenAllSucceedTestDeathTest,
              WhenAllSucceedFailsWithInputVectorOfSizeZero,
              future_util_details::kWhenAllSucceedEmptyInputInvariantMsg) {
     std::vector<Future<int>> inputFutures;
@@ -799,7 +800,8 @@ TEST_F(WhenAllSucceedTest, VariadicWhenAllSucceedMaintainsOrderingOfInputFutures
 // Test whenAllSucceed with void input futures.
 using WhenAllSucceedVoidTest = WhenAllSucceedTest;
 
-DEATH_TEST_F(WhenAllSucceedVoidTest,
+using WhenAllSucceedVoidTestDeathTest = WhenAllSucceedVoidTest;
+DEATH_TEST_F(WhenAllSucceedVoidTestDeathTest,
              WhenAllSucceedFailsWithInputVectorOfSizeZero,
              future_util_details::kWhenAllSucceedEmptyInputInvariantMsg) {
     std::vector<Future<void>> inputFutures;

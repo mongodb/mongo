@@ -747,7 +747,8 @@ TEST_F(KVEngineTestHarness, BasicTimestampMultiple) {
  * | Read A (NOT_FOUND)   |
  * | Write A 1 (NOT_FOUND)|
  */
-DEATH_TEST_REGEX_F(KVEngineTestHarness, SnapshotHidesVisibility, ".*item not found.*") {
+using KVEngineTestHarnessDeathTest = KVEngineTestHarness;
+DEATH_TEST_REGEX_F(KVEngineTestHarnessDeathTest, SnapshotHidesVisibility, ".*item not found.*") {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
     std::unique_ptr<RecordStore> rs = newRecordStore(engine);
@@ -917,7 +918,7 @@ TEST_F(KVEngineTestHarness, PinningOldestTimestampWithReadConflict) {
  * | Write A 1                   |                            |
  * | Commit :commit 2 (WCE)      |                            |
  */
-DEATH_TEST_REGEX_F(KVEngineTestHarness,
+DEATH_TEST_REGEX_F(KVEngineTestHarnessDeathTest,
                    PinningOldestTimestampWithWriteConflict,
                    "Fatal assertion.*39001") {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
@@ -1038,7 +1039,7 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
  * | Write A 1                       |                            |
  * | Timestamp :commit 1  (ROLLBACK) |                            |
  */
-DEATH_TEST_REGEX_F(KVEngineTestHarness, CommitBehindStable, "Fatal assertion.*39001") {
+DEATH_TEST_REGEX_F(KVEngineTestHarnessDeathTest, CommitBehindStable, "Fatal assertion.*39001") {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
 

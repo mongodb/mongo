@@ -100,7 +100,8 @@ protected:
     const UUID collUuid = UUID::gen();
 };
 
-DEATH_TEST_F(QueryAnalysisSamplerRateLimiterTest, CannotUseNegativeRate, "invariant") {
+using QueryAnalysisSamplerRateLimiterTestDeathTest = QueryAnalysisSamplerRateLimiterTest;
+DEATH_TEST_F(QueryAnalysisSamplerRateLimiterTestDeathTest, CannotUseNegativeRate, "invariant") {
     QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, -0.5);
 }
 
@@ -547,7 +548,8 @@ TEST_F(QueryAnalysisSamplerTest, CanGetOnConfigServer) {
     QueryAnalysisSampler::get(operationContext());
 }
 
-DEATH_TEST_F(QueryAnalysisSamplerTest, CannotGetOnStandaloneMongod, "invariant") {
+using QueryAnalysisSamplerTestDeathTest = QueryAnalysisSamplerTest;
+DEATH_TEST_F(QueryAnalysisSamplerTestDeathTest, CannotGetOnStandaloneMongod, "invariant") {
     setUpRole({ClusterRole::None}, false /* isReplEnabled */);
     QueryAnalysisSampler::get(operationContext());
 }

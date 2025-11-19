@@ -231,7 +231,8 @@ TEST_F(BucketStateRegistryTest, TransitionsFromUntrackedState) {
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 }
 
-DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnUntrackedBucket, "invariant") {
+using BucketStateRegistryTestDeathTest = BucketStateRegistryTest;
+DEATH_TEST_F(BucketStateRegistryTestDeathTest, CannotPrepareAnUntrackedBucket, "invariant") {
     // Start with an untracked bucket in the registry.
     auto& bucket = createBucket(info1, date);
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
@@ -242,7 +243,7 @@ DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnUntrackedBucket, "invariant
                 StateChangeSuccessful::kNo);
 }
 
-DEATH_TEST_F(BucketStateRegistryTest, CannotInitializeAnUnclearedBucket, "invariant") {
+DEATH_TEST_F(BucketStateRegistryTestDeathTest, CannotInitializeAnUnclearedBucket, "invariant") {
     // Start with a 'kNormal' bucket in the registry.
     auto& bucket = createBucket(info1, date);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
@@ -403,7 +404,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedState) {
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
 }
 
-DEATH_TEST_F(BucketStateRegistryTest, CannotInitializeAPreparedBucket, "invariant") {
+DEATH_TEST_F(BucketStateRegistryTestDeathTest, CannotInitializeAPreparedBucket, "invariant") {
     // Start with a 'kPrepared' bucket in the registry.
     auto& bucket = createBucket(info1, date);
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
@@ -414,7 +415,7 @@ DEATH_TEST_F(BucketStateRegistryTest, CannotInitializeAPreparedBucket, "invarian
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
 }
 
-DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnAlreadyPreparedBucket, "invariant") {
+DEATH_TEST_F(BucketStateRegistryTestDeathTest, CannotPrepareAnAlreadyPreparedBucket, "invariant") {
     // Start with a 'kPrepared' bucket in the registry.
     auto& bucket = createBucket(info1, date);
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));

@@ -4741,7 +4741,8 @@ TEST_F(ReevalSyncSourceTest, RemovedNodeSpecifiesSyncSourceStartupParameter) {
 
 // Test that we crash if the 'unsupportedSyncSource' parameter specifies a node that is not in the
 // replica set config.
-DEATH_TEST_F(ReevalSyncSourceTest, CrashOnSyncSourceParameterNotInReplSet, "7785600") {
+using ReevalSyncSourceTestDeathTest = ReevalSyncSourceTest;
+DEATH_TEST_F(ReevalSyncSourceTestDeathTest, CrashOnSyncSourceParameterNotInReplSet, "7785600") {
     RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
                                                               "host4:27017"};
     auto syncSource =
@@ -4749,7 +4750,7 @@ DEATH_TEST_F(ReevalSyncSourceTest, CrashOnSyncSourceParameterNotInReplSet, "7785
 }
 
 // Test that we crash if the 'unsupportedSyncSource' parameter specifies ourself as a node.
-DEATH_TEST_F(ReevalSyncSourceTest, CrashOnSyncSourceParameterIsSelf, "7785601") {
+DEATH_TEST_F(ReevalSyncSourceTestDeathTest, CrashOnSyncSourceParameterIsSelf, "7785601") {
     RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
                                                               "host1:27017"};
     auto syncSource =

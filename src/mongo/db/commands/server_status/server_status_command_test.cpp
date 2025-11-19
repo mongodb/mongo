@@ -93,7 +93,7 @@ TEST(ServerStatusSectionRegistryTest, CanRegisterSectionsWithSameNameUnderDiffer
     trySections({ClusterRole::ShardServer, ClusterRole::RouterServer});
 }
 
-DEATH_TEST(ServerStatusSectionRegistryTest,
+DEATH_TEST(ServerStatusSectionRegistryTestDeathTest,
            CannotRegisterSectionWithSameNameAndSameRole,
            "Duplicate ServerStatusSection") {
     trySections({ClusterRole::ShardServer, ClusterRole::ShardServer});
@@ -101,13 +101,13 @@ DEATH_TEST(ServerStatusSectionRegistryTest,
 
 const ClusterRole bothRoles{ClusterRole::ShardServer, ClusterRole::RouterServer};
 
-DEATH_TEST(ServerStatusSectionRegistryTest,
+DEATH_TEST(ServerStatusSectionRegistryTestDeathTest,
            CannotRegisterShardSectionWithSameNameAsShardAndRouterSection,
            "Duplicate ServerStatusSection") {
     trySections({bothRoles, ClusterRole::ShardServer});
 }
 
-DEATH_TEST(ServerStatusSectionRegistryTest,
+DEATH_TEST(ServerStatusSectionRegistryTestDeathTest,
            CannotRegisterRouterSectionWithSameNameAsShardAndRouterSection,
            "Duplicate ServerStatusSection") {
     trySections({bothRoles, ClusterRole::RouterServer});
@@ -134,8 +134,9 @@ class ServerStatusCmdTest : public DBCommandTestFixture {};
  * Ensure that the enableDiagnosticPrintingOnFailure feature emits the correct diagnostic
  * information on an invariant.
  */
+using ServerStatusCmdTestDeathTest = ServerStatusCmdTest;
 DEATH_TEST_REGEX_F(
-    ServerStatusCmdTest,
+    ServerStatusCmdTestDeathTest,
     CommandLogsDiagnosticsOnFailure,
     R"#(ScopedDebugInfo.*\'opDescription\': \{ serverStatus: 1, failingSection: 1.*)#") {
     runCommand(BSON("serverStatus" << 1 << "failingSection" << 1));

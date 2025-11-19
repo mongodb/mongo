@@ -237,8 +237,9 @@ TEST_F(PinnedConnectionTaskExecutorTest, FailCommandRemotelyDoesntBreakOtherComm
     pinnedTE->join();
 }
 
+using PinnedConnectionTaskExecutorTestDeathTest = PinnedConnectionTaskExecutorTest;
 DEATH_TEST_REGEX_F(
-    PinnedConnectionTaskExecutorTest,
+    PinnedConnectionTaskExecutorTestDeathTest,
     SchedulingCommandOnDifferentHostFails,
     R"#(Attempted to schedule RPC to (\S+):(\d+) on TaskExecutor that had pinned connection to (\S+):(\d+))#") {
     auto pinnedTE = makePinnedConnTaskExecutor();

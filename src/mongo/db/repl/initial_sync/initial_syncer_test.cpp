@@ -2188,7 +2188,8 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherCallbackError) {
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 }
 
-DEATH_TEST_REGEX_F(InitialSyncerTest,
+using InitialSyncerTestDeathTest = InitialSyncerTest;
+DEATH_TEST_REGEX_F(InitialSyncerTestDeathTest,
                    InitialSyncerCrashesOnBSONObjectTooLargeError,
                    "Fatal assertion.*9995200") {
     auto initialSyncer = &getInitialSyncer();

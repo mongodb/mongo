@@ -93,7 +93,7 @@ TEST(FieldRefTest, SinglePart) {
     ASSERT_EQUALS(fieldRef.dottedField(), field);
 }
 
-DEATH_TEST_REGEX(FieldRefTest, Overflow, "Tripwire assertion.*1589700") {
+DEATH_TEST_REGEX(FieldRefTestDeathTest, Overflow, "Tripwire assertion.*1589700") {
     std::string field = "a";
     for (size_t s = 1; s <= BSONObjMaxInternalSize / 2; s++) {
         field.append(".a");

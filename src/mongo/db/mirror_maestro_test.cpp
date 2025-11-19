@@ -333,7 +333,8 @@ TEST_F(GeneralMirrorMaestroTest, GeneralEmptyHostsList) {
 }
 
 // Invariant should be triggered when there is no invocation.
-DEATH_TEST_F(GeneralMirrorMaestroTest, GeneralNoInvocation, "invariant") {
+using GeneralMirrorMaestroTestDeathTest = GeneralMirrorMaestroTest;
+DEATH_TEST_F(GeneralMirrorMaestroTestDeathTest, GeneralNoInvocation, "invariant") {
     // Set the server parameter to have sampling rate = 0%.
     setServerParams(0.0);
 
@@ -384,7 +385,8 @@ public:
 };
 
 // Invariant should be triggered on absent replication coordinator.
-DEATH_TEST_F(NoReplCoordGeneralMirrorTest, GeneralNoReplCoord, "invariant") {
+using NoReplCoordGeneralMirrorTestDeathTest = NoReplCoordGeneralMirrorTest;
+DEATH_TEST_F(NoReplCoordGeneralMirrorTestDeathTest, GeneralNoReplCoord, "invariant") {
     // Set up the Mirror Maestro to not have a replication coordinator.
     repl::ReplicationCoordinator::set(getServiceContext(), nullptr);
     MirrorMaestro::init(getServiceContext());
@@ -548,7 +550,10 @@ TEST_F(TargetedMirrorMaestroTest, NoUpdateToCachedHostsIfTopologyVersionUnchange
     ASSERT_EQ((hosts)[0].toString(), kHost1);
 }
 
-DEATH_TEST_F(TargetedMirrorMaestroTest, InvariantOnDecreasedConfigVersionForSameTerm, "invariant") {
+using TargetedMirrorMaestroTestDeathTest = TargetedMirrorMaestroTest;
+DEATH_TEST_F(TargetedMirrorMaestroTestDeathTest,
+             InvariantOnDecreasedConfigVersionForSameTerm,
+             "invariant") {
     ServerParameterControllerForTest controller("mirrorReads", kDefaultServerParam);
 
     auto version = 2;

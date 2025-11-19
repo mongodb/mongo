@@ -187,7 +187,8 @@ TEST_F(OperationShardingStateTest, ScopedAllowImplicitCollectionCreateNestedSame
         ErrorCodes::CannotImplicitlyCreateCollection);
 }
 
-DEATH_TEST_REGEX_F(OperationShardingStateTest,
+using OperationShardingStateTestDeathTest = OperationShardingStateTest;
+DEATH_TEST_REGEX_F(OperationShardingStateTestDeathTest,
                    ScopedAllowImplicitCollectionCreateNestedDifferentNssFails,
                    "Tripwire assertion.*10897901") {
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
@@ -196,7 +197,7 @@ DEATH_TEST_REGEX_F(OperationShardingStateTest,
         operationContext(), kAnotherNss);
 }
 
-DEATH_TEST_REGEX_F(OperationShardingStateTest,
+DEATH_TEST_REGEX_F(OperationShardingStateTestDeathTest,
                    ScopedAllowImplicitCollectionCreateNestedMultipleNssFails,
                    "Tripwire assertion.*10897901") {
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(

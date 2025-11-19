@@ -484,7 +484,7 @@ TEST(GetURIFromArgs, BasicHostNameParsing) {
     ASSERT_EQ(uri, "mongodb://host:port/arg"s);
 }
 
-DEATH_TEST(GetURIFromArgs,
+DEATH_TEST(GetURIFromArgsDeathTest,
            HostPortDoesNotMatchProvidedPort,
            "connection string bears different port than provided by --port") {
     getURIFromArgs(""s, "host:port1"s, "port2"s);
@@ -510,19 +510,19 @@ TEST(GetURIFromArgs, ArgHostNames) {
     ASSERT_EQ(uri, "mongodb://host:1234/test"s);
 }
 
-DEATH_TEST(GetURIFromArgs,
+DEATH_TEST(GetURIFromArgsDeathTest,
            FullURIWithHost,
            "If a full URI is provided, you cannot also specify --host or --port") {
     getURIFromArgs("host/port"s, "host"s, ""s);
 }
 
-DEATH_TEST(GetURIFromArgs,
+DEATH_TEST(GetURIFromArgsDeathTest,
            FullURIWithPort,
            "If a full URI is provided, you cannot also specify --host or --port") {
     getURIFromArgs("host/port"s, ""s, "port"s);
 }
 
-DEATH_TEST(GetURIFromArgs,
+DEATH_TEST(GetURIFromArgsDeathTest,
            ArgHostPortDoesNotMatchProvidedPort,
            "connection string bears different port than provided by --port") {
     getURIFromArgs("host:1234"s, ""s, "5678"s);

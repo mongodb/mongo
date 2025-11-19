@@ -1033,7 +1033,8 @@ TEST_F(SamplingEstimatorTest, ExtractTopLevelFieldsFromMatchExpressionNestedAndO
     }
 }
 
-DEATH_TEST_F(SamplingEstimatorTest,
+using SamplingEstimatorTestDeathTest = SamplingEstimatorTest;
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              IndexBoundsAlignedWithMatchExpression,
              "bounds and expressions should have equal size.") {
     insertDocuments(kTestNss, createDocuments(10));
@@ -1065,7 +1066,7 @@ DEATH_TEST_F(SamplingEstimatorTest,
     auto estimates = samplingEstimator.estimateRIDs(boundslist, expressions);
 }
 
-DEATH_TEST_F(SamplingEstimatorTest,
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              TopLevelSampleFieldNamesContainDottedPath,
              "topLevelSampleFieldNames should not contain a dotted field path") {
     insertDocuments(kTestNss, createDocuments(10));
@@ -1084,7 +1085,7 @@ DEATH_TEST_F(SamplingEstimatorTest,
     samplingEstimator.generateSample(StringSet{"a", "b.c"});
 }
 
-DEATH_TEST_F(SamplingEstimatorTest,
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              TopLevelSampleFieldNamesIsEmpty,
              "topLevelSampleFieldNames must be a non-empty set if specified.") {
     insertDocuments(kTestNss, createDocuments(10));
@@ -1101,7 +1102,7 @@ DEATH_TEST_F(SamplingEstimatorTest,
     samplingEstimator.generateSample(StringSet{});
 }
 
-DEATH_TEST_F(SamplingEstimatorTest,
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              SampleDoesNotContainFieldInMatchExpressionEstimateCardinality,
              "MatchExpression contains fields not present in topLevelSampleFieldNames") {
     insertDocuments(kTestNss, createDocuments(10));
@@ -1124,7 +1125,7 @@ DEATH_TEST_F(SamplingEstimatorTest,
     samplingEstimator.estimateCardinality(&eq);
 }
 
-DEATH_TEST_F(SamplingEstimatorTest,
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              SampleDoesNotContainFieldInMatchExpressionEstimateCardinalityBatched,
              "MatchExpression contains fields not present in topLevelSampleFieldNames") {
     insertDocuments(kTestNss, createDocuments(10));
@@ -1147,7 +1148,7 @@ DEATH_TEST_F(SamplingEstimatorTest,
     samplingEstimator.estimateCardinality(std::vector<const MatchExpression*>{&eq});
 }
 
-DEATH_TEST_F(SamplingEstimatorTest,
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              SampleDoesNotContainFieldInMatchExpressionEstimateRIDs,
              "MatchExpression contains fields not present in topLevelSampleFieldNames") {
     insertDocuments(kTestNss, createDocuments(10));
@@ -1176,7 +1177,7 @@ DEATH_TEST_F(SamplingEstimatorTest,
     samplingEstimator.estimateRIDs(bounds, &eq);
 }
 
-DEATH_TEST_F(SamplingEstimatorTest,
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              SampleDoesNotContainFieldInIndexBoundsEstimateRIDs,
              "Field in index bounds should be included in the set of sampled fields") {
     insertDocuments(kTestNss, createDocuments(10));
@@ -1212,7 +1213,7 @@ DEATH_TEST_F(SamplingEstimatorTest,
     samplingEstimator.estimateRIDs(bounds, expr.get());
 }
 
-DEATH_TEST_F(SamplingEstimatorTest,
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              SampleDoesNotContainFieldInIndexBoundsEstimateKeysScanned,
              "Field in index bounds should be included in the set of sampled fields") {
     insertDocuments(kTestNss, createDocuments(10));
@@ -1248,7 +1249,7 @@ DEATH_TEST_F(SamplingEstimatorTest,
     samplingEstimator.estimateKeysScanned(bounds);
 }
 
-DEATH_TEST_F(SamplingEstimatorTest,
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              SampleNotGeneratedEstimateKeysScanned,
              "Sample must be generated before calling") {
     insertDocuments(kTestNss, createDocuments(10));
@@ -1275,7 +1276,7 @@ DEATH_TEST_F(SamplingEstimatorTest,
     samplingEstimator.estimateKeysScanned(bounds);
 }
 
-DEATH_TEST_F(SamplingEstimatorTest,
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              SampleNotGeneratedEstimateRIDs,
              "Sample must be generated before calling") {
     insertDocuments(kTestNss, createDocuments(10));
@@ -1302,7 +1303,7 @@ DEATH_TEST_F(SamplingEstimatorTest,
     samplingEstimator.estimateRIDs(bounds, expr.get());
 }
 
-DEATH_TEST_F(SamplingEstimatorTest,
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              SampleNotGeneratedEstimateCardinality,
              "Sample must be generated before calling") {
     insertDocuments(kTestNss, createDocuments(10));
@@ -1455,7 +1456,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTenPercent) {
     makeNDVAssertions(estimator, sampleSize);
 }
 
-DEATH_TEST_F(SamplingEstimatorTest,
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              EstimateNDVFailsWhenTopLevelFieldIsExcluded,
              "Sample must include the NDV fieldName as a top-level field") {
     const size_t card = 100;

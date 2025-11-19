@@ -92,7 +92,9 @@ TEST(FillLockerInfo, DoesReportLockStats) {
     ASSERT_EQ(infoObj["lockStats"].type(), BSONType::object);
 }
 
-DEATH_TEST(FillLockerInfo, ShouldFailIfLocksAreNotSortedAppropriately, "Invariant failure") {
+DEATH_TEST(FillLockerInfoDeathTest,
+           ShouldFailIfLocksAreNotSortedAppropriately,
+           "Invariant failure") {
     LockerInfo info;
     // The global lock is supposed to come before the database lock.
     info.locks = {

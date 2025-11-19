@@ -349,20 +349,22 @@ void doTassert() {
     ASSERT_EQ(tripwireAssertions + 3, assertionCount.tripwire.load());
 }
 
-DEATH_TEST_REGEX(TassertTerminationTest,
+DEATH_TEST_REGEX(TassertTerminationTestDeathTest,
                  tassertCleanLogMsg,
                  "4457001.*Aborting process during exit due to prior failed tripwire assertions") {
     doTassert();
 }
 
-DEATH_TEST_REGEX(TassertTerminationTest,
+DEATH_TEST_REGEX(TassertTerminationTestDeathTest,
                  tassertUncleanLogMsg,
                  "4457002.*Detected prior failed tripwire assertions") {
     doTassert();
     quickExit(ExitCode::abrupt);
 }
 
-DEATH_TEST(TassertTerminationTest, mongoUnreachableNonFatal, "Hit a MONGO_UNREACHABLE_TASSERT!") {
+DEATH_TEST(TassertTerminationTestDeathTest,
+           mongoUnreachableNonFatal,
+           "Hit a MONGO_UNREACHABLE_TASSERT!") {
     try {
         MONGO_UNREACHABLE_TASSERT(4457093);
     } catch (const DBException&) {
@@ -370,7 +372,7 @@ DEATH_TEST(TassertTerminationTest, mongoUnreachableNonFatal, "Hit a MONGO_UNREAC
     }
 }
 
-DEATH_TEST_REGEX(TassertTerminationTest,
+DEATH_TEST_REGEX(TassertTerminationTestDeathTest,
                  mongoUnimplementedNonFatal,
                  "6634500.*Hit a MONGO_UNIMPLEMENTED_TASSERT!") {
     try {
@@ -381,46 +383,46 @@ DEATH_TEST_REGEX(TassertTerminationTest,
 }
 
 // fassert and its friends
-DEATH_TEST(FassertionTerminationTest, BoolCondition, "40206") {
+DEATH_TEST(FassertionTerminationTestDeathTest, BoolCondition, "40206") {
     fassert(40206, false);
 }
 
-DEATH_TEST(FassertionTerminationTest, Overload, "Terminating with fassert") {
+DEATH_TEST(FassertionTerminationTestDeathTest, Overload, "Terminating with fassert") {
     fassert(40207, {ErrorCodes::InternalError, "Terminating with fassert"});
 }
 
-DEATH_TEST(FassertionTerminationTest, StatusWithOverload, "Terminating with fassert") {
+DEATH_TEST(FassertionTerminationTestDeathTest, StatusWithOverload, "Terminating with fassert") {
     fassert(50733,
             StatusWith<std::string>{ErrorCodes::InternalError,
                                     "Terminating with fassertStatusWithOverload"});
 }
 
-DEATH_TEST(FassertionTerminationTest, NoTrace, "Terminating with fassertNoTrace") {
+DEATH_TEST(FassertionTerminationTestDeathTest, NoTrace, "Terminating with fassertNoTrace") {
     fassertNoTrace(50734, Status(ErrorCodes::InternalError, "Terminating with fassertNoTrace"));
 }
 
-DEATH_TEST(FassertionTerminationTest, NoTraceOverload, "Terminating with fassertNoTrace") {
+DEATH_TEST(FassertionTerminationTestDeathTest, NoTraceOverload, "Terminating with fassertNoTrace") {
     fassertNoTrace(50735,
                    StatusWith<std::string>(ErrorCodes::InternalError,
                                            "Terminating with fassertNoTraceOverload"));
 }
 
-DEATH_TEST(FassertionTerminationTest, FassertFailed, "40210") {
+DEATH_TEST(FassertionTerminationTestDeathTest, FassertFailed, "40210") {
     fassertFailed(40210);
 }
 
-DEATH_TEST(FassertionTerminationTest, FassertFailedNoTrace, "40211") {
+DEATH_TEST(FassertionTerminationTestDeathTest, FassertFailedNoTrace, "40211") {
     fassertFailedNoTrace(40211);
 }
 
-DEATH_TEST(FassertionTerminationTest,
+DEATH_TEST(FassertionTerminationTestDeathTest,
            FassertFailedWithStatus,
            "Terminating with fassertFailedWithStatus") {
     fassertFailedWithStatus(
         40212, {ErrorCodes::InternalError, "Terminating with fassertFailedWithStatus"});
 }
 
-DEATH_TEST(FassertionTerminationTest,
+DEATH_TEST(FassertionTerminationTestDeathTest,
            FassertFailedWithStatusNoTrace,
            "Terminating with fassertFailedWithStatusNoTrace") {
     fassertFailedWithStatusNoTrace(
@@ -428,31 +430,37 @@ DEATH_TEST(FassertionTerminationTest,
 }
 
 // invariant and its friends
-DEATH_TEST_REGEX(InvariantTerminationTest, invariant, "Invariant failure.*false.*" __FILE__) {
+DEATH_TEST_REGEX(InvariantTerminationTestDeathTest,
+                 invariant,
+                 "Invariant failure.*false.*" __FILE__) {
     invariant(false);
 }
 
-DEATH_TEST(InvariantTerminationTest, invariantOverload, "Terminating with invariant") {
+DEATH_TEST(InvariantTerminationTestDeathTest, invariantOverload, "Terminating with invariant") {
     invariant(Status(ErrorCodes::InternalError, "Terminating with invariant"));
 }
 
-DEATH_TEST(InvariantTerminationTest, mongoUnimplementedFatal, "Hit a MONGO_UNIMPLEMENTED!") {
+DEATH_TEST(InvariantTerminationTestDeathTest,
+           mongoUnimplementedFatal,
+           "Hit a MONGO_UNIMPLEMENTED!") {
     MONGO_UNIMPLEMENTED;
 }
 
-DEATH_TEST(InvariantTerminationTest, invariantStatusWithOverload, "Terminating with invariant") {
+DEATH_TEST(InvariantTerminationTestDeathTest,
+           invariantStatusWithOverload,
+           "Terminating with invariant") {
     invariant(StatusWith<std::string>(ErrorCodes::InternalError,
                                       "Terminating with invariantStatusWithOverload"));
 }
 
-DEATH_TEST(InvariantTerminationTest,
+DEATH_TEST(InvariantTerminationTestDeathTest,
            invariantWithStringLiteralMsg,
            "Terminating with string literal invariant message") {
     const char* msg = "Terminating with string literal invariant message";
     invariant(false, msg);
 }
 
-DEATH_TEST(InvariantTerminationTest,
+DEATH_TEST(InvariantTerminationTestDeathTest,
            invariantWithStdStringMsg,
            "Terminating with std::string invariant message: 12345") {
     const std::string msg = str::stream()
@@ -460,14 +468,14 @@ DEATH_TEST(InvariantTerminationTest,
     invariant(false, msg);
 }
 
-DEATH_TEST(InvariantTerminationTest,
+DEATH_TEST(InvariantTerminationTestDeathTest,
            invariantOverloadWithStringLiteralMsg,
            "Terminating with string literal invariant message") {
     invariant(Status(ErrorCodes::InternalError, "Terminating with invariant"),
               "Terminating with string literal invariant message");
 }
 
-DEATH_TEST(InvariantTerminationTest,
+DEATH_TEST(InvariantTerminationTestDeathTest,
            invariantOverloadWithStdStringMsg,
            "Terminating with std::string invariant message: 12345") {
     const std::string msg = str::stream()
@@ -475,14 +483,14 @@ DEATH_TEST(InvariantTerminationTest,
     invariant(Status(ErrorCodes::InternalError, "Terminating with invariant"), msg);
 }
 
-DEATH_TEST(InvariantTerminationTest,
+DEATH_TEST(InvariantTerminationTestDeathTest,
            invariantStatusWithOverloadWithStringLiteralMsg,
            "Terminating with string literal invariant message") {
     invariant(StatusWith<std::string>(ErrorCodes::InternalError, "Terminating with invariant"),
               "Terminating with string literal invariant message");
 }
 
-DEATH_TEST(InvariantTerminationTest,
+DEATH_TEST(InvariantTerminationTestDeathTest,
            invariantStatusWithOverloadWithStdStringMsg,
            "Terminating with std::string invariant message: 12345") {
     const std::string msg = str::stream()
@@ -491,18 +499,20 @@ DEATH_TEST(InvariantTerminationTest,
               msg);
 }
 
-DEATH_TEST(InvariantTerminationTest, invariantStatusOK, "Terminating with invariantStatusOK") {
+DEATH_TEST(InvariantTerminationTestDeathTest,
+           invariantStatusOK,
+           "Terminating with invariantStatusOK") {
     invariantStatusOK(Status(ErrorCodes::InternalError, "Terminating with invariantStatusOK"));
 }
 
-DEATH_TEST(InvariantTerminationTest,
+DEATH_TEST(InvariantTerminationTestDeathTest,
            invariantStatusOKOverload,
            "Terminating with invariantStatusOK") {
     invariantStatusOK(
         StatusWith<std::string>(ErrorCodes::InternalError, "Terminating with invariantStatusOK"));
 }
 
-DEATH_TEST(InvariantTerminationTest,
+DEATH_TEST(InvariantTerminationTestDeathTest,
            invariantStatusOKWithContext,
            "Terminating with invariantStatusOKWithContext") {
     invariantStatusOKWithContext(
@@ -510,7 +520,7 @@ DEATH_TEST(InvariantTerminationTest,
         "Terminating with invariantStatusOKWithContext");
 }
 
-DEATH_TEST(InvariantTerminationTest,
+DEATH_TEST(InvariantTerminationTestDeathTest,
            invariantStatusOKWithContextOverload,
            "Terminating with invariantStatusOKWithContextOverload") {
     invariantStatusOKWithContext(
@@ -521,22 +531,24 @@ DEATH_TEST(InvariantTerminationTest,
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
 // dassert and its friends
-DEATH_TEST_REGEX(DassertTerminationTest, invariant, "Invariant failure.*false.*" __FILE__) {
+DEATH_TEST_REGEX(DassertTerminationTestDeathTest,
+                 invariant,
+                 "Invariant failure.*false.*" __FILE__) {
     dassert(false);
 }
 
-DEATH_TEST(DassertTerminationTest, dassertOK, "Terminating with dassertOK") {
+DEATH_TEST(DassertTerminationTestDeathTest, dassertOK, "Terminating with dassertOK") {
     dassert(Status(ErrorCodes::InternalError, "Terminating with dassertOK"));
 }
 
-DEATH_TEST(DassertTerminationTest,
+DEATH_TEST(DassertTerminationTestDeathTest,
            invariantWithStringLiteralMsg,
            "Terminating with string literal dassert message") {
     const char* msg = "Terminating with string literal dassert message";
     dassert(false, msg);
 }
 
-DEATH_TEST(DassertTerminationTest,
+DEATH_TEST(DassertTerminationTestDeathTest,
            dassertWithStdStringMsg,
            "Terminating with std::string dassert message: 12345") {
     const std::string msg = str::stream()
@@ -572,14 +584,14 @@ TEST(ScopedDebugInfo, Stack) {
     ASSERT_THAT(infoStack.getAll(), Eq(expected));
 }
 
-DEATH_TEST(ScopedDebugInfo, PrintedOnInvariant, "mission: ATestInjectedString") {
+DEATH_TEST(ScopedDebugInfoDeathTest, PrintedOnInvariant, "mission: ATestInjectedString") {
     ScopedDebugInfo g("mission", "ATestInjectedString");
     someRiskyBusiness();
 }
 
 // The following test relies on SIGSEGV which is not supported on Windows.
 #if !defined(_WIN32)
-DEATH_TEST(ScopedDebugInfo, PrintedOnSignal, "mission: ATestInjectedString") {
+DEATH_TEST(ScopedDebugInfoDeathTest, PrintedOnSignal, "mission: ATestInjectedString") {
     ScopedDebugInfo g("mission", "ATestInjectedString");
     raise(SIGSEGV);
 }
@@ -597,7 +609,7 @@ TEST(ScopedDebugInfo, FormattingCanBeCalledMoreThanOnce) {
 
 // Test that we are able to incrementally log ScopedDebugInfos from the stack (if one throws an
 // exception, we are able to attempt to print the next one).
-DEATH_TEST_REGEX(ScopedDebugInfo,
+DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  CorrectScopedDebugInfosOnStackAfterIncorrectOne,
                  "(?s)tasserting in mock printer.*BACKTRACE"
                  ".*ScopedDebugInfo failed.*test.*9513401") {
@@ -612,7 +624,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
 
 // Test that if we log the `ScopedDebugInfoStack` due to a tassert, and we hit a tassert during
 // logging, we only surface the original tassert.
-DEATH_TEST_REGEX(ScopedDebugInfo,
+DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  TassertAndTassertDuringLogging,
                  "(?s)tasserting in test.*BACKTRACE"
                  ".*tasserting in mock printer.*BACKTRACE"
@@ -622,7 +634,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
 }
 
 // Same as above, but with `uassert` instead of `tassert`.
-DEATH_TEST_REGEX(ScopedDebugInfo,
+DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  TassertAndUassertDuringLogging,
                  "(?s)tasserting in test.*BACKTRACE"
                  ".*ScopedDebugInfo failed.*test.*9513402") {
@@ -632,7 +644,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
 
 // Test that we end the process as expected due to an invariant even if we hit a tassert during
 // logging of the `ScopedDebugInfoStack`.
-DEATH_TEST_REGEX(ScopedDebugInfo,
+DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  InvariantAndTassertDuringLogging,
                  "(?s)ouch.*abruptQuit"
                  ".*tasserting in mock printer.*mongo::error_details::tassertFailed"
@@ -642,7 +654,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
 }
 
 // Same as above, but with `uassert` instead of `tassert`.
-DEATH_TEST_REGEX(ScopedDebugInfo,
+DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  InvariantAndUassertDuringLogging,
                  "(?s)ouch.*abruptQuit"
                  ".*ScopedDebugInfo failed.*test.*9513402") {
@@ -650,7 +662,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
     someRiskyBusiness();
 }
 
-DEATH_TEST_REGEX(ScopedDebugInfo,
+DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  InvariantAndInvariantDuringLogging,
                  "(?s)ouch.*abruptQuit.*ouch") {
     ScopedDebugInfo guardInvariants("test", PrinterMockInvariant());
@@ -661,7 +673,9 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
 // Note the regex here uses the negative lookahead operator `(?!)` in order to ensure that the
 // string `hello` is not found within the logs. The syntax here means: we want to match the start of
 // the string unless something after the start of the string contains `hello`.
-DEATH_TEST_REGEX(ScopedDebugInfo, InvariantWhenSignalHandlerLoggingDisabled, "(?s)^(?!.*hello)") {
+DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
+                 InvariantWhenSignalHandlerLoggingDisabled,
+                 "(?s)^(?!.*hello)") {
     RAIIServerParameterControllerForTest knobController("signalHandlerUsesDiagnosticLogging",
                                                         false);
     ScopedDebugInfo guard("test", "hello");
@@ -672,7 +686,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo, InvariantWhenSignalHandlerLoggingDisabled, "(?
 // Test that we end the process as expected due to a seg fault even if we hit a tassert during
 // logging of the `ScopedDebugInfoStack`.
 #if !defined(_WIN32)
-DEATH_TEST_REGEX(ScopedDebugInfo,
+DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  SignalAndTassertDuringLogging,
                  "(?s)Invalid access at address.*abruptQuit"
                  ".*tasserting in mock printer.*BACKTRACE"
@@ -682,7 +696,7 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
 }
 
 // Same as above, but with `uassert` instead of `tassert`.
-DEATH_TEST_REGEX(ScopedDebugInfo,
+DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  SignalAndUassertDuringLogging,
                  "(?s)Invalid access at address.*abruptQuit"
                  ".*ScopedDebugInfo failed.*test.*9513402") {
@@ -695,7 +709,9 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
 // Note the regex here uses the negative lookahead operator `(?!)` in order to ensure that the
 // string `hello` is not found within the logs. The syntax here means: we want to match the start of
 // the string unless something after the start of the string contains `hello`.
-DEATH_TEST_REGEX(ScopedDebugInfo, SignalWhenSignalHandlerLoggingDisabled, "(?s)^(?!.*hello)") {
+DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
+                 SignalWhenSignalHandlerLoggingDisabled,
+                 "(?s)^(?!.*hello)") {
     RAIIServerParameterControllerForTest knobController("signalHandlerUsesDiagnosticLogging",
                                                         false);
     ScopedDebugInfo guard("test", "hello");

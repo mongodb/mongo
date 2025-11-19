@@ -181,12 +181,17 @@ TEST_F(ClientOutOfLineExecutorTest, SkipShutdownWhenNoTaskIsScheduled) {
     ClientOutOfLineExecutor executor;
 }
 
-DEATH_TEST_F(ClientOutOfLineExecutorTest, RequireShutdownAfterAcquiringHandles, "invariant") {
+using ClientOutOfLineExecutorTestDeathTest = ClientOutOfLineExecutorTest;
+DEATH_TEST_F(ClientOutOfLineExecutorTestDeathTest,
+             RequireShutdownAfterAcquiringHandles,
+             "invariant") {
     ClientOutOfLineExecutor executor;
     executor.getHandle();
 }
 
-DEATH_TEST_F(ClientOutOfLineExecutorTest, RequireShutdownAfterSchedulingTasks, "invariant") {
+DEATH_TEST_F(ClientOutOfLineExecutorTestDeathTest,
+             RequireShutdownAfterSchedulingTasks,
+             "invariant") {
     ClientOutOfLineExecutor executor;
     executor.schedule([](Status) {});
 }

@@ -141,18 +141,21 @@ TEST_F(OplogVisibilityManagerTest, TrackAndUntrackTimestampsLIFO) {
     untrackTimestamps(iter1, 15 /* expectedVisibility */);
 }
 
-DEATH_TEST_F(OplogVisibilityManagerTest,
+using OplogVisibilityManagerTestDeathTest = OplogVisibilityManagerTest;
+DEATH_TEST_F(OplogVisibilityManagerTestDeathTest,
              TrackTimestampFirstTimestampLessThanLastTimestamp,
              "invariant") {
     trackTimestamps({4, 3} /* timestampRange */, true /* managerIsEmpty */);
 }
 
-DEATH_TEST_F(OplogVisibilityManagerTest, TrackTimestampsFirstLessThanLatestTimeSeen, "invariant") {
+DEATH_TEST_F(OplogVisibilityManagerTestDeathTest,
+             TrackTimestampsFirstLessThanLatestTimeSeen,
+             "invariant") {
     trackTimestamps({5, 6} /* timestampRange */, true /* managerIsEmpty */);
     trackTimestamps({3, 4} /* timestampRange */, false /* managerIsEmpty */);
 }
 
-DEATH_TEST_F(OplogVisibilityManagerTest,
+DEATH_TEST_F(OplogVisibilityManagerTestDeathTest,
              AdvanceVisibilityTimestampWhenTrackingOtherTimestamps,
              "invariant") {
     trackTimestamps({3, 5} /* timestampRange */, true /* managerIsEmpty */);

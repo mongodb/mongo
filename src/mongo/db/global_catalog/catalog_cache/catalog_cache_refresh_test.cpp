@@ -198,7 +198,8 @@ TEST_F(CatalogCacheRefreshTest, NoLoadIfShardNotMarkedStaleInOperationContext) {
     ASSERT_EQ(2, cri.getChunkManager().numChunks());
 }
 
-DEATH_TEST_REGEX_F(CatalogCacheRefreshTest,
+using CatalogCacheRefreshTestDeathTest = CatalogCacheRefreshTest;
+DEATH_TEST_REGEX_F(CatalogCacheRefreshTestDeathTest,
                    ShouldFailToRefreshWhenLocksAreHeld,
                    "Tripwire assertion.*10271000") {
     Lock::GlobalLock globalLock(operationContext(), MODE_X);

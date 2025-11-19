@@ -864,7 +864,8 @@ TEST_F(ReshardingDonorServiceTest, ReportForCurrentOpAfterCompletion) {
     ASSERT_OK(newDonor->getCompletionFuture().getNoThrow());
 }
 
-DEATH_TEST_REGEX_F(ReshardingDonorServiceTest, CommitFn, "4457001.*tripwire") {
+using ReshardingDonorServiceTestDeathTest = ReshardingDonorServiceTest;
+DEATH_TEST_REGEX_F(ReshardingDonorServiceTestDeathTest, CommitFn, "4457001.*tripwire") {
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(9858405,
               "Running case",

@@ -73,7 +73,7 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression, HasCorrectNumberOfChilden) 
     ASSERT(objMatch.getValue()->getChild(0));
 }
 
-DEATH_TEST_REGEX(InternalSchemaAllowedPropertiesMatchExpression,
+DEATH_TEST_REGEX(InternalSchemaAllowedPropertiesMatchExpressionDeathTest,
                  GetChildFailsOnIndexLargerThanChildSet,
                  "Tripwire assertion.*6400212") {
     auto query = fromjson(

@@ -329,12 +329,13 @@ TEST_F(ExpressionContextTest, MergeType) {
 
 // This should tassert to detect this malformed AggregateCommandRequest.
 // The 'needsSortedMerge' bit implies 'needsMerge'.
-DEATH_TEST_F(ExpressionContextTest, IllegalNeedsMergeCombo, "10372401") {
+using ExpressionContextTestDeathTest = ExpressionContextTest;
+DEATH_TEST_F(ExpressionContextTestDeathTest, IllegalNeedsMergeCombo, "10372401") {
     auto opCtx = makeOperationContext();
     AddCmdTestCase{.needsMerge = false, .needsSortedMerge = true}.makeExpCtx(opCtx.get());
 }
 
-DEATH_TEST_F(ExpressionContextTest, IllegalNeedsMergeComboNeedsMergeEmpty, "10372401") {
+DEATH_TEST_F(ExpressionContextTestDeathTest, IllegalNeedsMergeComboNeedsMergeEmpty, "10372401") {
     auto opCtx = makeOperationContext();
     AddCmdTestCase{.needsSortedMerge = true}.makeExpCtx(opCtx.get());
 }

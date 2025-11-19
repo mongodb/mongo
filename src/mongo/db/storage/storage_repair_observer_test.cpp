@@ -286,7 +286,8 @@ TEST_F(StorageRepairObserverTest, RepairCompleteAfterRestart) {
     assertReplConfigValid(false);
 }
 
-DEATH_TEST_F(StorageRepairObserverTest, FailsWhenDoneCalledFirst, "Invariant failure") {
+using StorageRepairObserverTestDeathTest = StorageRepairObserverTest;
+DEATH_TEST_F(StorageRepairObserverTestDeathTest, FailsWhenDoneCalledFirst, "Invariant failure") {
     auto repairObserver = getRepairObserver();
     ASSERT(!repairObserver->isIncomplete());
 
@@ -295,7 +296,9 @@ DEATH_TEST_F(StorageRepairObserverTest, FailsWhenDoneCalledFirst, "Invariant fai
     repairObserver->onRepairDone(opCtx.get(), [this]() { invalidateReplConfig(); });
 }
 
-DEATH_TEST_F(StorageRepairObserverTest, FailsWhenStartedCalledAfterDone, "Invariant failure") {
+DEATH_TEST_F(StorageRepairObserverTestDeathTest,
+             FailsWhenStartedCalledAfterDone,
+             "Invariant failure") {
     auto repairObserver = getRepairObserver();
     ASSERT(!repairObserver->isIncomplete());
     repairObserver->onRepairStarted();

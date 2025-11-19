@@ -2709,7 +2709,8 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesRequestResumeTokenWhenRequested
     oplogFetcher->join();
 }
 
-DEATH_TEST_REGEX_F(OplogFetcherTest,
+using OplogFetcherTestDeathTest = OplogFetcherTest;
+DEATH_TEST_REGEX_F(OplogFetcherTestDeathTest,
                    BSONObjectTooLargeShutsDownOplogFetcher,
                    "Fatal assertion.*9995200") {
     // Test that if find command succeeds, and second batch fails

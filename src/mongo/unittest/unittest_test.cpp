@@ -315,7 +315,7 @@ TEST_F(UnitTestFormatTest, FormatCustomized) {
     ASSERT_EQ(mus::invoke(x), "X{123}");
 }
 
-DEATH_TEST_REGEX(DeathTestSelfTest, TestDeath, "Invariant failure.*false") {
+DEATH_TEST_REGEX(DeathTestSelfTestDeathTest, TestDeath, "Invariant failure.*false") {
     invariant(false);
 }
 
@@ -328,7 +328,8 @@ public:
     }
 };
 
-DEATH_TEST_F(DeathTestSelfTestFixture, DieInTearDown, "Died in tear-down") {}
+using DeathTestSelfTestFixtureDeathTest = DeathTestSelfTestFixture;
+DEATH_TEST_F(DeathTestSelfTestFixtureDeathTest, DieInTearDown, "Died in tear-down") {}
 
 TEST(UnitTestSelfTest, StackTraceForAssertion) {
     bool threw = false;

@@ -43,7 +43,7 @@
 
 namespace mongo {
 
-DEATH_TEST_REGEX(InternalExprComparisonMatchExpression,
+DEATH_TEST_REGEX(InternalExprComparisonMatchExpressionDeathTest,
                  CannotCompareToArray,
                  "Tripwire assertion.*11052406") {
     BSONObj operand = BSON("x" << BSON_ARRAY(1 << 2));
@@ -51,7 +51,7 @@ DEATH_TEST_REGEX(InternalExprComparisonMatchExpression,
                                      operand.firstElement());
 }
 
-DEATH_TEST_REGEX(InternalExprComparisonMatchExpression,
+DEATH_TEST_REGEX(InternalExprComparisonMatchExpressionDeathTest,
                  CannotCompareToUndefined,
                  "Tripwire assertion.*11052405") {
     BSONObj operand = BSON("x" << BSONUndefined);

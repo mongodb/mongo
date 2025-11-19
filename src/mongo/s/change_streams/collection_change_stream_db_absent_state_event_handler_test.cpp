@@ -87,19 +87,21 @@ private:
     std::unique_ptr<ChangeStreamReaderContextMock> _readerCtx;
 };
 
-DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerFixture,
+using CollectionDbAbsentStateEventHandlerFixtureDeathTest =
+    CollectionDbAbsentStateEventHandlerFixture;
+DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerFixtureDeathTest,
                    Given_MovePrimaryControlEvent_When_HandleEventIsCalled_Then_Throws,
                    "Tripwire assertion.*IllegalOperation") {
     handler().handleEvent(opCtx(), MovePrimaryControlEvent{}, ctx(), readerCtx());
 }
 
-DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerFixture,
+DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerFixtureDeathTest,
                    Given_MoveChunkControlEvent_When_HandleEventIsCalled_Then_Throws,
                    "Tripwire assertion.*IllegalOperation") {
     handler().handleEvent(opCtx(), MoveChunkControlEvent{}, ctx(), readerCtx());
 }
 
-DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerFixture,
+DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerFixtureDeathTest,
                    Given_NamespacePlacementChangedControlEvent_When_HandleEventIsCalled_Then_Throws,
                    "Tripwire assertion.*IllegalOperation") {
     handler().handleEvent(opCtx(), NamespacePlacementChangedControlEvent{}, ctx(), readerCtx());
@@ -125,7 +127,7 @@ TEST_F(
 }
 
 DEATH_TEST_REGEX_F(
-    CollectionDbAbsentStateEventHandlerFixture,
+    CollectionDbAbsentStateEventHandlerFixtureDeathTest,
     Given_DatabaseCreatedControlEventWithPlacementInFuture_When_HandleEventIsCalled_Then_Throws,
     "Tripwire assertion.*10915200") {
     Timestamp clusterTime(100, 0);
@@ -140,7 +142,7 @@ DEATH_TEST_REGEX_F(
 }
 
 DEATH_TEST_REGEX_F(
-    CollectionDbAbsentStateEventHandlerFixture,
+    CollectionDbAbsentStateEventHandlerFixtureDeathTest,
     Given_DatabaseCreatedControlEventWithEmptyPlacement_When_HandleEventIsCalled_Then_Throws,
     "Tripwire assertion.*10915201") {
     Timestamp clusterTime(50, 1);
@@ -180,7 +182,7 @@ TEST_F(
         ctx().lastSetEventHandler()));
 }
 
-DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerFixture,
+DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerFixtureDeathTest,
                    When_HandleEventInDegradedModeIsCalled_Then_AlwaysThrows,
                    "Tripwire assertion.*IllegalOperation") {
     handler().handleEventInDegradedMode(opCtx(), DatabaseCreatedControlEvent{}, ctx(), readerCtx());

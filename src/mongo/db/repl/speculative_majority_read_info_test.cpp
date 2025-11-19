@@ -46,7 +46,7 @@ TEST(SpeculativeMajorityReadInfo, NonSpeculativeRead) {
     ASSERT_FALSE(readInfo.isSpeculativeRead());
 }
 
-DEATH_TEST(SpeculativeMajorityReadInfo,
+DEATH_TEST(SpeculativeMajorityReadInfoDeathTest,
            NonSpeculativeReadCannotRetrieveOpTime,
            "Invariant failure") {
     SpeculativeMajorityReadInfo readInfo;
@@ -71,7 +71,7 @@ TEST(SpeculativeMajorityReadInfo, SetSpeculativeReadOpTime) {
     ASSERT_EQ(*readTs, Timestamp(1, 0));
 }
 
-DEATH_TEST(SpeculativeMajorityReadInfo,
+DEATH_TEST(SpeculativeMajorityReadInfoDeathTest,
            CannotSetSpeculativeReadOpTimeOnNonSpeculativeRead,
            "Invariant failure") {
     SpeculativeMajorityReadInfo readInfo;

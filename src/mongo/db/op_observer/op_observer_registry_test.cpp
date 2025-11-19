@@ -239,7 +239,10 @@ TEST_F(OpObserverRegistryTest, PreRenameCollectionObserverResultReturnsRightTime
     checkConsistentOpTime(op);
 }
 
-DEATH_TEST_F(OpObserverRegistryTest, OnDropCollectionReturnsInconsistentTime, "invariant") {
+using OpObserverRegistryTestDeathTest = OpObserverRegistryTest;
+DEATH_TEST_F(OpObserverRegistryTestDeathTest,
+             OnDropCollectionReturnsInconsistentTime,
+             "invariant") {
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::move(unique2));
     auto op = [&]() -> repl::OpTime {
@@ -253,7 +256,9 @@ DEATH_TEST_F(OpObserverRegistryTest, OnDropCollectionReturnsInconsistentTime, "i
     checkInconsistentOpTime(op);
 }
 
-DEATH_TEST_F(OpObserverRegistryTest, PreRenameCollectionReturnsInconsistentTime, "invariant") {
+DEATH_TEST_F(OpObserverRegistryTestDeathTest,
+             PreRenameCollectionReturnsInconsistentTime,
+             "invariant") {
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::move(unique2));
     auto op = [&]() -> repl::OpTime {

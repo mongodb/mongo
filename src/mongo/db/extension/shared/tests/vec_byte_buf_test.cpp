@@ -111,7 +111,10 @@ public:
     };
 };
 
-DEATH_TEST_F(ExtensionByteBufVTableTest, InvalidExtensionByteBufVTableFailsGetView, "10806301") {
+using ExtensionByteBufVTableTestDeathTest = ExtensionByteBufVTableTest;
+DEATH_TEST_F(ExtensionByteBufVTableTestDeathTest,
+             InvalidExtensionByteBufVTableFailsGetView,
+             "10806301") {
     auto buf = new VecByteBuf();
     auto handle = TestExtensionByteBufVTableHandle{buf};
 

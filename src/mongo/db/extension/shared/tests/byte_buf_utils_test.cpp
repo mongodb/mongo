@@ -58,12 +58,16 @@ TEST(ByteBufUtilsTest, BsonObjFromByteViewValidInput) {
     ASSERT_EQUALS(std::string(bsonObj.getStringField("field")), "value");  // Verify field content
 }
 
-DEATH_TEST(ByteBufUtilsTest, BsonObjFromByteView_InvalidInput_InsufficientLength, "10596405") {
+DEATH_TEST(ByteBufUtilsTestDeathTest,
+           BsonObjFromByteView_InvalidInput_InsufficientLength,
+           "10596405") {
     MongoExtensionByteView view{nullptr, BSONObj::kMinBSONLength - 1};
     [[maybe_unused]] auto bsonObj = bsonObjFromByteView(view);
 }
 
-DEATH_TEST(ByteBufUtilsTest, BsonObjFromByteView_InvalidInput_MalformedLength, "10596405") {
+DEATH_TEST(ByteBufUtilsTestDeathTest,
+           BsonObjFromByteView_InvalidInput_MalformedLength,
+           "10596405") {
     const uint8_t malformedBsonData[] = {
         0xFF,
         0xFF,
@@ -74,7 +78,9 @@ DEATH_TEST(ByteBufUtilsTest, BsonObjFromByteView_InvalidInput_MalformedLength, "
     [[maybe_unused]] auto bsonObj = bsonObjFromByteView(view);
 }
 
-DEATH_TEST(ByteBufUtilsTest, BsonObjFromByteView_InvalidInput_LengthExceedsBufferSize, "10596405") {
+DEATH_TEST(ByteBufUtilsTestDeathTest,
+           BsonObjFromByteView_InvalidInput_LengthExceedsBufferSize,
+           "10596405") {
     const auto validBSON = BSON("field" << "value");
     const auto objSize = validBSON.objsize();
     DataRange bufferRange(const_cast<char*>(validBSON.objdata()), objSize);
@@ -98,7 +104,7 @@ TEST(ByteBufUtilsTest, BsonObjFromByteView_ValidInput_MinimumLength) {
     ASSERT_TRUE(bsonObj.isValid());  // Check BSON is logically valid.
 }
 
-DEATH_TEST(ByteBufUtilsTest, BsonObjFromByteView_InvalidInput_Empty, "10596405") {
+DEATH_TEST(ByteBufUtilsTestDeathTest, BsonObjFromByteView_InvalidInput_Empty, "10596405") {
     MongoExtensionByteView view{nullptr, 0};
     [[maybe_unused]] auto bsonObj = bsonObjFromByteView(view);
 }

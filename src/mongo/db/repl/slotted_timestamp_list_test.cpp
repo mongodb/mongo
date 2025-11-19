@@ -95,12 +95,12 @@ void eraseN(SlottedTimestampList& list,
 
 }  // namespace
 
-DEATH_TEST(SlottedTimestampListTest, InvariantRequiresNonEmptyListForFront, "invariant") {
+DEATH_TEST(SlottedTimestampListTestDeathTest, InvariantRequiresNonEmptyListForFront, "invariant") {
     SlottedTimestampList list;
     list.front();
 }
 
-DEATH_TEST(SlottedTimestampListTest, InvariantRequiresNonEmptyListForBack, "invariant") {
+DEATH_TEST(SlottedTimestampListTestDeathTest, InvariantRequiresNonEmptyListForBack, "invariant") {
     SlottedTimestampList list;
     list.back();
 }

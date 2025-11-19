@@ -47,7 +47,7 @@
 
 namespace mongo {
 
-DEATH_TEST_REGEX(ElemMatchObjectMatchExpression,
+DEATH_TEST_REGEX(ElemMatchObjectMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanOne,
                  "Tripwire assertion.*6400204") {
     auto baseOperand = BSON("c" << 6);
@@ -73,7 +73,7 @@ TEST(ElemMatchObjectMatchExpression, MatchesIndexKey) {
 }
 */
 
-DEATH_TEST_REGEX(ElemMatchValueMatchExpression,
+DEATH_TEST_REGEX(ElemMatchValueMatchExpressionDeathTest,
                  GetChildFailsOnIndexLargerThanChildSet,
                  "Tripwire assertion.*6400205") {
     auto baseOperand = BSON("$gt" << 6);
@@ -120,7 +120,7 @@ TEST(SizeMatchExpression, Equivalent) {
     ASSERT(!e1.equivalent(&e3));
 }
 
-DEATH_TEST_REGEX(SizeMatchExpression,
+DEATH_TEST_REGEX(SizeMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400206") {
     auto e1 = SizeMatchExpression{"a"_sd, 5};

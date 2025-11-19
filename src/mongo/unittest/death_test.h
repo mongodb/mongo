@@ -44,6 +44,9 @@
  * Death tests are incompatible with already-running threads. If you need multiple threads
  * in your death test, start them in the test body, or use DEATH_TEST_F and start them
  * in the setUp() method of the fixture.
+ *
+ * DEATH_TESTs should use a "DeathTest" suffix (see
+ * https://github.com/google/googletest/blob/main/docs/advanced.md#death-test-naming).
  */
 #define DEATH_TEST(SUITE_NAME, TEST_NAME, MATCH_EXPR) \
     DEATH_TEST_DEFINE_(SUITE_NAME, TEST_NAME, MATCH_EXPR, ::mongo::unittest::Test)

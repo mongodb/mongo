@@ -394,7 +394,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMixNotInclusi
     }
 }
 
-DEATH_TEST(HistogramPredicateEstimationTest,
+DEATH_TEST(HistogramPredicateEstimationTestDeathTest,
            EstimateViaTypeCountsEmptyArray,
            "Hit a MONGO_UNREACHABLE_TASSERT") {
 
@@ -1120,7 +1120,7 @@ TEST(HistogramPredicateEstimationTest, NonHistogrammableTypesEstimation) {
     }
 }
 
-DEATH_TEST(HistogramPredicateEstimationTest,
+DEATH_TEST(HistogramPredicateEstimationTestDeathTest,
            NonEstimableTypesEstimation,
            "Hit a MONGO_UNREACHABLE_TASSERT") {
     const int64_t startInstant = 1496777923LL;

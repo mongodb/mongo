@@ -714,7 +714,10 @@ TEST_F(OpObserverOnCreateCollectionTest, UnreplicatedCollectionNotInLocalCatalog
                                        false /* isPersistedInLocalCatalog */);
 }
 
-DEATH_TEST_F(OpObserverOnCreateCollectionTest, CrashIfNoReplicatedCatalogIdentifier, "invariant") {
+using OpObserverOnCreateCollectionTestDeathTest = OpObserverOnCreateCollectionTest;
+DEATH_TEST_F(OpObserverOnCreateCollectionTestDeathTest,
+             CrashIfNoReplicatedCatalogIdentifier,
+             "invariant") {
     // Invariant only enforced when replicated local catalog identifiers are required for
     // replication correctness.
     RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
@@ -1746,7 +1749,8 @@ TEST_F(OpObserverTest, MultipleOnDelete) {
     opObserver.onDelete(opCtx.get(), *autoColl, kUninitializedStmtId, doc, documentKey, args);
 }
 
-DEATH_TEST_REGEX_F(OpObserverTest,
+using OpObserverTestDeathTest = OpObserverTest;
+DEATH_TEST_REGEX_F(OpObserverTestDeathTest,
                    NodeCrashesIfShardIdentityDocumentRolledBack,
                    "Fatal assertion.*50712") {
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());

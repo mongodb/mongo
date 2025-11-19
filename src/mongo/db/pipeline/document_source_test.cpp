@@ -110,13 +110,16 @@ TEST_F(DocumentSourceExtensionParserTest, ShouldSuccessfullyregisterParser) {
     ASSERT_EQUALS(sourceList.size(), 1U);
 }
 
-DEATH_TEST_F(DocumentSourceExtensionParserTest, ShouldThrowOnDuplicateRegistration, "28707") {
+using DocumentSourceExtensionParserTestDeathTest = DocumentSourceExtensionParserTest;
+DEATH_TEST_F(DocumentSourceExtensionParserTestDeathTest,
+             ShouldThrowOnDuplicateRegistration,
+             "28707") {
     DocumentSource::registerParser("$duplicateTest", DocumentSourceMockExtension::createFromBson);
 
     // Should throw assertion on duplicate registration.
     DocumentSource::registerParser("$duplicateTest", DocumentSourceMockExtension::createFromBson);
 }
-DEATH_TEST_F(DocumentSourceExtensionParserTest, ShouldThrowOnExistingStage, "28707") {
+DEATH_TEST_F(DocumentSourceExtensionParserTestDeathTest, ShouldThrowOnExistingStage, "28707") {
     // Should throw when trying to override an existing stage that's not eligible for overrides.
     DocumentSource::registerParser("$match", DocumentSourceMockExtension::createFromBson);
 }

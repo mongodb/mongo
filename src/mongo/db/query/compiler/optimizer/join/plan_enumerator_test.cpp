@@ -76,7 +76,7 @@ TEST(PlanEnumeratorHelpers, CombinationSequence) {
     ASSERT_EQ(1, cs.next());
 }
 
-DEATH_TEST(PlanEnumeratorHelpers, TooManyInvocationsOfCombinationSequence, "10986301") {
+DEATH_TEST(PlanEnumeratorHelpersDeathTest, TooManyInvocationsOfCombinationSequence, "10986301") {
     CombinationSequence cs(5);
     for (int i = 0; i < 6; ++i) {
         cs.next();

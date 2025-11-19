@@ -121,7 +121,10 @@ TEST_F(SpillableDequeTest, CanReturnDocumentsFromCacheAndDisk) {
     cache->finalize();
 }
 
-DEATH_TEST_F(SpillableDequeTest, RemovesDocumentsWhenExpired, "Requested expired document") {
+using SpillableDequeTestDeathTest = SpillableDequeTest;
+DEATH_TEST_F(SpillableDequeTestDeathTest,
+             RemovesDocumentsWhenExpired,
+             "Requested expired document") {
     _expCtx->setAllowDiskUse(false);
     auto cache = createSpillableDeque(2000);
     buildAndLoadDocumentSet(4, cache.get());

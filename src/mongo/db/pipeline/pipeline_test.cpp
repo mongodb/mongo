@@ -5691,7 +5691,8 @@ TEST_F(PipelineMustRunOnRouterTest, UnsplittableRouterPipelineAssertsIfDisallowe
     ASSERT_NOT_OK(pipeline->canRunOnRouter());
 }
 
-DEATH_TEST_F(PipelineMustRunOnRouterTest,
+using PipelineMustRunOnRouterTestDeathTest = PipelineMustRunOnRouterTest;
+DEATH_TEST_F(PipelineMustRunOnRouterTestDeathTest,
              SplittablePipelineMustMergeOnRouterAfterSplit,
              "Tripwire assertion") {
     setExpCtx({.inRouter = true, .allowDiskUse = false});

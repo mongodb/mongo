@@ -332,7 +332,8 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
                        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
 
-DEATH_TEST_REGEX_F(DocumentSourceGroupTest,
+using DocumentSourceGroupTestDeathTest = DocumentSourceGroupTest;
+DEATH_TEST_REGEX_F(DocumentSourceGroupTestDeathTest,
                    CannotHandleControlEvent,
                    "Tripwire assertion.*10358900") {
     auto expCtx = getExpCtx();
@@ -356,7 +357,7 @@ DEATH_TEST_REGEX_F(DocumentSourceGroupTest,
     ASSERT_THROWS_CODE(groupStage->getNext(), AssertionException, 10358900);
 }
 
-DEATH_TEST_REGEX_F(DocumentSourceGroupTest,
+DEATH_TEST_REGEX_F(DocumentSourceGroupTestDeathTest,
                    StreamingGroupCannotHandleControlEvent,
                    "Tripwire assertion.*10358903") {
     auto expCtx = getExpCtx();

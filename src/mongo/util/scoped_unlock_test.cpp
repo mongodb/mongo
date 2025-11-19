@@ -71,7 +71,7 @@ TEST(ScopedUnlockTest, Dismissed) {
     ASSERT_FALSE(lk.owns_lock()) << "ScopedUnlock should not relock on destruction if dismissed";
 }
 
-DEATH_TEST(ScopedUnlockTest,
+DEATH_TEST(ScopedUnlockTestDeathTest,
            InitUnlocked,
            "Locks in ScopedUnlock must be locked on initialization.") {
     stdx::mutex mutex;

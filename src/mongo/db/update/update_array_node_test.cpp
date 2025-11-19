@@ -123,7 +123,8 @@ TEST_F(UpdateArrayNodeTest, UpdateIsAppliedToAllMatchingElements) {
     ASSERT_EQUALS("{a.0, a.2}", getModifiedPaths());
 }
 
-DEATH_TEST_REGEX_F(UpdateArrayNodeTest,
+using UpdateArrayNodeTestDeathTest = UpdateArrayNodeTest;
+DEATH_TEST_REGEX_F(UpdateArrayNodeTestDeathTest,
                    ArrayElementsMustNotBeDeserialized,
                    R"#(Invariant failure.*childElement.hasValue\(\))#") {
     auto update = fromjson("{$set: {'a.$[i].b': 0}}");

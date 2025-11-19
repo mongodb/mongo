@@ -68,7 +68,7 @@ TEST(InternalSchemaMatchArrayIndexMatchExpression, HasSingleChild) {
     ASSERT(objMatch.getValue()->getChild(0));
 }
 
-DEATH_TEST_REGEX(InternalSchemaMatchArrayIndexMatchExpression,
+DEATH_TEST_REGEX(InternalSchemaMatchArrayIndexMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanOne,
                  "Tripwire assertion.*6400214") {
     auto query = fromjson(

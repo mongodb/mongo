@@ -45,7 +45,7 @@ CardinalityEstimate makeCE(double ce) {
 // Test invalid inputs, and calculations that produce invalid estimates.
 // Since the principle of checking validity is the same for all estimates, here we check only
 // few typical cases.
-// DEATH_TEST(EstimatesFramework, NegativeCardinality, "Negative cardinality") {
+// DEATH_TEST(EstimatesFrameworkDeathTest, NegativeCardinality, "Negative cardinality") {
 //    const CardinalityEstimate ce1(CardinalityType{-7.0}, defaultSrc);
 //}
 

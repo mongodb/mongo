@@ -2099,7 +2099,7 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsBooleanMixNotIncl
     }
 }
 
-DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
+DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
            EstimateViaTypeCountsBooleanMixUnorderedValues1,
            "Tripwire assertion") {
 
@@ -2130,7 +2130,7 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
     }
 }
 
-DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
+DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
            EstimateViaTypeCountsBooleanMixUnorderedValues2,
            "Tripwire assertion") {
 
@@ -2161,7 +2161,7 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
     }
 }
 
-DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
+DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
            EstimateViaTypeCountsBooleanRangeWithSameValues1,
            "Tripwire assertion") {
 
@@ -2192,7 +2192,7 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
     }
 }
 
-DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
+DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
            EstimateViaTypeCountsBooleanRangeWithSameValues3,
            "Tripwire assertion") {
 
@@ -2223,7 +2223,7 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
     }
 }
 
-DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
+DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
            EstimateViaTypeCountsBooleanRangeWithSameValues2,
            "Tripwire assertion") {
 
@@ -2254,7 +2254,7 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
     }
 }
 
-DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
+DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
            EstimateViaTypeCountsBooleanRangeWithSameValues4,
            "Tripwire assertion") {
 

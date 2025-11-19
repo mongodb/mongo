@@ -174,7 +174,8 @@ JournalListenerMock* OplogWriterImplTest::getJournalListener() const {
     return static_cast<JournalListenerMock*>(journalListener());
 }
 
-DEATH_TEST_F(OplogWriterImplTest, WriteEmptyBatchFails, "!ops.empty()") {
+using OplogWriterImplTestDeathTest = OplogWriterImplTest;
+DEATH_TEST_F(OplogWriterImplTestDeathTest, WriteEmptyBatchFails, "!ops.empty()") {
     OplogWriter::Options options(false /* skipWritesToOplogColl */);
 
     OplogWriterImpl oplogWriter(nullptr,  // executor

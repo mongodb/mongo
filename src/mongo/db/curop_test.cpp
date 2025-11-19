@@ -564,7 +564,7 @@ TEST(CurOpTest, CanReadMemoryStatsWithoutFeatureFlag) {
     ASSERT_EQ(0, curop->getPeakTrackedMemoryBytes());
 }
 
-DEATH_TEST(CurOpTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "tassert") {
+DEATH_TEST(CurOpTestDeathTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "tassert") {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     auto curop = CurOp::get(*opCtx);

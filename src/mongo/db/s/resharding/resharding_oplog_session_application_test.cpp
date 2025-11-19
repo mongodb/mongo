@@ -911,7 +911,8 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPreImage)
     }
 }
 
-DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTest,
+using ReshardingOplogSessionApplicationTestDeathTest = ReshardingOplogSessionApplicationTest;
+DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTestDeathTest,
                    IncomingRetryableWriteHasPreImageThatCannotBeFound,
                    "Tripwire assertion.*6344401") {
     auto lsid = makeLogicalSessionIdForTest();
@@ -1010,7 +1011,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPostImage
     }
 }
 
-DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTest,
+DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTestDeathTest,
                    IncomingRetryableWriteHasPostImageThatCannotBeFound,
                    "Tripwire assertion.*6344401") {
     auto lsid = makeLogicalSessionIdForTest();

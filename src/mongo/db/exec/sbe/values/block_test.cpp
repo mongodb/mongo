@@ -1368,7 +1368,8 @@ TEST_F(ValueBlockTest, ArgMinMaxGetAt) {
     }
 }
 
-DEATH_TEST_REGEX_F(ValueBlockTest, OutOfBoundsAt, "Tripwire assertion.*11089617") {
+using ValueBlockTestDeathTest = ValueBlockTest;
+DEATH_TEST_REGEX_F(ValueBlockTestDeathTest, OutOfBoundsAt, "Tripwire assertion.*11089617") {
     auto block = value::MonoBlock::makeNothingBlock(1);
     ASSERT_THAT(block->at(0),
                 ValueEq(std::pair{value::TypeTags::Nothing, value::bitcastFrom<int64_t>(0)}));
@@ -1376,7 +1377,7 @@ DEATH_TEST_REGEX_F(ValueBlockTest, OutOfBoundsAt, "Tripwire assertion.*11089617"
     auto _ = block->at(1);
 }
 
-DEATH_TEST_REGEX_F(ValueBlockTest, OutOfBoundsAt2, "Tripwire assertion.*11089618") {
+DEATH_TEST_REGEX_F(ValueBlockTestDeathTest, OutOfBoundsAt2, "Tripwire assertion.*11089618") {
     auto block = std::make_unique<value::Int64Block>();
     block->push_back(static_cast<int64_t>(10));
     auto& valueBlock = static_cast<value::ValueBlock&>(*block);

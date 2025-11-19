@@ -197,7 +197,10 @@ TEST_F(SampleBasics, ShouldPropagatePauses) {
     assertEOF();
 }
 
-DEATH_TEST_REGEX_F(SampleBasics, CannotHandleControlEvent, "Tripwire assertion.*10358901") {
+using SampleBasicsDeathTest = SampleBasics;
+DEATH_TEST_REGEX_F(SampleBasicsDeathTest,
+                   CannotHandleControlEvent,
+                   "Tripwire assertion.*10358901") {
     createSample(2);
 
     // Create a control event.
@@ -429,7 +432,8 @@ TEST_F(SampleFromRandomCursorBasics, MimicNonOptimized) {
     ASSERT_LTE(secondTotal / nTrials, 0.52);
 }
 
-DEATH_TEST_REGEX_F(SampleFromRandomCursorBasics,
+using SampleFromRandomCursorBasicsDeathTest = SampleFromRandomCursorBasics;
+DEATH_TEST_REGEX_F(SampleFromRandomCursorBasicsDeathTest,
                    ShouldFailIfGivenPausedInput,
                    "Invariant failure.*Hit a MONGO_UNREACHABLE!") {
     createSample(2);
@@ -441,7 +445,7 @@ DEATH_TEST_REGEX_F(SampleFromRandomCursorBasics,
     sampleStage()->getNext();
 }
 
-DEATH_TEST_REGEX_F(SampleFromRandomCursorBasics,
+DEATH_TEST_REGEX_F(SampleFromRandomCursorBasicsDeathTest,
                    CannotHandleControlEvent,
                    "Tripwire assertion.*10358902") {
     createSample(2);

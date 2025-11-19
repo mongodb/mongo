@@ -260,24 +260,25 @@ TEST_F(RecoveryUnitTestHarness, FlipReadOnly) {
     ASSERT_FALSE(ru->readOnly());
 }
 
-DEATH_TEST_F(RecoveryUnitTestHarness, RegisterChangeMustBeInUnitOfWork, "invariant") {
+using RecoveryUnitTestHarnessDeathTest = RecoveryUnitTestHarness;
+DEATH_TEST_F(RecoveryUnitTestHarnessDeathTest, RegisterChangeMustBeInUnitOfWork, "invariant") {
     int count = 0;
     ru->registerChange(std::make_unique<TestChange>(&count));
 }
 
-DEATH_TEST_F(RecoveryUnitTestHarness, CommitMustBeInUnitOfWork, "invariant") {
+DEATH_TEST_F(RecoveryUnitTestHarnessDeathTest, CommitMustBeInUnitOfWork, "invariant") {
     ru->commitUnitOfWork();
 }
 
-DEATH_TEST_F(RecoveryUnitTestHarness, AbortMustBeInUnitOfWork, "invariant") {
+DEATH_TEST_F(RecoveryUnitTestHarnessDeathTest, AbortMustBeInUnitOfWork, "invariant") {
     ru->abortUnitOfWork();
 }
 
-DEATH_TEST_F(RecoveryUnitTestHarness, CannotHaveUnfinishedUnitOfWorkOnExit, "invariant") {
+DEATH_TEST_F(RecoveryUnitTestHarnessDeathTest, CannotHaveUnfinishedUnitOfWorkOnExit, "invariant") {
     ru->beginUnitOfWork(opCtx->readOnly());
 }
 
-DEATH_TEST_F(RecoveryUnitTestHarness, PrepareMustBeInUnitOfWork, "invariant") {
+DEATH_TEST_F(RecoveryUnitTestHarnessDeathTest, PrepareMustBeInUnitOfWork, "invariant") {
     try {
         ru->prepareUnitOfWork();
     } catch (const ExceptionFor<ErrorCodes::CommandNotSupported>&) {
@@ -286,7 +287,7 @@ DEATH_TEST_F(RecoveryUnitTestHarness, PrepareMustBeInUnitOfWork, "invariant") {
     }
 }
 
-DEATH_TEST_F(RecoveryUnitTestHarness, AbandonSnapshotMustBeOutOfUnitOfWork, "invariant") {
+DEATH_TEST_F(RecoveryUnitTestHarnessDeathTest, AbandonSnapshotMustBeOutOfUnitOfWork, "invariant") {
     ru->beginUnitOfWork(opCtx->readOnly());
     ru->abandonSnapshot();
 }

@@ -644,7 +644,8 @@ TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1ForDatabaseLevel
 
 // Test that creating a v2 change stream reader pipeline will fail if no valid
 // 'ChangeStreamReaderBuilder' instance is set in the global ServiceContext.
-DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+using ChangeStreamStageTestDeathTest = ChangeStreamStageTest;
+DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
                    CreatingChangeStreamFailsWithV2VersionWithoutReaderBuilderInstance,
                    "Tripwire assertion.*10743904") {
     getExpCtx()->setInRouter(true);
@@ -666,7 +667,7 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTest,
 // Test that creating a v2 change stream reader pipeline will fail if no valid
 // 'DataToShardsAllocationQueryService' instance is set in the global ServiceContext.
 DEATH_TEST_REGEX_F(
-    ChangeStreamStageTest,
+    ChangeStreamStageTestDeathTest,
     CreatingChangeStreamFailsWithV2VersionWithoutDataToShardsAllocationQueryServiceInstance,
     "Tripwire assertion.*10743906") {
     getExpCtx()->setInRouter(true);
@@ -839,7 +840,7 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersUnwindFilterForData
 
 // Test that the calling 'buildControlEventsFilterForDataShard' fails for change stream reader
 // versions unequal to v2.
-DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
                    BuildControlEventsFilterForDataShardFailsWhenCallingForNonV2ChangeStreamReaders,
                    "Tripwire assertion.*10743901") {
     // Set version v1 in the change stream spec of the ExpressionContext.
@@ -2136,7 +2137,7 @@ TEST_F(ChangeStreamStageTest, TransformEmptyApplyOps) {
     ASSERT_EQ(results.size(), 0u);
 }
 
-DEATH_TEST_F(ChangeStreamStageTest, ShouldCrashWithNoopInsideApplyOps, "Unexpected noop") {
+DEATH_TEST_F(ChangeStreamStageTestDeathTest, ShouldCrashWithNoopInsideApplyOps, "Unexpected noop") {
     Document applyOpsDoc =
         Document{{"applyOps",
                   Value{std::vector<Document>{
@@ -2148,7 +2149,7 @@ DEATH_TEST_F(ChangeStreamStageTest, ShouldCrashWithNoopInsideApplyOps, "Unexpect
     getApplyOpsResults(applyOpsDoc, lsid);  // Should crash.
 }
 
-DEATH_TEST_F(ChangeStreamStageTest,
+DEATH_TEST_F(ChangeStreamStageTestDeathTest,
              ShouldCrashWithEntryWithoutOpFieldInsideApplyOps,
              "Unexpected format for entry") {
     Document applyOpsDoc =
@@ -2161,7 +2162,7 @@ DEATH_TEST_F(ChangeStreamStageTest,
     getApplyOpsResults(applyOpsDoc, lsid);  // Should crash.
 }
 
-DEATH_TEST_F(ChangeStreamStageTest,
+DEATH_TEST_F(ChangeStreamStageTestDeathTest,
              ShouldCrashWithEntryWithNonStringOpFieldInsideApplyOps,
              "Unexpected format for entry") {
     Document applyOpsDoc =
@@ -3496,7 +3497,7 @@ TEST_F(ChangeStreamStageTest,
     ASSERT_TRUE(next.isEOF());
 }
 
-DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
                    DocumentSourceChangeStreamTransformTransformUnknownSupportedEvent,
                    "Tripwire assertion.*5052201") {
     getExpCtx()->setForPerShardCursor(true);
@@ -3698,7 +3699,7 @@ TEST_F(ChangeStreamStageTest, DSCSInjectControlEventsStageSerialization) {
     }
 }
 
-DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
                    DSCSInjectControlEventsStageSerializationInvalidInputType,
                    "Tripwire assertion.*10384001") {
     // Test invalid top-level BSON type.
@@ -3710,7 +3711,7 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTest,
         10384001);
 }
 
-DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
                    DSCSInjectControlEventsStageSerializationInvalidActionInputs,
                    "Tripwire assertion.*10384001") {
     // Test invalid actions types.
@@ -3739,7 +3740,7 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTest,
     }
 }
 
-DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
                    DSCSInjectControlEventsStageSerializationDuplicateEvents,
                    "Tripwire assertion.*10384002") {
     // Test duplicate events in spec.

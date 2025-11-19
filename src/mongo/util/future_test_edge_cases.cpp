@@ -358,7 +358,7 @@ TEST(Future_EdgeCases, SharedPromise_CompleteWithUnreadyFuture) {
 // With gcc 5.8 we terminate, but print "terminate() called. No exception is active". This works in
 // clang and gcc 7, so hopefully we can change the death-test search string to "die die die!!!" when
 // we upgrade the toolchain.
-DEATH_TEST(Future_EdgeCases, Success_getAsync_throw, "terminate() called") {
+DEATH_TEST(Future_EdgeCasesDeathTest, Success_getAsync_throw, "terminate() called") {
     Future<void>::makeReady().getAsync(
         [](Status) { uasserted(ErrorCodes::BadValue, "die die die!!!"); });
 }

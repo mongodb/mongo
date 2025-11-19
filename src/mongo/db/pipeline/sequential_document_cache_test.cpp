@@ -57,14 +57,16 @@ TEST(SequentialDocumentCacheTest, CanAddDocumentsToCacheWhileBuilding) {
     ASSERT_EQ(cache.count(), 2ul);
 }
 
-DEATH_TEST(SequentialDocumentCacheTest, CannotIterateCacheWhileBuilding, "Tripwire assertion") {
+DEATH_TEST(SequentialDocumentCacheTestDeathTest,
+           CannotIterateCacheWhileBuilding,
+           "Tripwire assertion") {
     SequentialDocumentCache cache(kCacheSizeBytes);
     ASSERT(cache.isBuilding());
 
     cache.getNext();
 }
 
-DEATH_TEST(SequentialDocumentCacheTest,
+DEATH_TEST(SequentialDocumentCacheTestDeathTest,
            CannotRestartCacheIterationWhileBuilding,
            "Tripwire assertion") {
     SequentialDocumentCache cache(kCacheSizeBytes);
@@ -111,7 +113,7 @@ TEST(SequentialDocumentCacheTest, CanRestartCacheIterationAfterFreezing) {
     ASSERT_FALSE(cache.getNext().has_value());
 }
 
-DEATH_TEST(SequentialDocumentCacheTest,
+DEATH_TEST(SequentialDocumentCacheTestDeathTest,
            CannotAddDocumentsToCacheAfterFreezing,
            "Tripwire assertion") {
     SequentialDocumentCache cache(kCacheSizeBytes);
@@ -131,21 +133,25 @@ TEST(SequentialDocumentCacheTest, ShouldAbandonCacheIfMaxSizeBytesExceeded) {
     ASSERT(cache.isAbandoned());
 }
 
-DEATH_TEST(SequentialDocumentCacheTest, CannotAddDocumentsToAbandonedCache, "Tripwire assertion") {
+DEATH_TEST(SequentialDocumentCacheTestDeathTest,
+           CannotAddDocumentsToAbandonedCache,
+           "Tripwire assertion") {
     SequentialDocumentCache cache(kCacheSizeBytes);
     cache.abandon();
 
     cache.add(DOC("_id" << 0));
 }
 
-DEATH_TEST(SequentialDocumentCacheTest, CannotFreezeCacheWhenAbandoned, "Tripwire assertion") {
+DEATH_TEST(SequentialDocumentCacheTestDeathTest,
+           CannotFreezeCacheWhenAbandoned,
+           "Tripwire assertion") {
     SequentialDocumentCache cache(kCacheSizeBytes);
     cache.abandon();
 
     cache.freeze();
 }
 
-DEATH_TEST(SequentialDocumentCacheTest,
+DEATH_TEST(SequentialDocumentCacheTestDeathTest,
            CannotRestartCacheIterationWhenAbandoned,
            "Tripwire assertion") {
     SequentialDocumentCache cache(kCacheSizeBytes);
@@ -156,7 +162,9 @@ DEATH_TEST(SequentialDocumentCacheTest,
     cache.restartIteration();
 }
 
-DEATH_TEST(SequentialDocumentCacheTest, CannotCallGetNextWhenAbandoned, "Tripwire assertion") {
+DEATH_TEST(SequentialDocumentCacheTestDeathTest,
+           CannotCallGetNextWhenAbandoned,
+           "Tripwire assertion") {
     SequentialDocumentCache cache(kCacheSizeBytes);
     ASSERT(cache.isBuilding());
 

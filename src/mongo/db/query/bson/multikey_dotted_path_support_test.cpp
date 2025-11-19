@@ -173,7 +173,7 @@ TEST(ExtractAllElementsAlongPath, NestedMaxDepthObjectWithScalarValue) {
     assertArrayComponentsAreEqual(MultikeyComponents{}, actualArrayComponents);
 }
 
-DEATH_TEST_REGEX(ExtractAllElementsAlongPath, ExceedsMaxDepth, "Tripwire.*11177100") {
+DEATH_TEST_REGEX(ExtractAllElementsAlongPathDeathTest, ExceedsMaxDepth, "Tripwire.*11177100") {
     BSONElementSet actualElements;
     const bool expandArrayOnTrailingField = true;
     MultikeyComponents actualArrayComponents;

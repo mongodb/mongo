@@ -679,7 +679,7 @@ TEST(DocumentMetadataFieldsTest, SettingScoreDetailsWithScoreOverridesScore) {
     ASSERT_EQ(metadata.getScore(), 0.293);
 }
 
-DEATH_TEST_REGEX(DocumentMetadataFieldsTest,
+DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
                  ScoreDetailsWithScoreMetadataFailsIfScoreValueIsNonNumeric,
                  "Tripwire assertion.*9679300") {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
@@ -687,7 +687,7 @@ DEATH_TEST_REGEX(DocumentMetadataFieldsTest,
     metadata.setScoreAndScoreDetails(Value(BSON("value" << "string")));
 }
 
-DEATH_TEST_REGEX(DocumentMetadataFieldsTest,
+DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
                  ScoreDetailsWithScoreMetadataFailsIfScoreValueIsMissing,
                  "Tripwire assertion.*9679300") {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
@@ -695,14 +695,14 @@ DEATH_TEST_REGEX(DocumentMetadataFieldsTest,
     metadata.setScoreAndScoreDetails(Value(BSON("non-value" << "string")));
 }
 
-DEATH_TEST_REGEX(DocumentMetadataFieldsTest,
+DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
                  GetTimeseriesBucketMinTimeDoesntExist,
                  "Tripwire assertion.*6850100") {
     DocumentMetadataFields source;
     source.getTimeseriesBucketMinTime();
 }
 
-DEATH_TEST_REGEX(DocumentMetadataFieldsTest,
+DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
                  GetTimeseriesBucketMaxTimeDoesntExist,
                  "Tripwire assertion.*6850101") {
     DocumentMetadataFields source;

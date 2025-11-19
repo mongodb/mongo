@@ -306,7 +306,8 @@ TEST_F(ApplyContainerOpsTest, ApplyContainerOpInvalidOpType) {
     ASSERT_THROWS_CODE(applyContainerOpHelper(_opCtx.get(), {op}), DBException, 10704705);
 }
 
-DEATH_TEST_F(ApplyContainerOpsTest, ApplyContainerOpRequiresIXLock, "invariant") {
+using ApplyContainerOpsTestDeathTest = ApplyContainerOpsTest;
+DEATH_TEST_F(ApplyContainerOpsTestDeathTest, ApplyContainerOpRequiresIXLock, "invariant") {
     int64_t k = 1;
     auto v = BSONBinData("V", 1, BinDataGeneral);
 

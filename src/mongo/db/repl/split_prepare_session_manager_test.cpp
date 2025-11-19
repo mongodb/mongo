@@ -143,7 +143,8 @@ TEST_F(SplitPrepareSessionManagerTest, SplitSessionsAndReleaseAll) {
     ASSERT_EQ(false, _splitSessManager->isSessionSplit(topLevelSessId2, txnNumber2));
 }
 
-DEATH_TEST_F(SplitPrepareSessionManagerTest, SplitAlreadySplitSessions, "invariant") {
+using SplitPrepareSessionManagerTestDeathTest = SplitPrepareSessionManagerTest;
+DEATH_TEST_F(SplitPrepareSessionManagerTestDeathTest, SplitAlreadySplitSessions, "invariant") {
     const auto& topLevelSessId = makeSystemLogicalSessionId();
     const TxnNumber txnNumber(100);
     const std::vector<uint32_t> requesterIds{2, 4, 6};
@@ -157,14 +158,16 @@ DEATH_TEST_F(SplitPrepareSessionManagerTest, SplitAlreadySplitSessions, "invaria
     _splitSessManager->splitSession(topLevelSessId, txnNumber, requesterIds);
 }
 
-DEATH_TEST_F(SplitPrepareSessionManagerTest, ReleaseNonSplitSessions, "invariant") {
+DEATH_TEST_F(SplitPrepareSessionManagerTestDeathTest, ReleaseNonSplitSessions, "invariant") {
     const auto& topLevelSessId = makeSystemLogicalSessionId();
 
     // Attempting to release a non-split top-level session should fail.
     _splitSessManager->releaseSplitSessions(topLevelSessId, TxnNumber(100));
 }
 
-DEATH_TEST_F(SplitPrepareSessionManagerTest, ChangeTxnNumberAfterSessionSplit, "invariant") {
+DEATH_TEST_F(SplitPrepareSessionManagerTestDeathTest,
+             ChangeTxnNumberAfterSessionSplit,
+             "invariant") {
     const auto& topLevelSessId = makeSystemLogicalSessionId();
     const TxnNumber txnNumber(100);
     const std::vector<uint32_t> requesterIds{2, 4, 6};

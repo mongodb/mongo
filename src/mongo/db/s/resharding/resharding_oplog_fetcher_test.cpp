@@ -1339,7 +1339,8 @@ TEST_F(ReshardingOplogFetcherTest, ImmediatelyDoneWhenFinalOpHasAlreadyBeenFetch
     ASSERT_OK(future.getNoThrow());
 }
 
-DEATH_TEST_REGEX_F(ReshardingOplogFetcherTest,
+using ReshardingOplogFetcherTestDeathTest = ReshardingOplogFetcherTest;
+DEATH_TEST_REGEX_F(ReshardingOplogFetcherTestDeathTest,
                    CannotFetchMoreWhenFinalOpHasAlreadyBeenFetched,
                    "Invariant failure.*_startAt != kFinalOpAlreadyFetched") {
     const NamespaceString outputCollectionNss =

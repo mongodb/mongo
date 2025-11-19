@@ -1734,7 +1734,8 @@ TEST_F(ReshardingRecipientServiceTest, OpCtxKilledWhileRestoringMetrics) {
     }
 }
 
-DEATH_TEST_REGEX_F(ReshardingRecipientServiceTest, CommitFn, "4457001.*tripwire") {
+using ReshardingRecipientServiceTestDeathTest = ReshardingRecipientServiceTest;
+DEATH_TEST_REGEX_F(ReshardingRecipientServiceTestDeathTest, CommitFn, "4457001.*tripwire") {
     for (const auto& testOptions : makeBasicTestOptions()) {
         LOGV2(9297802,
               "Running case",

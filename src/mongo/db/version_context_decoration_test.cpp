@@ -65,7 +65,8 @@ TEST_F(VersionContextDecorationTest, ScopedSetDecoration) {
     ASSERT_EQ(VersionContext{}, VersionContext::getDecoration(opCtx));
 }
 
-DEATH_TEST_F(VersionContextDecorationTest,
+using VersionContextDecorationTestDeathTest = VersionContextDecorationTest;
+DEATH_TEST_F(VersionContextDecorationTestDeathTest,
              ScopedSetDecorationRecursive,
              "Refusing to set a VersionContext on an operation that already has one") {
     VersionContext::ScopedSetDecoration scopedVCtx(opCtx, kLastLTSVersionContext);

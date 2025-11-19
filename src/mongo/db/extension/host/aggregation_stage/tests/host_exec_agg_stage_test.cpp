@@ -134,7 +134,8 @@ TEST(HostExecAggStageTest, GetNextResultEdgeCaseEof) {
     ASSERT_EQ(boost::none, hostGetNextResult.res);
 }
 
-DEATH_TEST_F(ExecAggStageTest, InvalidReturnStatusCode, "11019500") {
+using ExecAggStageTestDeathTest = ExecAggStageTest;
+DEATH_TEST_F(ExecAggStageTestDeathTest, InvalidReturnStatusCode, "11019500") {
     using ReturnStatus = exec::agg::GetNextResult::ReturnStatus;
     // Need to set this metadata, so we don't hit the dassert in makeAdvancedControlDocument(...).
     MutableDocument doc(Document{BSON("a" << 1)});

@@ -70,7 +70,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceUniqueForThisTestMappingFn(
  * Test that for the DocumentSources that do not have a registered mapping function, we hit the
  * tassert in the mapping function.
  */
-DEATH_TEST(DocumentSourceToStageRegistryTest,
+DEATH_TEST(DocumentSourceToStageRegistryTestDeathTest,
            NonexistentMapper,
            "Missing 'DocumentSource' to 'agg::Stage' mapping function") {
     const auto expCtx = make_intrusive<ExpressionContextForTest>();

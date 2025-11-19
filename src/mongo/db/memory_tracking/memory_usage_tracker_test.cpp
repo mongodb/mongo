@@ -138,14 +138,15 @@ TEST_F(MemoryUsageTrackerTest, UpdateUsageUpdatesGlobal) {
     ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 150LL);
 }
 
-DEATH_TEST_F(MemoryUsageTrackerTest,
+using MemoryUsageTrackerTestDeathTest = MemoryUsageTrackerTest;
+DEATH_TEST_F(MemoryUsageTrackerTestDeathTest,
              UpdateFunctionUsageToNegativeIsDisallowed,
              "Underflow in memory tracking") {
     _funcTracker.set(50LL);
     _funcTracker.add(-100LL);
 }
 
-DEATH_TEST_F(MemoryUsageTrackerTest,
+DEATH_TEST_F(MemoryUsageTrackerTestDeathTest,
              UpdateMemUsageToNegativeIsDisallowed,
              "Underflow in memory tracking") {
     _tracker.add(50LL);

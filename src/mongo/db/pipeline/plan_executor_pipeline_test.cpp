@@ -74,7 +74,8 @@ protected:
 /**
  * Test that the plan executor throws upon seeing a control event on a router.
  */
-DEATH_TEST_REGEX_F(PlanExecutorTest,
+using PlanExecutorTestDeathTest = PlanExecutorTest;
+DEATH_TEST_REGEX_F(PlanExecutorTestDeathTest,
                    AssertsOnControlEventOnRouter,
                    "Tripwire assertion.*10358906") {
     _expCtx->setInRouter(true);

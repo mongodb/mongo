@@ -671,7 +671,7 @@ TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndexDottedField) {
     }
 }
 
-DEATH_TEST_REGEX(IndexUpdateIdentifierTest,
+DEATH_TEST_REGEX(IndexUpdateIdentifierTestDeathTest,
                  FailsWhenAnIndexIsAddedWIthWrongCounter,
                  R"#(Tripwire assertion.*7639000.*indexCounter should be less than _numIndexes)#") {
     doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);

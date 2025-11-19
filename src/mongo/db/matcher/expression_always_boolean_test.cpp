@@ -57,7 +57,7 @@ TEST(AlwaysTrueMatchExpression, EquivalentReturnsCorrectResults) {
     ASSERT_FALSE(trueExpr->equivalent(&falseExpr));
 }
 
-DEATH_TEST_REGEX(AlwaysTrueMatchExpression,
+DEATH_TEST_REGEX(AlwaysTrueMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400202") {
     auto trueExpr = std::make_unique<AlwaysTrueMatchExpression>();
@@ -66,7 +66,7 @@ DEATH_TEST_REGEX(AlwaysTrueMatchExpression,
     ASSERT_THROWS_CODE(trueExpr->getChild(0), AssertionException, 6400202);
 }
 
-DEATH_TEST_REGEX(AlwaysFalseMatchExpression,
+DEATH_TEST_REGEX(AlwaysFalseMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400202") {
     auto falseExpr = std::make_unique<AlwaysFalseMatchExpression>();

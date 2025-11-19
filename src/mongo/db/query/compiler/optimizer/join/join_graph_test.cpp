@@ -88,7 +88,9 @@ TEST(JoinGraphTests, AddEdge) {
     ASSERT_EQ(graph.getEdge(secondThird).right, 1 << third);
 }
 
-DEATH_TEST(JoinGraphTests, AddEdgeSimpleSelfEdgeForbidden, "Self edges are not permitted") {
+DEATH_TEST(JoinGraphTestsDeathTest,
+           AddEdgeSimpleSelfEdgeForbidden,
+           "Self edges are not permitted") {
     JoinGraph graph{};
 
     auto a = graph.addNode(makeNSS("a"), nullptr, boost::none);
@@ -98,7 +100,9 @@ DEATH_TEST(JoinGraphTests, AddEdgeSimpleSelfEdgeForbidden, "Self edges are not p
     graph.addSimpleEqualityEdge(a, a, 0, 1);
 }
 
-DEATH_TEST(JoinGraphTests, AddEdgeComplexSelfEdgeForbidden, "Self edges are not permitted") {
+DEATH_TEST(JoinGraphTestsDeathTest,
+           AddEdgeComplexSelfEdgeForbidden,
+           "Self edges are not permitted") {
     JoinGraph graph{};
 
     auto a = graph.addNode(makeNSS("a"), nullptr, boost::none);

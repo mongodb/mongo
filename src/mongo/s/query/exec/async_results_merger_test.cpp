@@ -152,7 +152,8 @@ void runScheduledTasks(OperationContext* opCtx) {
     }
 }
 
-DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
+using AsyncResultsMergerTestDeathTest = AsyncResultsMergerTest;
+DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
                    CreateWithInvalidOperationContextPointer,
                    "Tripwire assertion.*10373300") {
     ASSERT_THROWS_CODE(AsyncResultsMerger::create(nullptr, executor(), AsyncResultsMergerParams{}),
@@ -1101,7 +1102,7 @@ TEST_F(AsyncResultsMergerTest, HighWaterMarkTestRecognizeControlEvents) {
     runHighWaterMarkTest(true /* recognizeControlEvents */);
 }
 
-DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
+DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
                    SetInitialHighWaterMarkWithTimeGoingBackwards,
                    "Tripwire assertion.*10359104") {
     AsyncResultsMergerParams params = AsyncResultsMergerTest::buildARMParamsForChangeStream();
@@ -1144,7 +1145,7 @@ TEST_F(AsyncResultsMergerTest, SetHighWaterMark) {
     ASSERT_BSONOBJ_EQ(highWaterMark, arm->getHighWaterMark());
 }
 
-DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
+DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
                    SetHighWaterMarkToHigher,
                    "Tripwire assertion.*11057504") {
     AsyncResultsMergerParams params = AsyncResultsMergerTest::buildARMParamsForChangeStream();
@@ -1311,7 +1312,9 @@ TEST_F(AsyncResultsMergerTest, HandleControlEventsWithNonUniqueTimestamps) {
     ASSERT_BSONOBJ_EQ(pbrts.back(), arm->getHighWaterMark());
 }
 
-DEATH_TEST_REGEX_F(AsyncResultsMergerTest, MakePBRTGoBackInTime, "Tripwire assertion.*10359104") {
+DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
+                   MakePBRTGoBackInTime,
+                   "Tripwire assertion.*10359104") {
     AsyncResultsMergerParams params = AsyncResultsMergerTest::buildARMParamsForChangeStream();
 
     std::vector<RemoteCursor> cursors;
@@ -2566,7 +2569,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreCommandRequestIncludesMaxTimeMS) {
     scheduleNetworkResponses(std::move(responses));
 }
 
-DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
+DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
                    SortedTailableFailsIfInitialBatchHasNoPostBatchResumeToken,
                    "Tripwire assertion.*11052302") {
     AsyncResultsMergerParams params;
@@ -2600,7 +2603,7 @@ DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
     MONGO_UNREACHABLE;
 }
 
-DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
+DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
                    SortedTailableCursorFailsIfOneOrMoreRemotesHasEmptyPostBatchResumeToken,
                    "Tripwire assertion.*11052309") {
     AsyncResultsMergerParams params;
@@ -3339,7 +3342,7 @@ TEST_F(AsyncResultsMergerTest, ProcessAdditionalParticipantsEvenIfKilled) {
     ASSERT_EQ(addedShard->readOnly, TransactionRouter::Participant::ReadOnly::kReadOnly);
 }
 
-DEATH_TEST_F(AsyncResultsMergerTest,
+DEATH_TEST_F(AsyncResultsMergerTestDeathTest,
              ShouldFailIfAskedToPerformGetMoresWithoutAnOpCtx,
              "Cannot schedule a getMore without an OperationContext") {
     BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true, awaitData: true}");
@@ -3643,7 +3646,7 @@ TEST_F(AsyncResultsMergerTest, CanAccessParams) {
 }
 
 // Test that calling 'undoNextReady()' fails if the undo mode is disabled.
-DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
+DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
                    UndoNextReadyFailsIfNoUndoModeNotEnabled,
                    "Tripwire assertion.*11057500") {
     std::vector<RemoteCursor> cursors;
@@ -3654,7 +3657,7 @@ DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
 }
 
 // Test that calling 'undoNextReady()' fails if no undo result is buffered.
-DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
+DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
                    UndoNextReadyFailsIfNoResultBuffered,
                    "Tripwire assertion.*11057501") {
     std::vector<RemoteCursor> cursors;
@@ -3752,7 +3755,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadyUnsorted) {
 }
 
 // Test 'undoNextReady()' after cursor for undone result was already closed.
-DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
+DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
                    UndoNextReadyAfterCursorForResultWasClosed,
                    "Tripwire assertion.*11057502") {
     std::vector<RemoteCursor> cursors;
@@ -4037,7 +4040,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadyMultipleUndos) {
 }
 
 // Test multiple undoNextReady calls for the same result.
-DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
+DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
                    UndoNextReadyMultipleUndosForSameResult,
                    "Tripwire assertion.*11057501") {
     std::vector<RemoteCursor> cursors;
@@ -4066,7 +4069,9 @@ DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
 }
 
 // Test calling 'undoNextReady()' after an EOF was returned.
-DEATH_TEST_REGEX_F(AsyncResultsMergerTest, UndoNextReadyWithEOF, "Tripwire assertion.*11057501") {
+DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
+                   UndoNextReadyWithEOF,
+                   "Tripwire assertion.*11057501") {
     BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true}");
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
     std::vector<RemoteCursor> cursors;
@@ -4136,7 +4141,7 @@ TEST(SimpleAsyncResultsMergerTest, CheckResumeTokensAreMonotonicallyIncreasing) 
     ASSERT_TRUE(isMonotonicallyIncreasing(doc1, doc2));
 }
 
-DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTest,
+DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTestDeathTest,
                  InvalidHighWatermarkStrategy,
                  "Tripwire assertion.*10359107") {
     // Use the "invalid" high water mark determining strategy. This strategy will always trigger a
@@ -4152,7 +4157,7 @@ DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTest,
                        10359107);
 }
 
-DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTest,
+DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTestDeathTest,
                  ChangeStreamV1InvalidInputDocument,
                  "Tripwire assertion.*10359101") {
     auto nextHighWaterMarkDeterminingStrategy =
@@ -4215,7 +4220,7 @@ TEST(NextHighWaterMarkDeterminingStrategyTest,
     }
 }
 
-DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTest,
+DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTestDeathTest,
                  RecognizeControlEventsInvalidInputDocument,
                  "Tripwire assertion.*10359101") {
     auto nextHighWaterMarkDeterminingStrategy =
@@ -4230,7 +4235,7 @@ DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTest,
         (*nextHighWaterMarkDeterminingStrategy)(BSONObj(), pbrt), AssertionException, 10359101);
 }
 
-DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTest,
+DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTestDeathTest,
                  RecognizeControlEventsThrowsUponEmptyCurrentHighWaterMark,
                  "Tripwire assertion.*10359109") {
     auto nextHighWaterMarkDeterminingStrategy =

@@ -171,7 +171,7 @@ TEST(InternalExprEqMatchExpression, EquivalentToClone) {
     ASSERT_TRUE(eq.getMatchExpression()->equivalent(clone.get()));
 }
 
-DEATH_TEST_REGEX(InternalExprEqMatchExpression,
+DEATH_TEST_REGEX(InternalExprEqMatchExpressionDeathTest,
                  CannotCompareToArray,
                  "Tripwire assertion.*11052406") {
     auto operand = BSON("a" << BSON_ARRAY(1 << 2));
@@ -179,7 +179,7 @@ DEATH_TEST_REGEX(InternalExprEqMatchExpression,
                                      operand.firstElement());
 }
 
-DEATH_TEST_REGEX(InternalExprEqMatchExpression,
+DEATH_TEST_REGEX(InternalExprEqMatchExpressionDeathTest,
                  CannotCompareToUndefined,
                  "Tripwire assertion.*11052405") {
     auto operand = BSON("a" << BSONUndefined);
@@ -187,7 +187,7 @@ DEATH_TEST_REGEX(InternalExprEqMatchExpression,
                                      operand.firstElement());
 }
 
-DEATH_TEST_REGEX(InternalExprEqMatchExpression,
+DEATH_TEST_REGEX(InternalExprEqMatchExpressionDeathTest,
                  CannotCompareToMissing,
                  "Tripwire assertion.*11052407") {
     InternalExprEqMatchExpression eq("a"_sd, BSONElement());

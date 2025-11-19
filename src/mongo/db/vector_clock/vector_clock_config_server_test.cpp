@@ -158,7 +158,8 @@ TEST_F(VectorClockConfigServerTest, TickToClusterTime) {
     ASSERT_EQ(LogicalTime(Timestamp(3, 3)), t3.clusterTime());
 }
 
-DEATH_TEST_F(VectorClockConfigServerTest, CannotTickConfigTime, "invariant") {
+using VectorClockConfigServerTestDeathTest = VectorClockConfigServerTest;
+DEATH_TEST_F(VectorClockConfigServerTestDeathTest, CannotTickConfigTime, "invariant") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
     vc->tickConfigTime(1);
@@ -184,7 +185,7 @@ TEST_F(VectorClockConfigServerTest, TickToConfigTime) {
     ASSERT_EQ(LogicalTime(Timestamp(3, 3)), t3.configTime());
 }
 
-DEATH_TEST_F(VectorClockConfigServerTest, CannotTickTopologyTime, "invariant") {
+DEATH_TEST_F(VectorClockConfigServerTestDeathTest, CannotTickTopologyTime, "invariant") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
     vc->tickTopologyTime(1);

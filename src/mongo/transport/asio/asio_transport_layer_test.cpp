@@ -890,7 +890,9 @@ TEST(AsioTransportLayer, ConfirmSocketSetOptionOnResetConnections) {
 
 // TODO SERVER-97299: Remove this test in favor of
 // ReactorTestFixture::testScheduleOnReactorAfterShutdownFails.
-DEATH_TEST_REGEX(AsioTransportLayer, ScheduleOnReactorAfterShutdownFails, "Shutdown in progress") {
+DEATH_TEST_REGEX(AsioTransportLayerDeathTest,
+                 ScheduleOnReactorAfterShutdownFails,
+                 "Shutdown in progress") {
     TestFixture tf;
 
     Notification<void> shutdown;
@@ -1683,7 +1685,8 @@ TEST_F(IngressAsioNetworkingBatonTest, CancelTimerTwiceWhileInPoll) {
     });
 }
 
-DEATH_TEST_F(IngressAsioNetworkingBatonTest, AddAnAlreadyAddedSession, "invariant") {
+using IngressAsioNetworkingBatonTestDeathTest = IngressAsioNetworkingBatonTest;
+DEATH_TEST_F(IngressAsioNetworkingBatonTestDeathTest, AddAnAlreadyAddedSession, "invariant") {
     auto opCtx = client().makeOperationContext();
     auto baton = opCtx->getBaton()->networking();
     auto session = client().session();

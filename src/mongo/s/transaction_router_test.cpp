@@ -1745,7 +1745,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, DoesNotAttachTxnNumIfAlreadyTher
     ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
 }
 
-DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
+using TransactionRouterTestWithDefaultSessionDeathTest = TransactionRouterTestWithDefaultSession;
+DEATH_TEST_F(TransactionRouterTestWithDefaultSessionDeathTest,
              CrashesIfCmdHasDifferentTxnNumber,
              "invariant") {
     TxnNumber txnNum{3};
@@ -1762,7 +1763,7 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
                                                     << "txnNumber" << TxnNumber(10)));
 }
 
-DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
+DEATH_TEST_F(TransactionRouterTestWithDefaultSessionDeathTest,
              CannotUnstashWithDifferentTxnNumber,
              "The requested operation has a different transaction number") {
     TxnNumber txnNum{3};
@@ -1777,7 +1778,7 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.unstash(operationContext());
 }
 
-DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
+DEATH_TEST_F(TransactionRouterTestWithDefaultSessionDeathTest,
              CannotUnstashWithNoTxnNumber,
              "Cannot unstash without a transaction number") {
     TxnNumber txnNum{3};
@@ -4530,7 +4531,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     future.default_timed_get();
 }
 
-DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
+DEATH_TEST_F(TransactionRouterTestWithDefaultSessionDeathTest,
              ProcessParticipantResponseInvariantsIfParticipantDoesNotExist,
              "Participant should exist if processing participant response") {
     TxnNumber txnNum{3};
@@ -4975,7 +4976,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, CannotAdvanceTxnNumberWithActive
     txnRouter.beginOrContinueTxn(opCtx, txnNum + 1, TransactionRouter::TransactionActions::kStart);
 }
 
-DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
+DEATH_TEST_F(TransactionRouterTestWithDefaultSessionDeathTest,
              ActiveYieldersCannotGoBelowZero,
              "Invalid activeYields") {
     TxnNumber txnNum{3};
@@ -6696,13 +6697,14 @@ TEST_F(TransactionRouterTest, RouterMetricsCurrent_ReapForUnstartedTxn) {
 // The following three tests verify that the methods that end metrics tracking for a transaction
 // can't be called for an unstarted one.
 
-DEATH_TEST_REGEX_F(TransactionRouterMetricsTest,
+using TransactionRouterMetricsTestDeathTest = TransactionRouterMetricsTest;
+DEATH_TEST_REGEX_F(TransactionRouterMetricsTestDeathTest,
                    AbortingUnstartedTxnCrashes,
                    R"#(Invariant failure.*isInitialized\(\))#") {
     txnRouter().abortTransaction(operationContext());
 }
 
-DEATH_TEST_REGEX_F(TransactionRouterMetricsTest,
+DEATH_TEST_REGEX_F(TransactionRouterMetricsTestDeathTest,
                    CommittingUnstartedTxnCrashes,
                    R"#(Invariant failure.*isInitialized\(\))#") {
     txnRouter().commitTransaction(operationContext(), boost::none);
@@ -7351,7 +7353,8 @@ TEST_F(TransactionRouterTest, EagerlyReapRetryableSessionsUponNewRetryableTransa
     ASSERT(doesExistInCatalog(higherRetryableChildLsid, sessionCatalog));
 }
 
-DEATH_TEST_F(TransactionRouterTest,
+using TransactionRouterTestDeathTest = TransactionRouterTest;
+DEATH_TEST_F(TransactionRouterTestDeathTest,
              ReconcileReadConcernMustSpecifyEitherAtClusterOrPlacementConflict,
              "invariant") {
     static_cast<void>(
@@ -7417,7 +7420,7 @@ TEST_F(TransactionRouterTest, CmdLevelAfterClusterTimeMustBeGTEToTxnLevelWithAft
     }
 }
 
-DEATH_TEST_REGEX_F(TransactionRouterTest,
+DEATH_TEST_REGEX_F(TransactionRouterTestDeathTest,
                    AssertsIfConflictTimeIsLowerThanTxnLevelAfterClusterTime,
                    "Tripwire assertion.*7750604") {
     repl::ReadConcernArgs txnLevelReadConcern(LogicalTime{Timestamp(10, 5)}, boost::none);
@@ -7429,7 +7432,7 @@ DEATH_TEST_REGEX_F(TransactionRouterTest,
         cmdLevelReadConcern, txnLevelReadConcern, atClusterTime, conflictTime));
 }
 
-DEATH_TEST_REGEX_F(TransactionRouterTest,
+DEATH_TEST_REGEX_F(TransactionRouterTestDeathTest,
                    AssertsIfConflictTimeIsLowerThanCmdLevelAfterClusterTime,
                    "Tripwire assertion.*7750605") {
     repl::ReadConcernArgs txnLevelReadConcern(LogicalTime{Timestamp(10, 1)}, boost::none);

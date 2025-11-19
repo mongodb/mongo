@@ -704,7 +704,9 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
     ASSERT(childTxnParticipant.checkStatementExecuted(opCtx(), 2000));
 }
 
-DEATH_TEST_REGEX_F(TransactionParticipantRetryableWritesTest,
+using TransactionParticipantRetryableWritesTestDeathTest =
+    TransactionParticipantRetryableWritesTest;
+DEATH_TEST_REGEX_F(TransactionParticipantRetryableWritesTestDeathTest,
                    CheckStatementExecutedForInvalidatedSelfTransactionParticipantInvariants,
                    R"#(Invariant failure.*retryableWriteTxnParticipantCatalog.isValid)#") {
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -712,7 +714,9 @@ DEATH_TEST_REGEX_F(TransactionParticipantRetryableWritesTest,
     txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 0);
 }
 
-DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTest,
+using ShardTransactionParticipantRetryableWritesTestDeathTest =
+    ShardTransactionParticipantRetryableWritesTest;
+DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTestDeathTest,
                    CheckStatementExecutedForInvalidatedParentTransactionParticipantInvariants,
                    R"#(Invariant failure.*retryableWriteTxnParticipantCatalog.isValid)#") {
     const auto parentLsid = *opCtx()->getLogicalSessionId();
@@ -737,7 +741,7 @@ DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTest,
     childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 0);
 }
 
-DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTest,
+DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTestDeathTest,
                    CheckStatementExecutedForInvalidatedChildTransactionParticipantInvariants,
                    R"#(Invariant failure.*retryableWriteTxnParticipantCatalog.isValid)#") {
     const auto parentLsid = *opCtx()->getLogicalSessionId();
@@ -763,7 +767,7 @@ DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTest,
 }
 
 DEATH_TEST_REGEX_F(
-    TransactionParticipantRetryableWritesTest,
+    TransactionParticipantRetryableWritesTestDeathTest,
     WriteOpCompletedOnPrimaryForOldTransactionInvariants,
     R"#(Invariant failure.*sessionTxnRecord.getTxnNum\(\) == o\(\).activeTxnNumber)#") {
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -808,7 +812,7 @@ DEATH_TEST_REGEX_F(
 }
 
 DEATH_TEST_REGEX_F(
-    TransactionParticipantRetryableWritesTest,
+    TransactionParticipantRetryableWritesTestDeathTest,
     WriteOpCompletedOnPrimaryForOldTransactionInvariantsMultiStmtIds,
     R"#(Invariant failure.*sessionTxnRecord.getTxnNum\(\) == o\(\).activeTxnNumber)#") {
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -853,7 +857,7 @@ DEATH_TEST_REGEX_F(
 }
 
 DEATH_TEST_REGEX_F(
-    TransactionParticipantRetryableWritesTest,
+    TransactionParticipantRetryableWritesTestDeathTest,
     WriteOpCompletedOnPrimaryForInvalidatedTransactionInvariants,
     R"#(Invariant failure.*sessionTxnRecord.getTxnNum\(\) == o\(\).activeTxnNumber)#") {
     auto txnParticipant = TransactionParticipant::get(opCtx());

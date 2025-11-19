@@ -83,7 +83,8 @@ TEST_F(ConfigServerOpObserverTest, NodeDoesNotClearCatalogManagerWhenConfigVersi
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 }
 
-DEATH_TEST_F(ConfigServerOpObserverTest,
+using ConfigServerOpObserverTestDeathTest = ConfigServerOpObserverTest;
+DEATH_TEST_F(ConfigServerOpObserverTestDeathTest,
              NodeClearsClusterIDOnConfigVersionRollBack,
              "Invariant failure") {
     ConfigServerOpObserver opObserver;

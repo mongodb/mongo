@@ -2094,7 +2094,7 @@ void attemptToSerializeIncompleteStruct() {
 }
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
-DEATH_TEST(IDLSerializeTests,
+DEATH_TEST(IDLSerializeTestsDeathTest,
            TestUninitializedRequiredFieldsDiesDebug,
            "Missing required fields: field3") {
     // This should invariant because the required field3 is uninitialized.

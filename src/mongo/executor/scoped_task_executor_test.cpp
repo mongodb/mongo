@@ -389,7 +389,8 @@ TEST_F(ScopedTaskExecutorTest, SetShutdownCode) {
     }
 }
 
-DEATH_TEST_F(ScopedTaskExecutorTest, SetShutdownCodeNonCancellation, "invariant") {
+using ScopedTaskExecutorTestDeathTest = ScopedTaskExecutorTest;
+DEATH_TEST_F(ScopedTaskExecutorTestDeathTest, SetShutdownCodeNonCancellation, "invariant") {
     // Make an executor with a provided non-CancellationError shutdown code and check
     // that an invariant is hit.
     Status stepDownStatus(ErrorCodes::InterruptedDueToReplStateChange,

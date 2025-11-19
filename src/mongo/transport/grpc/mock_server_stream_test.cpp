@@ -214,7 +214,8 @@ TEST_F(MockServerStreamTest, SendReceiveInitialMetadata) {
     ASSERT_EQ(getClientContext().getServerInitialMetadata(), expected);
 }
 
-DEATH_TEST_F(MockServerStreamTest, CannotModifyMetadataAfterSent, "invariant") {
+using MockServerStreamTestDeathTest = MockServerStreamTest;
+DEATH_TEST_F(MockServerStreamTestDeathTest, CannotModifyMetadataAfterSent, "invariant") {
     getServerContext().addInitialMetadataEntry("foo", "bar");
     auto serverResponse = makeUniqueMessage();
     ASSERT_TRUE(getServerStream().write(serverResponse.sharedBuffer()));
@@ -222,7 +223,7 @@ DEATH_TEST_F(MockServerStreamTest, CannotModifyMetadataAfterSent, "invariant") {
     getServerContext().addInitialMetadataEntry("cant", "add metadata after it has been sent");
 }
 
-DEATH_TEST_F(MockServerStreamTest, CannotRetrieveMetadataBeforeSent, "invariant") {
+DEATH_TEST_F(MockServerStreamTestDeathTest, CannotRetrieveMetadataBeforeSent, "invariant") {
     getServerContext().addInitialMetadataEntry("foo", "bar");
     getClientContext().getServerInitialMetadata();
 }

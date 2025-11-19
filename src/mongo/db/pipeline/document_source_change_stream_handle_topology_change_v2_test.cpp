@@ -423,7 +423,10 @@ class DSV2StageTest : public ChangeStreamStageTestNoSetup {};
 
 // Tests that a previous exception must have been registered when running the state machine when the
 // start state is kFinal.
-DEATH_TEST_REGEX_F(DSV2StageTest, StateMachineFailsOnStateFinal, "Tripwire assertion.*10657532") {
+using DSV2StageTestDeathTest = DSV2StageTest;
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
+                   StateMachineFailsOnStateFinal,
+                   "Tripwire assertion.*10657532") {
     getExpCtx()->setChangeStreamSpec(
         buildChangeStreamSpec(Timestamp(42, 0), ChangeStreamReadMode::kStrict));
 
@@ -446,7 +449,7 @@ DEATH_TEST_REGEX_F(DSV2StageTest, StateMachineFailsOnStateFinal, "Tripwire asser
 
 // Tests that an exception is thrown when the state is set to the existing state using 'setState()'
 // / 'setState_forTest()'.
-DEATH_TEST_REGEX_F(DSV2StageTest, CheckRepeatedState, "Tripwire assertion.*10657503") {
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest, CheckRepeatedState, "Tripwire assertion.*10657503") {
     getExpCtx()->setChangeStreamSpec(
         buildChangeStreamSpec(Timestamp(42, 0), ChangeStreamReadMode::kStrict));
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), nullptr);
@@ -462,7 +465,7 @@ DEATH_TEST_REGEX_F(DSV2StageTest, CheckRepeatedState, "Tripwire assertion.*10657
 
 // Tests that an exception is thrown when trying to change the state from the end state kFinal to
 // another state.
-DEATH_TEST_REGEX_F(DSV2StageTest,
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
                    CheckStateTransitionBackFromFinalState,
                    "Tripwire assertion.*10657504") {
     getExpCtx()->setChangeStreamSpec(
@@ -481,7 +484,7 @@ DEATH_TEST_REGEX_F(DSV2StageTest,
 }
 
 // Tests that an exception is thrown when trying to set the state back to kUninitialized.
-DEATH_TEST_REGEX_F(DSV2StageTest,
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
                    CheckStateTransitionBackToUninitialized,
                    "Tripwire assertion.*10657505") {
     getExpCtx()->setChangeStreamSpec(
@@ -1312,7 +1315,7 @@ TEST_F(DSV2StageTest, StateFetchingInitializationIgnoreRemovedShards) {
 
 // Tests state machine for input state kFetchingStartingChangeStreamSegment, without the segment
 // start timestamp being set.
-DEATH_TEST_REGEX_F(DSV2StageTest,
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
                    StateFetchingStartingChangeStreamSegmentWithoutStartTimestamp,
                    "Tripwire assertion.*10657518") {
     const Timestamp ts = Timestamp(23, 0);
@@ -1551,7 +1554,7 @@ TEST_F(DSV2StageTest, StateFetchingStartingChangeStreamSegmentOpenCursorFailsWit
 // new cursor on a shard and this fails with 'ShardNotFound' exceptions repeatedly until the max
 // number of consecutive failures is reached.
 DEATH_TEST_REGEX_F(
-    DSV2StageTest,
+    DSV2StageTestDeathTest,
     StateFetchingStartingChangeStreamSegmentOpenCursorFailsWithShardNotFoundRepeatedly,
     "Tripwire assertion.*10657541") {
     const Timestamp ts = Timestamp(23, 0);
@@ -2837,7 +2840,7 @@ TEST_F(DSV2StageTest, BuildPipelineForConfigServerV2) {
 }
 
 // Tests pipeline building for config server cursor.
-DEATH_TEST_REGEX_F(DSV2StageTest,
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
                    BuildPipelineForConfigServerWithV1ExpressionContext,
                    "Tripwire assertion.*10657555") {
     const Timestamp ts = Timestamp(123, 45);

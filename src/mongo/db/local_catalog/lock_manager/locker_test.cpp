@@ -1265,7 +1265,8 @@ TEST_F(LockerTest, SetTicketAcquisitionForLockRAIIType) {
     ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
 }
 
-DEATH_TEST_F(LockerTest, AssertOnGlobalLockAttempt, "9360800") {
+using LockerTestDeathTest = LockerTest;
+DEATH_TEST_F(LockerTestDeathTest, AssertOnGlobalLockAttempt, "9360800") {
     auto opCtx = makeOperationContext();
     auto locker = shard_role_details::getLocker(opCtx.get());
 
@@ -1273,7 +1274,7 @@ DEATH_TEST_F(LockerTest, AssertOnGlobalLockAttempt, "9360800") {
     locker->lockGlobal(opCtx.get(), MODE_IS);
 }
 
-DEATH_TEST_F(LockerTest, AssertOnDBLockAttempt, "9360800") {
+DEATH_TEST_F(LockerTestDeathTest, AssertOnDBLockAttempt, "9360800") {
     auto opCtx = makeOperationContext();
     auto locker = shard_role_details::getLocker(opCtx.get());
 
@@ -1285,7 +1286,7 @@ DEATH_TEST_F(LockerTest, AssertOnDBLockAttempt, "9360800") {
     locker->lock(opCtx.get(), resIdDb, MODE_IS);
 }
 
-DEATH_TEST_F(LockerTest, AssertOnCollLockAttempt, "9360800") {
+DEATH_TEST_F(LockerTestDeathTest, AssertOnCollLockAttempt, "9360800") {
     auto opCtx = makeOperationContext();
     auto locker = shard_role_details::getLocker(opCtx.get());
 
@@ -1299,7 +1300,7 @@ DEATH_TEST_F(LockerTest, AssertOnCollLockAttempt, "9360800") {
 }
 
 // This test exercises the lock dumping code in ~Locker in case locks are held on destruction.
-DEATH_TEST_F(LockerTest,
+DEATH_TEST_F(LockerTestDeathTest,
              LocksHeldOnDestructionCausesALocksDump,
              "Operation ending while holding locks.") {
     auto opCtx = makeOperationContext();
@@ -1318,7 +1319,7 @@ DEATH_TEST_F(LockerTest,
     // 'locker' destructor should invariant because locks are still held.
 }
 
-DEATH_TEST_F(LockerTest, SaveAndRestoreGlobalRecursivelyIsFatal, "7033800") {
+DEATH_TEST_F(LockerTestDeathTest, SaveAndRestoreGlobalRecursivelyIsFatal, "7033800") {
     auto opCtx = makeOperationContext();
 
     Locker::LockSnapshot lockInfo;
@@ -1338,7 +1339,7 @@ DEATH_TEST_F(LockerTest, SaveAndRestoreGlobalRecursivelyIsFatal, "7033800") {
 }
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
-DEATH_TEST_F(LockerTest, LockOrderingViolationCrashesTheServer, "9915000") {
+DEATH_TEST_F(LockerTestDeathTest, LockOrderingViolationCrashesTheServer, "9915000") {
     Lock::ResourceMutex mutexA{"Lock A"};
     Lock::ResourceMutex mutexB{"Lock B"};
 

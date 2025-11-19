@@ -297,14 +297,15 @@ ServiceContext::UniqueOperationContext makeOpCtx() {
     return cc().makeOperationContext();
 }
 
-DEATH_TEST_F(KVDropPendingIdentReaperTest, DoubleDropIdentFails, "invariant") {
+using KVDropPendingIdentReaperTestDeathTest = KVDropPendingIdentReaperTest;
+DEATH_TEST_F(KVDropPendingIdentReaperTestDeathTest, DoubleDropIdentFails, "invariant") {
     const std::string identName = "ident";
     KVDropPendingIdentReaper reaper(nullptr);
     reaper.addDropPendingIdent(Timestamp(1, 0), std::make_shared<Ident>(identName));
     reaper.addDropPendingIdent(Timestamp(1, 0), std::make_shared<Ident>(identName));
 }
 
-DEATH_TEST_F(KVDropPendingIdentReaperTest, TimestampedDropAfterUnknownDrop, "invariant") {
+DEATH_TEST_F(KVDropPendingIdentReaperTestDeathTest, TimestampedDropAfterUnknownDrop, "invariant") {
     const std::string identName = "ident";
     KVDropPendingIdentReaper reaper(nullptr);
     reaper.dropUnknownIdent(Timestamp(1, 0), identName);
@@ -542,7 +543,7 @@ TEST_F(KVDropPendingIdentReaperTest, MarkExpiredIdentInUse) {
     ASSERT_EQUALS(identName, engine->droppedIdents.front());
 }
 
-DEATH_TEST_F(KVDropPendingIdentReaperTest,
+DEATH_TEST_F(KVDropPendingIdentReaperTestDeathTest,
              DropIdentsOlderThanTerminatesIfKVEngineFailsToDropIdent,
              "Failed to remove drop-pending ident") {
     Timestamp dropTimestamp{Seconds{1}, 0};
@@ -671,7 +672,7 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropReportsDropErrors) {
                   ErrorCodes::OperationFailed);
 }
 
-DEATH_TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropIdentInUse, "invariant") {
+DEATH_TEST_F(KVDropPendingIdentReaperTestDeathTest, ImmediatelyDropIdentInUse, "invariant") {
     auto ident = std::make_shared<Ident>("ident");
     auto engine = getEngine();
     KVDropPendingIdentReaper reaper(engine);

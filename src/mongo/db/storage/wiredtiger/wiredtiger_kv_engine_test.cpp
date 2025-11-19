@@ -926,7 +926,8 @@ TEST_F(WiredTigerKVEngineTest, TestGetBackupCheckpointTimestampWithoutOpenBackup
     ASSERT_EQ(Timestamp::min(), engine->getBackupCheckpointTimestamp());
 }
 
-DEATH_TEST_F(WiredTigerKVEngineTest, WaitUntilDurableMustBeOutOfUnitOfWork, "invariant") {
+using WiredTigerKVEngineTestDeathTest = WiredTigerKVEngineTest;
+DEATH_TEST_F(WiredTigerKVEngineTestDeathTest, WaitUntilDurableMustBeOutOfUnitOfWork, "invariant") {
     auto opCtx = _makeOperationContext();
     shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(opCtx->readOnly());
     opCtx->getServiceContext()->getStorageEngine()->waitUntilDurable(opCtx.get());

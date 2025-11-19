@@ -58,7 +58,7 @@ TEST(InternalSchemaMaxPropertiesMatchExpression, MinPropertiesNotEquivalentToMax
     ASSERT_FALSE(maxProperties.equivalent(&minProperties));
 }
 
-DEATH_TEST_REGEX(InternalSchemaMaxPropertiesMatchExpression,
+DEATH_TEST_REGEX(InternalSchemaMaxPropertiesMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400216") {
     InternalSchemaMaxPropertiesMatchExpression maxProperties(5);

@@ -361,7 +361,8 @@ TEST_F(PipelineRewriteEngineTest, ApplyMultipleRulesDifferentTypesDifferentPrior
             });
 }
 
-DEATH_TEST_F(PipelineRewriteEngineTest, FailsOnDuplicateRuleNames, "11010016") {
+using PipelineRewriteEngineTestDeathTest = PipelineRewriteEngineTest;
+DEATH_TEST_F(PipelineRewriteEngineTestDeathTest, FailsOnDuplicateRuleNames, "11010016") {
     REGISTER_TEST_RULES(DocumentSourceMatch,
                         {"DUPLICATE_RULE_NAME", alwaysTrue, Transforms::noop, 1.0});
     REGISTER_TEST_RULES(DocumentSourceSort,

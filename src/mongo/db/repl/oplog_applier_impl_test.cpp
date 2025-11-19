@@ -1211,7 +1211,10 @@ Status TrackOpsAppliedApplier::applyOplogBatchPerWorker(
     return Status::OK();
 }
 
-DEATH_TEST_F(OplogApplierImplTest, MultiApplyAbortsWhenNoOperationsAreGiven, "!ops.empty()") {
+using OplogApplierImplTestDeathTest = OplogApplierImplTest;
+DEATH_TEST_F(OplogApplierImplTestDeathTest,
+             MultiApplyAbortsWhenNoOperationsAreGiven,
+             "!ops.empty()") {
     auto workerPool = makeReplWorkerPool();
     NoopOplogApplierObserver observer;
     TrackOpsAppliedApplier oplogApplier(
@@ -4564,7 +4567,8 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
     testOpsAreIdempotent(ops);
 }
 
-DEATH_TEST_F(IdempotencyTest, CannotCreateIndexForApplyOpsOnPrimary, "invariant") {
+using IdempotencyTestDeathTest = IdempotencyTest;
+DEATH_TEST_F(IdempotencyTestDeathTest, CannotCreateIndexForApplyOpsOnPrimary, "invariant") {
     ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj(), kUuid);
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));

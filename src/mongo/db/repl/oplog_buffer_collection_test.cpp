@@ -221,7 +221,8 @@ TEST_F(OplogBufferCollectionTest, addIdToDocumentChangesTimestampToId) {
                                       OplogBufferCollection::addIdToDocument(originalOp));
 }
 
-DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
+using OplogBufferCollectionTestDeathTest = OplogBufferCollectionTest;
+DEATH_TEST_REGEX_F(OplogBufferCollectionTestDeathTest,
                    addIdToDocumentWithMissingTimestampFieldTriggersInvariantFailure,
                    R"#(Invariant failure.*!ts.isNull\(\))#") {
     OplogBufferCollection::addIdToDocument(BSON("x" << 1));
@@ -361,7 +362,7 @@ TEST_F(OplogBufferCollectionTest, StartupWithExistingCollectionFailsWhenEntryHas
                                 "StartupWithExistingCollectionFailsWhenEntryHasNoId, index: _id_");
 }
 
-DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
+DEATH_TEST_REGEX_F(OplogBufferCollectionTestDeathTest,
                    StartupWithExistingCollectionFailsWhenEntryHasNoTimestamp,
                    R"#(Fatal assertion.*40405.*NoSuchKey: Missing expected field \\"ts\\")#") {
     auto nss = makeNamespace();
@@ -841,7 +842,7 @@ TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndTimesOutWhenItDoesNotFindD
     ASSERT_EQUALS(count, 0UL);
 }
 
-DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
+DEATH_TEST_REGEX_F(OplogBufferCollectionTestDeathTest,
                    PushAllNonBlockingWithOutOfOrderDocumentsTriggersInvariantFailure,
                    R"#(Invariant failure.*ts > previousTimestamp)#") {
     auto nss = makeNamespace();

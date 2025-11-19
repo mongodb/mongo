@@ -150,25 +150,26 @@ TEST_F(VectorClockMongoDTest, TickToClusterTime) {
     ASSERT_EQ(LogicalTime(Timestamp(3, 3)), t3.clusterTime());
 }
 
-DEATH_TEST_F(VectorClockMongoDTest, CannotTickConfigTime, "invariant") {
+using VectorClockMongoDTestDeathTest = VectorClockMongoDTest;
+DEATH_TEST_F(VectorClockMongoDTestDeathTest, CannotTickConfigTime, "invariant") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
     vc->tickConfigTime(1);
 }
 
-DEATH_TEST_F(VectorClockMongoDTest, CannotTickToConfigTime, "invariant") {
+DEATH_TEST_F(VectorClockMongoDTestDeathTest, CannotTickToConfigTime, "invariant") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
     vc->tickConfigTimeTo(LogicalTime());
 }
 
-DEATH_TEST_F(VectorClockMongoDTest, CannotTickTopologyTime, "invariant") {
+DEATH_TEST_F(VectorClockMongoDTestDeathTest, CannotTickTopologyTime, "invariant") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
     vc->tickTopologyTime(1);
 }
 
-DEATH_TEST_F(VectorClockMongoDTest, CannotTickToTopologyTime, "invariant") {
+DEATH_TEST_F(VectorClockMongoDTestDeathTest, CannotTickToTopologyTime, "invariant") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
     vc->tickTopologyTimeTo(LogicalTime());

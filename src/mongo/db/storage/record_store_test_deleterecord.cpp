@@ -139,7 +139,9 @@ TEST(RecordStoreTest, DeleteMultipleRecords) {
 }
 
 // Delete a non-existent record and expect it to crash with a log message.
-DEATH_TEST_REGEX(RecordStoreTest, DeleteNonExistentRecord, "Record to be deleted not found") {
+DEATH_TEST_REGEX(RecordStoreTestDeathTest,
+                 DeleteNonExistentRecord,
+                 "Record to be deleted not found") {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 

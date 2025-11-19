@@ -1997,7 +1997,8 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kAdmin));
 }
 
-DEATH_TEST_REGEX_F(StepDownTest, StepDownHangsCantGetRSTL, "5675600.*lockRep") {
+using StepDownTestDeathTest = StepDownTest;
+DEATH_TEST_REGEX_F(StepDownTestDeathTest, StepDownHangsCantGetRSTL, "5675600.*lockRep") {
     startSignalProcessingThread();
 
     const auto repl = getReplCoord();
@@ -7193,7 +7194,8 @@ TEST_F(ReplCoordTest,
     ASSERT_EQUALS(time3, getReplCoord()->getMyLastAppliedOpTime());
 }
 
-DEATH_TEST_F(ReplCoordTest,
+using ReplCoordTestDeathTest = ReplCoordTest;
+DEATH_TEST_F(ReplCoordTestDeathTest,
              SetMyLastOpTimeToTimestampLesserThanCurrentLastOpTimeTimestampButWithHigherTerm,
              "opTime.getTimestamp() > myLastAppliedOpTime.getTimestamp()") {
     assertStartSuccess(BSON("_id" << "mySet"
@@ -7215,7 +7217,7 @@ DEATH_TEST_F(ReplCoordTest,
     replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
 }
 
-DEATH_TEST_F(ReplCoordTest,
+DEATH_TEST_F(ReplCoordTestDeathTest,
              SetMyLastOpTimeToTimestampEqualToCurrentLastOpTimeTimestampButWithHigherTerm,
              "opTime.getTimestamp() > myLastAppliedOpTime.getTimestamp()") {
     assertStartSuccess(BSON("_id" << "mySet"
@@ -7237,7 +7239,7 @@ DEATH_TEST_F(ReplCoordTest,
     replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
 }
 
-DEATH_TEST_F(ReplCoordTest,
+DEATH_TEST_F(ReplCoordTestDeathTest,
              SetMyLastOpTimeToTimestampGreaterThanCurrentLastOpTimeTimestampButWithLesserTerm,
              "opTime.getTimestamp() < myLastAppliedOpTime.getTimestamp()") {
     assertStartSuccess(BSON("_id" << "mySet"
@@ -7259,7 +7261,7 @@ DEATH_TEST_F(ReplCoordTest,
     replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
 }
 
-DEATH_TEST_F(ReplCoordTest,
+DEATH_TEST_F(ReplCoordTestDeathTest,
              SetMyLastOpTimeToTimestampEqualToCurrentLastOpTimeTimestampButWithLesserTerm,
              "opTime.getTimestamp() < myLastAppliedOpTime.getTimestamp()") {
     assertStartSuccess(BSON("_id" << "mySet"

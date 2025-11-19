@@ -43,7 +43,7 @@ namespace mongo {
 
 namespace {
 
-DEATH_TEST_REGEX(InternalSchemaMinItemsMatchExpression,
+DEATH_TEST_REGEX(InternalSchemaMinItemsMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400215") {
     InternalSchemaMinItemsMatchExpression minItems("a"_sd, 2);

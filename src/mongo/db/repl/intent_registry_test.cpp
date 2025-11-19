@@ -167,7 +167,8 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepUp) {
     executePerIntent(assertRegistryFull);
 }
 
-DEATH_TEST_F(IntentRegistryTest, KillConflictingOperationsDrainTimeout, "9795401") {
+using IntentRegistryTestDeathTest = IntentRegistryTest;
+DEATH_TEST_F(IntentRegistryTestDeathTest, KillConflictingOperationsDrainTimeout, "9795401") {
     // This test checks that killConflictingOperations correctly fasserts when there is an interrupt
     // and the intents are not deregistered within the drain timeout.
     _intentRegistry.enable();
@@ -201,7 +202,9 @@ DEATH_TEST_F(IntentRegistryTest, KillConflictingOperationsDrainTimeout, "9795401
     kill.get();
 }
 
-DEATH_TEST_F(IntentRegistryTest, KillConflictingOperationsDrainSingleTimerTimeout, "9795401") {
+DEATH_TEST_F(IntentRegistryTestDeathTest,
+             KillConflictingOperationsDrainSingleTimerTimeout,
+             "9795401") {
     // This test checks that killConflictingOperations correctly fasserts when there is an interrupt
     // and it takes each intent to be deregistered less than a timeout period,
     // but total time it takes all three types of intents to deregister excceeds that period

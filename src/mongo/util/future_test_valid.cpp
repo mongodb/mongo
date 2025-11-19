@@ -118,7 +118,7 @@ TEST(FutureValid, ValidAfterGetConstLvalue) {
     assertFutureValidAfter([](const auto& fut) { [[maybe_unused]] auto val = fut.get(); });
 }
 
-DEATH_TEST(FutureValid, GetConstLvalueCrashesOnInvalidFuture, "Invariant failure") {
+DEATH_TEST(FutureValidDeathTest, GetConstLvalueCrashesOnInvalidFuture, "Invariant failure") {
     callWithInvalidFuture([](const auto& fut) { [[maybe_unused]] auto val = fut.get(); });
 }
 
@@ -126,7 +126,7 @@ TEST(FutureValid, InvalidAfterGetRvalue) {
     assertFutureInvalidAfter([](auto&& fut) { [[maybe_unused]] auto val = std::move(fut).get(); });
 }
 
-DEATH_TEST(FutureValid, GetRvalueCrashesOnInvalidFuture, "Invariant failure") {
+DEATH_TEST(FutureValidDeathTest, GetRvalueCrashesOnInvalidFuture, "Invariant failure") {
     callWithInvalidFuture([](auto&& fut) { [[maybe_unused]] auto val = std::move(fut).get(); });
 }
 
@@ -134,7 +134,7 @@ TEST(FutureValid, ValidAfterGetNoThrowConstLvalue) {
     assertFutureValidAfter([](const auto& fut) { [[maybe_unused]] auto val = fut.getNoThrow(); });
 }
 
-DEATH_TEST(FutureValid, GetNoThrowConstLvalueCrashesOnInvalidFuture, "Invariant failure") {
+DEATH_TEST(FutureValidDeathTest, GetNoThrowConstLvalueCrashesOnInvalidFuture, "Invariant failure") {
     callWithInvalidFuture([](const auto& fut) { [[maybe_unused]] auto val = fut.getNoThrow(); });
 }
 
@@ -143,7 +143,7 @@ TEST(FutureValid, InvalidAfterGetNoThrowRvalue) {
         [](auto&& fut) { [[maybe_unused]] auto val = std::move(fut).getNoThrow(); });
 }
 
-DEATH_TEST(FutureValid, GetNoThrowRvalueCrashesOnInvalidFuture, "Invariant failure") {
+DEATH_TEST(FutureValidDeathTest, GetNoThrowRvalueCrashesOnInvalidFuture, "Invariant failure") {
     callWithInvalidFuture(
         [](auto&& fut) { [[maybe_unused]] auto val = std::move(fut).getNoThrow(); });
 }
@@ -152,7 +152,7 @@ TEST(FutureValid, ValidAfterWait) {
     assertFutureValidAfter([](auto&& fut) { fut.wait(); });
 }
 
-DEATH_TEST(FutureValid, WaitCrashesOnInvalidFuture, "Invariant failure") {
+DEATH_TEST(FutureValidDeathTest, WaitCrashesOnInvalidFuture, "Invariant failure") {
     callWithInvalidFuture([](auto&& fut) { fut.wait(); });
 }
 
@@ -160,7 +160,7 @@ TEST(FutureValid, ValidAfterWaitNoThrow) {
     assertFutureValidAfter([](auto&& fut) { [[maybe_unused]] auto status = fut.waitNoThrow(); });
 }
 
-DEATH_TEST(FutureValid, WaitNoThrowCrashesOnInvalidFuture, "Invariant failure") {
+DEATH_TEST(FutureValidDeathTest, WaitNoThrowCrashesOnInvalidFuture, "Invariant failure") {
     callWithInvalidFuture([](auto&& fut) { [[maybe_unused]] auto status = fut.waitNoThrow(); });
 }
 
@@ -169,7 +169,7 @@ TEST(FutureValid, ThenTransfersValid) {
         [](auto&& fut) { return std::move(fut).then([](int i) { return i + 2; }); });
 }
 
-DEATH_TEST(FutureValid, ThenCrashesOnInvalidFuture, "Invariant failure") {
+DEATH_TEST(FutureValidDeathTest, ThenCrashesOnInvalidFuture, "Invariant failure") {
     callWithInvalidFuture(
         [](auto&& fut) { return std::move(fut).then([](int i) { return i + 2; }); });
 }
@@ -232,7 +232,7 @@ TEST(FutureValid, ShareTransfersValid) {
     assertFutureTransfersValid([](auto&& fut) { return std::move(fut).share(); });
 }
 
-DEATH_TEST(FutureValid, ShareCrashesOnInvalidFuture, "Invariant failure") {
+DEATH_TEST(FutureValidDeathTest, ShareCrashesOnInvalidFuture, "Invariant failure") {
     callWithInvalidFuture([](auto&& fut) { return std::move(fut).share(); });
 }
 
@@ -415,7 +415,7 @@ TEST(SharedSemiFutureValid, ValidAfterThenRunOn) {
     });
 }
 
-DEATH_TEST(SharedSemiFutureValid, ThenRunOnCrashesOnInvalidFuture, "Invariant failure") {
+DEATH_TEST(SharedSemiFutureValidDeathTest, ThenRunOnCrashesOnInvalidFuture, "Invariant failure") {
     callWithInvalidSharedSemiFuture([](auto&& fut) {
         auto exec = InlineQueuedCountingExecutor::make();
         return fut.thenRunOn(exec);
@@ -430,7 +430,7 @@ TEST(SharedSemiFutureValid, SemiRetainsValid) {
     assertSharedSemiFutureSplits([](auto&& fut) { return std::move(fut).semi(); });
 }
 
-DEATH_TEST(SharedSemiFutureValid, SemiCrashesOnInvalidFuture, "Invariant failure") {
+DEATH_TEST(SharedSemiFutureValidDeathTest, SemiCrashesOnInvalidFuture, "Invariant failure") {
     callWithInvalidSharedSemiFuture([](auto&& fut) { return std::move(fut).semi(); });
 }
 
@@ -438,7 +438,7 @@ TEST(SharedSemiFutureValid, SplitRetainsValid) {
     assertSharedSemiFutureSplits([](auto&& fut) { return std::move(fut).split(); });
 }
 
-DEATH_TEST(SharedSemiFutureValid, SplitCrashesOnInvalidFuture, "Invariant failure") {
+DEATH_TEST(SharedSemiFutureValidDeathTest, SplitCrashesOnInvalidFuture, "Invariant failure") {
     callWithInvalidSharedSemiFuture([](auto&& fut) { return std::move(fut).split(); });
 }
 

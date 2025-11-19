@@ -360,7 +360,8 @@ TEST_F(ReshardingDonorOplogIterTest, BatchIncludesProgressMarkEntries) {
     ASSERT_TRUE(next.empty());
 }
 
-DEATH_TEST_REGEX_F(ReshardingDonorOplogIterTest,
+using ReshardingDonorOplogIterTestDeathTest = ReshardingDonorOplogIterTest;
+DEATH_TEST_REGEX_F(ReshardingDonorOplogIterTestDeathTest,
                    ThrowsIfProgressMarkEntriesAfterFinalOp,
                    "Tripwire assertion.*6077499") {
     RAIIServerParameterControllerForTest controller{"reshardingOplogBatchLimitOperations", 100};

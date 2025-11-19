@@ -394,7 +394,8 @@ protected:
     std::shared_ptr<executor::TaskExecutor> _testExecutor;
 };
 
-DEATH_TEST_F(PrimaryOnlyServiceTest,
+using PrimaryOnlyServiceTestDeathTest = PrimaryOnlyServiceTest;
+DEATH_TEST_F(PrimaryOnlyServiceTestDeathTest,
              DoubleRegisterService,
              "Attempted to register PrimaryOnlyService (TestService) that is already registered") {
     PrimaryOnlyServiceRegistry registry;
@@ -633,7 +634,7 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstanceHoldingIXLock) {
     instance->getCompletionFuture().get();
 }
 
-DEATH_TEST_F(PrimaryOnlyServiceTest,
+DEATH_TEST_F(PrimaryOnlyServiceTestDeathTest,
              LookupInstanceHoldingISLockWithoutAlwaysBeingInterruptible,
              "invariant") {
     // Make sure the instance doesn't complete before we try to look it up.

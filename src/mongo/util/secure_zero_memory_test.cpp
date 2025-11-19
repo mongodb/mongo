@@ -45,7 +45,7 @@ TEST(SecureZeroMemoryTest, zeroZeroLengthNull) {
     ASSERT_TRUE(true);
 }
 
-DEATH_TEST(SecureZeroMemoryTest, zeroNonzeroLengthNull, "Fatal assertion") {
+DEATH_TEST(SecureZeroMemoryTestDeathTest, zeroNonzeroLengthNull, "Fatal assertion") {
     void* ptr = nullptr;
     secureZeroMemory(ptr, 1000);
 }

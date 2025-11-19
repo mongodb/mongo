@@ -653,7 +653,8 @@ TEST_F(ReshardingOplogBatchApplierTest,
     future.get();
 }
 
-DEATH_TEST_F(ReshardingOplogBatchApplierTest,
+using ReshardingOplogBatchApplierTestDeathTest = ReshardingOplogBatchApplierTest;
+DEATH_TEST_F(ReshardingOplogBatchApplierTestDeathTest,
              ThrowUponSeeingProgressMarkOplogCreatedBeforeOplogApplicationStarted,
              "invariant") {
     auto executor = makeTaskExecutorForApplier();
@@ -667,7 +668,7 @@ DEATH_TEST_F(ReshardingOplogBatchApplierTest,
     future.get();
 }
 
-DEATH_TEST_F(ReshardingOplogBatchApplierTest, ThrowUponSeeingFinalOplog, "invariant") {
+DEATH_TEST_F(ReshardingOplogBatchApplierTestDeathTest, ThrowUponSeeingFinalOplog, "invariant") {
     auto executor = makeTaskExecutorForApplier();
     auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
 
@@ -678,7 +679,7 @@ DEATH_TEST_F(ReshardingOplogBatchApplierTest, ThrowUponSeeingFinalOplog, "invari
     future.get();
 }
 
-DEATH_TEST_F(ReshardingOplogBatchApplierTest, ThrowUponSeeingGenericNoop, "invariant") {
+DEATH_TEST_F(ReshardingOplogBatchApplierTestDeathTest, ThrowUponSeeingGenericNoop, "invariant") {
     auto executor = makeTaskExecutorForApplier();
     auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
 

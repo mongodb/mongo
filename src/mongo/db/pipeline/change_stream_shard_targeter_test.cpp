@@ -78,7 +78,8 @@ private:
     boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
 };
 
-DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
+using ChangeStreamShardTargeterTestDeathTest = ChangeStreamShardTargeterTest;
+DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTestDeathTest,
                    TargeterFailsWhenQueueIsEmpty,
                    "Tripwire assertion.*10767900") {
     getExpCtx()->setChangeStreamSpec(buildChangeStreamSpec(Timestamp(42, 0)));
@@ -90,7 +91,7 @@ DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
         mock.initialize(getOpCtx(), Timestamp(42, 1), context), AssertionException, 10767900);
 }
 
-DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
+DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTestDeathTest,
                    TargeterFailsWhenInitializeIsCalledWithoutTimestamp,
                    "Tripwire assertion.*10767901") {
     getExpCtx()->setChangeStreamSpec(buildChangeStreamSpec(Timestamp(42, 0)));
@@ -108,7 +109,7 @@ DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
         mock.initialize(getOpCtx(), Timestamp(42, 1), context), AssertionException, 10767901);
 }
 
-DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
+DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTestDeathTest,
                    InitializeCalledWithWrongTimestamp,
                    "Tripwire assertion.*10767902") {
     getExpCtx()->setChangeStreamSpec(buildChangeStreamSpec(Timestamp(42, 0)));
@@ -128,7 +129,7 @@ DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
         mock.initialize(getOpCtx(), Timestamp(42, 1), context), AssertionException, 10767902);
 }
 
-DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTest,
+DEATH_TEST_REGEX_F(ChangeStreamShardTargeterTestDeathTest,
                    TargeterFailsWhenHandleEventIsCalledWithoutDocument,
                    "Tripwire assertion.*10767903") {
     getExpCtx()->setChangeStreamSpec(buildChangeStreamSpec(Timestamp(42, 0)));

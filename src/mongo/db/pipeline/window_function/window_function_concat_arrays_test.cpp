@@ -156,14 +156,17 @@ TEST_F(WindowFunctionConcatArraysTest, RemoveExactlyAllValuesInWindow) {
     ASSERT_VALUE_EQ(concatArrays.getValue(), Value(std::vector<Value>({})));
 }
 
-DEATH_TEST_F(WindowFunctionConcatArraysTest, CannotRemoveFromEmptyWindowFunction, "1628401") {
+using WindowFunctionConcatArraysTestDeathTest = WindowFunctionConcatArraysTest;
+DEATH_TEST_F(WindowFunctionConcatArraysTestDeathTest,
+             CannotRemoveFromEmptyWindowFunction,
+             "1628401") {
     concatArrays.reset();
 
     std::vector<Value> attemptToRemove = {Value(1), Value(2), Value(2)};
     concatArrays.remove(Value(attemptToRemove));
 }
 
-DEATH_TEST_F(WindowFunctionConcatArraysTest, CannotRemoveNonArrayFromWindow, "1628400") {
+DEATH_TEST_F(WindowFunctionConcatArraysTestDeathTest, CannotRemoveNonArrayFromWindow, "1628400") {
     concatArrays.reset();
 
     std::vector<Value> value = {Value(1), Value(2)};

@@ -76,11 +76,11 @@ MONGO_INITIALIZER_GENERAL(InitializeTraceProviderForTest, (), ("InitializeTraceP
 static constexpr auto kTracerName = "MyTracer";
 }  // namespace
 
-DEATH_TEST(TracingSupportTest, CannotInitializeTwice, "invariant") {
+DEATH_TEST(TracingSupportTestDeathTest, CannotInitializeTwice, "invariant") {
     TracerProvider::initialize(makeTickSource());  // NOLINT
 }
 
-DEATH_TEST(TracingSupportTest, SpansMustCloseInOrder, "invariant") {
+DEATH_TEST(TracingSupportTestDeathTest, SpansMustCloseInOrder, "invariant") {
     auto tracer = TracerProvider::get().getTracer(kTracerName);  // NOLINT
     auto outerSpan = tracer->startSpan("outer span");
     auto innerSpan = tracer->startSpan("inner span");

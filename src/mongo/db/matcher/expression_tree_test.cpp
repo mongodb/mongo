@@ -47,7 +47,7 @@
 
 namespace mongo {
 
-DEATH_TEST_REGEX(NotMatchExpression,
+DEATH_TEST_REGEX(NotMatchExpressionDeathTest,
                  GetChildFailsIndexLargerThanOne,
                  "Tripwire assertion.*6400210") {
     auto baseOperand = BSON("$lt" << 5);
@@ -58,7 +58,9 @@ DEATH_TEST_REGEX(NotMatchExpression,
     ASSERT_THROWS_CODE(notOp.getChild(1), AssertionException, 6400210);
 }
 
-DEATH_TEST_REGEX(AndOp, GetChildFailsOnIndexLargerThanChildren, "Tripwire assertion.*6400201") {
+DEATH_TEST_REGEX(AndOpDeathTest,
+                 GetChildFailsOnIndexLargerThanChildren,
+                 "Tripwire assertion.*6400201") {
     auto baseOperand1 = BSON("$gt" << 1);
     auto baseOperand2 = BSON("$lt" << 10);
     auto baseOperand3 = BSON("$lt" << 100);
@@ -77,7 +79,9 @@ DEATH_TEST_REGEX(AndOp, GetChildFailsOnIndexLargerThanChildren, "Tripwire assert
     ASSERT_THROWS_CODE(andOp.getChild(numChildren), AssertionException, 6400201);
 }
 
-DEATH_TEST_REGEX(OrOp, GetChildFailsOnIndexLargerThanChildren, "Tripwire assertion.*6400201") {
+DEATH_TEST_REGEX(OrOpDeathTest,
+                 GetChildFailsOnIndexLargerThanChildren,
+                 "Tripwire assertion.*6400201") {
     auto baseOperand1 = BSON("$gt" << 10);
     auto baseOperand2 = BSON("$lt" << 0);
     auto baseOperand3 = BSON("b" << 100);
@@ -112,7 +116,9 @@ TEST(NorOp, Equivalent) {
     ASSERT(!e1.equivalent(&e2));
 }
 
-DEATH_TEST_REGEX(NorOp, GetChildFailsOnIndexLargerThanChildren, "Tripwire assertion.*6400201") {
+DEATH_TEST_REGEX(NorOpDeathTest,
+                 GetChildFailsOnIndexLargerThanChildren,
+                 "Tripwire assertion.*6400201") {
     auto baseOperand1 = BSON("$gt" << 10);
     auto baseOperand2 = BSON("$lt" << 0);
     auto baseOperand3 = BSON("b" << 100);

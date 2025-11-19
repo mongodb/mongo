@@ -546,21 +546,22 @@ TEST_F(ReshardingMetricsTest, RecipientCanRegisterDonors) {
     metrics->registerDonors({shardId0});
 }
 
-DEATH_TEST_REGEX_F(ReshardingMetricsTest,
+using ReshardingMetricsTestDeathTest = ReshardingMetricsTest;
+DEATH_TEST_REGEX_F(ReshardingMetricsTestDeathTest,
                    DonorCannotRegisterDonors,
                    "Tripwire assertion.*10626500") {
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kDonor);
     metrics->registerDonors({shardId0});
 }
 
-DEATH_TEST_REGEX_F(ReshardingMetricsTest,
+DEATH_TEST_REGEX_F(ReshardingMetricsTestDeathTest,
                    CoordinatorCannotRegisterDonors,
                    "Tripwire assertion.*10626500") {
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
     metrics->registerDonors({shardId0});
 }
 
-DEATH_TEST_REGEX_F(ReshardingMetricsTest,
+DEATH_TEST_REGEX_F(ReshardingMetricsTestDeathTest,
                    CannotRegisterDonorsMultipleTimes,
                    "Tripwire assertion.*10626501") {
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);

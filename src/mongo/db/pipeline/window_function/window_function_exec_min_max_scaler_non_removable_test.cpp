@@ -151,7 +151,9 @@ TEST_F(WindowFunctionExecMinMaxScalerNonRemovableTest, AccumulateMultiplePartiti
     ASSERT_VALUE_EQ(Value(0), mgr.getNext(Document{{"a", 3}, {"key", 3}}));
 }
 
-DEATH_TEST_F(WindowFunctionExecMinMaxScalerNonRemovableTest,
+using WindowFunctionExecMinMaxScalerNonRemovableTestDeathTest =
+    WindowFunctionExecMinMaxScalerNonRemovableTest;
+DEATH_TEST_F(WindowFunctionExecMinMaxScalerNonRemovableTestDeathTest,
              GetWindowValueThrowsWithNonNumericInput,
              "10487003") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{

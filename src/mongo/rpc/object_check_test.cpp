@@ -88,7 +88,7 @@ TEST(DataTypeValidated, BSONValidationEnabled) {
     }
 }
 
-DEATH_TEST(ObjectCheck, BSONValidationEnabledWithCrashOnError, "50761") {
+DEATH_TEST(ObjectCheckDeathTest, BSONValidationEnabledWithCrashOnError, "50761") {
     bool objcheckValue = serverGlobalParams.objcheck;
     serverGlobalParams.objcheck = true;
     ON_BLOCK_EXIT([=] { serverGlobalParams.objcheck = objcheckValue; });

@@ -109,7 +109,8 @@ TEST(HostParseNodeTest, IsNotHostAllocated) {
     ASSERT_FALSE(host::HostAggStageParseNode::isHostAllocated(*handle.get()));
 }
 
-DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsGetName, "11217600") {
+using HostParseNodeVTableTestDeathTest = HostParseNodeVTableTest;
+DEATH_TEST_F(HostParseNodeVTableTestDeathTest, InvalidParseNodeVTableFailsGetName, "11217600") {
     auto noOpParseNode = std::make_unique<host::HostAggStageParseNode>(NoOpHostParseNode::make({}));
     auto handle = TestHostParseNodeVTableHandle{noOpParseNode.release()};
 
@@ -118,7 +119,9 @@ DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsGetName, "11217
     handle.assertVTableConstraints(vtable);
 };
 
-DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsGetQueryShape, "10977600") {
+DEATH_TEST_F(HostParseNodeVTableTestDeathTest,
+             InvalidParseNodeVTableFailsGetQueryShape,
+             "10977600") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
     auto handle = TestHostParseNodeVTableHandle{noOpParseNode};
 
@@ -127,7 +130,9 @@ DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsGetQueryShape, 
     handle.assertVTableConstraints(vtable);
 };
 
-DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsGetExpandedSize, "11113800") {
+DEATH_TEST_F(HostParseNodeVTableTestDeathTest,
+             InvalidParseNodeVTableFailsGetExpandedSize,
+             "11113800") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
     auto handle = TestHostParseNodeVTableHandle{noOpParseNode};
 
@@ -136,7 +141,7 @@ DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsGetExpandedSize
     handle.assertVTableConstraints(vtable);
 };
 
-DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "10977601") {
+DEATH_TEST_F(HostParseNodeVTableTestDeathTest, InvalidParseNodeVTableFailsExpand, "10977601") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
     auto handle = TestHostParseNodeVTableHandle{noOpParseNode};
 
@@ -145,7 +150,7 @@ DEATH_TEST_F(HostParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "109776
     handle.assertVTableConstraints(vtable);
 };
 
-DEATH_TEST(HostParseNodeTest, HostGetQueryShapeUnimplemented, "10977800") {
+DEATH_TEST(HostParseNodeTestDeathTest, HostGetQueryShapeUnimplemented, "10977800") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
     auto handle = AggStageParseNodeHandle{noOpParseNode};
 
@@ -153,7 +158,7 @@ DEATH_TEST(HostParseNodeTest, HostGetQueryShapeUnimplemented, "10977800") {
     handle.vtable().get_query_shape(noOpParseNode, nullptr, &shape);
 }
 
-DEATH_TEST(HostParseNodeTest, HostGetExpandedSizeUnimplemented, "11113803") {
+DEATH_TEST(HostParseNodeTestDeathTest, HostGetExpandedSizeUnimplemented, "11113803") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
     auto handle = AggStageParseNodeHandle{noOpParseNode};
 
@@ -165,7 +170,7 @@ DEATH_TEST(HostParseNodeTest, HostGetExpandedSizeUnimplemented, "11113803") {
     [[maybe_unused]] auto expanded = handle.expand();
 }
 
-DEATH_TEST(HostParseNodeTest, HostExpandUnimplemented, "10977801") {
+DEATH_TEST(HostParseNodeTestDeathTest, HostExpandUnimplemented, "10977801") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
     auto handle = AggStageParseNodeHandle{noOpParseNode};
 

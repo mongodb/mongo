@@ -802,7 +802,8 @@ TEST_F(MultiUpdateCoordinatorTest, CoordinatorFailsOnMissingCollectionPostMigrat
     ASSERT_EQ(instance->getCompletionFuture().getNoThrow().getStatus(), ErrorCodes::CommandFailed);
 }
 
-DEATH_TEST_F(MultiUpdateCoordinatorTest, AbortReasonMustBeError, "!reason.isOK()") {
+using MultiUpdateCoordinatorTestDeathTest = MultiUpdateCoordinatorTest;
+DEATH_TEST_F(MultiUpdateCoordinatorTestDeathTest, AbortReasonMustBeError, "!reason.isOK()") {
     auto [instance, fp] = createAbortedInstance(Status::OK());
 }
 

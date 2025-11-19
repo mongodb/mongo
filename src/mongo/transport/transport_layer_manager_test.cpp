@@ -133,7 +133,7 @@ TEST_F(TransportLayerManagerTest, ShutdownAfterSetup) {
     }
 }
 
-DEATH_TEST(PortsTest,
+DEATH_TEST(PortsTestDeathTest,
            ShouldFailIfMainAndMaintenancePortsCollide,
            "Port collision, ports must be unique.") {
     serverGlobalParams.port = 20017;
@@ -149,7 +149,7 @@ DEATH_TEST(PortsTest,
     std::ignore = TransportLayerManagerImpl::make(svcCtx.get(), true);
 }
 
-DEATH_TEST(PortsTest,
+DEATH_TEST(PortsTestDeathTest,
            ShouldFailIfMainAndProxyPortsCollide,
            "Port collision, ports must be unique.") {
     serverGlobalParams.port = 20017;

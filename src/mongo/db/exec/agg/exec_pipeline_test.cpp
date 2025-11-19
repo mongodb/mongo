@@ -85,7 +85,9 @@ TEST(PipelineTest, ThreeStagePipeline) {
     ASSERT_EQ(stage2.get(), pl.getStages()[2].get());
 }
 
-DEATH_TEST_REGEX(PipelineTest, GetNextResultOnEmptyPipelineThrows, "Tripwire assertion.*10549300") {
+DEATH_TEST_REGEX(PipelineTestDeathTest,
+                 GetNextResultOnEmptyPipelineThrows,
+                 "Tripwire assertion.*10549300") {
     StageContainer stages;
     ASSERT_THROWS_CODE(Pipeline(std::move(stages), make_intrusive<ExpressionContextForTest>()),
                        AssertionException,

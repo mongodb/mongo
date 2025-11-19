@@ -2375,7 +2375,8 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToMinMaxCalculation) {
     ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToMinMaxCalculation.load());
 }
 
-DEATH_TEST_F(BucketCatalogTest, ReopeningFailedDueToCompression, "invariant") {
+using BucketCatalogTestDeathTest = BucketCatalogTest;
+DEATH_TEST_F(BucketCatalogTestDeathTest, ReopeningFailedDueToCompression, "invariant") {
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
             "control":{"version":2,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},

@@ -114,7 +114,7 @@ TEST(RecordStoreTest, TruncateNonEmpty) {
     ASSERT_EQUALS(0, rs->numRecords());
 }
 
-DEATH_TEST(RecordStoreTest,
+DEATH_TEST(RecordStoreTestDeathTest,
            RangeTruncateMustHaveBoundsTest,
            "Ranged truncate must have one bound defined") {
     const auto harnessHelper(newRecordStoreHarnessHelper());

@@ -528,7 +528,8 @@ TEST_F(ReplicationRecoveryTest, RecoveryWithEmptyOplogSucceedsWithStableTimestam
 }
 
 
-DEATH_TEST_F(ReplicationRecoveryTest,
+using ReplicationRecoveryTestDeathTest = ReplicationRecoveryTest;
+DEATH_TEST_F(ReplicationRecoveryTestDeathTest,
              RecoveryInvariantsIfStableTimestampAndDoesNotSupportRecoveryTimestamp,
              "Invariant failure") {
     getStorageInterfaceRecovery()->setSupportsRecoveryTimestamp(false);
@@ -540,7 +541,9 @@ DEATH_TEST_F(ReplicationRecoveryTest,
     recovery.recoverFromOplog(opCtx, Timestamp(1, 1));
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest, TruncateEntireOplogFasserts, "Fatal assertion.*40296") {
+DEATH_TEST_REGEX_F(ReplicationRecoveryTestDeathTest,
+                   TruncateEntireOplogFasserts,
+                   "Fatal assertion.*40296") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -798,7 +801,7 @@ TEST_F(ReplicationRecoveryTest, UnstableRecoveryIgnoresDroppedCollections) {
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+DEATH_TEST_REGEX_F(ReplicationRecoveryTestDeathTest,
                    StableRecoveryCrashOnDroppedCollectionsInTests,
                    "Fatal assertion.*5415000") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
@@ -863,7 +866,7 @@ TEST_F(ReplicationRecoveryTest,
     testRecoveryAppliesDocumentsWithNoAppliedThroughAfterTruncation(false);
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+DEATH_TEST_REGEX_F(ReplicationRecoveryTestDeathTest,
                    AppliedThroughBehindOplogFasserts,
                    "Fatal assertion.*5466601") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
@@ -876,7 +879,7 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
     recovery.recoverFromOplog(opCtx, boost::none);
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+DEATH_TEST_REGEX_F(ReplicationRecoveryTestDeathTest,
                    AppliedThroughAheadOfTopOfOplogCausesFassert,
                    "Fatal assertion.*40313") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
@@ -986,7 +989,7 @@ TEST_F(ReplicationRecoveryTest, RecoveryAppliesUpdatesIdempotently) {
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
 }
 
-DEATH_TEST_F(ReplicationRecoveryTest, RecoveryFailsWithBadOp, "terminate() called") {
+DEATH_TEST_F(ReplicationRecoveryTestDeathTest, RecoveryFailsWithBadOp, "terminate() called") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -1524,7 +1527,7 @@ TEST_F(ReplicationRecoveryTest,
     }
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+DEATH_TEST_REGEX_F(ReplicationRecoveryTestDeathTest,
                    RecoverFromOplogUpToWithoutStableCheckpoint,
                    "Fatal assertion.*31399") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
@@ -1535,7 +1538,7 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 5));
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+DEATH_TEST_REGEX_F(ReplicationRecoveryTestDeathTest,
                    RecoverFromOplogAsStandaloneFailsWithoutStableCheckpoint,
                    "Fatal assertion.*31229") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
@@ -1546,7 +1549,7 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
     recovery.recoverFromOplogAsStandalone(opCtx);
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+DEATH_TEST_REGEX_F(ReplicationRecoveryTestDeathTest,
                    RecoverFromOplogAsStandaloneFailsWithNullStableCheckpoint,
                    "Fatal assertion.*50806") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
@@ -1558,7 +1561,7 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
     recovery.recoverFromOplogAsStandalone(opCtx);
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+DEATH_TEST_REGEX_F(ReplicationRecoveryTestDeathTest,
                    RecoverFromOplogUpToFailsWithNullStableCheckpoint,
                    "Fatal assertion.*50806") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
@@ -1609,7 +1612,7 @@ TEST_F(ReplicationRecoveryTest,
 }
 
 DEATH_TEST_REGEX_F(
-    ReplicationRecoveryTest,
+    ReplicationRecoveryTestDeathTest,
     RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithInitialSyncFlag,
     "Fatal assertion.*31362") {
     gTakeUnstableCheckpointOnShutdown = true;
@@ -1624,7 +1627,7 @@ DEATH_TEST_REGEX_F(
 }
 
 DEATH_TEST_REGEX_F(
-    ReplicationRecoveryTest,
+    ReplicationRecoveryTestDeathTest,
     RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithOplogTruncateAfterPoint,
     "Fatal assertion.*31363") {
     gTakeUnstableCheckpointOnShutdown = true;
@@ -1639,7 +1642,7 @@ DEATH_TEST_REGEX_F(
 }
 
 DEATH_TEST_REGEX_F(
-    ReplicationRecoveryTest,
+    ReplicationRecoveryTestDeathTest,
     RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithEmptyOplog,
     "Fatal assertion.*31364") {
     gTakeUnstableCheckpointOnShutdown = true;
@@ -1653,7 +1656,7 @@ DEATH_TEST_REGEX_F(
 }
 
 DEATH_TEST_REGEX_F(
-    ReplicationRecoveryTest,
+    ReplicationRecoveryTestDeathTest,
     RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithMismatchedAppliedThrough,
     "Fatal assertion.*31365") {
     gTakeUnstableCheckpointOnShutdown = true;
@@ -1737,7 +1740,7 @@ TEST_F(ReplicationRecoveryTest, TruncateOplogToTimestamp) {
     _assertDocsInTestCollection(opCtx, {});
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+DEATH_TEST_REGEX_F(ReplicationRecoveryTestDeathTest,
                    TruncateOplogToTimestampOplogDoesntExist,
                    "Fatal assertion.*34418") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
@@ -1882,7 +1885,7 @@ TEST_F(ReplicationRecoveryTest, ApplyOplogEntriesForRestore) {
               Timestamp::kAllowUnstableCheckpointsSentinel);
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+DEATH_TEST_REGEX_F(ReplicationRecoveryTestDeathTest,
                    ApplyOplogEntriesForRestoreStorageMustSupportRts,
                    "Invariant failure") {
     storageGlobalParams.magicRestore = true;
@@ -1895,7 +1898,7 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
     recovery.applyOplogEntriesForRestore(opCtx, Timestamp(1, 1));
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+DEATH_TEST_REGEX_F(ReplicationRecoveryTestDeathTest,
                    ApplyOplogEntriesForRestoreNoOplog,
                    "Fatal assertion.*8290703") {
     storageGlobalParams.magicRestore = true;

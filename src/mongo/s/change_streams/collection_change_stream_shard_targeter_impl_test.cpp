@@ -96,7 +96,9 @@ TEST_F(CollectionChangeStreamShardTargeterImplFixture,
     ASSERT_TRUE(readerCtx().openCursorOnConfigServerCalls.empty());
 }
 
-DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplFixture,
+using CollectionChangeStreamShardTargeterImplFixtureDeathTest =
+    CollectionChangeStreamShardTargeterImplFixture;
+DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplFixtureDeathTest,
                    Given_FuturePlacement_When_Initialize_Then_Throws,
                    "Tripwire assertion.*10720100") {
     Timestamp clusterTime(20, 1);
@@ -145,7 +147,7 @@ TEST_F(
         targeter().getEventHandler()));
 }
 
-DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplFixture,
+DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplFixtureDeathTest,
                    Given_NoEventHandlerSet_When_HandleEvent_Then_Throws,
                    "Tripwire assertion.*10720101") {
     Document event(BSON("operationType" << MoveChunkControlEvent::opType));
@@ -190,7 +192,7 @@ TEST_F(CollectionChangeStreamShardTargeterImplFixture,
     }
 }
 
-DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplFixture,
+DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplFixtureDeathTest,
                    When_StartChangeStreamSegmentIsCalled_Then_Throws,
                    "Tripwire assertion.*10783902") {
     targeter().startChangeStreamSegment(opCtx(), Timestamp(99, 0), readerCtx());

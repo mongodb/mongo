@@ -126,7 +126,7 @@ TEST(DocumentSourceWalker, MultipleVisitorsRegistered) {
     ASSERT_EQ(expected, ctx.seen);
 }
 
-DEATH_TEST_REGEX(DocumentSourceWalker, UnimplementedStage, "Tripwire assertion.*6202701") {
+DEATH_TEST_REGEX(DocumentSourceWalkerDeathTest, UnimplementedStage, "Tripwire assertion.*6202701") {
     DocumentSourceVisitorRegistry reg;
     // Register match and not project.
     registerVisitFuncs<VisitorCtxImpl, DocumentSourceMatch>(&reg);
@@ -139,7 +139,9 @@ DEATH_TEST_REGEX(DocumentSourceWalker, UnimplementedStage, "Tripwire assertion.*
     ASSERT_THROWS_CODE(walker.walk(*pipeline), DBException, 6202701);
 }
 
-DEATH_TEST_REGEX(DocumentSourceWalker, DuplicateRegistryKey, "Tripwire assertion.*6202700") {
+DEATH_TEST_REGEX(DocumentSourceWalkerDeathTest,
+                 DuplicateRegistryKey,
+                 "Tripwire assertion.*6202700") {
     auto f = []() {
         DocumentSourceVisitorRegistry reg;
         registerVisitFuncs<VisitorCtxImpl, DocumentSourceMatch, DocumentSourceMatch>(&reg);

@@ -63,15 +63,16 @@ namespace {
         ASSERT_EQ(0, raise(SIGNUM));     \
     }
 
-#define FATAL_SIGNAL(SIGNUM)                                                                   \
-    DEATH_TEST(FatalSignalTest, SIGNUM##_, str::stream() << "Got signal: " << SIGNUM << " ") { \
-        ASSERT_EQ(0, raise(SIGNUM));                                                           \
+#define FATAL_SIGNAL(SIGNUM)                                                                     \
+    DEATH_TEST(                                                                                  \
+        FatalSignalTestDeathTest, SIGNUM##_, str::stream() << "Got signal: " << SIGNUM << " ") { \
+        ASSERT_EQ(0, raise(SIGNUM));                                                             \
     }
 
 #ifdef __linux__
 // The si_code field is always SI_TKILL when using raise
 #define DUMP_SIGINFO(SIGNUM)                                                               \
-    DEATH_TEST(DumpSiginfoTest,                                                            \
+    DEATH_TEST(DumpSiginfoTestDeathTest,                                                   \
                SIGNUM##_,                                                                  \
                fmt::format("Dumping siginfo (si_code={}): ", fmt::underlying(SI_TKILL))) { \
         ASSERT_EQ(0, raise(SIGNUM));                                                       \
@@ -98,13 +99,13 @@ FATAL_SIGNAL(SIGFPE)
 DUMP_SIGINFO(SIGFPE)
 #endif
 
-DEATH_TEST(FatalTerminateTest,
+DEATH_TEST(FatalTerminateTestDeathTest,
            TerminateIsFatalWithoutException,
            "terminate() called. No exception") {
     std::terminate();
 }
 
-DEATH_TEST(FatalTerminateTest,
+DEATH_TEST(FatalTerminateTestDeathTest,
            TerminateIsFatalWithDBException,
            "terminate() called. An exception is active") {
     try {
@@ -114,7 +115,7 @@ DEATH_TEST(FatalTerminateTest,
     }
 }
 
-DEATH_TEST(FatalTerminateTest,
+DEATH_TEST(FatalTerminateTestDeathTest,
            TerminateIsFatalWithDoubleException,
            "terminate() called. An exception is active") {
     class ThrowInDestructor {
@@ -224,18 +225,21 @@ public:
     }
 };
 
-DEATH_TEST_F(MallocFreeOStreamGuardTest, SecondGuardQuits, "[deadlock]") {
+using MallocFreeOStreamGuardTestDeathTest = MallocFreeOStreamGuardTest;
+DEATH_TEST_F(MallocFreeOStreamGuardTestDeathTest, SecondGuardQuits, "[deadlock]") {
     auto guard1 = makeGuard(sig<0>);
     auto guard2 = makeGuard(sig<1>);
 }
 
-DEATH_TEST_F(MallocFreeOStreamGuardTest, DeadlockCounterOnlyIncreases, "[deadlock]") {
+DEATH_TEST_F(MallocFreeOStreamGuardTestDeathTest, DeadlockCounterOnlyIncreases, "[deadlock]") {
     // The deadlock avoidance counter remains incremented after guard dies.
     (void)makeGuard(sig<0>);
     (void)makeGuard(sig<1>);
 }
 
-DEATH_TEST_F(MallocFreeOStreamGuardTest, RaiseWithinHandler, "[sig<1>][sig<0>][deadlock]") {
+DEATH_TEST_F(MallocFreeOStreamGuardTestDeathTest,
+             RaiseWithinHandler,
+             "[sig<1>][sig<0>][deadlock]") {
     installSignalHandler(sig<0>, handler<"[sig<0>]", thenExitCleanly>);
     installSignalHandler(sig<1>, handler<"[sig<1>]", thenRaise<sig<0>>>);
     raise(sig<1>);
@@ -245,7 +249,7 @@ DEATH_TEST_F(MallocFreeOStreamGuardTest, RaiseWithinHandler, "[sig<1>][sig<0>][d
  * Because we made a guard, the `sig<0>` signal handlers will die, and the
  * `exitCleanly` action won't happen.
  */
-DEATH_TEST_F(MallocFreeOStreamGuardTest, WithoutBlockedSignal, "[sig<0>][deadlock]") {
+DEATH_TEST_F(MallocFreeOStreamGuardTestDeathTest, WithoutBlockedSignal, "[sig<0>][deadlock]") {
     installSignalHandler(sig<0>, handler<"[sig<0>]", thenExitCleanly>);
     auto guard = makeGuard(sig<1>);
     raise(sig<0>);
@@ -257,7 +261,9 @@ DEATH_TEST_F(MallocFreeOStreamGuardTest, WithoutBlockedSignal, "[sig<0>][deadloc
  * unblocked, the pending `sig<0>` will activate and trigger the deadlock
  * mitigation.
  */
-DEATH_TEST_F(MallocFreeOStreamGuardTest, WithBlockedSignal, "[survived][sig<0>][deadlock]") {
+DEATH_TEST_F(MallocFreeOStreamGuardTestDeathTest,
+             WithBlockedSignal,
+             "[survived][sig<0>][deadlock]") {
     blockSignal(sig<0>, true);
     installSignalHandler(sig<0>, handler<"[sig<0>]", thenExitCleanly>);
     auto guard = makeGuard(sig<1>);
@@ -286,7 +292,8 @@ public:
 
 // Tests that even if the signal is blocked (e.g. by another thread) between the start of the signal
 // handler and the deadlock mitigation, the deadlock mitigation ends the process as expected.
-DEATH_TEST_F(BlockInsideSignalHandlerTest, ProcessEnds, "[sig<0>][sig<1>][deadlock]") {
+using BlockInsideSignalHandlerTestDeathTest = BlockInsideSignalHandlerTest;
+DEATH_TEST_F(BlockInsideSignalHandlerTestDeathTest, ProcessEnds, "[sig<0>][sig<1>][deadlock]") {
     installSignalHandler(sig<0>, handler<"[sig<0>]", thenRaise<sig<1>>>);
     installSignalHandler(sig<1>, handler<"[sig<1>]", thenExitCleanly>);
     raise(sig<0>);

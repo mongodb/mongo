@@ -105,7 +105,7 @@ TEST(ViewDefinitionTest, CopyAssignmentOperatorProperlyClonesAllFields) {
                                              copiedView.defaultCollator()));
 }
 
-DEATH_TEST_REGEX(ViewDefinitionTest,
+DEATH_TEST_REGEX(ViewDefinitionTestDeathTest,
                  SetViewOnFailsIfNewViewOnNotInSameDatabaseAsView,
                  R"#(Invariant failure.*_viewNss\.isEqualDb\(viewOnNss\))#") {
     ViewDefinition viewDef(

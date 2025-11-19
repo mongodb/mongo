@@ -1023,7 +1023,8 @@ TEST_F(SessionCatalogMigrationSourceTest,
     ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 0);
 }
 
-DEATH_TEST_F(SessionCatalogMigrationSourceTest,
+using SessionCatalogMigrationSourceTestDeathTest = SessionCatalogMigrationSourceTest;
+DEATH_TEST_F(SessionCatalogMigrationSourceTestDeathTest,
              DiscardOplogEntriesForNewCommittedInternalTransactionForNonRetryableWrite,
              "invariant") {
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);

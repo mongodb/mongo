@@ -332,7 +332,7 @@ TEST(RecordId, RecordIdBigStr) {
 }
 
 // RecordIds of different formats may not be compared.
-DEATH_TEST(RecordId, UnsafeComparison, "Invariant failure") {
+DEATH_TEST(RecordIdDeathTest, UnsafeComparison, "Invariant failure") {
     if (kDebugBuild) {
         RecordId rid1(1);
         RecordId rid2 =

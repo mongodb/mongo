@@ -2255,8 +2255,9 @@ TEST_F(CollectionCatalogTimestampTest,
         });
 }
 
+using CollectionCatalogTimestampTestDeathTest = CollectionCatalogTimestampTest;
 #ifdef MONGO_CONFIG_DEBUG_BUILD
-DEATH_TEST_F(CollectionCatalogTimestampTest,
+DEATH_TEST_F(CollectionCatalogTimestampTestDeathTest,
              DetectLeftoverOpenCollections,
              "Server encountered potential use-after free") {
     const NamespaceString collNss = NamespaceString::createNamespaceString_forTest("a.coll");
@@ -2277,7 +2278,9 @@ DEATH_TEST_F(CollectionCatalogTimestampTest,
 }
 #endif
 
-DEATH_TEST_F(CollectionCatalogTimestampTest, OpenCollectionInWriteUnitOfWork, "invariant") {
+DEATH_TEST_F(CollectionCatalogTimestampTestDeathTest,
+             OpenCollectionInWriteUnitOfWork,
+             "invariant") {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
     const Timestamp createIndexTs = Timestamp(20, 20);

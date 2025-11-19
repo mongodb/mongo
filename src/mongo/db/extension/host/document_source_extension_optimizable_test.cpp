@@ -78,7 +78,10 @@ TEST_F(DocumentSourceExtensionOptimizableTest, stageCanSerializeForQueryExecutio
                            << "serializedForExecution"));
 }
 
-DEATH_TEST_F(DocumentSourceExtensionOptimizableTest, serializeWithWrongOptsFails, "11217800") {
+using DocumentSourceExtensionOptimizableTestDeathTest = DocumentSourceExtensionOptimizableTest;
+DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
+             serializeWithWrongOptsFails,
+             "11217800") {
     auto astNode =
         new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
     auto astHandle = AggStageAstNodeHandle(astNode);

@@ -1798,7 +1798,8 @@ TEST_F(TxnAPITest, ClientRetryableWrite_UsesRetryableInternalSession) {
 }
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
-DEATH_TEST_F(TxnAPITest,
+using TxnAPITestDeathTest = TxnAPITest;
+DEATH_TEST_F(TxnAPITestDeathTest,
              ClientRetryableWrite_RetryableWriteWithoutStmtIdCrashesOnDebug,
              "In a retryable write transaction every retryable write command should") {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());

@@ -111,7 +111,9 @@ TEST(ChunkVersionTest, ThrowsErrorIfOverflowIsAttemptedForMinorVersion) {
     ASSERT_THROWS_CODE(version.incMinor(), DBException, 31181);
 }
 
-DEATH_TEST_REGEX(ChunkVersionTest, Error_00SameCollectionTimestamp, "Tripwire assertion.*664720") {
+DEATH_TEST_REGEX(ChunkVersionTestDeathTest,
+                 Error_00SameCollectionTimestamp,
+                 "Tripwire assertion.*664720") {
     OID epoch = OID::gen();
     OID differentEpoch = OID::gen();
     Timestamp timestamp(1);
@@ -121,7 +123,9 @@ DEATH_TEST_REGEX(ChunkVersionTest, Error_00SameCollectionTimestamp, "Tripwire as
     unsetVersionDifferentEpoch <=> ChunkVersion({epoch, timestamp}, {3, 1});
 }
 
-DEATH_TEST_REGEX(ChunkVersionTest, Error_00SameCollectionEpoch, "Tripwire assertion.*664721") {
+DEATH_TEST_REGEX(ChunkVersionTestDeathTest,
+                 Error_00SameCollectionEpoch,
+                 "Tripwire assertion.*664721") {
     OID epoch = OID::gen();
     Timestamp timestamp(1);
     Timestamp differentTimestamp(2);

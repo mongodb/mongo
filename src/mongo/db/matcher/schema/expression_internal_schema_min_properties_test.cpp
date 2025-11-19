@@ -51,7 +51,7 @@ TEST(InternalSchemaMinPropertiesMatchExpression, EquivalentFunctionIsAccurate) {
     ASSERT_FALSE(minProperties1.equivalent(&minProperties3));
 }
 
-DEATH_TEST_REGEX(InternalSchemaMinPropertiesMatchExpression,
+DEATH_TEST_REGEX(InternalSchemaMinPropertiesMatchExpressionDeathTest,
                  GetChildFailsIndexGreaterThanZero,
                  "Tripwire assertion.*6400216") {
     InternalSchemaMaxPropertiesMatchExpression minProperties(1);

@@ -608,7 +608,8 @@ TEST_F(DocumentSourceMatchTest, RepeatedJoinWithShouldNotNestAnds) {
                  "{o: 1}]}]}"));
 }
 
-DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
+using DocumentSourceMatchTestDeathTest = DocumentSourceMatchTest;
+DEATH_TEST_REGEX_F(DocumentSourceMatchTestDeathTest,
                    ShouldFailToDescendExpressionOnPathThatIsNotACommonPrefix,
                    "Tripwire assertion.*Expected 'a' to be a prefix of 'b.c', but it is not.") {
     const auto expCtx = getExpCtx();
@@ -619,7 +620,7 @@ DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
 }
 
 DEATH_TEST_REGEX_F(
-    DocumentSourceMatchTest,
+    DocumentSourceMatchTestDeathTest,
     ShouldFailToDescendExpressionOnPathThatContainsElemMatchWithObject,
     "Tripwire assertion.*The given match expression has a node that represents a partial path.") {
     const auto expCtx = getExpCtx();
@@ -629,7 +630,7 @@ DEATH_TEST_REGEX_F(
     DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
 }
 
-DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
+DEATH_TEST_REGEX_F(DocumentSourceMatchTestDeathTest,
                    ShouldFailToDescendExpressionOnPathThatContainsElemMatchWithValue,
                    "Tripwire assertion.") {
     const auto expCtx = getExpCtx();

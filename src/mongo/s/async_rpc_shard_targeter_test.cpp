@@ -305,7 +305,10 @@ TEST_F(AsyncRPCShardingTestFixture, TestingIfShardRemoved) {
 /**
  * Make sure that we cannot call onRemoteCommandError before calling resolve.
  */
-DEATH_TEST_F(AsyncRPCShardingTestFixture, CannotCallOnRemoteErrorBeforeResolve, "invariant") {
+using AsyncRPCShardingTestFixtureDeathTest = AsyncRPCShardingTestFixture;
+DEATH_TEST_F(AsyncRPCShardingTestFixtureDeathTest,
+             CannotCallOnRemoteErrorBeforeResolve,
+             "invariant") {
     ReadPreferenceSetting readPref;
     ShardIdTargeter targeter{executor(), operationContext(), kTestShardIds[0], readPref};
 

@@ -89,7 +89,8 @@ TEST_F(InternalSearchIdLookupTest, TestSearchIdLookupMetricsGetLookupSuccessRate
     ASSERT_EQUALS(double(0.5), searchIdLookupMetrics.getIdLookupSuccessRate());
 }
 
-DEATH_TEST_F(InternalSearchIdLookupTest,
+using InternalSearchIdLookupTestDeathTest = InternalSearchIdLookupTest;
+DEATH_TEST_F(InternalSearchIdLookupTestDeathTest,
              TestSearchIdLookupMetricsGetLookupSuccessRateTAssert,
              "9074400") {
     // Check the (should be impossible) case where the number of documents

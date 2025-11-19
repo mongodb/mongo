@@ -138,7 +138,7 @@ TEST(QueryAnalysisWriterBufferTest, TruncateBasic) {
     testTruncateCommon(10 /* oldCount */, 9 /* newCount */);  // Truncate one.
 }
 
-DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidIndex_Negative, "invariant") {
+DEATH_TEST(QueryAnalysisWriterBufferTestDeathTest, TruncateInvalidIndex_Negative, "invariant") {
     auto buffer = QueryAnalysisWriter::Buffer(nss0);
 
     auto doc = BSON("a" << 0);
@@ -149,7 +149,7 @@ DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidIndex_Negative, "invari
     buffer.truncate(-1, doc.objsize());
 }
 
-DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidIndex_Positive, "invariant") {
+DEATH_TEST(QueryAnalysisWriterBufferTestDeathTest, TruncateInvalidIndex_Positive, "invariant") {
     auto buffer = QueryAnalysisWriter::Buffer(nss0);
 
     auto doc = BSON("a" << 0);
@@ -160,7 +160,7 @@ DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidIndex_Positive, "invari
     buffer.truncate(2, doc.objsize());
 }
 
-DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidSize_Negative, "invariant") {
+DEATH_TEST(QueryAnalysisWriterBufferTestDeathTest, TruncateInvalidSize_Negative, "invariant") {
     auto buffer = QueryAnalysisWriter::Buffer(nss0);
 
     auto doc = BSON("a" << 0);
@@ -171,7 +171,7 @@ DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidSize_Negative, "invaria
     buffer.truncate(0, -doc.objsize());
 }
 
-DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidSize_Zero, "invariant") {
+DEATH_TEST(QueryAnalysisWriterBufferTestDeathTest, TruncateInvalidSize_Zero, "invariant") {
     auto buffer = QueryAnalysisWriter::Buffer(nss0);
 
     auto doc = BSON("a" << 0);
@@ -182,7 +182,7 @@ DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidSize_Zero, "invariant")
     buffer.truncate(0, 0);
 }
 
-DEATH_TEST(QueryAnalysisWriterBufferTest, TruncateInvalidSize_Positive, "invariant") {
+DEATH_TEST(QueryAnalysisWriterBufferTestDeathTest, TruncateInvalidSize_Positive, "invariant") {
     auto buffer = QueryAnalysisWriter::Buffer(nss0);
 
     auto doc = BSON("a" << 0);
@@ -864,7 +864,8 @@ TEST_F(QueryAnalysisWriterTest, AggregateQuery) {
         emptyFilter, emptyCollation, oneSecondExpirationSecs, makeLetParameters());
 }
 
-DEATH_TEST_F(QueryAnalysisWriterTest, UpdateQueryNotMarkedForSampling, "invariant") {
+using QueryAnalysisWriterTestDeathTest = QueryAnalysisWriterTest;
+DEATH_TEST_F(QueryAnalysisWriterTestDeathTest, UpdateQueryNotMarkedForSampling, "invariant") {
     auto& writer = *QueryAnalysisWriter::get(operationContext());
     auto [originalCmd, _] = makeUpdateCommandRequest(nss0, 1, {} /* markForSampling */);
     writer.addUpdateQuery(operationContext(), originalCmd, 0).get();
@@ -897,7 +898,7 @@ TEST_F(QueryAnalysisWriterTest, UpdateQueriesMarkedForSampling) {
     }
 }
 
-DEATH_TEST_F(QueryAnalysisWriterTest, DeleteQueryNotMarkedForSampling, "invariant") {
+DEATH_TEST_F(QueryAnalysisWriterTestDeathTest, DeleteQueryNotMarkedForSampling, "invariant") {
     auto& writer = *QueryAnalysisWriter::get(operationContext());
     auto [originalCmd, _] = makeDeleteCommandRequest(nss0, 1, {} /* markForSampling */);
     writer.addDeleteQuery(operationContext(), originalCmd, 0).get();
@@ -930,7 +931,9 @@ TEST_F(QueryAnalysisWriterTest, DeleteQueriesMarkedForSampling) {
     }
 }
 
-DEATH_TEST_F(QueryAnalysisWriterTest, FindAndModifyQueryNotMarkedForSampling, "invariant") {
+DEATH_TEST_F(QueryAnalysisWriterTestDeathTest,
+             FindAndModifyQueryNotMarkedForSampling,
+             "invariant") {
     auto& writer = *QueryAnalysisWriter::get(operationContext());
     auto [originalCmd, _] =
         makeFindAndModifyCommandRequest(nss0, true /* isUpdate */, false /* markForSampling */);

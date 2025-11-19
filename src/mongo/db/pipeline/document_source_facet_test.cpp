@@ -550,7 +550,8 @@ TEST_F(DocumentSourceFacetTest, ShouldPropagateDisposeThroughToSource) {
 }
 
 // TODO: DocumentSourceFacet will have to propagate pauses if we ever allow nested $facets.
-DEATH_TEST_REGEX_F(DocumentSourceFacetTest,
+using DocumentSourceFacetTestDeathTest = DocumentSourceFacetTest;
+DEATH_TEST_REGEX_F(DocumentSourceFacetTestDeathTest,
                    ShouldFailIfGivenPausedInput,
                    R"#(Invariant failure.*!input.isPaused\(\))#") {
     auto ctx = getExpCtx();

@@ -94,7 +94,8 @@ TEST_F(PartitionKeyComparatorTest, NullAndMissingCompareEqual) {
     ASSERT_TRUE(_keyComparator->isDocumentNewPartition(docFour));
 }
 
-DEATH_TEST_F(PartitionKeyComparatorTest,
+using PartitionKeyComparatorTestDeathTest = PartitionKeyComparatorTest;
+DEATH_TEST_F(PartitionKeyComparatorTestDeathTest,
              FailsWithNullExpressionContext,
              "Null expression context") {
     boost::intrusive_ptr<ExpressionFieldPath> expr =
@@ -102,7 +103,9 @@ DEATH_TEST_F(PartitionKeyComparatorTest,
     _keyComparator = std::make_unique<PartitionKeyComparator>(nullptr, expr, Document{{}});
 }
 
-DEATH_TEST_F(PartitionKeyComparatorTest, FailsWithNullExpression, "Null expression passed") {
+DEATH_TEST_F(PartitionKeyComparatorTestDeathTest,
+             FailsWithNullExpression,
+             "Null expression passed") {
     _keyComparator =
         std::make_unique<PartitionKeyComparator>(getExpCtx().get(), nullptr, Document{{}});
 }
