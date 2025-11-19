@@ -512,15 +512,12 @@ public:
                                              &opStateAccumulator);
     }
 
-    void onPreparedTransactionCommit(
-        OperationContext* opCtx,
-        OplogSlot commitOplogEntryOpTime,
-        Timestamp commitTimestamp,
-        const std::vector<repl::ReplOperation>& statements) noexcept override {
+    void onPreparedTransactionCommit(OperationContext* opCtx,
+                                     OplogSlot commitOplogEntryOpTime,
+                                     Timestamp commitTimestamp) noexcept override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onPreparedTransactionCommit(
-                opCtx, commitOplogEntryOpTime, commitTimestamp, statements);
+            o->onPreparedTransactionCommit(opCtx, commitOplogEntryOpTime, commitTimestamp);
     }
 
     void preTransactionPrepare(

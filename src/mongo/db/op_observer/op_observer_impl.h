@@ -246,11 +246,9 @@ public:
                               WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
                               OpStateAccumulator* opAccumulator = nullptr) final;
     void onBatchedWriteAbort(OperationContext* opCtx) final;
-    void onPreparedTransactionCommit(
-        OperationContext* opCtx,
-        OplogSlot commitOplogEntryOpTime,
-        Timestamp commitTimestamp,
-        const std::vector<repl::ReplOperation>& statements) noexcept final;
+    void onPreparedTransactionCommit(OperationContext* opCtx,
+                                     OplogSlot commitOplogEntryOpTime,
+                                     Timestamp commitTimestamp) noexcept final;
 
     void preTransactionPrepare(
         OperationContext* opCtx,

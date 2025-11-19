@@ -2111,11 +2111,9 @@ void OpObserverImpl::onBatchedWriteAbort(OperationContext* opCtx) {
     batchedWriteContext.setWritesAreBatched(false);
 }
 
-void OpObserverImpl::onPreparedTransactionCommit(
-    OperationContext* opCtx,
-    OplogSlot commitOplogEntryOpTime,
-    Timestamp commitTimestamp,
-    const std::vector<repl::ReplOperation>& statements) noexcept {
+void OpObserverImpl::onPreparedTransactionCommit(OperationContext* opCtx,
+                                                 OplogSlot commitOplogEntryOpTime,
+                                                 Timestamp commitTimestamp) noexcept {
     invariant(opCtx->getTxnNumber());
 
     if (!opCtx->writesAreReplicated()) {

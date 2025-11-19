@@ -233,11 +233,9 @@ public:
 
     void onBatchedWriteAbort(OperationContext* opCtx) override {}
 
-    void onPreparedTransactionCommit(
-        OperationContext* opCtx,
-        OplogSlot commitOplogEntryOpTime,
-        Timestamp commitTimestamp,
-        const std::vector<repl::ReplOperation>& statements) noexcept override {}
+    void onPreparedTransactionCommit(OperationContext* opCtx,
+                                     OplogSlot commitOplogEntryOpTime,
+                                     Timestamp commitTimestamp) noexcept override {}
 
     void preTransactionPrepare(
         OperationContext* opCtx,

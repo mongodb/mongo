@@ -524,14 +524,10 @@ public:
      *
      * The 'commitOplogEntryOpTime' is passed in to be used as the OpTime of the oplog entry. The
      * 'commitTimestamp' is the timestamp at which the multi-document transaction was committed.
-     *
-     * The 'statements' are the list of CRUD operations to be applied in this transaction.
      */
-    virtual void onPreparedTransactionCommit(
-        OperationContext* opCtx,
-        OplogSlot commitOplogEntryOpTime,
-        Timestamp commitTimestamp,
-        const std::vector<repl::ReplOperation>& statements) noexcept = 0;
+    virtual void onPreparedTransactionCommit(OperationContext* opCtx,
+                                             OplogSlot commitOplogEntryOpTime,
+                                             Timestamp commitTimestamp) noexcept = 0;
 
     /**
      * Events for logical grouping of writes to be replicated atomically.

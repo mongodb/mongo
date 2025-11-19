@@ -204,14 +204,11 @@ public:
     };
 
 
-    void onPreparedTransactionCommit(
-        OperationContext* opCtx,
-        OplogSlot commitOplogEntryOpTime,
-        Timestamp commitTimestamp,
-        const std::vector<repl::ReplOperation>& statements) noexcept override {
+    void onPreparedTransactionCommit(OperationContext* opCtx,
+                                     OplogSlot commitOplogEntryOpTime,
+                                     Timestamp commitTimestamp) noexcept override {
         ASSERT_TRUE(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-        OpObserverNoop::onPreparedTransactionCommit(
-            opCtx, commitOplogEntryOpTime, commitTimestamp, statements);
+        OpObserverNoop::onPreparedTransactionCommit(opCtx, commitOplogEntryOpTime, commitTimestamp);
 
         uassert(ErrorCodes::OperationFailed,
                 "onPreparedTransactionCommit() failed",

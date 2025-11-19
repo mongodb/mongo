@@ -2240,11 +2240,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         invariant(opObserver);
 
         // Once the transaction is committed, the oplog entry must be written.
-        opObserver->onPreparedTransactionCommit(
-            opCtx,
-            commitOplogSlot,
-            commitTimestamp,
-            retrieveCompletedTransactionOperations(opCtx)->getOperationsForOpObserver());
+        opObserver->onPreparedTransactionCommit(opCtx, commitOplogSlot, commitTimestamp);
 
         auto operationCount = p().transactionOperations.numOperations();
         auto oplogOperationBytes = p().transactionOperations.getTotalOperationBytes();

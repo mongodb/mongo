@@ -204,17 +204,13 @@ public:
         };
 
 
-    void onPreparedTransactionCommit(
-        OperationContext* opCtx,
-        OplogSlot commitOplogEntryOpTime,
-        Timestamp commitTimestamp,
-        const std::vector<repl::ReplOperation>& statements) noexcept override;
+    void onPreparedTransactionCommit(OperationContext* opCtx,
+                                     OplogSlot commitOplogEntryOpTime,
+                                     Timestamp commitTimestamp) noexcept override;
     bool onPreparedTransactionCommitThrowsException = false;
     bool preparedTransactionCommitted = false;
-    std::function<void(OplogSlot, Timestamp, const std::vector<repl::ReplOperation>&)>
-        onPreparedTransactionCommitFn = [](OplogSlot commitOplogEntryOpTime,
-                                           Timestamp commitTimestamp,
-                                           const std::vector<repl::ReplOperation>& statements) {
+    std::function<void(OplogSlot, Timestamp)> onPreparedTransactionCommitFn =
+        [](OplogSlot commitOplogEntryOpTime, Timestamp commitTimestamp) {
         };
 
     void onTransactionAbort(OperationContext* opCtx,
@@ -266,22 +262,19 @@ void OpObserverMock::onUnpreparedTransactionCommit(
     onUnpreparedTransactionCommitFn(statements);
 }
 
-void OpObserverMock::onPreparedTransactionCommit(
-    OperationContext* opCtx,
-    OplogSlot commitOplogEntryOpTime,
-    Timestamp commitTimestamp,
-    const std::vector<repl::ReplOperation>& statements) noexcept {
+void OpObserverMock::onPreparedTransactionCommit(OperationContext* opCtx,
+                                                 OplogSlot commitOplogEntryOpTime,
+                                                 Timestamp commitTimestamp) noexcept {
     ASSERT_FALSE(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     // The 'commitTimestamp' must be cleared before we write the oplog entry.
     ASSERT(shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull());
 
-    OpObserverNoop::onPreparedTransactionCommit(
-        opCtx, commitOplogEntryOpTime, commitTimestamp, statements);
+    OpObserverNoop::onPreparedTransactionCommit(opCtx, commitOplogEntryOpTime, commitTimestamp);
     uassert(ErrorCodes::OperationFailed,
             "onPreparedTransactionCommit() failed",
             !onPreparedTransactionCommitThrowsException);
     preparedTransactionCommitted = true;
-    onPreparedTransactionCommitFn(commitOplogEntryOpTime, commitTimestamp, statements);
+    onPreparedTransactionCommitFn(commitOplogEntryOpTime, commitTimestamp);
 }
 
 void OpObserverMock::onTransactionAbort(OperationContext* opCtx,
@@ -873,16 +866,12 @@ TEST_F(TxnParticipantTest, CommitTransactionSetsCommitTimestampOnPreparedTransac
     const auto commitTS = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
 
     auto originalFn = _opObserver->onPreparedTransactionCommitFn;
-    _opObserver->onPreparedTransactionCommitFn =
-        [&](OplogSlot commitOplogEntryOpTime,
-            Timestamp commitTimestamp,
-            const std::vector<repl::ReplOperation>& statements) {
-            originalFn(commitOplogEntryOpTime, commitTimestamp, statements);
+    _opObserver->onPreparedTransactionCommitFn = [&](OplogSlot commitOplogEntryOpTime,
+                                                     Timestamp commitTimestamp) {
+        originalFn(commitOplogEntryOpTime, commitTimestamp);
 
-            ASSERT_GT(commitTimestamp, prepareTimestamp);
-
-            ASSERT(statements.empty());
-        };
+        ASSERT_GT(commitTimestamp, prepareTimestamp);
+    };
 
     txnParticipant.commitPreparedTransaction(opCtx(), commitTS, {});
 
