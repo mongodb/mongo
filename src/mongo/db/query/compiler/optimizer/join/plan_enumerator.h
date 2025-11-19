@@ -38,7 +38,7 @@ namespace mongo::join_ordering {
 /**
  * Describes shape of plan tree.
  */
-enum class PlanTreeShape { LEFT_DEEP, RIGHT_DEEP };
+enum class PlanTreeShape { LEFT_DEEP, RIGHT_DEEP, ZIG_ZAG };
 
 /**
  * Context containing all the state for the bottom-up dynamic programming join plan enumeration
@@ -62,7 +62,7 @@ public:
     /**
      * Enumerates all join subsets in bottom-up fashion.
      */
-    void enumerateJoinSubsets(PlanTreeShape type = PlanTreeShape::LEFT_DEEP);
+    void enumerateJoinSubsets(PlanTreeShape type = PlanTreeShape::ZIG_ZAG);
 
     JoinPlanNodeId getBestFinalPlan() const {
         tassert(11336904,
@@ -96,11 +96,23 @@ private:
      * Helper for adding a join plan to subset 'cur', constructed using the specified join 'method'
      * connecting the best plans from the provided subsets.
      */
-    void addJoinPlan(JoinMethod method,
+    void addJoinPlan(PlanTreeShape type,
+                     JoinMethod method,
                      const JoinSubset& left,
                      const JoinSubset& right,
                      const std::vector<EdgeId>& edges,
                      JoinSubset& cur);
+
+    /**
+     * Determines based on the shape of the tree obtained by joining the best plans on each side if
+     * we would retain the tree shape specified by 'type' and the plan is valid for the given join
+     * 'method'.
+     */
+    bool canPlanBeEnumerated(PlanTreeShape type,
+                             JoinMethod method,
+                             const JoinSubset& left,
+                             const JoinSubset& right,
+                             const JoinSubset& subset) const;
 
     const JoinGraph& _joinGraph;
 

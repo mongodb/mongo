@@ -32,6 +32,8 @@
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 
+#include <variant>
+
 namespace mongo::join_ordering {
 
 // Forward declarations.
@@ -57,7 +59,7 @@ struct JoinSubset {
     JoinSubset(JoinSubset&& other) = default;
     JoinSubset& operator=(JoinSubset&& other) = default;
 
-    inline bool isBasePlan() const {
+    inline bool isBaseCollectionAccess() const {
         return subset.count() == 1;
     }
 
@@ -152,6 +154,16 @@ public:
     }
 
     NodeSet getBitset(JoinPlanNodeId id) const;
+
+    template <typename T>
+    const T& getAs(JoinPlanNodeId id) const {
+        return std::get<T>(get(id));
+    }
+
+    template <typename T>
+    bool isOfType(JoinPlanNodeId id) const {
+        return std::holds_alternative<T>(get(id));
+    }
 
     std::string joinPlansToString(const JoinPlans& plans,
                                   size_t numNodesToPrint = kMaxNodesInJoin,

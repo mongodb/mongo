@@ -302,6 +302,11 @@ TEST_F(JoinPlanEnumeratorTest, RightDeep8Nodes) {
     testLargeSubset(&goldenCtx, PlanTreeShape::RIGHT_DEEP, 8);
 }
 
+TEST_F(JoinPlanEnumeratorTest, ZigZag8Nodes) {
+    unittest::GoldenTestContext goldenCtx(&config);
+    testLargeSubset(&goldenCtx, PlanTreeShape::ZIG_ZAG, 8);
+}
+
 TEST_F(JoinPlanEnumeratorTest, InitialzeLargeSubsets) {
     testLargeSubset(nullptr /* No golden test here. */, PlanTreeShape::LEFT_DEEP, 15);
 }

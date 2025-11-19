@@ -51,11 +51,106 @@ const std::vector<JoinSubset>& PlanEnumeratorContext::getSubsets(int level) {
     return _joinSubsets[level];
 }
 
-void PlanEnumeratorContext::addJoinPlan(JoinMethod method,
+bool PlanEnumeratorContext::canPlanBeEnumerated(PlanTreeShape type,
+                                                JoinMethod method,
+                                                const JoinSubset& left,
+                                                const JoinSubset& right,
+                                                const JoinSubset& subset) const {
+    if (method == JoinMethod::NLJ && !right.isBaseCollectionAccess()) {
+        // NLJ plans perform poorly when the right hand side is not a collection access- don't
+        // enumerate this plan.
+        return false;
+    }
+
+    switch (type) {
+        case PlanTreeShape::LEFT_DEEP:
+            // We create a left-deep tree by only generating plans that add a "base" join subset on
+            // the right.
+            return right.isBaseCollectionAccess();
+
+        case PlanTreeShape::RIGHT_DEEP:
+            // We create a right-deep tree by only generating plans that add a "base" join subset on
+            // the left.
+            return left.isBaseCollectionAccess();
+
+        case PlanTreeShape::ZIG_ZAG:
+            // We create a zig-zag plan by alternating which side we add a "base" join subset to.
+            // TODO SERVER-113059: Pick based on which side has smaller CE.
+            if (left.isBaseCollectionAccess() && right.isBaseCollectionAccess()) {
+                /**
+                 * We always allow a join like this as a base case:
+                 *
+                 *      J
+                 *     / \
+                 *    B   B
+                 *
+                 */
+                return true;
+
+            } else if (!left.isBaseCollectionAccess()) {
+                /**
+                 * Accept two subtree shapes here for the tree we're trying to construct.
+                 * (1)         J
+                 *            /  \
+                 * 'left' -> J    *
+                 *          / \
+                 *         B   B
+                 *
+                 * (2)         J
+                 *            /  \
+                 * 'left' -> J    *
+                 *          / \
+                 *         *   J
+                 *            / \
+                 *           *   *
+                 *
+                 */
+                const auto& leftJoin = _registry.getAs<JoiningNode>(left.bestPlan());
+                return _registry.isOfType<JoiningNode>(leftJoin.right) ||
+                    (_registry.isOfType<BaseNode>(leftJoin.right) &&
+                     _registry.isOfType<BaseNode>(leftJoin.left));
+
+            } else if (!right.isBaseCollectionAccess()) {
+                /**
+                 * Accept two subtree shapes here for the tree we're trying to construct.
+                 * (1)   J
+                 *      /  \
+                 *     *    J <- 'right'
+                 *         / \
+                 *        B   B
+                 *
+                 * (2)   J
+                 *      /  \
+                 *     *    J <- 'right'
+                 *         / \
+                 *        J   *
+                 *       / \
+                 *      *   *
+                 *
+                 */
+                const auto& rightJoin = _registry.getAs<JoiningNode>(right.bestPlan());
+                return _registry.isOfType<JoiningNode>(rightJoin.left) ||
+                    (_registry.isOfType<BaseNode>(rightJoin.right) &&
+                     _registry.isOfType<BaseNode>(rightJoin.left));
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    MONGO_UNREACHABLE_TASSERT(11336906);
+}
+
+void PlanEnumeratorContext::addJoinPlan(PlanTreeShape type,
+                                        JoinMethod method,
                                         const JoinSubset& left,
                                         const JoinSubset& right,
                                         const std::vector<EdgeId>& edges,
                                         JoinSubset& subset) {
+    if (!canPlanBeEnumerated(type, method, left, right, subset)) {
+        return;
+    }
     // TODO SERVER-113059: Rudimentary cost metric/tracking.
     subset.plans.push_back(
         _registry.registerJoinNode(subset, method, left.bestPlan(), right.bestPlan()));
@@ -89,26 +184,8 @@ void PlanEnumeratorContext::enumerateJoinPlans(PlanTreeShape type,
     }
 
     // TODO SERVER-113717: enumerate INLJ plans.
-    switch (type) {
-        case PlanTreeShape::LEFT_DEEP:
-            // We create a left-deep tree by only generating plans that add a "base" join subset on
-            // the right.
-            if (right.isBasePlan()) {
-                addJoinPlan(JoinMethod::HJ, left, right, joinEdges, cur);
-                addJoinPlan(JoinMethod::NLJ, left, right, joinEdges, cur);
-            }
-            break;
-        case PlanTreeShape::RIGHT_DEEP:
-            // We create a right-deep tree by only generating plans that add a "base" join subset on
-            // the left.
-            if (left.isBasePlan()) {
-                addJoinPlan(JoinMethod::HJ, left, right, joinEdges, cur);
-                addJoinPlan(JoinMethod::NLJ, left, right, joinEdges, cur);
-            }
-            break;
-        default:
-            MONGO_UNREACHABLE_TASSERT(11336906);
-    }
+    addJoinPlan(type, JoinMethod::HJ, left, right, joinEdges, cur);
+    addJoinPlan(type, JoinMethod::NLJ, left, right, joinEdges, cur);
 }
 
 void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
@@ -156,7 +233,7 @@ void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
                 // Ensure we don't generate the same subset twice (for example, AB | C and BC | A
                 // both produce ABC).
                 if (auto it = seenSubsetIndexes.find(newSubset); it != seenSubsetIndexes.end()) {
-                    if (prevJoinSubset.isBasePlan()) {
+                    if (prevJoinSubset.isBaseCollectionAccess()) {
                         // We will have already enumerated all plans for joining these two base
                         // collections (we already tried joining both A | B and B | A). No need
                         // to enumerate more plans. As long as we always join with a base-collection

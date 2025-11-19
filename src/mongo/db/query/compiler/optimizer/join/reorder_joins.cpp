@@ -426,7 +426,7 @@ std::unique_ptr<QuerySolution> constructSolutionBottomUp(
     PlanEnumeratorContext peCtx(joinGraph, solns);
     ReorderContext rCtx(joinGraph, resolvedPaths);
 
-    peCtx.enumerateJoinSubsets();
+    peCtx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
     auto bestPlanNodeId = peCtx.getBestFinalPlan();
 
     // Build QSN based on best plan.
