@@ -6,16 +6,21 @@ assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a 
 const conn = db.getMongo();
 
 const assertNonShardedCluster = (conn) => {
+    let topology;
     try {
-        const topology = DiscoverTopology.findConnectedNodes(conn);
-        assert(topology.type != Topology.kShardedCluster &&
-                   !(topology.type == Topology.kReplicaSet && topology.configsvr &&
-                     TestData.testingReplicaSetEndpoint),
-               "Metadata consistency check must be run against a sharded cluster");
+        topology = DiscoverTopology.findConnectedNodes(conn);
     } catch (e) {
-        jsTest.log(
+        jsTest.log.info(
             `Aborted metadata consistency check due to an error during topology discovery: ${e}`);
+        return;
     }
+
+    assert(
+        topology && topology.type != Topology.kShardedCluster &&
+            !(topology.type == Topology.kReplicaSet && topology.configsvr &&
+              TestData.testingReplicaSetEndpoint),
+        "Metadata consistency check command not found, but we are unexpectedly on a sharded cluster",
+    );
 };
 
 try {
