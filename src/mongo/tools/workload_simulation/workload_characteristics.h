@@ -32,6 +32,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <random>
 

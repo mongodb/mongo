@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/tools/workload_simulation/event_queue.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>

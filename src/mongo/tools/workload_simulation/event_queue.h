@@ -34,6 +34,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source_mock.h"
 
 #include <queue>

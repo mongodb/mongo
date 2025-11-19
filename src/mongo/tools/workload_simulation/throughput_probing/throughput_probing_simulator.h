@@ -34,6 +34,7 @@
 #include "mongo/tools/workload_simulation/throughput_probing/ticketed_workload_driver.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/mock_periodic_runner.h"
+#include "mongo/util/modules.h"
 
 #include <thread>
 

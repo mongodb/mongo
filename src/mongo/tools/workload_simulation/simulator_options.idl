@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo::workload_simulation"
     cpp_includes:
         - "mongo/tools/workload_simulation/simulator_options.h"
+    mod_visibility: private
     configs:
         source: cli
         initializer:
