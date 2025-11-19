@@ -59,7 +59,7 @@ def get_git_file_content(commit_hash: str) -> str:
     """Retrieve the content of a file from a specific commit in a local Git repository."""
 
     git_command = ["git", "show", f"{commit_hash}:{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}"]
-    git_fetch_command = ["git", "fetch", "--depth", "1", commit_hash]
+    git_fetch_command = ["git", "fetch", "--depth", "1", "origin", commit_hash]
 
     try:
         result = subprocess.run(git_command, capture_output=True, text=True, check=True)
