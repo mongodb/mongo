@@ -9,6 +9,8 @@ from bazel.wrapper_hook.wrapper_debug import wrapper_debug
 
 _UNKNOWN = "Unknown"
 _REPO_ROOT = str(pathlib.Path(__file__).parent.parent.parent)
+_EXISTING_TERMINAL_STDOUT = None
+_EXISTING_TERMINAL_STDERR = None
 
 
 def get_terminal_stream(fd_env_var: str):
@@ -17,30 +19,49 @@ def get_terminal_stream(fd_env_var: str):
     if not fd_str:
         return None
 
+    global _EXISTING_TERMINAL_STDOUT, _EXISTING_TERMINAL_STDERR
+    if _EXISTING_TERMINAL_STDOUT:
+        return _EXISTING_TERMINAL_STDOUT
+    if _EXISTING_TERMINAL_STDERR:
+        return _EXISTING_TERMINAL_STDERR
+
     # Handle Windows CON device
     if fd_str == "CON":
         # On Windows, open CON device for console output
         # Use the appropriate stream based on the variable name
         if "STDOUT" in fd_env_var:
             try:
-                return open("CON", "w", buffering=1)
-            except (OSError, IOError):
+                _EXISTING_TERMINAL_STDOUT = open("CON", "w", buffering=1)
+                return _EXISTING_TERMINAL_STDOUT
+            except (OSError, IOError) as e:
+                print(e)
                 return None
         elif "STDERR" in fd_env_var:
             try:
-                return open("CON", "w", buffering=1)
-            except (OSError, IOError):
+                _EXISTING_TERMINAL_STDERR = open("CON", "w", buffering=1)
+                return _EXISTING_TERMINAL_STDERR
+            except (OSError, IOError) as e:
+                print(e)
                 return None
         return None
 
     # Handle Unix file descriptors
     if fd_str.isdigit():
         fd = int(fd_str)
-        try:
-            return os.fdopen(fd, "w", buffering=1)
-        except (OSError, ValueError):
-            return None
-
+        if "STDOUT" in fd_env_var:
+            try:
+                _EXISTING_TERMINAL_STDOUT = os.fdopen(fd, "w", buffering=1)
+                return _EXISTING_TERMINAL_STDOUT
+            except (OSError, ValueError) as e:
+                print(e)
+                return None
+        elif "STDERR" in fd_env_var:
+            try:
+                _EXISTING_TERMINAL_STDERR = os.fdopen(fd, "w", buffering=1)
+                return _EXISTING_TERMINAL_STDERR
+            except (OSError, ValueError) as e:
+                print(e)
+                return None
     return None
 
 

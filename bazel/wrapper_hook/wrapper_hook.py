@@ -13,6 +13,7 @@ sys.stdout = sys.stderr
 
 from bazel.wrapper_hook.install_modules import install_modules
 from bazel.wrapper_hook.wrapper_debug import wrapper_debug
+from bazel.wrapper_hook.wrapper_util import get_terminal_stream
 
 wrapper_debug(f"wrapper hook script is using {sys.executable}")
 
@@ -41,10 +42,7 @@ def _fmt_duration(seconds: float) -> str:
 
 
 def _info(msg: str, printer=print, stream=None):
-    from bazel.wrapper_hook.wrapper_util import get_terminal_stream
-
     term_err = get_terminal_stream("MONGO_WRAPPER_STDERR_FD")
-
     # Save current stdout/stderr
     old_stdout = sys.stdout
     old_stderr = sys.stderr
@@ -56,6 +54,24 @@ def _info(msg: str, printer=print, stream=None):
         stream = stream or sys.stdout
         prefix = _info_prefix(stream)
         printer(f"{prefix} {msg}")
+
+    finally:
+        # Restore original stdout/stderr to whatever wrapper has
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
+
+
+def run_with_terminal_output(func, *args, **kwargs):
+    term_err = get_terminal_stream("MONGO_WRAPPER_STDERR_FD")
+    sys.stdout = None
+    # Save current stdout/stderr
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+
+    try:
+        sys.stdout = term_err
+        sys.stderr = term_err
+        return func(*args, **kwargs)
 
     finally:
         # Restore original stdout/stderr to whatever wrapper has
@@ -127,7 +143,8 @@ def main():
         check_resource()
 
         try:
-            args = test_runner_interface(
+            args = run_with_terminal_output(
+                test_runner_interface,
                 sys.argv[1:],
                 autocomplete_query=os.environ.get("MONGO_AUTOCOMPLETE_QUERY") == "1",
                 enterprise=enterprise,

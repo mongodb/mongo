@@ -105,6 +105,13 @@ class LintRunner:
             "src/mongo/util/processinfo_solaris.cpp",
         }
 
+        exempted_subpaths = [
+            # Skip files in bazel_rules_mongo, since it has its own Bazel repo
+            "bazel_rules_mongo",
+            # vim creates temporary c++ files that aren't part of the tree
+            "/.vim/",
+        ]
+
         typed_files_in_targets = [line for line in files_with_targets if line.endswith(f".{ext}")]
 
         print(f"Checking that all {type_name} files have BUILD.bazel targets...")
@@ -129,11 +136,8 @@ class LintRunner:
         new_list = []
         for file in all_typed_files:
             if file not in typed_files_in_targets_set and file not in exempt_list:
-                if "bazel_rules_mongo" in file:
-                    # Skip files in bazel_rules_mongo, since it has its own Bazel repo
-                    continue
-
-                new_list.append(file)
+                if not any(subpath in file for subpath in exempted_subpaths):
+                    new_list.append(file)
 
         if len(new_list) != 0:
             print(f"Found {type_name} files without BUILD.bazel definitions:")
@@ -408,7 +412,7 @@ def run_rules_lint(bazel_bin: str, args: List[str]):
     )
 
     # Actually run the lint itself
-    subprocess.run([bazel_bin, "build"] + args, check=True)
+    subprocess.run([bazel_bin, "build"] + args, check=True, stdout=sys.stdout, stderr=sys.stderr)
 
     # Parse out the reports from the build events
     filter_expr = '.namedSetOfFiles | values | .files[] | select(.name | endswith($ext)) | ((.pathPrefix | join("/")) + "/" + .name)'
