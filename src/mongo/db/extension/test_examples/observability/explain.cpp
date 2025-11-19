@@ -46,7 +46,10 @@ public:
 
     mongo::extension::ExtensionGetNextResult getNext(
         const sdk::QueryExecutionContextHandle& execCtx,
-        const MongoExtensionExecAggStage* execStage) override {
+        const MongoExtensionExecAggStage* execStage,
+        ::MongoExtensionGetNextRequestType requestType) override {
+        // TODO SERVER-113905: once we support metadata, we should only support returning both
+        // document and metadata.
         return mongo::extension::ExtensionGetNextResult::pauseExecution();
     }
 

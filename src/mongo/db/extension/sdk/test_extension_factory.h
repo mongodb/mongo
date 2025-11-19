@@ -34,7 +34,8 @@
         ExtensionName##ExecAggStage() : sdk::ExecAggStage(ExtensionName##StageName) {}          \
         ::mongo::extension::ExtensionGetNextResult getNext(                                     \
             const ::mongo::extension::sdk::QueryExecutionContextHandle& execCtx,                \
-            const ::MongoExtensionExecAggStage* execStage) override {                           \
+            const ::MongoExtensionExecAggStage* execStage,                                      \
+            ::MongoExtensionGetNextRequestType requestType) override {                          \
             return ::mongo::extension::ExtensionGetNextResult::pauseExecution();                \
         }                                                                                       \
         void open() override {}                                                                 \

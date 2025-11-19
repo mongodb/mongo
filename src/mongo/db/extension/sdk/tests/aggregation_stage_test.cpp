@@ -840,7 +840,10 @@ public:
 
     extension::ExtensionGetNextResult getNext(
         const QueryExecutionContextHandle& expCtx,
-        const MongoExtensionExecAggStage* execAggStage) override {
+        const MongoExtensionExecAggStage* execAggStage,
+        MongoExtensionGetNextRequestType requestType) override {
+        // TODO SERVER-113905: once we support metadata, we should only support returning both
+        // document and metadata.
         if (_results.empty()) {
             return extension::ExtensionGetNextResult::eof();
         }
@@ -882,7 +885,10 @@ public:
     ResourceTrackingExecAggStage(std::string_view stageName) : ExecAggStage(stageName) {}
 
     ExtensionGetNextResult getNext(const QueryExecutionContextHandle& execCtx,
-                                   const MongoExtensionExecAggStage* execAggStage) override {
+                                   const MongoExtensionExecAggStage* execAggStage,
+                                   MongoExtensionGetNextRequestType requestType) override {
+        // TODO SERVER-113905: once we support metadata, we should only support returning both
+        // document and metadata.
         return extension::ExtensionGetNextResult::eof();
     }
 
@@ -982,8 +988,10 @@ public:
 
     extension::ExtensionGetNextResult getNext(
         const extension::sdk::QueryExecutionContextHandle& execCtx,
-        const MongoExtensionExecAggStage* execAggStage) override {
-
+        const MongoExtensionExecAggStage* execAggStage,
+        MongoExtensionGetNextRequestType requestType) override {
+        // TODO SERVER-113905: once we support metadata, we should only support returning both
+        // document and metadata.
         auto metrics = execCtx.getMetrics(execAggStage);
         metrics.update(MongoExtensionByteView{nullptr, 0});
 

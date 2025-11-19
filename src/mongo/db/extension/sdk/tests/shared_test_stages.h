@@ -58,7 +58,8 @@ public:
     NoOpExecAggStage() : sdk::ExecAggStage(kNoOpName) {}
 
     ExtensionGetNextResult getNext(const QueryExecutionContextHandle& execCtx,
-                                   const MongoExtensionExecAggStage* execStage) override {
+                                   const MongoExtensionExecAggStage* execStage,
+                                   ::MongoExtensionGetNextRequestType requestType) override {
         return ExtensionGetNextResult::pauseExecution();
     }
 
@@ -153,7 +154,8 @@ public:
     SourceExecAggStage() : sdk::ExecAggStage(kSourceName) {}
 
     ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
-                                   const MongoExtensionExecAggStage* execStage) override {
+                                   const MongoExtensionExecAggStage* execStage,
+                                   ::MongoExtensionGetNextRequestType requestType) override {
         if (_currentIndex >= _documents.size()) {
             return ExtensionGetNextResult::eof();
         }
@@ -1015,7 +1017,8 @@ public:
 
     extension::ExtensionGetNextResult getNext(
         const sdk::QueryExecutionContextHandle& execCtx,
-        const MongoExtensionExecAggStage* execStage) override {
+        const MongoExtensionExecAggStage* execStage,
+        ::MongoExtensionGetNextRequestType requestType) override {
         if (_results.empty()) {
             return extension::ExtensionGetNextResult::eof();
         }
@@ -1073,7 +1076,8 @@ public:
 class NoOpExtensionExecAggStage : public sdk::ExecAggStage {
 public:
     ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& expCtx,
-                                   const MongoExtensionExecAggStage* execStage) override {
+                                   const MongoExtensionExecAggStage* execStage,
+                                   ::MongoExtensionGetNextRequestType requestType) override {
         MONGO_UNIMPLEMENTED;
     }
 

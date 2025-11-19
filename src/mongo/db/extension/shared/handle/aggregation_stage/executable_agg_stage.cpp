@@ -32,8 +32,8 @@
 
 namespace mongo::extension {
 
-ExtensionGetNextResult ExecAggStageHandle::getNext(
-    MongoExtensionQueryExecutionContext* execCtxPtr) {
+ExtensionGetNextResult ExecAggStageHandle::getNext(MongoExtensionQueryExecutionContext* execCtxPtr,
+                                                   ::MongoExtensionGetNextRequestType requestType) {
     ::MongoExtensionGetNextResult result{};
     invokeCAndConvertStatusToException(
         [&]() { return vtable().get_next(get(), execCtxPtr, &result); });

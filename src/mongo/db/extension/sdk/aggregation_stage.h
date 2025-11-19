@@ -433,9 +433,12 @@ private:
 class ExecAggStage {
 public:
     virtual ~ExecAggStage() = default;
-
-    virtual ExtensionGetNextResult getNext(const QueryExecutionContextHandle& execCtx,
-                                           const MongoExtensionExecAggStage* execStage) = 0;
+    // TODO SERVER-113905: once we support metadata, we should only support returning both
+    // document and metadata.
+    virtual ExtensionGetNextResult getNext(
+        const QueryExecutionContextHandle& execCtx,
+        const MongoExtensionExecAggStage* execStage,
+        ::MongoExtensionGetNextRequestType requestType = kDocumentOnly) = 0;
 
     std::string_view getName() const {
         return _name;

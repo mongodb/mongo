@@ -99,7 +99,8 @@ class InvalidExtensionExecAggStageAdvancedState
 public:
     extension::ExtensionGetNextResult getNext(
         const QueryExecutionContextHandle& expCtx,
-        const MongoExtensionExecAggStage* execAggStage) override {
+        const MongoExtensionExecAggStage* execAggStage,
+        MongoExtensionGetNextRequestType requestType) override {
         return {.code = extension::GetNextCode::kAdvanced, .res = boost::none};
     }
 
@@ -119,7 +120,8 @@ class InvalidExtensionExecAggStagePauseExecutionState
 public:
     extension::ExtensionGetNextResult getNext(
         const QueryExecutionContextHandle& expCtx,
-        const MongoExtensionExecAggStage* execAggStage) override {
+        const MongoExtensionExecAggStage* execAggStage,
+        MongoExtensionGetNextRequestType requestType) override {
         return {.code = extension::GetNextCode::kPauseExecution,
                 .res = boost::make_optional(BSON("$dog" << "I should not exist"))};
     }
@@ -139,7 +141,8 @@ class InvalidExtensionExecAggStageEofState : public shared_test_stages::NoOpExte
 public:
     extension::ExtensionGetNextResult getNext(
         const QueryExecutionContextHandle& expCtx,
-        const MongoExtensionExecAggStage* execAggStage) override {
+        const MongoExtensionExecAggStage* execAggStage,
+        MongoExtensionGetNextRequestType requestType) override {
         return {.code = extension::GetNextCode::kEOF,
                 .res = boost::make_optional(BSON("$dog" << "I should not exist"))};
     }
@@ -160,7 +163,8 @@ class InvalidExtensionExecAggStageGetNextCode
 public:
     extension::ExtensionGetNextResult getNext(
         const QueryExecutionContextHandle& expCtx,
-        const MongoExtensionExecAggStage* execAggStage) override {
+        const MongoExtensionExecAggStage* execAggStage,
+        MongoExtensionGetNextRequestType requestType) override {
         return {.code = static_cast<const GetNextCode>(10), .res = boost::none};
     }
 

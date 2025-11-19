@@ -45,7 +45,8 @@ public:
 
     mongo::extension::ExtensionGetNextResult getNext(
         const sdk::QueryExecutionContextHandle& execCtx,
-        const MongoExtensionExecAggStage* execStage) override {
+        const MongoExtensionExecAggStage* execStage,
+        ::MongoExtensionGetNextRequestType requestType) override {
         return mongo::extension::ExtensionGetNextResult::pauseExecution();
     }
 
