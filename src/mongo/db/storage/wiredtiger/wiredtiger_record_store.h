@@ -52,6 +52,7 @@
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
@@ -237,14 +238,9 @@ public:
     }
 
     /**
-     * Sets the new number of records and flushes the size storer.
+     * Sets the new number of records and data size, and flushes the size storer.
      */
-    void setNumRecords(long long numRecords);
-
-    /**
-     * Sets the new data size and flushes the size storer.
-     */
-    void setDataSize(long long dataSize);
+    void setSize(long long numRecords, long long dataSize) override;
 
     RecordStore::RecordStoreContainer getContainer() override;
 

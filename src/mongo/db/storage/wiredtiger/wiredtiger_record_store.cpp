@@ -1298,20 +1298,8 @@ void WiredTigerRecordStore::_changeNumRecordsAndDataSize(RecoveryUnit& ru,
     updateAndStoreSizeInfo(numRecordDiff, dataSizeDiff);
 }
 
-void WiredTigerRecordStore::setNumRecords(long long numRecords) {
+void WiredTigerRecordStore::setSize(long long numRecords, long long dataSize) {
     _sizeInfo->numRecords.store(std::max(numRecords, 0ll));
-
-    if (!_sizeStorer) {
-        return;
-    }
-
-    // Flush the updated number of records to disk immediately.
-    _sizeStorer->store(getURI(), _sizeInfo);
-    bool syncToDisk = true;
-    _sizeStorer->flush(syncToDisk);
-}
-
-void WiredTigerRecordStore::setDataSize(long long dataSize) {
     _sizeInfo->dataSize.store(std::max(dataSize, 0ll));
 
     if (!_sizeStorer) {

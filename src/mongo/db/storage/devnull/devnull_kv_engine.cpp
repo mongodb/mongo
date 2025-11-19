@@ -105,6 +105,10 @@ public:
         return 0;
     }
 
+    void setSize(long long numRecords, long long dataSize) override {
+        // Do nothing.
+    }
+
     virtual bool isCapped() const {
         // Record stores for capped collections should inherit from 'DevNullRecordStore::Capped',
         // which overrides this to true.

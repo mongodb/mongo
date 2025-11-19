@@ -146,6 +146,12 @@ public:
         return _data->records.size();
     }
 
+    void setSize(long long numRecords, long long dataSize) override {
+        // We should only be forcibly setting the size in certain situations (like collection
+        // imports) that don't currently make sense for ephemeral test-only collections.
+        MONGO_UNIMPLEMENTED;
+    }
+
     void updateStatsAfterRepair(long long numRecords, long long dataSize) override {
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->mutex);
         invariant(_data->records.size() == size_t(numRecords));

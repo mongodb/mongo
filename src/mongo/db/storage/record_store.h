@@ -407,6 +407,12 @@ public:
     virtual long long numRecords() const = 0;
 
     /**
+     * Override the size of the collection (number of records and data size), required when
+     * creating a collection from pre-existing data.
+     */
+    virtual void setSize(long long numRecords, long long dataSize) = 0;
+
+    /**
      * @param extraInfo - optional more debug info
      * @param level - optional, level of debug info to put in (higher is more)
      * @return total estimate size (in bytes) on stable storage

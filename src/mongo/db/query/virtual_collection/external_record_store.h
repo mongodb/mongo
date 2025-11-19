@@ -102,6 +102,10 @@ public:
         return 0LL;
     }
 
+    void setSize(long long numRecords, long long dataSize) final {
+        // Do nothing.
+    }
+
     int64_t storageSize(RecoveryUnit&, BSONObjBuilder*, int) const final {
         return 0LL;
     }

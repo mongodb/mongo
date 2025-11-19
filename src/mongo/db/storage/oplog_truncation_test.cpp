@@ -689,7 +689,6 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_NoMarkersGeneratedFromScanning)
 
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
-    auto wtRS = static_cast<WiredTigerRecordStore::Oplog*>(rs);
 
     int realNumRecords = 4;
     int realSizePerRecord = 100;
@@ -698,8 +697,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_NoMarkersGeneratedFromScanning)
     }
 
     // Force the estimates of 'dataSize' and 'numRecords' to be lower than the real values.
-    wtRS->setNumRecords(realNumRecords - 1);
-    wtRS->setDataSize((realNumRecords - 1) * realSizePerRecord);
+    long long fakeNumRecords = realNumRecords - 1;
+    rs->setSize(fakeNumRecords, fakeNumRecords * realSizePerRecord);
 
     // Re-initialize the truncate markers.
     LocalOplogInfo::get(opCtx)->setRecordStore(opCtx, rs);
@@ -716,8 +715,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_NoMarkersGeneratedFromScanning)
     // A forced scan over the RecordStore should force the 'currentBytes' to be accurate in the
     // truncate markers as well as the RecordStore's 'numRecords' and 'dataSize'.
     ASSERT_EQ(oplogTruncateMarkers->currentBytes_forTest(), realNumRecords * realSizePerRecord);
-    ASSERT_EQ(wtRS->dataSize(), realNumRecords * realSizePerRecord);
-    ASSERT_EQ(wtRS->numRecords(), realNumRecords);
+    ASSERT_EQ(rs->dataSize(), realNumRecords * realSizePerRecord);
+    ASSERT_EQ(rs->numRecords(), realNumRecords);
 }
 
 // Ensure that if we sample and create duplicate oplog truncate markers, perform truncation
@@ -731,7 +730,6 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_Duplicates) {
 
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
-    auto wtRS = static_cast<WiredTigerRecordStore::Oplog*>(rs);
     auto engine = getServiceContext()->getStorageEngine();
 
     {
@@ -745,9 +743,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_Duplicates) {
     {
         // Force initialize the oplog truncate markers to use sampling by providing very large,
         // inaccurate sizes. This should cause us to over sample the records in the oplog.
-        ASSERT_OK(wtRS->updateSize(1024 * 1024 * 1024));
-        wtRS->setNumRecords(1024 * 1024);
-        wtRS->setDataSize(1024 * 1024 * 1024);
+        ASSERT_OK(rs->oplog()->updateSize(1024 * 1024 * 1024));
+        rs->setSize(/*numRecords=*/1024 * 1024, /*dataSize=*/1024 * 1024 * 1024);
     }
 
     // Confirm that some truncate markers were generated.
@@ -791,8 +788,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_Duplicates) {
         ASSERT_EQ(1, oplogTruncateMarkers->numMarkers());
 
         // The original oplog should have rolled over and the size and count should be accurate.
-        ASSERT_EQ(1, wtRS->numRecords());
-        ASSERT_EQ(100, wtRS->dataSize());
+        ASSERT_EQ(1, rs->numRecords());
+        ASSERT_EQ(100, rs->dataSize());
     }
 }
 
