@@ -114,8 +114,8 @@ commands:
             demoMode:
                 type: optionalBool
                 description: >-
-                    "When set to true, overrides reshardingMinimumOperationDurationMillis 
-                    and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0 
+                    "When set to true, overrides reshardingMinimumOperationDurationMillis
+                    and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0
                     for quick demo of reshardCollection operation"
 
     _configsvrReshardCollection:
@@ -194,8 +194,8 @@ commands:
             demoMode:
                 type: optionalBool
                 description: >-
-                    "When set to true, overrides reshardingMinimumOperationDurationMillis 
-                    and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0 
+                    "When set to true, overrides reshardingMinimumOperationDurationMillis
+                    and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0
                     for quick demo of reshardCollection operation"
 
     rewriteCollection:
@@ -225,8 +225,8 @@ commands:
             demoMode:
                 type: optionalBool
                 description: >-
-                    "When set to true, overrides reshardingMinimumOperationDurationMillis 
-                    and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0 
+                    "When set to true, overrides reshardingMinimumOperationDurationMillis
+                    and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0
                     for quick demo of reshardCollection operation"
 
     moveCollection:
@@ -337,3 +337,15 @@ commands:
             approxCopySize:
                 type: ReshardingApproxCopySize
                 description: "Not meant to be used directly. Only use internal fields."
+
+    _shardsvrReshardRecipientCriticalSectionStarted:
+        description:
+            "The internal command run by coordinator against recipients to notify them that the
+            critical section has started."
+        command_name: _shardsvrReshardRecipientCriticalSectionStarted
+        cpp_name: ShardsvrReshardRecipientCriticalSectionStarted
+        type: uuid
+        strict: false
+        namespace: type
+        reply_type: OkReply
+        api_version: ""

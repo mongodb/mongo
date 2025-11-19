@@ -55,6 +55,7 @@ export const commandsAddedToMongodSinceLastLTS = [
     "_shardsvrRenameIndexMetadata",
     "getTrafficRecordingStatus",
     "_shardsvrReshardRecipientClone",
+    "_shardsvrReshardRecipientCriticalSectionStarted",
     "_shardsvrResolveView",
     "_configsvrStartShardDraining",
     "_shardsvrDropIndexesParticipant",

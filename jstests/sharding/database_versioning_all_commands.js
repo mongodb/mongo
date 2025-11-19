@@ -1019,6 +1019,21 @@ const allTestCases = {
         _shardsvrRenameIndexMetadata: {skip: "TODO"},
         _shardsvrReshardCollection: {skip: "TODO"},
         _shardsvrReshardRecipientClone: {skip: "TODO"},
+        _shardsvrReshardRecipientCriticalSectionStarted: {
+            run: {
+                sendsDbVersion: false,
+                runsAgainstAdminDb: true,
+                command: function (dbName, collName) {
+                    return {
+                        _shardsvrReshardRecipientCriticalSectionStarted: UUID(),
+                    };
+                },
+                // When the resharding recipient state machine does not exist, we throw
+                // NotWritablePrimary under the assumption that the request was delayed and the
+                // node is no longer the primary.
+                expectedFailureCode: ErrorCodes.NotWritablePrimary,
+            },
+        },
         _shardsvrReshardingDonorFetchFinalCollectionStats: {skip: "TODO"},
         _shardsvrReshardingDonorStartChangeStreamsMonitor: {skip: "TODO"},
         _shardsvrReshardingOperationTime: {skip: "TODO"},

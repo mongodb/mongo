@@ -736,6 +736,12 @@ const internalCommandsMap = {
             donorShards: [],
         },
     },
+    _shardsvrReshardRecipientCriticalSectionStarted: {
+        testname: "_shardsvrReshardRecipientCriticalSectionStarted",
+        command: {
+            _shardsvrReshardRecipientCriticalSectionStarted: UUID(),
+        },
+    },
     _shardsvrRefineCollectionShardKey: {
         testname: "_shardsvrRefineCollectionShardKey",
         command: {_shardsvrRefineCollectionShardKey: "test.x", newShardKey: {}},

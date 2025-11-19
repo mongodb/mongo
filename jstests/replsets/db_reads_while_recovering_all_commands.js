@@ -131,6 +131,7 @@ const allCommands = {
     _shardsvrReshardCollection: {skip: isPrimaryOnly},
     _shardsvrReshardingOperationTime: {skip: isPrimaryOnly},
     _shardsvrReshardRecipientClone: {skip: isPrimaryOnly},
+    _shardsvrReshardRecipientCriticalSectionStarted: {skip: isPrimaryOnly},
     _shardsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
     _shardsvrSetAllowMigrations: {skip: isPrimaryOnly},
     _shardsvrSetClusterParameter: {skip: isAnInternalCommand},
