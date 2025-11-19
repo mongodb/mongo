@@ -45,7 +45,7 @@ class test_hs11(wttest.WiredTigerTestCase):
         ('update', dict(update_type='update'))
     ]
     long_running_txn_values = [
-       ('long-running', dict(long_run_txn=True)),
+        ('long-running', dict(long_run_txn=True)),
         ('no-long-running', dict(long_run_txn=False))
     ]
     last_update_type_values = [
@@ -56,7 +56,11 @@ class test_hs11(wttest.WiredTigerTestCase):
         ('small-nrows', dict(nrows=100)),
         ('large-nrows', dict(nrows=10000))
     ]
-    scenarios = make_scenarios(format_values, update_type_values,long_running_txn_values, last_update_type_values, nrows)
+    location = [
+        ('insert-list', dict(insert=True)),
+        ('update-list', dict(insert=False))
+    ]
+    scenarios = make_scenarios(format_values, update_type_values,long_running_txn_values, last_update_type_values, nrows, location)
     timestamps = 5
 
     def create_key(self, i):
@@ -105,7 +109,8 @@ class test_hs11(wttest.WiredTigerTestCase):
 
         # Reconcile and flush versions 1-3 to the history store.
         self.session.checkpoint()
-        self.evict_cursor(uri, self.nrows)
+        if not self.insert:
+            self.evict_cursor(uri, self.nrows)
 
         # Apply a modify update at timestamp 5.
         if self.modify and self.value_format != '8t':
@@ -194,6 +199,8 @@ class test_hs11(wttest.WiredTigerTestCase):
 
         # Reconcile and flush versions 1-3 to the history store.
         self.session.checkpoint()
+        if not self.insert:
+            self.evict_cursor(uri, self.nrows)
 
         # Apply a modify update at timestamp 5.
         if self.modify and self.value_format != '8t':
@@ -216,8 +223,8 @@ class test_hs11(wttest.WiredTigerTestCase):
 
         # Now apply an update at timestamp 20.
         for i in range(1, self.nrows):
-                with self.transaction(commit_timestamp = 20):
-                    cursor[self.create_key(i)] = value2
+            with self.transaction(commit_timestamp = 20):
+                cursor[self.create_key(i)] = value2
 
         # Ensure that we didn't select old history store content even if it is not blew away.
         with self.transaction(read_timestamp = 10, rollback = True):

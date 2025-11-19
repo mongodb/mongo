@@ -253,7 +253,7 @@ __wt_time_aggregate_validate(
      *    newest_start_durable_ts - The default value is WT_TS_NONE. It tracks the maximum durable
      timestamp of all the inserts, updates, or modify operations performed on a page.
      *    newest_stop_durable_ts - The default value is WT_TS_NONE. It tracks the maximum durable
-     timestamp of all the the delete operations performed on a page.
+     timestamp of all the delete operations performed on a page.
      *    oldest_start_ts - The default value is WT_TS_NONE. It tracks the minimum commit timestamp
      of any inserts performed on a page.
      *    newest_txn - The default value is WT_TXN_NONE. It tracks the maximum transaction id of any

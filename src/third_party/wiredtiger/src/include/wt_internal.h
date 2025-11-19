@@ -119,6 +119,8 @@ struct __wt_capacity;
 typedef struct __wt_capacity WT_CAPACITY;
 struct __wt_cell;
 typedef struct __wt_cell WT_CELL;
+struct __wt_cell_kv;
+typedef struct __wt_cell_kv WT_CELL_KV;
 struct __wt_cell_unpack_addr;
 typedef struct __wt_cell_unpack_addr WT_CELL_UNPACK_ADDR;
 struct __wt_cell_unpack_common;

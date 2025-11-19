@@ -345,6 +345,7 @@ __wti_rec_pack_delta_row_leaf(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_SAV
     WT_DECL_ITEM(custom_value);
     WT_DECL_RET;
     WT_ITEM *key, value;
+    WT_TIME_WINDOW *twp, tw;
     size_t custom_value_size, new_size;
     uint8_t flags, *p;
     bool ovfl_key;
@@ -379,6 +380,8 @@ __wti_rec_pack_delta_row_leaf(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_SAV
             value.data = supd->onpage_upd->data;
             value.size = supd->onpage_upd->size;
         }
+
+        twp = &supd->tw;
     } else {
         WT_ASSERT(session,
           supd->onpage_tombstone != NULL &&
@@ -387,6 +390,9 @@ __wti_rec_pack_delta_row_leaf(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_SAV
         LF_SET(WT_DELTA_LEAF_IS_DELETE);
         value.data = NULL;
         value.size = 0;
+
+        WT_TIME_WINDOW_INIT(&tw);
+        twp = &tw;
     }
 
     /* Pack the flags and delta value into a custom value. */
@@ -398,8 +404,8 @@ __wti_rec_pack_delta_row_leaf(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_SAV
       WT_DELTA_LEAF_VALUE_FORMAT, &value, flags));
 
     /* Pack the custom value into a standard cell structure. */
-    WT_ERR(__wti_rec_cell_build_val(
-      session, r, custom_value->data, custom_value_size, &supd->tw, 0, NULL));
+    WT_ERR(
+      __wti_rec_cell_build_val(session, r, custom_value->data, custom_value_size, twp, 0, NULL));
 
     new_size = r->delta.size + r->k.len + r->v.len;
     if (new_size > r->delta.memsize)

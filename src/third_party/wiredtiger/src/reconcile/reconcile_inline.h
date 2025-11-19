@@ -334,11 +334,11 @@ static WT_INLINE void
 __wti_rec_cell_build_addr(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_ADDR *addr,
   WT_CELL_UNPACK_ADDR *vpack, uint64_t recno, WT_PAGE_DELETED *page_del)
 {
-    WTI_REC_KV *val;
+    WTI_REC_KV *val = &r->v;
     WT_TIME_AGGREGATE *ta;
-    u_int cell_type;
-
-    val = &r->v;
+    uint8_t cell_type;
+    const void *data;
+    size_t data_size;
 
     /*
      * Caller includes fast-delete information in the case of fast-delete proxy cells, which both
@@ -346,6 +346,7 @@ __wti_rec_cell_build_addr(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_ADDR *a
      * address cell.
      */
     if (vpack == NULL) {
+        /* Determine the cell type from the WT_ADDR structure */
         switch (addr->type) {
         case WT_ADDR_INT:
             cell_type = WT_CELL_ADDR_INT;
@@ -358,51 +359,30 @@ __wti_rec_cell_build_addr(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_ADDR *a
             cell_type = WT_CELL_ADDR_LEAF_NO;
             break;
         }
+
         WT_ASSERT(session, addr->block_cookie_size != 0);
         ta = &addr->ta;
+        data = addr->block_cookie;
+        data_size = addr->block_cookie_size;
     } else {
+        /* Use the unpacked reference instead of WT_ADDR. */
         cell_type = vpack->type;
         ta = &vpack->ta;
+        data = vpack->data;
+        data_size = vpack->size;
     }
+
     __rec_cell_addr_stats(r, ta);
 
     /*
-     * If passed fast-delete information, override the cell type. We should never see fast-truncate
-     * cell types without fast-truncate information.
+     * Use the shared cell builder from the cell module. We assign both the packed cell length and
+     * total length, and re-point the buffer to the caller-provided data.
      */
-    WT_ASSERT(session, page_del != NULL || cell_type != WT_CELL_ADDR_DEL);
-    if (page_del != NULL) {
-        /*
-         * We only fast-truncate leaf pages without overflow items, however, we can write a proxy
-         * cell for a page, evict and then read the internal page, and then checkpoint is writing it
-         * again.
-         */
-        WT_ASSERT(session, cell_type == WT_CELL_ADDR_DEL || cell_type == WT_CELL_ADDR_LEAF_NO);
-        cell_type = WT_CELL_ADDR_DEL;
-
-        /* We should never be in an in-progress prepared state. */
-        WT_ASSERT(session,
-          page_del->prepare_state == WT_PREPARE_INIT ||
-            page_del->prepare_state == WT_PREPARE_RESOLVED);
-    }
-
-    /*
-     * We don't copy the data into the buffer, it's not necessary; just re-point the buffer's
-     * data/length fields.
-     */
-    if (vpack == NULL) {
-        WT_ASSERT(session, addr != NULL);
-        val->buf.data = addr->block_cookie;
-        val->buf.size = addr->block_cookie_size;
-    } else {
-        WT_ASSERT(session, addr == NULL);
-        val->buf.data = vpack->data;
-        val->buf.size = vpack->size;
-    }
-
-    val->cell_len =
-      __wt_cell_pack_addr(session, &val->cell, cell_type, recno, page_del, ta, val->buf.size);
-    val->len = val->cell_len + val->buf.size;
+    val->buf.data = data;
+    val->buf.size = data_size;
+    val->cell_len = (uint16_t)__wt_cell_build_addr(
+      session, &val->cell, cell_type, recno, page_del, ta, data_size);
+    val->len = val->cell_len + data_size;
 }
 
 /*

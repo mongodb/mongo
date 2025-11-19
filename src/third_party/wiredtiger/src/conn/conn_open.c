@@ -267,7 +267,7 @@ __wti_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__wt_live_restore_server_create(session, cfg));
 
     /* Initialize metadata tracking, required before creating tables. */
-    WT_RET(__wt_meta_track_init(session)); /* XXXXXX */
+    WT_RET(__wt_meta_track_init(session));
 
     /*
      * Initialize disaggregated storage. It technically doesn't belong here, but it must be

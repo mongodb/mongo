@@ -45,7 +45,6 @@ test_eviction03.py
 test_hs01.py  # FIXME: WT-15371
 test_hs06.py
 test_hs09.py
-test_hs11.py
 test_hs18.py
 test_hs21.py
 test_hs24.py
