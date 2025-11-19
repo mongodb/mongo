@@ -544,6 +544,8 @@ TEST_F(CollectionMarkersTest, CursorYieldsAndIgnoresNewRecords) {
     size_t seenRecords = 0;
     while (!hasYielded.load()) {
         mockTickSource.advance(Milliseconds(11));
+        // Have a real sleep so that the yield thread has a chance to catch up.
+        opCtx->sleepFor(Milliseconds(1));
         if (iterator->getNext()) {
             ++seenRecords;
         }
@@ -556,6 +558,230 @@ TEST_F(CollectionMarkersTest, CursorYieldsAndIgnoresNewRecords) {
 
     ASSERT_EQ(seenRecords, initialRecords);
     ASSERT_LT(static_cast<long long>(seenRecords), coll->getRecordStore()->numRecords());
+}
+
+// Test that random cursors will yield periodically. Since random cursors will see records added
+// after they were created due to the yield, we only care that it can continue to sample.
+TEST_F(CollectionMarkersTest, CursorYieldWithRandomCursor) {
+    TickSourceMock mockTickSource;
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
+    createPopulatedCollection(collNs);
+
+    auto opCtx = getClient()->makeOperationContext();
+    AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+    auto iterator = CollectionTruncateMarkers::makeIterator(
+        opCtx.get(), coll->getRecordStore(), &mockTickSource, Milliseconds(10));
+
+    AtomicWord<bool> hasYielded(false);
+    stdx::thread yieldNotifier([this, &collNs, &hasYielded] {
+        ThreadClient client(getServiceContext()->getService());
+        auto innerOpCtx = cc().makeOperationContext();
+        // We won't be able to acquire the write lock until the read yields.
+        insertElements(
+            innerOpCtx.get(), collNs, /*dataLength=*/100, /*numElements=*/10, Timestamp(1, 0));
+        hasYielded.store(true);
+    });
+
+    ASSERT_FALSE(hasYielded.load());
+
+    while (!hasYielded.load()) {
+        mockTickSource.advance(Milliseconds(11));
+        // Have a real sleep so that the yield thread has a chance to catch up.
+        opCtx->sleepFor(Milliseconds(1));
+        ASSERT(iterator->getNextRandom());
+    }
+    yieldNotifier.join();
+
+    for (int i = 0; i < 1000; i++) {
+        ASSERT(iterator->getNextRandom());
+    }
+}
+
+// Test that yielding handles the collection being truncated from underneath it.
+TEST_F(CollectionMarkersTest, CursorYieldSerialCursorHandlesTruncate) {
+    TickSourceMock mockTickSource;
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
+    auto [_, initialRecords] = createPopulatedCollection(collNs);
+
+    auto opCtx = getClient()->makeOperationContext();
+    AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+    auto iterator = CollectionTruncateMarkers::makeIterator(
+        opCtx.get(), coll->getRecordStore(), &mockTickSource, Milliseconds(10));
+
+    AtomicWord<bool> hasYielded(false);
+    stdx::thread yieldNotifier([this, &collNs, &hasYielded] {
+        ThreadClient client(getServiceContext()->getService());
+        auto innerOpCtx = cc().makeOperationContext();
+        auto opCtx = innerOpCtx.get();
+
+        // We won't be able to acquire the write lock until the read yields.
+        AutoGetCollection coll(opCtx, collNs, MODE_X);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(
+            coll->getRecordStore()->truncate(opCtx, *shard_role_details::getRecoveryUnit(opCtx)));
+        wuow.commit();
+        hasYielded.store(true);
+    });
+
+    ASSERT_FALSE(hasYielded.load());
+
+    size_t seenRecords = 0;
+    while (!hasYielded.load()) {
+        mockTickSource.advance(Milliseconds(11));
+        // Have a real sleep so that the yield thread has a chance to catch up.
+        opCtx->sleepFor(Milliseconds(1));
+        if (iterator->getNext()) {
+            ++seenRecords;
+        }
+    }
+    yieldNotifier.join();
+
+    while (iterator->getNext()) {
+        ++seenRecords;
+    }
+
+    // Since we truncated we won't see later records
+    ASSERT_LT(seenRecords, initialRecords);
+}
+
+// Test that yielding a random cursor handles the collection being truncated from underneath it.
+TEST_F(CollectionMarkersTest, CursorYieldRandomCursorHandlesTruncate) {
+    TickSourceMock mockTickSource;
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
+    createPopulatedCollection(collNs);
+
+    auto opCtx = getClient()->makeOperationContext();
+    AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+    auto iterator = CollectionTruncateMarkers::makeIterator(
+        opCtx.get(), coll->getRecordStore(), &mockTickSource, Milliseconds(10));
+
+    AtomicWord<bool> hasYielded(false);
+    stdx::thread yieldNotifier([this, &collNs, &hasYielded] {
+        ThreadClient client(getServiceContext()->getService());
+        auto innerOpCtx = cc().makeOperationContext();
+        auto opCtx = innerOpCtx.get();
+
+        // We won't be able to acquire the write lock until the read yields.
+        AutoGetCollection coll(opCtx, collNs, MODE_X);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(
+            coll->getRecordStore()->truncate(opCtx, *shard_role_details::getRecoveryUnit(opCtx)));
+        wuow.commit();
+        hasYielded.store(true);
+    });
+
+    // When we truncate underneath the random cursor it will return nullopt.
+    ASSERT_FALSE(hasYielded.load());
+    while (iterator->getNextRandom()) {
+        mockTickSource.advance(Milliseconds(11));
+        // Have a real sleep so that the yield thread has a chance to catch up.
+        opCtx->sleepFor(Milliseconds(1));
+    }
+    ASSERT_TRUE(hasYielded.load());
+    yieldNotifier.join();
+}
+
+// Test that sampling handles the collection being truncated from underneath us.
+TEST_F(CollectionMarkersTest, SamplingWorksWithTruncate) {
+    TickSourceMock mockTickSource;
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
+    createPopulatedCollection(collNs);
+
+    auto opCtx = getClient()->makeOperationContext();
+    AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+    // 0ms yield interval means sample every next()
+    auto iterator = CollectionTruncateMarkers::makeIterator(
+        opCtx.get(), coll->getRecordStore(), &mockTickSource, {Milliseconds(0)});
+
+    // Synchronize to avoid sampling the collection before the yield thread is ready.
+    stdx::mutex waitingMutex;
+    stdx::unique_lock waitingLock(waitingMutex);
+    stdx::condition_variable waitingCv;
+
+    AtomicWord<bool> hasYielded(false);
+    stdx::thread yieldNotifier([this, &collNs, &hasYielded, &waitingCv, &waitingMutex] {
+        ThreadClient client(getServiceContext()->getService());
+        auto innerOpCtx = cc().makeOperationContext();
+        auto opCtx = innerOpCtx.get();
+
+        {
+            stdx::unique_lock readyLock(waitingMutex);
+        }
+        waitingCv.notify_one();
+
+        // We won't be able to acquire the write lock until the read yields.
+        AutoGetCollection coll(opCtx, collNs, MODE_X);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(
+            coll->getRecordStore()->truncate(opCtx, *shard_role_details::getRecoveryUnit(opCtx)));
+        wuow.commit();
+        hasYielded.store(true);
+    });
+
+    waitingCv.wait(waitingLock);
+    opCtx->sleepFor(Milliseconds{1});
+
+    // When we truncate underneath the random cursor it will return nullopt.
+    ASSERT_FALSE(hasYielded.load());
+
+    CollectionTruncateMarkers::createMarkersBySampling(opCtx.get(),
+                                                       *iterator,
+                                                       /*estimatedRecordsPerMarker=*/1,
+                                                       /*estimatedBytesPerMarker=*/1,
+                                                       getIdAndWallTime);
+
+    ASSERT_TRUE(hasYielded.load());
+    yieldNotifier.join();
+}
+
+// Test that scanning handles the collection being truncated from underneath us.
+TEST_F(CollectionMarkersTest, ScanningWorksWithTruncate) {
+    TickSourceMock mockTickSource;
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
+    createPopulatedCollection(collNs);
+
+    auto opCtx = getClient()->makeOperationContext();
+    AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+    // 0ms yield interval means sample every next()
+    auto iterator = CollectionTruncateMarkers::makeIterator(
+        opCtx.get(), coll->getRecordStore(), &mockTickSource, {Milliseconds(0)});
+
+    // Synchronize to avoid scanning the collection before the yield thread is ready.
+    stdx::mutex waitingMutex;
+    stdx::unique_lock waitingLock(waitingMutex);
+    stdx::condition_variable waitingCv;
+
+    AtomicWord<bool> hasYielded(false);
+    stdx::thread yieldNotifier([this, &collNs, &hasYielded, &waitingCv, &waitingMutex] {
+        ThreadClient client(getServiceContext()->getService());
+        auto innerOpCtx = cc().makeOperationContext();
+        auto opCtx = innerOpCtx.get();
+
+        {
+            stdx::unique_lock readyLock(waitingMutex);
+        }
+        waitingCv.notify_one();
+
+        // We won't be able to acquire the write lock until the read yields.
+        AutoGetCollection coll(opCtx, collNs, MODE_X);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(
+            coll->getRecordStore()->truncate(opCtx, *shard_role_details::getRecoveryUnit(opCtx)));
+        wuow.commit();
+        hasYielded.store(true);
+    });
+
+    waitingCv.wait(waitingLock);
+    opCtx->sleepFor(Milliseconds{1});
+
+    // When we truncate underneath the random cursor it will return nullopt.
+    ASSERT_FALSE(hasYielded.load());
+
+    CollectionTruncateMarkers::createMarkersByScanning(
+        opCtx.get(), *iterator, /*estimatedBytesPerMarker=*/1, getIdAndWallTime);
+
+    ASSERT_TRUE(hasYielded.load());
+    yieldNotifier.join();
 }
 
 }  // namespace mongo

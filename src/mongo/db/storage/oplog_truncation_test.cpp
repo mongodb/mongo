@@ -630,6 +630,137 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
 }
 
 /**
+ * Verify that oplog truncate marker reclaim is a no-op if the rs has been truncated.
+ */
+TEST_F(OplogTruncationTest, OplogTruncateMarkers_TestReclaimOverPreviouslyTruncatedRange) {
+    // This is actually an async test but we turn async off because we simulate the asynchronous
+    // behaviour another way
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", false);
+
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto engine = getServiceContext()->getStorageEngine();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+
+    auto oplogTruncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+    ASSERT(oplogTruncateMarkers);
+
+    ASSERT_OK(rs->oplog()->updateSize(230));
+
+    oplogTruncateMarkers->setMinBytesPerMarker(100);
+
+    {
+        insertOplog(1, 100);
+        insertOplog(2, 110);
+        insertOplog(3, 120);
+
+        ASSERT_EQ(3, rs->numRecords());
+        ASSERT_EQ(330, rs->dataSize());
+        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+    }
+
+    {
+        Lock::GlobalLock globalLock(opCtx, MODE_X);
+        WriteUnitOfWork wuow(opCtx);
+
+        LocalOplogInfo::get(opCtx)->setTruncateMarkers(nullptr);
+
+        ASSERT_OK(rs->truncate(opCtx, ru));
+
+        LocalOplogInfo::get(opCtx)->setTruncateMarkers(oplogTruncateMarkers);
+        wuow.commit();
+
+        ASSERT_EQ(0, rs->numRecords());
+        ASSERT_EQ(0, rs->dataSize());
+        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
+    }
+
+    {
+        insertOplog(4, 100);
+        insertOplog(5, 110);
+        insertOplog(6, 120);
+
+        ASSERT_EQ(3, rs->numRecords());
+        ASSERT_EQ(330, rs->dataSize());
+        ASSERT_EQ(6U, oplogTruncateMarkers->numMarkers());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+    }
+
+    {
+        advanceStableTimestamp(Timestamp(1, 5));
+        auto mayTruncateUpTo = RecordId(engine->getPinnedOplog().asULL());
+        auto truncatedUpTo = oplog_truncation::reclaimOplog(opCtx, *rs, mayTruncateUpTo);
+
+        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+    }
+}
+
+
+/**
+ * Verify that oplog truncate marker reclaim is a no-op if the rs has been truncated.
+ */
+TEST_F(OplogTruncationTest, OplogTruncateMarkers_AsyncUpdateToMaxSize) {
+    // This is actually an async test but we turn async off because we simulate the asynchronous
+    // behaviour another way
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", false);
+
+    RAIIServerParameterControllerForTest minMarkerCountController("minOplogTruncationPoints", 30);
+    RAIIServerParameterControllerForTest maxMarkerCountController(
+        "maxOplogTruncationPointsAfterStartup", 30);
+
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+
+    auto oplogTruncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+    ASSERT(oplogTruncateMarkers);
+
+    ASSERT_OK(rs->oplog()->updateSize(230));
+
+    oplogTruncateMarkers->setMinBytesPerMarker(100);
+
+    {
+        insertOplog(1, 100);
+        insertOplog(2, 110);
+        insertOplog(3, 120);
+
+        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
+    }
+
+    {
+        AutoGetCollection coll(opCtx, oplogNs, MODE_X);
+        CollectionWriter writer{opCtx, coll};
+        WriteUnitOfWork wuow(opCtx);
+
+        LocalOplogInfo::get(opCtx)->setTruncateMarkers(nullptr);
+
+        // We forced keeping 30 markers above, so our 9000 byte oplog should have 300 bytes
+        // per marker.
+        ASSERT_OK(writer.getWritableCollection(opCtx)->updateCappedSize(
+            opCtx, 9000, /*newCappedMax=*/boost::none));
+
+        LocalOplogInfo::get(opCtx)->setTruncateMarkers(oplogTruncateMarkers);
+        wuow.commit();
+
+        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
+    }
+
+    {
+        insertOplog(4, 100);
+        insertOplog(5, 110);
+        insertOplog(6, 120);
+
+        ASSERT_EQ(4U, oplogTruncateMarkers->numMarkers());
+    }
+}
+
+/**
  * Verify that an oplog truncate marker isn't created if it would cause the logical representation
  * of the records to not be in increasing order.
  */

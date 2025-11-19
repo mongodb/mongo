@@ -351,12 +351,10 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
 
     for (int i = 0; i < numSamples; ++i) {
         auto nextRandom = collectionIterator.getNextRandom();
-        const auto [rId, doc] = *nextRandom;
-        auto samplingLogIntervalSeconds = gCollectionSamplingLogIntervalSeconds.load();
         if (!nextRandom) {
-            // This shouldn't really happen unless the size storer values are far off from reality.
-            // The collection is probably empty, but fall back to scanning the collection just in
-            // case.
+            // getNextRandom() returns nullopt on an empty collection, so either the size storer was
+            // wrong or something modified the collection concurrently (which we do in tests). The
+            // collection is probably empty, but fall back to scanning the collection just in case.
             LOGV2(7393206,
                   "Failed to get enough random samples, falling back to scanning the collection",
                   "uuid"_attr = collectionIterator.getRecordStore()->uuid());
@@ -367,6 +365,8 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
                 estimatedBytesPerMarker,
                 std::move(getRecordIdAndWallTime));
         }
+        const auto [rId, doc] = *nextRandom;
+        auto samplingLogIntervalSeconds = gCollectionSamplingLogIntervalSeconds.load();
 
         collectionEstimates.emplace_back(
             getRecordIdAndWallTime(Record{rId, RecordData{doc.objdata(), doc.objsize()}}));

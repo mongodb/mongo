@@ -129,6 +129,10 @@ std::shared_ptr<OplogTruncateMarkers> LocalOplogInfo::getTruncateMarkers() const
 void LocalOplogInfo::setTruncateMarkers(std::shared_ptr<OplogTruncateMarkers> markers) {
     stdx::lock_guard<stdx::mutex> lk(_rsMutex);
     _truncateMarkers = std::move(markers);
+    // Re-adjust in case the max size changed while sampling.
+    if (_truncateMarkers) {
+        _truncateMarkers->adjust(_rs->oplog()->getMaxSize());
+    }
 }
 
 void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
