@@ -48,29 +48,7 @@
 
 namespace mongo {
 
-class ExpressionCreateUUIDTest : public AggregationContextFixture {
-public:
-    ExpressionCreateUUIDTest() {
-        // TODO(SERVER-101162): Delete this once the feature flag defaults to true.
-        // Use logic similar to registerSigmoidExpression to register the $createUUID expression
-        // even though the feature falg defaults to off.
-        // $createUUID is gated behind a feature flag and does
-        // not get put into the map as the flag is off by default. Changing the value of the feature
-        // flag with RAIIServerParameterControllerForTest() does not solve the issue because the
-        // registration logic is not re-hit.
-        try {
-            Expression::registerExpression("$createUUID",
-                                           ExpressionCreateUUID::parse,
-                                           AllowedWithApiStrict::kNeverInVersion1,
-                                           AllowedWithClientType::kAny,
-                                           nullptr /* featureFlag */);
-        } catch (const DBException& e) {
-            // Allow this exception, to allow multiple ExpressionCreateUUIDTest instances
-            // to be created in this process.
-            ASSERT(e.reason() == "Duplicate expression ($createUUID) registered.");
-        }
-    }
-};
+using ExpressionCreateUUIDTest = AggregationContextFixture;
 
 TEST_F(ExpressionCreateUUIDTest, Basic) {
     auto expCtx = getExpCtx();

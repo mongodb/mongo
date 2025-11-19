@@ -1,8 +1,7 @@
 /**
  * Test the $createUUID expression.
  * @tags: [
- *  featureFlagUUIDExpression,
- *  requires_fcv_81
+ *  requires_fcv_83
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";

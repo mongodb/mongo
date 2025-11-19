@@ -224,7 +224,8 @@ feature_flags:
     featureFlagCurrentDate:
         description: "Feature flag to enable $currentDate expression"
         cpp_varname: gFeatureFlagCurrentDate
-        default: false
+        default: true
+        version: 8.3
         fcv_gated: true
 
     featureFlagMultiPlanLimiter:
@@ -242,7 +243,8 @@ feature_flags:
     featureFlagUUIDExpression:
         description: "Feature flag to enable $createUUID expression"
         cpp_varname: gFeatureFlagUUIDExpression
-        default: false
+        default: true
+        version: 8.3
         fcv_gated: true
 
     featureFlagTopNBottomNExpressions:

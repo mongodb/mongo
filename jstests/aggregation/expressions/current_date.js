@@ -1,8 +1,7 @@
 /**
  * Test the $currentDate expression.
  * @tags: [
- *  featureFlagCurrentDate,
- *  requires_fcv_81,
+ *  requires_fcv_83,
  *  uses_getmore_outside_of_transaction,
  *  # Some multitenancy passthrough suites do not enforce the failPoint this test requires.
  *  command_not_supported_in_serverless,
