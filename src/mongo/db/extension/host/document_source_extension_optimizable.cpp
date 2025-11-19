@@ -41,11 +41,10 @@ Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& 
 
     if (opts.isSerializingForExplain()) {
         return Value(_logicalStage.explain(*opts.verbosity));
-    } else {
-        // Serialize the stage for query execution.
-        return Value(_logicalStage.serialize());
     }
-    return Value(BSONObj());
+
+    // Serialize the stage for query execution.
+    return Value(_logicalStage.serialize());
 }
 
 StageConstraints DocumentSourceExtensionOptimizable::constraints(
