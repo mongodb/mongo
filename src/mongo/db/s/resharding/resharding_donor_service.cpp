@@ -1400,9 +1400,11 @@ void ReshardingDonorService::DonorStateMachine::insertStateDocument(
 
 void ReshardingDonorService::DonorStateMachine::commit() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    tassert(ErrorCodes::ReshardCollectionInProgress,
-            "Attempted to commit the resharding operation in an incorrect state",
-            _donorCtx.getState() >= DonorStateEnum::kBlockingWrites);
+    tassert(
+        ErrorCodes::ReshardCollectionInProgress,
+        fmt::format("Attempted to commit the resharding operation in an incorrect donor state: {}",
+                    DonorState_serializer(_donorCtx.getState())),
+        _donorCtx.getState() >= DonorStateEnum::kBlockingWrites);
 
     if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
         _coordinatorHasDecisionPersisted.emplaceValue();

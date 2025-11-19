@@ -1701,7 +1701,9 @@ void ReshardingRecipientService::RecipientStateMachine::insertStateDocument(
 void ReshardingRecipientService::RecipientStateMachine::commit() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     tassert(ErrorCodes::ReshardCollectionInProgress,
-            "Attempted to commit the resharding operation in an incorrect state",
+            fmt::format(
+                "Attempted to commit the resharding operation in an incorrect recipient state: {}",
+                RecipientState_serializer(_recipientCtx.getState())),
             _recipientCtx.getState() >= RecipientStateEnum::kStrictConsistency);
 
     if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
