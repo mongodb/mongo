@@ -266,7 +266,10 @@ ExecutorFuture<void> ReshardingCloneFetcher::run(OperationContext* opCtx, WriteC
         .onCompletion([this](auto ignoredStatus) {
             return whenAll(std::move(_writerFutures)).thenRunOn(_executor);
         })
-        .onCompletion([this](auto ignoredStatus) { return _finalResult; });
+        .onCompletion([this](auto ignoredStatus) {
+            std::lock_guard lk(_mutex);
+            return _finalResult;
+        });
 }
 
 }  // namespace mongo
