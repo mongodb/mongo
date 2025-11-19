@@ -34,6 +34,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -56,7 +57,7 @@ namespace mongo {
  *
  * FieldRefSets do not own the FieldRef paths they contain.
  */
-class FieldRefSet {
+class MONGO_MOD_PUBLIC FieldRefSet {
     FieldRefSet(const FieldRefSet&) = delete;
     FieldRefSet& operator=(const FieldRefSet&) = delete;
 
@@ -166,7 +167,7 @@ private:
 /**
  * A wrapper class for FieldRefSet which owns the storage of the underlying FieldRef objects.
  */
-class FieldRefSetWithStorage {
+class MONGO_MOD_PUBLIC FieldRefSetWithStorage {
 public:
     /**
      * Inserts the given FieldRef into the set. In the case of a conflict with an existing element,

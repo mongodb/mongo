@@ -37,6 +37,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <cstddef>
@@ -57,7 +58,7 @@ namespace mongo {
  *    { a : 1 , b  : -1 }
  *    { a : "hashed" }
  */
-class KeyPattern {
+class MONGO_MOD_PUBLIC KeyPattern {
 public:
     /**
      * Is the provided key pattern ordered increasing or decreasing or not?

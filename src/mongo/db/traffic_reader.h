@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/traffic_recorder.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/util/modules.h"
 
 #include <filesystem>
 #include <iosfwd>
@@ -56,7 +57,7 @@ struct TrafficReaderPacket {
 bool operator==(const TrafficReaderPacket& read, const TrafficRecordingPacket& recorded);
 
 // Method for testing, takes the recorded traffic and returns a BSONArray
-BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile);
+MONGO_MOD_PUBLIC BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile);
 
 // This is the function that traffic_reader_main.cpp calls
 void trafficRecordingFileToMongoReplayFile(int inFile, std::ostream& outFile);

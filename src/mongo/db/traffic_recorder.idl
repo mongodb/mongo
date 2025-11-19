@@ -34,6 +34,7 @@ global:
     cpp_includes:
         - "mongo/db/traffic_recorder_validators.h"
         - "mongo/db/query/util/memory_util.h"
+    mod_visibility: public
 
 imports:
     - "mongo/db/basic_types.idl"

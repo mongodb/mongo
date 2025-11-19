@@ -38,6 +38,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -49,7 +50,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 
 /**
@@ -387,4 +388,4 @@ inline FieldRef operator+(const FieldRef& lhs, const FieldRef& rhs) {
 
 std::ostream& operator<<(std::ostream& stream, const FieldRef& value);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

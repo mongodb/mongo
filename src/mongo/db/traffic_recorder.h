@@ -39,6 +39,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/tick_source.h"
@@ -82,7 +83,7 @@ void appendPacketHeader(DataBuilder& builder, const TrafficRecordingPacket& pack
  * The recording can have one recording running at a time and the intention is that observe() blocks
  * callers for the least amount of time possible.
  */
-class TrafficRecorder {
+class MONGO_MOD_PUBLIC TrafficRecorder {
 public:
     using RecordingID = std::string;
     // The Recorder may record some special events that are required by the replay client.
