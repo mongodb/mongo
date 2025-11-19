@@ -22,11 +22,6 @@ function bulkWriteBasicTest(ordered) {
         mongosOptions: {setParameter: {logComponentVerbosity: tojson({query: 4, sharding: 4})}},
     });
 
-    const isUnifiedWriteExecutor = st.s0.adminCommand({
-        getParameter: 1,
-        internalQueryUnifiedWriteExecutor: 1,
-    }).internalQueryUnifiedWriteExecutor;
-
     function getCollection(ns) {
         const [dbName, collName] = getDBNameAndCollNameFromFullNamespace(ns);
         return st.s0.getDB(dbName)[collName];

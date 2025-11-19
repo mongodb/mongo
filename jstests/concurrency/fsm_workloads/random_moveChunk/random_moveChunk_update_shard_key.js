@@ -13,6 +13,7 @@ import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = 5;
@@ -546,6 +547,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * document is given to each one.
      */
     $config.setup = function setup(db, collName, cluster) {
+        // TODO SERVER-104122: Handle WCOS error in UWE.
+        const uweEnabled = isUweEnabled(db);
+        if (uweEnabled) {
+            quit();
+        }
+
         const ns = db[collName].getFullName();
 
         for (let tid = 0; tid < this.threadCount; ++tid) {

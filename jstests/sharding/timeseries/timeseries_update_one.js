@@ -20,9 +20,12 @@ import {
     st,
     timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 setUpShardedCluster();
 const testDB = getTestDB();
+
+const uweEnabled = isUweEnabled(testDB);
 
 const runTest = function ({
     initialDocList,
@@ -173,7 +176,6 @@ const runTest = function ({
 })();
 
 // TODO SERVER-104122: Handle WCOS error in UWE.
-const uweEnabled = TestData.setParametersMongos.internalQueryUnifiedWriteExecutor;
 if (!uweEnabled) {
     (function testTargetSingleShardretryableWriteByReplacementChangeShard() {
         runTest({

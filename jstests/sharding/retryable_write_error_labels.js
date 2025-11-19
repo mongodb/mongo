@@ -12,6 +12,7 @@ import {
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
@@ -31,10 +32,7 @@ const st = new ShardingTest({
     shards: 1,
 });
 
-const isUnifiedWriteExecutor = st.s.adminCommand({
-    getParameter: 1,
-    internalQueryUnifiedWriteExecutor: 1,
-}).internalQueryUnifiedWriteExecutor;
+const uweEnabled = isUweEnabled(st.s);
 
 function checkErrorCode(res, expectedErrorCodes, isWCError) {
     // Rewrite each element of the `expectedErrorCodes` array.
@@ -85,7 +83,7 @@ function testMongodError(errorCode, isWCError) {
     const sessionColl = sessionDb.getCollection(collName);
 
     let insertFailPoint = enableFailCommand(shard0Primary, isWCError, errorCode, ["insert"]);
-    if (isUnifiedWriteExecutor) {
+    if (uweEnabled) {
         // In the unified write executor batched writes are converted to bulkWrites.
         insertFailPoint = enableFailCommand(shard0Primary, isWCError, errorCode, ["bulkWrite"]);
     }

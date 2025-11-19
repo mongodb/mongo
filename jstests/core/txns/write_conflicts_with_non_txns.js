@@ -21,17 +21,15 @@ import {WriteConflictHelpers} from "jstests/core/txns/libs/write_conflicts.js";
 import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
-
-const isUnifiedWriteExecutor = db.adminCommand({
-    getParameter: 1,
-    internalQueryUnifiedWriteExecutor: 1,
-}).internalQueryUnifiedWriteExecutor;
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const dbName = "test";
 const collName = "write_conflicts_with_non_txns";
 
 const testDB = db.getSiblingDB(dbName);
 const testColl = testDB[collName];
+
+const uweEnabled = isUweEnabled(testDB);
 
 // Clean up and create test collection.
 testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
@@ -63,7 +61,7 @@ function writeStarted(opType) {
         return (
             op.active &&
             op.ns === testColl.getFullName() &&
-            (op.op === opType || (isUnifiedWriteExecutor && op.op === "bulkWrite")) &&
+            (op.op === opType || (uweEnabled && op.op === "bulkWrite")) &&
             op.writeConflicts > 0
         );
     });
@@ -78,12 +76,7 @@ function validateWriteConflictsBeforeAndAfter(before, after, exact = false) {
         // a single op into multiple writes and causes multiple WCEs. In the unified write executor,
         // the opType is 'bulkWrite' instead of 'insert', 'update', or 'remove' due to an internal
         // implementation detail.
-        if (
-            FixtureHelpers.isSharded(testColl) ||
-            TestData.runningWithBulkWriteOverride ||
-            !exact ||
-            isUnifiedWriteExecutor
-        ) {
+        if (FixtureHelpers.isSharded(testColl) || TestData.runningWithBulkWriteOverride || !exact || uweEnabled) {
             assert.gte(after, before + 1);
         } else {
             assert.eq(after, before + 1);

@@ -37,10 +37,6 @@
               internalQueryUnifiedWriteExecutor: true
               setParametersMongos:
                 internalQueryUnifiedWriteExecutor: true
-    selector:
-      exclude_files:
-        # TODO SERVER-104122: Handle WCOS error in UWE.
-        - jstests/sharding/timeseries/timeseries_shardkey_update.js
 
 - name: unified_write_executor_sharding_jscore_passthrough
   value:

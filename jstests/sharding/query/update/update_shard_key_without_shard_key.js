@@ -13,10 +13,17 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {execCtxTypes} from "jstests/noPassthrough/rs_endpoint/lib/util.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 import {makeCommitTransactionCmdObj} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const st = new ShardingTest({shards: 4});
 const mongos = st.s0;
 const db = mongos.getDB(jsTestName());
+
+// TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
+const uweEnabled = isUweEnabled(db);
+if (uweEnabled) {
+    quit();
+}
 
 const coll = db.coll;
 coll.drop();

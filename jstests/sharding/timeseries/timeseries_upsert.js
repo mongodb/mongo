@@ -14,10 +14,11 @@ import {
     testDB,
     timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 setUpShardedCluster();
 
-const uweEnabled = TestData.setParametersMongos.internalQueryUnifiedWriteExecutor;
+const uweEnabled = isUweEnabled(testDB);
 
 const collName = "sharded_timeseries_upsert";
 const dateTime = new ISODate();

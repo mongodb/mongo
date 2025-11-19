@@ -25,6 +25,7 @@ import {
     flushRoutersAndRefreshShardMetadata,
     isUpdateDocumentShardKeyUsingTransactionApiEnabled,
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 // For startParallelOps to write its state
 let staticMongod = MongoRunner.runMongod({});
@@ -35,6 +36,12 @@ let st = new ShardingTest({
     rs: {nodes: 2},
     rsOptions: {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}},
 });
+
+// TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
+const uweEnabled = isUweEnabled(st.s);
+if (uweEnabled) {
+    quit();
+}
 
 const dbName = "test";
 const collName = "foo";

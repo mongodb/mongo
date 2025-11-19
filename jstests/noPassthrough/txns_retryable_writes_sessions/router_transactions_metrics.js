@@ -9,6 +9,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 // Verifies the transaction server status response has the fields that we expect.
 function verifyServerStatusFields(res) {
@@ -227,6 +228,8 @@ const st = new ShardingTest({
         mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
     },
 });
+
+const uweEnabled = isUweEnabled(st.s);
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
@@ -716,44 +719,47 @@ jsTest.log("Active transaction.");
 const retrySession = st.s.startSession({retryWrites: true});
 const retrySessionDB = retrySession.getDatabase(dbName);
 
-jsTest.log("Change shard key with retryable write - findAndModify.");
-(() => {
-    // Insert document to be updated.
-    assert.commandWorked(retrySessionDB[collName].insert({skey: -10}));
+// TODO SERVER-104122: Handle WCOS error in UWE.
+if (!uweEnabled) {
+    jsTest.log("Change shard key with retryable write - findAndModify.");
+    (() => {
+        // Insert document to be updated.
+        assert.commandWorked(retrySessionDB[collName].insert({skey: -10}));
 
-    // Retryable write findAndModify that would change the shard key. Uses a txn internally. Throws
-    // on error.
-    retrySessionDB[collName].findAndModify({query: {skey: -10}, update: {$set: {skey: 10}}});
+        // Retryable write findAndModify that would change the shard key. Uses a txn internally. Throws
+        // on error.
+        retrySessionDB[collName].findAndModify({query: {skey: -10}, update: {$set: {skey: 10}}});
 
-    expectedStats.totalStarted += 1;
-    expectedStats.totalCommitted += 1;
-    expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
-    expectedStats.commitTypes.twoPhaseCommit.successful += 1;
-    expectedStats.totalContactedParticipants += 2;
-    expectedStats.totalParticipantsAtCommit += 2;
-    expectedStats.totalRequestsTargeted += 4;
+        expectedStats.totalStarted += 1;
+        expectedStats.totalCommitted += 1;
+        expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
+        expectedStats.commitTypes.twoPhaseCommit.successful += 1;
+        expectedStats.totalContactedParticipants += 2;
+        expectedStats.totalParticipantsAtCommit += 2;
+        expectedStats.totalRequestsTargeted += 4;
 
-    verifyServerStatusValues(st, expectedStats);
-})();
+        verifyServerStatusValues(st, expectedStats);
+    })();
 
-jsTest.log("Change shard key with retryable write - batch write command.");
-(() => {
-    // Insert document to be updated.
-    assert.commandWorked(retrySessionDB[collName].insert({skey: -15}));
+    jsTest.log("Change shard key with retryable write - batch write command.");
+    (() => {
+        // Insert document to be updated.
+        assert.commandWorked(retrySessionDB[collName].insert({skey: -15}));
 
-    // Retryable write update that would change the shard key. Uses a txn internally.
-    assert.commandWorked(retrySessionDB[collName].update({skey: -15}, {$set: {skey: 15}}));
+        // Retryable write update that would change the shard key. Uses a txn internally.
+        assert.commandWorked(retrySessionDB[collName].update({skey: -15}, {$set: {skey: 15}}));
 
-    expectedStats.totalStarted += 1;
-    expectedStats.totalCommitted += 1;
-    expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
-    expectedStats.commitTypes.twoPhaseCommit.successful += 1;
-    expectedStats.totalContactedParticipants += 2;
-    expectedStats.totalParticipantsAtCommit += 2;
-    expectedStats.totalRequestsTargeted += 4;
+        expectedStats.totalStarted += 1;
+        expectedStats.totalCommitted += 1;
+        expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
+        expectedStats.commitTypes.twoPhaseCommit.successful += 1;
+        expectedStats.totalContactedParticipants += 2;
+        expectedStats.totalParticipantsAtCommit += 2;
+        expectedStats.totalRequestsTargeted += 4;
 
-    verifyServerStatusValues(st, expectedStats);
-})();
+        verifyServerStatusValues(st, expectedStats);
+    })();
+}
 
 session.endSession();
 st.stop();

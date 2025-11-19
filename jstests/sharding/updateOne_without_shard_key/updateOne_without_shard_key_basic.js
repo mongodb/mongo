@@ -9,12 +9,15 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {WriteWithoutShardKeyTestUtil} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 // Make sure we're testing with no implicit session.
 TestData.disableImplicitSessions = true;
 
 // 2 shards single node, 1 mongos, 1 config server 3-node
 const st = new ShardingTest({});
+
+const uweEnabled = isUweEnabled(st.s);
 
 const dbName = "test";
 const collName = "foo";
@@ -377,6 +380,8 @@ const testCases = [
         expectedResponse: {n: 1, nModified: 1},
         dbName: dbName,
         collName: collName,
+        // TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
+        skip: uweEnabled,
     },
     {
         logMessage: "Running a single update where no document matches on the query and {upsert: true}",
@@ -425,6 +430,10 @@ const isTxnApiEnabled = FeatureFlagUtil.isEnabled(
 );
 
 configurations.forEach((config) => {
+    if (config.skip) {
+        return;
+    }
+
     let conn = WriteWithoutShardKeyTestUtil.getClusterConnection(st, config);
     testCases.forEach((testCase) => {
         if (

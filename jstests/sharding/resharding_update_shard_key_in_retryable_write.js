@@ -6,6 +6,7 @@
  * @tags: [requires_fcv_60]
  */
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 function runTest(reshardInPlace) {
     const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace});
@@ -39,6 +40,12 @@ function runTest(reshardInPlace) {
     });
     const mongosConn = mongosTestColl.getMongo();
     const mongosTestDB = mongosConn.getDB(dbName);
+
+    // TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
+    const uweEnabled = isUweEnabled(mongosTestDB);
+    if (uweEnabled) {
+        quit();
+    }
 
     // Test commands that the shard key of a document in the test collection from change its shard
     // key. Note we don't test the remove:true case because the document can't move shards if it is

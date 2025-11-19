@@ -9,8 +9,15 @@
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {isUpdateDocumentShardKeyUsingTransactionApiEnabled} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const st = new ShardingTest({mongos: 1, shards: 3});
+
+// TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
+const uweEnabled = isUweEnabled(st.s);
+if (uweEnabled) {
+    quit();
+}
 
 const updateDocumentShardKeyUsingTransactionApiEnabled = isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
 

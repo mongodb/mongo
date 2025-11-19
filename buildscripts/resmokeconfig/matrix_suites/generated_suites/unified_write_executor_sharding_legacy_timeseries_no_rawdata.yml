@@ -21,8 +21,6 @@ executor:
       nodb: ""
 matrix_suite: true
 selector:
-  exclude_files:
-    - jstests/sharding/timeseries/timeseries_shardkey_update.js
   roots:
     - jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
     - jstests/sharding/balancer_should_return_random_migrations_failpoint.js

@@ -29,10 +29,17 @@ import {
     timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const docs = [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106];
 
 setUpShardedCluster();
+
+// TODO SERVER-104122: Handle WCOS error in UWE.
+const uweEnabled = isUweEnabled(testDB);
+if (uweEnabled) {
+    quit();
+}
 
 (function testUpdateMultiModifyingShardKey() {
     // This will create a sharded collection with 2 chunks: (MinKey, meta: "A"] and [meta: "B",
