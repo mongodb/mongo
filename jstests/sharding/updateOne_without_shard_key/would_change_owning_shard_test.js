@@ -31,6 +31,7 @@ const docsToInsert = [{_id: 0, x: shardKey1, y: 1}];
 // TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
 const uweEnabled = isUweEnabled(st.s);
 if (uweEnabled) {
+    st.stop();
     quit();
 }
 

@@ -44,6 +44,7 @@ function runTest(reshardInPlace) {
     // TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
     const uweEnabled = isUweEnabled(mongosTestDB);
     if (uweEnabled) {
+        reshardingTest.teardown();
         quit();
     }
 

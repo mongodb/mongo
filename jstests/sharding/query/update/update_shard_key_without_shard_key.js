@@ -22,6 +22,7 @@ const db = mongos.getDB(jsTestName());
 // TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
 const uweEnabled = isUweEnabled(db);
 if (uweEnabled) {
+    st.stop();
     quit();
 }
 

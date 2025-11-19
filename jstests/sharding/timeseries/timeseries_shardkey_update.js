@@ -38,6 +38,7 @@ setUpShardedCluster();
 // TODO SERVER-104122: Handle WCOS error in UWE.
 const uweEnabled = isUweEnabled(testDB);
 if (uweEnabled) {
+    tearDownShardedCluster();
     quit();
 }
 

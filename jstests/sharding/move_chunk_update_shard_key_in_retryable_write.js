@@ -40,6 +40,8 @@ let st = new ShardingTest({
 // TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
 const uweEnabled = isUweEnabled(st.s);
 if (uweEnabled) {
+    st.stop();
+    MongoRunner.stopMongod(staticMongod);
     quit();
 }
 

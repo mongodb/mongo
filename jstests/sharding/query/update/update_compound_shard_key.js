@@ -16,6 +16,7 @@ const st = new ShardingTest({mongos: 1, shards: 3});
 // TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
 const uweEnabled = isUweEnabled(st.s);
 if (uweEnabled) {
+    st.stop();
     quit();
 }
 
