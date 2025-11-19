@@ -38,6 +38,7 @@
 #include "mongo/db/extension/host_connector/query_execution_context_adapter.h"
 #include "mongo/db/extension/host_connector/query_shape_opts_adapter.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/dpl_array_container.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/raii_vector_to_abi_array.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/dpl_array_container.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -1254,6 +1256,37 @@ TEST_F(AggStageTest, TestDPLRaiiVecToAbiArrayWithFailPoint) {
     // Verify all instances are destroyed even after exception.
     ASSERT_EQ(shared_test_stages::CountingLogicalStage::alive, 0);
     ASSERT_EQ(shared_test_stages::CountingParse::alive, 0);
+}
+
+TEST_F(AggStageTest, TestDPLArrayContainerRoundTrip) {
+    shared_test_stages::CountingLogicalStage::alive = 0;
+    shared_test_stages::CountingParse::alive = 0;
+
+    auto logicalStage =
+        new sdk::ExtensionLogicalAggStage(shared_test_stages::CountingLogicalStage::make());
+    auto parseNode = new sdk::ExtensionAggStageParseNode(shared_test_stages::CountingParse::make());
+
+    ASSERT_EQ(shared_test_stages::CountingLogicalStage::alive, 1);
+    ASSERT_EQ(shared_test_stages::CountingParse::alive, 1);
+
+    std::vector<extension::VariantDPLHandle> sdkElements;
+    sdkElements.emplace_back(extension::LogicalAggStageHandle{logicalStage});
+    sdkElements.emplace_back(extension::AggStageParseNodeHandle{parseNode});
+
+    auto sdkAdapter = std::make_unique<sdk::ExtensionDPLArrayContainerAdapter>(
+        std::make_unique<sdk::DPLArrayContainer>(std::move(sdkElements)));
+
+    DPLArrayContainerHandle arrayContainer(sdkAdapter.release());
+    ASSERT_EQ(arrayContainer.size(), 2U);
+
+    // Transfer the elements to a vector of RAII handles.
+    auto roundTripVector = arrayContainer.transfer();
+    ASSERT_EQ(roundTripVector.size(), 2U);
+    ASSERT_TRUE(std::holds_alternative<extension::LogicalAggStageHandle>(roundTripVector[0]));
+    ASSERT_TRUE(std::holds_alternative<extension::AggStageParseNodeHandle>(roundTripVector[1]));
+
+    ASSERT_EQ(shared_test_stages::CountingLogicalStage::alive, 1);
+    ASSERT_EQ(shared_test_stages::CountingParse::alive, 1);
 }
 
 }  // namespace

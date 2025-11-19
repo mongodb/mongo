@@ -467,6 +467,46 @@ typedef struct MongoExtensionDPLArray {
 } MongoExtensionDPLArray;
 
 /**
+ * MongoExtensionDPLArrayContainer wraps an extension-implemented array that must be transferred
+ * into a Host pre-allocated array.
+ *
+ * This container allows extensions to provide arrays of stages (either parse nodes or logical
+ * stages) for distributed planning without going through a serialize/parse cycle. The Host
+ * pre-allocates the target array and the extension transfers ownership of the elements into it.
+ */
+typedef struct MongoExtensionDPLArrayContainer {
+    const struct MongoExtensionDPLArrayContainerVTable* const vtable;
+} MongoExtensionDPLArrayContainer;
+
+/**
+ * Virtual function table for MongoExtensionDPLArrayContainer.
+ */
+typedef struct MongoExtensionDPLArrayContainerVTable {
+    /**
+     * Destroy `container` and free all associated resources.
+     */
+    void (*destroy)(MongoExtensionDPLArrayContainer* container);
+
+    /**
+     * Returns the number of elements in the DPLArrayContainer.
+     * Callers must first obtain the size before calling transfer() in order to
+     * pre-allocate the target output array.
+     */
+    size_t (*size)(const MongoExtensionDPLArrayContainer* container);
+
+    /**
+     * Transfers ownership of the underlying DPLArrayContainer's elements into
+     * the target array.
+     * Callers must first obtain the size of the array in order to pre-allocate the
+     * target output array.
+     * Ownership of the pointers within the array elements is transferred to the caller.
+     * It is an error to provide an incorrectly sized output array.
+     */
+    MongoExtensionStatus* (*transfer)(MongoExtensionDPLArrayContainer* container,
+                                      MongoExtensionDPLArray* array);
+} MongoExtensionDPLArrayContainerVTable;
+
+/**
  * Virtual function table for MongoExtensionAggStageParseNode.
  */
 typedef struct MongoExtensionAggStageParseNodeVTable {

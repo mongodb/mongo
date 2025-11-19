@@ -33,9 +33,11 @@
 #include "mongo/db/extension/host_connector/query_execution_context_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/dpl_array_container.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/dpl_array_container.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -468,6 +470,69 @@ DEATH_TEST_F(AggStageDeathTest,
     auto compiledExecAggStageHandle = handle.compile();
 
     [[maybe_unused]] auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+};
+
+class TestDPLArrayContainerHandle : public DPLArrayContainerHandle {
+public:
+    TestDPLArrayContainerHandle(::MongoExtensionDPLArrayContainer* container)
+        : DPLArrayContainerHandle(container) {}
+
+    void transferInternal(::MongoExtensionDPLArray& arr) {
+        assertValid();
+        _transferInternal(arr);
+    }
+
+    void assertVTableConstraints(const VTable_t& vtable) {
+        _assertVTableConstraints(vtable);
+    }
+};
+
+DEATH_TEST_F(AggStageDeathTest, InvalidDPLArrayContainerVTableFailsSize, "11368301") {
+    auto handle = TestDPLArrayContainerHandle{new sdk::ExtensionDPLArrayContainerAdapter(
+        std::make_unique<sdk::DPLArrayContainer>(std::vector<VariantDPLHandle>{}))};
+
+    auto vtable = handle.vtable();
+    vtable.size = nullptr;
+    handle.assertVTableConstraints(vtable);
+};
+
+DEATH_TEST_F(AggStageDeathTest, InvalidDPLArrayContainerVTableFailsTransfer, "11368302") {
+    auto handle = TestDPLArrayContainerHandle{new sdk::ExtensionDPLArrayContainerAdapter(
+        std::make_unique<sdk::DPLArrayContainer>(std::vector<VariantDPLHandle>{}))};
+
+    auto vtable = handle.vtable();
+    vtable.transfer = nullptr;
+    handle.assertVTableConstraints(vtable);
+};
+
+DEATH_TEST_F(AggStageDeathTest, DPLArrayContainerExtensionToHostWrongSizeFails, "11368303") {
+    auto logicalStage =
+        new sdk::ExtensionLogicalAggStage(shared_test_stages::CountingLogicalStage::make());
+    auto parseNode = new sdk::ExtensionAggStageParseNode(shared_test_stages::CountingParse::make());
+
+    std::vector<VariantDPLHandle> sdkElements;
+    sdkElements.emplace_back(extension::LogicalAggStageHandle{logicalStage});
+    sdkElements.emplace_back(extension::AggStageParseNodeHandle{parseNode});
+
+    const auto size = sdkElements.size();
+
+    auto sdkAdapter = std::make_unique<sdk::ExtensionDPLArrayContainerAdapter>(
+        std::make_unique<sdk::DPLArrayContainer>(std::move(sdkElements)));
+
+    TestDPLArrayContainerHandle arrayContainerHandle(sdkAdapter.release());
+
+    // Pre-allocate array with incorrect size.
+    std::vector<::MongoExtensionDPLArrayElement> sdkAbiArray{size + 1};
+    ::MongoExtensionDPLArray targetArray{size + 1, sdkAbiArray.data()};
+
+    // Transfer should fail due to incorrectly sized array.
+    arrayContainerHandle.transferInternal(targetArray);
+}
+
+DEATH_TEST_F(AggStageDeathTest, DPLArrayContainerAdapterNullContainerFails, "11368304") {
+    [[maybe_unused]] auto handle =
+        TestDPLArrayContainerHandle{new sdk::ExtensionDPLArrayContainerAdapter(
+            std::unique_ptr<sdk::DPLArrayContainer>(nullptr))};
 };
 
 }  // namespace
