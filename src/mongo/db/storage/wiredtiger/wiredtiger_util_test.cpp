@@ -282,17 +282,14 @@ TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatVersionNumber) 
         WiredTigerUtil::checkApplicationMetadataFormatVersion(getSessionNoTxn(), getURI(), 3, 3));
 }
 
-// SERVER-113979 Temporary disabled to allow WiredTiger drop with the fix for broken configs.
-// TODO: SERVER-113978 Fix unit-tests that allow invalid WiredTiger configs
-//
-// TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatInvalidURI) {
-//     createSession("\"");
-//     Status result =
-//         WiredTigerUtil::checkApplicationMetadataFormatVersion(getSessionNoTxn(), getURI(), 0, 3)
-//             .getStatus();
-//     ASSERT_NOT_OK(result);
-//     ASSERT_EQUALS(ErrorCodes::FailedToParse, result.code());
-// }
+TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatInvalidURI) {
+    WiredTigerUtilHarnessHelper harnessHelper("");
+    WiredTigerSession wtSession(harnessHelper.getConnection());
+    const char* config = "\"";
+    auto result = wtRCToStatus(wtSession.create(getURI(), config), wtSession);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.code());
+}
 
 class WiredTigerUtilTest : public ServiceContextTest {};
 using WiredTigerUtilDeathTest = WiredTigerUtilTest;
