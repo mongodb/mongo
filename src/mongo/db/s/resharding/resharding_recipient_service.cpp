@@ -130,6 +130,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientDuringOplogApplication);
 MONGO_FAIL_POINT_DEFINE(reshardingOpCtxKilledWhileRestoringMetrics);
 MONGO_FAIL_POINT_DEFINE(reshardingRecipientFailsAfterTransitionToCloning);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeBuildingIndex);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeWaitingForCriticalSection);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeEnteringStrictConsistency);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeTransitionToCreateCollection);
 MONGO_FAIL_POINT_DEFINE(reshardingRecipientFailInPhase);
@@ -838,6 +839,10 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
         }
     }
 
+    if (coordinatorState >= CoordinatorStateEnum::kBlockingWrites) {
+        ensureFulfilledPromise(lk, _coordinatorHasEngagedCriticalSection);
+    }
+
     if (coordinatorState >= CoordinatorStateEnum::kCommitting) {
         ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
     }
@@ -1343,6 +1348,17 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                     }
                     _transitionToApplying(factory);
                 });
+        })
+        .onCompletion([this, executor, abortToken](Status status) {
+            if (abortToken.isCanceled()) {
+                return ExecutorFuture<void>(**executor, status);
+            }
+
+            {
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                ensureFulfilledPromise(lk, _inApplyingOrError);
+            }
+            return ExecutorFuture<void>(**executor, status);
         });
 }
 
@@ -1367,7 +1383,10 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                 LOGV2(9110902,
                       "Skip fetching and applying oplog entries since this recipient shard is not "
                       "going to own any chunks for the collection after resharding");
-                return SemiFuture<void>();
+
+                reshardingPauseRecipientBeforeWaitingForCriticalSection.pauseWhileSet();
+                return future_util::withCancellation(
+                    _coordinatorHasEngagedCriticalSection.getFuture(), abortToken);
             }
 
             {
@@ -1698,6 +1717,18 @@ void ReshardingRecipientService::RecipientStateMachine::insertStateDocument(
     store.add(opCtx, recipientDoc, kNoWaitWriteConcern);
 }
 
+void ReshardingRecipientService::RecipientStateMachine::onCriticalSectionStarted() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    tassert(ErrorCodes::ReshardCollectionInProgress,
+            "Critical section was engaged before this recipient enters the applying state",
+            _recipientCtx.getState() >= RecipientStateEnum::kApplying);
+
+    ensureFulfilledPromise(lk, _coordinatorHasEngagedCriticalSection);
+    if (_dataReplication) {
+        _dataReplication->prepareForCriticalSection();
+    }
+}
+
 void ReshardingRecipientService::RecipientStateMachine::commit() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     tassert(ErrorCodes::ReshardCollectionInProgress,
@@ -1706,6 +1737,7 @@ void ReshardingRecipientService::RecipientStateMachine::commit() {
                 RecipientState_serializer(_recipientCtx.getState())),
             _recipientCtx.getState() >= RecipientStateEnum::kStrictConsistency);
 
+    ensureFulfilledPromise(lk, _coordinatorHasEngagedCriticalSection);
     if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
         _coordinatorHasDecisionPersisted.emplaceValue();
     }
@@ -2202,10 +2234,9 @@ void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancell
             // run() hasn't been called, notify the operation should be aborted by setting an
             // error. Abort is allowed to be retried, so setError only if it has not yet been
             // done before.
-            if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
-                _coordinatorHasDecisionPersisted.setError(
-                    {ErrorCodes::ReshardCollectionAborted, "aborted"});
-            }
+            auto status = Status{ErrorCodes::ReshardCollectionAborted, "aborted"};
+            ensureFulfilledPromise(lk, _coordinatorHasEngagedCriticalSection, status);
+            ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted, status);
             return boost::none;
         }
     }();
@@ -2217,13 +2248,21 @@ void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancell
 
 void ReshardingRecipientService::RecipientStateMachine::_fulfillPromisesOnStepup(
     boost::optional<mongo::ReshardingRecipientMetrics> metrics) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    if (_recipientCtx.getState() >= RecipientStateEnum::kApplying) {
+        ensureFulfilledPromise(lk, _inApplyingOrError);
+    }
+    if (_recipientCtx.getState() >= RecipientStateEnum::kStrictConsistency) {
+        ensureFulfilledPromise(lk, _inStrictConsistencyOrError);
+    }
+
     if (!resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         _recipientCtx.getState() <= RecipientStateEnum::kAwaitingFetchTimestamp) {
         return;
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (metrics && _cloneTimestamp) {
         ensureFulfilledPromise(lk,
                                _allDonorsPreparedToDonate,

@@ -92,6 +92,9 @@ public:
                       "_shardsvrRecipientCriticalSectionStarted command.",
                       "reshardingUUID"_attr = uuid());
 
+                (*machine)->onCriticalSectionStarted();
+                (*machine)->awaitInStrictConsistencyOrError().get(opCtx);
+
                 LOGV2(11400402,
                       "Resharding recipient finished executing "
                       "_shardsvrRecipientCriticalSectionStarted command.",

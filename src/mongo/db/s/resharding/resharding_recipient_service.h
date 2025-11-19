@@ -186,6 +186,14 @@ public:
     void prepareForCriticalSection();
 
     /**
+     * Returns a Future fulfilled once the recipient locally updates its state to
+     * RecipientStateEnum::kApplying or RecipientStateEnum::kError.
+     */
+    SharedSemiFuture<void> awaitInApplyingOrError() const {
+        return _inApplyingOrError.getFuture();
+    }
+
+    /**
      * Returns a Future fulfilled once the recipient locally persists its final state before the
      * coordinator makes its decision to commit or abort (RecipientStateEnum::kError or
      * RecipientStateEnum::kStrictConsistency).
@@ -238,6 +246,12 @@ public:
 
     static void insertStateDocument(OperationContext* opCtx,
                                     const ReshardingRecipientDocument& recipientDoc);
+
+    /**
+     * Indicates that the coordinator has engaged the critical section. Unblocks the
+     * _coordinatorHasEngagedCriticalSection promise.
+     */
+    void onCriticalSectionStarted();
 
     /**
      * Indicates that the coordinator has persisted a decision. Unblocks the
@@ -482,8 +496,10 @@ private:
     // ascending order, such that the first promise below will be the first promise fulfilled.
     SharedPromise<CloneDetails> _allDonorsPreparedToDonate;
 
+    SharedPromise<void> _inApplyingOrError;
     SharedPromise<void> _inStrictConsistencyOrError;
 
+    SharedPromise<void> _coordinatorHasEngagedCriticalSection;
     SharedPromise<void> _coordinatorHasDecisionPersisted;
 
     SharedPromise<void> _completionPromise;
