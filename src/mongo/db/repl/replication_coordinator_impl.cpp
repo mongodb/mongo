@@ -67,7 +67,6 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
-#include "mongo/db/repl/clang_checked/mutex.h"
 #include "mongo/db/repl/collection_utils.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
@@ -453,6 +452,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _rsConfigState(kConfigPreStart),
       _rsConfig(std::make_shared<ReplSetConfig>()),  // Initialize with empty configuration.
       _selfIndex(-1),
+      _sleptLastElection(false),
       _readWriteAbility(std::make_unique<ReadWriteAbility>(!settings.isReplSet())),
       _replicationProcess(replicationProcess),
       _storage(storage),
@@ -476,21 +476,6 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     _electionIdTermShadow.store(_topCoord->getElectionIdTerm());
 
     invariant(_service);
-
-    {
-        clang_checked::lock_guard lk(_mutex);
-        _memberStateCached.store(lk, _memberState);
-        _oplogSyncStateCached.store(lk, _oplogSyncState);
-
-        auto o0 = OpTimeAndWallTime(OpTime(), Date_t::min());
-        _myLastAppliedOpTimeAndWallTimeCached.store(lk, o0);
-        auto o1 = OpTimeAndWallTime(OpTime(), Date_t::min());
-        _myLastCommittedOpTimeAndWallTimeCached.store(lk, o1);
-        auto o2 = OpTimeAndWallTime(OpTime(), Date_t::min());
-        _myLastDurableOpTimeAndWallTimeCached.store(lk, o2);
-        auto o3 = OpTimeAndWallTime(OpTime(), Date_t::min());
-        _myLastWrittenOpTimeAndWallTimeCached.store(lk, o3);
-    }
 
     if (!_settings.isReplSet()) {
         return;
@@ -1273,7 +1258,8 @@ const ReplSettings& ReplicationCoordinatorImpl::getSettings() const {
 }
 
 MemberState ReplicationCoordinatorImpl::getMemberState() const {
-    return _memberStateCached.load();
+    stdx::lock_guard lk(_mutex);
+    return _getMemberState(lk);
 }
 
 std::vector<MemberData> ReplicationCoordinatorImpl::getMemberData() const {
@@ -1371,7 +1357,8 @@ Status ReplicationCoordinatorImpl::_setFollowerMode(OperationContext* opCtx,
 }
 
 ReplicationCoordinator::OplogSyncState ReplicationCoordinatorImpl::getOplogSyncState() {
-    return _oplogSyncStateCached.load();
+    stdx::lock_guard lk(_mutex);
+    return _oplogSyncState;
 }
 
 void ReplicationCoordinatorImpl::signalWriterDrainComplete(OperationContext* opCtx,
@@ -1390,7 +1377,6 @@ void ReplicationCoordinatorImpl::signalWriterDrainComplete(OperationContext* opC
 
     // Update state and signal the applier's buffer to enter drain mode.
     _oplogSyncState = OplogSyncState::ApplierDraining;
-    _oplogSyncStateCached.store(lk, _oplogSyncState);
     _externalState->onWriterDrainComplete(opCtx);
 }
 
@@ -1462,7 +1448,6 @@ void ReplicationCoordinatorImpl::signalApplierDrainComplete(OperationContext* op
         return;
     }
     _oplogSyncState = OplogSyncState::Stopped;
-    _oplogSyncStateCached.store(lk, _oplogSyncState);
     _externalState->onApplierDrainComplete(opCtx);
 
     invariant(_getMemberState(lk).primary());
@@ -1679,7 +1664,6 @@ void ReplicationCoordinatorImpl::_setMyLastWrittenOpTimeAndWallTime(
 
     _topCoord->setMyLastWrittenOpTimeAndWallTime(
         opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
-    _myLastWrittenOpTimeAndWallTimeCached.store(lk, opTimeAndWallTime);
 
     // Signal anyone waiting on optime changes.
     _lastWrittenOpTimeWaiterList.setValueIf(
@@ -1703,8 +1687,6 @@ void ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTime(
     // transaction, which may be delayed, but this should be fine.
     _topCoord->setMyLastDurableOpTimeAndWallTime(
         opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
-    _myLastDurableOpTimeAndWallTimeCached.store(lk, opTimeAndWallTime);
-
     // If we are using durable times to calculate the commit level, update it now.
     if (_rsConfig.unsafePeek().getWriteConcernMajorityShouldJournal()) {
         _updateLastCommittedOpTimeAndWallTime(lk);
@@ -1754,18 +1736,12 @@ bool ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTimeForward(
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastWrittenOpTime() const {
-    return _myLastWrittenOpTimeAndWallTimeCached.load().opTime;
+    stdx::lock_guard lock(_mutex);
+    return _getMyLastWrittenOpTime(lock);
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastWrittenOpTimeAndWallTime(
     bool rollbackSafe) const {
-    // If !rollbackSafe, then we access only 1 member, so we don't need the
-    // lock.
-    if (!rollbackSafe) {
-        return _myLastWrittenOpTimeAndWallTimeCached.load();
-    }
-    // Otherwise, we must take the lock since we might touch both _memberState
-    // and _lastWritten.
     stdx::lock_guard lock(_mutex);
     if (rollbackSafe && _getMemberState(lock).rollback()) {
         return {};
@@ -1774,19 +1750,23 @@ OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastWrittenOpTimeAndWallTime(
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastAppliedOpTime() const {
-    return getMyLastAppliedOpTimeAndWallTime().opTime;
+    stdx::lock_guard lock(_mutex);
+    return _getMyLastAppliedOpTime(lock);
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastAppliedOpTimeAndWallTime() const {
-    return _myLastAppliedOpTimeAndWallTimeCached.load();
+    stdx::lock_guard lock(_mutex);
+    return _getMyLastAppliedOpTimeAndWallTime(lock);
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastDurableOpTimeAndWallTime() const {
-    return _myLastDurableOpTimeAndWallTimeCached.load();
+    stdx::lock_guard lock(_mutex);
+    return _getMyLastDurableOpTimeAndWallTime(lock);
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastDurableOpTime() const {
-    return getMyLastDurableOpTimeAndWallTime().opTime;
+    stdx::lock_guard lock(_mutex);
+    return _getMyLastDurableOpTime(lock);
 }
 
 Status ReplicationCoordinatorImpl::_validateReadConcern(OperationContext* opCtx,
@@ -4551,11 +4531,10 @@ boost::optional<Timestamp> ReplicationCoordinatorImpl::getRecoveryTimestamp() {
     return _storage->getRecoveryTimestamp(getServiceContext());
 }
 
-void ReplicationCoordinatorImpl::_enterDrainMode(WithLock lk) {
+void ReplicationCoordinatorImpl::_enterDrainMode(WithLock) {
     _oplogSyncState = feature_flags::gReduceMajorityWriteLatency.isEnabled()
         ? OplogSyncState::WriterDraining
         : OplogSyncState::ApplierDraining;
-    _oplogSyncStateCached.store(lk, _oplogSyncState);
     _externalState->stopProducer();
 }
 
@@ -5028,8 +5007,6 @@ ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSourceOnError
 void ReplicationCoordinatorImpl::_updateLastCommittedOpTimeAndWallTime(WithLock lk) {
     if (_topCoord->updateLastCommittedOpTimeAndWallTime()) {
         _setStableTimestampForStorage(lk);
-        auto lastCommittedOpTimeAndWallTime = _topCoord->getLastCommittedOpTimeAndWallTime();
-        _myLastCommittedOpTimeAndWallTimeCached.store(lk, lastCommittedOpTimeAndWallTime);
     }
 }
 
@@ -5242,8 +5219,6 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint(
     bool forInitiate) {
     if (_topCoord->advanceLastCommittedOpTimeAndWallTime(
             committedOpTimeAndWallTime, fromSyncSource, forInitiate)) {
-        auto lastCommittedOpTimeAndWallTime = _topCoord->getLastCommittedOpTimeAndWallTime();
-        _myLastCommittedOpTimeAndWallTimeCached.store(lk, lastCommittedOpTimeAndWallTime);
         if (_getMemberState(lk).arbiter()) {
             // Arbiters do not store replicated data, so we consider their data trivially
             // consistent.
@@ -5258,11 +5233,13 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint(
 }
 
 OpTime ReplicationCoordinatorImpl::getLastCommittedOpTime() const {
-    return getLastCommittedOpTimeAndWallTime().opTime;
+    stdx::unique_lock lk(_mutex);
+    return _topCoord->getLastCommittedOpTime();
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::getLastCommittedOpTimeAndWallTime() const {
-    return _myLastCommittedOpTimeAndWallTimeCached.load();
+    stdx::unique_lock lk(_mutex);
+    return _topCoord->getLastCommittedOpTimeAndWallTime();
 }
 
 Status ReplicationCoordinatorImpl::processReplSetRequestVotes(

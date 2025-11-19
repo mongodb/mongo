@@ -43,7 +43,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/auto_get_rstl_for_stepup_stepdown.h"
-#include "mongo/db/repl/data_with_lock_free_reads.h"
 #include "mongo/db/repl/delayable_timeout_callback.h"
 #include "mongo/db/repl/hello/hello_response.h"
 #include "mongo/db/repl/initial_sync/initial_syncer.h"
@@ -214,9 +213,6 @@ public:
 
     const ReplSettings& getSettings() const override;
 
-    // This method makes no threading guarantees since it fetches a single
-    // value. If you are an internal caller working with multiple protected
-    // members, use _getMemberState(WithLock).
     MemberState getMemberState() const override;
 
     std::vector<MemberData> getMemberData() const override;
@@ -292,34 +288,13 @@ public:
 
     void setMyHeartbeatMessage(const std::string& msg) override;
 
-    // This method makes no threading guarantees since it fetches a single
-    // value. If you are an internal caller working with multiple protected
-    // members, use _getMyLastWrittenOpTime(WithLock).
     OpTime getMyLastWrittenOpTime() const override;
-
-    // This method makes no threading guarantees since it fetches a single
-    // value. If you are an internal caller working with multiple protected
-    // members, use _getMyLastWrittenOpTimeAndWallTime(WithLock).
     OpTimeAndWallTime getMyLastWrittenOpTimeAndWallTime(bool rollbackSafe = false) const override;
 
-    // This method makes no threading guarantees since it fetches a single
-    // value. If you are an internal caller working with multiple protected
-    // members, use _getMyLastAppliedOpTime(WithLock).
     OpTime getMyLastAppliedOpTime() const override;
-
-    // This method makes no threading guarantees since it fetches a single
-    // value. If you are an internal caller working with multiple protected
-    // members, use _getMyLastAppliedOpTimeAndWallTime(WithLock).
     OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const override;
 
-    // This method makes no threading guarantees since it fetches a single
-    // value. If you are an internal caller working with multiple protected
-    // members, use _getMyLastDurableOpTime(WithLock).
     OpTime getMyLastDurableOpTime() const override;
-
-    // This method makes no threading guarantees since it fetches a single
-    // value. If you are an internal caller working with multiple protected
-    // members, use _getMyLastDurableOpTimeAndWallTime(WithLock).
     OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const override;
 
     Status waitUntilMajorityOpTime(OperationContext* opCtx,
@@ -348,9 +323,6 @@ public:
 
     Status setFollowerModeRollback(OperationContext* opCtx) override;
 
-    // This method makes no threading guarantees since it fetches a single
-    // value. If you are an internal caller working with multiple protected
-    // members, add a WithLock version of this method and use _oplogSyncState.
     OplogSyncState getOplogSyncState() override;
 
     void signalWriterDrainComplete(OperationContext* opCtx,
@@ -449,14 +421,7 @@ public:
     ChangeSyncSourceAction shouldChangeSyncSourceOnError(
         const HostAndPort& currentSource, const OpTime& lastOpTimeFetched) const override;
 
-    // This method makes no threading guarantees since it fetches a single
-    // value. If you are an internal caller working with multiple protected
-    // members, use _topCoord->getLastCommittedOpTime().
     OpTime getLastCommittedOpTime() const override;
-
-    // This method makes no threading guarantees since it fetches a single
-    // value. If you are an internal caller working with multiple protected
-    // members, use _topCoord->getLastCommittedOpTimeAndWallTime().
     OpTimeAndWallTime getLastCommittedOpTimeAndWallTime() const override;
 
     Status processReplSetRequestVotes(OperationContext* opCtx,
@@ -1831,11 +1796,6 @@ private:
     // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
     std::unique_ptr<TopologyCoordinator> _topCoord;  // (M)
 
-    DataWithLockFreeReads<OpTimeAndWallTime> _myLastAppliedOpTimeAndWallTimeCached;    // (S)
-    DataWithLockFreeReads<OpTimeAndWallTime> _myLastCommittedOpTimeAndWallTimeCached;  // (S)
-    DataWithLockFreeReads<OpTimeAndWallTime> _myLastDurableOpTimeAndWallTimeCached;    // (S)
-    DataWithLockFreeReads<OpTimeAndWallTime> _myLastWrittenOpTimeAndWallTimeCached;    // (S)
-
     // Executor that drives the topology coordinator.
     std::shared_ptr<executor::TaskExecutor> _replExecutor;  // (S)
 
@@ -1879,11 +1839,7 @@ private:
     // Current ReplicaSet state.
     MemberState _memberState;  // (M)
 
-    DataWithLockFreeReads<MemberState> _memberStateCached;  // (S)
-
     ReplicationCoordinator::OplogSyncState _oplogSyncState = OplogSyncState::Running;  // (M)
-
-    DataWithLockFreeReads<ReplicationCoordinator::OplogSyncState> _oplogSyncStateCached;  // (S)
 
     // Used to signal threads waiting for changes to _rsConfigState.
     stdx::condition_variable _rsConfigStateChange;  // (M)
@@ -1900,6 +1856,9 @@ private:
 
     // This member's index position in the current config.
     int _selfIndex;  // (M)
+
+    // Whether we slept last time we attempted an election but possibly tied with other nodes.
+    bool _sleptLastElection;  // (M)
 
     // Used to manage the concurrency around _canAcceptNonLocalWrites and _canServeNonLocalReads.
     std::unique_ptr<ReadWriteAbility> _readWriteAbility;  // (S)

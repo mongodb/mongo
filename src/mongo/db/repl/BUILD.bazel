@@ -1281,13 +1281,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "data_with_lock_free_reads",
-    hdrs = [
-        "data_with_lock_free_reads.h",
-    ],
-)
-
-mongo_cc_library(
     name = "repl_coordinator_impl",
     srcs = [
         "check_quorum_for_config_change.cpp",
@@ -1304,7 +1297,6 @@ mongo_cc_library(
     deps = [
         "auto_get_rstl_for_stepup_stepdown",
         "data_replicator_external_state_impl",
-        "data_with_lock_free_reads",
         "delayable_timeout_callback",
         "intent_registry",
         "oplog_visibility_manager",
@@ -1330,7 +1322,6 @@ mongo_cc_library(
         "//src/mongo/db/local_catalog:collection_catalog",
         "//src/mongo/db/local_catalog:local_oplog_info",
         "//src/mongo/db/local_catalog/lock_manager",
-        "//src/mongo/db/repl/clang_checked",
         "//src/mongo/db/repl/initial_sync:initial_syncer",
         "//src/mongo/db/repl/split_horizon",
         "//src/mongo/db/session:kill_sessions_local",
@@ -1808,17 +1799,6 @@ mongo_cc_unit_test(
         "//src/mongo/db:read_write_concern_defaults_mock",
         "//src/mongo/db:server_base",
         "//src/mongo/db/storage:storage_options",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "data_with_lock_free_reads_test",
-    srcs = [
-        "data_with_lock_free_reads_test.cpp",
-    ],
-    tags = ["mongo_unittest_seventh_group"],
-    deps = [
-        ":data_with_lock_free_reads",
     ],
 )
 
