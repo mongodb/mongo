@@ -138,34 +138,6 @@ public:
     }
 };
 
-TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, OnDbVersionMismatch) {
-    const auto oldDb = createDatabase(UUID::gen(), Timestamp(1));
-    const auto newDb = createDatabase(UUID::gen(), Timestamp(2));
-
-    auto checkOnDbVersionMismatch = [&](const auto& newDb, bool expectRefresh) {
-        const auto newDbVersion = newDb.getVersion();
-        auto opCtx = operationContext();
-
-        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
-        ASSERT_OK(
-            FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(opCtx, kDbName, newDbVersion));
-
-        auto dbVersion = [&] {
-            const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, kDbName);
-            return scopedDsr->getDbVersion(opCtx);
-        }();
-
-        ASSERT_TRUE(dbVersion);
-        if (expectRefresh) {
-            ASSERT_EQUALS(newDbVersion.getTimestamp(), dbVersion->getTimestamp());
-        }
-    };
-
-    checkOnDbVersionMismatch(oldDb, true);
-    checkOnDbVersionMismatch(newDb, true);
-    checkOnDbVersionMismatch(oldDb, false);
-}
-
 TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, ForceDatabaseRefresh) {
     const auto uuid = UUID::gen();
 

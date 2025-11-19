@@ -4,8 +4,7 @@
  * collection.
  *
  * @tags: [
- *   featureFlagShardAuthoritativeDbMetadataCRUD,
- *   featureFlagShardAuthoritativeDbMetadataDDL,
+ *   requires_fcv_83,
  * ]
  */
 
