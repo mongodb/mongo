@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <type_traits>
@@ -87,7 +88,7 @@ HostAndPort parseGRPCFormattedURI(StringData uri);
 /**
  * Converts a gRPC status code into its corresponding MongoDB error code.
  */
-ErrorCodes::Error statusToErrorCode(::grpc::StatusCode statusCode);
+MONGO_MOD_PUBLIC ErrorCodes::Error statusToErrorCode(::grpc::StatusCode statusCode);
 
 /**
  * Converts a MongoDB error code into its corresponding gRPC status code.
