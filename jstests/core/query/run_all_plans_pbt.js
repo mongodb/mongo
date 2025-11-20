@@ -100,7 +100,15 @@ function hintedQueryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
     return {passed: true};
 }
 
-const aggModel = getQueryAndOptionsModel();
+const is83orAbove = (() => {
+    const {version} = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    return MongoRunner.compareBinVersions(version, "8.3") >= 0;
+})();
+
+const aggModel = getQueryAndOptionsModel().filter(
+    // Older versions suffer from SERVER-101007
+    ({pipeline}) => is83orAbove || !JSON.stringify(pipeline).includes('"$elemMatch"'),
+);
 
 // Test with a regular collection.
 testProperty(

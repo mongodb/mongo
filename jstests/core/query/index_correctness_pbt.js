@@ -26,13 +26,20 @@ if (isSlowBuild(db)) {
     quit();
 }
 
+const is83orAbove = (() => {
+    const {version} = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    return MongoRunner.compareBinVersions(version, "8.3") >= 0;
+})();
 const numRuns = 50;
 const numQueriesPerRun = 20;
 
 const controlColl = db.index_correctness_pbt_control;
 const experimentColl = db.index_correctness_pbt_experiment;
 const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl);
-const aggModel = getQueryAndOptionsModel();
+const aggModel = getQueryAndOptionsModel().filter(
+    // Older versions suffer from SERVER-101007
+    ({pipeline}) => is83orAbove || !JSON.stringify(pipeline).includes('"$elemMatch"'),
+);
 
 // Test with a regular collection.
 testProperty(

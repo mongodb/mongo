@@ -30,6 +30,11 @@ if (isSlowBuild(db)) {
     quit();
 }
 
+const is83orAbove = (() => {
+    const {version} = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    return MongoRunner.compareBinVersions(version, "8.3") >= 0;
+})();
+
 const numRuns = 40;
 const numQueriesPerRun = 40;
 
@@ -49,7 +54,10 @@ const allowedStages = [
     addFieldsVarArb,
     getSortArb(),
 ];
-const aggModel = getQueryAndOptionsModel({allowCollation: true, allowedStages: allowedStages});
+const aggModel = getQueryAndOptionsModel({allowCollation: true, allowedStages: allowedStages}).filter(
+    // Older versions suffer from SERVER-101007
+    ({pipeline}) => is83orAbove || !JSON.stringify(pipeline).includes('"$elemMatch"'),
+);
 
 testProperty(
     correctnessProperty,
