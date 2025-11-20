@@ -32,6 +32,7 @@ global:
 server_parameters:
     temporarilyUnavailableMaxRetries:
         description: "The number of times to retry a TemporarilyUnavailable error internally"
+        mod_visibility: private
         set_at: [startup, runtime]
         cpp_varname: "gTemporarilyUnavailableExceptionMaxRetryAttempts"
         cpp_vartype: AtomicWord<long long>
@@ -42,6 +43,7 @@ server_parameters:
 
     minimalWriteConflictRetryCountForStateDump:
         description: "We won't dump storage engine state more frequently than once in this many write conflict retries"
+        mod_visibility: private
         set_at: [startup, runtime]
         cpp_varname: "gMinimalWriteConflictRetryCountForStateDump"
         cpp_vartype: AtomicWord<int>
@@ -55,6 +57,7 @@ server_parameters:
             "The base period of time to wait between each TemporarilyUnavailable retry
             attempt. The backoff time is linear such that the Nth retry waits for N times
             the base backoff period."
+        mod_visibility: private
         set_at: [startup, runtime]
         cpp_varname: "gTemporarilyUnavailableExceptionRetryBackoffBaseMs"
         cpp_vartype: AtomicWord<long long>

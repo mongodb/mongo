@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <string>
@@ -41,6 +42,8 @@
 
 #include <boost/optional/optional.hpp>
 #include <boost/serialization/strong_typedef.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

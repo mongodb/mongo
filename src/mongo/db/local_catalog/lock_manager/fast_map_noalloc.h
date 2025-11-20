@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <deque>
@@ -51,7 +52,7 @@ namespace mongo {
  * repetitive entry mallocs and frees.
  */
 template <class KeyType, class ValueType>
-class FastMapNoAlloc {
+class MONGO_MOD_PRIVATE FastMapNoAlloc {
 private:
     /**
      * Map entry through which we avoid releasing memory: we mark it as inUse or not.

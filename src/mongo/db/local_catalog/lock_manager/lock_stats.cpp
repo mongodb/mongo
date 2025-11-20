@@ -31,10 +31,14 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/stats/counter_ops.h"
+#include "mongo/platform/atomic_word.h"
 
 #include <memory>
 
 namespace mongo {
+
+template <typename CounterType>
+LockStats<CounterType>::LockStats() = default;
 
 template <typename CounterType>
 void LockStats<CounterType>::report(BSONObjBuilder* builder) const {
@@ -164,7 +168,8 @@ int64_t LockStats<CounterType>::_getWaitTime(const PerModeLockStatCounters& stat
     return timeAcquiringLocks;
 }
 
-// Ensures that there are instances compiled for LockStats for AtomicWord<long long> and int64_t
+// Ensures that these are the only instances compiled for LockStats for AtomicWord<long long> and
+// int64_t
 template class LockStats<int64_t>;
 template class LockStats<AtomicWord<long long>>;
 

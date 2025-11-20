@@ -663,8 +663,8 @@ bool LockManager::hasConflictingRequests(ResourceId resId, const LockRequest* re
     return request->lock ? !request->lock->conflictList.empty() : false;
 }
 
-std::vector<LogDebugInfo> LockManager::getLockInfoFromResourceHolders(ResourceId resId) {
-    std::vector<LogDebugInfo> locksInfo;
+std::vector<LockDebugInfo> LockManager::getLockInfoFromResourceHolders(ResourceId resId) {
+    std::vector<LockDebugInfo> locksInfo;
     for (size_t i = 0; i < _numLockBuckets; ++i) {
         LockBucket& bucket = _lockBuckets[i];
         stdx::lock_guard scopedLock{bucket.mutex};

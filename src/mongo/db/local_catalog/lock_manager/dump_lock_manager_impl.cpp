@@ -31,7 +31,6 @@
 
 #include "mongo/base/shim.h"
 #include "mongo/db/client.h"
-#include "mongo/db/local_catalog/lock_manager/dump_lock_manager.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"

@@ -36,6 +36,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
 
 #include <map>
@@ -46,8 +47,11 @@ namespace mongo {
 /**
  * Entry point for the lock manager scheduling functionality. Don't use it directly, but
  * instead go through the Locker interface.
+ *
+ * TODO (SERVER-113920): Remove the only direct usage of the LockManager outside of the shard local
+ * catalog module and make this class MONGO_MOD_PRIVATE
  */
-class LockManager {
+class MONGO_MOD_USE_REPLACEMENT("Lock Acquisition RAII Classes") LockManager {
     LockManager(const LockManager&) = delete;
     LockManager& operator=(const LockManager&) = delete;
 
@@ -135,7 +139,7 @@ public:
     /**
      * Returns a vector of those locks granted for the given resource.
      */
-    std::vector<LogDebugInfo> getLockInfoFromResourceHolders(ResourceId resId);
+    std::vector<LockDebugInfo> getLockInfoFromResourceHolders(ResourceId resId);
 
 private:
     // The lockheads need access to the partitions

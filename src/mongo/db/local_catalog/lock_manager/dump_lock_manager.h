@@ -29,11 +29,13 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 namespace mongo {
 
 /**
  * Dumps the contents of all locks to the log.
  */
-void dumpLockManager();
+MONGO_MOD_PUBLIC void dumpLockManager();
 
 }  // namespace mongo

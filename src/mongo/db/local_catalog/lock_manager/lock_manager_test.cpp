@@ -31,19 +31,15 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
-#include "mongo/db/local_catalog/lock_manager/lock_manager_test_help.h"
 #include "mongo/db/local_catalog/lock_manager/locker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 
 #include <cstdint>
 #include <memory>
-#include <string>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -96,9 +92,33 @@ TEST(ResourceIdTest, Masking) {
 
 namespace lock_manager_test {
 
+class TrackingLockGrantNotification : public LockGrantNotification {
+public:
+    TrackingLockGrantNotification() : numNotifies(0), lastResult(LOCK_INVALID) {}
+
+    void notify(ResourceId resId, LockResult result) override {
+        numNotifies++;
+        lastResId = resId;
+        lastResult = result;
+    }
+
+public:
+    int numNotifies;
+
+    ResourceId lastResId;
+    LockResult lastResult;
+};
+
+struct LockRequestCombo : public LockRequest, TrackingLockGrantNotification {
+public:
+    explicit LockRequestCombo(Locker* locker) {
+        initNew(locker, this);
+    }
+};
+
 class LockManagerTest : public ServiceContextTest {};
 
-TEST(SimpleLockManagerTest, IsModeCovered) {
+TEST_F(LockManagerTest, IsModeCovered) {
     ASSERT(isModeCovered(MODE_IS, MODE_IX));
 }
 

@@ -32,6 +32,7 @@
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -41,7 +42,7 @@ class OperationContext;
  * Notfication callback, which stores the last notification result and signals a condition
  * variable, which can be waited on.
  */
-class CondVarLockGrantNotification final : public LockGrantNotification {
+class MONGO_MOD_PRIVATE CondVarLockGrantNotification final : public LockGrantNotification {
 public:
     CondVarLockGrantNotification() = default;
 

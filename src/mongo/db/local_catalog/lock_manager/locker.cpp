@@ -97,15 +97,14 @@ private:
     // This alignment is a best effort approach to ensure that each partition falls on a
     // separate page/cache line in order to avoid false sharing.
     struct alignas(stdx::hardware_destructive_interference_size) AlignedLockStats {
-        AtomicLockStats stats;
+        Locker::AtomicLockStats stats;
     };
 
     enum { NumPartitions = 8 };
 
-    AtomicLockStats& _get(LockerId id) {
+    Locker::AtomicLockStats& _get(LockerId id) {
         return _partitions[id % NumPartitions].stats;
     }
-
 
     AlignedLockStats _partitions[NumPartitions];
 };
@@ -821,7 +820,7 @@ void Locker::setGlobalLockTakenInMode(LockMode mode) {
     }
 }
 
-std::vector<LogDebugInfo> Locker::getLockInfoFromResourceHolders(ResourceId resId) const {
+std::vector<LockDebugInfo> Locker::getLockInfoFromResourceHolders(ResourceId resId) const {
     return _lockManager->getLockInfoFromResourceHolders(resId);
 }
 
@@ -1254,7 +1253,7 @@ void reportGlobalLockingStats(SingleThreadedLockStats* outStats) {
     globalStats.report(outStats);
 }
 
-void resetGlobalLockStats() {
+void resetGlobalLockStats_forTest() {
     globalStats.reset();
 }
 

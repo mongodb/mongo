@@ -66,6 +66,7 @@ commands:
         command_name: lockInfo
         namespace: ignored
         api_version: ""
+        mod_visibility: private
         fields:
             includeStorageEngineDump:
                 optional: true

@@ -59,7 +59,7 @@ TEST_F(LockStatsTest, NoWait) {
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "LockStats.NoWait"));
 
-    resetGlobalLockStats();
+    resetGlobalLockStats_forTest();
 
     auto opCtx = makeOperationContext();
     Locker locker(getServiceContext());
@@ -82,7 +82,7 @@ TEST_F(LockStatsTest, Wait) {
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "LockStats.Wait"));
 
-    resetGlobalLockStats();
+    resetGlobalLockStats_forTest();
 
     auto opCtx = makeOperationContext();
     Locker locker(getServiceContext());
@@ -122,7 +122,7 @@ TEST_F(LockStatsTest, Reporting) {
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "LockStats.Reporting"));
 
-    resetGlobalLockStats();
+    resetGlobalLockStats_forTest();
 
     auto opCtx = makeOperationContext();
     Locker locker(getServiceContext());
@@ -144,7 +144,7 @@ TEST_F(LockStatsTest, Subtraction) {
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "LockStats.Subtraction"));
 
-    resetGlobalLockStats();
+    resetGlobalLockStats_forTest();
 
     auto opCtx = makeOperationContext();
     Locker locker(getServiceContext());
@@ -197,7 +197,7 @@ namespace {
  * resource.
  */
 void assertGlobalAcquisitionStats(OperationContext* opCtx, ResourceId rid) {
-    resetGlobalLockStats();
+    resetGlobalLockStats_forTest();
 
     SingleThreadedLockStats stats;
     reportGlobalLockingStats(&stats);
@@ -232,7 +232,7 @@ TEST_F(LockStatsTest, GlobalRetrievableSeparately) {
 }
 
 TEST_F(LockStatsTest, ServerStatus) {
-    resetGlobalLockStats();
+    resetGlobalLockStats_forTest();
 
     // If there are no locks, nothing is reported.
     SingleThreadedLockStats stats;
@@ -274,7 +274,7 @@ TEST_F(LockStatsTest, CumulativeWaitTime) {
     auto opCtx = makeOperationContext();
     Locker locker(getServiceContext());
 
-    resetGlobalLockStats();
+    resetGlobalLockStats_forTest();
     locker.lockGlobal(opCtx.get(), MODE_IX);
     ON_BLOCK_EXIT([&] { locker.unlockGlobal(); });
     locker.lock(opCtx.get(), resId1, MODE_X);

@@ -41,10 +41,11 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -275,5 +276,3 @@ auto writeConflictRetry(
 }
 
 }  // namespace mongo
-
-#undef MONGO_LOGV2_DEFAULT_COMPONENT

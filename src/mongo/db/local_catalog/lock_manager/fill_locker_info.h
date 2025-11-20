@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/local_catalog/lock_manager/locker.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -38,6 +39,7 @@ namespace mongo {
  * Constructs a human-readable BSON from the specified LockerInfo structure.
  * The lockerInfo must be sorted.
  */
-void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBuilder);
+MONGO_MOD_PUBLIC void fillLockerInfo(const Locker::LockerInfo& lockerInfo,
+                                     BSONObjBuilder& infoBuilder);
 
 }  // namespace mongo

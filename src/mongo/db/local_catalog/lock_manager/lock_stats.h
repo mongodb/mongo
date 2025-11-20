@@ -33,13 +33,11 @@
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/stats/counter_ops.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
 namespace mongo {
-
-class BSONObjBuilder;
 
 /**
  * Counts numAcquisitions, numWaits and combinedWaitTimeMicros values.
@@ -48,7 +46,7 @@ class BSONObjBuilder;
  * and can reset its own values to 0.
  */
 template <typename CounterType>
-struct LockStatCounters {
+struct MONGO_MOD_PUBLIC LockStatCounters {
     template <typename OtherType>
     void set(const LockStatCounters<OtherType>& other) {
         counter_ops::set(numAcquisitions, other.numAcquisitions);
@@ -82,7 +80,8 @@ struct LockStatCounters {
     CounterType combinedWaitTimeMicros{0};
 };
 
-const ResourceId resourceIdRsOplog(RESOURCE_COLLECTION, NamespaceString::kRsOplogNamespace);
+MONGO_MOD_FILE_PRIVATE const ResourceId resourceIdRsOplog(RESOURCE_COLLECTION,
+                                                          NamespaceString::kRsOplogNamespace);
 
 /**
  * Templatized lock statistics management class, which can be specialized with atomic integers
@@ -91,12 +90,12 @@ const ResourceId resourceIdRsOplog(RESOURCE_COLLECTION, NamespaceString::kRsOplo
  * CounterType allows the code to operate on both int64_t and AtomicWord<long long>
  */
 template <typename CounterType>
-class LockStats {
+class MONGO_MOD_PUBLIC LockStats {
 public:
     // Declare the type for the lock counters bundle
     typedef LockStatCounters<CounterType> LockStatCountersType;
 
-    LockStats() = default;
+    LockStats();
     LockStats(const LockStats<CounterType>& other) = default;
 
     template <typename OtherType>
@@ -125,12 +124,12 @@ public:
     }
 
     LockStatCountersType& get(ResourceId resId, LockMode mode) {
-        if (resId == resourceIdRsOplog) {
-            return _oplogStats.modeStats[mode];
-        }
-
         if (resId.getType() == RESOURCE_GLOBAL) {
             return _resourceGlobalStats[resId.getHashId()].modeStats[mode];
+        }
+
+        if (resId == resourceIdRsOplog) {
+            return _oplogStats.modeStats[mode];
         }
 
         return _stats[resId.getType()].modeStats[mode];
@@ -230,13 +229,11 @@ private:
     template <typename T>
     friend class LockStats;
 
-
     // Keep the per-mode lock stats next to each other in case we want to do fancy operations
     // such as atomic operations on 128-bit values.
     struct PerModeLockStatCounters {
         LockStatCountersType modeStats[LockModesCount];
     };
-
 
     void _report(BSONObjBuilder* builder,
                  const char* resourceTypeName,
@@ -252,18 +249,16 @@ private:
     PerModeLockStatCounters _oplogStats;
 };
 
-typedef LockStats<int64_t> SingleThreadedLockStats;
-typedef LockStats<AtomicWord<long long>> AtomicLockStats;
-
+typedef LockStats<int64_t> SingleThreadedLockStats MONGO_MOD_PUBLIC;
 
 /**
  * Reports instance-wide locking statistics, which can then be converted to BSON or logged.
  */
-void reportGlobalLockingStats(SingleThreadedLockStats* outStats);
+MONGO_MOD_PUBLIC void reportGlobalLockingStats(SingleThreadedLockStats* outStats);
 
 /**
- * Currently used for testing only.
+ * Zeroes out all the global locking statistics, for testing purposes.
  */
-void resetGlobalLockStats();
+MONGO_MOD_PUBLIC void resetGlobalLockStats_forTest();
 
 }  // namespace mongo

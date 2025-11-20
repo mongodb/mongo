@@ -49,14 +49,15 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace service_entry_point_shard_role_helpers {
 
-BSONObj getRedactedCopyForLogging(const Command* command, const BSONObj& cmdObj);
+MONGO_MOD_PRIVATE BSONObj getRedactedCopyForLogging(const Command* command, const BSONObj& cmdObj);
 
-inline void setPrepareConflictBehaviorForReadConcern(OperationContext* opCtx,
-                                                     const CommandInvocation* invocation) {
+MONGO_MOD_PRIVATE inline void setPrepareConflictBehaviorForReadConcern(
+    OperationContext* opCtx, const CommandInvocation* invocation) {
     // Some read commands can safely ignore prepare conflicts by default because they do not
     // require snapshot isolation and do not conflict with concurrent writes. We also give these
     // operations permission to write, as this may be required for queries that spill using the
@@ -69,40 +70,42 @@ inline void setPrepareConflictBehaviorForReadConcern(OperationContext* opCtx,
         opCtx, repl::ReadConcernArgs::get(opCtx), prepareConflictBehavior);
 }
 
-void waitForReadConcern(OperationContext* opCtx,
-                        const CommandInvocation* invocation,
-                        const OpMsgRequest& request);
+MONGO_MOD_PRIVATE void waitForReadConcern(OperationContext* opCtx,
+                                          const CommandInvocation* invocation,
+                                          const OpMsgRequest& request);
 
-void waitForWriteConcern(OperationContext* opCtx,
-                         const CommandInvocation* invocation,
-                         const repl::OpTime& lastOpBeforeRun,
-                         BSONObjBuilder& commandResponseBuilder);
+MONGO_MOD_PRIVATE void waitForWriteConcern(OperationContext* opCtx,
+                                           const CommandInvocation* invocation,
+                                           const repl::OpTime& lastOpBeforeRun,
+                                           BSONObjBuilder& commandResponseBuilder);
 
-inline void uassertCommandDoesNotSpecifyWriteConcern(const GenericArguments& requestArgs) {
+MONGO_MOD_PRIVATE inline void uassertCommandDoesNotSpecifyWriteConcern(
+    const GenericArguments& requestArgs) {
     uassert(ErrorCodes::InvalidOptions,
             "Command does not support writeConcern",
             !commandSpecifiesWriteConcern(requestArgs));
 }
 
-void appendReplyMetadata(OperationContext* opCtx,
-                         const GenericArguments& requestArgs,
-                         BSONObjBuilder* metadataBob);
+MONGO_MOD_PRIVATE void appendReplyMetadata(OperationContext* opCtx,
+                                           const GenericArguments& requestArgs,
+                                           BSONObjBuilder* metadataBob);
 
 // When handling possible retryable errors, we may have modified the locker state, in particular the
 // flags which say if the operation took a write lock or shared lock. This will cause mongod to
 // perhaps erroneously check for write concern when no writes were done, or unnecessarily kill a
 // read operation. If we re-use the opCtx to retry command execution, we must reset the locker
 // state.
-inline void resetLockerState(OperationContext* opCtx) {
+MONGO_MOD_PRIVATE inline void resetLockerState(OperationContext* opCtx) {
     // It is necessary to lock the client to change the Locker on the OperationContext.
     ClientLock lk(opCtx->getClient());
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     shard_role_details::swapLocker(opCtx, std::make_unique<Locker>(opCtx->getServiceContext()), lk);
 }
 
-void createTransactionCoordinator(OperationContext* opCtx,
-                                  TxnNumber clientTxnNumber,
-                                  boost::optional<TxnRetryCounter> clientTxnRetryCounter);
+MONGO_MOD_PRIVATE void createTransactionCoordinator(
+    OperationContext* opCtx,
+    TxnNumber clientTxnNumber,
+    boost::optional<TxnRetryCounter> clientTxnRetryCounter);
 
 }  // namespace service_entry_point_shard_role_helpers
 }  // namespace mongo

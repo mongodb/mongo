@@ -33,13 +33,14 @@
 #include "mongo/rpc/message.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 /**
  * Shard-role specific service entry point.
  */
-class ServiceEntryPointShardRole final : public ServiceEntryPoint {
+class MONGO_MOD_PUBLIC ServiceEntryPointShardRole final : public ServiceEntryPoint {
 public:
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request,

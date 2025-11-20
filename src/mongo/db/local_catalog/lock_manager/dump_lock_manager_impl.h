@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 
@@ -41,6 +42,7 @@ namespace mongo {
  * Diagnostics function which obtains a mapping of lock to client info. Used by the lockInfo command
  * and any other code which needs to generate a global view of what operations hold what resources.
  */
-std::map<LockerId, BSONObj> getLockerIdToClientMap(ServiceContext* serviceContext);
+MONGO_MOD_PRIVATE std::map<LockerId, BSONObj> getLockerIdToClientMap(
+    ServiceContext* serviceContext);
 
 }  // namespace mongo

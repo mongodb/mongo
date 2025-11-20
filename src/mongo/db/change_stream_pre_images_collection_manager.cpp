@@ -41,7 +41,6 @@
 #include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/local_catalog/lock_manager/exception_util.h"
-#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"
