@@ -21,7 +21,8 @@ const st = new ShardingTest({
 });
 
 const testDB = st.s.getDB(jsTestName());
-const coll = testDB.test;
+const collName = "test";
+const coll = testDB[collName];
 
 // The set of errors which might be thrown if we attempt to getMore after stopping a shard.
 const expectedStopShardErrors = [
@@ -92,7 +93,10 @@ for (let i = 1; i <= 10; ++i) {
 
 // ... and read all the corresponding events from the stream.
 assert.soon(() => {
-    return csCursor.hasNext() && csCursor.next().documentKey._id === 10;
+    if (csCursor.hasNext()) {
+        return csCursor.next().documentKey._id === 10;
+    }
+    return false;
 });
 
 // Issue a "find" query to retrieve the first few documents, leaving the cursor open.
@@ -137,7 +141,15 @@ assert.commandFailedWithCode(err, expectedStopShardErrors);
 assert(!("errorLabels" in err), err);
 
 // Now confirm that attempting to open a new stream fails on the initial aggregate.
-err = assert.throws(() => coll.watch([]));
+{
+    err = assert.throws(() => {
+        let res = coll.watch([]);
+        assert.soon(() => {
+            const cursorId = res._cursorid ?? res.cursor.id;
+            res = assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: collName}));
+        });
+    });
+}
 assert.commandFailedWithCode(err, ErrorCodes.FailedToSatisfyReadPreference);
 
 // Confirm that the response includes the "ResumableChangeStreamError" error label.

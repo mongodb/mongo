@@ -29,4 +29,6 @@ const csCursor2 = testColl.watch([{$match: {"fullDocument._id": {$gt: 1}}}, {$pr
 
 // As long as SERVER-71565 is not fixed, we expect the new change stream to throw a fatal error
 // because the resume token is not present in the new stream.
-assert.throwsWithCode(() => csCursor2.hasNext(), ErrorCodes.ChangeStreamFatalError);
+assert.throwsWithCode(() => {
+    assert.soon(() => csCursor2.hasNext());
+}, ErrorCodes.ChangeStreamFatalError);

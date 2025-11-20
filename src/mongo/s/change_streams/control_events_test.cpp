@@ -111,6 +111,48 @@ TEST(
 
 TEST(
     ControlEventTest,
+    GivenValidNamespacePlacementChangedControlEventAsDocumentWithDbFieldOnly_WhenCallingParseControlEvent_ThenParsingIsSuccessful) {
+    Timestamp ts;
+
+    NamespaceString nss(NamespaceString::kDefaultInitialSyncIdNamespace.dbName());
+    auto nssSpec = [&]() {
+        NamespaceSpec nssSpec;
+        nssSpec.setDb(nss.dbName());
+        return nssSpec;
+    }();
+
+    Document event =
+        Document(BSON("operationType" << NamespacePlacementChangedControlEvent::opType
+                                      << "clusterTime" << ts << "ns" << nssSpec.toBSON()));
+
+    ControlEvent expectedControlEvent = NamespacePlacementChangedControlEvent{ts, nss};
+    ASSERT_EQ(parseControlEvent(event), expectedControlEvent);
+}
+
+TEST(
+    ControlEventTest,
+    GivenValidNamespacePlacementChangedControlEventAsDocumentForTheWholeCluster_WhenCallingParseControlEvent_ThenParsingIsSuccessful) {
+    Timestamp ts;
+
+    Document event =
+        Document(BSON("operationType" << NamespacePlacementChangedControlEvent::opType
+                                      << "clusterTime" << ts << "ns" << NamespaceSpec().toBSON()));
+
+    ControlEvent expectedControlEvent =
+        NamespacePlacementChangedControlEvent{ts, NamespaceString::kEmpty};
+    ASSERT_EQ(parseControlEvent(event), expectedControlEvent);
+}
+
+TEST(
+    ControlEventTest,
+    GivenInvalidNamespacePlacementChangedControlEventAsDocumentWithOnlyCollectionBeingProvided_WhenCallingParseControlEvent_ThenParsingThrowsAnException) {
+    Document event =
+        Document(BSON("operationType" << NamespacePlacementChangedControlEvent::opType));
+    ASSERT_THROWS(parseControlEvent(event), DBException);
+}
+
+TEST(
+    ControlEventTest,
     GivenInvalidNamespacePlacementChangedControlEventAsDocument_WhenCallingParseControlEvent_ThenParsingThrowsAnException) {
     Document event =
         Document(BSON("operationType" << NamespacePlacementChangedControlEvent::opType));

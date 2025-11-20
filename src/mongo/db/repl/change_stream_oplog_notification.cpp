@@ -288,26 +288,10 @@ std::vector<repl::MutableOplogEntry> buildMoveChunkOplogEntries(
     bool firstCollectionChunkOnRecipient) {
     const auto nss = NamespaceStringUtil::serialize(collName, SerializationContext::stateDefault());
     std::vector<repl::MutableOplogEntry> oplogEntries;
-    {
-        repl::MutableOplogEntry oplogEntry;
-        StringData opName("moveChunk");
-
-        oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
-        oplogEntry.setNss(collName);
-        oplogEntry.setUuid(collUUID);
-        oplogEntry.setTid(collName.tenantId());
-        oplogEntry.setObject(BSON("msg" << BSON(opName << nss)));
-        oplogEntry.setObject2(BSON(opName << nss << "donor" << donor << "recipient" << recipient
-                                          << "allCollectionChunksMigratedFromDonor"
-                                          << noMoreCollectionChunksOnDonor));
-        oplogEntry.setOpTime(repl::OpTime());
-        oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
-
-        oplogEntries.push_back(std::move(oplogEntry));
-    }
-
     // Conditionally emit the legacy 'migrateLastChunkFromShard' and 'migrateChunkToNewShard' op
     // entry types, consumed by V1 change stream readers.
+    // 'moveChunk' oplog entry must be the last one to be emitted to ensure V2 change stream reader
+    // correctness.
     if (noMoreCollectionChunksOnDonor) {
         repl::MutableOplogEntry legacyOplogEntry;
 
@@ -342,6 +326,24 @@ std::vector<repl::MutableOplogEntry> buildMoveChunkOplogEntries(
         legacyOplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 
         oplogEntries.push_back(std::move(legacyOplogEntry));
+    }
+
+    {
+        repl::MutableOplogEntry oplogEntry;
+        StringData opName("moveChunk");
+
+        oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+        oplogEntry.setNss(collName);
+        oplogEntry.setUuid(collUUID);
+        oplogEntry.setTid(collName.tenantId());
+        oplogEntry.setObject(BSON("msg" << BSON(opName << nss)));
+        oplogEntry.setObject2(BSON(opName << nss << "donor" << donor << "recipient" << recipient
+                                          << "allCollectionChunksMigratedFromDonor"
+                                          << noMoreCollectionChunksOnDonor));
+        oplogEntry.setOpTime(repl::OpTime());
+        oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
+
+        oplogEntries.push_back(std::move(oplogEntry));
     }
 
     return oplogEntries;

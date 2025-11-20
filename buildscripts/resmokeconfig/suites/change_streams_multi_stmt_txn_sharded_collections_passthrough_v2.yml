@@ -8,6 +8,17 @@ selector:
     - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
     # TODO: SERVER-98064 Investigate split_large_event.js failures in change_streams_multi_stmt_txn_sharded_collections_passthrough
     - jstests/change_streams/split_large_event.js
+
+    # This test exercises the internal behavior of $changeStream v1 and is not compatible with v2.
+    - jstests/change_streams/create_event_from_chunk_migration.js
+
+    # TODO: SERVER-113247 Ensure placementHistory entries are recorded with the right timestamp.
+    - jstests/change_streams/reshard_collection_event.js
+    - jstests/change_streams/migrate_last_chunk_from_shard_event.js
+
+    # TODO:SERVER-113140 Report resumeToken for change streams when batchSize is 0.
+    - jstests/change_streams/report_post_batch_resume_token.js
+    - jstests/change_streams/resume_from_high_water_mark_token.js
   exclude_with_any_tags:
     # These tests would fail with "Cowardly refusing to override write concern of command: ..."
     - assumes_write_concern_unchanged
@@ -42,6 +53,7 @@ executor:
         await import("jstests/libs/override_methods/network_error_and_txn_override.js");
         await import("jstests/libs/override_methods/implicit_filter_eot_changestreams.js");
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import('jstests/libs/override_methods/implicit_change_stream_v2.js');
       # Set longer host discovery time to handle change stream resumable errors.
       setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
   hooks:

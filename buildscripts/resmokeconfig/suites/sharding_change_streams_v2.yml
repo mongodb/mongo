@@ -1,0 +1,26 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/sharding/query/change_streams/*.js
+  exclude_files:
+    # TODO:SERVER-113140 Report resumeToken for change streams when batchSize is 0.
+    - jstests/sharding/query/change_streams/change_streams_primary_shard_unaware.js
+    - jstests/sharding/query/change_streams/config_server_data_shard_error_handling.js
+
+    # TODO: SERVER-113459 ChangeStreamHandleTopologyChangeV2Stage does not respect maxTimeMS of getMore request when in Waiting state.
+    - jstests/sharding/query/change_streams/change_stream_enforce_max_time_ms_on_mongos.js
+
+    # Test is testing behavior specific to change streams v1.
+    - jstests/sharding/query/change_streams/change_streams_establishment_finds_new_shards.js
+
+executor:
+  archive:
+    tests:
+      - jstests/sharding/*reshard*.js
+  config:
+    shell_options:
+      nodb: ""
+      # Ensure we always start change streams with v2 version.
+      eval: >-
+        await import('jstests/libs/override_methods/implicit_change_stream_v2.js');

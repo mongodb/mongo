@@ -628,6 +628,11 @@ Mongo.prototype._extractChangeStreamOptions = function (options) {
         options.maxAwaitTimeMS = 15 * 1000;
     }
 
+    if (options.hasOwnProperty("version")) {
+        changeStreamOptions.version = options.version;
+        delete options.version;
+    }
+
     return [{$changeStream: changeStreamOptions}, options];
 };
 

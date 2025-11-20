@@ -120,9 +120,6 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
     // In case the set of shards is empty, it means the underlying database is no longer present.
     // We open a cursor on the configsvr and change the event handler to the database absent state.
     if (shards.empty()) {
-        tassert(10917002,
-                "Opened cursors set must be empty",
-                readerCtx.getCurrentlyTargetedDataShards().empty());
         readerCtx.openCursorOnConfigServer(clusterTime + 1);
         ctx.setEventHandler(buildDbAbsentStateEventHandler());
     }

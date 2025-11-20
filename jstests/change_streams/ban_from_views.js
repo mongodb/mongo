@@ -34,7 +34,12 @@ assert.commandFailedWithCode(
 );
 
 // Verify change streams cannot be created on views.
-assert.commandFailedWithCode(
-    db.runCommand({aggregate: normalViewName, pipeline: [{$changeStream: {}}], cursor: {}}),
-    ErrorCodes.CommandNotSupportedOnView,
-);
+let response = db.runCommand({aggregate: normalViewName, pipeline: [{$changeStream: {}}], cursor: {}});
+if (response.ok) {
+    // In case we are running change streams version 2, the cursor may not be opened on the shard.
+    // To ensure the failure indeed occurs, we issue a getMore command to ensure that the cursor
+    // will be attempted to be opened on the shard and will fail.
+    assert.eq(response._changeStreamVersion, "v2", "Change stream of version v1 should fail immediately");
+    response = db.runCommand({getMore: response.cursor.id, collection: normalViewName});
+}
+assert.commandFailedWithCode(response, ErrorCodes.CommandNotSupportedOnView);

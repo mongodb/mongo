@@ -68,6 +68,17 @@
   value:
     eval: "await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');"
 
+- name: change_streams_v2_eval
+  value:
+    eval: "await import('jstests/libs/override_methods/implicit_change_stream_v2.js');"
+
+# TODO:SERVER-113140 Report resumeToken for change streams when batchSize is 0.
+- name: batch_zero_excludes
+  value:
+    exclude_files:
+      - jstests/change_streams/report_post_batch_resume_token.js
+      - jstests/change_streams/resume_from_high_water_mark_token.js
+
 - name: secondary_reads
   value:
     executor:

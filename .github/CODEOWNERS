@@ -199,7 +199,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/benchmarks_query.yml @10gen/query @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/bulk_write* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/bulk_write_multi_op_sharded_collections_jscore_passthrough.yml @10gen/query-execution-router @svc-auto-approve-bot
-/buildscripts/resmokeconfig/suites/**/change_streams* @10gen/query-execution-change-streams @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/clustered_collection_passthrough.yml @10gen/query-execution @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/concurrency_compute_mode.yml @10gen/query-integration-features @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/core_wildcard_indexes.yml @10gen/query-execution-write-exec @svc-auto-approve-bot
@@ -249,6 +248,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/sharding_jscore_passthrough_with_config_shard.yml @10gen/server-cluster-scalability @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/sharded_collections_jscore_passthrough_with_config_shard.yml @10gen/server-cluster-scalability @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/concurrency_simultaneous_replication.yml @10gen/server-replication-reviewers @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/change_streams* @10gen/query-execution-change-streams @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/sharding_change_streams_v2.yml @10gen/query-execution-change-streams @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/OWNERS.yml
 /buildscripts/resmokelib/ @10gen/devprod-correctness @svc-auto-approve-bot
@@ -1017,6 +1018,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/override_methods/**/implicit_identity_views.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/libs/override_methods/**/implicitly_retry_on_conflicting_operation_during_fuzztest.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /jstests/libs/override_methods/**/validate_collections_on_shutdown.js @10gen/server-validate @svc-auto-approve-bot
+/jstests/libs/override_methods/**/implicit_change_stream_v2.js @10gen/query-execution-change-streams @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libs/override_methods/collection_write_path/OWNERS.yml
 /jstests/libs/override_methods/collection_write_path/**/* @10gen/server-collection-write-path @svc-auto-approve-bot

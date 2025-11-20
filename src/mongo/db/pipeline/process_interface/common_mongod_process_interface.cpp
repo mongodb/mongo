@@ -883,6 +883,9 @@ boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
         auto foreignExpCtx = makeCopyFromExpressionContext(
             expCtx, nss, collectionUUID, std::unique_ptr<CollatorInterface>());
 
+        // Clearing the change stream spec as the aggregate request is not a change stream.
+        foreignExpCtx->setChangeStreamSpec(boost::none);
+
         // If we are here, we are either executing the pipeline normally or running in one of the
         // execution stat explain verbosities. In either case, we disable explain on the foreign
         // context so that we actually retrieve the document.

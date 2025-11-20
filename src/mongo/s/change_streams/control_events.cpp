@@ -30,9 +30,9 @@
 #include "mongo/s/change_streams/control_events.h"
 
 #include "mongo/db/namespace_spec_gen.h"
-#include "mongo/util/database_name_util.h"
 
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
@@ -94,7 +94,24 @@ NamespacePlacementChangedControlEvent NamespacePlacementChangedControlEvent::cre
     auto nsField = assertFieldType(event, kNamespaceField, BSONType::object).getDocument();
     auto nssSpec = NamespaceSpec::parse(nsField.toBson(),
                                         IDLParserContext("NamespacePlacementChangedControlEvent"));
-    NamespaceString nss = NamespaceStringUtil::deserialize(*nssSpec.getDb(), *nssSpec.getColl());
+
+    NamespaceString nss = [&]() {
+        if (nssSpec.getDb()) {
+            if (nssSpec.getColl()) {
+                return NamespaceStringUtil::deserialize(*nssSpec.getDb(), *nssSpec.getColl());
+            } else {
+                return NamespaceString(*nssSpec.getDb());
+            }
+        }
+
+        tassert(11161100,
+                fmt::format("Invalid NamespacePlacementChangedControlEvent. Collection name is "
+                            "provided, but no database name is present {}",
+                            event.toString()),
+                !nssSpec.getColl());
+        return NamespaceString::kEmpty;
+    }();
+
     return NamespacePlacementChangedControlEvent{clusterTime, nss};
 }
 

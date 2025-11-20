@@ -50,7 +50,6 @@ selector:
   exclude_files:
     - jstests/change_streams/does_not_implicitly_create_database.js
     - jstests/change_streams/oplog_rewrite/*.js
-    - jstests/change_streams/projection_fakes_internal_event.js
     - jstests/change_streams/split_large_event.js
     - src/mongo/db/modules/enterprise/jstests/fle2/basic_create_collection.js
     - src/mongo/db/modules/enterprise/jstests/fle2/fle2_bulk_write.js

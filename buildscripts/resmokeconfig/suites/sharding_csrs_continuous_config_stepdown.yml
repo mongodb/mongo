@@ -265,6 +265,7 @@ selector:
     # then remove them from the exclusion list.
     - jstests/sharding/query/api_version/api_version_stage_allowance_checks.js
     - jstests/sharding/query/log_remote_op_wait.js
+    - jstests/sharding/query/change_streams/projection_fakes_internal_event.js
     - jstests/sharding/query/change_streams/change_stream_against_shard_mongod.js
     - jstests/sharding/query/change_streams/change_stream_chunk_migration.js
     - jstests/sharding/query/change_streams/change_stream_empty_apply_ops.js

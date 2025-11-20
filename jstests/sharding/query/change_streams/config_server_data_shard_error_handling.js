@@ -77,7 +77,7 @@ function killShardAndTestErrorForChangeStream({sharding, changeStream, cursor}) 
             return false;
         } catch (e) {
             // Log the error message received, which should state that the cursor cannot be read.
-            jsTest.log.info("Cursor threw an error. Exception message:", e.toString());
+            jsTest.log.info("Cursor threw an error", {exception: e});
             // Most importantly verify that the error is resumable.
             return isResumableChangeStreamError(e);
         }

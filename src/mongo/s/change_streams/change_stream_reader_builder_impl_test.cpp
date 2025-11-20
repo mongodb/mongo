@@ -84,6 +84,51 @@ public:
             ChangeStreamReadMode::kStrict, ChangeStreamType::kAllDatabases, boost::none /* nss */);
     }
 
+    bool assertMoveChunk(const ChangeStream& changeStream,
+                         const MatchExpression& matchExpr,
+                         const NamespaceString& nss,
+                         ShardId fromShard,
+                         ShardId toShard) {
+        // buildMoveChunkOplogEntries() may build multiple oplog entries. The MatchExpression should
+        // only potentially match the last one depending on the 'nss' attribute.
+        auto moveChunkOplogEntriesWithMatchingNss =
+            buildMoveChunkOplogEntries(opCtx(),
+                                       nss,
+                                       boost::none /* collUUID */,
+                                       fromShard,
+                                       toShard,
+                                       true /* noMoreCollectionChunksOnDonor */,
+                                       false /* firstCollectionChunkOnRecipient */);
+        auto lastMoveChunkOplogEntryIt = --moveChunkOplogEntriesWithMatchingNss.end();
+        for (auto it = moveChunkOplogEntriesWithMatchingNss.begin();
+             it != lastMoveChunkOplogEntryIt;
+             ++it) {
+            auto moveChunkWithMatchingNssBSON = it->toBSON();
+            BSONMatchableDocument matchingDoc(moveChunkWithMatchingNssBSON);
+            ASSERT_FALSE(exec::matcher::matches(&matchExpr, &matchingDoc));
+        }
+
+        auto moveChunkWithMatchingNssBSON = lastMoveChunkOplogEntryIt->toBSON();
+        BSONMatchableDocument matchingDoc(moveChunkWithMatchingNssBSON);
+        return exec::matcher::matches(&matchExpr, &matchingDoc);
+    }
+
+    void assertMoveChunkTrue(const ChangeStream& changeStream,
+                             const MatchExpression& matchExpr,
+                             const NamespaceString& nss,
+                             ShardId fromShard,
+                             ShardId toShard) {
+        ASSERT_TRUE(assertMoveChunk(changeStream, matchExpr, nss, fromShard, toShard));
+    }
+
+    void assertMoveChunkFalse(const ChangeStream& changeStream,
+                              const MatchExpression& matchExpr,
+                              const NamespaceString& nss,
+                              ShardId fromShard,
+                              ShardId toShard) {
+        ASSERT_FALSE(assertMoveChunk(changeStream, matchExpr, nss, fromShard, toShard));
+    }
+
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
@@ -222,33 +267,8 @@ TEST_F(
 
     // Ensure 'controlEventFilter' matches only those moveChunk events that affect the relevant
     // namespace.
-    {
-        auto moveChunkOplogEntriesWithMatchingNss =
-            buildMoveChunkOplogEntries(opCtx(),
-                                       matchingNss,
-                                       boost::none /* collUUID */,
-                                       fromShard,
-                                       toShard,
-                                       true /* noMoreCollectionChunksOnDonor */,
-                                       false /* firstCollectionChunkOnRecipient */);
-        auto moveChunkWithMatchingNssBSON = moveChunkOplogEntriesWithMatchingNss[0].toBSON();
-        BSONMatchableDocument matchingDoc(moveChunkWithMatchingNssBSON);
-        ASSERT_EQ(*changeStream.getNamespace(), matchingNss);
-        ASSERT_TRUE(exec::matcher::matches(matchExpr.get(), &matchingDoc));
-
-        auto moveChunkOplogEntriesWithoutMatchingNss =
-            buildMoveChunkOplogEntries(opCtx(),
-                                       nonMatchingNss,
-                                       boost::none /* collUUID */,
-                                       fromShard,
-                                       toShard,
-                                       true /* noMoreCollectionChunksOnDonor */,
-                                       false /* firstCollectionChunkOnRecipient */);
-        auto moveChunkWithoutMatchingNssBSON = moveChunkOplogEntriesWithoutMatchingNss[0].toBSON();
-        BSONMatchableDocument nonMatchingDoc(moveChunkWithoutMatchingNssBSON);
-        ASSERT_NE(*changeStream.getNamespace(), nonMatchingNss);
-        ASSERT_FALSE(exec::matcher::matches(matchExpr.get(), &nonMatchingDoc));
-    }
+    assertMoveChunkTrue(changeStream, *matchExpr, matchingNss, fromShard, toShard);
+    assertMoveChunkFalse(changeStream, *matchExpr, nonMatchingNss, fromShard, toShard);
 }
 
 TEST_F(
@@ -346,44 +366,9 @@ TEST_F(
 
     // Ensure 'controlEventFilter' matches only those moveChunk events that affect the relevant
     // namespace.
-    {
-        auto moveChunkOplogEntriesWithMatchingNss1 =
-            buildMoveChunkOplogEntries(opCtx(),
-                                       matchingNss1,
-                                       boost::none /* collUUID */,
-                                       fromShard,
-                                       toShard,
-                                       true /* noMoreCollectionChunksOnDonor */,
-                                       false /* firstCollectionChunkOnRecipient */);
-        auto moveChunkWithMatchingNss1BSON = moveChunkOplogEntriesWithMatchingNss1[0].toBSON();
-        BSONMatchableDocument matchingDoc1(moveChunkWithMatchingNss1BSON);
-        ASSERT_TRUE(exec::matcher::matches(matchExpr.get(), &matchingDoc1));
-
-        auto moveChunkOplogEntriesWithMatchingNss2 =
-            buildMoveChunkOplogEntries(opCtx(),
-                                       matchingNss2,
-                                       boost::none /* collUUID */,
-                                       fromShard,
-                                       toShard,
-                                       true /* noMoreCollectionChunksOnDonor */,
-                                       false /* firstCollectionChunkOnRecipient */);
-        auto moveChunkWithMatchingNss2BSON = moveChunkOplogEntriesWithMatchingNss2[0].toBSON();
-        BSONMatchableDocument matchingDoc2(moveChunkWithMatchingNss2BSON);
-        ASSERT_TRUE(exec::matcher::matches(matchExpr.get(), &matchingDoc2));
-
-        auto moveChunkOplogEntriesWithoutMatchingNss =
-            buildMoveChunkOplogEntries(opCtx(),
-                                       nonMatchingNss,
-                                       boost::none /* collUUID */,
-                                       fromShard,
-                                       toShard,
-                                       true /* noMoreCollectionChunksOnDonor */,
-                                       false /* firstCollectionChunkOnRecipient */);
-        auto moveChunkWithoutMatchingNssBSON = moveChunkOplogEntriesWithoutMatchingNss[0].toBSON();
-        BSONMatchableDocument nonMatchingDoc(moveChunkWithoutMatchingNssBSON);
-        ASSERT_NE(*changeStream.getNamespace(), nonMatchingNss);
-        ASSERT_FALSE(exec::matcher::matches(matchExpr.get(), &nonMatchingDoc));
-    }
+    assertMoveChunkTrue(changeStream, *matchExpr, matchingNss1, fromShard, toShard);
+    assertMoveChunkTrue(changeStream, *matchExpr, matchingNss2, fromShard, toShard);
+    assertMoveChunkFalse(changeStream, *matchExpr, nonMatchingNss, fromShard, toShard);
 }
 
 TEST_F(
@@ -440,31 +425,8 @@ TEST_F(
     }
 
     // Ensure 'controlEventFilter' matches all moveChunk events.
-    {
-        auto moveChunkOplogEntriesWithNss1 =
-            buildMoveChunkOplogEntries(opCtx(),
-                                       nss1,
-                                       boost::none /* collUUID */,
-                                       fromShard,
-                                       toShard,
-                                       true /* noMoreCollectionChunksOnDonor */,
-                                       false /* firstCollectionChunkOnRecipient */);
-        auto moveChunkWithNss1BSON = moveChunkOplogEntriesWithNss1[0].toBSON();
-        BSONMatchableDocument matchingDoc1(moveChunkWithNss1BSON);
-        ASSERT_TRUE(exec::matcher::matches(matchExpr.get(), &matchingDoc1));
-
-        auto moveChunkOplogEntriesWithNss2 =
-            buildMoveChunkOplogEntries(opCtx(),
-                                       nss2,
-                                       boost::none /* collUUID */,
-                                       fromShard,
-                                       toShard,
-                                       true /* noMoreCollectionChunksOnDonor */,
-                                       false /* firstCollectionChunkOnRecipient */);
-        auto moveChunkWithNss2BSON = moveChunkOplogEntriesWithNss2[0].toBSON();
-        BSONMatchableDocument matchingDoc2(moveChunkWithNss2BSON);
-        ASSERT_TRUE(exec::matcher::matches(matchExpr.get(), &matchingDoc2));
-    }
+    assertMoveChunkTrue(changeStream, *matchExpr, nss1, fromShard, toShard);
+    assertMoveChunkTrue(changeStream, *matchExpr, nss2, fromShard, toShard);
 }
 
 TEST_F(

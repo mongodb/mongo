@@ -45,9 +45,6 @@ filters:
   - "bulk_write_multi_op_sharded_collections_jscore_passthrough.yml":
     approvers:
       - 10gen/query-execution-router
-  - "change_streams*":
-    approvers:
-      - 10gen/query-execution-change-streams
   - "clustered_collection_passthrough.yml":
     approvers:
       - 10gen/query-execution
@@ -195,3 +192,9 @@ filters:
   - "concurrency_simultaneous_replication.yml":
     approvers:
       - 10gen/server-replication-reviewers
+  - "change_streams*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "sharding_change_streams_v2.yml":
+    approvers:
+      - 10gen/query-execution-change-streams

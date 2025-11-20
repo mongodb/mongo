@@ -591,7 +591,31 @@ tasks:
       - func: "run tests"
 
   - <<: *task_template
+    name: change_streams_mongos_sessions_passthrough_v2
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
     name: change_streams_multi_stmt_txn_mongos_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: change_streams_multi_stmt_txn_mongos_passthrough_v2
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
@@ -616,6 +640,18 @@ tasks:
 
   - <<: *task_template
     name: change_streams_multi_stmt_txn_sharded_collections_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: change_streams_multi_stmt_txn_sharded_collections_passthrough_v2
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
@@ -663,6 +699,19 @@ tasks:
 
   - <<: *task_template
     name: change_streams_secondary_reads_sharded_collections
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+        "secondary_reads",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: change_streams_secondary_reads_sharded_collections_v2
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
@@ -1424,6 +1473,15 @@ tasks:
       - func: "run tests"
         vars:
           resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: sharding_change_streams_v2_gen
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "default", "sharding"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
 
   - <<: *gen_task_template
     name: sharding_api_strict_passthrough_gen

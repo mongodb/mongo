@@ -177,8 +177,11 @@ buildvariants:
       - name: causally_consistent_jscore_passthrough_gen
       - name: change_streams
       - name: change_streams_mongos_sessions_passthrough
+      - name: change_streams_mongos_sessions_passthrough_v2
       - name: change_streams_multi_stmt_txn_mongos_passthrough
+      - name: change_streams_multi_stmt_txn_mongos_passthrough_v2
       - name: change_streams_multi_stmt_txn_sharded_collections_passthrough
+      - name: change_streams_multi_stmt_txn_sharded_collections_passthrough_v2
       - name: change_streams_per_shard_cursor_passthrough
       - name: change_streams_sharded_collections_query_shape_hash_stability_multiversion_gen
       - name: fle2_sharding_high_cardinality

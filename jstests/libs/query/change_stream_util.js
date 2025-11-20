@@ -264,7 +264,7 @@ export function ChangeStreamTest(_db, options) {
             });
             updateResumeToken(res.cursor, res.cursor.firstBatch);
             _allCursors.push({db: _db.getName(), coll: collName, cursorId: res.cursor.id});
-            return res.cursor;
+            return {...res.cursor, _changeStreamVersion: res._changeStreamVersion};
         });
     };
 

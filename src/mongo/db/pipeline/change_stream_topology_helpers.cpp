@@ -62,16 +62,21 @@ BSONObj replaceResumeTokenAndVersionInCommand(
 
     MutableDocument changeStreamStage(
         pipeline[0][DocumentSourceChangeStream::kStageName].getDocument());
-    changeStreamStage[DocumentSourceChangeStreamSpec::kResumeAfterFieldName] = Value(resumeToken);
 
     if (changeStreamVersion.has_value()) {
         changeStreamStage[DocumentSourceChangeStreamSpec::kVersionFieldName] =
             Value(ChangeStreamReaderVersion_serializer(*changeStreamVersion));
     }
 
-    // If the command was initially specified with a startAtOperationTime, we need to remove it to
-    // use the new resume token.
+    // Provide 'resumeToken' as part 'startAfter' for resuming the changeStream. 'startAfter' and
+    // not 'resumeAfter' attribute is provided, to allow opening the change stream cursors  with an
+    // invalidation 'resumeToken' resume token.
+    // All other forms of resuming the change stream are set to null if provided in the original
+    // command.
+    changeStreamStage[DocumentSourceChangeStreamSpec::kStartAfterFieldName] = Value(resumeToken);
     changeStreamStage[DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName] = Value();
+    changeStreamStage[DocumentSourceChangeStreamSpec::kResumeAfterFieldName] = Value();
+
     pipeline[0] =
         Value(Document{{DocumentSourceChangeStream::kStageName, changeStreamStage.freeze()}});
     MutableDocument newCmd(std::move(originalCmd));
@@ -84,9 +89,18 @@ BSONObj createUpdatedCommandForNewShard(
     Timestamp atClusterTime,
     const BSONObj& originalAggregateCommand,
     const boost::optional<ChangeStreamReaderVersionEnum>& changeStreamVersion) {
-    auto resumeTokenForNewShard =
-        ResumeToken::makeHighWaterMarkToken(atClusterTime, expCtx->getChangeStreamTokenVersion());
+    return createUpdatedCommandForNewShard(
+        expCtx,
+        ResumeToken::makeHighWaterMarkToken(atClusterTime, expCtx->getChangeStreamTokenVersion()),
+        originalAggregateCommand,
+        changeStreamVersion);
+}
 
+BSONObj createUpdatedCommandForNewShard(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ResumeToken& resumeTokenForNewShard,
+    const BSONObj& originalAggregateCommand,
+    const boost::optional<ChangeStreamReaderVersionEnum>& changeStreamVersion) {
     // Create a new shard command object containing the new resume token, adding the 'resumeAfter'
     // field to the '$changeStream' spec. An example input 'originalAggregateCommand' is:
     // {"aggregate":"test","pipeline":[{"$changeStream":{"fullDocument":"default"}}],"cursor":{"batchSize":101}}

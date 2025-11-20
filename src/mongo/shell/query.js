@@ -656,6 +656,10 @@ function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS, txnNumber) {
     // If the command result represents a change stream cursor, update our postBatchResumeToken.
     this._updatePostBatchResumeToken(cmdResult.cursor);
 
+    if (cmdResult._changeStreamVersion) {
+        this._changeStreamVersion = cmdResult._changeStreamVersion;
+    }
+
     this._cursorid = cmdResult.cursor.id;
     this._batchSize = batchSize;
     this._maxAwaitTimeMS = maxAwaitTimeMS;
@@ -808,6 +812,10 @@ DBCommandCursor.prototype.getResumeToken = function () {
     return this._resumeToken;
 };
 
+DBCommandCursor.prototype.getChangeStreamVersion = function () {
+    return this._changeStreamVersion;
+};
+
 DBCommandCursor.prototype.getClusterTime = function () {
     // Return the read timestamp for snapshot reads, or undefined for other readConcern levels.
     return this._atClusterTime;
@@ -828,6 +836,7 @@ DBCommandCursor.prototype.help = function () {
     print(
         "\t.getResumeToken() - for a change stream cursor, obtains the most recent valid resume token, if it exists.",
     );
+    print("\t.getChangeStreamVersion() - for a change stream cursor, obtains the change stream version, if it exists.");
     print("\t.getClusterTime() - returns the read timestamp for snapshot reads.");
     print("\t.pretty() - pretty print each document, possibly over multiple lines");
     print("\t.close()");

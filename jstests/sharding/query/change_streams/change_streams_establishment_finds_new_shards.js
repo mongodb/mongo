@@ -6,6 +6,7 @@
 // ]
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const rsNodeOptions = {
     // Use a higher frequency for periodic noops to speed up the test.
@@ -13,7 +14,7 @@ const rsNodeOptions = {
 };
 const st = new ShardingTest({shards: 1, mongos: 1, rs: {nodes: 1}, other: {rsOptions: rsNodeOptions}});
 
-jsTestLog("Starting new shard (but not adding to shard set yet)");
+jsTest.log.info("Starting new shard (but not adding to shard set yet)");
 const newShard = new ReplSetTest({name: "newShard", nodes: 1, nodeOptions: rsNodeOptions});
 newShard.startSet({shardsvr: ""});
 newShard.initiate();
@@ -37,25 +38,47 @@ assert.commandWorked(
 );
 
 // While opening the cursor, wait for the failpoint and add the new shard.
+function addShardAndMigrate(mongosHost, newShardURL, newShardName, collFullName) {
+    const mongos = new Mongo(mongosHost);
+    const db = mongos.getDB("admin");
+
+    jsTest.log.info("Looking for failpoint shardedAggregateHangBeforeEstablishingShardCursors in the logs");
+    checkLog.contains(db, "shardedAggregateHangBeforeEstablishingShardCursors fail point enabled");
+
+    jsTest.log.info(`Adding new shard ${newShardURL}`);
+    assert.commandWorked(db.adminCommand({addShard: newShardURL, name: newShardName}));
+
+    jsTest.log.info("Moving chunk to new shard");
+    assert.commandWorked(
+        db.adminCommand({
+            moveChunk: collFullName,
+            find: {_id: 20},
+            to: newShardName,
+            _waitForDelete: true,
+        }),
+    );
+
+    jsTest.log.info("Disabling failpoint shardedAggregateHangBeforeEstablishingShardCursors");
+    assert.commandWorked(
+        db.adminCommand({
+            configureFailPoint: "shardedAggregateHangBeforeEstablishingShardCursors",
+            mode: "off",
+        }),
+    );
+}
+
 const awaitNewShard = startParallelShell(
-    `
-        checkLog.contains(db,
-            "shardedAggregateHangBeforeEstablishingShardCursors fail point enabled");
-        assert.commandWorked(
-            db.adminCommand({addShard: "${newShard.getURL()}", name: "${newShard.name}"}));
-        // Migrate the [10, MaxKey] chunk to "newShard".
-        assert.commandWorked(db.adminCommand({moveChunk: "${mongosColl.getFullName()}",
-                                              find: {_id: 20},
-                                              to: "${newShard.name}",
-                                              _waitForDelete: true}));
-        assert.commandWorked(
-            db.adminCommand(
-                {configureFailPoint: "shardedAggregateHangBeforeEstablishingShardCursors",
-                 mode: "off"}));`,
+    funWithArgs(
+        addShardAndMigrate,
+        mongos.host, // Instead of st.s
+        newShard.getURL(),
+        newShard.name,
+        mongosColl.getFullName(),
+    ),
     mongos.port,
 );
 
-jsTestLog("Opening $changeStream cursor");
+jsTest.log.info("Opening $changeStream cursor");
 const changeStream = mongosColl.aggregate([{$changeStream: {}}]);
 assert(!changeStream.hasNext(), "Do not expect any results yet");
 
@@ -68,7 +91,7 @@ assert.commandWorked(mongosColl.insert({_id: 20}, {writeConcern: {w: "majority"}
 
 // Expect to see them both.
 for (let id of [0, 20]) {
-    jsTestLog("Expecting Item " + id);
+    jsTest.log.info("Expecting Item " + id);
     assert.soon(() => changeStream.hasNext());
     let next = changeStream.next();
     assert.eq(next.operationType, "insert");

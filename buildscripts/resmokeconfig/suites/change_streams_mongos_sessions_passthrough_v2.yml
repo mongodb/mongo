@@ -3,6 +3,23 @@ test_kind: js_test
 selector:
   roots:
     - jstests/change_streams/**/*.js
+  exclude_files:
+    # This test creates a collection (and index) inside a transaction. Even though the collections are
+    # unsharded this suite enables sharding in the test database which makes transactions against
+    # it distributed. This causes the following tests to fail since creating a collection in a
+    # distributed transaction is not allowed.
+    - jstests/change_streams/ddl_create_index_txn.js
+
+    # This test exercises the internal behavior of $changeStream v1 and is not compatible with v2.
+    - jstests/change_streams/create_event_from_chunk_migration.js
+
+    # TODO: SERVER-113247 Ensure placementHistory entries are recorded with the right timestamp.
+    - jstests/change_streams/reshard_collection_event.js
+    - jstests/change_streams/migrate_last_chunk_from_shard_event.js
+
+    # TODO:SERVER-113140 Report resumeToken for change streams when batchSize is 0.
+    - jstests/change_streams/report_post_batch_resume_token.js
+    - jstests/change_streams/resume_from_high_water_mark_token.js
   exclude_with_any_tags:
     ##
     # The next tags correspond to the special errors thrown by the
@@ -14,11 +31,7 @@ selector:
     - assumes_write_concern_unchanged
     # Exclude any that assume sharding is disabled
     - assumes_against_mongod_not_mongos
-    - assumes_unsharded_collection
-    # This passthrough implicitly shards the accessed collections. Do not run tests where collections
-    # can't be created on `getCollection` call.
-    - assumes_no_implicit_collection_creation_on_get_collection
-    - requires_2_or_more_shards
+
 executor:
   archive:
     hooks:
@@ -35,9 +48,9 @@ executor:
       eval: >-
         globalThis.testingReplication = true;
         await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
-        await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
+        await import('jstests/libs/override_methods/enable_sessions.js');
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
-        await import('jstests/libs/override_methods/implicit_passthrough_to_shard_changestreams.js');
+        await import('jstests/libs/override_methods/implicit_change_stream_v2.js');
       # Set longer host discovery time to handle change stream resumable errors.
       setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
   hooks:
@@ -50,6 +63,9 @@ executor:
       n: 20
   fixture:
     class: ShardedClusterFixture
+    # Use two shards to make sure we will only talk to the primary shard for the database and will
+    # not delay changes to wait for notifications or a clock advancement from other shards.
+    num_shards: 2
     mongos_options:
       bind_ip_all: ""
       set_parameters:
@@ -58,6 +74,5 @@ executor:
       bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
-        writePeriodicNoops: 1
         periodicNoopIntervalSecs: 1
-    num_shards: 1
+        writePeriodicNoops: true

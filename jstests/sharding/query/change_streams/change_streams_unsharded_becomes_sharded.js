@@ -176,18 +176,26 @@ function testUnshardedBecomesSharded(collToWatch) {
         ],
     });
 
-    // Verify that the kNewShardDetected event is successfully delivered to mongoS even in cases
-    // where the event does not match the user's filter.
-    // TODO SERVER-30784: remove this test-case, or rework it without the failpoint, when the
-    // kNewShardDetected event is the only way we detect a new shard for the collection.
-    mongosDB.adminCommand({configureFailPoint: "throwChangeStreamTopologyChangeExceptionToClient", mode: "alwaysOn"});
-    ChangeStreamTest.assertChangeStreamThrowsCode({
-        db: mongosDB,
-        collName: collToWatch,
-        pipeline: [{$changeStream: {resumeAfter: preShardCollectionResumeToken}}, {$match: {operationType: "delete"}}],
-        expectedCode: ErrorCodes.ChangeStreamTopologyChange,
-    });
-    mongosDB.adminCommand({configureFailPoint: "throwChangeStreamTopologyChangeExceptionToClient", mode: "off"});
+    if (cursor._changeStreamVersion === "v1") {
+        // Verify that the kNewShardDetected event is successfully delivered to mongoS even in cases
+        // where the event does not match the user's filter.
+        // TODO SERVER-30784: remove this test-case, or rework it without the failpoint, when the
+        // kNewShardDetected event is the only way we detect a new shard for the collection.
+        mongosDB.adminCommand({
+            configureFailPoint: "throwChangeStreamTopologyChangeExceptionToClient",
+            mode: "alwaysOn",
+        });
+        ChangeStreamTest.assertChangeStreamThrowsCode({
+            db: mongosDB,
+            collName: collToWatch,
+            pipeline: [
+                {$changeStream: {resumeAfter: preShardCollectionResumeToken}},
+                {$match: {operationType: "delete"}},
+            ],
+            expectedCode: ErrorCodes.ChangeStreamTopologyChange,
+        });
+        mongosDB.adminCommand({configureFailPoint: "throwChangeStreamTopologyChangeExceptionToClient", mode: "off"});
+    }
 
     cst.cleanUp();
 }

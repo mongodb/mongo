@@ -34,6 +34,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/resume_token.h"
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -57,6 +58,16 @@ BSONObj replaceResumeTokenAndVersionInCommand(
  * the newly-added shard(s), then generates the final command object to be run on those shards.
  * The change stream version can be optionally specified to force a specific change stream reader
  * version on the shard.
+ */
+BSONObj createUpdatedCommandForNewShard(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ResumeToken& resumeTokenForNewShard,
+    const BSONObj& originalAggregateCommand,
+    const boost::optional<ChangeStreamReaderVersionEnum>& changeStreamVersion);
+
+/**
+ * Calls createUpdatedCommandForNewShard() with the HighWaterMark ResumeToken created from the
+ * 'atClusterTime' timestamp.
  */
 BSONObj createUpdatedCommandForNewShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
