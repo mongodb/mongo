@@ -40,7 +40,7 @@ for (let i = 0; i < numDocs; i++) {
 }
 
 // Make sure the documents make it to the secondaries.
-replTest.awaitReplication();
+replTest.awaitLastOpCommitted();
 
 const secondaries = replTest.getSecondaries();
 assert.eq(nodes.length - 1, secondaries.length, "unexpected number of secondaries: " + tojson(secondaries));
