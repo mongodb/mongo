@@ -817,6 +817,9 @@ protected:
 
     const Comparator _comp;
     const Settings _settings;
+    size_t fileIteratorsMaxBytesSize =
+        1 * 1024 * 1024;  // Memory Iterators for spilled data area allowed to use.
+    size_t fileIteratorsMaxNum;
 
 private:
     // Update the maxMemoryUsageBytes subtracting the memory reserved for the file iterators. File
