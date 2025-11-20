@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,32 +29,42 @@
 
 #pragma once
 
-#include "mongo/crypto/jwks_fetcher.h"
+#include <memory>
 
-#include "mongo/base/string_data.h"
-#include "mongo/util/synchronized_value.h"
-#include "mongo/util/time_support.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/crypto/jwk_manager.h"
+#include "mongo/crypto/jwks_fetcher_mock.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/clock_source_mock.h"
 
-namespace mongo {
-class ClockSource;
+namespace mongo::crypto::test {
 
-namespace crypto {
-
-/** JWKSFetcher implementation which acquires keys via HTTP.
- */
-class JWKSFetcherImpl : public JWKSFetcher {
+class JWKManagerTest : public unittest::Test {
 public:
-    JWKSFetcherImpl(ClockSource* clock, StringData issuer);
+    void setUp() override {
+        _clock = std::make_unique<ClockSourceMock>();
+        auto uniqueFetcher =
+            std::make_unique<MockJWKSFetcher>(_clock.get(), BSON("keys"_sd << BSONArray()));
+        _jwksFetcher = uniqueFetcher.get();
+        _jwkManager = std::make_unique<JWKManager>(std::move(uniqueFetcher));
+    }
 
-    JWKSet fetch() override;
-    bool quiesce() const override;
-    void setQuiesce(Date_t quiesce) override;
+    ClockSourceMock* getClock() {
+        return _clock.get();
+    }
 
-protected:
-    std::string _issuer;
-    ClockSource* _clock;
-    synchronized_value<Date_t> _lastFetchQuiesceTime;
+    JWKManager* jwkManager() {
+        return _jwkManager.get();
+    }
+
+    MockJWKSFetcher* jwksFetcher() {
+        return _jwksFetcher;
+    }
+
+private:
+    std::unique_ptr<ClockSourceMock> _clock;
+    MockJWKSFetcher* _jwksFetcher{nullptr};
+    std::unique_ptr<JWKManager> _jwkManager;
 };
 
-}  // namespace crypto
-}  // namespace mongo
+}  // namespace mongo::crypto::test

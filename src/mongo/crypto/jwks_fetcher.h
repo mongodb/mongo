@@ -40,7 +40,24 @@ public:
     JWKSFetcher() = default;
     virtual ~JWKSFetcher() = default;
 
+    /**
+     * Fetch the JWK set.
+     */
     virtual JWKSet fetch() = 0;
+
+    /**
+     * Returns TRUE if a fetch SHOULD NOT be performed at this time.
+     * e.g. If a fetch was performed too recently.
+     * Implementations MAY allow fetch() to be called anyway, or MAY throw.
+     */
+    virtual bool quiesce() const {
+        return false;
+    }
+
+    /**
+     * Sets a date to be used as the latest time a fetch happened.
+     */
+    virtual void setQuiesce(Date_t quiesce) = 0;
 };
 
 }  // namespace mongo::crypto
