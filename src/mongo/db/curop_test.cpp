@@ -98,6 +98,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.prepareReadConflicts.store(5);
     currentAdditiveMetrics.writeConflicts.store(7);
     additiveMetricsToAdd.writeConflicts.store(0);
+    currentAdditiveMetrics.numInterruptChecks = 1;
+    additiveMetricsToAdd.numInterruptChecks = 2;
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -135,6 +137,9 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     ASSERT_EQ(currentAdditiveMetrics.writeConflicts.load(),
               additiveMetricsBeforeAdd.writeConflicts.load() +
                   additiveMetricsToAdd.writeConflicts.load());
+    ASSERT_EQ(*currentAdditiveMetrics.numInterruptChecks,
+              *additiveMetricsBeforeAdd.numInterruptChecks +
+                  *additiveMetricsToAdd.numInterruptChecks);
 }
 
 TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
@@ -241,6 +246,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
 
     additiveMetrics.keysExamined = 1;
     additiveMetrics.docsExamined = 2;
+    additiveMetrics.numInterruptChecks = 2;
     additiveMetrics.clusterWorkingTime = Milliseconds(3);
     additiveMetrics.readingTime = Microseconds(4);
     additiveMetrics.bytesRead = 5;
@@ -256,6 +262,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
                                 false /* usedDisk */,
                                 true /* fromMultiPlanner */,
                                 false /* fromPlanCache */);
+    cursorMetrics.setNumInterruptChecks(3);
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 
@@ -266,6 +273,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(*additiveMetrics.bytesRead, 15);
     ASSERT_EQ(additiveMetrics.hasSortStage, true);
     ASSERT_EQ(additiveMetrics.usedDisk, false);
+    ASSERT_EQ(*additiveMetrics.numInterruptChecks, 5);
 }
 
 TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
@@ -284,12 +292,14 @@ TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
                                 false /* usedDisk */,
                                 true /* fromMultiPlanner */,
                                 false /* fromPlanCache */);
+    cursorMetrics.setNumInterruptChecks(3);
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 
     ASSERT_EQ(*additiveMetrics.keysExamined, 1);
     ASSERT_EQ(*additiveMetrics.docsExamined, 2);
     ASSERT_EQ(*additiveMetrics.bytesRead, 3);
+    ASSERT_EQ(*additiveMetrics.numInterruptChecks, 3);
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
@@ -300,6 +310,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     additiveMetrics.clusterWorkingTime = Milliseconds(3);
     additiveMetrics.hasSortStage = false;
     additiveMetrics.usedDisk = false;
+    additiveMetrics.numInterruptChecks = 2;
 
     query_stats::DataBearingNodeMetrics remoteMetrics;
     remoteMetrics.keysExamined = 3;
@@ -307,6 +318,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     remoteMetrics.clusterWorkingTime = Milliseconds(5);
     remoteMetrics.hasSortStage = true;
     remoteMetrics.usedDisk = false;
+    remoteMetrics.numInterruptChecks = 1;
 
     additiveMetrics.aggregateDataBearingNodeMetrics(remoteMetrics);
 
@@ -315,6 +327,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     ASSERT_EQ(additiveMetrics.clusterWorkingTime, Milliseconds(8));
     ASSERT_EQ(additiveMetrics.hasSortStage, true);
     ASSERT_EQ(additiveMetrics.usedDisk, false);
+    ASSERT_EQ(*additiveMetrics.numInterruptChecks, 3);
 }
 
 TEST(CurOpTest, AdditiveMetricsAggregateDataBearingNodeMetricsTreatsNoneAsZero) {
@@ -466,6 +479,31 @@ TEST(CurOpTest, ShouldReportIsFromUserConnection) {
     ASSERT_TRUE(bsonObjUserConn.hasField("isFromUserConnection"));
     ASSERT_FALSE(bsonObj.getField("isFromUserConnection").Bool());
     ASSERT_TRUE(bsonObjUserConn.getField("isFromUserConnection").Bool());
+}
+
+TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curOp = CurOp::get(*opCtx);
+
+    {
+        BSONObjBuilder bob;
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+        // Field numInterruptChecks should be always shown.
+        ASSERT_TRUE(state.hasField("numInterruptChecks"));
+    }
+
+    // If the delinquent stats are not zero, they *are* included in the state.
+    {
+        opCtx->checkForInterrupt();
+        BSONObjBuilder bob;
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+
+        ASSERT_TRUE(state.hasField("numInterruptChecks")) << state.toString();
+        ASSERT_EQ(state["numInterruptChecks"].Number(), 1);
+    }
 }
 
 TEST(CurOpTest, ElapsedTimeReflectsTickSource) {

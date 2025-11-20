@@ -55,6 +55,7 @@ static const BSONObj basicMetricsObj = fromjson(R"({
     keysExamined: {"$numberLong": "1"},
     docsExamined: {"$numberLong": "2"},
     bytesRead: {"$numberLong": "4"},
+    numInterruptChecks: {"$numberLong": "0"},
     readingTimeMicros: {"$numberLong": "5"},
     workingTimeMillis: {"$numberLong": "3"},
     hasSortStage: true,
@@ -311,6 +312,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     ASSERT_TRUE(metrics.getUsedDisk());
     ASSERT_TRUE(metrics.getFromMultiPlanner());
     ASSERT_TRUE(metrics.getFromPlanCache());
+    ASSERT_EQ(metrics.getNumInterruptChecks(), 0);
 }
 
 TEST(CursorResponseTest, parseFromBSONCursorMetricsWrongType) {
@@ -855,6 +857,7 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
                           true /* usedDisk */,
                           true /* fromMultiPlanner */,
                           false /* fromPlanCache */);
+    metrics.setNumInterruptChecks(15);
 
     auto pbrToken = BSON("n" << 1);
     builder.setPostBatchResumeToken(pbrToken);
@@ -883,6 +886,7 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     ASSERT_TRUE(parsedMetrics->getUsedDisk());
     ASSERT_TRUE(parsedMetrics->getFromMultiPlanner());
     ASSERT_FALSE(parsedMetrics->getFromPlanCache());
+    ASSERT_EQ(parsedMetrics->getNumInterruptChecks(), 15);
 
     ASSERT_TRUE(response.getPartialResultsReturned());
     ASSERT_TRUE(response.getInvalidated());

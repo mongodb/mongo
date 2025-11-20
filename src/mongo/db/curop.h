@@ -270,6 +270,9 @@ public:
         // query involved missed the cache. Optional because we need tri-state (true, false, not
         // set) to make the "sticky towards false" logic work.
         boost::optional<bool> fromPlanCache;
+
+        // Total number of checkForInterrupt() calls by an operation.
+        boost::optional<uint64_t> numInterruptChecks;
     };
 
     OpDebug() = default;

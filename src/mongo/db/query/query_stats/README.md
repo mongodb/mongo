@@ -184,6 +184,8 @@ following way:
   executing this query, including getMores.
 - `metrics.readingTime`: Various broken down statistics for the amount of time spent reading from disk
   while executing this query, including getMores.
+- `metrics.numInterruptChecksPerSec`: Number of times checkForInterrupt is called per second by a
+  query operation, including getMores.
 - `metrics.lastExecutionMicros`: Estimated time spent processing the latest query (akin to
   "totalExecMicros", not "firstResponseExecMicros").
 

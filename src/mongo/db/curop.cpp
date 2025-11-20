@@ -441,6 +441,10 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
         metrics.clusterWorkingTime = metrics.clusterWorkingTime.value_or(Milliseconds(0)) +
             (duration_cast<Milliseconds>(elapsed - (_sumBlockedTimeTotal() - _blockedTimeAtStart)));
 
+        if (!parent()) {
+            metrics.numInterruptChecks = opCtx()->numInterruptChecks();
+        }
+
         try {
             // If we need them, try to fetch the storage stats. We use an unlimited timeout here,
             // but the lock acquisition could still be interrupted, which we catch and log.
@@ -1008,6 +1012,10 @@ void CurOp::reportState(BSONObjBuilder* builder,
                         durationCount<Milliseconds>(elapsedTimeTotal));
     }
 
+    if (!parent()) {
+        builder->append("numInterruptChecks", opCtx->numInterruptChecks());
+    }
+
     boost::optional<std::tuple<std::string, Microseconds>> currentQueue;
     BSONObjBuilder queuesBuilder(builder->subobjStart("queues"));
     for (auto&& [queueName, lookup] : gQueueMetricsRegistry) {
@@ -1376,6 +1384,10 @@ void OpDebug::report(OperationContext* opCtx,
 
     if (remoteOpWaitTime) {
         pAttrs->add("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
+    }
+
+    if (!curop.parent()) {
+        pAttrs->add("numInterruptChecks", opCtx->numInterruptChecks());
     }
 
     BSONObjBuilder queuesBuilder;
@@ -2125,6 +2137,8 @@ CursorMetrics OpDebug::getCursorMetrics() const {
     metrics.setWorkingTimeMillis(
         additiveMetrics.clusterWorkingTime.value_or(Milliseconds(0)).count());
 
+    metrics.setNumInterruptChecks(additiveMetrics.numInterruptChecks.value_or(0));
+
     metrics.setHasSortStage(additiveMetrics.hasSortStage);
     metrics.setUsedDisk(additiveMetrics.usedDisk);
     metrics.setFromMultiPlanner(additiveMetrics.fromMultiPlanner);
@@ -2223,6 +2237,8 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     temporarilyUnavailableErrors.fetchAndAdd(otherMetrics.temporarilyUnavailableErrors.load());
     executionTime = addOptionals(executionTime, otherMetrics.executionTime);
 
+    numInterruptChecks = addOptionals(numInterruptChecks, otherMetrics.numInterruptChecks);
+
     hasSortStage = hasSortStage || otherMetrics.hasSortStage;
     usedDisk = usedDisk || otherMetrics.usedDisk;
     fromMultiPlanner = fromMultiPlanner || otherMetrics.fromMultiPlanner;
@@ -2242,6 +2258,7 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
     bytesRead = bytesRead.value_or(0) + metrics.bytesRead;
     readingTime = readingTime.value_or(Microseconds(0)) + metrics.readingTime;
     clusterWorkingTime = clusterWorkingTime.value_or(Milliseconds(0)) + metrics.clusterWorkingTime;
+    numInterruptChecks = numInterruptChecks.value_or(0) + metrics.numInterruptChecks;
     hasSortStage = hasSortStage || metrics.hasSortStage;
     usedDisk = usedDisk || metrics.usedDisk;
     fromMultiPlanner = fromMultiPlanner || metrics.fromMultiPlanner;
@@ -2266,6 +2283,7 @@ void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metri
         query_stats::DataBearingNodeMetrics{static_cast<uint64_t>(metrics.getKeysExamined()),
                                             static_cast<uint64_t>(metrics.getDocsExamined()),
                                             static_cast<uint64_t>(metrics.getBytesRead()),
+                                            static_cast<uint64_t>(metrics.getNumInterruptChecks()),
                                             Microseconds(metrics.getReadingTimeMicros()),
                                             Milliseconds(metrics.getWorkingTimeMillis()),
                                             metrics.getHasSortStage(),

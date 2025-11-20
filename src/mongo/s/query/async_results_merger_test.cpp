@@ -2394,17 +2394,19 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Schedule a response.
-    scheduleResponse(id,
-                     {fromjson("{_id: 1}")},
-                     CursorMetrics(2 /* keysExamined */,
-                                   5 /* docsExamined */,
-                                   13 /* bytesRead */,
-                                   17 /* readingTimeMicros */,
-                                   7 /* workingTimeMillis */,
-                                   false /* hasSortStage */,
-                                   true /* usedDisk */,
-                                   true /* fromMultiPlanner */,
-                                   true /* fromPlanCache */));
+    {
+        CursorMetrics cursorMetrics(2 /* keysExamined */,
+                                    5 /* docsExamined */,
+                                    13 /* bytesRead */,
+                                    17 /* readingTimeMicros */,
+                                    7 /* workingTimeMillis */,
+                                    false /* hasSortStage */,
+                                    true /* usedDisk */,
+                                    true /* fromMultiPlanner */,
+                                    true /* fromPlanCache */);
+        cursorMetrics.setNumInterruptChecks(3);
+        scheduleResponse(id, {fromjson("{_id: 1}")}, cursorMetrics);
+    }
 
     // Wait for the batch to be processed and read the single object.
     executor()->waitForEvent(readyEvent);
@@ -2424,20 +2426,23 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.usedDisk, true);
         ASSERT_EQ(remoteMetrics.fromMultiPlanner, true);
         ASSERT_EQ(remoteMetrics.fromPlanCache, true);
+        ASSERT_EQ(remoteMetrics.numInterruptChecks, 3);
     }
 
     // Schedule a second response.
-    scheduleResponse(CursorId(0),
-                     {fromjson("{_id: 2}")},
-                     CursorMetrics(7 /* keysExamined */,
-                                   11 /* docsExamined */,
-                                   17 /* bytesRead */,
-                                   19 /* readingTimeMicros */,
-                                   13 /* workingTimeMillis */,
-                                   false /* hasSortStage */,
-                                   true /* usedDisk */,
-                                   true /* fromMultiPlanner */,
-                                   false /* fromPlanCache */));
+    {
+        CursorMetrics cursorMetrics(7 /* keysExamined */,
+                                    11 /* docsExamined */,
+                                    17 /* bytesRead */,
+                                    19 /* readingTimeMicros */,
+                                    13 /* workingTimeMillis */,
+                                    false /* hasSortStage */,
+                                    true /* usedDisk */,
+                                    true /* fromMultiPlanner */,
+                                    false /* fromPlanCache */);
+        cursorMetrics.setNumInterruptChecks(2);
+        scheduleResponse(CursorId(0), {fromjson("{_id: 2}")}, cursorMetrics);
+    }
 
     // Wait for the final batch to be processed and read the object.
     executor()->waitForEvent(readyEvent);
@@ -2455,6 +2460,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.usedDisk, true);
         ASSERT_EQ(remoteMetrics.fromMultiPlanner, true);
         ASSERT_EQ(remoteMetrics.fromPlanCache, false);
+        ASSERT_EQ(remoteMetrics.numInterruptChecks, 5);
     }
 
     {
@@ -2467,6 +2473,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.usedDisk, false);
         ASSERT_EQ(remoteMetrics.fromMultiPlanner, false);
         ASSERT_EQ(remoteMetrics.fromPlanCache, true);
+        ASSERT_EQ(remoteMetrics.numInterruptChecks, 0);
     }
 
     // Read the EOF

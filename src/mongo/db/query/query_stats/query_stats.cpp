@@ -255,6 +255,14 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
     toUpdate.fromPlanCache.aggregate(snapshot.fromPlanCache);
 
     toUpdate.addSupplementalStats(std::move(supplementalStatsEntry));
+
+    // Store the number of interrupt checks per second as a rate, this can give us a better sense of
+    // how often interrupts are being checked relative to the total execution time across multiple
+    // query runs.
+    auto secondCount = durationCount<Seconds>(Milliseconds{snapshot.workingTimeMillis});
+    auto numInterruptChecksPerSec =
+        secondCount == 0 ? 0 : snapshot.numInterruptChecks / (static_cast<double>(secondCount));
+    toUpdate.numInterruptChecksPerSec.aggregate(numInterruptChecksPerSec);
 }
 
 void insertQueryStatsEntry(QueryStatsStore::Partition& proofOfLock,
@@ -412,6 +420,7 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
         static_cast<uint64_t>(metrics.keysExamined.value_or(0)),
         static_cast<uint64_t>(metrics.docsExamined.value_or(0)),
         static_cast<uint64_t>(metrics.bytesRead.value_or(0)),
+        static_cast<uint64_t>(metrics.numInterruptChecks.value_or(0)),
         metrics.readingTime.value_or(Microseconds(0)).count(),
         metrics.clusterWorkingTime.value_or(Milliseconds(0)).count(),
         metrics.hasSortStage,

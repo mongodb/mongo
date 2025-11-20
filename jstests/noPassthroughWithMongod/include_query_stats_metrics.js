@@ -33,6 +33,7 @@ function assertMetricsEqual(cursor, {
     assertMetricEqual(metrics, "usedDisk", usedDisk);
     assertMetricEqual(metrics, "fromMultiPlanner", fromMultiPlanner);
     assertMetricEqual(metrics, "fromPlanCache", fromPlanCache);
+    assertMetricEqual(metrics, "numInterruptChecks", undefined);
 }
 
 {

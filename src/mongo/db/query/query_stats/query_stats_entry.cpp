@@ -56,6 +56,8 @@ BSONObj QueryStatsEntry::toBSON(bool includeDiskUsageMetrics) const {
         fromPlanCache.appendTo(builder, "fromPlanCache");
     }
 
+    numInterruptChecksPerSec.appendTo(builder, "numInterruptChecksPerSec");
+
     builder.append("firstSeenTimestamp", firstSeenTimestamp);
     builder.append("latestSeenTimestamp", latestSeenTimestamp);
     if (supplementalStatsMap) {

@@ -86,6 +86,11 @@ structs:
                 description: "Boolean value that is true if the plan came from the plan cache."
                 type: bool
                 stability: unstable
+            numInterruptChecks:
+                description: "Number of checkForInterrupt is call by a query operation."
+                type: long
+                stability: unstable
+                default: 0
 
     ResponseCursorBase:
         description: "Common fields of initial and subsequent cursor responses."

@@ -44,6 +44,7 @@ struct DataBearingNodeMetrics {
     uint64_t keysExamined = 0;
     uint64_t docsExamined = 0;
     uint64_t bytesRead = 0;
+    uint64_t numInterruptChecks = 0;
     Microseconds readingTime{0};
     Milliseconds clusterWorkingTime{0};
     bool hasSortStage : 1 = false;
@@ -59,6 +60,7 @@ struct DataBearingNodeMetrics {
         keysExamined += other.keysExamined;
         docsExamined += other.docsExamined;
         bytesRead += other.bytesRead;
+        numInterruptChecks += other.numInterruptChecks;
         readingTime += other.readingTime;
         clusterWorkingTime += other.clusterWorkingTime;
         hasSortStage = hasSortStage || other.hasSortStage;
@@ -81,6 +83,7 @@ struct DataBearingNodeMetrics {
         keysExamined += metrics.getKeysExamined();
         docsExamined += metrics.getDocsExamined();
         bytesRead += metrics.getBytesRead();
+        numInterruptChecks += metrics.getNumInterruptChecks();
         readingTime += Microseconds(metrics.getReadingTimeMicros());
         clusterWorkingTime += Milliseconds(metrics.getWorkingTimeMillis());
         hasSortStage = hasSortStage || metrics.getHasSortStage();

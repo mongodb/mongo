@@ -742,6 +742,13 @@ public:
         _killOpsExempt = true;
     }
 
+    /**
+     * Returns number of checkForInterrupts() done on this OperationContext.
+     */
+    int64_t numInterruptChecks() const {
+        return _numInterruptChecks.loadRelaxed();
+    }
+
     // The query sampling options for operations on this opCtx. 'optIn' makes the operations
     // eligible for query sampling regardless of whether the client is considered as internal by
     // the sampler. 'optOut' does the opposite.
@@ -918,6 +925,9 @@ private:
     // operation is not killed. If killed, it will contain a specific code. This value changes only
     // once from OK to some kill code.
     AtomicWord<ErrorCodes::Error> _killCode{ErrorCodes::OK};
+
+    // Tracks total number of interrupt checks.
+    Atomic<int64_t> _numInterruptChecks{0};
 
     // Used to cancel all tokens obtained via getCancellationToken() when this OperationContext is
     // killed.

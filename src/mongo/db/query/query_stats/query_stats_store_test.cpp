@@ -1569,6 +1569,7 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
                               .append("totalExecMicros", emptyIntMetric)
                               .append("firstResponseExecMicros", emptyIntMetric)
                               .append("docsReturned", emptyIntMetric)
+                              .append("numInterruptChecksPerSec", emptyIntMetric)
                               .append("firstSeenTimestamp", qse.firstSeenTimestamp)
                               .append("latestSeenTimestamp", Date_t())
                               .obj());
@@ -1590,6 +1591,7 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
                               .append("usedDisk", boolMetricBson(0, 0))
                               .append("fromMultiPlanner", boolMetricBson(0, 0))
                               .append("fromPlanCache", boolMetricBson(0, 0))
+                              .append("numInterruptChecksPerSec", emptyIntMetric)
                               .append("firstSeenTimestamp", qse.firstSeenTimestamp)
                               .append("latestSeenTimestamp", Date_t())
                               .obj());
@@ -1624,6 +1626,7 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
                               .append("usedDisk", boolMetricBson(1, 0))
                               .append("fromMultiPlanner", boolMetricBson(0, 0))
                               .append("fromPlanCache", boolMetricBson(0, 0))
+                              .append("numInterruptChecksPerSec", emptyIntMetric)
                               .append("firstSeenTimestamp", qse2.firstSeenTimestamp)
                               .append("latestSeenTimestamp", Date_t())
                               .obj());

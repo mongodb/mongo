@@ -118,6 +118,11 @@ struct QueryStatsEntry {
     AggregatedMetric<int64_t> workingTimeMillis;
 
     /**
+     * Aggregates the checkForInterrupt stats including getMore requests.
+     */
+    AggregatedMetric<uint64_t> numInterruptChecksPerSec;
+
+    /**
      * Counts the frequency of the boolean value hasSortStage.
      */
     AggregatedBool hasSortStage;
