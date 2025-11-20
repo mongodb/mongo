@@ -30,9 +30,31 @@
 
 #include "mongo/db/extension/host_connector/logger_adapter.h"
 #include "mongo/db/extension/public/api.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 
 namespace mongo::extension::host_connector {
+/**
+ * IdleThreadBlockAdapter is an implementation of ::MongoExtensionIdleThreadBlock, providing the
+ * ability to mark extension-spawned threads as idle, omitting them from gdb multi-threaded
+ * stacktraces.
+ *
+ * The logic for marking the thread is done by the 'IdleThreadBlock' RAII object, and and the
+ * ownership of the object is transferred to the caller.
+ */
+class IdleThreadBlockAdapter final : public ::MongoExtensionIdleThreadBlock {
+public:
+    IdleThreadBlockAdapter(const char* location)
+        : ::MongoExtensionIdleThreadBlock{&VTABLE}, _idleThreadBlock{location} {}
+
+private:
+    IdleThreadBlock _idleThreadBlock;
+    static void _extDestroy(::MongoExtensionIdleThreadBlock* idleThreadBlock) noexcept {
+        delete static_cast<IdleThreadBlockAdapter*>(idleThreadBlock);
+    }
+
+    const ::MongoExtensionIdleThreadBlockVTable VTABLE{.destroy = &_extDestroy};
+};
 /**
  * HostServicesAdapter is an implementation of ::MongoExtensionHostServices, providing host
  * services to extensions.
@@ -62,6 +84,12 @@ private:
     static ::MongoExtensionStatus* _extUserAsserted(
         ::MongoExtensionByteView structuredErrorMessage);
 
+    static ::MongoExtensionStatus* _extMarkIdleThreadBlock(
+        ::MongoExtensionIdleThreadBlock** idleThreadBlock, const char* location) {
+        return wrapCXXAndConvertExceptionToStatus(
+            [&]() { *idleThreadBlock = new IdleThreadBlockAdapter(location); });
+    }
+
     static ::MongoExtensionStatus* _extTripwireAsserted(
         ::MongoExtensionByteView structuredErrorMessage);
 
@@ -75,6 +103,7 @@ private:
         .get_logger = &_extGetLogger,
         .user_asserted = &_extUserAsserted,
         .tripwire_asserted = &_extTripwireAsserted,
+        .mark_idle_thread_block = &_extMarkIdleThreadBlock,
         .create_host_agg_stage_parse_node = &_extCreateHostAggStageParseNode,
         .create_id_lookup = &_extCreateIdLookup};
 };

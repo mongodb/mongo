@@ -830,6 +830,22 @@ typedef struct MongoExtensionLogMessage {
 } MongoExtensionLogMessage;
 
 /**
+ * MongoExtensionIdleThreadBlock enables extension-spawned threads to be marked as idle, which means
+ * they will be excluded from multi-threaded gdb stacktraces.
+ *
+ * Only the 'destroy' function is needed as the idle functionality will be handled by a
+ * host-constructed adapter, so the API struct is only responsible for providing a bridge
+ * to transfer ownership from said adapter to the extension-side handle.
+ */
+typedef struct MongoExtensionIdleThreadBlock {
+    const struct MongoExtensionIdleThreadBlockVTable* const vtable;
+} MongoExtensionIdleThreadBlock;
+
+typedef struct MongoExtensionIdleThreadBlockVTable {
+    void (*destroy)(MongoExtensionIdleThreadBlock*);
+} MongoExtensionIdleThreadBlockVTable;
+
+/**
  * MongoExtensionLogger enables extensions to send structured log messages to MongoDB's logging
  * system.
  *
@@ -895,6 +911,17 @@ typedef struct MongoExtensionHostServicesVTable {
      */
     MongoExtensionStatus* (*tripwire_asserted)(MongoExtensionByteView structuredErrorMessage);
 
+    /**
+     * Call this method to mark an extension-owned thread as idle. This will cause the thread to be
+     * omitted from gdb stacktraces when using the 'mongodb-bt-if-active' command. The thread will
+     * remain idle as long as the owned handle for 'idleThreadBlock' remains in scope.
+     *
+     * Location must be a null-terminated c string, so either a string literal or a stable char*.
+     * For ease of use, the MONGO_EXTENSION_IDLE_LOCATION macro will pass in the location in the
+     * correct format.
+     */
+    MongoExtensionStatus* (*mark_idle_thread_block)(MongoExtensionIdleThreadBlock** idleThreadBlock,
+                                                    const char* location);
     /*
      * Creates a host-defined parse node. Use this function when you need to instantiate a parse
      * node implemented by the host during extension parse node expansion.

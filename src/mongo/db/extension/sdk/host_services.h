@@ -36,6 +36,26 @@
 #include "mongo/util/modules.h"
 
 namespace mongo::extension::sdk {
+
+/**
+ * Wrapper for ::MongoExtensionIdleThreadBlock, providing access to an 'IdleThreadBlock' object
+ * constructed by the host-side adapter, marking a spawned thread as idle in gdb.
+ *
+ * This is an owned handle, meaning that the 'IdleThreadBlock' object's lifetime is managed by the
+ * extension, ensuring that said object remains in scope for as long as the this handle is still in
+ * scope.
+ */
+class IdleThreadBlockHandle : public OwnedHandle<::MongoExtensionIdleThreadBlock> {
+public:
+    IdleThreadBlockHandle(::MongoExtensionIdleThreadBlock* ptr)
+        : OwnedHandle<::MongoExtensionIdleThreadBlock>(ptr) {
+        _assertValidVTable();
+    }
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {}
+};
+
 /**
  * Wrapper for ::MongoExtensionHostServices, providing safe access to its public API through the
  * underlying vtable.
@@ -65,6 +85,13 @@ public:
         return &_hostServices;
     }
 
+    IdleThreadBlockHandle markIdleThread(const char* location) {
+        ::MongoExtensionIdleThreadBlock* idleThreadBlock = nullptr;
+        invokeCAndConvertStatusToException(
+            [&] { return vtable().mark_idle_thread_block(&idleThreadBlock, location); });
+
+        return IdleThreadBlockHandle{idleThreadBlock};
+    }
     /**
      * setHostServices() should be called only once during initialization of the extension. The host
      * guarantees that the pointer remains valid during the lifetime of the extension.
@@ -98,4 +125,11 @@ private:
     void _assertVTableConstraints(const VTable_t& vtable) const override;
 };
 
+/**
+ * These macros are used to get 'file:line' as a const char*. You should only be calling
+ * MONGO_EXTENSION_IDLE_LOCATION as a parameter to 'markIdleThread'.
+ */
+#define MONGO_EXTENSION_IDLE_LOCATION_STR1_(x) #x
+#define MONGO_EXTENSION_IDLE_LOCATION_STR_(x) MONGO_EXTENSION_IDLE_LOCATION_STR1_(x)
+#define MONGO_EXTENSION_IDLE_LOCATION __FILE__ ":" MONGO_EXTENSION_IDLE_LOCATION_STR_(__LINE__)
 }  // namespace mongo::extension::sdk
