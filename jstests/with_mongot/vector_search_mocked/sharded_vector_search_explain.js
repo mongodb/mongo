@@ -1,9 +1,7 @@
 /**
  * Sharding tests for using "explain" with the $vectorSearch aggregation stage.
- * @tags: [
- *  featureFlagVectorSearchPublicPreview,
- * ]
  */
+
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
