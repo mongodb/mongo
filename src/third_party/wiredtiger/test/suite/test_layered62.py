@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, os.path, shutil, threading, time, wiredtiger, wttest
+import threading, time, wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
@@ -58,29 +58,6 @@ class test_layered62(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages('test_layered62', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
-    num_restarts = 0
-
-    # Restart the node without local files
-    def restart_without_local_files(self):
-        # Close the current connection
-        self.close_conn()
-
-        # Move the local files to another directory
-        self.num_restarts += 1
-        dir = f'SAVE.{self.num_restarts}'
-        os.mkdir(dir)
-        for f in os.listdir():
-            if os.path.isdir(f):
-                continue
-            if f.startswith('WiredTiger') or f.startswith('test_'):
-                os.rename(f, os.path.join(dir, f))
-
-        # Also save the PALI database (to aid debugging)
-        shutil.copytree('kv_home', os.path.join(dir, 'kv_home'))
-
-        # Reopen the connection
-        self.open_conn()
-
     # Wait for a checkpoint to start running
     def wait_for_checkpoint_start(self):
         while True:
@@ -107,13 +84,8 @@ class test_layered62(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
 
-        # Prevent the shutdown checkpoint.
-        self.conn.reconfigure('disaggregated=(role="follower")')
-
         # Reopen the connection as a follower.
-        checkpoint_meta = self.disagg_get_complete_checkpoint_meta()
         self.restart_without_local_files()
-        self.conn.reconfigure(f'disaggregated=(checkpoint_meta="{checkpoint_meta}")')
 
         #
         # Part 1: Step up while a checkpoint is running.
@@ -207,9 +179,7 @@ class test_layered62(wttest.WiredTigerTestCase):
         self.assertEqual(checkpoint_timestamp, 3)
 
         # Reopen the connection.
-        checkpoint_meta = self.disagg_get_complete_checkpoint_meta()
         self.restart_without_local_files()
-        self.conn.reconfigure(f'disaggregated=(checkpoint_meta="{checkpoint_meta}")')
 
         # Check that all the data is present.
         cursor = self.session.open_cursor(self.uri, None, None)

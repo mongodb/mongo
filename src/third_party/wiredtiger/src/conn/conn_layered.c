@@ -2136,7 +2136,7 @@ __layered_iterate_ingest_tables_for_gc_pruning(
     for (i = 0; i < manager->open_layered_table_count; i++) {
         if ((entry = manager->entries[i]) == NULL)
             continue;
-        WT_ERR(__wt_buf_setstr(session, layered_table_uri_buf, entry->layered_uri));
+        ret = __wt_buf_setstr(session, layered_table_uri_buf, entry->layered_uri);
 
         /*
          * Unlock the mutex while handling a table since while updating the prune timestamp we get a
@@ -2147,8 +2147,13 @@ __layered_iterate_ingest_tables_for_gc_pruning(
          * probably do nothing), or miss an element to prune (it will be visited next time).
          */
         __wt_spin_unlock(session, &manager->layered_table_lock);
+
+        /* Check the buffer-copy result here to avoid returning with the mutex held. */
+        WT_ERR(ret);
+
         WT_ERR(__layered_update_ingest_table_prune_timestamp(
           session, layered_table_uri_buf->data, checkpoint_timestamp, uri_at_checkpoint_buf));
+
         __wt_spin_lock(session, &manager->layered_table_lock);
     }
     __wt_spin_unlock(session, &manager->layered_table_lock);

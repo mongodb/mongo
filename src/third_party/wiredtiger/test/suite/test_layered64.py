@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, os.path, shutil, re, wiredtiger, wttest
+import re, wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
@@ -46,29 +46,6 @@ class test_layered64(wttest.WiredTigerTestCase):
 
     disagg_storages = gen_disagg_storages('test_layered64', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
-
-    num_restarts = 0
-
-    # Restart the node without local files
-    def restart_without_local_files(self):
-        # Close the current connection
-        self.close_conn()
-
-        # Move the local files to another directory
-        self.num_restarts += 1
-        dir = f'SAVE.{self.num_restarts}'
-        os.mkdir(dir)
-        for f in os.listdir():
-            if os.path.isdir(f):
-                continue
-            if f.startswith('WiredTiger') or f.startswith('test_'):
-                os.rename(f, os.path.join(dir, f))
-
-        # Also save the PALI database (to aid debugging)
-        shutil.copytree('kv_home', os.path.join(dir, 'kv_home'))
-
-        # Reopen the connection
-        self.open_conn()
 
     # Test checkpoint metadata checksums.
     def test_layered64(self):
@@ -100,7 +77,7 @@ class test_layered64(wttest.WiredTigerTestCase):
 
         # Prevent the shutdown checkpoint, and restart as follower.
         self.conn.reconfigure('disaggregated=(role="follower")')
-        self.restart_without_local_files()
+        self.restart_without_local_files(pickup_checkpoint=False)
 
         # Ensure that we can pick up the checkpoint without a checksum.
         checkpoint_meta_no_checksum = re.sub(r',metadata_checksum=[0-9a-fA-F]+', '', checkpoint_meta)
@@ -115,7 +92,7 @@ class test_layered64(wttest.WiredTigerTestCase):
         cursor.close()
 
         # Restart again.
-        self.restart_without_local_files()
+        self.restart_without_local_files(pickup_checkpoint=False)
 
         # Corrupt the checksum. Ensure that the follower cannot pick up the checkpoint.
         corrupted_checksum_int = checksum_int ^ 0xFF

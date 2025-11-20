@@ -378,7 +378,8 @@ functions:
           mkdir -p cmake_build
           cd cmake_build
 
-          echo "Call CMake"
+          echo "Calling CMake with command:"
+          echo $CMAKE $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
           $CMAKE $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
           echo "Completed CMake"
         fi

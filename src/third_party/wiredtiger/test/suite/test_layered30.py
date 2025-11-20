@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, os.path, shutil, wiredtiger, wttest
+import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
@@ -55,29 +55,6 @@ class test_layered30(wttest.WiredTigerTestCase):
         ('one-table', dict(another_table=False)),
         ('two-tables', dict(another_table=True)),
     ])
-
-    num_restarts = 0
-
-    # Restart the node without local files
-    def restart_without_local_files(self):
-        # Close the current connection
-        self.close_conn()
-
-        # Move the local files to another directory
-        self.num_restarts += 1
-        dir = f'SAVE.{self.num_restarts}'
-        os.mkdir(dir)
-        for f in os.listdir():
-            if os.path.isdir(f):
-                continue
-            if f.startswith('WiredTiger') or f.startswith('test_'):
-                os.rename(f, os.path.join(dir, f))
-
-        # Also save the PALM database (to aid debugging)
-        shutil.copytree('kv_home', os.path.join(dir, 'kv_home'))
-
-        # Reopen the connection
-        self.open_conn()
 
     # Test creating an empty table.
     def test_layered30(self):
@@ -126,10 +103,7 @@ class test_layered30(wttest.WiredTigerTestCase):
         # Part 2: Check the new table after restart
         #
 
-        checkpoint_meta = self.disagg_get_complete_checkpoint_meta()
-        self.restart_without_local_files()
-        self.conn.reconfigure(f'disaggregated=(checkpoint_meta="{checkpoint_meta}")')
-        self.conn.reconfigure(f'disaggregated=(role="leader")')
+        self.restart_without_local_files(step_up=True)
 
         # Avoid checkpoint error with precise checkpoint
         self.conn.set_timestamp('stable_timestamp=1')

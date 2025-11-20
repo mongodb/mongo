@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, os.path, shutil, wttest
+import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
@@ -53,32 +53,6 @@ class test_layered15(wttest.WiredTigerTestCase):
 
     disagg_storages = gen_disagg_storages('test_layered15', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
-
-    num_restarts = 0
-
-    # Restart the node without local files
-    def restart_without_local_files(self):
-        # Step down to ensure that there are no more checkpoints
-        self.conn.reconfigure(f'disaggregated=(role=follower)')
-
-        # Close the current connection
-        self.close_conn()
-
-        # Move the local files to another directory
-        self.num_restarts += 1
-        dir = f'SAVE.{self.num_restarts}'
-        os.mkdir(dir)
-        for f in os.listdir():
-            if os.path.isdir(f):
-                continue
-            if f.startswith('WiredTiger') or f.startswith('test_'):
-                os.rename(f, os.path.join(dir, f))
-
-        # Also save the PALM database (to aid debugging)
-        shutil.copytree('kv_home', os.path.join(dir, 'kv_home'))
-
-        # Reopen the connection
-        self.open_conn()
 
     # Ensure that the metadata cursor has all the expected URIs.
     def check_metadata_cursor(self, expect_contains, expect_missing = []):
@@ -139,8 +113,11 @@ class test_layered15(wttest.WiredTigerTestCase):
         # ------------------------------ Restart 1 ------------------------------
         #
 
+        # Step down to ensure that there are no more checkpoints
+        self.conn.reconfigure(f'disaggregated=(role=follower)')
+
         # Reopen the connection
-        self.restart_without_local_files()
+        self.restart_without_local_files(pickup_checkpoint=False)
 
         # There should be no shared URIs in the metadata table at this point
         self.check_metadata_cursor([], self.with_ingest_uris)
@@ -229,8 +206,11 @@ class test_layered15(wttest.WiredTigerTestCase):
         # ------------------------------ Restart 2 ------------------------------
         #
 
+        # Step down to ensure that there are no more checkpoints
+        self.conn.reconfigure(f'disaggregated=(role=follower)')
+
         # Reopen the connection
-        self.restart_without_local_files()
+        self.restart_without_local_files(pickup_checkpoint=False)
 
         # Pick up the checkpoint
         self.conn.reconfigure(f'disaggregated=(checkpoint_meta="{checkpoint_meta}")')

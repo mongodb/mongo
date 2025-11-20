@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import functools, os, wttest
+import functools, os, shutil, wttest
 
 # These routines help run the various page log sources used by disaggregated storage.
 # They are required to manage the generation of disaggregated storage specific configurations.
@@ -108,11 +108,16 @@ def disagg_test_class(cls):
 
     return disagg_test_case_class
 
-# This mixin class provides disaggregated storage configuration methods.
+# This mixin class provides disaggregated storage configuration methods and a few utility functions.
 class DisaggConfigMixin:
+
+    # Configuration parameters, can be overridden in test class
     disagg_verbose = 0        # (0 <= level <=3) can be overridden in test class
     disagg_config = None      # a string, can be overridden in test class
     palm_cache_size_mb = -1   # this uses the default, can be overridden
+
+    # Internal state tracking
+    num_restarts = 0
 
     # Returns True if the current scenario is disaggregated.
     def is_disagg_scenario(self):
@@ -245,3 +250,40 @@ class DisaggConfigMixin:
         self.conn.reconfigure('disaggregated=(role="follower")')
         self.close_conn()
         self.open_conn(directory, config)
+
+    def restart_without_local_files(self, pickup_checkpoint=True, step_up=False):
+        """
+        Restart the node without local files.
+        """
+
+        if pickup_checkpoint:
+            # Step down to avoid shutdown checkpoint
+            self.conn.reconfigure('disaggregated=(role="follower")')
+            checkpoint_meta = self.disagg_get_complete_checkpoint_meta()
+
+        # Close the current connection
+        self.close_conn()
+
+        # Move the local files to another directory
+        self.num_restarts += 1
+        dir = f'SAVE.{self.num_restarts}'
+        os.mkdir(dir)
+        for f in os.listdir():
+            if os.path.isdir(f):
+                continue
+            if f.startswith('WiredTiger') or f.endswith('.wt') or f.endswith('.wt_ingest'):
+                os.rename(f, os.path.join(dir, f))
+
+        # Also save the PALI database (to aid debugging)
+        shutil.copytree('kv_home', os.path.join(dir, 'kv_home'))
+
+        # Reopen the connection
+        self.open_conn()
+
+        # Pick up the last checkpoint
+        if pickup_checkpoint:
+            self.conn.reconfigure(f'disaggregated=(checkpoint_meta="{checkpoint_meta}")')
+
+        # Step up as the leader
+        if step_up:
+            self.conn.reconfigure(f'disaggregated=(role="leader")')
