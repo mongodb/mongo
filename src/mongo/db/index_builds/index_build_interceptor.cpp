@@ -121,6 +121,18 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
         _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(
             opCtx, entry, *indexBuildInfo.constraintViolationsTrackerIdent, /*tableExists=*/resume);
     }
+    // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    auto isPrimaryDrivenIndexBuild = fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot);
+    if (isPrimaryDrivenIndexBuild) {
+        uassert(11411100, "sorterIdent is not provided", indexBuildInfo.sorterIdent);
+        uassert(11411101, "Resumability with the sorter is not supported", !resume);
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        _sorterTable = storageEngine->makeTemporaryRecordStore(
+            opCtx, *indexBuildInfo.sorterIdent, KeyFormat::Long);
+    }
 }
 
 void IndexBuildInterceptor::keepTemporaryTables() {

@@ -205,6 +205,14 @@ public:
                                     : boost::none;
     }
 
+    /**
+     * We need a getter for the sorter table for container writes and  to iterate through the sorter
+     * table.
+     */
+    std::unique_ptr<TemporaryRecordStore> getSorterTable() {
+        return std::move(_sorterTable);
+    }
+
 private:
     using SideWriteRecord = std::pair<RecordId, BSONObj>;
 
@@ -241,6 +249,11 @@ private:
     // TODO(SERVER-111304): We might be able to remove this field by not creating an instance of
     // IndexBuildInterceptor on a standby in case of primary driven index builds.
     bool _generateTableWrites{true};
+
+    // This temporary record store records all the index keys that we encounter upon collection
+    // scan. We will use the _sorterTable for primary-driven index builds to replicate sorting and
+    // inserting the sorted index keys into each node's index table.
+    std::unique_ptr<TemporaryRecordStore> _sorterTable;
 
     // This temporary record store records intercepted keys that will be written into the index by
     // calling drainWritesIntoIndex(). It is owned by the interceptor and dropped along with it.
