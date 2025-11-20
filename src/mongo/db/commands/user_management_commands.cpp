@@ -92,6 +92,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/local_executor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -977,9 +978,7 @@ public:
     void run(OperationContext* opCtx,
              unique_function<Status(UMCTransactionClient&)> txnOpsCallback) final {
         auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-        auto sleepAndCleanupExecutor = serverGlobalParams.clusterRole.has(ClusterRole::None)
-            ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(opCtx->getServiceContext())
-            : Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+        auto sleepAndCleanupExecutor = getLocalExecutor(opCtx);
 
         // Constructing a SyncTransactionWithRetries causes it to store the write concern from
         // the supplied OperationContext and then wait for that write concern when
