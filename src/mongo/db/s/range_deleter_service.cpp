@@ -90,6 +90,8 @@ namespace mongo {
 namespace {
 const auto rangeDeleterServiceDecorator = ServiceContext::declareDecoration<RangeDeleterService>();
 
+const Seconds kMissingIndexRetryInterval(10);
+
 BSONObj getShardKeyPattern(OperationContext* opCtx,
                            const DatabaseName& dbName,
                            const UUID& collectionUuid) {
@@ -128,8 +130,10 @@ RangeDeleterService* RangeDeleterService::get(OperationContext* opCtx) {
 }
 
 RangeDeleterService::ReadyRangeDeletionsProcessor::ReadyRangeDeletionsProcessor(
-    OperationContext* opCtx)
-    : _service(opCtx->getServiceContext()), _thread([this] { _runRangeDeletions(); }) {}
+    OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor)
+    : _service(opCtx->getServiceContext()),
+      _thread([this] { _runRangeDeletions(); }),
+      _executor(executor) {}
 
 RangeDeleterService::ReadyRangeDeletionsProcessor::~ReadyRangeDeletionsProcessor() {
     shutdown();
@@ -317,7 +321,21 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                 // recoverable for a range shard key. This index may be rebuilt in the future, so
                 // reschedule the task at the end of the queue.
                 _completedRangeDeletion();
-                emplaceRangeDeletion(task);
+
+                sleepFor(_executor, kMissingIndexRetryInterval)
+                    .getAsync([this, task](Status status) {
+                        if (!status.isOK()) {
+                            LOGV2_WARNING(9962300,
+                                          "Encountered an error while retrying a range deletion "
+                                          "task that previously failed due to missing index",
+                                          "status"_attr = status,
+                                          "task"_attr = task.toBSON());
+                            return;
+                        }
+
+                        emplaceRangeDeletion(task);
+                    });
+
                 break;
             } catch (const DBException&) {
                 // Release the thread only in case the operation context has been interrupted, as
@@ -372,7 +390,8 @@ void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long te
     _executor->startup();
 
     // Initialize the range deletion processor to allow enqueueing ready task
-    _readyRangeDeletionsProcessorPtr = std::make_unique<ReadyRangeDeletionsProcessor>(opCtx);
+    _readyRangeDeletionsProcessorPtr =
+        std::make_unique<ReadyRangeDeletionsProcessor>(opCtx, _executor);
 
     _recoverRangeDeletionsOnStepUp(opCtx);
 }

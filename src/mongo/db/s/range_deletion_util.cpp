@@ -121,11 +121,6 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                         "Unable to find range shard key index",
                         "keyPattern"_attr = keyPattern,
                         logAttrs(nss));
-
-            // When a shard key index is not found, the range deleter moves the task to the bottom
-            // of the range deletion queue. This sleep is aimed at avoiding logging too aggressively
-            // in order to prevent log files to increase too much in size.
-            opCtx->sleepFor(Seconds(5));
         }
 
         iasserted(ErrorCodes::IndexNotFound,
