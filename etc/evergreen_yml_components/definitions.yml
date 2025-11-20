@@ -176,7 +176,7 @@ functions:
       display_name: "generate evergreen engflow bazelrc"
       binary: bash
       env:
-        evergreen_remote_exec: "on"
+        evergreen_remote_exec: ${evergreen_remote_exec|off}
       args:
       - "src/evergreen/generate_evergreen_bazelrc.sh"
 
@@ -211,7 +211,7 @@ functions:
     params:
       binary: bash
       env:
-        evergreen_remote_exec: "on"
+        evergreen_remote_exec: ${evergreen_remote_exec|off}
         author_email: ${author_email}
         build_id: ${build_id}
         distro_id: ${distro_id}
