@@ -28,12 +28,13 @@ assert.commandWorked(coll.createIndex({a: 1, "$**": -1, b: 1}, {"wildcardProject
 
 // Tests that _id can be excluded in an inclusion projection statement.
 assert.commandWorked(coll.createIndex({"$**": 1, "other": 1}, {"wildcardProjection": {"_id": 0, "a": 1}}));
-// Tests that _id can be inccluded in an exclusion projection statement.
+// Tests that _id can be included in an exclusion projection statement.
 assert.commandWorked(
     coll.createIndex({"$**": 1, "another": 1}, {"wildcardProjection": {"_id": 1, "a": 0, "another": 0}}),
 );
+assert.commandWorked(coll.createIndex({"$**": 1, "yetAnother": 1}, {"wildcardProjection": {"_id": 1}}));
 
-// Tests we wildcard projections allow nested objects.
+// Tests wildcard projections allow nested objects.
 assert.commandWorked(coll.createIndex({"$**": 1, "d": 1}, {"wildcardProjection": {"a": {"b": 1, "c": 1}}}));
 
 //
@@ -65,8 +66,39 @@ assert.commandFailedWithCode(coll.createIndex({"a.$**": 1, b: 1}, {expireAfterSe
 // 'wildcardProjection' is not specified.
 assert.commandFailedWithCode(coll.createIndex({a: 1, "$**": 1}), 67);
 
+// Tests that the wildcardProjection cannot be empty.
+assert.commandFailedWithCode(coll.createIndex({a: 1, "$**": 1}, {wildcardProjection: {}}), ErrorCodes.FailedToParse);
+
+// Tests that a wildcardProjection is not allowed for non-wildcard indexes.
+assert.commandFailedWithCode(coll.createIndex({a: 1, b: 1}, {wildcardProjection: {c: 1}}), ErrorCodes.BadValue);
+
+// Tests that wildcardProjection cannot include regular index fields.
+assert.commandFailedWithCode(coll.createIndex({a: 1, "$**": 1}, {wildcardProjection: {a: 1}}), 7246208);
+assert.commandFailedWithCode(coll.createIndex({a: 1, "$**": 1}, {wildcardProjection: {a: 1, b: 1}}), 7246208);
+assert.commandFailedWithCode(coll.createIndex({a: 1, "$**": 1, b: 1}, {wildcardProjection: {a: 1, b: 1}}), 7246208);
+assert.commandFailedWithCode(coll.createIndex({_id: 1, "$**": 1}, {wildcardProjection: {_id: 1}}), 7246208);
+
+// Tests that a wildcardProjection can only mix inclusion/exclusion projections with _id.
+assert.commandFailedWithCode(coll.createIndex({"$**": 1, c: 1}, {wildcardProjection: {_id: 0, a: 0, b: 1}}), 7246211);
+assert.commandFailedWithCode(coll.createIndex({"$**": 1, c: 1}, {wildcardProjection: {_id: 1, a: 0, b: 1}}), 7246211);
+assert.commandWorked(coll.createIndex({"$**": 1, "c": 1}, {wildcardProjection: {"_id": 0, b: 1}}));
+assert.commandWorked(coll.createIndex({"$**": 1, "e": 1}, {wildcardProjection: {"_id": 1, e: 0}}));
+assert.commandFailedWithCode(
+    coll.createIndex({"$**": 1, "_id": 1, "e": 1}, {wildcardProjection: {"_id": 1, e: 0}}),
+    7246209,
+);
+assert.commandWorked(coll.createIndex({"$**": 1, "_id": 1, "e": 1}, {wildcardProjection: {"_id": 0, a: 1}}));
+
 // Tests that wildcard projections accept only numeric values.
 assert.commandFailedWithCode(coll.createIndex({"st": 1, "$**": 1}, {wildcardProjection: {"a": "something"}}), 51271);
+
+// Tests that just excluding _id is not valid in the wildcardProjection, unless the regular part is _id.
+assert.commandFailedWithCode(coll.createIndex({"a": 1, "$**": 1}, {wildcardProjection: {"_id": 0}}), 7246210);
+assert.commandFailedWithCode(coll.createIndex({"$**": 1, "a": 1}, {wildcardProjection: {"_id": 0}}), 7246210);
+assert.commandFailedWithCode(coll.createIndex({"b": 1, "$**": 1, "a": 1}, {wildcardProjection: {"_id": 0}}), 7246210);
+assert.commandWorked(coll.createIndex({"_id": 1, "$**": 1}, {wildcardProjection: {"_id": 0}}));
+assert.commandWorked(coll.createIndex({"$**": 1, "_id": 1}, {wildcardProjection: {"_id": 0}}));
+assert.commandFailedWithCode(coll.createIndex({"_id": 1, "$**": 1, "a": 1}, {wildcardProjection: {"_id": 0}}), 7246210);
 
 // Tests that all compound wildcard indexes in the catalog can be validated by running validate()
 // command.
@@ -76,6 +108,35 @@ assert.commandWorked(coll.createIndex({a: 1, "b.$**": 1, str: 1}));
 assert.commandWorked(coll.createIndex({"b.$**": 1, str: 1}));
 assert.commandWorked(coll.createIndex({a: 1, "b.$**": 1}));
 assert.commandWorked(coll.createIndex({"$**": 1}));
+assert.commandWorked(coll.createIndex({"b": 1, "$**": 1}, {wildcardProjection: {"_id": 0, "a": 1}}));
+assert.commandWorked(coll.createIndex({"_id": 1, "a": 1, "$**": 1}, {wildcardProjection: {"_id": 0, "a": 0}}));
+assert.commandFailedWithCode(coll.createIndex({"a": 1, "_id": 1, "$**": 1}, {wildcardProjection: {"a": 0}}), 7246209);
+assert.commandFailedWithCode(coll.createIndex({"a": 1, "b": 1, "$**": 1}, {wildcardProjection: {"b": 0}}), 7246209);
+assert.commandWorked(coll.createIndex({"a": 1, "$**": 1}, {wildcardProjection: {"_id": 0, "a": 0}}));
+assert.commandWorked(coll.createIndex({"e": 1, "$**": 1}, {wildcardProjection: {"_id": 1, "f": 1}}));
+assert.commandFailedWithCode(coll.createIndex({"b": 1, "$**": 1}, {wildcardProjection: {"_id": 0, "a": 0}}), 7246210);
+assert.commandFailedWithCode(coll.createIndex({"a": 1, "$**": 1}, {wildcardProjection: {"_id": 0, "a": 1}}), 7246208);
+assert.commandFailedWithCode(coll.createIndex({"a": 1, "$**": 1}, {wildcardProjection: {"_id": 1, "a": 1}}), 7246208);
+assert.commandFailedWithCode(coll.createIndex({"_id": 1, "$**": 1}, {wildcardProjection: {"_id": 1, "a": 1}}), 7246208);
+assert.commandFailedWithCode(coll.createIndex({"$**": 1, "d": 1}, {wildcardProjection: {"_id": 1, e: 0}}), 7246209);
+
+// Dotted paths
+assert.commandWorked(coll.createIndex({"_id": 1, "a.b": 1, "$**": 1}, {wildcardProjection: {"_id": 0, "a": 0}}));
+assert.commandFailedWithCode(
+    coll.createIndex({"_id": 1, "a": 1, "$**": 1}, {wildcardProjection: {"_id": 0, "a.b": 0}}),
+    7246209,
+);
+assert.commandWorked(coll.createIndex({"a.b": 1, "$**": 1}, {wildcardProjection: {"_id": 0, "a": 0}}));
+assert.commandFailedWithCode(coll.createIndex({"a": 1, "$**": 1}, {wildcardProjection: {"_id": 0, "a.b": 0}}), 7246209);
+assert.commandWorked(coll.createIndex({"$**": 1, "_id": 1, "e.b": 1}, {wildcardProjection: {"_id": 0, "a.b": 1}}));
+assert.commandWorked(coll.createIndex({"b.c": 1, "$**": 1}, {wildcardProjection: {"_id": 0, "a": 1}}));
+assert.commandWorked(coll.createIndex({"b.d": 1, "$**": 1}, {wildcardProjection: {"_id": 0, "a.b": 1}}));
+assert.commandWorked(coll.createIndex({"$**": 1, "e.b": 1}, {wildcardProjection: {"_id": 1, e: 0}}));
+assert.commandFailedWithCode(coll.createIndex({"$**": 1, "e": 1}, {wildcardProjection: {"_id": 1, "e.b": 0}}), 7246209);
+assert.commandFailedWithCode(
+    coll.createIndex({"$**": 1, "e.c": 1}, {wildcardProjection: {"_id": 1, "e.b": 0}}),
+    7246210,
+);
 
 // Insert documents to index.
 for (let i = 0; i < 10; i++) {
