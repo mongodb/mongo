@@ -56,6 +56,12 @@ static void accumulateStats(ECOCStats& left, const ECOCStats& right) {
     left.setRead(left.getRead() + right.getRead());
     left.setDeleted(left.getDeleted() + right.getDeleted());
 }
+static void accumulateStats(FLEIndexTypeStats& left, const FLEIndexTypeStats& right) {
+    left.setEquality(left.getEquality() + right.getEquality());
+    left.setRange(left.getRange() + right.getRange());
+    left.setRangePreview(left.getRangePreview() + right.getRangePreview());
+    left.setUnindexed(left.getUnindexed() + right.getUnindexed());
+}
 }  // namespace FLEStatsUtil
 
 /**
@@ -69,9 +75,9 @@ public:
     // Return the global status section Singleton
     static FLEStatusSection& get();
 
-    // Report FLE metrics if any stat has been set.
+    // Report FLE metrics at all times
     bool includeByDefault() const final {
-        return _hasStats.loadRelaxed();
+        return true;
     }
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final;
@@ -102,7 +108,6 @@ public:
         explicit EmuBinaryTracker(FLEStatusSection* section, bool active)
             : _section(section), _active(active), _timer(_section->_tickSource) {
             if (_active) {
-                _section->_hasStats.store(true);
                 _section->emuBinaryCalls.fetchAndAddRelaxed(1);
             }
         }
@@ -116,22 +121,24 @@ public:
 
     void updateCompactionStats(const CompactStats& stats) {
         stdx::lock_guard<Mutex> lock(_compactMutex);
-        _hasStats.store(true);
         FLEStatsUtil::accumulateStats(_compactStats.getEsc(), stats.getEsc());
         FLEStatsUtil::accumulateStats(_compactStats.getEcoc(), stats.getEcoc());
     }
 
     void updateCleanupStats(const CleanupStats& stats) {
         stdx::lock_guard<Mutex> lock(_cleanupMutex);
-        _hasStats.store(true);
         FLEStatsUtil::accumulateStats(_cleanupStats.getEsc(), stats.getEsc());
         FLEStatsUtil::accumulateStats(_cleanupStats.getEcoc(), stats.getEcoc());
     }
 
-private:
-    TickSource* _tickSource;
+    void updateIndexTypeStatsOnRegisterCollection(const EncryptedFieldConfig& efc);
+    void updateIndexTypeStatsOnDeregisterCollection(const EncryptedFieldConfig& efc);
+    void clearIndexTypeStats();
 
-    AtomicWord<bool> _hasStats{false};
+private:
+    void updateIndexTypeStats(const EncryptedFieldConfig& efc, bool subtract);
+
+    TickSource* _tickSource;
 
     AtomicWord<long long> emuBinaryCalls;
     AtomicWord<long long> emuBinarySuboperation;
@@ -142,6 +149,11 @@ private:
 
     mutable Mutex _cleanupMutex = MONGO_MAKE_LATCH("FLECleanupStats::_mutex");
     CleanupStats _cleanupStats;
+
+    // Tracks and reports statistics about how many collections in the catalog use each of the
+    // Queryable Encryption index types, and how many collections use unindexed encryption.
+    mutable Mutex _indexTypeMutex = MONGO_MAKE_LATCH("FLEIndexTypeStats::_mutex");
+    FLEIndexTypeStats _indexTypeStats;
 };
 
 }  // namespace mongo

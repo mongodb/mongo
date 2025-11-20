@@ -54,6 +54,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/crypto/fle_stats.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/client.h"
@@ -2371,6 +2372,8 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
             }
             if (coll->getCollectionOptions().encryptedFieldConfig) {
                 _stats.queryableEncryption += 1;
+                FLEStatusSection::get().updateIndexTypeStatsOnRegisterCollection(
+                    coll->getCollectionOptions().encryptedFieldConfig.value());
             }
             if (isCSFLE1Validator(coll->getValidatorDoc())) {
                 _stats.csfle += 1;
@@ -2440,6 +2443,8 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
             }
             if (coll->getCollectionOptions().encryptedFieldConfig) {
                 _stats.queryableEncryption -= 1;
+                FLEStatusSection::get().updateIndexTypeStatsOnDeregisterCollection(
+                    coll->getCollectionOptions().encryptedFieldConfig.value());
             }
             if (isCSFLE1Validator(coll->getValidatorDoc())) {
                 _stats.csfle -= 1;
@@ -2549,6 +2554,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx)
     _dropPendingIndex = {};
     _stats = {};
 
+    FLEStatusSection::get().clearIndexTypeStats();
     ResourceCatalog::get().clear();
 }
 

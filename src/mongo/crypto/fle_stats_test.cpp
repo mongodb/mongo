@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/crypto/fle_stats.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/crypto/fle_stats.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
@@ -94,7 +93,7 @@ public:
 };
 
 TEST_F(FLEStatsTest, NoopStats) {
-    ASSERT_FALSE(instance->includeByDefault());
+    ASSERT_TRUE(instance->includeByDefault());
 
     auto obj = instance->generateSection(opCtx, BSONElement());
     ASSERT_TRUE(obj.hasField("compactStats"));
@@ -137,7 +136,7 @@ TEST_F(FLEStatsTest, BinaryEmuStatsAreEmptyWithoutTesting) {
         tracker.recordSuboperation();
     }
 
-    ASSERT_FALSE(instance->includeByDefault());
+    ASSERT_TRUE(instance->includeByDefault());
 
     auto obj = instance->generateSection(opCtx, BSONElement());
     ASSERT_TRUE(obj.hasField("compactStats"));
@@ -170,6 +169,100 @@ TEST_F(FLEStatsTest, BinaryEmuStatsArePopulatedWithTesting) {
     ASSERT_EQ(1, obj["emuBinaryStats"]["suboperations"].Long());
     ASSERT_EQ(100, obj["emuBinaryStats"]["totalMillis"].Long());
 }
+
+TEST_F(FLEStatsTest, IndexTypeStats) {
+    struct IndexTypeCounters {
+        int64_t equality = 0;
+        int64_t unindexed = 0;
+        int64_t range = 0;
+        int64_t rangePreview = 0;
+    };
+
+    auto assertCounters = [this](const IndexTypeCounters& expected) {
+        auto ctx = IDLParserContext("indexTypeStats");
+        auto obj = instance->generateSection(opCtx, BSONElement());
+        auto actual = FLEIndexTypeStats::parse(ctx, obj["indexTypeStats"].Obj());
+        ASSERT_EQ(actual.getEquality(), expected.equality);
+        ASSERT_EQ(actual.getUnindexed(), expected.unindexed);
+        ASSERT_EQ(actual.getRange(), expected.range);
+        ASSERT_EQ(actual.getRangePreview(), expected.rangePreview);
+    };
+
+    const auto buildConfig = [](const StringMap<int64_t>& spec) {
+        EncryptedFieldConfig efc;
+        std::vector<EncryptedField> fields;
+        const auto keyId = UUID::gen();
+
+        for (auto& [indexType, count] : spec) {
+            if (indexType == "unindexed") {
+                for (auto i = count; i > 0; i--) {
+                    fields.emplace_back(keyId, indexType);
+                }
+            } else {
+                for (auto i = count; i > 0; i--) {
+                    auto ctx = IDLParserContext("queryTypeConfig");
+                    fields.emplace_back(keyId, indexType);
+                    auto qtc = QueryTypeConfig::parse(
+                        ctx, fromjson("{\"queryType\": \"" + indexType + "\"}"));
+                    fields.back().setQueries(
+                        std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>(
+                            std::move(qtc)));
+                }
+            }
+        }
+        efc.setFields(std::move(fields));
+        return efc;
+    };
+
+    ASSERT_TRUE(instance->includeByDefault());
+
+    IndexTypeCounters expected;
+    assertCounters(expected);
+
+    auto efc1 = buildConfig({{"unindexed", 4}, {"equality", 2}});
+    instance->updateIndexTypeStatsOnRegisterCollection(efc1);
+    expected.unindexed++;
+    expected.equality++;
+    assertCounters(expected);
+
+    auto efc2 = buildConfig({{"range", 3}, {"rangePreview", 1}});
+    instance->updateIndexTypeStatsOnRegisterCollection(efc2);
+    expected.range++;
+    expected.rangePreview++;
+    assertCounters(expected);
+
+    auto efc3 = buildConfig({{"equality", 1}, {"range", 2}});
+    instance->updateIndexTypeStatsOnRegisterCollection(efc3);
+    expected.equality++;
+    expected.range++;
+    assertCounters(expected);
+
+    instance->updateIndexTypeStatsOnDeregisterCollection(efc2);
+    expected.range--;
+    expected.rangePreview--;
+    assertCounters(expected);
+
+    instance->updateIndexTypeStatsOnRegisterCollection(efc3);
+    expected.equality++;
+    expected.range++;
+    assertCounters(expected);
+
+    instance->updateIndexTypeStatsOnDeregisterCollection(efc3);
+    expected.equality--;
+    expected.range--;
+    assertCounters(expected);
+
+    instance->updateIndexTypeStatsOnDeregisterCollection(efc1);
+    expected.unindexed--;
+    expected.equality--;
+    assertCounters(expected);
+
+    instance->updateIndexTypeStatsOnDeregisterCollection(efc3);
+    expected.equality--;
+    expected.range--;
+    assertCounters(expected);
+}
+
 
 }  // namespace
 }  // namespace mongo

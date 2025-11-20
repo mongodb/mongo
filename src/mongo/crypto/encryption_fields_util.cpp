@@ -66,4 +66,36 @@ Status checkForVersion70IncompatibleFields(const FLECompactionOptions& newVal,
     return Status::OK();
 }
 
+bool visitQueryTypeConfigs(const EncryptedField& field,
+                           const QueryTypeConfigVisitor& visitOne,
+                           const UnindexedEncryptedFieldVisitor& onEmptyField) {
+    if (!field.getQueries()) {
+        if (onEmptyField) {
+            return onEmptyField(field);
+        }
+        return false;
+    }
+
+    return visit(OverloadedVisitor{[&](QueryTypeConfig query) { return visitOne(field, query); },
+                                   [&](std::vector<QueryTypeConfig> queries) {
+                                       return std::any_of(queries.cbegin(),
+                                                          queries.cend(),
+                                                          [&](const QueryTypeConfig& qtc) {
+                                                              return visitOne(field, qtc);
+                                                          });
+                                   }},
+                 field.getQueries().get());
+}
+
+bool visitQueryTypeConfigs(const EncryptedFieldConfig& efc,
+                           const QueryTypeConfigVisitor& visitOne,
+                           const UnindexedEncryptedFieldVisitor& onEmptyField) {
+    for (const auto& field : efc.getFields()) {
+        if (visitQueryTypeConfigs(field, visitOne, onEmptyField)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace mongo

@@ -62,11 +62,27 @@ structs:
     CompactStats:
         description: "Stats about records in ECOC, and ESC compact touched"
         fields:
-           ecoc: ECOCStats
-           esc: ECStats
+            ecoc: ECOCStats
+            esc: ECStats
 
     CleanupStats:
         description: "Stats about records in ECOC, and ESC cleanup touched"
         fields:
-           ecoc: ECOCStats
-           esc: ECStats
+            ecoc: ECOCStats
+            esc: ECStats
+
+    FLEIndexTypeStats:
+        description: "Counters for each FLE2 index type, including unindexed"
+        fields:
+            unindexed:
+                type: exactInt64
+                default: 0
+            equality:
+                type: exactInt64
+                default: 0
+            range:
+                type: exactInt64
+                default: 0
+            rangePreview:
+                type: exactInt64
+                default: 0
