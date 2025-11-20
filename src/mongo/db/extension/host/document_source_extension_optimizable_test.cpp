@@ -56,11 +56,13 @@ TEST_F(DocumentSourceExtensionOptimizableTest, noOpConstructionSucceeds) {
         new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
     auto astHandle = AggStageAstNodeHandle(astNode);
 
+    DepsTracker deps(QueryMetadataBitSet{});
     auto optimizable =
         host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
 
     ASSERT_EQ(std::string(optimizable->getSourceName()),
               sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
+    ASSERT_DOES_NOT_THROW(optimizable->getDependencies(&deps));
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, stageCanSerializeForQueryExecution) {
@@ -106,6 +108,9 @@ TEST_F(DocumentSourceExtensionOptimizableTest, stageWithDefaultStaticProperties)
     ASSERT_TRUE(staticProperties.getRequiresInputDocSource());
     ASSERT_EQ(staticProperties.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
     ASSERT_EQ(staticProperties.getHostType(), MongoExtensionHostTypeRequirementEnum::kNone);
+    ASSERT_TRUE(staticProperties.getPreservesUpstreamMetadata());
+    ASSERT_FALSE(staticProperties.getRequiredMetadataFields().has_value());
+    ASSERT_FALSE(staticProperties.getProvidedMetadataFields().has_value());
 
     auto constraints = optimizable->constraints(PipelineSplitState::kUnsplit);
 
@@ -127,6 +132,8 @@ TEST_F(DocumentSourceExtensionOptimizableTest, searchLikeStageWithSourceStageSta
     ASSERT_FALSE(staticProperties.getRequiresInputDocSource());
     ASSERT_EQ(staticProperties.getPosition(), MongoExtensionPositionRequirementEnum::kFirst);
     ASSERT_EQ(staticProperties.getHostType(), MongoExtensionHostTypeRequirementEnum::kAnyShard);
+    ASSERT_TRUE(staticProperties.getProvidedMetadataFields().has_value());
+    ASSERT_TRUE(staticProperties.getRequiredMetadataFields().has_value());
 
     auto constraints = optimizable->constraints(PipelineSplitState::kUnsplit);
 
@@ -134,5 +141,96 @@ TEST_F(DocumentSourceExtensionOptimizableTest, searchLikeStageWithSourceStageSta
     ASSERT_EQ(constraints.hostRequirement, StageConstraints::HostTypeRequirement::kAnyShard);
     ASSERT_FALSE(constraints.requiresInputDocSource);
     ASSERT_FALSE(constraints.consumesLogicalCollectionData);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, searchLikeStageWithMetadataFields) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::SearchLikeSourceAggStageAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    DepsTracker deps(QueryMetadataBitSet{});
+    deps.setMetadataAvailable(DocumentMetadataFields::kScore);
+
+    optimizable->getDependencies(&deps);
+
+    ASSERT_FALSE(deps.getAvailableMetadata()[DocumentMetadataFields::kScore]);
+    ASSERT_TRUE(deps.getAvailableMetadata()[DocumentMetadataFields::kSearchHighlights]);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       searchLikeStageWithMetadataFieldsWithPreserveUpstreamMetadata) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::SearchLikeSourceWithPreserveUpstreamMetadataAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    DepsTracker deps(QueryMetadataBitSet{});
+    deps.setMetadataAvailable(DocumentMetadataFields::kSearchScore);
+
+    optimizable->getDependencies(&deps);
+
+    ASSERT_TRUE(deps.getAvailableMetadata()[DocumentMetadataFields::kScore]);
+    ASSERT_TRUE(deps.getAvailableMetadata()[DocumentMetadataFields::kSearchHighlights]);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, searchLikeStageWithNoSourceMetadata) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::SearchLikeSourceAggStageAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    DepsTracker deps(DepsTracker::kNoMetadata);
+
+    ASSERT_THROWS_CODE(optimizable->getDependencies(&deps), AssertionException, 40218);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, searchLikeStageWithNoSuitableSourceMetadata) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::SearchLikeSourceAggStageAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    DepsTracker deps(DepsTracker::kAllGeoNearData);
+
+    ASSERT_THROWS_CODE(optimizable->getDependencies(&deps), AssertionException, 40218);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       searchLikeStageWithMetadataFieldsWithInvalidRequiredMetadataField) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::SearchLikeSourceWithInvalidRequiredMetadataFieldAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    DepsTracker deps(QueryMetadataBitSet{});
+    deps.setMetadataAvailable(DocumentMetadataFields::kSearchScore);
+
+    ASSERT_THROWS_CODE(optimizable->getDependencies(&deps), AssertionException, 17308);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       searchLikeStageWithMetadataFieldsWithInvalidProvidedMetadataField) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::SearchLikeSourceWithInvalidProvidedMetadataFieldAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    DepsTracker deps(QueryMetadataBitSet{});
+    deps.setMetadataAvailable(DocumentMetadataFields::kSearchScore);
+
+    ASSERT_THROWS_CODE(optimizable->getDependencies(&deps), AssertionException, 17308);
 }
 }  // namespace mongo::extension

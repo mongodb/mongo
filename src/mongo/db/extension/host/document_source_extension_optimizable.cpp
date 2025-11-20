@@ -70,4 +70,34 @@ DocumentSource::Id DocumentSourceExtensionOptimizable::getId() const {
     return id;
 }
 
+DepsTracker::State DocumentSourceExtensionOptimizable::getDependencies(DepsTracker* deps) const {
+    const auto& properties = getStaticProperties();
+
+    auto processFields = [](const auto& fields, auto&& apply) {
+        if (fields.has_value()) {
+            for (const auto& fieldName : *fields) {
+                auto metaType = DocumentMetadataFields::parseMetaType(fieldName);
+                apply(metaType);
+            }
+        }
+    };
+
+    // Report required metadata fields for this stage.
+    processFields(properties.getRequiredMetadataFields(),
+                  [&](auto metaType) { deps->setNeedsMetadata(metaType); });
+
+    // Drop upstream metadata fields if this stage does not preserve them.
+    if (!properties.getPreservesUpstreamMetadata()) {
+        // TODO: SERVER-100443
+        deps->clearMetadataAvailable();
+    }
+
+    // Report provided metadata fields for this stage.
+    processFields(properties.getProvidedMetadataFields(),
+                  [&](auto metaType) { deps->setMetadataAvailable(metaType); });
+
+    // Retain entire metadata and do not optimize, as it may be needed by the extension.
+    return DepsTracker::State::NOT_SUPPORTED;
+}
+
 }  // namespace mongo::extension::host

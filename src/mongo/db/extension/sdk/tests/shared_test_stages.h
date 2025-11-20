@@ -725,9 +725,8 @@ public:
         return BSON("requiresInputDocSource"
                     << false << "position" << "first" << "hostType"
                     << "anyShard"
-                    << "requiredMetadataFields" << BSON_ARRAY("searchScore")
-                    << "providedMetadataFields" << BSON_ARRAY("searchScore" << "searchHighlights")
-                    << "preservesUpstreamMetadata" << false);
+                    << "requiredMetadataFields" << BSON_ARRAY("score") << "providedMetadataFields"
+                    << BSON_ARRAY("searchHighlights") << "preservesUpstreamMetadata" << false);
     }
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
@@ -736,6 +735,54 @@ public:
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<SearchLikeSourceAggStageAstNode>();
+    }
+};
+
+class SearchLikeSourceWithPreserveUpstreamMetadataAstNode : public SearchLikeSourceAggStageAstNode {
+public:
+    BSONObj getProperties() const override {
+        return BSON("requiresInputDocSource"
+                    << false << "position" << "first" << "hostType"
+                    << "anyShard"
+                    << "requiredMetadataFields" << BSON_ARRAY("score") << "providedMetadataFields"
+                    << BSON_ARRAY("searchHighlights") << "preservesUpstreamMetadata" << true);
+    }
+
+    static std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<SearchLikeSourceWithPreserveUpstreamMetadataAstNode>();
+    }
+};
+
+class SearchLikeSourceWithInvalidRequiredMetadataFieldAstNode
+    : public SearchLikeSourceAggStageAstNode {
+public:
+    BSONObj getProperties() const override {
+        return BSON("requiresInputDocSource"
+                    << false << "position" << "first" << "hostType"
+                    << "anyShard"
+                    << "requiredMetadataFields" << BSON_ARRAY("customSearchScore")
+                    << "providedMetadataFields" << BSON_ARRAY("searchScore" << "searchHighlights"));
+    }
+
+    static std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<SearchLikeSourceWithInvalidRequiredMetadataFieldAstNode>();
+    }
+};
+
+class SearchLikeSourceWithInvalidProvidedMetadataFieldAstNode
+    : public SearchLikeSourceAggStageAstNode {
+public:
+    BSONObj getProperties() const override {
+        return BSON("requiresInputDocSource"
+                    << false << "position" << "first" << "hostType"
+                    << "anyShard"
+                    << "requiredMetadataFields" << BSON_ARRAY("searchScore")
+                    << "providedMetadataFields"
+                    << BSON_ARRAY("customSearchScore" << "searchHighlights"));
+    }
+
+    static std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<SearchLikeSourceWithInvalidProvidedMetadataFieldAstNode>();
     }
 };
 

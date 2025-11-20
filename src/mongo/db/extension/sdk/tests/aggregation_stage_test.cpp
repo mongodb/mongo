@@ -351,12 +351,11 @@ TEST_F(AggStageTest, SearchLikeSourceAggStageAstNodeSucceeds) {
 
     ASSERT_TRUE(requiredFields.has_value());
     ASSERT_EQ(requiredFields->size(), 1u);
-    ASSERT_EQ((*requiredFields)[0], "searchScore");
+    ASSERT_EQ((*requiredFields)[0], "score");
 
     ASSERT_TRUE(providedFields.has_value());
-    ASSERT_EQ(providedFields->size(), 2u);
-    ASSERT_EQ((*providedFields)[0], "searchScore");
-    ASSERT_EQ((*providedFields)[1], "searchHighlights");
+    ASSERT_EQ(providedFields->size(), 1u);
+    ASSERT_EQ((*providedFields)[0], "searchHighlights");
 }
 
 TEST_F(AggStageTest, BadRequiresInputDocSourceTypeAggStageAstNodeFails) {
