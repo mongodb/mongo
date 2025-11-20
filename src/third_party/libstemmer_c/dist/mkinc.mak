@@ -5,7 +5,7 @@
 #
 # Modules included by this file are: danish, dutch, english, finnish, french,
 # german, hungarian, italian, norwegian, porter, portuguese, romanian,
-# russian, spanish, swedish, turkish
+# russian, serbian, spanish, swedish, turkish
 
 snowball_sources= \
   src_c/stem_ISO_8859_1_danish.c \
@@ -34,6 +34,7 @@ snowball_sources= \
   src_c/stem_UTF_8_romanian.c \
   src_c/stem_KOI8_R_russian.c \
   src_c/stem_UTF_8_russian.c \
+  src_c/stem_UTF_8_serbian.c \
   src_c/stem_ISO_8859_1_spanish.c \
   src_c/stem_UTF_8_spanish.c \
   src_c/stem_ISO_8859_1_swedish.c \
@@ -70,6 +71,7 @@ snowball_headers= \
   src_c/stem_UTF_8_romanian.h \
   src_c/stem_KOI8_R_russian.h \
   src_c/stem_UTF_8_russian.h \
+  src_c/stem_UTF_8_serbian.h \
   src_c/stem_ISO_8859_1_spanish.h \
   src_c/stem_UTF_8_spanish.h \
   src_c/stem_ISO_8859_1_swedish.h \
