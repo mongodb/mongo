@@ -48,8 +48,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-namespace mongo {
-namespace admission {
+namespace mongo::admission::execution_control {
 
 namespace {
 const auto ticketingSystemDecoration =
@@ -109,15 +108,14 @@ bool wasOperationDowngradedToLowPriority(OperationContext* opCtx,
     //      2. We don't deprioritize operations within a multi-document transaction.
     //      3. It is illegal to demote a high-priority (exempt) operation.
     //      4. The operation is already low-priority (no-op).
-    if (!gExecutionControlHeuristicDeprioritizationEnabled.load() ||
-        opCtx->inMultiDocumentTransaction() || priority == AdmissionContext::Priority::kExempt ||
+    if (!gHeuristicDeprioritization.load() || opCtx->inMultiDocumentTransaction() ||
+        priority == AdmissionContext::Priority::kExempt ||
         priority == AdmissionContext::Priority::kLow) {
         return false;
     }
 
     // If the op is eligible, downgrade it if it has yielded enough times to meet the threshold.
-    return admCtx->getAdmissions() >=
-        gExecutionControlHeuristicNumAdmissionsDeprioritizeThreshold.load();
+    return admCtx->getAdmissions() >= gHeuristicNumAdmissionsDeprioritizeThreshold.load();
 }
 
 }  // namespace
@@ -596,5 +594,4 @@ void TicketingSystem::TicketingState::appendStats(BSONObjBuilder& b) const {
     b.append("executionControlConcurrencyAdjustmentAlgorithm", algorithm);
 }
 
-}  // namespace admission
-}  // namespace mongo
+}  // namespace mongo::admission::execution_control

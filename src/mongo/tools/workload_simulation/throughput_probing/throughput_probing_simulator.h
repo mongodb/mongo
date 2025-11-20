@@ -85,7 +85,7 @@ private:
     std::unique_ptr<TicketHolder> _writeTicketHolder;
 
     MockPeriodicRunner* _runner;
-    std::unique_ptr<admission::ThroughputProbing> _throughputProbing;
+    std::unique_ptr<admission::execution_control::ThroughputProbing> _throughputProbing;
     stdx::thread _probingThread;
     AtomicWord<bool> _probing;
 

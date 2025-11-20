@@ -554,7 +554,7 @@ config_fuzzer_params = {
             "period": 60,
             "fuzz_at": ["startup", "runtime"],
         },
-        "executionControlHeuristicDeprioritizationEnabled": {
+        "executionControlHeuristicDeprioritization": {
             "choices": [True, False],
             "period": 60,
             "fuzz_at": ["startup", "runtime"],
@@ -565,7 +565,7 @@ config_fuzzer_params = {
             "period": 60,
             "fuzz_at": ["startup", "runtime"],
         },
-        "executionControlDeprioritizeBackgroundTasks": {
+        "executionControlBackgroundTasksDeprioritization": {
             "choices": [True, False],
             "period": 60,
             "fuzz_at": ["startup", "runtime"],

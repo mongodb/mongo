@@ -204,7 +204,7 @@ describe("Execution control deprioritization mechanisms", function () {
                     setParameter: {
                         executionControlConcurrencyAdjustmentAlgorithm:
                             kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
-                        executionControlHeuristicDeprioritizationEnabled: false,
+                        executionControlHeuristicDeprioritization: false,
                     },
                 },
             });
@@ -267,7 +267,7 @@ describe("Execution control deprioritization mechanisms", function () {
                         ttlMonitorEnabled: false,
                         executionControlConcurrencyAdjustmentAlgorithm:
                             kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
-                        executionControlHeuristicDeprioritizationEnabled: false,
+                        executionControlHeuristicDeprioritization: false,
                     },
                 },
             });
@@ -346,7 +346,7 @@ describe("Execution control deprioritization mechanisms", function () {
                         setParameter: {
                             executionControlConcurrencyAdjustmentAlgorithm:
                                 kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
-                            executionControlHeuristicDeprioritizationEnabled: false,
+                            executionControlHeuristicDeprioritization: false,
                         },
                     },
                 },

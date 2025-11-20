@@ -804,7 +804,8 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
     if (!opCtx->inMultiDocumentTransaction()) {
         // If we're not in a txn, we record information about delinquent ticket acquisitions to the
         // Queue's stats.
-        if (auto ticketingSystem = admission::TicketingSystem::get(opCtx->getServiceContext())) {
+        if (auto ticketingSystem =
+                admission::execution_control::TicketingSystem::get(opCtx->getServiceContext())) {
             ticketingSystem->incrementStats(opCtx);
         }
     }

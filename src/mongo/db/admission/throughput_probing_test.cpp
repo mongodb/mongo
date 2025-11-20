@@ -48,7 +48,7 @@
 
 #include <boost/move/utility_core.hpp>
 
-namespace mongo::admission::throughput_probing {
+namespace mongo::admission::execution_control::throughput_probing {
 
 TEST(ThroughputProbingParameterTest, InitialConcurrency) {
     ASSERT_OK(validateInitialConcurrency(gMinConcurrency, {}));
@@ -531,4 +531,4 @@ TEST_F(ThroughputProbingWriteHeavyTest, StepSizeNonZeroDecreasing) {
     ASSERT_LT(_writeTicketHolder.outof(), writes);
 }
 
-}  // namespace mongo::admission::throughput_probing
+}  // namespace mongo::admission::execution_control::throughput_probing

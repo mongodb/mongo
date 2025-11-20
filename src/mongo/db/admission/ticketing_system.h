@@ -44,11 +44,9 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace mongo::admission::execution_control {
 
 enum class ExecutionControlConcurrencyAdjustmentAlgorithmEnum;
-
-namespace admission {
 
 /**
  * A ticket mechanism is required for global lock acquisition to reduce contention on storage engine
@@ -238,5 +236,4 @@ private:
     AtomicWord<std::int64_t> _opsDeprioritized;
 };
 
-}  // namespace admission
-}  // namespace mongo
+}  // namespace mongo::admission::execution_control

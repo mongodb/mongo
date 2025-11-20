@@ -63,7 +63,8 @@ using Argument =
     decltype(TransactionParticipant::observeCachePressureQueryPeriodMilliseconds)::Argument;
 
 bool underCachePressure(OperationContext* opCtx) {
-    auto ticketingSystem = admission::TicketingSystem::get(opCtx->getServiceContext());
+    auto ticketingSystem =
+        admission::execution_control::TicketingSystem::get(opCtx->getServiceContext());
     return opCtx->getServiceContext()->getStorageEngine()->underCachePressure(
         ticketingSystem->numOfTicketsUsed());
 }

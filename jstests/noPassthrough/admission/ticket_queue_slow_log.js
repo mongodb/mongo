@@ -31,7 +31,7 @@ rst.initiate();
 assert.commandWorked(
     rst.getPrimary().adminCommand({
         setParameter: 1,
-        executionControlHeuristicDeprioritizationEnabled: false,
+        executionControlHeuristicDeprioritization: false,
     }),
 );
 assert.commandWorked(

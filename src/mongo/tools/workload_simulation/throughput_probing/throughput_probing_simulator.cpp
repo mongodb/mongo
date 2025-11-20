@@ -44,10 +44,11 @@ ThroughputProbing::ThroughputProbing(StringData workloadName)
 void ThroughputProbing::setup() {
     Simulation::setup();
 
-    const auto initialTickets = admission::throughput_probing::gInitialConcurrency;
+    const auto initialTickets =
+        admission::execution_control::throughput_probing::gInitialConcurrency;
     constexpr auto initialMaxQueueDepth = TicketHolder::kDefaultMaxQueueDepth;
     Milliseconds probingInterval{
-        admission::throughput_probing::gConcurrencyAdjustmentIntervalMillis};
+        admission::execution_control::throughput_probing::gConcurrencyAdjustmentIntervalMillis};
 
     constexpr bool trackPeakUsed = true;
     _readTicketHolder = std::make_unique<TicketHolder>(
@@ -62,7 +63,7 @@ void ThroughputProbing::setup() {
         return runnerPtr;
     }();
 
-    _throughputProbing = std::make_unique<admission::ThroughputProbing>(
+    _throughputProbing = std::make_unique<admission::execution_control::ThroughputProbing>(
         svcCtx(), _readTicketHolder.get(), _writeTicketHolder.get(), probingInterval);
 
     _probingThread = stdx::thread([this, probingInterval]() {
@@ -110,7 +111,8 @@ size_t ThroughputProbing::actorCount() const {
     // held by threads waiting in our queue. The holder implementation only
     // updates the outof() value once it has finished burning all the
     // disappearing tickets.
-    return count * (1 - admission::throughput_probing::gStepMultiple.loadRelaxed());
+    return count *
+        (1 - admission::execution_control::throughput_probing::gStepMultiple.loadRelaxed());
 }
 
 boost::optional<BSONObj> ThroughputProbing::metrics() const {

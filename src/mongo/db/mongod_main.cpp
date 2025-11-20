@@ -588,7 +588,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         repl::InitialSyncerFactory::get(serviceContext)->runCrashRecovery();
     }
 
-    admission::initializeExecutionControl(serviceContext);
+    admission::execution_control::initializeTicketingSystem(serviceContext);
 
     serviceLifecycle.initializeStorageEngineExtensions(serviceContext);
 

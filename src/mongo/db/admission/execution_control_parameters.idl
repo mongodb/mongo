@@ -27,7 +27,7 @@
 #
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "mongo::admission::execution_control"
     cpp_includes:
         - "mongo/db/admission/ticketing_system.h"
 
@@ -61,16 +61,13 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentWriteTransactions
-        on_update: "admission::TicketingSystem::NormalPrioritySettings::updateConcurrentWriteTransactions"
+        on_update: "TicketingSystem::NormalPrioritySettings::updateConcurrentWriteTransactions"
         deprecated_name:
             - storageEngineConcurrentWriteTransactions
             - wiredTigerConcurrentWriteTransactions
-        default:
-            {
-                expr: "admission::TicketingSystem::kDefaultConcurrentTransactionsValue",
-            }
+        default: {expr: "TicketingSystem::kDefaultConcurrentTransactionsValue"}
         validator:
-            callback: "admission::TicketingSystem::NormalPrioritySettings::validateConcurrentWriteTransactions"
+            callback: "TicketingSystem::NormalPrioritySettings::validateConcurrentWriteTransactions"
         redact: false
 
     executionControlConcurrentWriteLowPriorityTransactions:
@@ -81,13 +78,13 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentWriteLowPriorityTransactions
-        on_update: "admission::TicketingSystem::LowPrioritySettings::updateConcurrentWriteTransactions"
+        on_update: "TicketingSystem::LowPrioritySettings::updateConcurrentWriteTransactions"
         default:
             {
-                expr: "admission::TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue",
+                expr: "TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue",
             }
         validator:
-            callback: "admission::TicketingSystem::LowPrioritySettings::validateConcurrentWriteTransactions"
+            callback: "TicketingSystem::LowPrioritySettings::validateConcurrentWriteTransactions"
         redact: false
 
     executionControlConcurrentReadTransactions:
@@ -97,16 +94,13 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentReadTransactions
-        on_update: "admission::TicketingSystem::NormalPrioritySettings::updateConcurrentReadTransactions"
+        on_update: "TicketingSystem::NormalPrioritySettings::updateConcurrentReadTransactions"
         deprecated_name:
             - storageEngineConcurrentReadTransactions
             - wiredTigerConcurrentReadTransactions
-        default:
-            {
-                expr: "admission::TicketingSystem::kDefaultConcurrentTransactionsValue",
-            }
+        default: {expr: "TicketingSystem::kDefaultConcurrentTransactionsValue"}
         validator:
-            callback: "admission::TicketingSystem::NormalPrioritySettings::validateConcurrentReadTransactions"
+            callback: "TicketingSystem::NormalPrioritySettings::validateConcurrentReadTransactions"
         redact: false
 
     executionControlConcurrentReadLowPriorityTransactions:
@@ -117,13 +111,13 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentReadLowPriorityTransactions
-        on_update: "admission::TicketingSystem::LowPrioritySettings::updateConcurrentReadTransactions"
+        on_update: "TicketingSystem::LowPrioritySettings::updateConcurrentReadTransactions"
         default:
             {
-                expr: "admission::TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue",
+                expr: "TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue",
             }
         validator:
-            callback: "admission::TicketingSystem::LowPrioritySettings::validateConcurrentReadTransactions"
+            callback: "TicketingSystem::LowPrioritySettings::validateConcurrentReadTransactions"
         redact: false
 
     executionControlReadMaxQueueDepth:
@@ -134,7 +128,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: Atomic<std::int32_t>
         cpp_varname: gReadMaxQueueDepth
-        on_update: "admission::TicketingSystem::NormalPrioritySettings::updateReadMaxQueueDepth"
+        on_update: "TicketingSystem::NormalPrioritySettings::updateReadMaxQueueDepth"
         deprecated_name:
             - storageEngineReadMaxQueueDepth
         default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
@@ -149,7 +143,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: Atomic<std::int32_t>
         cpp_varname: gReadLowPriorityMaxQueueDepth
-        on_update: "admission::TicketingSystem::LowPrioritySettings::updateReadMaxQueueDepth"
+        on_update: "TicketingSystem::LowPrioritySettings::updateReadMaxQueueDepth"
         default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
         validator: {gte: 0}
         redact: false
@@ -162,7 +156,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: Atomic<std::int32_t>
         cpp_varname: gWriteMaxQueueDepth
-        on_update: "admission::TicketingSystem::NormalPrioritySettings::updateWriteMaxQueueDepth"
+        on_update: "TicketingSystem::NormalPrioritySettings::updateWriteMaxQueueDepth"
         deprecated_name:
             - storageEngineWriteMaxQueueDepth
         default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
@@ -177,7 +171,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: Atomic<std::int32_t>
         cpp_varname: gWriteLowPriorityMaxQueueDepth
-        on_update: "admission::TicketingSystem::LowPrioritySettings::updateWriteMaxQueueDepth"
+        on_update: "TicketingSystem::LowPrioritySettings::updateWriteMaxQueueDepth"
         default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
         validator: {gte: 0}
         redact: false
@@ -187,16 +181,16 @@ server_parameters:
             The algorithm to be used for adjusting the number of concurrent execution control transactions.
         set_at: [startup, runtime]
         cpp_vartype: std::string
-        cpp_varname: gExecutionControlConcurrencyAdjustmentAlgorithm
-        on_update: "admission::TicketingSystem::updateConcurrencyAdjustmentAlgorithm"
+        cpp_varname: gConcurrencyAdjustmentAlgorithm
+        on_update: "TicketingSystem::updateConcurrencyAdjustmentAlgorithm"
         deprecated_name:
             - storageEngineConcurrencyAdjustmentAlgorithm
         default: "throughputProbing"
         validator:
-            callback: admission::TicketingSystem::validateConcurrencyAdjustmentAlgorithm
+            callback: TicketingSystem::validateConcurrencyAdjustmentAlgorithm
         redact: false
 
-    executionControlHeuristicDeprioritizationEnabled:
+    executionControlHeuristicDeprioritization:
         description: >-
             Enables a heuristic that will evaluate long-running operations and deprioritize them to
             the low priority ticket pool. This parameter only takes effect if the execution
@@ -204,33 +198,33 @@ server_parameters:
             `executionControlConcurrencyAdjustmentAlgorithm` is "fixedConcurrentTransactionsWithPrioritization".
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
-        cpp_varname: gExecutionControlHeuristicDeprioritizationEnabled
+        cpp_varname: gHeuristicDeprioritization
         default: true
         redact: false
 
     executionControlHeuristicNumAdmissionsDeprioritizeThreshold:
         description: >-
             The number of admissions an operation must perform before it is deprioritized to the low-priority
-            ticket pool. This parameter only takes effect when `executionControlHeuristicDeprioritizationEnabled`
+            ticket pool. This parameter only takes effect when `executionControlHeuristicDeprioritization`
             is true and `executionControlConcurrencyAdjustmentAlgorithm` is "fixedConcurrentTransactionsWithPrioritization".
         set_at: [startup, runtime]
         cpp_vartype: Atomic<int>
-        cpp_varname: gExecutionControlHeuristicNumAdmissionsDeprioritizeThreshold
+        cpp_varname: gHeuristicNumAdmissionsDeprioritizeThreshold
         default: 3
         validator:
             gte: 0
         redact: false
 
-    executionControlDeprioritizeBackgroundTasks:
+    executionControlBackgroundTasksDeprioritization:
         description: >-
             This controls whether background tasks (defined as index builds, range deletions, and
             TTL deletions) are automatically deprioritized to the low-priority pool. If set to false,
             these tasks will not be automatically deprioritized upon starting. However, they can
-            still be deprioritized later by the heuristic if the operation exceeds the yield
+            still be deprioritized later by the heuristic if the operation exceeds the admissions
             threshold. This only takes effect if `executionControlConcurrencyAdjustmentAlgorithm` is
             "fixedConcurrentTransactionsWithPrioritization".
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
-        cpp_varname: gExecutionControlDeprioritizeBackgroundTasks
+        cpp_varname: gBackgroundTasksDeprioritization
         default: true
         redact: false

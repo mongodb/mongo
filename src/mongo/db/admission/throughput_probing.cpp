@@ -47,8 +47,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-namespace mongo {
-namespace admission {
+namespace mongo::admission::execution_control {
 namespace throughput_probing {
 
 Status validateInitialConcurrency(int32_t concurrency, const boost::optional<TenantId>&) {
@@ -407,5 +406,4 @@ void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
     builder.append("timesProbedDown", static_cast<long long>(timesProbedDown.load()));
 }
 
-}  // namespace admission
-}  // namespace mongo
+}  // namespace mongo::admission::execution_control

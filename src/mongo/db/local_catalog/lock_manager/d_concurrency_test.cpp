@@ -99,22 +99,23 @@ class UseReaderWriterGlobalThrottling {
 public:
     explicit UseReaderWriterGlobalThrottling(ServiceContext* svcCtx, int numTickets)
         : _svcCtx(svcCtx) {
+        using namespace admission::execution_control;
         const bool trackPeakUsed = false;
         constexpr auto maxQueueDepth = TicketHolder::kDefaultMaxQueueDepth;
-        auto ticketingSystem = std::make_unique<admission::TicketingSystem>(
+        auto ticketingSystem = std::make_unique<TicketingSystem>(
             _svcCtx,
-            admission::TicketingSystem::RWTicketHolder{
+            TicketingSystem::RWTicketHolder{
                 std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth),
                 std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth)},
-            admission::TicketingSystem::RWTicketHolder{
+            TicketingSystem::RWTicketHolder{
                 std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth),
                 std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth)},
             ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions);
-        admission::TicketingSystem::use(_svcCtx, std::move(ticketingSystem));
+        TicketingSystem::use(_svcCtx, std::move(ticketingSystem));
     }
 
     ~UseReaderWriterGlobalThrottling() noexcept(false) {
-        admission::TicketingSystem::use(_svcCtx, nullptr);
+        admission::execution_control::TicketingSystem::use(_svcCtx, nullptr);
     }
 
 private:

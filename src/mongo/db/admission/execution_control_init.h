@@ -33,12 +33,12 @@ namespace mongo {
 
 class ServiceContext;
 
-namespace admission {
+namespace admission::execution_control {
 
 /**
- * Globally initialize execution control.
+ * Globally initialize the ticketing system from execution control.
  */
-void initializeExecutionControl(ServiceContext* svCctx);
-}  // namespace admission
+void initializeTicketingSystem(ServiceContext* svCctx);
+}  // namespace admission::execution_control
 
 }  // namespace mongo

@@ -42,24 +42,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-namespace mongo {
-namespace admission {
+namespace mongo::admission::execution_control {
 namespace {
-
-bool hasNonDefaultTransactionConcurrencySettings() {
-    const std::array actual{gConcurrentReadTransactions.load(),
-                            gConcurrentWriteTransactions.load(),
-                            gConcurrentReadLowPriorityTransactions.load(),
-                            gConcurrentWriteLowPriorityTransactions.load()};
-
-    const std::array defaults{TicketingSystem::kDefaultConcurrentTransactionsValue,
-                              TicketingSystem::kDefaultConcurrentTransactionsValue,
-                              TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue,
-                              TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue};
-
-    auto [actIt, defIt] = std::mismatch(actual.begin(), actual.end(), defaults.begin());
-    return actIt != actual.end();
-}
 
 std::unique_ptr<TicketingSystem> createTicketingSystem(
     ServiceContext* svcCtx, ExecutionControlConcurrencyAdjustmentAlgorithmEnum algorithm) {
@@ -104,9 +88,9 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
 
 }  // namespace
 
-void initializeExecutionControl(ServiceContext* svcCtx) {
+void initializeTicketingSystem(ServiceContext* svcCtx) {
     auto algorithm = ExecutionControlConcurrencyAdjustmentAlgorithm_parse(
-        gExecutionControlConcurrencyAdjustmentAlgorithm,
+        gConcurrencyAdjustmentAlgorithm,
         IDLParserContext{"executionControlConcurrencyAdjustmentAlgorithm"});
 
     if (algorithm == ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing &&
@@ -114,17 +98,13 @@ void initializeExecutionControl(ServiceContext* svcCtx) {
              TicketingSystem::kDefaultConcurrentTransactionsValue ||
          gConcurrentWriteTransactions.load() !=
              TicketingSystem::kDefaultConcurrentTransactionsValue)) {
-        gExecutionControlConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
+        gConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
         algorithm =
             ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions;
-    }
-
-    if (algorithm == ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing &&
-        hasNonDefaultTransactionConcurrencySettings()) {
         LOGV2_WARNING(11039601,
-                      "When using the kThroughputProbing storage engine algorithm, all concurrent "
-                      "transactions server parameters must remain at their default values. "
-                      "Non-default values will be ignored.");
+                      "When using the kThroughputProbing execution control algorithm, all "
+                      "concurrent transactions server parameters must remain at their default "
+                      "values. Non-default values will be ignored.");
     }
 
     TicketingSystem::use(svcCtx, createTicketingSystem(svcCtx, algorithm));
@@ -141,5 +121,4 @@ void initializeExecutionControl(ServiceContext* svcCtx) {
     ticketingSystem->startThroughputProbe();
 }
 
-}  // namespace admission
-}  // namespace mongo
+}  // namespace mongo::admission::execution_control

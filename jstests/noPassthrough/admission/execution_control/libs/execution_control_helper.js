@@ -47,14 +47,14 @@ export function getExecutionControlAlgorithm(node) {
  * Enables or disables heuristic deprioritization for long-running operations.
  */
 export function setHeuristicDeprioritization(node, enabled) {
-    setExecutionControlParameter(node, "executionControlHeuristicDeprioritizationEnabled", enabled);
+    setExecutionControlParameter(node, "executionControlHeuristicDeprioritization", enabled);
 }
 
 /**
  * Enables or disables background task deprioritization (for index builds, TTL, range deletions).
  */
 export function setBackgroundTaskDeprioritization(node, enabled) {
-    setExecutionControlParameter(node, "executionControlDeprioritizeBackgroundTasks", enabled);
+    setExecutionControlParameter(node, "executionControlBackgroundTasksDeprioritization", enabled);
 }
 
 /**

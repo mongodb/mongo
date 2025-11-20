@@ -45,8 +45,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
-namespace admission {
+namespace mongo::admission::execution_control {
 namespace throughput_probing {
 
 class ThroughputProbingTest;
@@ -130,5 +129,4 @@ private:
     PeriodicJobAnchor _job;
 };
 
-}  // namespace admission
-}  // namespace mongo
+}  // namespace mongo::admission::execution_control

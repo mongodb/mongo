@@ -51,7 +51,8 @@ public:
         const ClusterRole role = opCtx->getService()->role();
 
         BSONObjBuilder admissionBuilder;
-        auto ticketingSystem = TicketingSystem::get(opCtx->getServiceContext());
+        auto ticketingSystem =
+            admission::execution_control::TicketingSystem::get(opCtx->getServiceContext());
         if (ticketingSystem && role.has(ClusterRole::ShardServer)) {
             BSONObjBuilder executionBuilder(admissionBuilder.subobjStart("execution"));
             ticketingSystem->appendStats(executionBuilder);

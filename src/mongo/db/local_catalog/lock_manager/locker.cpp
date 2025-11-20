@@ -222,7 +222,7 @@ const auto globalLockOrderingsSet =
 Locker::Locker(ServiceContext* serviceContext)
     : _id(idCounter.addAndFetch(1)),
       _lockManager(LockManager::get(serviceContext)),
-      _ticketingSystem(admission::TicketingSystem::get(serviceContext)) {
+      _ticketingSystem(admission::execution_control::TicketingSystem::get(serviceContext)) {
 #ifdef MONGO_CONFIG_DEBUG_BUILD
     _lockOrderingsSet = &globalLockOrderingsSet(serviceContext);
 #endif
@@ -1131,8 +1131,9 @@ bool Locker::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadl
 
     _ticket = _ticketingSystem->waitForTicketUntil(
         opCtx,
-        isSharedLockMode(mode) ? admission::TicketingSystem::OperationType::kRead
-                               : admission::TicketingSystem::OperationType::kWrite,
+        isSharedLockMode(mode)
+            ? admission::execution_control::TicketingSystem::OperationType::kRead
+            : admission::execution_control::TicketingSystem::OperationType::kWrite,
         deadline);
 
     if (!_ticket) {
