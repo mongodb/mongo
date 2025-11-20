@@ -1,11 +1,6 @@
 // Tests using a server parameter to set `ingressConnectionEstablishmentRateLimiterBypass` at
 // runtime.
 
-// TODO (SERVER-96103): Allow test to run on Windows.
-if (_isWindows()) {
-    quit();
-}
-
 const maxEstablishing = "ingressConnectionEstablishmentRateLimiterBypass";
 
 function runTest(args, testFunc) {

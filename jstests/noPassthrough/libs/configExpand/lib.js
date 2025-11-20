@@ -88,9 +88,6 @@ function makeReflectionCmd(arg, opts = {}) {
 
         load('jstests/libs/python.js');
         let cmd = getPython3Binary();
-        if (_isWindows()) {
-            cmd = '"' + cmd + '"';
-        }
         cmd += ' jstests/noPassthrough/libs/configExpand/reflect.py';
 
         if (opts.sleep && (opts.sleep > 0)) {

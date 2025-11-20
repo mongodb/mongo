@@ -10,11 +10,6 @@
 (function() {
 'use strict';
 
-// TODO (SERVER-96103): Allow test to run on Windows.
-if (_isWindows()) {
-    quit();
-}
-
 load('jstests/libs/host_ipaddr.js');
 load('jstests/noPassthrough/libs/conn_establishment_rate_limiter_helpers.js');
 
