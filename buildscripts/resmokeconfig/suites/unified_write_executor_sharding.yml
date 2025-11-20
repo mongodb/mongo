@@ -36,6 +36,9 @@ selector:
     - jstests/sharding/updateOne_without_shard_key/dropping_collection_during_clusterQueryWithoutShardKey_errors.js
     - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_basic.js
     - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_sort.js
+    - jstests/sharding/updateOne_without_shard_key/errors.js
+    - jstests/sharding/updateOne_without_shard_key/find_and_modify_without_shard_key_sort.js
+    - jstests/sharding/analyze_shard_key/read_and_write_distribution.js
     - jstests/noPassthrough/crud/bulk_write_max_replies_size_mongos.js
     - jstests/noPassthrough/crud/bulk_write_metrics.js
     - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js

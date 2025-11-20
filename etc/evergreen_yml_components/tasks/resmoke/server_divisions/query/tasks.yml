@@ -1869,6 +1869,13 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_initial_sync_gen
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
     name: unified_write_executor_sharded_collections_jscore_passthrough_gen
     tags:
       ["assigned_to_jira_team_server_query_execution", "experimental", "uwe"]

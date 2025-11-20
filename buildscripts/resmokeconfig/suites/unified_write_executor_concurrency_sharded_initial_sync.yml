@@ -1,0 +1,184 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    # Disabled because MapReduce can lose cursors if the primary steps down.
+
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+
+    # These workloads sometimes trigger 'Could not lock auth data update lock'
+    # errors because the AuthorizationManager currently waits for only five
+    # seconds to acquire the lock for authorization documents
+
+    # uses >100MB of data, which can overwhelm test hosts
+
+    # compact can only be run against a standalone mongod
+
+    # can cause OOM kills on test hosts
+
+    # cannot createIndex after dropDatabase without sharding first
+
+    # TODO Undenylist (SERVER-38852).
+
+    # serverStatus does not include transaction metrics on mongos.
+
+    # Uses the same transaction id across different routers, which is not allowed because when either
+    # router tries to commit, it may not know the full participant list.
+
+    # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
+
+    # These workloads frequently time out waiting for the distributed lock to drop a sharded
+    # collection.
+
+    # Uses getmores.
+
+    # Uses non retryable writes.
+
+    # Uses non retryable commands.
+    - jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
+    - jstests/concurrency/fsm_workloads/ddl/collMod/collMod_separate_collections.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog_cycle_lookup.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog_cycle_with_drop.js
+
+    # The auto_retry_on_network_error.js override needs to overwrite the response from drop on
+    # NamespaceNotFound, and since this workload only creates and drops collections there isn't
+    # much value in running it.
+    - jstests/concurrency/fsm_workloads/ddl/drop_collection/drop_collection.js
+
+    # serverStatus does not include transaction metrics on mongos.
+
+    # Use non-retryable commands not allowed by the network retry helper.
+
+    # Induces non-blindly-retriable errors (see SERVER-45767).
+    - jstests/concurrency/fsm_workloads/ddl/create_database.js
+
+    # TODO(SERVER-71510): Un-denylist this test.
+    - jstests/concurrency/fsm_workloads/txns/snapshot_read/snapshot_read_catalog_operations.js
+
+    # Next test fails because requestResumeToken is not supported without Resharding.
+    - jstests/concurrency/fsm_workloads/txns/internal_transactions/internal_transactions_resharding.js
+
+    # These tests run large commands which can sometimes trigger IncompleteTransactionHistory
+    # if the initial sync node stepup happens at a specific timing.
+    - jstests/concurrency/fsm_workloads/ddl/create_collection/create_capped_collection.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_capped_collection_droptarget.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_graph_lookup.js
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
+
+    # Applying operation on feature compatibility version document not supported in initial sync
+
+    # Resharding cannot succeed on a node which undergoes initial sync because initial sync
+    # does not preserve the ability to read at the cloneTimestamp in the past
+    - jstests/concurrency/fsm_workloads/updateOne_without_shard_key/write_without_shard_key_with_resharding.js
+    - jstests/concurrency/fsm_workloads/crud/reshard_collection_crud_ops.js
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - requires_non_retryable_writes
+    - assumes_against_mongod_not_mongos
+    - assumes_balancer_off
+    # Curop requires readConcern local.
+    - uses_curop_agg_stage
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - does_not_support_stepdowns
+    - assumes_unsharded_collection
+    - assumes_standalone_mongod
+    - assumes_read_preference_unchanged
+    # The tests start their own ReplSetTest
+    - requires_replication
+    - does_not_support_causal_consistency
+    # Because this suite kills / restarts the initial syncing node, if a kill occurs between a read and
+    # subsequent getMore on the initial syncing node tests can fail.
+    - requires_getmore
+    # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+    # so that the whole result set is returned through a single batch
+    - assumes_no_implicit_cursor_exhaustion
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: >-
+        globalThis.testingReplication = true;
+        await import("jstests/libs/override_methods/set_read_preference_secondary.js");
+        await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+      global_vars:
+        TestData:
+          defaultReadPreference:
+            {mode: "secondaryPreferred", tags: [{tag: "INIT_SYNC"}, {}]}
+          runningWithBalancer: true
+          # Will prompt the FSM workers to use 'network_error_and_txn_override.js'
+          # and generally retry operations.
+          runningWithConfigStepdowns: true
+          runningWithShardStepdowns: true
+          killShards: true
+          implicitlyShardOnCreateCollectionOnly: true
+          useActionPermittedFile: [ContinuousInitialSync]
+
+  hooks:
+    - class: ContinuousInitialSync
+      is_fsm_workload: true
+      sync_interval_secs: 15
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+      shell_options:
+        global_vars:
+          TestData:
+            skipEnforceFastCountOnValidate: true
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        findShardsOnConfigTimeoutMS: 30000 # giving legroom as this suite is doing initial sync
+        internalQueryUnifiedWriteExecutor: true
+    shard_options:
+      all_nodes_electable: True
+      mongod_options:
+        oplogSize: 1024
+      start_initial_sync_node: True
+      electable_initial_sync_node: True
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
+    configsvr_options:
+      num_nodes: 3
+      all_nodes_electable: True
+      start_initial_sync_node: True
+      electable_initial_sync_node: True
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        enableElectionHandoff: 0
+        roleGraphInvalidationIsFatal: 1
+        collectionClonerBatchSize: 10
+        initialSyncOplogFetcherBatchSize: 10
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        skipDroppingHashedShardKeyIndex: true
+        internalQueryUnifiedWriteExecutor: true
+    num_rs_nodes_per_shard: 3
+    num_shards: 2
+    num_mongos: 2
+    enable_balancer: true

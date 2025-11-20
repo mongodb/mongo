@@ -540,6 +540,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchWithFindAndModifyRequest) 
     auto hint = BSON("h" << 1);
     auto comment = "comment";
     auto let = BSON("l" << 1);
+    auto stmtId = 0;
     write_ops::FindAndModifyCommandRequest findAndModifyRequest(nss1);
     findAndModifyRequest.setQuery(query);
     findAndModifyRequest.setSort(sort);
@@ -590,18 +591,19 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchWithFindAndModifyRequest) 
         nss1Shard1.shardVersion->serialize("", &builder);
         auto shardVersionBson = builder.obj().firstElement().Obj().getOwned();
 
-        auto expectedCmdObj = BSON(
-            "findAndModify" << nss1.makeTimeseriesBucketsNamespace().coll() << "query" << query
-                            << "fields" << fields << "sort" << sort << "hint" << hint << "collation"
-                            << collation << "arrayFilters" << BSON_ARRAY(arrayFilters) << "remove"
-                            << remove << "update" << update << "lsid" << lsid.toBSON() << "upsert"
-                            << upsert << "new" << newParam << "bypassDocumentValidation"
-                            << bypassDocumentValidation << "let" << let << "maxTimeMS" << maxTimeMS
-                            << "comment" << comment << "txnNumber" << txnNumber << "databaseVersion"
-                            << nss1DbVersion.toBSON() << "shardVersion" << shardVersionBson
-                            << "readConcern" << BSONObj() << "writeConcern"
-                            << operationContext()->getWriteConcern().toBSON()
-                            << "isTimeseriesNamespace" << true);
+        auto expectedCmdObj =
+            BSON("findAndModify" << nss1.makeTimeseriesBucketsNamespace().coll() << "query" << query
+                                 << "fields" << fields << "sort" << sort << "hint" << hint
+                                 << "collation" << collation << "arrayFilters"
+                                 << BSON_ARRAY(arrayFilters) << "remove" << remove << "update"
+                                 << update << "lsid" << lsid.toBSON() << "upsert" << upsert << "new"
+                                 << newParam << "stmtId" << stmtId << "bypassDocumentValidation"
+                                 << bypassDocumentValidation << "let" << let << "maxTimeMS"
+                                 << maxTimeMS << "comment" << comment << "txnNumber" << txnNumber
+                                 << "databaseVersion" << nss1DbVersion.toBSON() << "shardVersion"
+                                 << shardVersionBson << "readConcern" << BSONObj() << "writeConcern"
+                                 << operationContext()->getWriteConcern().toBSON()
+                                 << "isTimeseriesNamespace" << true);
         ASSERT_BSONOBJ_EQ_UNORDERED(expectedCmdObj, request.cmdObj);
 
         return emptyFindAndModifyCommandReplyObj;

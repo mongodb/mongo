@@ -378,6 +378,10 @@ BSONObj WriteBatchExecutor::buildFindAndModifyRequest(
         filterGenericArgumentsForEmbeddedCommand(opCtx, request);
     }
 
+    if (opCtx->isRetryableWrite()) {
+        request.setStmtId(op.getEffectiveStmtId());
+    }
+
     auto cmdObj = request.toBSON();
 
     if (shouldAppendReadWriteConcern) {
