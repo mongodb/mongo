@@ -66,7 +66,14 @@ public:
 class QueryExecutionContextAdapter final : public ::MongoExtensionQueryExecutionContext {
 public:
     QueryExecutionContextAdapter(std::unique_ptr<QueryExecutionContextBase> ctx)
-        : ::MongoExtensionQueryExecutionContext{&VTABLE}, _ctx(std::move(ctx)) {}
+        : ::MongoExtensionQueryExecutionContext{&VTABLE}, _ctx(std::move(ctx)) {
+        tassert(11417100, "Provided QueryExecutionContextBase is null", _ctx != nullptr);
+    }
+
+    QueryExecutionContextAdapter(const QueryExecutionContextAdapter&) = delete;
+    QueryExecutionContextAdapter& operator=(const QueryExecutionContextAdapter&) = delete;
+    QueryExecutionContextAdapter(QueryExecutionContextAdapter&&) = delete;
+    QueryExecutionContextAdapter& operator=(QueryExecutionContextAdapter&&) = delete;
 
     const QueryExecutionContextBase& getCtxImpl() const {
         return *_ctx;

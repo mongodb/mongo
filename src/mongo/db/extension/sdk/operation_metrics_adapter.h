@@ -66,8 +66,16 @@ public:
 class OperationMetricsAdapter final : public ::MongoExtensionOperationMetrics {
 public:
     OperationMetricsAdapter(std::unique_ptr<OperationMetricsBase> metrics)
-        : ::MongoExtensionOperationMetrics{&VTABLE}, _metrics(std::move(metrics)) {}
+        : ::MongoExtensionOperationMetrics{&VTABLE}, _metrics(std::move(metrics)) {
+        sdk_tassert(11417103, "Provided OperationMetricsBase is null", _metrics != nullptr);
+    }
+
     ~OperationMetricsAdapter() = default;
+
+    OperationMetricsAdapter(const OperationMetricsAdapter&) = delete;
+    OperationMetricsAdapter& operator=(const OperationMetricsAdapter&) = delete;
+    OperationMetricsAdapter(OperationMetricsAdapter&&) = delete;
+    OperationMetricsAdapter& operator=(OperationMetricsAdapter&&) = delete;
 
     const OperationMetricsBase& getImpl() const noexcept {
         return *_metrics;

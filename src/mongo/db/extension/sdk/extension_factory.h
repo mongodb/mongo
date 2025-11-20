@@ -80,13 +80,26 @@ class ExtensionAdapter final : public ::MongoExtension {
 public:
     ExtensionAdapter(std::unique_ptr<sdk::Extension> extensionPointer,
                      ::MongoExtensionAPIVersion version)
-        : ::MongoExtension{&VTABLE, version}, _extensionPointer(std::move(extensionPointer)) {}
+        : ::MongoExtension{&VTABLE, version}, _extensionPointer(std::move(extensionPointer)) {
+        sdk_tassert(11417101, "Provided Extension is null", _extensionPointer != nullptr);
+    }
 
     ExtensionAdapter(const VersionedExtension& versionedExtension)
         : ::MongoExtension{&VTABLE, versionedExtension.version},
-          _extensionPointer(versionedExtension.factoryFunc()) {}
+          _extensionPointer(versionedExtension.factoryFunc()) {
+        sdk_tassert(11417102, "Provided Extension is null", _extensionPointer != nullptr);
+    }
 
     ~ExtensionAdapter() = default;
+
+    // ExtensionAdapter is non-copyable and non-movable, as adapters should be heap-allocated, and
+    // managed via a unique_ptr or Handle. This property guarantees that the adapter's underlying
+    // implementation pointer remains valid for object's lifetime. The same is true for all
+    // adapters.
+    ExtensionAdapter(const ExtensionAdapter&) = delete;
+    ExtensionAdapter& operator=(const ExtensionAdapter&) = delete;
+    ExtensionAdapter(ExtensionAdapter&&) = delete;
+    ExtensionAdapter& operator=(ExtensionAdapter&&) = delete;
 
 private:
     static ::MongoExtensionStatus* _extInitialize(

@@ -48,11 +48,15 @@ namespace mongo::extension {
 namespace {
 
 class ExecAggStageTest : public unittest::Test {
-protected:
-    ExecAggStageTest() = default;
+public:
+    void setUp() override {
+        _execCtx = std::make_unique<host_connector::QueryExecutionContextAdapter>(
+            std::make_unique<sdk::shared_test_stages::MockQueryExecutionContext>());
+    }
+    std::unique_ptr<host_connector::QueryExecutionContextAdapter> _execCtx;
 };
 
-TEST(HostExecAggStageTest, GetNextResult) {
+TEST_F(ExecAggStageTest, GetNextResult) {
     using ReturnStatus = exec::agg::GetNextResult::ReturnStatus;
     boost::intrusive_ptr<DocumentSourceMatch> matchDocSourceStage =
         DocumentSourceMatch::create(BSON("a" << 1), make_intrusive<ExpressionContextForTest>());
@@ -77,20 +81,19 @@ TEST(HostExecAggStageTest, GetNextResult) {
     ASSERT_EQ(ReturnStatus::kPauseExecution, getNextResult.getStatus());
 
     // Test getNext() via ExecAggStageHandle.
-    auto nullExpCtx = host_connector::QueryExecutionContextAdapter(nullptr);
     auto hostExecAggStage = new host_connector::HostExecAggStageAdapter(std::move(execAggStage));
     auto handle = ExecAggStageHandle{hostExecAggStage};
 
-    auto hostGetNextResult = handle.getNext(&nullExpCtx);
+    auto hostGetNextResult = handle.getNext(_execCtx.get());
     ASSERT_EQ(extension::GetNextCode::kPauseExecution, hostGetNextResult.code);
     ASSERT_EQ(boost::none, hostGetNextResult.res);
 
-    hostGetNextResult = handle.getNext(&nullExpCtx);
+    hostGetNextResult = handle.getNext(_execCtx.get());
     ASSERT_EQ(extension::GetNextCode::kAdvanced, hostGetNextResult.code);
     ASSERT_BSONOBJ_EQ(BSON("a" << 1), hostGetNextResult.res.get());
 
     // Note that the match clause is "a": 1 so the documents where "a": 2 will be passed over.
-    hostGetNextResult = handle.getNext(&nullExpCtx);
+    hostGetNextResult = handle.getNext(_execCtx.get());
     ASSERT_EQ(extension::GetNextCode::kEOF, hostGetNextResult.code);
     ASSERT_EQ(boost::none, hostGetNextResult.res);
 
@@ -110,7 +113,7 @@ TEST(HostExecAggStageTest, GetNextResult) {
     ASSERT_EQ(boost::none, hostGetNextResult.res);
 }
 
-TEST(HostExecAggStageTest, GetNextResultEdgeCaseEof) {
+TEST_F(ExecAggStageTest, GetNextResultEdgeCaseEof) {
     using ReturnStatus = exec::agg::GetNextResult::ReturnStatus;
     boost::intrusive_ptr<DocumentSourceMatch> matchDocSourceStage =
         DocumentSourceMatch::create(BSON("a" << 1), make_intrusive<ExpressionContextForTest>());
@@ -127,9 +130,8 @@ TEST(HostExecAggStageTest, GetNextResultEdgeCaseEof) {
     // Test getNext() via ExecAggStageHandle.
     auto hostExecAggStage = new host_connector::HostExecAggStageAdapter(std::move(execAggStage));
     auto handle = ExecAggStageHandle{hostExecAggStage};
-    auto nullExpCtx = host_connector::QueryExecutionContextAdapter(nullptr);
 
-    auto hostGetNextResult = handle.getNext(&nullExpCtx);
+    auto hostGetNextResult = handle.getNext(_execCtx.get());
     ASSERT_EQ(extension::GetNextCode::kEOF, hostGetNextResult.code);
     ASSERT_EQ(boost::none, hostGetNextResult.res);
 }
@@ -159,14 +161,13 @@ DEATH_TEST_F(ExecAggStageTestDeathTest, InvalidReturnStatusCode, "11019500") {
 
     auto hostExecAggStage = new host_connector::HostExecAggStageAdapter(std::move(execAggStage));
     auto handle = ExecAggStageHandle{hostExecAggStage};
-    auto nullExpCtx = host_connector::QueryExecutionContextAdapter(nullptr);
 
     // This getNext() call should hit the tassert because the C API doesn't have a
     // kAdvancedControlDocument value for GetNextCode.
-    handle.getNext(&nullExpCtx);
+    handle.getNext(_execCtx.get());
 }
 
-TEST(HostExecAggStageTest, IsHostAllocated) {
+TEST_F(ExecAggStageTest, IsHostAllocated) {
     boost::intrusive_ptr<DocumentSourceMatch> matchDocSourceStage =
         DocumentSourceMatch::create(BSON("a" << 1), make_intrusive<ExpressionContextForTest>());
     exec::agg::StagePtr matchExecAggStage = exec::agg::buildStage(matchDocSourceStage);
@@ -177,7 +178,7 @@ TEST(HostExecAggStageTest, IsHostAllocated) {
     ASSERT_TRUE(host_connector::HostExecAggStageAdapter::isHostAllocated(*handle.get()));
 }
 
-TEST(HostExecAggStageTest, IsNotHostAllocated) {
+TEST_F(ExecAggStageTest, IsNotHostAllocated) {
     auto noOpExtensionExecAggStage =
         new sdk::ExtensionExecAggStage(sdk::shared_test_stages::NoOpExtensionExecAggStage::make());
     auto handle = ExecAggStageHandle{noOpExtensionExecAggStage};
@@ -185,7 +186,7 @@ TEST(HostExecAggStageTest, IsNotHostAllocated) {
     ASSERT_FALSE(host_connector::HostExecAggStageAdapter::isHostAllocated(*handle.get()));
 }
 
-TEST(HostExecAggStageTest, GetNameFromExtensionStage) {
+TEST_F(ExecAggStageTest, GetNameFromExtensionStage) {
     auto noOpExtensionExecAggStage =
         new sdk::ExtensionExecAggStage(sdk::shared_test_stages::NoOpExtensionExecAggStage::make());
     auto handle = ExecAggStageHandle{noOpExtensionExecAggStage};
@@ -193,7 +194,7 @@ TEST(HostExecAggStageTest, GetNameFromExtensionStage) {
     ASSERT_EQ(handle.getName(), "$noOpExt");
 }
 
-TEST(HostExecAggStageTest, GetNameFromHostStage) {
+TEST_F(ExecAggStageTest, GetNameFromHostStage) {
     boost::intrusive_ptr<DocumentSourceMatch> matchDocSourceStage =
         DocumentSourceMatch::create(BSON("a" << 1), make_intrusive<ExpressionContextForTest>());
     auto mock = DocumentSourceMock::createForTest({}, make_intrusive<ExpressionContextForTest>());
@@ -209,7 +210,7 @@ TEST(HostExecAggStageTest, GetNameFromHostStage) {
     ASSERT_EQ(handle.getName(), "$match");
 }
 
-TEST(HostExecAggStageTest, DeletedCopyAndMoveConstructors) {
+TEST_F(ExecAggStageTest, DeletedCopyAndMoveConstructors) {
     static_assert(!std::is_copy_constructible_v<host_connector::HostExecAggStageAdapter>,
                   "HostExecAggStageAdapter should not be copy constructible");
     static_assert(!std::is_move_constructible_v<host_connector::HostExecAggStageAdapter>,

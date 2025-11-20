@@ -79,9 +79,6 @@ public:
 
     ~ExtensionDistributedPlanLogicAdapter() = default;
 
-    // Delete copy and move constructors/assignment to guarantee _dpl remains valid
-    // throughout the object's lifetime. Adapters should only be accessed through Handles, so
-    // copying/moving is unnecessary.
     ExtensionDistributedPlanLogicAdapter(const ExtensionDistributedPlanLogicAdapter&) = delete;
     ExtensionDistributedPlanLogicAdapter& operator=(const ExtensionDistributedPlanLogicAdapter&) =
         delete;

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -50,7 +51,14 @@ public:
                       std::unique_ptr<HostPortalBase> portal)
         : ::MongoExtensionHostPortal{&VTABLE, apiVersion, maxWireVersion},
           _extensionOpts(std::move(extensionOptions)),
-          _portal(std::move(portal)) {}
+          _portal(std::move(portal)) {
+        tassert(11417104, "Provided HostPortalBase is null", _portal != nullptr);
+    }
+
+    HostPortalAdapter(const HostPortalAdapter&) = delete;
+    HostPortalAdapter& operator=(const HostPortalAdapter&) = delete;
+    HostPortalAdapter(HostPortalAdapter&&) = delete;
+    HostPortalAdapter& operator=(HostPortalAdapter&&) = delete;
 
     const HostPortalBase& getImpl() const {
         return *_portal;

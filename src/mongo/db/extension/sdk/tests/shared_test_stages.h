@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/host_connector/query_execution_context_adapter.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/distributed_plan_logic.h"
 #include "mongo/db/extension/sdk/dpl_array_container.h"
@@ -1297,6 +1298,18 @@ public:
 
     static inline std::unique_ptr<sdk::DistributedPlanLogicBase> make() {
         return std::make_unique<EmptyDistributedPlanLogic>();
+    }
+};
+
+class MockQueryExecutionContext : public host_connector::QueryExecutionContextBase {
+public:
+    Status checkForInterrupt() const override {
+        return Status::OK();
+    }
+
+    host_connector::HostOperationMetricsHandle* getMetrics(
+        const std::string& stageName, const UnownedExecAggStageHandle& execStage) const override {
+        return nullptr;
     }
 };
 

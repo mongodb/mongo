@@ -81,6 +81,11 @@ public:
         sdk_tassert(11368304, "Provided DPLArrayContainer is null", _container != nullptr);
     }
 
+    ExtensionDPLArrayContainerAdapter(const ExtensionDPLArrayContainerAdapter&) = delete;
+    ExtensionDPLArrayContainerAdapter& operator=(const ExtensionDPLArrayContainerAdapter&) = delete;
+    ExtensionDPLArrayContainerAdapter(ExtensionDPLArrayContainerAdapter&&) = delete;
+    ExtensionDPLArrayContainerAdapter& operator=(ExtensionDPLArrayContainerAdapter&&) = delete;
+
 private:
     const DPLArrayContainer& getImpl() const noexcept {
         return *_container;

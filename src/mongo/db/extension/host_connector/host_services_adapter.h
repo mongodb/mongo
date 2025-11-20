@@ -45,7 +45,15 @@ namespace mongo::extension::host_connector {
 class IdleThreadBlockAdapter final : public ::MongoExtensionIdleThreadBlock {
 public:
     IdleThreadBlockAdapter(const char* location)
-        : ::MongoExtensionIdleThreadBlock{&VTABLE}, _idleThreadBlock{location} {}
+        : ::MongoExtensionIdleThreadBlock{&VTABLE}, _idleThreadBlock{location} {
+        tassert(
+            11417110, "Provided location to IdleThreadBlockAdapter is null", location != nullptr);
+    }
+
+    IdleThreadBlockAdapter(const IdleThreadBlockAdapter&) = delete;
+    IdleThreadBlockAdapter& operator=(const IdleThreadBlockAdapter&) = delete;
+    IdleThreadBlockAdapter(IdleThreadBlockAdapter&&) = delete;
+    IdleThreadBlockAdapter& operator=(IdleThreadBlockAdapter&&) = delete;
 
 private:
     IdleThreadBlock _idleThreadBlock;
@@ -69,6 +77,11 @@ private:
 class HostServicesAdapter final : public ::MongoExtensionHostServices {
 public:
     HostServicesAdapter() : ::MongoExtensionHostServices{&VTABLE} {}
+
+    HostServicesAdapter(const HostServicesAdapter&) = delete;
+    HostServicesAdapter& operator=(const HostServicesAdapter&) = delete;
+    HostServicesAdapter(HostServicesAdapter&&) = delete;
+    HostServicesAdapter& operator=(HostServicesAdapter&&) = delete;
 
     static HostServicesAdapter* get() {
         return &_hostServicesAdapter;

@@ -84,9 +84,9 @@ public:
     void setUp() override {
         // Initialize HostServices so that aggregation stages will be able to access member
         // functions, e.g. to run assertions.
-        extension::sdk::HostServicesHandle::setHostServices(
-            extension::host_connector::HostServicesAdapter::get());
-        _execCtx = std::make_unique<host_connector::QueryExecutionContextAdapter>(nullptr);
+        sdk::HostServicesHandle::setHostServices(host_connector::HostServicesAdapter::get());
+        _execCtx = std::make_unique<host_connector::QueryExecutionContextAdapter>(
+            std::make_unique<shared_test_stages::MockQueryExecutionContext>());
     }
 
     std::unique_ptr<host_connector::QueryExecutionContextAdapter> _execCtx;
@@ -927,26 +927,24 @@ private:
     bool _initialized = false;
 };
 
-TEST(AggregationStageTest, ValidExecAggStageVTableGetNextSucceeds) {
+TEST_F(AggStageTest, ValidExecAggStageVTableGetNextSucceeds) {
     auto validExecAggStage = new extension::sdk::ExtensionExecAggStage(
         shared_test_stages::ValidExtensionExecAggStage::make());
     auto handle = extension::ExecAggStageHandle{validExecAggStage};
 
-    auto nullExecCtx = host_connector::QueryExecutionContextAdapter(nullptr);
-
-    auto getNext = handle.getNext(&nullExecCtx);
+    auto getNext = handle.getNext(_execCtx.get());
     ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
     ASSERT_BSONOBJ_EQ(BSON("meow" << "adithi"), getNext.res.get());
 
-    getNext = handle.getNext(&nullExecCtx);
+    getNext = handle.getNext(_execCtx.get());
     ASSERT_EQUALS(extension::GetNextCode::kPauseExecution, getNext.code);
     ASSERT_EQ(boost::none, getNext.res);
 
-    getNext = handle.getNext(&nullExecCtx);
+    getNext = handle.getNext(_execCtx.get());
     ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
     ASSERT_BSONOBJ_EQ(BSON("meow" << "cedric"), getNext.res.get());
 
-    getNext = handle.getNext(&nullExecCtx);
+    getNext = handle.getNext(_execCtx.get());
     ASSERT_EQUALS(extension::GetNextCode::kEOF, getNext.code);
     ASSERT_EQ(boost::none, getNext.res);
 };
