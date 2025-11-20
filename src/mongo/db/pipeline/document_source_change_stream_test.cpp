@@ -3072,15 +3072,46 @@ TEST_F(ChangeStreamStageDBTest, TransformsEntriesForLegalClientCollectionsWithSy
     }
 }
 
-TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsVMissingNotSupported) {
-    // A missing $v field in the update oplog entry implies $v:1, which is no longer supported.
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsVMissingWithId) {
+    // An _id field in the update oplog entry implies a replace.
+    BSONObj o = BSON("_id" << 1 << "$set" << BSON("y" << 1));
+    BSONObj o2 = BSON("_id" << 1 << "x" << 2);
+    auto replace = makeOplogEntry(OpTypeEnum::kUpdate, nss, o, testUuid(), boost::none, o2);
+
+    Document expectedReplace{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o2, DSChangeStream::kReplaceOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"$set", D{{"y", 1}}}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+    };
+
+    checkTransformation(replace, expectedReplace);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsVMissingWithoutId) {
+    // A missing _id field and a missing $v field in the update oplog entry implies a $v:1 update
+    // oplog entry, which is no longer supported.
     BSONObj o = BSON("$set" << BSON("y" << 1));
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate, nss, o, testUuid(), boost::none, o2);
     checkTransformation(updateField, boost::none, kDefaultSpec, {}, {}, {}, 6741200);
 }
 
-TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsNonV2NotSupported) {
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsInvalidV) {
+    // A $v field in the update oplog entry without an _id field requires '$v:2'.
+    BSONObj o = BSON("$v"
+                     << "ABC"
+                     << "diff" << BSON("i" << BSON("v" << 5)));
+    BSONObj o2 = BSON("_id" << 1 << "x" << 2);
+    auto updateField = makeOplogEntry(OpTypeEnum::kUpdate, nss, o, testUuid(), boost::none, o2);
+    checkTransformation(updateField, boost::none, kDefaultSpec, {}, {}, {}, 6741200);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsDeltaUpdateNonV2NotSupported) {
     BSONObj diff = BSON("u" << BSON("y" << 1));
     BSONObj o = BSON("diff" << diff << "$v" << 3);
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
@@ -3088,7 +3119,7 @@ TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsNonV2NotSupported) {
     checkTransformation(updateField, boost::none, kDefaultSpec, {}, {}, {}, 6741200);
 }
 
-TEST_F(ChangeStreamStageDBTest, TransformUpdateFields) {
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsDeltaUpdate) {
     BSONObj diff = BSON("u" << BSON("y" << 1));
     BSONObj o = BSON("diff" << diff << "$v" << 2);
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
@@ -3101,6 +3132,13 @@ TEST_F(ChangeStreamStageDBTest, TransformUpdateFields) {
                                                                {"removedFields", vector<V>()},
                                                                {"truncatedArrays", vector<V>()}});
     checkTransformation(updateField, expectedUpdateField);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsModifierUpdate) {
+    BSONObj o = BSON("x" << 2 << "y" << 1);
+    BSONObj o2 = BSON("_id" << 1);
+    auto updateField = makeOplogEntry(OpTypeEnum::kUpdate, nss, o, testUuid(), boost::none, o2);
+    checkTransformation(updateField, boost::none, kDefaultSpec, {}, {}, {}, 6741200);
 }
 
 TEST_F(ChangeStreamStageDBTest, TransformRemoveFields) {
@@ -3142,6 +3180,30 @@ TEST_F(ChangeStreamStageDBTest, TransformReplace) {
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}, {"y", 1}}},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+    };
+    checkTransformation(replace, expectedReplace);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformReplaceWithVField) {
+    BSONObj o = BSON("_id" << 1 << "x" << 2 << "y" << 1 << "$v" << 2);
+    BSONObj o2 = BSON("_id" << 1);
+    auto replace = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
+                                  nss,                  // namespace
+                                  o,                    // o
+                                  testUuid(),           // uuid
+                                  boost::none,          // fromMigrate
+                                  o2);                  // o2
+
+    // Replace
+    Document expectedReplace{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o2, DSChangeStream::kReplaceOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}, {"y", 1}, {"$v", 2}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
     };
     checkTransformation(replace, expectedReplace);
 }
