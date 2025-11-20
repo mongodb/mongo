@@ -45,6 +45,7 @@
 #include "mongo/s/write_ops/pause_migrations_during_multi_updates_enablement.h"
 #include "mongo/s/write_ops/wc_error.h"
 #include "mongo/s/write_ops/write_op.h"
+#include "mongo/s/write_ops/write_op_helper.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
@@ -307,25 +308,8 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
                                     boost::optional<std::string>* actualCollection,
                                     bool* hasContactedPrimaryShard);
 
-class BatchCommandSizeEstimatorBase {
-public:
-    BatchCommandSizeEstimatorBase() = default;
-    virtual ~BatchCommandSizeEstimatorBase() = default;
 
-    virtual int getBaseSizeEstimate() const = 0;
-    virtual int getOpSizeEstimate(int opIdx, const ShardId& shard) const = 0;
-    virtual void addOpToBatch(int opIdx, const ShardId& shard) = 0;
-
-protected:
-    // Copy/move constructors and assignment operators are declared protected to prevent slicing.
-    // Derived classes can supply public copy/move constructors and assignment operators if desired.
-    BatchCommandSizeEstimatorBase(const BatchCommandSizeEstimatorBase&) = default;
-    BatchCommandSizeEstimatorBase(BatchCommandSizeEstimatorBase&&) = default;
-    BatchCommandSizeEstimatorBase& operator=(const BatchCommandSizeEstimatorBase&) = default;
-    BatchCommandSizeEstimatorBase& operator=(BatchCommandSizeEstimatorBase&&) = default;
-};
-
-class BatchedCommandSizeEstimator final : public BatchCommandSizeEstimatorBase {
+class BatchedCommandSizeEstimator final : public write_op_helpers::BatchCommandSizeEstimatorBase {
 public:
     explicit BatchedCommandSizeEstimator(OperationContext* opCtx,
                                          const BatchedCommandRequest& clientRequest);
@@ -347,6 +331,6 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                                      bool recordTargetErrors,
                                      PauseMigrationsDuringMultiUpdatesEnablement& pauseMigrations,
                                      GetTargeterFn getTargeterFn,
-                                     BatchCommandSizeEstimatorBase& sizeEstimator,
+                                     write_op_helpers::BatchCommandSizeEstimatorBase& sizeEstimator,
                                      TargetedBatchMap& batchMap);
 }  // namespace mongo

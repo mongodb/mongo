@@ -171,7 +171,7 @@ bool wouldFitInBatch(OperationContext* opCtx,
                      std::vector<std::unique_ptr<TargetedWrite>>& writes,
                      const TargetedBatchMap& batchMap,
                      int opIdx,
-                     BatchCommandSizeEstimatorBase& sizeEstimator,
+                     write_op_helpers::BatchCommandSizeEstimatorBase& sizeEstimator,
                      std::vector<int>& estSizesForOpsOut) {
     estSizesForOpsOut.clear();
 
@@ -278,7 +278,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                                      bool recordTargetErrors,
                                      PauseMigrationsDuringMultiUpdatesEnablement& pauseMigrations,
                                      GetTargeterFn getTargeterFn,
-                                     BatchCommandSizeEstimatorBase& sizeEstimator,
+                                     write_op_helpers::BatchCommandSizeEstimatorBase& sizeEstimator,
                                      TargetedBatchMap& batchMap) {
     //
     // Targeting of unordered batches is fairly simple - each remaining write op is targeted,

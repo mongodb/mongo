@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"

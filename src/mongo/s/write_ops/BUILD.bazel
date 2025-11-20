@@ -17,6 +17,7 @@ mongo_cc_library(
         "batched_upsert_detail.cpp",
         "bulk_write_command_modifier.cpp",
         "write_command_ref.cpp",
+        "write_op_helper.cpp",
     ],
     deps = [
         "//src/mongo:base",
@@ -60,18 +61,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "write_op_helper",
-    srcs = [
-        "write_op_helper.cpp",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/rpc:command_status",
-        "//src/mongo/s:sharding_router_api",
-    ],
-)
-
-mongo_cc_library(
     name = "pause_migrations_during_multi_updates_enablement",
     srcs = [
         "pause_migrations_during_multi_updates_enablement.cpp",
@@ -97,7 +86,6 @@ mongo_cc_library(
         "fle",
         "pause_migrations_during_multi_updates_enablement",
         "wc_error",
-        "write_op_helper",
         "//src/mongo:base",
         "//src/mongo/db/timeseries/write_ops:timeseries_write_ops_utils",
         "//src/mongo/s:sharding_write_without_shard_key_api",

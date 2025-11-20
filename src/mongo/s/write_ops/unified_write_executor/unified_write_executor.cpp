@@ -79,9 +79,9 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
 
     std::unique_ptr<WriteOpBatcher> batcher{nullptr};
     if (ordered) {
-        batcher = std::make_unique<OrderedWriteOpBatcher>(producer, analyzer);
+        batcher = std::make_unique<OrderedWriteOpBatcher>(producer, analyzer, cmdRef);
     } else {
-        batcher = std::make_unique<UnorderedWriteOpBatcher>(producer, analyzer);
+        batcher = std::make_unique<UnorderedWriteOpBatcher>(producer, analyzer, cmdRef);
     }
 
     WriteBatchExecutor executor(cmdRef, originalCommand);

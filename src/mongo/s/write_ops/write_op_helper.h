@@ -30,10 +30,50 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/commands/query_cmd/bulk_write_crud_op.h"
 #include "mongo/db/commands/query_cmd/bulk_write_parser.h"
+#include "mongo/s/write_ops/write_command_ref.h"
 
 namespace mongo {
 namespace write_op_helpers {
+
+class BatchCommandSizeEstimatorBase {
+public:
+    BatchCommandSizeEstimatorBase() = default;
+    virtual ~BatchCommandSizeEstimatorBase() = default;
+
+    virtual int getBaseSizeEstimate() const = 0;
+    virtual int getOpSizeEstimate(int opIdx, const ShardId& shard) const = 0;
+    virtual void addOpToBatch(int opIdx, const ShardId& shard) = 0;
+
+protected:
+    // Copy/move constructors and assignment operators are declared protected to prevent slicing.
+    // Derived classes can supply public copy/move constructors and assignment operators if desired.
+    BatchCommandSizeEstimatorBase(const BatchCommandSizeEstimatorBase&) = default;
+    BatchCommandSizeEstimatorBase(BatchCommandSizeEstimatorBase&&) = default;
+    BatchCommandSizeEstimatorBase& operator=(const BatchCommandSizeEstimatorBase&) = default;
+    BatchCommandSizeEstimatorBase& operator=(BatchCommandSizeEstimatorBase&&) = default;
+};
+
+class BulkCommandSizeEstimator final : public write_op_helpers::BatchCommandSizeEstimatorBase {
+public:
+    explicit BulkCommandSizeEstimator(OperationContext* opCtx, WriteCommandRef cmdRef);
+
+    int getBaseSizeEstimate() const final;
+    int getOpSizeEstimate(int opIdx, const ShardId& shardId) const final;
+    void addOpToBatch(int opIdx, const ShardId& shardId) final;
+
+private:
+    const WriteCommandRef _cmdRef;
+    const bool _isRetryableWriteOrInTransaction;
+    const int _baseSizeEstimate;
+
+    // targetWriteOps() can target writes to different shards which will end up being executed
+    // inside different child batches. We need to keep a map of shardId to a set of all of the
+    // nsInfo indexes we have account for the size of. We only want to count each nsInfoIdx once
+    // per child batch.
+    absl::flat_hash_map<ShardId, absl::flat_hash_set<NamespaceString>> _accountedForNsInfos;
+};
 
 bool isRetryErrCode(int errCode);
 
@@ -92,6 +132,12 @@ bool shouldTargetAllShardsSVIgnored(bool inTransaction, bool isMulti);
  * placement concern and broadcasting to all shards.
  */
 bool isSafeToIgnoreErrorInPartiallyAppliedOp(const Status& status);
+
+int computeBaseSizeEstimate(OperationContext* opCtx, WriteCommandRef cmdRef);
+
+BulkWriteDeleteOp toBulkWriteDelete(const write_ops::DeleteOpEntry& op);
+
+BulkWriteUpdateOp toBulkWriteUpdate(const write_ops::UpdateOpEntry& op);
 
 }  // namespace write_op_helpers
 }  // namespace mongo

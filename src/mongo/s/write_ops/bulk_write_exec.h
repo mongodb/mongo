@@ -47,6 +47,7 @@
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/bulk_write_reply_info.h"
 #include "mongo/s/write_ops/write_op.h"
+#include "mongo/s/write_ops/write_op_helper.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
@@ -100,27 +101,6 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
 BulkWriteCommandReply createEmulatedErrorReply(const Status& error,
                                                int errorCount,
                                                const boost::optional<TenantId>& tenantId);
-
-class BulkCommandSizeEstimator final : public BatchCommandSizeEstimatorBase {
-public:
-    explicit BulkCommandSizeEstimator(OperationContext* opCtx,
-                                      const BulkWriteCommandRequest& clientRequest);
-
-    int getBaseSizeEstimate() const final;
-    int getOpSizeEstimate(int opIdx, const ShardId& shardId) const final;
-    void addOpToBatch(int opIdx, const ShardId& shardId) final;
-
-private:
-    const BulkWriteCommandRequest& _clientRequest;
-    const bool _isRetryableWriteOrInTransaction;
-    const int _baseSizeEstimate;
-
-    // targetWriteOps() can target writes to different shards which will end up being executed
-    // inside different child batches. We need to keep a map of shardId to a set of all of the
-    // nsInfo indexes we have account for the size of. We only want to count each nsInfoIdx once
-    // per child batch.
-    absl::flat_hash_map<ShardId, absl::flat_hash_set<int>> _accountedForNsInfos;
-};
 
 /**
  * The BulkWriteOp class manages the lifecycle of a bulkWrite request received by mongos. Each op in

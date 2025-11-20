@@ -13,6 +13,8 @@ selector:
     - jstests/core/query/bulk/bulk_write.js
     - jstests/core/query/find_and_modify/*.js
     - jstests/core/timeseries/write/*.js
+    - jstests/aggregation/sources/out/*.js
+    - jstests/aggregation/sources/merge/*.js
     - jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
     - jstests/core/write/bulk/bulk_write_insert_cursor.js
     - jstests/core/write/empty_ts/bypass_empty_ts_replacement_bulk_write.js

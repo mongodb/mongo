@@ -31,6 +31,7 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_producer.h"
+#include "mongo/s/write_ops/write_op_helper.h"
 #include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
@@ -61,6 +62,7 @@ struct SimpleWriteBatch {
         std::set<NamespaceString> nssIsViewfulTimeseries;
         std::vector<WriteOp> ops;
         std::map<WriteOpId, UUID> sampleIds;
+        int sizeEstimate;  // Stores the size of the base command and all of the ops.
     };
 
     std::map<ShardId, ShardRequest> requestByShardId;
@@ -207,8 +209,8 @@ struct BatcherResult {
  */
 class WriteOpBatcher {
 public:
-    WriteOpBatcher(WriteOpProducer& producer, WriteOpAnalyzer& analyzer)
-        : _producer(producer), _analyzer(analyzer) {}
+    WriteOpBatcher(WriteOpProducer& producer, WriteOpAnalyzer& analyzer, WriteCommandRef cmdRef)
+        : _producer(producer), _analyzer(analyzer), _cmdRef(std::move(cmdRef)) {}
 
     virtual ~WriteOpBatcher() = default;
 
@@ -310,20 +312,26 @@ protected:
 
     // Tracks which shards operations already succeeded on.
     std::map<WriteOpId, std::set<ShardId>> _successfulShardMap;
+
+    const WriteCommandRef _cmdRef;
 };
 
 class OrderedWriteOpBatcher : public WriteOpBatcher {
 public:
-    OrderedWriteOpBatcher(WriteOpProducer& producer, WriteOpAnalyzer& analyzer)
-        : WriteOpBatcher(producer, analyzer) {}
+    OrderedWriteOpBatcher(WriteOpProducer& producer,
+                          WriteOpAnalyzer& analyzer,
+                          WriteCommandRef cmdRef)
+        : WriteOpBatcher(producer, analyzer, cmdRef) {}
 
     BatcherResult getNextBatch(OperationContext* opCtx, RoutingContext& routingCtx) override;
 };
 
 class UnorderedWriteOpBatcher : public WriteOpBatcher {
 public:
-    UnorderedWriteOpBatcher(WriteOpProducer& producer, WriteOpAnalyzer& analyzer)
-        : WriteOpBatcher(producer, analyzer) {}
+    UnorderedWriteOpBatcher(WriteOpProducer& producer,
+                            WriteOpAnalyzer& analyzer,
+                            WriteCommandRef cmdRef)
+        : WriteOpBatcher(producer, analyzer, cmdRef) {}
 
     BatcherResult getNextBatch(OperationContext* opCtx, RoutingContext& routingCtx) override;
 };

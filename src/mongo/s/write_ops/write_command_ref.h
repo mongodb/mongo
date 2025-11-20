@@ -245,6 +245,14 @@ public:
      */
     int estimateOpSizeInBytes(int index) const;
 
+
+    /**
+     * Returns an estimate of how much space, in bytes, the referred-to write op would add to a
+     * BulkWriteCommandRequest if it were a BulkOp. Used in UWE command size estimation where
+     * batched commands are serialized as bulk commands.
+     */
+    int estimateOpSizeInBytesAsBulkOp(int index) const;
+
     /**
      * Returns the specified write op's "arrayFilters" field if present, otherwise returns
      * boost::none.
@@ -530,6 +538,13 @@ public:
      */
     int estimateOpSizeInBytes(int index) const;
 
+
+    /**
+     * Returns an estimate of how much space, in bytes, the referred-to write op would add to a
+     * BulkWriteCommandRequest.
+     */
+    int estimateOpSizeInBytesAsBulkOp(int index) const;
+
     /**
      * Returns the specified write op's "arrayFilters" field if present, otherwise returns
      * boost::none.
@@ -785,6 +800,15 @@ public:
      * write command.
      */
     int estimateOpSizeInBytes(int index) const;
+
+    /**
+     * Returns an estimate of how much space, in bytes, the referred-to write op would add to a
+     * BulkWriteCommandRequest.
+     *
+     * This method will always return 0 since a findAndModify command will not be added to a bulk
+     * write command.
+     */
+    int estimateOpSizeInBytesAsBulkOp(int index) const;
 
     /**
      * Returns the specified write op's "arrayFilters" field if present, otherwise returns
@@ -1301,6 +1325,10 @@ public:
     }
     decltype(auto) toBSON() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.toBSON(_index); });
+    }
+    decltype(auto) estimateOpSizeInBytesAsBulkOp() const {
+        return visitImpl(
+            [&](auto&& r) -> decltype(auto) { return r.estimateOpSizeInBytesAsBulkOp(_index); });
     }
 
     /**

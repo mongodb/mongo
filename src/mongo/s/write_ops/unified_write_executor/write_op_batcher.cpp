@@ -30,6 +30,7 @@
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
 
 #include "mongo/db/error_labels.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/transaction_router.h"
 
@@ -47,7 +48,9 @@ bool writeTypeSupportsGrouping(BatchType writeType) {
 template <bool Ordered>
 class SimpleBatchBuilderBase {
 public:
-    SimpleBatchBuilderBase(WriteOpBatcher& batcher) : _batcher(batcher) {}
+    SimpleBatchBuilderBase(OperationContext* opCtx, WriteOpBatcher& batcher, WriteCommandRef cmdRef)
+        : _batcher(batcher),
+          _sizeEstimator(write_op_helpers::BulkCommandSizeEstimator(opCtx, cmdRef)) {}
 
     /**
      * If ops were added to '_batch' but done() was not called, mark all the ops in '_batch' for
@@ -106,6 +109,33 @@ public:
     }
 
     /**
+     * Returns true if there is room for the current op in this SimpleBatch. Note that this isn't
+     * needed for other op types as they hold one op each. This function doesn't add the op to the
+     * sizeEstimator, this is done when the op is actually added into the batch in 'addOp'.
+     */
+    bool wouldFitInBatch(WriteOpId opIdx, Analysis analysis) {
+        for (const auto& shard : analysis.shardsAffected) {
+            auto it = _batch->requestByShardId.find(shard.shardName);
+            if (it == _batch->requestByShardId.end()) {
+                // If this is the first item in the batch, it can't be too big.
+                continue;
+            }
+
+            int estSizeBytesForWrite = _sizeEstimator.getOpSizeEstimate(opIdx, shard.shardName);
+            tassert(10414701, "Expected a non-zero write operation size", estSizeBytesForWrite > 0);
+
+            if (it->second.ops.size() >= write_ops::kMaxWriteBatchSize ||
+                it->second.sizeEstimate + estSizeBytesForWrite > BSONObjMaxUserSize) {
+                // Too many items in batch, or batch would be too big.
+                LOGV2_DEBUG(10414700, 5, "Write is too large to include in the current batch");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Adds 'writeOp' to the current batch. This method will fail with a tassert if writeOp's type
      * is not compatible with SimpleWriteBatch.
      */
@@ -120,6 +150,9 @@ public:
 
         for (const auto& shard : analysis.shardsAffected) {
             auto nss = writeOp.getNss();
+            int estSizeBytesForWrite =
+                _sizeEstimator.getOpSizeEstimate(writeOp.getId(), shard.shardName);
+
             auto it = _batch->requestByShardId.find(shard.shardName);
             if (it != _batch->requestByShardId.end()) {
                 SimpleWriteBatch::ShardRequest& request = it->second;
@@ -137,6 +170,8 @@ public:
                 if (analysis.isViewfulTimeseries) {
                     request.nssIsViewfulTimeseries.emplace(nss);
                 }
+
+                request.sizeEstimate += estSizeBytesForWrite;
             } else {
                 std::set<NamespaceString> nssIsViewfulTimeseries;
                 if (analysis.isViewfulTimeseries) {
@@ -147,7 +182,9 @@ public:
                     SimpleWriteBatch::ShardRequest{
                         std::map<NamespaceString, ShardEndpoint>{{nss, shard}},
                         std::move(nssIsViewfulTimeseries),
-                        std::vector<WriteOp>{writeOp}});
+                        std::vector<WriteOp>{writeOp},
+                        std::map<WriteOpId, UUID>{},
+                        _sizeEstimator.getBaseSizeEstimate() + estSizeBytesForWrite});
             }
 
             const auto& targetedSampleId = analysis.targetedSampleId;
@@ -199,6 +236,7 @@ protected:
 
     WriteOpBatcher& _batcher;
     boost::optional<SimpleWriteBatch> _batch;
+    write_op_helpers::BulkCommandSizeEstimator _sizeEstimator;
 };
 
 class OrderedSimpleBatchBuilder : public SimpleBatchBuilderBase<true> {
@@ -220,7 +258,7 @@ BatcherResult OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     std::vector<std::pair<WriteOp, Status>> opsWithErrors;
-    OrderedSimpleBatchBuilder builder(*this);
+    OrderedSimpleBatchBuilder builder(opCtx, *this, _cmdRef);
 
     for (;;) {
         // Peek at the next op from the producer. If the producer has been exhausted, return the
@@ -288,7 +326,8 @@ BatcherResult OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
 
         if (builder) {
             // If this is not the first op, see if it's compatible with the current batch.
-            if (builder.isCompatibleWithBatch(writeOp->getNss(), analysis)) {
+            if (builder.isCompatibleWithBatch(writeOp->getNss(), analysis) &&
+                builder.wouldFitInBatch(writeOp->getId(), analysis)) {
                 // If 'writeOp', consume it and add it to the current batch, and keep looping to see
                 // if more ops can be added to the batch.
                 _producer.advance();
@@ -352,7 +391,7 @@ BatcherResult UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
     ON_BLOCK_EXIT([&] { markOpReprocess(opsToReprocess); });
 
     std::vector<std::pair<WriteOp, Status>> opsWithErrors;
-    UnorderedSimpleBatchBuilder builder(*this);
+    UnorderedSimpleBatchBuilder builder(opCtx, *this, _cmdRef);
 
     // This outer loop searches for ops to add to the current batch.
     for (;;) {
@@ -427,7 +466,8 @@ BatcherResult UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
             // Consume 'writeOp'.
             _producer.advance();
             // Check if 'writeOp' is compatible with the current batch.
-            if (builder.isCompatibleWithBatch(writeOp.getNss(), analysis)) {
+            if (builder.isCompatibleWithBatch(writeOp.getNss(), analysis) &&
+                builder.wouldFitInBatch(writeOp.getId(), analysis)) {
                 // Add 'writeOp' to the current batch.
                 builder.addOp(writeOp, analysis);
             } else {

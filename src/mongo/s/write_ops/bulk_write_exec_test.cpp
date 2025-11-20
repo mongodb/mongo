@@ -1873,7 +1873,9 @@ TEST_F(BulkWriteOpTest, TestGetBaseChildBatchCommandSizeEstimate) {
     request.setDbName(DatabaseName::kAdmin);
 
     // Get a base size estimate.
-    auto baseSizeEstimate = BulkCommandSizeEstimator(_opCtx, request).getBaseSizeEstimate();
+    auto baseSizeEstimate =
+        write_op_helpers::BulkCommandSizeEstimator(_opCtx, WriteCommandRef{request})
+            .getBaseSizeEstimate();
 
     BSONObjBuilder builder;
     request.serialize(&builder);

@@ -9,6 +9,8 @@ selector:
     - jstests/sharding/internal_txns/**/*.js
     - jstests/sharding/txn*.js
     - jstests/noPassthrough/txns_retryable_writes_sessions/**/*.js
+    - jstests/noPassthrough/query/out_merge/**/*.js
+    - jstests/sharding/query/out_merge/**/*.js
 
     # Sharding tests.
     - jstests/sharding/query/bulk_write_basic.js
@@ -66,6 +68,10 @@ selector:
     - jstests/sharding/migration_blocking_operation/pause_during_multi_updates_cluster_parameter_requires_feature_flag.js
 
     - jstests/sharding/swallow_unnecessary_uuid_mismatch_error.js
+
+  exclude_files:
+    # TODO SERVER-114138: Handle concurrent collection drops with $merge in UWE.
+    - jstests/sharding/query/out_merge/merge_stale_on_fields.js
 
 executor:
   archive:

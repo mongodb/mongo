@@ -29,7 +29,16 @@
 
 #include "mongo/s/write_ops/write_command_ref.h"
 
+#include "mongo/s/write_ops/write_op_helper.h"
+
 namespace mongo {
+
+// This constant accounts for the null terminator in each field name and the BSONType byte for
+// each element.
+static constexpr int kPerElementOverhead = 2;
+
+// This constant accounts for the size of a bool.
+static constexpr int kBoolSize = 1;
 
 bool BatchWriteCommandRefImpl::getBypassDocumentValidation() const {
     return getRequest().getBypassDocumentValidation();
@@ -154,6 +163,59 @@ int BatchWriteCommandRefImpl::estimateOpSizeInBytes(int index) const {
                     del.getQ(), del.getCollation(), del.getHint(), del.getSampleId());
                 // Verify that estSize is at least the BSON serialization size for debug builds.
                 dassert(estSize >= del.toBSON().objsize());
+                return estSize;
+            }});
+}
+
+int BatchWriteCommandRefImpl::estimateOpSizeInBytesAsBulkOp(int index) const {
+    return visitOpData(
+        index,
+        OverloadedVisitor{
+            [&](const BSONObj& insertDoc) {
+                auto estSize = write_ops::getBulkWriteInsertSizeEstimate(insertDoc);
+                // Verify that estSize is at least the BSON serialization
+                // size for debug builds.
+                dassert(estSize >= BulkWriteInsertOp(0, insertDoc).toBSON().objsize());
+                return estSize;
+            },
+            [&](const write_ops::UpdateOpEntry& update) {
+                const auto bulkUpdateOp = write_op_helpers::toBulkWriteUpdate(update);
+                auto estSize = write_ops::getBulkWriteUpdateSizeEstimate(
+                    bulkUpdateOp.getFilter(),
+                    bulkUpdateOp.getUpdateMods(),
+                    bulkUpdateOp.getConstants(),
+                    bulkUpdateOp.getUpsertSupplied().has_value(),
+                    bulkUpdateOp.getCollation(),
+                    bulkUpdateOp.getArrayFilters(),
+                    bulkUpdateOp.getSort(),
+                    bulkUpdateOp.getHint(),
+                    bulkUpdateOp.getSampleId());
+
+                // Add the size of the '$_allowShardKeyUpdatesWithoutFullShardKeyInQuery' field, if
+                // present. This is not accounted for currently in 'toBulkWriteUpdate' since updates
+                // without shard keys are executed in their own child batches, however it's added
+                // here to keep parity with the conversion to bulk write commands in the unified
+                // write executor.
+                if (update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery()) {
+                    estSize += write_ops::UpdateOpEntry::
+                                   kAllowShardKeyUpdatesWithoutFullShardKeyInQueryFieldName.size() +
+                        kBoolSize + kPerElementOverhead;
+                }
+                // Verify that estSize is at least the BSON serialization
+                // size for debug builds.
+                dassert(estSize >= bulkUpdateOp.toBSON().objsize());
+                return estSize;
+            },
+            [&](const write_ops::DeleteOpEntry& del) {
+                const auto bulkDeleteOp = write_op_helpers::toBulkWriteDelete(del);
+                auto estSize =
+                    write_ops::getBulkWriteDeleteSizeEstimate(bulkDeleteOp.getFilter(),
+                                                              bulkDeleteOp.getCollation(),
+                                                              bulkDeleteOp.getHint(),
+                                                              bulkDeleteOp.getSampleId());
+                // Verify that estSize is at least the BSON serialization
+                // size for debug builds.
+                dassert(estSize >= bulkDeleteOp.toBSON().objsize());
                 return estSize;
             }});
 }
@@ -315,6 +377,10 @@ int BulkWriteCommandRefImpl::estimateOpSizeInBytes(int index) const {
                           }});
 }
 
+int BulkWriteCommandRefImpl::estimateOpSizeInBytesAsBulkOp(int index) const {
+    return estimateOpSizeInBytes(index);
+}
+
 const boost::optional<std::vector<BSONObj>>& BulkWriteCommandRefImpl::getArrayFilters(
     int index) const {
     using RetT = const boost::optional<std::vector<BSONObj>>&;
@@ -434,6 +500,10 @@ BSONObj BulkWriteCommandRefImpl::toBSON(int index) const {
 }
 
 int FindAndModifyCommandRefImpl::estimateOpSizeInBytes(int index) const {
+    return 0;
+}
+
+int FindAndModifyCommandRefImpl::estimateOpSizeInBytesAsBulkOp(int index) const {
     return 0;
 }
 

@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/commands/query_cmd/bulk_write_common.h"
 #include "mongo/s/write_ops/write_command_ref.h"
+#include "mongo/s/write_ops/write_op_helper.h"
 #include "mongo/util/modules.h"
 
 #include <variant>
@@ -97,10 +97,10 @@ public:
                 return BulkWriteInsertOp(0, insertDoc);
             },
             [&](const write_ops::UpdateOpEntry& updateOp) -> BulkWriteOpVariant {
-                return bulk_write_common::toBulkWriteUpdate(updateOp);
+                return write_op_helpers::toBulkWriteUpdate(updateOp);
             },
             [&](const write_ops::DeleteOpEntry& deleteOp) -> BulkWriteOpVariant {
-                return bulk_write_common::toBulkWriteDelete(deleteOp);
+                return write_op_helpers::toBulkWriteDelete(deleteOp);
             },
             [&](const mongo::BulkWriteInsertOp& insertOp) -> BulkWriteOpVariant {
                 return insertOp;

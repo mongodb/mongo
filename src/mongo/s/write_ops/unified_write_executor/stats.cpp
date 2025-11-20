@@ -29,6 +29,7 @@
 
 #include "mongo/s/write_ops/unified_write_executor/stats.h"
 
+#include "mongo/db/commands/query_cmd/bulk_write_common.h"
 #include "mongo/db/sharding_environment/client/num_hosts_targeted_metrics.h"
 #include "mongo/db/stats/counters.h"
 
