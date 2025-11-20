@@ -15,6 +15,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {randomManualMigration} from "jstests/concurrency/fsm_workload_modifiers/random_manual_migrations.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/updateOne_without_shard_key/write_without_shard_key_base.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const $partialConfig = extendWorkload($baseConfig, randomManualMigration);
 export const $config = extendWorkload($partialConfig, function ($config, $super) {
@@ -76,6 +77,14 @@ export const $config = extendWorkload($partialConfig, function ($config, $super)
             deleteOneWithId: 0.1,
             findAndModify: 0.1,
         },
+    };
+
+    // TODO SERVER-104122: Handle WCOS error in UWE.
+    $config.setup = function (db, collName, cluster) {
+        const uweEnabled = isUweEnabled(db);
+        if (uweEnabled) {
+            quit();
+        }
     };
 
     // Because updates don't have a shard filter stage, a migration may fail if a
