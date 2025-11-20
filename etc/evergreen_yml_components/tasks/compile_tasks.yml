@@ -1315,8 +1315,7 @@ tasks:
             - "SERVER-110427-${revision}"
   - name: publish_crypt_packages
     run_on: rhel8.7-small
-    tags:
-      [
+    tags: [
         "assigned_to_jira_team_devprod_build",
         "incompatible_aubsan",
         "incompatible_community",
@@ -1324,9 +1323,9 @@ tasks:
         "incompatible_mac",
         "incompatible_tsan",
         "incompatible_windows",
-        "publish_crypt",
-        "release_critical",
-        "requires_compile_variant",
+        #  "publish_crypt",
+        #  "release_critical",
+        #  "requires_compile_variant",
       ]
     # This should prevent this task from running in patch builds, where we
     # don't want to publish packages.
