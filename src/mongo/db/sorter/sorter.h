@@ -309,6 +309,55 @@ protected:
     SorterStats _stats;
 };
 
+/**
+ * Appends a pre-sorted range of data to a given storage and hands back an Iterator over that
+ * storage range.
+ */
+template <typename Key, typename Value>
+class SortedStorageWriter {
+    SortedStorageWriter(const SortedStorageWriter&) = delete;
+    SortedStorageWriter& operator=(const SortedStorageWriter&) = delete;
+
+public:
+    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef std::pair<typename Key::SorterDeserializeSettings,
+                      typename Value::SorterDeserializeSettings>
+        Settings;
+
+    explicit SortedStorageWriter(const SortOptions& opts, const Settings& settings);
+    virtual ~SortedStorageWriter() = default;
+
+    virtual void addAlreadySorted(const Key&, const Value&) = 0;
+
+    /**
+     * Writes any data remaining in the buffer to disk and then closes the storage to which data was
+     * written.
+     *
+     * No more data can be added via addAlreadySorted() after calling done().
+     */
+    virtual std::shared_ptr<Iterator> done() = 0;
+    virtual std::unique_ptr<Iterator> doneUnique() = 0;
+
+    /**
+     * The SortedStorageWriter organizes data into chunks, with a chunk getting written to the
+     * output storage when it exceeds a maximum chunks size. A SortedStorageWriter client can
+     * produce a short chunk by manually calling this function.
+     *
+     * If no new data has been added since the last chunk was written, this function is a no-op.
+     */
+    virtual void writeChunk() = 0;
+
+protected:
+    const Settings _settings;
+    BufBuilder _buffer;
+
+    // Keeps track of the hash of all data objects spilled to disk. Passed to the FileIterator
+    // to ensure data has not been corrupted after reading from disk.
+    SorterChecksumCalculator _checksumCalculator;
+
+    SortOptions _opts;
+};
+
 
 /**
  * Represents the file that a Sorter uses to spill to disk. Supports reading and writing
@@ -374,6 +423,55 @@ private:
     SorterFileStats* _stats;
 
     boost::filesystem::path _path;
+};
+
+/**
+ * A class where we provide the factory methods to create a writer or iterator for the
+ * specific type of storage the sorter is using.
+ */
+template <typename Key, typename Value>
+class SorterStorage {
+public:
+    typedef std::pair<typename Key::SorterDeserializeSettings,
+                      typename Value::SorterDeserializeSettings>
+        Settings;
+
+    virtual ~SorterStorage() = default;
+
+    virtual std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(
+        const SortOptions& opts, const Settings& settings = Settings()) = 0;
+
+    virtual std::shared_ptr<SortIteratorInterface<Key, Value>> makeIterator(
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer) = 0;
+
+    virtual std::unique_ptr<SortIteratorInterface<Key, Value>> makeIteratorUnique(
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer) = 0;
+};
+
+/**
+ * A class where we declare making a writer or iterator for when the sorter is using a
+ * file as its underlying storage.
+ */
+template <typename Key, typename Value>
+class FileBasedSorterStorage : public SorterStorage<Key, Value> {
+public:
+    typedef std::pair<typename Key::SorterDeserializeSettings,
+                      typename Value::SorterDeserializeSettings>
+        Settings;
+
+    explicit FileBasedSorterStorage(std::shared_ptr<SorterFile> file);
+
+    std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(
+        const SortOptions& opts, const Settings& settings = Settings()) override;
+
+    std::shared_ptr<SortIteratorInterface<Key, Value>> makeIterator(
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer) override;
+
+    std::unique_ptr<SortIteratorInterface<Key, Value>> makeIteratorUnique(
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer) override;
+
+private:
+    std::shared_ptr<SorterFile> _file;
 };
 
 /**
@@ -641,55 +739,6 @@ private:
 
     boost::optional<Key> _min;
     bool _done = false;
-};
-
-/**
- * Appends a pre-sorted range of data to a given storage and hands back an Iterator over that
- * storage range.
- */
-template <typename Key, typename Value>
-class SortedStorageWriter {
-    SortedStorageWriter(const SortedStorageWriter&) = delete;
-    SortedStorageWriter& operator=(const SortedStorageWriter&) = delete;
-
-public:
-    typedef SortIteratorInterface<Key, Value> Iterator;
-    typedef std::pair<typename Key::SorterDeserializeSettings,
-                      typename Value::SorterDeserializeSettings>
-        Settings;
-
-    explicit SortedStorageWriter(const SortOptions& opts, const Settings& settings);
-    virtual ~SortedStorageWriter() = default;
-
-    virtual void addAlreadySorted(const Key&, const Value&) = 0;
-
-    /**
-     * Writes any data remaining in the buffer to disk and then closes the storage to which data was
-     * written.
-     *
-     * No more data can be added via addAlreadySorted() after calling done().
-     */
-    virtual std::shared_ptr<Iterator> done() = 0;
-    virtual std::unique_ptr<Iterator> doneUnique() = 0;
-
-    /**
-     * The SortedStorageWriter organizes data into chunks, with a chunk getting written to the
-     * output storage when it exceeds a maximum chunks size. A SortedStorageWriter client can
-     * produce a short chunk by manually calling this function.
-     *
-     * If no new data has been added since the last chunk was written, this function is a no-op.
-     */
-    virtual void writeChunk() = 0;
-
-protected:
-    const Settings _settings;
-    BufBuilder _buffer;
-
-    // Keeps track of the hash of all data objects spilled to disk. Passed to the FileIterator
-    // to ensure data has not been corrupted after reading from disk.
-    SorterChecksumCalculator _checksumCalculator;
-
-    SortOptions _opts;
 };
 
 template <typename Key, typename Value>

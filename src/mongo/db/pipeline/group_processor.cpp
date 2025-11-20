@@ -255,18 +255,20 @@ void GroupProcessor::spill() {
         _file = std::make_shared<SorterFile>(sorter::nextFileName(_expCtx->getTempDir()),
                                              _spillStats.get());
     }
-    SortedFileWriter<Value, Value> writer(SortOptions().TempDir(_expCtx->getTempDir()), _file);
+    FileBasedSorterStorage<Value, Value> sorterStorage(_file);
+    std::unique_ptr<SortedStorageWriter<Value, Value>> writer =
+        sorterStorage.makeWriter(SortOptions().TempDir(_expCtx->getTempDir()));
     switch (_accumulatedFields.size()) {  // same as ptrs[i]->second.size() for all i.
         case 0:                           // no values, essentially a distinct
             for (size_t i = 0; i < ptrs.size(); i++) {
-                writer.addAlreadySorted(ptrs[i]->first, Value());
+                writer->addAlreadySorted(ptrs[i]->first, Value());
             }
             break;
 
         case 1:  // just one value, use optimized serialization as single Value
             for (size_t i = 0; i < ptrs.size(); i++) {
-                writer.addAlreadySorted(ptrs[i]->first,
-                                        ptrs[i]->second[0]->getValue(/*toBeMerged=*/true));
+                writer->addAlreadySorted(ptrs[i]->first,
+                                         ptrs[i]->second[0]->getValue(/*toBeMerged=*/true));
             }
             break;
 
@@ -276,11 +278,11 @@ void GroupProcessor::spill() {
                 for (size_t j = 0; j < ptrs[i]->second.size(); j++) {
                     accums.push_back(ptrs[i]->second[j]->getValue(/*toBeMerged=*/true));
                 }
-                writer.addAlreadySorted(ptrs[i]->first, Value(std::move(accums)));
+                writer->addAlreadySorted(ptrs[i]->first, Value(std::move(accums)));
             }
             break;
     }
-    _sortedFiles.emplace_back(writer.done());
+    _sortedFiles.emplace_back(sorterStorage.makeIterator(std::move(writer)));
 
     auto spilledDataStorageIncrease = _stats.spillingStats.updateSpillingStats(
         1, _memoryTracker.inUseTrackedMemoryBytes(), spilledRecords, _spillStats->bytesSpilled());

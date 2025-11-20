@@ -169,9 +169,13 @@ private:
         };
 
         int currentBufSize = 0;
-        SortedFileWriter<IntWrapper, IntWrapper> sorter(*opts, makeFile());
+        // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
+        // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
+        FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(makeFile());
+        std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> sorter =
+            sorterStorage.makeWriter(*opts);
         for (int i = 0; i < range; ++i) {
-            sorter.addAlreadySorted(i, -i);
+            sorter->addAlreadySorted(i, -i);
             currentBufSize += sizeof(i) + sizeof(-i);
 
             if (currentBufSize > static_cast<int>(sorter::kSortedFileBufferSize)) {
@@ -181,7 +185,8 @@ private:
                 currentBufSize = 0;
             }
         }
-        ASSERT_ITERATORS_EQUIVALENT(sorter.done(), std::make_unique<IntIterator>(0, range));
+        ASSERT_ITERATORS_EQUIVALENT(sorterStorage.makeIterator(std::move(sorter)),
+                                    std::make_unique<IntIterator>(0, range));
         // Anything left in-memory is spilled to disk when sorter.done().
         currentFileSize += currentBufSize + sizeof(uint32_t);
         return currentFileSize;
@@ -428,10 +433,14 @@ TEST_F(SorterMakeFromExistingRangesTest, NextWithDeferredValues) {
     IWPair pair2(2, 200);
     auto spillFile =
         std::make_shared<SorterFile>(sorter::nextFileName(*(opts.tempDir)), opts.sorterFileStats);
-    SortedFileWriter<IntWrapper, IntWrapper> writer(opts, std::move(spillFile));
-    writer.addAlreadySorted(pair1.first, pair1.second);
-    writer.addAlreadySorted(pair2.first, pair2.second);
-    auto iter = writer.done();
+    // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
+    // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
+    FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(spillFile);
+    std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> writer =
+        sorterStorage.makeWriter(opts);
+    writer->addAlreadySorted(pair1.first, pair1.second);
+    writer->addAlreadySorted(pair2.first, pair2.second);
+    auto iter = sorterStorage.makeIterator(std::move(writer));
 
     ASSERT(iter->more());
     IntWrapper key1 = iter->nextWithDeferredValue();

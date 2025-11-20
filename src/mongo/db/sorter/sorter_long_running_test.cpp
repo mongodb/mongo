@@ -75,9 +75,13 @@ private:
         };
 
         int currentBufSize = 0;
-        SortedFileWriter<IntWrapper, IntWrapper> sorter(*opts, makeFile());
+        // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
+        // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
+        FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(makeFile());
+        std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> sorter =
+            sorterStorage.makeWriter(*opts);
         for (int i = 0; i < range; ++i) {
-            sorter.addAlreadySorted(i, -i);
+            sorter->addAlreadySorted(i, -i);
             currentBufSize += sizeof(i) + sizeof(-i);
 
             if (currentBufSize > static_cast<int>(sorter::kSortedFileBufferSize)) {
@@ -87,8 +91,9 @@ private:
                 currentBufSize = 0;
             }
         }
-        ASSERT_ITERATORS_EQUIVALENT(sorter.done(), std::make_unique<IntIterator>(0, range));
-        // Anything left in-memory is spilled to disk when sorter.done().
+        ASSERT_ITERATORS_EQUIVALENT(sorterStorage.makeIterator(std::move(sorter)),
+                                    std::make_unique<IntIterator>(0, range));
+        // Anything left in-memory is spilled to disk when we call makeIterator().
         currentFileSize += currentBufSize + sizeof(uint32_t);
         return currentFileSize;
     }

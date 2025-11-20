@@ -200,10 +200,13 @@ public:
 
         auto spillsFile =
             std::make_shared<SorterFile>(nextFileName(*(opts.tempDir)), opts.sorterFileStats);
-        SortedFileWriter<Key, Value> writer(opts, spillsFile, settings);
+        // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
+        FileBasedSorterStorage<Key, Value> sorterStorage(spillsFile);
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer =
+            sorterStorage.makeWriter(opts, settings);
 
         for (size_t i = _index; i < _data.size(); ++i) {
-            writer.addAlreadySorted(_data[i].first, _data[i].second);
+            writer->addAlreadySorted(_data[i].first, _data[i].second);
         }
 
         if (opts.sorterTracker) {
@@ -215,7 +218,7 @@ public:
         _data.shrink_to_fit();
         _index = 0;
 
-        return writer.doneUnique();
+        return sorterStorage.makeIteratorUnique(std::move(writer));
     }
 
 private:
@@ -729,14 +732,17 @@ protected:
                             "endIdx"_attr = i + count - 1);
 
                 auto mergeIterator = Iterator::merge(spillsToMerge, this->_opts, _comp);
-                SortedFileWriter<Key, Value> writer(this->_opts, newSpillsFile, _settings);
+                // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
+                FileBasedSorterStorage<Key, Value> sorterStorage(newSpillsFile);
+                std::unique_ptr<SortedStorageWriter<Key, Value>> writer =
+                    sorterStorage.makeWriter(this->_opts, _settings);
                 uint64_t pairCount = 0;
                 while (mergeIterator->more()) {
                     auto pair = mergeIterator->next();
-                    writer.addAlreadySorted(pair.first, pair.second);
+                    writer->addAlreadySorted(pair.first, pair.second);
                     ++pairCount;
                 }
-                this->_iters.push_back(writer.done());
+                this->_iters.push_back(sorterStorage.makeIterator(std::move(writer)));
                 this->_stats.incrementSpilledRanges();
                 this->_stats.incrementSpilledKeyValuePairs(pairCount);
             }
@@ -947,9 +953,12 @@ private:
 
         sort();
 
-        SortedFileWriter<Key, Value> writer(this->_opts, this->_file, this->_settings);
+        // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
+        FileBasedSorterStorage<Key, Value> sorterStorage(this->_file);
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer =
+            sorterStorage.makeWriter(this->_opts, this->_settings);
         for (auto& data : _data) {
-            writer.addAlreadySorted(data.first, data.second);
+            writer->addAlreadySorted(data.first, data.second);
         }
 
         this->_stats.incrementSpilledKeyValuePairs(_data.size());
@@ -957,7 +966,7 @@ private:
         // _data may have grown very large. Even though it's clear()ed, we need to
         // free the excess memory.
         _data.shrink_to_fit();
-        this->_iters.push_back(writer.done());
+        this->_iters.push_back(sorterStorage.makeIterator(std::move(writer)));
 
         auto& memPool = this->_memPool;
         if (memPool) {
@@ -1382,6 +1391,33 @@ typename Sorter<Key, Value>::PersistedState Sorter<Key, Value>::persistDataForSh
     });
 
     return {_file->path().filename().string(), ranges};
+}
+
+//
+// FileBasedSorterStorage members
+//
+
+template <typename Key, typename Value>
+FileBasedSorterStorage<Key, Value>::FileBasedSorterStorage(std::shared_ptr<SorterFile> file)
+    : _file(std::move(file)){};
+
+template <typename Key, typename Value>
+std::unique_ptr<SortedStorageWriter<Key, Value>> FileBasedSorterStorage<Key, Value>::makeWriter(
+    const SortOptions& opts, const Settings& settings) {
+    return std::make_unique<SortedFileWriter<Key, Value>>(opts, _file, settings);
+}
+
+template <typename Key, typename Value>
+std::shared_ptr<SortIteratorInterface<Key, Value>> FileBasedSorterStorage<Key, Value>::makeIterator(
+    std::unique_ptr<SortedStorageWriter<Key, Value>> writer) {
+    return writer->done();
+}
+
+template <typename Key, typename Value>
+std::unique_ptr<SortIteratorInterface<Key, Value>>
+FileBasedSorterStorage<Key, Value>::makeIteratorUnique(
+    std::unique_ptr<SortedStorageWriter<Key, Value>> writer) {
+    return writer->doneUnique();
 }
 
 //
@@ -1836,12 +1872,14 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill(size_t maxMemoryU
     this->_stats.incrementSpilledRanges();
 
     // Write out all the values from the heap in sorted order.
-    SortedFileWriter<Key, Value> writer(_opts, _file, {});
+    // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
+    FileBasedSorterStorage<Key, Value> sorterStorage(_file);
+    std::unique_ptr<SortedStorageWriter<Key, Value>> writer = sorterStorage.makeWriter(_opts, {});
     while (!_heap.empty()) {
-        writer.addAlreadySorted(_heap.top().first, _heap.top().second);
+        writer->addAlreadySorted(_heap.top().first, _heap.top().second);
         _heap.pop();
     }
-    auto iteratorPtr = writer.done();
+    auto iteratorPtr = sorterStorage.makeIterator(std::move(writer));
 
     if (auto* mergeIter = static_cast<typename sorter::MergeIterator<Key, Value, Comparator>*>(
             _spillIter.get())) {

@@ -106,12 +106,14 @@ void SpoolStage::spill() {
     auto opts = SortOptions().TempDir(expCtx()->getTempDir());
     opts.FileStats(_spillStats.get());
 
-    SortedFileWriter<RecordId, NullValue> writer(opts, _file);
+    FileBasedSorterStorage<RecordId, NullValue> sorterStorage(_file);
+    std::unique_ptr<SortedStorageWriter<RecordId, NullValue>> writer =
+        sorterStorage.makeWriter(opts);
     // Do not spill the records that have been already consumed.
     for (size_t i = _nextIndex + 1; i < _buffer.size(); ++i) {
-        writer.addAlreadySorted(_buffer[i], NullValue());
+        writer->addAlreadySorted(_buffer[i], NullValue());
     }
-    _spillFileIters.emplace_back(writer.done());
+    _spillFileIters.emplace_back(sorterStorage.makeIterator(std::move(writer)));
 
     _specificStats.spillingStats.updateSpillingStats(1 /* spills */,
                                                      _memTracker.inUseTrackedMemoryBytes(),
