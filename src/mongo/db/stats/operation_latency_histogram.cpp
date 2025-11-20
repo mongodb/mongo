@@ -206,10 +206,11 @@ void appendHistogram(const HistogramDataType& data,
 
         // Append final bucket only if it contains values to minimize data in FTDC. Final bucket
         // is aggregate of all buckets >= slowMS with bucket labeled as minimum latency of
-        // bucket.
-        if (filterBuckets && filteredCount > 0) {
+        // bucket. `includeEmptyBuckets` means that all buckets should be present even if they have
+        // no entries, and this is true for the final bucket as well.
+        if (filterBuckets && (filteredCount > 0 || includeEmptyBuckets)) {
             BSONObjBuilder entryBuilder(arrayBuilder.subobjStart());
-            entryBuilder.append("micros", static_cast<long long>(lowestFilteredBound + 1));
+            entryBuilder.append("micros", static_cast<long long>(lowestFilteredBound));
             entryBuilder.append("count", static_cast<long long>(filteredCount));
             entryBuilder.doneFast();
         }

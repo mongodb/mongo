@@ -197,7 +197,7 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencySlowBuckets) {
     {
         BSONObj bucket = readBuckets[kMaxUnFilteredBuckets].Obj();
         ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()),
-                      kLowerBounds[kMaxUnFilteredBuckets] + 1);
+                      kLowerBounds[kMaxUnFilteredBuckets]);
         ASSERT_EQUALS(bucket["count"].Long(), 83);
     }
 }
@@ -241,7 +241,7 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencySlowBucketsExclu
         // Since kMaxUnFilteredBuckets is odd, the last bucket will actually be the one at index
         // kMaxUnFilteredBuckets+1.
         ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()),
-                      kLowerBounds[kMaxUnFilteredBuckets + 1] + 1);
+                      kLowerBounds[kMaxUnFilteredBuckets + 1]);
         ASSERT_EQUALS(bucket["count"].Long(), 14);
     }
 }
@@ -283,8 +283,121 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencySlowBucketsInclu
     {
         BSONObj bucket = readBuckets.back().Obj();
         ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()),
-                      kLowerBounds[kMaxUnFilteredBuckets] + 1);
+                      kLowerBounds[kMaxUnFilteredBuckets]);
         ASSERT_EQUALS(bucket["count"].Long(), 14);
+    }
+}
+
+TEST(OperationLatencyHistogram, CheckLastBucketValueSlowBucketsExcludeEmptyBuckets) {
+    // Set a specific slowMS value so we know how many histogram values will be recorded.
+    auto orig = serverGlobalParams.slowMS.load();
+    serverGlobalParams.slowMS.store(100);
+    ScopeGuard g1 = [orig] {
+        serverGlobalParams.slowMS.store(orig);
+    };
+
+    OperationLatencyHistogram hist({.includeEmptyBuckets = false});
+    // Add one bucket below the slowMS threshold
+    uint64_t expectedSum = 0;
+    const size_t kMaxUnFilteredBuckets = 23;
+    const size_t kUnfilteredBucket = 4;
+    hist.increment(kLowerBounds[kUnfilteredBucket],
+                   Command::ReadWriteType::kRead,
+                   /*isQueryableEncryptionOp=*/false);
+    expectedSum += kLowerBounds[kUnfilteredBucket];
+
+    BSONObj out;
+    BSONObjBuilder outBuilder1;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder1);
+    out = outBuilder1.done();
+
+    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    ASSERT_EQUALS(out["reads"]["ops"].Long(), 1);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    // Only one entry, so just one bucket.
+    ASSERT_EQUALS(readBuckets.size(), 1);
+    BSONObj bucket = readBuckets[0].Obj();
+    ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()), kLowerBounds[kUnfilteredBucket]);
+    ASSERT_EQUALS(bucket["count"].Long(), 1);
+
+    // Add a filtered entry.
+    hist.increment(kLowerBounds[kMaxUnFilteredBuckets + 2],
+                   Command::ReadWriteType::kRead,
+                   /*isQueryableEncryptionOp=*/false);
+    expectedSum += kLowerBounds[kMaxUnFilteredBuckets + 2];
+
+    BSONObjBuilder outBuilder2;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder2);
+    out = outBuilder2.done();
+
+    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    ASSERT_EQUALS(out["reads"]["ops"].Long(), 2);
+    readBuckets = out["reads"]["histogram"].Array();
+    // Two buckets, one for the initial entry and one for the filtered entry.
+    ASSERT_EQUALS(readBuckets.size(), 2);
+    bucket = readBuckets[0].Obj();
+    ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()), kLowerBounds[kUnfilteredBucket]);
+    ASSERT_EQUALS(bucket["count"].Long(), 1);
+
+    bucket = readBuckets[1].Obj();
+    ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()),
+                  kLowerBounds[kMaxUnFilteredBuckets + 2]);
+    ASSERT_EQUALS(bucket["count"].Long(), 1);
+}
+
+TEST(OperationLatencyHistogram, CheckLastBucketValueSlowBucketsIncludeEmptyBuckets) {
+    // Set a specific slowMS value so we know how many histogram values will be recorded.
+    auto orig = serverGlobalParams.slowMS.load();
+    serverGlobalParams.slowMS.store(100);
+    ScopeGuard g1 = [orig] {
+        serverGlobalParams.slowMS.store(orig);
+    };
+
+    OperationLatencyHistogram hist({.includeEmptyBuckets = true});
+    // Add one bucket below the slowMS threshold
+    uint64_t expectedSum = 0;
+    const size_t kMaxUnFilteredBuckets = 23;
+    const size_t kUnfilteredBucket = 4;
+    hist.increment(kLowerBounds[kUnfilteredBucket],
+                   Command::ReadWriteType::kRead,
+                   /*isQueryableEncryptionOp=*/false);
+    expectedSum += kLowerBounds[kUnfilteredBucket];
+
+    BSONObj out;
+    BSONObjBuilder outBuilder1;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder1);
+    out = outBuilder1.done();
+
+    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    ASSERT_EQUALS(out["reads"]["ops"].Long(), 1);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), kMaxUnFilteredBuckets + 1);
+    for (size_t i = 0; i < readBuckets.size(); ++i) {
+        BSONObj bucket = readBuckets[i].Obj();
+        ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()), kLowerBounds[i]);
+        // The only bucket with a value is the one we incremented.
+        ASSERT_EQUALS(bucket["count"].Long(), i == kUnfilteredBucket ? 1 : 0);
+    }
+
+    // Add a filtered entry.
+    hist.increment(kLowerBounds[kMaxUnFilteredBuckets + 2],
+                   Command::ReadWriteType::kRead,
+                   /*isQueryableEncryptionOp=*/false);
+    expectedSum += kLowerBounds[kMaxUnFilteredBuckets + 2];
+
+    BSONObjBuilder outBuilder2;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder2);
+    out = outBuilder2.done();
+
+    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    ASSERT_EQUALS(out["reads"]["ops"].Long(), 2);
+    readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), kMaxUnFilteredBuckets + 1);
+    for (size_t i = 0; i < readBuckets.size(); ++i) {
+        BSONObj bucket = readBuckets[i].Obj();
+        ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()), kLowerBounds[i]);
+        bool isPopulatedBucket = (i == kUnfilteredBucket) || (i == readBuckets.size() - 1);
+        ASSERT_EQUALS(bucket["count"].Long(), isPopulatedBucket ? 1 : 0);
     }
 }
 
