@@ -157,6 +157,15 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
  * should return "unwound" values 10, 11, and 12, but {$group: {_id: '$a'}} needs to see the
  * documents for the original [10, 11] and 12 values. Thus, the latter would use the
  * STRICT_DISTINCT_ONLY option to preserve the arrays.
+ *
+ * A third meaning of QueryPlannerParams::STRICT_DISTINCT_ONLY is to indicate we expect to not
+ * perform a distinct scan if its over a sparse index. For example, if the collection has a document
+ * {b: 5} and an index on {a: 1}, the distinct('a') command would return no results since the
+ * distinct command ignores missing fields. If the index {a: 1} was sparse, this would not affect
+ * the results as the sparse index does not cover missing fields. However, {$group: {_id: '$a'}}
+ * should return the result {_id: null} because $group treats missing fields as null. Thus, the
+ * $group would use the STRICT_DISTINCT_ONLY option to ensure that we do not ignore missing fields
+ * by using a distinct scan over a sparse index.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorDistinct(
     const MultipleCollectionAccessor& collections,

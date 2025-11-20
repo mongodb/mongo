@@ -31,7 +31,7 @@ import {
     prepareCollection,
     removeIndex,
 } from "jstests/aggregation/libs/group_to_distinct_scan_utils.js";
-import {getAggPlanStage, getQueryPlanner} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage, getQueryPlanner, planHasStage} from "jstests/libs/analyze_plan.js";
 
 prepareCollection();
 
@@ -955,4 +955,80 @@ assertPipelineResultsAndExplain({
     ],
     expectedOutput: expectedResult,
     validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {_id: 1})
+});
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+// Sparse index tests
+////////////////////////////////////////////////////////////////////////////////////////////////
+assert.commandWorked(coll.dropIndexes());
+addIndex({missingField: 1}, {sparse: true});
+
+//
+// Verify that a distinct command can use a DISTINCT_SCAN on a sparse index.
+//
+assert(planHasStage(
+    db, coll.explain().distinct("missingField").queryPlanner.winningPlan, 'DISTINCT_SCAN'));
+let results = coll.distinct("missingField");
+assert.sameMembers(results, []);
+
+//
+// Verify that the $sort/$group optimization does not use a DISTINCT_SCAN on a sparse index.
+//
+assertPipelineResultsAndExplain({
+    pipeline: [{$group: {_id: "$missingField"}}],
+    expectedOutput: [{_id: null}],
+    validateExplain: assertPlanUsesCollScan
+});
+assertPipelineResultsAndExplain({
+    pipeline: [{$sort: {missingField: 1}}, {$group: {_id: "$missingField"}}],
+    expectedOutput: [{_id: null}],
+    validateExplain: assertPlanUsesCollScan
+});
+assertPipelineResultsAndExplain({
+    pipeline: [{$group: {_id: "$missingField", accum: {$last: "$anotherMissingField"}}}],
+    expectedOutput: [{_id: null, accum: null}],
+    validateExplain: assertPlanUsesCollScan
+});
+assertPipelineResultsAndExplain({
+    pipeline: [
+        {$sort: {missingField: 1}},
+        {$group: {_id: "$missingField", accum: {$last: "$anotherMissingField"}}}
+    ],
+    expectedOutput: [{_id: null, accum: null}],
+    validateExplain: assertPlanUsesCollScan
+});
+
+//
+// Verify that the $group optimization does not use a DISTINCT_SCAN on a sparse index in the
+// presence of an alternative non-sparse compound index (it should use a DISTINCT_SCAN on the
+// compound index).
+//
+addIndex({missingField: 1, anotherMissingField: 1});
+
+assertPipelineResultsAndExplain({
+    pipeline: [{$group: {_id: "$missingField"}}],
+    expectedOutput: [{_id: null}],
+    validateExplain: (explain) =>
+        assertPlanUsesDistinctScan(explain, {missingField: 1, anotherMissingField: 1})
+});
+assertPipelineResultsAndExplain({
+    pipeline: [{$sort: {missingField: 1}}, {$group: {_id: "$missingField"}}],
+    expectedOutput: [{_id: null}],
+    validateExplain: (explain) =>
+        assertPlanUsesDistinctScan(explain, {missingField: 1, anotherMissingField: 1})
+});
+assertPipelineResultsAndExplain({
+    pipeline: [{$group: {_id: "$missingField", accum: {$last: "$anotherMissingField"}}}],
+    expectedOutput: [{_id: null, accum: null}],
+    validateExplain: (explain) =>
+        assertPlanUsesDistinctScan(explain, {missingField: 1, anotherMissingField: 1})
+});
+assertPipelineResultsAndExplain({
+    pipeline: [
+        {$sort: {missingField: 1}},
+        {$group: {_id: "$missingField", accum: {$last: "$anotherMissingField"}}}
+    ],
+    expectedOutput: [{_id: null, accum: null}],
+    validateExplain: (explain) =>
+        assertPlanUsesDistinctScan(explain, {missingField: 1, anotherMissingField: 1})
 });
