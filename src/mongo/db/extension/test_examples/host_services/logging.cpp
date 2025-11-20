@@ -59,7 +59,7 @@ public:
             sdk::sdk_log(kStageName + " stage spec is empty or not an object.",
                          11134000,
                          ::MongoExtensionLogSeverity::kError);
-            return std::make_unique<LogParseNode>(stageBson);
+            return std::make_unique<LogParseNode>(kStageName, mongo::BSONObj());
         }
 
         mongo::BSONObj bsonSpec = stageBson.getField(kStageName).Obj();
@@ -108,7 +108,7 @@ public:
             sdk::sdk_log("Logging info line for " + kStageName, 11134004, attrs);
         }
 
-        return std::make_unique<LogParseNode>(stageBson);
+        return std::make_unique<LogParseNode>(kStageName, bsonSpec);
     }
 };
 

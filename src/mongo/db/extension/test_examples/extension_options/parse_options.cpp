@@ -31,7 +31,6 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -71,7 +70,7 @@ public:
                         obj.getField("num").numberDouble() <= ExtensionOptions::max);
         }
 
-        return std::make_unique<CheckNumParseNode>(stageBson);
+        return std::make_unique<CheckNumParseNode>(kStageName, obj);
     }
 };
 

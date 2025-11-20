@@ -26,79 +26,208 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/test_extension_util.h"
 
-#define DEFAULT_LOGICAL_AST_PARSE(ExtensionName, StageNameStringView)                           \
-    inline constexpr std::string_view ExtensionName##StageName = StageNameStringView;           \
-    class ExtensionName##ExecAggStage : public sdk::ExecAggStageTransform {                     \
-    public:                                                                                     \
-        ExtensionName##ExecAggStage() : sdk::ExecAggStageTransform(ExtensionName##StageName) {} \
-        ::mongo::extension::ExtensionGetNextResult getNext(                                     \
-            const ::mongo::extension::sdk::QueryExecutionContextHandle& execCtx,                \
-            ::MongoExtensionExecAggStage* execStage,                                            \
-            ::MongoExtensionGetNextRequestType requestType) override {                          \
-            auto input = _getSource().getNext(execCtx.get());                                   \
-            if (input.code == ::mongo::extension::GetNextCode::kPauseExecution) {               \
-                return ::mongo::extension::ExtensionGetNextResult::pauseExecution();            \
-            }                                                                                   \
-            if (input.code == ::mongo::extension::GetNextCode::kEOF) {                          \
-                return ::mongo::extension::ExtensionGetNextResult::eof();                       \
-            }                                                                                   \
-            return ::mongo::extension::ExtensionGetNextResult::advanced(input.res.get());       \
-        }                                                                                       \
-        void open() override {}                                                                 \
-        void reopen() override {}                                                               \
-        void close() override {}                                                                \
-    };                                                                                          \
-    class ExtensionName##LogicalStage : public sdk::LogicalAggStage {                           \
-    public:                                                                                     \
-        ExtensionName##LogicalStage(const ::mongo::BSONObj& rawSpec)                            \
-            : _rawSpec(rawSpec.getOwned()) {}                                                   \
-                                                                                                \
-        ::mongo::BSONObj serialize() const override {                                           \
-            return _rawSpec;                                                                    \
-        }                                                                                       \
-        ::mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {   \
-            return _rawSpec;                                                                    \
-        }                                                                                       \
-        std::unique_ptr<sdk::ExecAggStageBase> compile() const override {                       \
-            return std::make_unique<ExtensionName##ExecAggStage>();                             \
-        }                                                                                       \
-                                                                                                \
-    private:                                                                                    \
-        ::mongo::BSONObj _rawSpec;                                                              \
-    };                                                                                          \
-    class ExtensionName##AstNode : public sdk::AggStageAstNode {                                \
-    public:                                                                                     \
-        ExtensionName##AstNode(const ::mongo::BSONObj& rawSpec)                                 \
-            : sdk::AggStageAstNode(ExtensionName##StageName), _rawSpec(rawSpec.getOwned()) {}   \
-                                                                                                \
-        std::unique_ptr<sdk::LogicalAggStage> bind() const override {                           \
-            return std::make_unique<ExtensionName##LogicalStage>(_rawSpec);                     \
-        };                                                                                      \
-                                                                                                \
-    private:                                                                                    \
-        ::mongo::BSONObj _rawSpec;                                                              \
-    };                                                                                          \
-    class ExtensionName##ParseNode : public sdk::AggStageParseNode {                            \
-    public:                                                                                     \
-        ExtensionName##ParseNode(const ::mongo::BSONObj& rawSpec)                               \
-            : sdk::AggStageParseNode(ExtensionName##StageName), _rawSpec(rawSpec.getOwned()) {} \
-                                                                                                \
-        size_t getExpandedSize() const override {                                               \
-            return 1;                                                                           \
-        }                                                                                       \
-        std::vector<mongo::extension::VariantNodeHandle> expand() const override {              \
-            std::vector<mongo::extension::VariantNodeHandle> expanded;                          \
-            expanded.reserve(getExpandedSize());                                                \
-            expanded.emplace_back(new sdk::ExtensionAggStageAstNode(                            \
-                std::make_unique<ExtensionName##AstNode>(_rawSpec)));                           \
-            return expanded;                                                                    \
-        }                                                                                       \
-        ::mongo::BSONObj getQueryShape(                                                         \
-            const ::MongoExtensionHostQueryShapeOpts* ctx) const override {                     \
-            return _rawSpec;                                                                    \
-        }                                                                                       \
-                                                                                                \
-    private:                                                                                    \
-        ::mongo::BSONObj _rawSpec;                                                              \
+namespace mongo::extension::sdk {
+
+/**
+ * Default ExecAggStage implementation.
+ */
+class TestExecStage : public sdk::ExecAggStageTransform {
+public:
+    TestExecStage(std::string_view stageName, const mongo::BSONObj& arguments)
+        : sdk::ExecAggStageTransform(stageName), _arguments(arguments.getOwned()) {}
+
+    mongo::extension::ExtensionGetNextResult getNext(
+        const mongo::extension::sdk::QueryExecutionContextHandle& execCtx,
+        ::MongoExtensionExecAggStage* execStage,
+        ::MongoExtensionGetNextRequestType requestType) override {
+        auto input = _getSource().getNext(execCtx.get());
+        if (input.code == ::mongo::extension::GetNextCode::kPauseExecution) {
+            return ::mongo::extension::ExtensionGetNextResult::pauseExecution();
+        }
+        if (input.code == ::mongo::extension::GetNextCode::kEOF) {
+            return ::mongo::extension::ExtensionGetNextResult::eof();
+        }
+        return ::mongo::extension::ExtensionGetNextResult::advanced(input.res.get());
+    }
+
+    void open() override {}
+    void reopen() override {}
+    void close() override {}
+
+protected:
+    const mongo::BSONObj _arguments;
+};
+
+/**
+ * Default LogicalAggStage implementation for a stage that compiles to type 'ExecStageType'.
+ */
+template <typename ExecStageType>
+class TestLogicalStage : public sdk::LogicalAggStage {
+public:
+    TestLogicalStage(std::string_view stageName, const mongo::BSONObj& arguments)
+        : _arguments(arguments.getOwned()), _name(stageName) {}
+
+    mongo::BSONObj serialize() const override {
+        return BSON(_name << _arguments);
+    }
+    mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSON(_name << _arguments);
+    }
+    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
+        return std::make_unique<ExecStageType>(_name, _arguments);
+    }
+
+protected:
+    const mongo::BSONObj _arguments;
+    const std::string _name;
+};
+
+/**
+ * Default AggStageAstNode implementation for a stage that binds to type 'LogicalStageType'.
+ */
+template <typename LogicalStageType>
+class TestAstNode : public sdk::AggStageAstNode {
+public:
+    TestAstNode(std::string_view stageName, const mongo::BSONObj& arguments)
+        : sdk::AggStageAstNode(stageName), _arguments(arguments.getOwned()) {}
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<LogicalStageType>(getName(), _arguments);
+    };
+
+protected:
+    const mongo::BSONObj _arguments;
+};
+
+/**
+ * Default AggStageParseNode implementation for a stage that expands to type 'AstNodeType'.
+ */
+template <typename AstNodeType>
+class TestParseNode : public sdk::AggStageParseNode {
+public:
+    TestParseNode(std::string_view stageName, const mongo::BSONObj& arguments)
+        : sdk::AggStageParseNode(stageName), _arguments(arguments.getOwned()) {}
+
+    size_t getExpandedSize() const override {
+        return 1;
+    }
+    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
+        std::vector<mongo::extension::VariantNodeHandle> expanded;
+        expanded.reserve(getExpandedSize());
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
+            std::make_unique<AstNodeType>(getName(), _arguments)));
+        return expanded;
+    }
+    mongo::BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSON(_name << _arguments);
+    }
+
+protected:
+    const mongo::BSONObj _arguments;
+};
+
+/**
+ * This class allows us to define template types using string literals.
+ */
+template <size_t N>
+struct StringLiteral {
+    constexpr StringLiteral(const char (&str)[N]) {
+        std::copy_n(str, N, value);
+    }
+    char value[N];
+
+    constexpr bool operator==(const StringLiteral& other) const {
+        return std::equal(value, value + N, other.value);
+    }
+
+    // Support implicit cast to std::string so that we can pass the template argument as a
+    // constructor argument of type std::string.
+    constexpr operator std::string() const {
+        return std::string(value, N - 1);
+    }
+};
+
+/**
+ * Default AggStageDescriptor implementation for a stage with name 'StageName' that parses to type
+ * 'ParseNodeType'.
+ *
+ * This can be instantiated using a stage name constant or with the stage name as an inline string
+ * literal:
+ * using GroupStageDescriptor = TestStageDescriptor<"$group", GroupParseNode>;
+ *
+ * constexpr char kMatchStageName[] = "$match";
+ * using MatchStageDescriptor = TestStageDescriptor<kMatchStageName, MatchParseNode>;
+ */
+template <StringLiteral StageName, typename ParseNodeType>
+class TestStageDescriptor : public sdk::AggStageDescriptor {
+public:
+    static inline const std::string kStageName = std::string(StageName);
+
+    TestStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
+
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
+        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
+        return std::make_unique<ParseNodeType>(kStageName, std::move(arguments));
+    }
+};
+}  // namespace mongo::extension::sdk
+
+namespace sdk = mongo::extension::sdk;
+
+/*
+ * Defines a stage name variable with the name k<ExtensionName>StageName.
+ */
+#define STAGE_NAME(ExtensionName, StageNameStringView) \
+    inline constexpr char ExtensionName##StageName[] = StageNameStringView;
+
+/*
+ * Defines a default ExecAggStage class implementation with the name <ExtensionName>ExecStage.
+ */
+#define DEFAULT_EXEC_STAGE(ExtensionName) using ExtensionName##ExecStage = sdk::TestExecStage;
+
+/*
+ * Defines a default LogicalStage class implementation with the name <ExtensionName>LogicalStage.
+ * This class will compile() to <ExtensionName>ExecStage (which must also exist).
+ */
+#define DEFAULT_LOGICAL_STAGE(ExtensionName) \
+    using ExtensionName##LogicalStage = sdk::TestLogicalStage<ExtensionName##ExecStage>;
+
+/*
+ * Defines a default AstNode class implementation with the name <ExtensionName>AstNode. This class
+ * will bind() to <ExtensionName>LogicalStage (which must also exist).
+ */
+#define DEFAULT_AST_NODE(ExtensionName) \
+    using ExtensionName##AstNode = sdk::TestAstNode<ExtensionName##LogicalStage>;
+
+/*
+ * Defines a default ParseNode class implementation with the name <ExtensionName>ParseNode. This
+ * class will expand() to <ExtensionName>AstNode (which must also exist).
+ */
+#define DEFAULT_PARSE_NODE(ExtensionName) \
+    using ExtensionName##ParseNode = sdk::TestParseNode<ExtensionName##AstNode>;
+
+/*
+ * Defines default ExecAggStage, LogicalStage, AstNode, and ParseNode class for the extension.
+ */
+#define DEFAULT_LOGICAL_AST_PARSE(ExtensionName, StageNameStringView) \
+    STAGE_NAME(ExtensionName, StageNameStringView);                   \
+    DEFAULT_EXEC_STAGE(ExtensionName);                                \
+    DEFAULT_LOGICAL_STAGE(ExtensionName);                             \
+    DEFAULT_AST_NODE(ExtensionName);                                  \
+    DEFAULT_PARSE_NODE(ExtensionName);
+
+/**
+ * Defines an extension that registers a single StageDescriptor with the given name prefix.
+ */
+#define DEFAULT_EXTENSION(ExtensionName)                                \
+    class ExtensionName##Extension : public sdk::Extension {            \
+    public:                                                             \
+        void initialize(const sdk::HostPortalHandle& portal) override { \
+            _registerStage<ExtensionName##StageDescriptor>(portal);     \
+        }                                                               \
     };

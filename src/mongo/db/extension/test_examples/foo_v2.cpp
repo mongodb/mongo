@@ -31,7 +31,6 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -52,9 +51,9 @@ public:
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         // Unlike foo.cpp, this will NOT fail to parse if the stage definition is not empty. Any/all
         // fields are just quietly ignored.
-        sdk::validateStageDefinition(stageBson, kStageName);
+        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
 
-        return std::make_unique<TestFooParseNode>(stageBson);
+        return std::make_unique<TestFooParseNode>(kStageName, arguments);
     }
 };
 

@@ -31,7 +31,6 @@
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/log_util.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -87,7 +86,7 @@ public:
 
         sdk::sdk_logDebug("Test log message", 11134100, level, attrs);
 
-        return std::make_unique<DebugLogParseNode>(stageBson);
+        return std::make_unique<DebugLogParseNode>(kStageName, bsonSpec);
     }
 };
 

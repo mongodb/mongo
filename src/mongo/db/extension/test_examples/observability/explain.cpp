@@ -30,57 +30,30 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
-#include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
+#include "mongo/db/extension/sdk/test_extension_factory.h"
 
 #include <memory>
 
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 
-static constexpr std::string kExplainStageName = "$explain";
+STAGE_NAME(Explain, "$explain");
+DEFAULT_EXEC_STAGE(Explain);
 
-class ExplainExecAggStage : public sdk::ExecAggStageTransform {
+class ExplainLogicalStage : public sdk::TestLogicalStage<ExplainExecStage> {
 public:
-    ExplainExecAggStage() : sdk::ExecAggStageTransform(kExplainStageName) {}
-
-    mongo::extension::ExtensionGetNextResult getNext(
-        const sdk::QueryExecutionContextHandle& execCtx,
-        ::MongoExtensionExecAggStage* execStage,
-        ::MongoExtensionGetNextRequestType requestType) override {
-        // TODO SERVER-113905: once we support metadata, we should only support returning both
-        // document and metadata.
-        auto input = _getSource().getNext(execCtx.get());
-        if (input.code == extension::GetNextCode::kPauseExecution) {
-            return extension::ExtensionGetNextResult::pauseExecution();
-        }
-        if (input.code == extension::GetNextCode::kEOF) {
-            return extension::ExtensionGetNextResult::eof();
-        }
-        return extension::ExtensionGetNextResult::advanced(input.res.get());
-    }
-
-    void open() override {}
-
-    void reopen() override {}
-
-    void close() override {}
-};
-
-class ExplainLogicalStage : public sdk::LogicalAggStage {
-public:
-    ExplainLogicalStage(StringData input) : _input(input) {}
-
-    BSONObj serialize() const override {
-        return BSON(kExplainStageName << BSON("input" << _input));
-    }
+    ExplainLogicalStage(std::string_view stageName, const mongo::BSONObj& spec)
+        : TestLogicalStage(stageName, spec) {}
 
     BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
         BSONObjBuilder builder;
 
         {
-            BSONObjBuilder stageBuilder = builder.subobjStart(kExplainStageName);
-            stageBuilder.append("input", _input);
+            BSONObjBuilder stageBuilder = builder.subobjStart(ExplainStageName);
+
+            // This was validated at parse time.
+            auto input = _arguments["input"].valueStringDataSafe();
+            stageBuilder.append("input", input);
 
             switch (verbosity) {
                 case ::MongoExtensionExplainVerbosity::kQueryPlanner:
@@ -95,7 +68,7 @@ public:
                 default:
                     sdk_tasserted(11239405,
                                   (str::stream() << "unknown explain verbosity provided to "
-                                                 << kExplainStageName << " stage: " << verbosity));
+                                                 << ExplainStageName << " stage: " << verbosity));
             }
 
             stageBuilder.done();
@@ -103,50 +76,10 @@ public:
 
         return builder.obj();
     }
-
-    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
-        return std::make_unique<ExplainExecAggStage>();
-    }
-
-private:
-    std::string _input;
 };
 
-class ExplainAstNode : public sdk::AggStageAstNode {
-public:
-    ExplainAstNode(StringData input) : sdk::AggStageAstNode(kExplainStageName), _input(input) {}
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<ExplainLogicalStage>(_input);
-    }
-
-private:
-    std::string _input;
-};
-
-class ExplainParseNode : public sdk::AggStageParseNode {
-public:
-    ExplainParseNode(StringData input) : sdk::AggStageParseNode(kExplainStageName), _input(input) {}
-
-    size_t getExpandedSize() const override {
-        return 1;
-    }
-
-    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
-        std::vector<mongo::extension::VariantNodeHandle> expanded;
-        expanded.reserve(getExpandedSize());
-        expanded.emplace_back(
-            new sdk::ExtensionAggStageAstNode(std::make_unique<ExplainAstNode>(_input)));
-        return expanded;
-    }
-
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        return BSONObj();
-    }
-
-private:
-    std::string _input;
-};
+DEFAULT_AST_NODE(Explain);
+DEFAULT_PARSE_NODE(Explain);
 
 /**
  * Stage with a non-default explain implementation. Syntax:
@@ -155,33 +88,20 @@ private:
  *
  * Explain will output the input and the verbosity level.
  */
-class ExplainStageDescriptor : public sdk::AggStageDescriptor {
+class ExplainStageDescriptor : public sdk::TestStageDescriptor<ExplainStageName, ExplainParseNode> {
 public:
-    static inline const std::string kStageName = "$explain";
-
-    ExplainStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName);
-
-        auto arguments = stageBson[kStageName];
+        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
 
         sdk_uassert(
             11239403,
             (str::stream() << "input to " << kStageName << " must be a string " << arguments),
             arguments["input"] && arguments["input"].type() == mongo::BSONType::string);
-        auto input = arguments["input"].valueStringDataSafe();
 
-        return std::make_unique<ExplainParseNode>(input);
+        return std::make_unique<ExplainParseNode>(kStageName, arguments);
     }
 };
 
-class ExplainExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        _registerStage<ExplainStageDescriptor>(portal);
-    }
-};
-
+DEFAULT_EXTENSION(Explain)
 REGISTER_EXTENSION(ExplainExtension)
 DEFINE_GET_EXTENSION()

@@ -162,7 +162,6 @@ protected:
     AggStageAstNode() = delete;  // No default constructor.
     explicit AggStageAstNode(std::string_view name) : _name(name) {}
 
-private:
     const std::string _name;
 };
 
@@ -260,7 +259,6 @@ protected:
     AggStageParseNode() = delete;  // No default constructor.
     explicit AggStageParseNode(std::string_view name) : _name(name) {}
 
-private:
     const std::string _name;
 };
 
@@ -463,7 +461,6 @@ protected:
 
     virtual UnownedExecAggStageHandle& _getSource() = 0;
 
-private:
     const std::string _name;
 };
 

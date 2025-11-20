@@ -30,7 +30,6 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -46,9 +45,10 @@ namespace sdk = mongo::extension::sdk;
         ExtensionV##VERSION_NUM##StageDescriptor() : sdk::AggStageDescriptor(kStageName) {}      \
                                                                                                  \
         std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override { \
-            sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);          \
+            auto arguments =                                                                     \
+                sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);      \
                                                                                                  \
-            return std::make_unique<ExtensionV##VERSION_NUM##ParseNode>(stageBson);              \
+            return std::make_unique<ExtensionV##VERSION_NUM##ParseNode>(kStageName, arguments);  \
         }                                                                                        \
     };                                                                                           \
                                                                                                  \

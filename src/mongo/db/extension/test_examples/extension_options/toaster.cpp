@@ -31,7 +31,6 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -53,7 +52,7 @@ public:
     ToastStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName);
+        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
 
         const auto obj = stageBson.getField(kStageName).Obj();
         sdk_uassert(11285301,
@@ -67,7 +66,7 @@ public:
                     obj.getField("temp").numberDouble() <= ToasterOptions::maxToasterHeat);
 
 
-        return std::make_unique<ToastParseNode>(stageBson);
+        return std::make_unique<ToastParseNode>(kStageName, arguments);
     }
 };
 
@@ -81,9 +80,9 @@ public:
     ToastBagelStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
+        auto arguments = sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
 
-        return std::make_unique<ToastBagelParseNode>(stageBson);
+        return std::make_unique<ToastBagelParseNode>(kStageName, arguments);
     }
 };
 

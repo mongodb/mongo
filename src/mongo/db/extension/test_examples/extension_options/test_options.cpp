@@ -31,7 +31,6 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -53,9 +52,9 @@ public:
     OptionAStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
+        auto arguments = sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
 
-        return std::make_unique<OptionAParseNode>(stageBson);
+        return std::make_unique<OptionAParseNode>(kStageName, arguments);
     }
 };
 
@@ -71,9 +70,9 @@ public:
     OptionBStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
+        auto arguments = sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
 
-        return std::make_unique<OptionBParseNode>(stageBson);
+        return std::make_unique<OptionBParseNode>(kStageName, arguments);
     }
 };
 
