@@ -46,7 +46,8 @@ void ThroughputProbing::setup() {
 
     const auto initialTickets = admission::throughput_probing::gInitialConcurrency;
     constexpr auto initialMaxQueueDepth = TicketHolder::kDefaultMaxQueueDepth;
-    Milliseconds probingInterval{gExecutionControlConcurrencyAdjustmentIntervalMillis};
+    Milliseconds probingInterval{
+        admission::throughput_probing::gConcurrencyAdjustmentIntervalMillis};
 
     constexpr bool trackPeakUsed = true;
     _readTicketHolder = std::make_unique<TicketHolder>(

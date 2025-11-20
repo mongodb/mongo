@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/admission/execution_control_parameters_gen.h"
+#include "mongo/db/admission/throughput_probing_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/logv2/log.h"
@@ -290,10 +291,12 @@ TicketingSystem::TicketingSystem(
     ServiceContext* svcCtx,
     RWTicketHolder normal,
     RWTicketHolder low,
-    Milliseconds throughputProbingInterval,
     ExecutionControlConcurrencyAdjustmentAlgorithmEnum concurrencyAdjustmentAlgorithm)
     : _state({concurrencyAdjustmentAlgorithm}),
-      _throughputProbing(svcCtx, normal.read.get(), normal.write.get(), throughputProbingInterval) {
+      _throughputProbing(svcCtx,
+                         normal.read.get(),
+                         normal.write.get(),
+                         Milliseconds{throughput_probing::gConcurrencyAdjustmentIntervalMillis}) {
     _holders[static_cast<size_t>(AdmissionContext::Priority::kNormal)] = std::move(normal);
     _holders[static_cast<size_t>(AdmissionContext::Priority::kLow)] = std::move(low);
 };

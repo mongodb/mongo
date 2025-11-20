@@ -82,7 +82,6 @@ public:
         ServiceContext* svcCtx,
         RWTicketHolder normal,
         RWTicketHolder low,
-        Milliseconds throughputProbingInterval,
         ExecutionControlConcurrencyAdjustmentAlgorithmEnum concurrencyAdjustmentAlgorithm);
 
     /**

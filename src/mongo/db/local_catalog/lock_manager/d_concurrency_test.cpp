@@ -109,7 +109,6 @@ public:
             admission::TicketingSystem::RWTicketHolder{
                 std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth),
                 std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth)},
-            Milliseconds{100},
             ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions);
         admission::TicketingSystem::use(_svcCtx, std::move(ticketingSystem));
     }

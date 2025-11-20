@@ -540,7 +540,7 @@ config_fuzzer_params = {
             "period": 60,
             "fuzz_at": ["startup", "runtime"],
         },
-        "executionControlConcurrencyAdjustmentIntervalMillis": {
+        "throughputProbingConcurrencyAdjustmentIntervalMillis": {
             "min": 10,
             "max": 1_000,
             "fuzz_at": ["startup"],

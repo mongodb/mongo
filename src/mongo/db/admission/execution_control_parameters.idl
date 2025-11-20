@@ -197,20 +197,6 @@ server_parameters:
             callback: validateConcurrencyAdjustmentAlgorithm
         redact: false
 
-    executionControlConcurrencyAdjustmentIntervalMillis:
-        description: >-
-            The interval in milliseconds in which to run the concurrency adjustment algorithm, if it is
-            not set to fixedConcurrentTransactions.
-        set_at: startup
-        cpp_vartype: int32_t
-        cpp_varname: gExecutionControlConcurrencyAdjustmentIntervalMillis
-        deprecated_name:
-            - storageEngineConcurrencyAdjustmentIntervalMillis
-        default: 100
-        validator:
-            gte: 10
-        redact: false
-
     executionControlHeuristicDeprioritizationEnabled:
         description: >-
             Enables a heuristic that will evaluate long-running operations and deprioritize them to

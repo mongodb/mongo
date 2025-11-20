@@ -99,7 +99,6 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
                 false /* trackPeakUsed */,
                 gWriteLowPriorityMaxQueueDepth.load(),
                 delinquentWriteCb)},
-        Milliseconds{gExecutionControlConcurrencyAdjustmentIntervalMillis},
         algorithm);
 }
 
