@@ -114,6 +114,9 @@ public:
                                                          boost::optional<TenantId>);
     };
 
+    static Status validateConcurrencyAdjustmentAlgorithm(const std::string& name,
+                                                         const boost::optional<TenantId>&);
+
     static Status updateConcurrencyAdjustmentAlgorithm(std::string newAlgorithm);
 
     /**

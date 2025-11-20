@@ -186,6 +186,15 @@ Status TicketingSystem::NormalPrioritySettings::validateConcurrentReadTransactio
     return Status::OK();
 }
 
+Status TicketingSystem::validateConcurrencyAdjustmentAlgorithm(
+    const std::string& name, const boost::optional<TenantId>&) try {
+    ExecutionControlConcurrencyAdjustmentAlgorithm_parse(
+        name, IDLParserContext{"executionControlConcurrencyAdjustmentAlgorithm"});
+    return Status::OK();
+} catch (const DBException& ex) {
+    return ex.toStatus();
+}
+
 Status TicketingSystem::LowPrioritySettings::updateWriteMaxQueueDepth(
     std::int32_t newWriteMaxQueueDepth) {
     const auto spName = "low priority write max queue depth";
