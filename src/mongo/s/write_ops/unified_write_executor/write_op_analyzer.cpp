@@ -120,12 +120,12 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
 
     if (tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId) {
         recordTargetingStats(opCtx, targeter, tr, op);
-        return Analysis{BatchType::kNonTargetedWrite,
+        return Analysis{AnalysisType::kTwoPhaseWrite,
                         std::move(tr.endpoints),
                         isViewfulTimeseries,
                         std::move(targetedSampleId)};
     } else if (isMultiWriteBlockingMigrations) {
-        return Analysis{BatchType::kMultiWriteBlockingMigrations,
+        return Analysis{AnalysisType::kMultiWriteBlockingMigrations,
                         std::move(tr.endpoints),
                         isViewfulTimeseries,
                         std::move(targetedSampleId)};
@@ -138,13 +138,13 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
                 !(tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId));
         // Note we do not translate viewful timeseries collection namespace here, it will be
         // translated within the transaction when we analyze the request again.
-        return Analysis{BatchType::kInternalTransaction,
+        return Analysis{AnalysisType::kInternalTransaction,
                         std::move(tr.endpoints),
                         false /* isTimeseries */,
                         std::move(targetedSampleId)};
     } else if (tr.endpoints.size() == 1) {
         recordTargetingStats(opCtx, targeter, tr, op);
-        return Analysis{BatchType::kSingleShard,
+        return Analysis{AnalysisType::kSingleShard,
                         std::move(tr.endpoints),
                         isViewfulTimeseries,
                         std::move(targetedSampleId)};
@@ -169,7 +169,7 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
                 opCtx, targeter.getNS(), op.getItemRef().getOpType(), tr.endpoints);
         }
 
-        return Analysis{BatchType::kMultiShard,
+        return Analysis{AnalysisType::kMultiShard,
                         std::move(tr.endpoints),
                         isViewfulTimeseries,
                         std::move(targetedSampleId)};

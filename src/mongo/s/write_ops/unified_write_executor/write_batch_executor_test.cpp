@@ -252,11 +252,11 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
         auto resps = executor.execute(operationContext(), rtx, {batch});
 
         ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
-        auto& responses = get<SimpleWriteBatchResponse>(resps);
+        auto& response = get<SimpleWriteBatchResponse>(resps);
 
         std::set<ShardId> expectedShardIds{shardId1, shardId2};
-        ASSERT_EQ(2, responses.size());
-        for (auto& [shardId, response] : responses) {
+        ASSERT_EQ(2, response.shardResponses.size());
+        for (auto& [shardId, response] : response.shardResponses) {
             ASSERT(expectedShardIds.contains(shardId));
             ASSERT(response.isOK());
         }
@@ -345,11 +345,11 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSpecifiedWriteOptions) {
 
         ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
 
-        auto& responses = get<SimpleWriteBatchResponse>(resps);
+        auto& response = get<SimpleWriteBatchResponse>(resps);
 
         std::set<ShardId> expectedShardIds{shardId1};
-        ASSERT_EQ(1, responses.size());
-        for (auto& [shardId, response] : responses) {
+        ASSERT_EQ(1, response.shardResponses.size());
+        for (auto& [shardId, response] : response.shardResponses) {
             ASSERT(expectedShardIds.contains(shardId));
             ASSERT(response.isOK());
         }
@@ -417,11 +417,11 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
 
         ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
 
-        auto& responses = get<SimpleWriteBatchResponse>(resps);
+        auto& response = get<SimpleWriteBatchResponse>(resps);
 
         std::set<ShardId> expectedShardIds{shardId1};
-        ASSERT_EQ(1, responses.size());
-        for (auto& [shardId, response] : responses) {
+        ASSERT_EQ(1, response.shardResponses.size());
+        for (auto& [shardId, response] : response.shardResponses) {
             ASSERT(expectedShardIds.contains(shardId));
             ASSERT(response.isOK());
         }
@@ -483,11 +483,11 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
 
         ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
 
-        auto& responses = get<SimpleWriteBatchResponse>(resps);
+        auto& response = get<SimpleWriteBatchResponse>(resps);
 
         std::set<ShardId> expectedShardIds{shardId1};
-        ASSERT_EQ(1, responses.size());
-        for (auto& [shardId, response] : responses) {
+        ASSERT_EQ(1, response.shardResponses.size());
+        for (auto& [shardId, response] : response.shardResponses) {
             ASSERT(expectedShardIds.contains(shardId));
             ASSERT(response.isOK());
         }
@@ -576,11 +576,11 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchWithFindAndModifyRequest) 
 
         ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
 
-        auto& responses = get<SimpleWriteBatchResponse>(resps);
+        auto& response = get<SimpleWriteBatchResponse>(resps);
 
         std::set<ShardId> expectedShardIds{shardId1};
-        ASSERT_EQ(1, responses.size());
-        for (auto& [shardId, response] : responses) {
+        ASSERT_EQ(1, response.shardResponses.size());
+        for (auto& [shardId, response] : response.shardResponses) {
             ASSERT(expectedShardIds.contains(shardId));
             ASSERT(response.isOK());
         }

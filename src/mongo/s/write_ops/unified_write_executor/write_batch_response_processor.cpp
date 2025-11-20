@@ -109,10 +109,10 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     std::vector<std::pair<ShardId, ShardResult>> shardResults;
-    shardResults.reserve(response.size());
+    shardResults.reserve(response.shardResponses.size());
 
     // For each ShardResponse, call onShardResponse() and store the result into 'shardResults'.
-    for (const auto& [shardId, shardResponse] : response) {
+    for (const auto& [shardId, shardResponse] : response.shardResponses) {
         shardResults.emplace_back(shardId,
                                   onShardResponse(opCtx, routingCtx, shardId, shardResponse));
     }

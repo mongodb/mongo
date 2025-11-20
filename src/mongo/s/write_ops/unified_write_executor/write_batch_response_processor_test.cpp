@@ -115,11 +115,10 @@ TEST_F(WriteBatchResponseProcessorTest, OKReplies) {
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {shard1Name,
-             WriteBatchExecutor::makeShardResponse(rcr1, {}, inTransaction, errorsOnly)},
-            {shard2Name,
-             WriteBatchExecutor::makeShardResponse(
-                 rcr2, {WriteOp(request, 0), WriteOp(request, 1)}, inTransaction, errorsOnly)}});
+            {{shard1Name, ShardResponse::make(rcr1, {}, inTransaction, errorsOnly)},
+             {shard2Name,
+              ShardResponse::make(
+                  rcr2, {WriteOp(request, 0), WriteOp(request, 1)}, inTransaction, errorsOnly)}}});
 
     auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNInserted(), 2);
@@ -161,11 +160,10 @@ TEST_F(WriteBatchResponseProcessorTest, OKRepliesWithUpdateCommand) {
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {shard1Name,
-             WriteBatchExecutor::makeShardResponse(rcr1, {}, inTransaction, errorsOnly)},
-            {shard2Name,
-             WriteBatchExecutor::makeShardResponse(
-                 rcr2, {WriteOp(request, 0), WriteOp(request, 1)}, inTransaction, errorsOnly)}});
+            {{shard1Name, ShardResponse::make(rcr1, {}, inTransaction, errorsOnly)},
+             {shard2Name,
+              ShardResponse::make(
+                  rcr2, {WriteOp(request, 0), WriteOp(request, 1)}, inTransaction, errorsOnly)}}});
 
     // Generating a 'BatchedCommandResponse' should output the same statistics, save for 'n', which
     // is the combination of 'nInserted' and 'nMatched', and 'nModified', which is only set on
@@ -196,8 +194,7 @@ TEST_F(WriteBatchResponseProcessorTest, AllStatisticsCopied) {
     processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {WriteOp(request, 0)})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)})}}});
     auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNInserted(), 1);
     ASSERT_EQ(clientReply.getNMatched(), 1);
@@ -266,10 +263,9 @@ TEST_F(WriteBatchResponseProcessorTest, MixedErrorsAndOk) {
     processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1})},
-            {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op2, op3})},
-            {shard3Name, WriteBatchExecutor::makeShardResponse(rcr3, {op4})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op2, op3})},
+                                  {shard3Name, ShardResponse::make(rcr3, {op4})}}});
 
     auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNErrors(), 2);
@@ -313,8 +309,7 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1, op2})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1, op2})}}});
     // No errors.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
     // One incomplete returned (op2).
@@ -353,7 +348,7 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
     result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{{shard1Name, WriteBatchExecutor::makeShardResponse(rcr2, {op2})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr2, {op2})}}});
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
     ASSERT(result.opsToRetry.empty());
     ASSERT(result.collsToCreate.empty());
@@ -392,8 +387,7 @@ TEST_F(WriteBatchResponseProcessorTest, SingleReplyItemForBatchOfThree) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1, op2, op3})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1, op2, op3})}}});
     // No errors.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
     // Assert all ops were returned for retry even though there was only one item in the reply.
@@ -466,9 +460,8 @@ TEST_F(WriteBatchResponseProcessorTest, TwoShardMixedNamespaceExistence) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1, op2, op3})},
-            {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op4, op5, op6})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1, op2, op3})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op4, op5, op6})}}});
     // No errors.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
     // Assert all the errors were returned for retry.
@@ -540,10 +533,8 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op5, op3, op4})},
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op6, op1, op2})},
-        });
+        SimpleWriteBatchResponse{{{shard2Name, ShardResponse::make(rcr2, {op5, op3, op4})},
+                                  {shard1Name, ShardResponse::make(rcr1, {op6, op1, op2})}}});
     // Errors should have occurred.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 3);
 
@@ -611,8 +602,7 @@ TEST_F(WriteBatchResponseProcessorTest, RetryStalenessErrors) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1, op2})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1, op2})}}});
 
     ASSERT_EQ(routingCtx.errors.size(), 2);
     ASSERT_EQ(routingCtx.errors[0].code(), ErrorCodes::StaleConfig);
@@ -679,9 +669,8 @@ TEST_F(WriteBatchResponseProcessorTest, MixedStalenessErrorsAndOk) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1, op3})},
-            {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op2, op4})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1, op3})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op2, op4})}}});
 
     ASSERT_EQ(routingCtx.errors.size(), 2);
     ASSERT_EQ(routingCtx.errors[0].code(), ErrorCodes::StaleConfig);
@@ -729,8 +718,7 @@ TEST_F(WriteBatchResponseProcessorTest, RetryShardsCannotRefreshDueToLocksHeldEr
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1, op2})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1, op2})}}});
 
     // No errors.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
@@ -785,8 +773,8 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesSingleWriteConcernError) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{{shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op2})},
-                                 {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op1})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op2})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op1})}}});
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
@@ -842,13 +830,12 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
     WriteCommandRef cmdRef(request);
     Stats stats;
     WriteBatchResponseProcessor processor(cmdRef, stats);
-    auto result = processor.onWriteBatchResponse(
-        opCtx,
-        routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op2})},
-            {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op1})},
-        });
+    auto result = processor.onWriteBatchResponse(opCtx,
+                                                 routingCtx,
+                                                 SimpleWriteBatchResponse{{
+                                                     {shard1Name, ShardResponse::make(rcr1, {op2})},
+                                                     {shard2Name, ShardResponse::make(rcr2, {op1})},
+                                                 }});
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
@@ -905,8 +892,8 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesExceededMemoryLimitError) {
             opCtx,
             routingCtx,
             SimpleWriteBatchResponse{
-                {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {WriteOp(request, 0)})},
-                {shard2Name, WriteBatchExecutor::makeShardResponse(rcr1, {WriteOp(request, 1)})}});
+                {{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)})},
+                 {shard2Name, ShardResponse::make(rcr1, {WriteOp(request, 1)})}}});
 
         ASSERT_FALSE(processor.checkBulkWriteReplyMaxSize(opCtx));
         auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
@@ -931,7 +918,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesExceededMemoryLimitError) {
             opCtx,
             routingCtx,
             SimpleWriteBatchResponse{
-                {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {WriteOp(request, 0)})}});
+                {{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)})}}});
 
         ASSERT_TRUE(processor.checkBulkWriteReplyMaxSize(opCtx));
         ASSERT_EQ(processor.getNumErrorsRecorded(), 1);
@@ -982,8 +969,7 @@ TEST_F(WriteBatchResponseProcessorTest, IncrementApproxSizeOnceForRetry) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1, op2})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1, op2})}}});
     // No unrecoverable error.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
 
@@ -1013,7 +999,7 @@ TEST_F(WriteBatchResponseProcessorTest, IncrementApproxSizeOnceForRetry) {
     result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{{shard1Name, WriteBatchExecutor::makeShardResponse(rcr2, {op2})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr2, {op2})}}});
 
     // On successful retry, we should have exceeded the memory limit.
     ASSERT_TRUE(processor.checkBulkWriteReplyMaxSize(opCtx));
@@ -1043,11 +1029,11 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseOk) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        WriteBatchExecutor::makeNoRetryWriteBatchResponse(StatusWith<BSONObj>(reply.toBSON()),
-                                                          /*wce*/ boost::none,
-                                                          WriteOp(request, 0),
-                                                          inTransaction,
-                                                          errorsOnly));
+        NoRetryWriteBatchResponse::make(StatusWith<BSONObj>(reply.toBSON()),
+                                        /*wce*/ boost::none,
+                                        WriteOp(request, 0),
+                                        inTransaction,
+                                        errorsOnly));
     ASSERT_TRUE(result.opsToRetry.empty());
     ASSERT_TRUE(result.collsToCreate.empty());
 
@@ -1083,11 +1069,11 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseError) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        WriteBatchExecutor::makeNoRetryWriteBatchResponse(StatusWith<BSONObj>(reply.toBSON()),
-                                                          /*wce*/ boost::none,
-                                                          WriteOp(request, 0),
-                                                          inTransaction,
-                                                          errorsOnly));
+        NoRetryWriteBatchResponse::make(StatusWith<BSONObj>(reply.toBSON()),
+                                        /*wce*/ boost::none,
+                                        WriteOp(request, 0),
+                                        inTransaction,
+                                        errorsOnly));
     ASSERT_TRUE(result.opsToRetry.empty());
     ASSERT_TRUE(result.collsToCreate.empty());
 
@@ -1130,8 +1116,8 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseMode) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{{shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op2})},
-                                 {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op1})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op2})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op1})}}});
 
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
     ASSERT_EQ(result.opsToRetry.size(), 0);
@@ -1167,7 +1153,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithErrors) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{{shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1})}}});
 
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
@@ -1221,9 +1207,8 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithMixedErrorsAndOk) {
     processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1})},
-            {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op2, op3})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op2, op3})}}});
 
     auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNErrors(), 1);
@@ -1295,10 +1280,9 @@ TEST_F(WriteBatchResponseProcessorTest, MultiWritesOKReplies) {
     processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1, op2, op3})},
-            {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op1, op2, op3})},
-            {shard3Name, WriteBatchExecutor::makeShardResponse(rcr3, {op1, op2, op3})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1, op2, op3})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op1, op2, op3})},
+                                  {shard3Name, ShardResponse::make(rcr3, {op1, op2, op3})}}});
 
     auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNErrors(), 0);
@@ -1365,10 +1349,9 @@ TEST_F(WriteBatchResponseProcessorTest, MixedMultiAndNonMultiWritesOKReplies) {
     processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1, op3})},
-            {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op1, op2, op3})},
-            {shard3Name, WriteBatchExecutor::makeShardResponse(rcr3, {op1, op3})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1, op3})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op1, op2, op3})},
+                                  {shard3Name, ShardResponse::make(rcr3, {op1, op3})}}});
 
     auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNErrors(), 0);
@@ -1421,9 +1404,8 @@ TEST_F(WriteBatchResponseProcessorTest, MultiWriteMixedOKAndRetryableErrorThenOK
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{{shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1})},
-                                 {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op1})}});
-
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op1})}}});
 
     ASSERT_EQ(result.successfulShardSet.size(), 1);
     ASSERT_EQ(result.opsToRetry.size(), 1);
@@ -1435,7 +1417,7 @@ TEST_F(WriteBatchResponseProcessorTest, MultiWriteMixedOKAndRetryableErrorThenOK
     auto nextResult = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{{shard1Name, WriteBatchExecutor::makeShardResponse(rcr3, {op1})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr3, {op1})}}});
 
     ASSERT_EQ(nextResult.successfulShardSet.size(), 1);
     ASSERT_EQ(nextResult.opsToRetry.size(), 0);
@@ -1488,8 +1470,8 @@ TEST_F(WriteBatchResponseProcessorTest, MultiWriteMixedOKAndRetryableErrorThenNo
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{{shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1})},
-                                 {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op1})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op1})}}});
 
 
     ASSERT_EQ(result.successfulShardSet.size(), 1);
@@ -1510,7 +1492,7 @@ TEST_F(WriteBatchResponseProcessorTest, MultiWriteMixedOKAndRetryableErrorThenNo
     auto nextResult = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{{shard1Name, WriteBatchExecutor::makeShardResponse(rcr3, {op1})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr3, {op1})}}});
 
     ASSERT_EQ(nextResult.successfulShardSet.size(), 0);
     ASSERT_EQ(nextResult.opsToRetry.size(), 0);
@@ -1560,8 +1542,8 @@ TEST_F(WriteBatchResponseProcessorTest, MultiWriteMixedOKAndNonRetryableError) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{{shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1})},
-                                 {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op1})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op1})}}});
 
 
     ASSERT_EQ(result.successfulShardSet.size(), 1);
@@ -1617,8 +1599,8 @@ TEST_F(WriteBatchResponseProcessorTest, MultiWriteNonRetryableErrors) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{{shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1})},
-                                 {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op1})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op1})}}});
 
 
     ASSERT_EQ(result.successfulShardSet.size(), 0);
@@ -1698,9 +1680,9 @@ TEST_F(WriteBatchResponseProcessorTest, MultiWriteRetryableNonRetryableAndOK) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{{shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1})},
-                                 {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op1})},
-                                 {shard3Name, WriteBatchExecutor::makeShardResponse(rcr3, {op1})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op1})},
+                                  {shard3Name, ShardResponse::make(rcr3, {op1})}}});
 
 
     ASSERT_EQ(result.successfulShardSet.size(), 1);
@@ -1739,9 +1721,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessFindAndModifyOKResponse) {
     WriteBatchResponseProcessor processor(cmdRef, stats);
 
     auto result = processor.onWriteBatchResponse(
-        opCtx,
-        routingCtx,
-        SimpleWriteBatchResponse{{shard1, WriteBatchExecutor::makeShardResponse(rcr1, {op})}});
+        opCtx, routingCtx, SimpleWriteBatchResponse{{{shard1, ShardResponse::make(rcr1, {op})}}});
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
 
@@ -1773,9 +1753,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessFindAndModifyErrorResponse) {
     WriteBatchResponseProcessor processor(cmdRef, stats);
 
     auto result = processor.onWriteBatchResponse(
-        opCtx,
-        routingCtx,
-        SimpleWriteBatchResponse{{shard1, WriteBatchExecutor::makeShardResponse(rcr1, {op})}});
+        opCtx, routingCtx, SimpleWriteBatchResponse{{{shard1, ShardResponse::make(rcr1, {op})}}});
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
 
@@ -1813,9 +1791,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessFindAndModifyRetryResponse) {
     WriteBatchResponseProcessor processor(cmdRef, stats);
 
     auto result = processor.onWriteBatchResponse(
-        opCtx,
-        routingCtx,
-        SimpleWriteBatchResponse{{shard1, WriteBatchExecutor::makeShardResponse(rcr1, {op})}});
+        opCtx, routingCtx, SimpleWriteBatchResponse{{{shard1, ShardResponse::make(rcr1, {op})}}});
     ASSERT_EQ(result.collsToCreate.size(), 0);
     ASSERT_EQ(result.opsToRetry.size(), 1);
     ASSERT_EQ(result.opsToRetry[0].getId(), op.getId());
@@ -1864,10 +1840,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, OKReplies) {
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {shard1Name,
-             WriteBatchExecutor::makeShardResponse(rcr1, {WriteOp(request, 0)}, inTransaction)},
-            {shard2Name,
-             WriteBatchExecutor::makeShardResponse(rcr2, {WriteOp(request, 1)}, inTransaction)}});
+            {{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)}, inTransaction)},
+             {shard2Name, ShardResponse::make(rcr2, {WriteOp(request, 1)}, inTransaction)}}});
 
     // No errors.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
@@ -1903,14 +1877,13 @@ TEST_F(WriteBatchResponseProcessorTxnTest, TransientTransactionErrorInARSThrows)
     Stats stats;
     WriteBatchResponseProcessor processor(cmdRef, stats);
 
-    ASSERT_THROWS_CODE(
-        processor.onWriteBatchResponse(
-            opCtx,
-            routingCtx,
-            SimpleWriteBatchResponse{
-                {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1}, inTransaction)}}),
-        DBException,
-        errorCode);
+    ASSERT_THROWS_CODE(processor.onWriteBatchResponse(
+                           opCtx,
+                           routingCtx,
+                           SimpleWriteBatchResponse{
+                               {{shard1Name, ShardResponse::make(rcr1, {op1}, inTransaction)}}}),
+                       DBException,
+                       errorCode);
 }
 
 TEST_F(WriteBatchResponseProcessorTxnTest,
@@ -1942,15 +1915,14 @@ TEST_F(WriteBatchResponseProcessorTxnTest,
     reply.setCursor(BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss2));
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    ASSERT_THROWS_CODE(
-        processor.onWriteBatchResponse(
-            opCtx,
-            routingCtx,
-            SimpleWriteBatchResponse{
-                {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1}, inTransaction)},
-                {shard2Name, WriteBatchExecutor::makeShardResponse(rcr2, {op2}, inTransaction)}}),
-        DBException,
-        errorCode);
+    ASSERT_THROWS_CODE(processor.onWriteBatchResponse(
+                           opCtx,
+                           routingCtx,
+                           SimpleWriteBatchResponse{
+                               {{shard1Name, ShardResponse::make(rcr1, {op1}, inTransaction)},
+                                {shard2Name, ShardResponse::make(rcr2, {op2}, inTransaction)}}}),
+                       DBException,
+                       errorCode);
 }
 
 TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInARSHaltsProcessing) {
@@ -1986,11 +1958,9 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInARSHalt
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {shard1Name,
-             WriteBatchExecutor::makeShardResponse(rcr1, {WriteOp(request, 0)}, inTransaction)},
-            {shard2Name,
-             WriteBatchExecutor::makeShardResponse(rcr2, {WriteOp(request, 1)}, inTransaction)},
-            {shard3Name, WriteBatchExecutor::makeEmptyShardResponse({WriteOp(request, 2)})}});
+            {{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)}, inTransaction)},
+             {shard2Name, ShardResponse::make(rcr2, {WriteOp(request, 1)}, inTransaction)},
+             {shard3Name, ShardResponse::makeEmpty({WriteOp(request, 2)})}}});
 
     // An error should have occurred.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 1);
@@ -2045,14 +2015,13 @@ TEST_F(WriteBatchResponseProcessorTxnTest, TransientTransactionErrorInShardRespo
     Stats stats;
     WriteBatchResponseProcessor processor(cmdRef, stats);
 
-    ASSERT_THROWS_CODE(
-        processor.onWriteBatchResponse(
-            opCtx,
-            routingCtx,
-            SimpleWriteBatchResponse{
-                {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {op1}, inTransaction)}}),
-        DBException,
-        errorCode);
+    ASSERT_THROWS_CODE(processor.onWriteBatchResponse(
+                           opCtx,
+                           routingCtx,
+                           SimpleWriteBatchResponse{
+                               {{shard1Name, ShardResponse::make(rcr1, {op1}, inTransaction)}}}),
+                       DBException,
+                       errorCode);
 }
 
 TEST_F(WriteBatchResponseProcessorTxnTest,
@@ -2099,11 +2068,9 @@ TEST_F(WriteBatchResponseProcessorTxnTest,
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {shard1Name,
-             WriteBatchExecutor::makeShardResponse(rcr1, {WriteOp(request, 0)}, inTransaction)},
-            {shard2Name,
-             WriteBatchExecutor::makeShardResponse(rcr2, {WriteOp(request, 1)}, inTransaction)},
-            {shard3Name, WriteBatchExecutor::makeEmptyShardResponse({WriteOp(request, 2)})}});
+            {{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)}, inTransaction)},
+             {shard2Name, ShardResponse::make(rcr2, {WriteOp(request, 1)}, inTransaction)},
+             {shard3Name, ShardResponse::makeEmpty({WriteOp(request, 2)})}}});
 
     // An error should have occurred.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 1);
@@ -2164,11 +2131,10 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInReplyIt
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {shard1Name,
-             WriteBatchExecutor::makeShardResponse(
-                 rcr1,
-                 {WriteOp(request, 0), WriteOp(request, 1), WriteOp(request, 2)},
-                 inTransaction)}});
+            {{shard1Name,
+              ShardResponse::make(rcr1,
+                                  {WriteOp(request, 0), WriteOp(request, 1), WriteOp(request, 2)},
+                                  inTransaction)}}});
 
     // An error should have occurred.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 1);
@@ -2221,8 +2187,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest, RetryableErrorInReplyItemHaltsProcess
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{
-            {shard1Name, WriteBatchExecutor::makeShardResponse(rcr1, {WriteOp(request, 0)})}});
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)})}}});
 
     // An error should have occurred.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 1);
@@ -2290,10 +2255,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, ProcessorSetsRetriedStmtIdsInClientRe
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {shard1Name,
-             WriteBatchExecutor::makeShardResponse(rcr1, {WriteOp(request, 0)}, inTransaction)},
-            {shard2Name,
-             WriteBatchExecutor::makeShardResponse(rcr2, {WriteOp(request, 1)}, inTransaction)}});
+            {{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)}, inTransaction)},
+             {shard2Name, ShardResponse::make(rcr2, {WriteOp(request, 1)}, inTransaction)}}});
 
     // No errors.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
@@ -2358,8 +2321,7 @@ TEST_F(WriteBatchResponseProcessorTest, SimpleWriteErrorsOnlyModeNoError) {
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {shard1Name,
-             WriteBatchExecutor::makeShardResponse(rcr1, {op1, op2}, inTransaction, errorsOnly)}});
+            {{shard1Name, ShardResponse::make(rcr1, {op1, op2}, inTransaction, errorsOnly)}}});
     // No errors.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
     ASSERT_EQ(result.opsToRetry.size(), 0);
@@ -2407,8 +2369,7 @@ TEST_F(WriteBatchResponseProcessorTest, SimpleWriteErrorsOnlyModeWithError) {
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {shard1Name,
-             WriteBatchExecutor::makeShardResponse(rcr1, {op1, op2}, inTransaction, errorsOnly)}});
+            {{shard1Name, ShardResponse::make(rcr1, {op1, op2}, inTransaction, errorsOnly)}}});
     // An error should have occurred.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 1);
     ASSERT_EQ(result.opsToRetry.size(), 0);
@@ -2462,9 +2423,8 @@ TEST_F(WriteBatchResponseProcessorTest, SimpleWriteErrorsOnlyModeUnordered) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        SimpleWriteBatchResponse{{shard1Name,
-                                  WriteBatchExecutor::makeShardResponse(
-                                      rcr1, {op1, op2, op3}, inTransaction, errorsOnly)}});
+        SimpleWriteBatchResponse{
+            {{shard1Name, ShardResponse::make(rcr1, {op1, op2, op3}, inTransaction, errorsOnly)}}});
 
     // Errors should have occurred.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 2);
@@ -2484,7 +2444,7 @@ TEST_F(WriteBatchResponseProcessorTest, SimpleWriteErrorsOnlyModeUnordered) {
     ASSERT_EQ(batch[1].getStatus().code(), ErrorCodes::BadValue);
 }
 
-TEST_F(WriteBatchResponseProcessorTest, NonTargetedWriteErrorsOnlyModeNoError) {
+TEST_F(WriteBatchResponseProcessorTest, TwoPhaseWriteErrorsOnlyModeNoError) {
     BulkWriteCommandRequest request = BulkWriteCommandRequest(
         {
             BulkWriteUpdateOp(0, BSON("_id" << 1), BSON("$set" << BSON("y" << 2))),
@@ -2505,7 +2465,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonTargetedWriteErrorsOnlyModeNoError) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        WriteBatchExecutor::makeNoRetryWriteBatchResponse(
+        NoRetryWriteBatchResponse::make(
             BSONObj(), /*wce*/ boost::none, op1, inTransaction, errorsOnly));
 
     // No errors.
@@ -2520,7 +2480,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonTargetedWriteErrorsOnlyModeNoError) {
     ASSERT_EQ(batch.size(), 0);
 }
 
-TEST_F(WriteBatchResponseProcessorTest, NonTargetedWriteErrorsOnlyModeWithError) {
+TEST_F(WriteBatchResponseProcessorTest, TwoPhaseWriteErrorsOnlyModeWithError) {
     BulkWriteCommandRequest request = BulkWriteCommandRequest(
         {
             BulkWriteUpdateOp(0, BSON("_id" << 1), BSON("$set" << BSON("y" << 2))),
@@ -2541,7 +2501,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonTargetedWriteErrorsOnlyModeWithError)
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        WriteBatchExecutor::makeNoRetryWriteBatchResponse(
+        NoRetryWriteBatchResponse::make(
             Status(ErrorCodes::BadValue, ""), /*wce*/ boost::none, op1, inTransaction, errorsOnly));
 
     // An error should have occurred.

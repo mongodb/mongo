@@ -97,7 +97,7 @@ struct SimpleWriteBatch {
     }
 };
 
-struct NonTargetedWriteBatch {
+struct TwoPhaseWriteBatch {
     WriteOp op;
     boost::optional<UUID> sampleId;
     bool isViewfulTimeseries;
@@ -159,7 +159,7 @@ struct MultiWriteBlockingMigrationsBatch {
 struct WriteBatch {
     std::variant<EmptyBatch,
                  SimpleWriteBatch,
-                 NonTargetedWriteBatch,
+                 TwoPhaseWriteBatch,
                  InternalTransactionBatch,
                  MultiWriteBlockingMigrationsBatch>
         data;

@@ -172,7 +172,7 @@ bool WriteBatchExecutor::usesProvidedRoutingContext(const WriteBatch& batch) con
     // types, the executor does not use the provided RoutingContext.
     return std::visit(OverloadedVisitor{
                           [](const SimpleWriteBatch& data) { return true; },
-                          [](const NonTargetedWriteBatch& data) { return false; },
+                          [](const TwoPhaseWriteBatch& data) { return false; },
                           [](const InternalTransactionBatch& data) { return false; },
                           [](const MultiWriteBlockingMigrationsBatch& data) { return false; },
                           [](const EmptyBatch& data) { return false; },
@@ -455,13 +455,12 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     return EmptyBatchResponse{};
 }
 
-ShardResponse WriteBatchExecutor::makeShardResponse(
-    StatusWith<executor::RemoteCommandResponse> swResponse,
-    std::vector<WriteOp> ops,
-    bool inTransaction,
-    bool errorsOnly,
-    boost::optional<HostAndPort> hostAndPort,
-    boost::optional<const ShardId&> shardId) {
+ShardResponse ShardResponse::make(StatusWith<executor::RemoteCommandResponse> swResponse,
+                                  std::vector<WriteOp> ops,
+                                  bool inTransaction,
+                                  bool errorsOnly,
+                                  boost::optional<HostAndPort> hostAndPort,
+                                  boost::optional<const ShardId&> shardId) {
     const bool isFindAndModifyCommand = (ops.size() == 1 && ops.front().isFindAndModify());
 
     // If there was a local error, return a ShardResponse that reports this local error.
@@ -555,8 +554,7 @@ ShardResponse WriteBatchExecutor::makeShardResponse(
                          response.target};
 }
 
-ShardResponse WriteBatchExecutor::makeEmptyShardResponse(std::vector<WriteOp> ops,
-                                                         bool errorsOnly) {
+ShardResponse ShardResponse::makeEmpty(std::vector<WriteOp> ops, bool errorsOnly) {
     return ShardResponse{boost::none /*swReply*/,
                          boost::none /*wce*/,
                          std::move(ops),
@@ -564,7 +562,7 @@ ShardResponse WriteBatchExecutor::makeEmptyShardResponse(std::vector<WriteOp> op
                          errorsOnly};
 }
 
-NoRetryWriteBatchResponse WriteBatchExecutor::makeNoRetryWriteBatchResponse(
+NoRetryWriteBatchResponse NoRetryWriteBatchResponse::make(
     const StatusWith<BSONObj>& swResponse,
     boost::optional<WriteConcernErrorDetail> wce,
     const WriteOp& op,
@@ -644,7 +642,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         routingCtx.onRequestSentForNss(nss);
     }
 
-    SimpleWriteBatchResponse shardResponses;
+    SimpleWriteBatchResponse resp;
     bool stopParsingResponses = false;
 
     while (!stopParsingResponses && !sender.done()) {
@@ -654,12 +652,12 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         const auto& shardRequest = batch.requestByShardId.at(shardId);
         const bool errorsOnly = errorsOnlyByShardId.at(shardId);
 
-        ShardResponse shardResponse = makeShardResponse(std::move(arsResponse.swResponse),
-                                                        shardRequest.ops,
-                                                        inTransaction,
-                                                        errorsOnly,
-                                                        std::move(arsResponse.shardHostAndPort),
-                                                        shardId);
+        ShardResponse shardResponse = ShardResponse::make(std::move(arsResponse.swResponse),
+                                                          shardRequest.ops,
+                                                          inTransaction,
+                                                          errorsOnly,
+                                                          std::move(arsResponse.shardHostAndPort),
+                                                          shardId);
 
         const bool isShutdownError = shardResponse.isShutdownError();
 
@@ -690,7 +688,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
             stopParsingResponses = true;
         }
 
-        shardResponses.emplace_back(std::move(shardId), std::move(shardResponse));
+        resp.shardResponses.emplace_back(std::move(shardId), std::move(shardResponse));
     }
 
     // If we stopped parsing responses early, generate empty ShardResponses for the remaining
@@ -698,32 +696,32 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     if (stopParsingResponses) {
         // Make a set of the ShardIds for which we already have ShardResponses.
         absl::flat_hash_set<ShardId> shardIdSet;
-        for (const auto& [shardId, _] : shardResponses) {
+        for (const auto& [shardId, _] : resp.shardResponses) {
             shardIdSet.emplace(shardId);
         }
 
         // For each 'shardId' that isn't in 'shardIdSet', create an empty ShardResponse and
-        // add it to 'shardResponses'.
+        // add it to 'resp.shardResponses'.
         for (const auto& [shardId, _] : batch.requestByShardId) {
             if (!shardIdSet.count(shardId)) {
                 const auto& shardRequest = batch.requestByShardId.at(shardId);
                 const bool errorsOnly = errorsOnlyByShardId.at(shardId);
-                shardResponses.emplace_back(shardId,
-                                            makeEmptyShardResponse(shardRequest.ops, errorsOnly));
+                resp.shardResponses.emplace_back(
+                    shardId, ShardResponse::makeEmpty(shardRequest.ops, errorsOnly));
             }
         }
     }
 
     tassert(10346800,
             "There should same number of requests and responses from a simple write batch",
-            shardResponses.size() == batch.requestByShardId.size());
+            resp.shardResponses.size() == batch.requestByShardId.size());
 
-    return shardResponses;
+    return WriteBatchResponse{std::move(resp)};
 }
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 RoutingContext& routingCtx,
-                                                const NonTargetedWriteBatch& batch) {
+                                                const TwoPhaseWriteBatch& batch) {
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     const WriteOp& writeOp = batch.op;
@@ -763,7 +761,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     auto swResponse = swRes.isOK() ? StatusWith{swRes.getValue().getResponse().getOwned()}
                                    : StatusWith<BSONObj>{swRes.getStatus()};
 
-    return makeNoRetryWriteBatchResponse(
+    return NoRetryWriteBatchResponse::make(
         swResponse, std::move(wce), writeOp, inTransaction, errorsOnly);
 }
 
@@ -829,7 +827,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     auto swResponse = responseStatus.isOK() ? StatusWith(bulkWriteResponse.toBSON().getOwned())
                                             : StatusWith<BSONObj>(responseStatus);
 
-    return makeNoRetryWriteBatchResponse(
+    return NoRetryWriteBatchResponse::make(
         swResponse, std::move(wce), writeOp, inTransaction, errorsOnly);
 }
 
@@ -865,7 +863,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         }
     }();
 
-    return makeNoRetryWriteBatchResponse(
+    return NoRetryWriteBatchResponse::make(
         reply, /*wce*/ boost::none, writeOp, inTransaction, errorsOnly);
 }
 

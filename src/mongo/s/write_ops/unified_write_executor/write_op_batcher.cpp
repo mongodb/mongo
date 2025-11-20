@@ -40,7 +40,7 @@ namespace mongo {
 namespace unified_write_executor {
 
 namespace {
-bool writeTypeSupportsGrouping(BatchType writeType) {
+bool analysisTypeSupportsGrouping(AnalysisType writeType) {
     return writeType == kSingleShard || writeType == kMultiShard;
 }
 }  // namespace
@@ -81,7 +81,7 @@ public:
     bool isCompatibleWithBatch(NamespaceString nss, Analysis& analysis) const {
         const auto& endpoints = analysis.shardsAffected;
         // If the op's type is not compatible with SimpleBatch, return false.
-        if (!writeTypeSupportsGrouping(analysis.type)) {
+        if (!analysisTypeSupportsGrouping(analysis.type)) {
             return false;
         }
         // Verify that there is at least one endpoint. Also, if this op is kSingleShard, verify
@@ -142,7 +142,7 @@ public:
     void addOp(WriteOp& writeOp, Analysis& analysis) {
         tassert(10896513,
                 "Expected op to be compatible with SimpleWriteBatch",
-                writeTypeSupportsGrouping(analysis.type));
+                analysisTypeSupportsGrouping(analysis.type));
 
         if (!_batch) {
             _batch.emplace();
@@ -339,12 +339,12 @@ BatcherResult OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
         } else {
             // Consume the first op.
             _producer.advance();
-            // If the first WriteOp is kNonTargetedWrite, then consume the op and put it in a
-            // NonTargetedWriteBatch by itself and return the batch.
-            if (analysis.type == kNonTargetedWrite) {
+            // If the first WriteOp is kTwoPhaseWrite, then consume the op and put it in a
+            // TwoPhaseWriteBatch by itself and return the batch.
+            if (analysis.type == kTwoPhaseWrite) {
                 auto sampleId =
                     analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return {WriteBatch{NonTargetedWriteBatch{
+                return {WriteBatch{TwoPhaseWriteBatch{
                             *writeOp, std::move(sampleId), analysis.isViewfulTimeseries}},
                         std::move(opsWithErrors)};
             }
@@ -479,12 +479,12 @@ BatcherResult UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
         } else {
             // Consume 'writeOp'.
             _producer.advance();
-            // If the first WriteOp is kNonTargetedWrite, then consume the op and put it in a
-            // NonTargetedWriteBatch by itself and return the batch.
-            if (analysis.type == kNonTargetedWrite) {
+            // If the first WriteOp is kTwoPhaseWrite, then consume the op and put it in a
+            // TwoPhaseWriteBatch by itself and return the batch.
+            if (analysis.type == kTwoPhaseWrite) {
                 auto sampleId =
                     analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return {WriteBatch{NonTargetedWriteBatch{
+                return {WriteBatch{TwoPhaseWriteBatch{
                             writeOp, std::move(sampleId), analysis.isViewfulTimeseries}},
                         std::move(opsWithErrors)};
             }

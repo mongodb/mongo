@@ -140,15 +140,42 @@ private:
 class ShardResponse : public BasicResponse {
 public:
     using BasicResponse::BasicResponse;
+
+    /**
+     * Creates a ShardResponse from the supplied RemoteCommandResponse.
+     */
+    static ShardResponse make(StatusWith<executor::RemoteCommandResponse> swResponse,
+                              std::vector<WriteOp> ops,
+                              bool inTransaction = false,
+                              bool errorsOnly = false,
+                              boost::optional<HostAndPort> hostAndPort = boost::none,
+                              boost::optional<const ShardId&> shardId = boost::none);
+
+    /**
+     * Creates an "empty" ShardResponse. This method is used when there is no RemoteCommandResponse
+     * for a given 'shardId' (in cases where we decided to break out of the ARS loop early).
+     */
+    static ShardResponse makeEmpty(std::vector<WriteOp> ops, bool errorsOnly = false);
 };
 
 struct EmptyBatchResponse {};
 
-using SimpleWriteBatchResponse = std::vector<std::pair<ShardId, ShardResponse>>;
+struct SimpleWriteBatchResponse {
+    std::vector<std::pair<ShardId, ShardResponse>> shardResponses;
+};
 
 class NoRetryWriteBatchResponse : public BasicResponse {
 public:
     using BasicResponse::BasicResponse;
+
+    /**
+     * Creates a NoRetryWriteBatchResponse from the supplied BSONObj response.
+     */
+    static NoRetryWriteBatchResponse make(const StatusWith<BSONObj>& swResponse,
+                                          boost::optional<WriteConcernErrorDetail> wce,
+                                          const WriteOp& op,
+                                          bool inTransaction,
+                                          bool errorsOnly);
 
     const WriteOp& getOp() const {
         tassert(11182200, "Expected vector to contain exactly one op", getOps().size() == 1);
@@ -161,32 +188,6 @@ using WriteBatchResponse =
 
 class WriteBatchExecutor {
 public:
-    /**
-     * Creates a ShardResponse from the supplied RemoteCommandResponse.
-     */
-    static ShardResponse makeShardResponse(StatusWith<executor::RemoteCommandResponse> swResponse,
-                                           std::vector<WriteOp> ops,
-                                           bool inTransaction = false,
-                                           bool errorsOnly = false,
-                                           boost::optional<HostAndPort> hostAndPort = boost::none,
-                                           boost::optional<const ShardId&> shardId = boost::none);
-
-    /**
-     * Creates an "empty" ShardResponse. This method is used when there is no RemoteCommandResponse
-     * for a given 'shardId' (in cases where we decided to break out of the ARS loop early).
-     */
-    static ShardResponse makeEmptyShardResponse(std::vector<WriteOp> ops, bool errorsOnly = false);
-
-    /**
-     * Creates a NoRetryWriteBatchResponse from the supplied BSONObj response.
-     */
-    static NoRetryWriteBatchResponse makeNoRetryWriteBatchResponse(
-        const StatusWith<BSONObj>& swResponse,
-        boost::optional<WriteConcernErrorDetail> wce,
-        const WriteOp& op,
-        bool inTransaction,
-        bool errorsOnly);
-
     /**
      * Returns true if the scheduler must provide a RoutingContext when executing the specified
      * batch, otherwise returns false.
@@ -242,7 +243,7 @@ private:
 
     WriteBatchResponse _execute(OperationContext* opCtx,
                                 RoutingContext& routingCtx,
-                                const NonTargetedWriteBatch& batch);
+                                const TwoPhaseWriteBatch& batch);
 
     WriteBatchResponse _execute(OperationContext* opCtx,
                                 RoutingContext& routingCtx,

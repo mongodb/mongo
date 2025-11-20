@@ -132,16 +132,16 @@ public:
         }
     }
 
-    void assertNonTargetedWriteBatch(const WriteBatch& batch,
-                                     WriteOpId expectedOpId,
-                                     bool expectedIsViewfulTimeseries,
-                                     boost::optional<UUID> expectedSampleId = boost::none) {
-        ASSERT_TRUE(std::holds_alternative<NonTargetedWriteBatch>(batch.data));
-        auto& nonTargetedWriteBatch = std::get<NonTargetedWriteBatch>(batch.data);
-        const auto& op = nonTargetedWriteBatch.op;
+    void assertTwoPhaseWriteBatch(const WriteBatch& batch,
+                                  WriteOpId expectedOpId,
+                                  bool expectedIsViewfulTimeseries,
+                                  boost::optional<UUID> expectedSampleId = boost::none) {
+        ASSERT_TRUE(std::holds_alternative<TwoPhaseWriteBatch>(batch.data));
+        auto& twoPhaseWriteBatch = std::get<TwoPhaseWriteBatch>(batch.data);
+        const auto& op = twoPhaseWriteBatch.op;
         ASSERT_EQ(op.getId(), expectedOpId);
-        ASSERT_EQ(nonTargetedWriteBatch.isViewfulTimeseries, expectedIsViewfulTimeseries);
-        ASSERT_EQ(nonTargetedWriteBatch.sampleId, expectedSampleId);
+        ASSERT_EQ(twoPhaseWriteBatch.isViewfulTimeseries, expectedIsViewfulTimeseries);
+        ASSERT_EQ(twoPhaseWriteBatch.sampleId, expectedSampleId);
     }
 
     void assertInternalTransactionBatch(const WriteBatch& batch,
@@ -432,7 +432,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherBatchesQuaruntineOp
 
     WriteOpAnalyzerMock analyzer({
         {0, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries}},
-        {1, Analysis{kNonTargetedWrite, {nss0Shard0}, nss0IsViewfulTimeseries}},
+        {1, Analysis{kTwoPhaseWrite, {nss0Shard0}, nss0IsViewfulTimeseries}},
         {2, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries}},
         {3, Analysis{kInternalTransaction, {nss0Shard0}}},
         {4, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries}},
@@ -449,7 +449,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherBatchesQuaruntineOp
 
     auto result2 = batcher.getNextBatch(getOperationContext(), *routingCtx);
     ASSERT_FALSE(result2.batch.isEmptyBatch());
-    assertNonTargetedWriteBatch(result2.batch, 1, nss0IsViewfulTimeseries);
+    assertTwoPhaseWriteBatch(result2.batch, 1, nss0IsViewfulTimeseries);
 
     auto result3 = batcher.getNextBatch(getOperationContext(), *routingCtx);
     ASSERT_FALSE(result3.batch.isEmptyBatch());
@@ -613,7 +613,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherAttachesSampleIdToB
          }},
         {2,
          Analysis{
-             kNonTargetedWrite,
+             kTwoPhaseWrite,
              {nss0Shard0, nss0Shard1},
              nss0IsViewfulTimeseries,
              analyze_shard_key::TargetedSampleId(sampleId2, shardId0),
@@ -650,7 +650,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherAttachesSampleIdToB
 
     auto result3 = batcher.getNextBatch(getOperationContext(), *routingCtx);
     ASSERT_FALSE(result3.batch.isEmptyBatch());
-    assertNonTargetedWriteBatch(result3.batch, expectedOpId, nss0IsViewfulTimeseries, sampleId2);
+    assertTwoPhaseWriteBatch(result3.batch, expectedOpId, nss0IsViewfulTimeseries, sampleId2);
     expectedOpId++;
 
     auto result4 = batcher.getNextBatch(getOperationContext(), *routingCtx);
@@ -920,10 +920,10 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherBatchesQuarunti
 
     WriteOpAnalyzerMock analyzer({
         {0, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries}},
-        {1, Analysis{kNonTargetedWrite, {nss0Shard0, nss0Shard1}, nss0IsViewfulTimeseries}},
+        {1, Analysis{kTwoPhaseWrite, {nss0Shard0, nss0Shard1}, nss0IsViewfulTimeseries}},
         {2, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries}},
-        {3, Analysis{kNonTargetedWrite, {nss0Shard0, nss0Shard1}, nss0IsViewfulTimeseries}},
-        {4, Analysis{kNonTargetedWrite, {nss0Shard0, nss0Shard1}, nss0IsViewfulTimeseries}},
+        {3, Analysis{kTwoPhaseWrite, {nss0Shard0, nss0Shard1}, nss0IsViewfulTimeseries}},
+        {4, Analysis{kTwoPhaseWrite, {nss0Shard0, nss0Shard1}, nss0IsViewfulTimeseries}},
         {5, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries}},
         {6, Analysis{kInternalTransaction, {nss0Shard0}}},
         {7, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries}},
@@ -945,15 +945,15 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherBatchesQuarunti
 
     auto result2 = batcher.getNextBatch(getOperationContext(), *routingCtx);
     ASSERT_FALSE(result2.batch.isEmptyBatch());
-    assertNonTargetedWriteBatch(result2.batch, 1, nss0IsViewfulTimeseries);
+    assertTwoPhaseWriteBatch(result2.batch, 1, nss0IsViewfulTimeseries);
 
     auto result3 = batcher.getNextBatch(getOperationContext(), *routingCtx);
     ASSERT_FALSE(result3.batch.isEmptyBatch());
-    assertNonTargetedWriteBatch(result3.batch, 3, nss0IsViewfulTimeseries);
+    assertTwoPhaseWriteBatch(result3.batch, 3, nss0IsViewfulTimeseries);
 
     auto result4 = batcher.getNextBatch(getOperationContext(), *routingCtx);
     ASSERT_FALSE(result4.batch.isEmptyBatch());
-    assertNonTargetedWriteBatch(result4.batch, 4, nss0IsViewfulTimeseries);
+    assertTwoPhaseWriteBatch(result4.batch, 4, nss0IsViewfulTimeseries);
 
     auto result5 = batcher.getNextBatch(getOperationContext(), *routingCtx);
     ASSERT_FALSE(result5.batch.isEmptyBatch());
@@ -1298,7 +1298,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherSkipsDoneBatche
         {1, Analysis{kSingleShard, {nss0Shard0}}},
         {2, Analysis{kMultiShard, {{nss0Shard0, nss0Shard1}}}},
         {3, Analysis{kMultiShard, {{nss0Shard0, nss0Shard1}}}},
-        {4, Analysis{kNonTargetedWrite, {nss0Shard0}}},
+        {4, Analysis{kTwoPhaseWrite, {nss0Shard0}}},
         {5, Analysis{kMultiShard, {{nss0Shard0, nss0Shard1}}}},
         {6, Analysis{kSingleShard, {nss1Shard0}}},
     });
@@ -1326,7 +1326,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherSkipsDoneBatche
 
     auto result2 = batcher.getNextBatch(getOperationContext(), *routingCtx);
     ASSERT_FALSE(result2.batch.isEmptyBatch());
-    assertNonTargetedWriteBatch(result2.batch, 4, nss0IsViewfulTimeseries);
+    assertTwoPhaseWriteBatch(result2.batch, 4, nss0IsViewfulTimeseries);
 
     auto result3 = batcher.getNextBatch(getOperationContext(), *routingCtx);
     ASSERT_TRUE(result3.batch.isEmptyBatch());
@@ -1363,7 +1363,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherAttachesSampleI
          }},
         {2,
          Analysis{
-             kNonTargetedWrite,
+             kTwoPhaseWrite,
              {nss0Shard0, nss0Shard1},
              nss0IsViewfulTimeseries,
              analyze_shard_key::TargetedSampleId(sampleId2, shardId0),
@@ -1392,7 +1392,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherAttachesSampleI
 
     auto result2 = batcher.getNextBatch(getOperationContext(), *routingCtx);
     ASSERT_FALSE(result2.batch.isEmptyBatch());
-    assertNonTargetedWriteBatch(result2.batch, 2, nss0IsViewfulTimeseries, sampleId2);
+    assertTwoPhaseWriteBatch(result2.batch, 2, nss0IsViewfulTimeseries, sampleId2);
 
     auto result3 = batcher.getNextBatch(getOperationContext(), *routingCtx);
     ASSERT_FALSE(result3.batch.isEmptyBatch());

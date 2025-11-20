@@ -45,16 +45,16 @@
 namespace mongo {
 namespace unified_write_executor {
 
-enum BatchType {
+enum AnalysisType {
     kSingleShard,
     kMultiShard,
-    kNonTargetedWrite,
+    kTwoPhaseWrite,
     kInternalTransaction,
     kMultiWriteBlockingMigrations,
 };
 
 struct Analysis {
-    BatchType type;
+    AnalysisType type;
     std::vector<ShardEndpoint> shardsAffected;
     // TODO SERVER-106874 remove the 'isViewfulTimeseries' flag entirely once 9.0 becomes last LTS.
     // By then we will only have viewless timeseries that do not require nss translation.
