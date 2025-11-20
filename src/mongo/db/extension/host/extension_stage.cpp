@@ -32,7 +32,9 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host/query_execution_context.h"
+#include "mongo/db/extension/host_connector/executable_agg_stage_adapter.h"
 #include "mongo/db/extension/shared/get_next_result.h"
+
 namespace mongo {
 
 using namespace extension::host;
@@ -56,21 +58,42 @@ REGISTER_AGG_STAGE_MAPPING(extensionStage,
 ExtensionStage::ExtensionStage(StringData name,
                                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                extension::ExecAggStageHandle execAggStageHandle)
-    : Stage(name, pExpCtx), _execAggStageHandle(std::move(execAggStageHandle)) {
-    tassert(11357600, "_execAggStageHandle is invalid", _execAggStageHandle.isValid());
+    : Stage(name, pExpCtx),
+      _execAggStageHandle(std::move(execAggStageHandle)),
+      _sourceAggStageHandle(nullptr) {
+    tassert(10957211, "_execAggStageHandle is invalid", _execAggStageHandle.isValid());
+}
+
+void ExtensionStage::setSource(Stage* source) {
+    // First, let's check that we have a valid _execAggStageHandle before we proceed with
+    // allocations.
+    tassert(10957204, "_execAggStageHandle is invalid", _execAggStageHandle.isValid());
+
+    // This sets pSource to be source.
+    Stage::setSource(source);
+
+    // Remove any reference to the pointer in the extension before deleting the old handle.
+    if (_sourceAggStageHandle.isValid()) {
+        _execAggStageHandle.setSource(nullptr);
+    }
+
+    if (pSource) {
+        _sourceAggStageHandle = extension::ExecAggStageHandle{
+            new extension::host_connector::HostExecAggStageAdapter(ExecAggStage::make(pSource))};
+        // Check if the allocation failed. This might be superfluous, as any allocation failure
+        // would have likely oomed/bad_alloc.
+        tassert(10957205, "_sourceAggStageHandle is invalid", _sourceAggStageHandle.isValid());
+        // Attach the reference on extension side.
+        _execAggStageHandle.setSource(_sourceAggStageHandle);
+    }
 }
 
 GetNextResult ExtensionStage::doGetNext() {
-    if (pSource) {
-        // TODO (SERVER-112713): Call the api's set_source instead of returning pSource->getNext()
-        // so that pSource can be passed as an input stage to transform extension stages.
-        return pSource->getNext();
-    }
     using namespace mongo::extension;
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(pExpCtx.get());
     host_connector::QueryExecutionContextAdapter ctxAdapter(std::move(wrappedCtx));
-    tassert(11357601, "execAggStageHandle is invalid", _execAggStageHandle.isValid());
+    tassert(11357601, "_execAggStageHandle is invalid", _execAggStageHandle.isValid());
     auto result = _execAggStageHandle.getNext(&ctxAdapter);
     switch (result.code) {
         case GetNextCode::kAdvanced: {

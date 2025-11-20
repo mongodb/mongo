@@ -42,6 +42,7 @@
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/unittest/death_test.h"
@@ -1097,8 +1098,8 @@ DEATH_TEST_F(DocumentSourceExtensionTestDeathTest,
 }
 
 TEST_F(DocumentSourceExtensionTest, ShouldPropagateValidGetNextResultsForSourceExtensionStage) {
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::SourceAggStageAstNode::make());
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::FruitsAsDocumentsAstNode::make());
     auto astHandle = AggStageAstNodeHandle(astNode);
 
     auto optimizable =
@@ -1138,6 +1139,324 @@ TEST_F(DocumentSourceExtensionTest, ShouldPropagateValidGetNextResultsForSourceE
         ASSERT_DOCUMENT_EQ(next.releaseDocument(),
                            (Document{BSON("_id" << 5 << "pie" << 3.14159)}));
     }
+    // Verify that the next result after all the documents have been exhausted has a status of EOF.
+    auto eof = extensionStage->getNext();
+    ASSERT_TRUE(eof.isEOF());
 }
 
+TEST_F(DocumentSourceExtensionTest, ShouldPropagateValidGetNextResultsForTransformExtensionStage) {
+    // Create the $documents stage with test data. $documents is a source stage.
+    auto docSourcesList = DocumentSourceDocuments::createFromBson(
+        BSON("$documents" << BSON_ARRAY(BSON("sourceField" << 1)
+                                        << BSON("sourceField" << 2) << BSON("sourceField" << 3)
+                                        << BSON("sourceField" << 4) << BSON("sourceField" << 5)))
+            .firstElement(),
+        getExpCtx());
+
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    // Stitch the document sources returned by DocumentSourceDocuments::createFromBson(...) before
+    // stitching it with the extension stage.
+    std::vector<boost::intrusive_ptr<exec::agg::Stage>> stages;
+    for (auto& docSource : docSourcesList) {
+        stages.push_back(exec::agg::buildStage(docSource));
+    }
+
+    // The document sources are stitched in this order: queue -> project -> unwind -> replaceRoot.
+    for (size_t i = 1; i < stages.size(); ++i) {
+        stages[i]->setSource(stages[i - 1].get());
+    }
+
+    // Tests that exec::agg::ExtensionStage::setSource() correctly overrides
+    // exec::agg::Stage::setSource() and sets the source stage for the transform extension stage.
+    auto extensionStage = exec::agg::buildStageAndStitch(optimizable, stages.back().get());
+
+    // See sdk::shared_test_stages::TransformExecAggStage for the full expected test document suite.
+    std::vector<BSONObj> expectedTransforms = {
+        BSON("_id" << 1 << "apples" << "red"),
+        BSON("_id" << 2 << "oranges" << 5),
+        BSON("_id" << 3 << "bananas" << false),
+        BSON("_id" << 4 << "tropical fruits" << BSON_ARRAY("rambutan" << "durian" << "lychee")),
+        BSON("_id" << 5 << "pie" << 3.14159)};
+
+    // Verify all documents are transformed correctly.
+    for (int i = 1; i <= 5; ++i) {
+        auto next = extensionStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        BSONObj docToBson = next.releaseDocument().toBson();
+
+        // Verify transformation added the expected fields.
+        ASSERT_TRUE(docToBson.hasField("existingDoc"));
+        ASSERT_TRUE(docToBson.hasField("addedFields"));
+
+        // Verify the source document was preserved in "existingDoc".
+        ASSERT_BSONOBJ_EQ(docToBson.getObjectField("existingDoc"), BSON("sourceField" << i));
+
+        // Verify the transformed fields match the expected values.
+        ASSERT_BSONOBJ_EQ(docToBson.getObjectField("addedFields"), expectedTransforms[i - 1]);
+    }
+
+    // Verify that the next result after all the documents have been exhausted has a status of EOF.
+    ASSERT_TRUE(extensionStage->getNext().isEOF());
+}
+
+TEST_F(
+    DocumentSourceExtensionTest,
+    ShouldPropagateValidGetNextResultsForTransformExtensionStageWithSourceAsTransformExtensionStage) {
+    // Create the $documents stage with test data. $documents is a source stage.
+    auto docSourcesList = DocumentSourceDocuments::createFromBson(
+        BSON("$documents" << BSON_ARRAY(BSON("sourceField" << 1)
+                                        << BSON("sourceField" << 2) << BSON("sourceField" << 3)
+                                        << BSON("sourceField" << 4) << BSON("sourceField" << 5)))
+            .firstElement(),
+        getExpCtx());
+
+    auto firstAstNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+    auto firstAstHandle = AggStageAstNodeHandle(firstAstNode);
+
+    auto secondAstNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+    auto secondAstHandle = AggStageAstNodeHandle(secondAstNode);
+
+    auto firstOptimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(firstAstHandle));
+    auto secondOptimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(secondAstHandle));
+
+    // Stitch the document sources returned by DocumentSourceDocuments::createFromBson(...) before
+    // stitching it with the extension stage.
+    std::vector<boost::intrusive_ptr<exec::agg::Stage>> stages;
+    for (auto& docSource : docSourcesList) {
+        stages.push_back(exec::agg::buildStage(docSource));
+    }
+
+    // The document sources are stitched in this order: queue -> project -> unwind ->replaceRoot.
+    for (size_t i = 1; i < stages.size(); ++i) {
+        stages[i]->setSource(stages[i - 1].get());
+    }
+
+    // Tests that exec::agg::ExtensionStage::setSource() correctly overrides
+    // exec::agg::Stage::setSource() and sets the source stage for the transform extension stage.
+    auto firstTransformExtensionStage =
+        exec::agg::buildStageAndStitch(firstOptimizable, stages.back().get());
+
+    // Set the source of the second transform extension stage to be the first transform extension
+    // stage.
+    auto secondTransformExtensionStage =
+        exec::agg::buildStageAndStitch(secondOptimizable, firstTransformExtensionStage);
+
+    // See sdk::shared_test_stages::TransformExecAggStage for the full expected test documentsuite.
+    std::vector<BSONObj> expectedTransforms = {
+        BSON("_id" << 1 << "apples" << "red"),
+        BSON("_id" << 2 << "oranges" << 5),
+        BSON("_id" << 3 << "bananas" << false),
+        BSON("_id" << 4 << "tropical fruits" << BSON_ARRAY("rambutan" << "durian" << "lychee")),
+        BSON("_id" << 5 << "pie" << 3.14159)};
+
+    // Verify all documents are transformed correctly.
+    for (int i = 1; i <= 5; ++i) {
+        auto nextResult = secondTransformExtensionStage->getNext();
+        ASSERT_TRUE(nextResult.isAdvanced());
+        BSONObj docToBson = nextResult.releaseDocument().toBson();
+
+        // Verify transformation added the expected fields.
+        ASSERT_TRUE(docToBson.hasField("existingDoc"));
+        ASSERT_TRUE(docToBson.hasField("addedFields"));
+
+        // For $documents -> $transformExtensionStage:
+        // Verify the source document was preserved in "existingDoc".
+        ASSERT_BSONOBJ_EQ(docToBson.getObjectField("existingDoc").getObjectField("existingDoc"),
+                          BSON("sourceField" << i));
+        // Verify the transformed fields match the expected values.
+        ASSERT_BSONOBJ_EQ(docToBson.getObjectField("existingDoc").getObjectField("addedFields"),
+                          expectedTransforms[i - 1]);
+
+        // For $transformExtensionStage -> $transformExtensionStage:
+        // Verify the source document was preserved in "existingDoc".
+        ASSERT_BSONOBJ_EQ(docToBson.getObjectField("existingDoc"),
+                          BSON("existingDoc" << BSON("sourceField" << i) << "addedFields"
+                                             << expectedTransforms[i - 1]));
+        // Verify the transformed fields match the expected values.
+        ASSERT_BSONOBJ_EQ(docToBson.getObjectField("addedFields"), expectedTransforms[i - 1]);
+    }
+    // Verify that the next result after all the documents have been exhausted has a status of EOF.
+    ASSERT_TRUE(secondTransformExtensionStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceExtensionTest,
+       ShouldPropagateValidGetNextResultsForTransformExtensionStageWithSourceExtensionStage) {
+    auto sourceAstNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::FruitsAsDocumentsAstNode::make());
+    auto sourceAstHandle = AggStageAstNodeHandle(sourceAstNode);
+
+    auto sourceOptimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(sourceAstHandle));
+
+    auto sourceStage = exec::agg::buildStage(sourceOptimizable);
+
+    auto transformAstNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+    auto transformAstHandle = AggStageAstNodeHandle(transformAstNode);
+
+    auto transformOptimizable = host::DocumentSourceExtensionOptimizable::create(
+        getExpCtx(), std::move(transformAstHandle));
+
+    // Tests that exec::agg::ExtensionStage::setSource() correctly overrides
+    // exec::agg::Stage::setSource() and sets the source stage for the transform extension stage.
+    auto extensionStage = exec::agg::buildStageAndStitch(transformOptimizable, sourceStage);
+
+    // See sdk::shared_test_stages::TransformExecAggStage for the full expected test document suite.
+    std::vector<BSONObj> expectedTransforms = {
+        BSON("_id" << 1 << "apples" << "red"),
+        BSON("_id" << 2 << "oranges" << 5),
+        BSON("_id" << 3 << "bananas" << false),
+        BSON("_id" << 4 << "tropical fruits" << BSON_ARRAY("rambutan" << "durian" << "lychee")),
+        BSON("_id" << 5 << "pie" << 3.14159)};
+
+    // Verify all documents are transformed correctly.
+    for (int i = 1; i <= 5; ++i) {
+        auto next = extensionStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        BSONObj docToBson = next.releaseDocument().toBson();
+
+        // Verify transformation added the expected fields.
+        ASSERT_TRUE(docToBson.hasField("existingDoc"));
+        ASSERT_TRUE(docToBson.hasField("addedFields"));
+
+        // Verify the source document was preserved in "existingDoc".
+        ASSERT_BSONOBJ_EQ(docToBson.getObjectField("existingDoc"), expectedTransforms[i - 1]);
+
+        // Verify the transformed fields match the expected values.
+        ASSERT_BSONOBJ_EQ(docToBson.getObjectField("addedFields"), expectedTransforms[i - 1]);
+    }
+
+    // Verify that the next result after all the documents have been exhausted has a status of EOF.
+    ASSERT_TRUE(extensionStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceExtensionTest, ShouldEofWhenSourceStageEofsEarly) {
+    // Create the $documents stage with test data. $documents is a source stage.
+    auto docSourcesList = DocumentSourceDocuments::createFromBson(
+        BSON("$documents" << BSON_ARRAY(BSON("sourceField" << 1))).firstElement(), getExpCtx());
+
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    // Stitch the document sources returned by DocumentSourceDocuments::createFromBson(...) before
+    // stitching it with the extension stage.
+    std::vector<boost::intrusive_ptr<exec::agg::Stage>> stages;
+    for (auto& docSource : docSourcesList) {
+        stages.push_back(exec::agg::buildStage(docSource));
+    }
+
+    // The document sources are stitched in this order: queue -> project -> unwind -> replaceRoot.
+    for (size_t i = 1; i < stages.size(); ++i) {
+        stages[i]->setSource(stages[i - 1].get());
+    }
+
+    // Tests that exec::agg::ExtensionStage::setSource() correctly overrides
+    // exec::agg::Stage::setSource() and sets the source stage for the transform extension stage.
+    auto extensionStage = exec::agg::buildStageAndStitch(optimizable, stages.back().get());
+
+    // See sdk::shared_test_stages::TransformExecAggStage for the full expected test document suite.
+    std::vector<BSONObj> expectedTransforms = {BSON("_id" << 1 << "apples" << "red")};
+
+    // Verify all documents are transformed correctly.
+    auto next = extensionStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    BSONObj docToBson = next.releaseDocument().toBson();
+
+    // Verify transformation added the expected fields.
+    ASSERT_TRUE(docToBson.hasField("existingDoc"));
+    ASSERT_TRUE(docToBson.hasField("addedFields"));
+
+    // Verify the source document was preserved in "existingDoc".
+    ASSERT_BSONOBJ_EQ(docToBson.getObjectField("existingDoc"), BSON("sourceField" << 1));
+
+    // Verify the transformed fields match the expected values.
+    ASSERT_BSONOBJ_EQ(docToBson.getObjectField("addedFields"), expectedTransforms[0]);
+
+    // Exhausted all documents in stream, should return a status of EOF.
+    ASSERT_TRUE(extensionStage->getNext().isEOF());
+
+    // Verify that the status is still EOF even when getNext() is called again.
+    ASSERT_TRUE(extensionStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceExtensionTest,
+       ShouldPropagateValidGetNextResultsForHostStageTransformStageHostStage) {
+    // Create the $documents stage with test data. $documents is a source stage.
+    auto docSourcesList = DocumentSourceDocuments::createFromBson(
+        BSON("$documents" << BSON_ARRAY(BSON("fruit" << 1)
+                                        << BSON("vegetable" << 1) << BSON("fruit" << 1)
+                                        << BSON("fruit" << 1) << BSON("vegetable" << 1)))
+            .firstElement(),
+        getExpCtx());
+
+    auto firstAstNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+    auto firstAstHandle = AggStageAstNodeHandle(firstAstNode);
+
+    auto firstOptimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(firstAstHandle));
+
+    boost::intrusive_ptr<DocumentSourceMatch> matchDocSourceStage = DocumentSourceMatch::create(
+        BSON("existingDoc" << BSON("fruit" << 1)), make_intrusive<ExpressionContextForTest>());
+
+    // Stitch the document sources returned by DocumentSourceDocuments::createFromBson(...) before
+    // stitching it with the extension stage.
+    std::vector<boost::intrusive_ptr<exec::agg::Stage>> stages;
+    for (auto& docSource : docSourcesList) {
+        stages.push_back(exec::agg::buildStage(docSource));
+    }
+
+    // The document sources are stitched in this order: queue -> project -> unwind ->replaceRoot.
+    for (size_t i = 1; i < stages.size(); ++i) {
+        stages[i]->setSource(stages[i - 1].get());
+    }
+
+    // Tests that exec::agg::ExtensionStage::setSource() correctly overrides
+    // exec::agg::Stage::setSource() and sets the source stage for the transform extension stage.
+    auto transformExtensionStage =
+        exec::agg::buildStageAndStitch(firstOptimizable, stages.back().get());
+
+    // Set the source of the host match stage to be the transform extension stage.
+    auto secondTransformStage =
+        exec::agg::buildStageAndStitch(matchDocSourceStage, transformExtensionStage);
+
+    // See sdk::shared_test_stages::TransformExecAggStage for the full expected test documentsuite.
+    std::vector<BSONObj> expectedTransforms = {
+        BSON("_id" << 1 << "apples" << "red"),
+        BSON("_id" << 3 << "bananas" << false),
+        BSON("_id" << 4 << "tropical fruits" << BSON_ARRAY("rambutan" << "durian" << "lychee"))};
+
+    // Verify all documents are transformed correctly.
+    for (int i = 1; i <= 3; ++i) {
+        auto nextResult = secondTransformStage->getNext();
+        ASSERT_TRUE(nextResult.isAdvanced());
+        BSONObj docToBson = nextResult.releaseDocument().toBson();
+
+        // Verify transformation added the expected fields.
+        ASSERT_TRUE(docToBson.hasField("existingDoc"));
+        ASSERT_TRUE(docToBson.hasField("addedFields"));
+
+        // Verify the source document was preserved in "existingDoc".
+        ASSERT_BSONOBJ_EQ(docToBson.getObjectField("existingDoc"), BSON("fruit" << 1));
+
+        // Verify the transformed fields match the expected values.
+        ASSERT_BSONOBJ_EQ(docToBson.getObjectField("addedFields"), expectedTransforms[i - 1]);
+    }
+    // Verify that the next result after all the documents have been exhausted has a status of EOF.
+    ASSERT_TRUE(secondTransformStage->getNext().isEOF());
+}
 }  // namespace mongo::extension

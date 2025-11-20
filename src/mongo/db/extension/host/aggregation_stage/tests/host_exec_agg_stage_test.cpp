@@ -209,6 +209,17 @@ TEST(HostExecAggStageTest, GetNameFromHostStage) {
     ASSERT_EQ(handle.getName(), "$match");
 }
 
+TEST(HostExecAggStageTest, DeletedCopyAndMoveConstructors) {
+    static_assert(!std::is_copy_constructible_v<host_connector::HostExecAggStageAdapter>,
+                  "HostExecAggStageAdapter should not be copy constructible");
+    static_assert(!std::is_move_constructible_v<host_connector::HostExecAggStageAdapter>,
+                  "HostExecAggStageAdapter should not be move constructible");
+    static_assert(!std::is_copy_assignable_v<host_connector::HostExecAggStageAdapter>,
+                  "HostExecAggStageAdapter should not be copy assignable");
+    static_assert(!std::is_move_assignable_v<host_connector::HostExecAggStageAdapter>,
+                  "HostExecAggStageAdapter should not be move assignable");
+}
+
 }  // namespace
 
 }  // namespace mongo::extension

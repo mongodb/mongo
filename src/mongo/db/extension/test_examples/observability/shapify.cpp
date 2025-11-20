@@ -59,15 +59,22 @@ static constexpr std::string kShapifyStageName = "$shapify";
  */
 static constexpr std::string kShapifyDesugarStageName = "$shapifyDesugar";
 
-class ShapifyExecAggStage : public sdk::ExecAggStage {
+class ShapifyExecAggStage : public sdk::ExecAggStageTransform {
 public:
-    ShapifyExecAggStage() : sdk::ExecAggStage(kShapifyDesugarStageName) {}
+    ShapifyExecAggStage() : sdk::ExecAggStageTransform(kShapifyDesugarStageName) {}
 
     mongo::extension::ExtensionGetNextResult getNext(
         const sdk::QueryExecutionContextHandle& execCtx,
-        const MongoExtensionExecAggStage* execStage,
+        ::MongoExtensionExecAggStage* execStage,
         ::MongoExtensionGetNextRequestType requestType) override {
-        return mongo::extension::ExtensionGetNextResult::pauseExecution();
+        auto input = _getSource().getNext(execCtx.get());
+        if (input.code == extension::GetNextCode::kPauseExecution) {
+            return extension::ExtensionGetNextResult::pauseExecution();
+        }
+        if (input.code == extension::GetNextCode::kEOF) {
+            return extension::ExtensionGetNextResult::eof();
+        }
+        return extension::ExtensionGetNextResult::advanced(input.res.get());
     }
 
     void open() override {}
@@ -89,7 +96,7 @@ public:
         return BSON(kShapifyStageName << _input);
     }
 
-    std::unique_ptr<extension::sdk::ExecAggStage> compile() const override {
+    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
         return std::make_unique<ShapifyExecAggStage>();
     }
 

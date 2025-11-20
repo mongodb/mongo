@@ -40,17 +40,24 @@ using namespace mongo;
 
 static constexpr std::string kExplainStageName = "$explain";
 
-class ExplainExecAggStage : public sdk::ExecAggStage {
+class ExplainExecAggStage : public sdk::ExecAggStageTransform {
 public:
-    ExplainExecAggStage() : sdk::ExecAggStage(kExplainStageName) {}
+    ExplainExecAggStage() : sdk::ExecAggStageTransform(kExplainStageName) {}
 
     mongo::extension::ExtensionGetNextResult getNext(
         const sdk::QueryExecutionContextHandle& execCtx,
-        const MongoExtensionExecAggStage* execStage,
+        ::MongoExtensionExecAggStage* execStage,
         ::MongoExtensionGetNextRequestType requestType) override {
         // TODO SERVER-113905: once we support metadata, we should only support returning both
         // document and metadata.
-        return mongo::extension::ExtensionGetNextResult::pauseExecution();
+        auto input = _getSource().getNext(execCtx.get());
+        if (input.code == extension::GetNextCode::kPauseExecution) {
+            return extension::ExtensionGetNextResult::pauseExecution();
+        }
+        if (input.code == extension::GetNextCode::kEOF) {
+            return extension::ExtensionGetNextResult::eof();
+        }
+        return extension::ExtensionGetNextResult::advanced(input.res.get());
     }
 
     void open() override {}
@@ -97,7 +104,7 @@ public:
         return builder.obj();
     }
 
-    std::unique_ptr<extension::sdk::ExecAggStage> compile() const override {
+    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
         return std::make_unique<ExplainExecAggStage>();
     }
 

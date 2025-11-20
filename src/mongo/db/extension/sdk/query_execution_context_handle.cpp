@@ -41,7 +41,7 @@ ExtensionGenericStatus QueryExecutionContextHandle::checkForInterrupt() const {
 }
 
 ExtensionOperationMetricsHandle QueryExecutionContextHandle::getMetrics(
-    const MongoExtensionExecAggStage* execStage) const {
+    MongoExtensionExecAggStage* execStage) const {
     assertValid();
 
     MongoExtensionOperationMetrics* metrics = nullptr;

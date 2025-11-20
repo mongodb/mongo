@@ -43,17 +43,16 @@ namespace mongo::extension::sdk {
  * This is an unowned handle, meaning the object is fully owned by the host, and
  * ownership is never transferred to the extension.
  */
-class QueryExecutionContextHandle
-    : public UnownedHandle<const ::MongoExtensionQueryExecutionContext> {
+class QueryExecutionContextHandle : public UnownedHandle<::MongoExtensionQueryExecutionContext> {
 public:
-    QueryExecutionContextHandle(const ::MongoExtensionQueryExecutionContext* ctx)
-        : UnownedHandle<const ::MongoExtensionQueryExecutionContext>(ctx) {
+    QueryExecutionContextHandle(::MongoExtensionQueryExecutionContext* ctx)
+        : UnownedHandle<::MongoExtensionQueryExecutionContext>(ctx) {
         _assertValidVTable();
     }
 
     ExtensionGenericStatus checkForInterrupt() const;
 
-    ExtensionOperationMetricsHandle getMetrics(const MongoExtensionExecAggStage* execStage) const;
+    ExtensionOperationMetricsHandle getMetrics(MongoExtensionExecAggStage* execStage) const;
 
 private:
     void _assertVTableConstraints(const VTable_t& vtable) const override {

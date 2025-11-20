@@ -51,9 +51,22 @@ namespace mongo::extension::host_connector {
 class HostExecAggStageAdapter final : public ::MongoExtensionExecAggStage {
 public:
     HostExecAggStageAdapter(std::unique_ptr<host::ExecAggStage> execAggStage)
-        : ::MongoExtensionExecAggStage(&VTABLE), _execAggStage(std::move(execAggStage)) {}
+        : ::MongoExtensionExecAggStage(&VTABLE), _execAggStage(std::move(execAggStage)) {
+        tassert(10957207,
+                "The adapter's underlying host exec agg stage is invalid.",
+                _execAggStage != nullptr);
+    }
 
     ~HostExecAggStageAdapter() = default;
+
+    // HostExecAggStageAdapter is non-copyable and non-moveable, as adapters should be heap
+    // allocated, and managed via a unique_ptr or Handle.
+    // This property guarantees that the adapter's underlying implementation pointer remains valid
+    // for object's lifetime.
+    HostExecAggStageAdapter(const HostExecAggStageAdapter&) = delete;
+    HostExecAggStageAdapter& operator=(const HostExecAggStageAdapter&) = delete;
+    HostExecAggStageAdapter(HostExecAggStageAdapter&&) = delete;
+    HostExecAggStageAdapter& operator=(HostExecAggStageAdapter&&) = delete;
 
     /**
      * Specifies whether the provided exec agg stage was allocated by the host.
@@ -103,6 +116,15 @@ private:
         });
     }
 
+    static MongoExtensionStatus* _hostSetSource(::MongoExtensionExecAggStage* execAggStage,
+                                                ::MongoExtensionExecAggStage* input) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([]() {
+            tasserted(10957206,
+                      "_hostSetSource should not be called. Ensure that execAggStage is "
+                      "extension-allocated, not host-allocated.");
+        });
+    };
+
     /**
      * The following lifecycle functions are unreachable because HostExecAggStageAdapter only wraps
      * host stages to forward getNext() results to extension stages. These functions are currently
@@ -140,6 +162,7 @@ private:
                                                                .get_name = &_hostGetName,
                                                                .create_metrics =
                                                                    &_hostCreateMetrics,
+                                                               .set_source = &_hostSetSource,
                                                                .open = &_hostOpen,
                                                                .reopen = &_hostReopen,
                                                                .close = &_hostClose};

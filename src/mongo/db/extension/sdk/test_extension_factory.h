@@ -29,14 +29,21 @@
 
 #define DEFAULT_LOGICAL_AST_PARSE(ExtensionName, StageNameStringView)                           \
     inline constexpr std::string_view ExtensionName##StageName = StageNameStringView;           \
-    class ExtensionName##ExecAggStage : public sdk::ExecAggStage {                              \
+    class ExtensionName##ExecAggStage : public sdk::ExecAggStageTransform {                     \
     public:                                                                                     \
-        ExtensionName##ExecAggStage() : sdk::ExecAggStage(ExtensionName##StageName) {}          \
+        ExtensionName##ExecAggStage() : sdk::ExecAggStageTransform(ExtensionName##StageName) {} \
         ::mongo::extension::ExtensionGetNextResult getNext(                                     \
             const ::mongo::extension::sdk::QueryExecutionContextHandle& execCtx,                \
-            const ::MongoExtensionExecAggStage* execStage,                                      \
+            ::MongoExtensionExecAggStage* execStage,                                            \
             ::MongoExtensionGetNextRequestType requestType) override {                          \
-            return ::mongo::extension::ExtensionGetNextResult::pauseExecution();                \
+            auto input = _getSource().getNext(execCtx.get());                                   \
+            if (input.code == ::mongo::extension::GetNextCode::kPauseExecution) {               \
+                return ::mongo::extension::ExtensionGetNextResult::pauseExecution();            \
+            }                                                                                   \
+            if (input.code == ::mongo::extension::GetNextCode::kEOF) {                          \
+                return ::mongo::extension::ExtensionGetNextResult::eof();                       \
+            }                                                                                   \
+            return ::mongo::extension::ExtensionGetNextResult::advanced(input.res.get());       \
         }                                                                                       \
         void open() override {}                                                                 \
         void reopen() override {}                                                               \
@@ -53,7 +60,7 @@
         ::mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {   \
             return _rawSpec;                                                                    \
         }                                                                                       \
-        std::unique_ptr<sdk::ExecAggStage> compile() const override {                           \
+        std::unique_ptr<sdk::ExecAggStageBase> compile() const override {                       \
             return std::make_unique<ExtensionName##ExecAggStage>();                             \
         }                                                                                       \
                                                                                                 \

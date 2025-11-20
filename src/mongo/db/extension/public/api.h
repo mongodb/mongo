@@ -237,7 +237,7 @@ typedef struct MongoExtensionQueryExecutionContextVTable {
      * stage in a single pipeline will share operation metrics.
      */
     MongoExtensionStatus* (*get_metrics)(const MongoExtensionQueryExecutionContext* ctx,
-                                         const MongoExtensionExecAggStage* execAggStage,
+                                         MongoExtensionExecAggStage* execAggStage,
                                          MongoExtensionOperationMetrics** metrics);
 } MongoExtensionQueryExecutionContextVTable;
 
@@ -376,12 +376,6 @@ typedef struct MongoExtensionLogicalAggStageVTable {
      * compile: On success, "compiles" the LogicalStage into an ExecutableStage, populating the
      * output parameter ExecutableStage pointer with the extension's executable stage. Ownership is
      * transferred to the caller.
-     *
-     * The caller may optionally provide its own executable input stage in the case of a Transform
-     * stage. In this case, the extension must pull documents from the input executable stage. If an
-     * input stage is provided, ownership is NOT transferred from the Host to the Extension.
-     * Otherwise, in cases in which there is no predecessor stage to pull from, the caller will
-     * provide a nullptr for the input.
      */
     MongoExtensionStatus* (*compile)(const MongoExtensionLogicalAggStage* logicalStage,
                                      struct MongoExtensionExecAggStage** output);
@@ -718,6 +712,12 @@ typedef struct MongoExtensionExecAggStageVTable {
     MongoExtensionStatus* (*create_metrics)(const MongoExtensionExecAggStage* execAggStage,
                                             MongoExtensionOperationMetrics** metrics);
 
+    /**
+     * Sets the source input stage for the extension stage. Ownership is NOT transferred to the
+     * caller.
+     */
+    MongoExtensionStatus* (*set_source)(MongoExtensionExecAggStage* execAggStage,
+                                        MongoExtensionExecAggStage* sourceStage);
     /**
      * Initializes the stage and positions it before the first result.
      * Resources should be acquired during open() and avoided in getNext() for better

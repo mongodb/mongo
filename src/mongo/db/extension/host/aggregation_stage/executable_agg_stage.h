@@ -39,7 +39,7 @@ namespace mongo::extension::host {
  * Host-defined ExecAggStage node.
  *
  * Wraps an exec::agg::Stage (an execution stage) such that a host-defined execution stage can
- * forward the results from itself execution stage to the extension-defined transform stage.
+ * forward the results from its execution stage to the extension-defined transform stage.
  */
 class ExecAggStage {
 public:
@@ -61,7 +61,7 @@ public:
     }
 
 protected:
-    ExecAggStage(exec::agg::Stage* execAggStage)
+    ExecAggStage(absl::Nonnull<exec::agg::Stage*> execAggStage)
         : _execAggStage(execAggStage), _stageName(execAggStage->getCommonStats().stageTypeStr) {}
 
 private:

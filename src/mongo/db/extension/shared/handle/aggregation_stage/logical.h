@@ -65,6 +65,7 @@ protected:
         tassert(
             11173703, "ExtensionLogicalAggStage 'serialize' is null", vtable.serialize != nullptr);
         tassert(11239401, "ExtensionLogicalAggStage 'explain' is null", vtable.explain != nullptr);
+        tassert(10957200, "ExtensionLogicalAggStage 'compile' is null", vtable.compile != nullptr);
     }
 };
 }  // namespace mongo::extension

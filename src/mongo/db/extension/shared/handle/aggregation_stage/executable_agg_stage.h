@@ -69,8 +69,49 @@ static ExtensionGetNextResult convertCRepresentationToGetNextResult(
  */
 class ExecAggStageHandle : public OwnedHandle<::MongoExtensionExecAggStage> {
 public:
-    ExecAggStageHandle(absl::Nonnull<::MongoExtensionExecAggStage*> execAggStage)
+    ExecAggStageHandle(::MongoExtensionExecAggStage* execAggStage)
         : OwnedHandle<::MongoExtensionExecAggStage>(execAggStage) {
+        _assertValidVTable();
+    }
+    // TODO SERVER-113905: once we support metadata, we should only support returning both
+    // document and metadata.
+    ExtensionGetNextResult getNext(MongoExtensionQueryExecutionContext* execCtxPtr,
+                                   ::MongoExtensionGetNextRequestType requestType = kDocumentOnly);
+
+    std::string_view getName() const;
+
+    host_connector::HostOperationMetricsHandle createMetrics() const;
+
+    void setSource(const ExecAggStageHandle& input);
+
+    void open();
+
+    void reopen();
+
+    void close();
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(10956800, "ExecAggStage 'get_next' is null", vtable.get_next != nullptr);
+        tassert(11213503, "ExecAggStage 'get_name' is null", vtable.get_name != nullptr);
+        tassert(
+            11213504, "ExecAggStage 'create_metrics' is null", vtable.create_metrics != nullptr);
+        tassert(10957202, "ExecAggStage 'set_source' is null", vtable.set_source != nullptr);
+        tassert(11216705, "ExecAggStage 'open' is null", vtable.open != nullptr);
+        tassert(11216706, "ExecAggStage 'reopen' is null", vtable.reopen != nullptr);
+        tassert(11216707, "ExecAggStage 'close' is null", vtable.close != nullptr);
+    }
+};
+
+/**
+ * An unowned wrapper around a MongoExtensionExecAggStage. This is used when passing a
+ * MongoExtensionExecAggStage through the API boundary, but the callee callsite should not take
+ * ownership of the agg stage.
+ */
+class UnownedExecAggStageHandle : public UnownedHandle<::MongoExtensionExecAggStage> {
+public:
+    UnownedExecAggStageHandle(::MongoExtensionExecAggStage* execAggStage)
+        : UnownedHandle<::MongoExtensionExecAggStage>(execAggStage) {
         _assertValidVTable();
     }
     // TODO SERVER-113905: once we support metadata, we should only support returning both
@@ -90,40 +131,7 @@ public:
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(10956800, "ExecAggStage 'get_next' is null", vtable.get_next != nullptr);
-        tassert(11213503, "ExecAggStage 'get_name' is null", vtable.get_name != nullptr);
-        tassert(
-            11213504, "ExecAggStage 'create_metrics' is null", vtable.create_metrics != nullptr);
-        tassert(11216705, "ExecAggStage 'open' is null", vtable.open != nullptr);
-        tassert(11216706, "ExecAggStage 'reopen' is null", vtable.reopen != nullptr);
-        tassert(11216707, "ExecAggStage 'close' is null", vtable.close != nullptr);
-    }
-};
-
-/**
- * An unowned wrapper around a MongoExtensionExecAggStage. This is used when passing a
- * MongoExtensionExecAggStage through the API boundary, but the callee callsite should not take
- * ownership of the agg stage.
- */
-class UnownedExecAggStageHandle : public UnownedHandle<const ::MongoExtensionExecAggStage> {
-public:
-    UnownedExecAggStageHandle(const ::MongoExtensionExecAggStage* execAggStage)
-        : UnownedHandle<const ::MongoExtensionExecAggStage>(execAggStage) {
-        _assertValidVTable();
-    }
-
-    std::string_view getName() const;
-
-    host_connector::HostOperationMetricsHandle createMetrics() const;
-
-    void open();
-
-    void reopen();
-
-    void close();
-
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(10957201, "ExecAggStage 'get_next' is null", vtable.get_next != nullptr);
         tassert(11213502, "ExecAggStage 'get_name' is null", vtable.get_name != nullptr);
         tassert(
             11213506, "ExecAggStage 'create_metrics' is null", vtable.create_metrics != nullptr);

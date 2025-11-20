@@ -465,7 +465,7 @@ public:
     }
 
     // TODO (SERVER-112395): Implement this function for testing.
-    std::unique_ptr<ExecAggStage> compile() const override {
+    std::unique_ptr<ExecAggStageBase> compile() const override {
         return nullptr;
     }
 
@@ -634,13 +634,13 @@ TEST_F(AggStageTest, DesugarToEmptyDescriptorParseTest) {
 
 TEST_F(AggStageTest, SourceStageParseTest) {
     auto descriptor = std::make_unique<ExtensionAggStageDescriptor>(
-        shared_test_stages::SourceAggStageDescriptor::make());
+        shared_test_stages::FruitsAsDocumentsDescriptor::make());
     auto handle = extension::AggStageDescriptorHandle{descriptor.get()};
 
     BSONObj stageBson =
-        BSON(shared_test_stages::SourceAggStageDescriptor::kStageName << BSON("foo" << true));
+        BSON(shared_test_stages::FruitsAsDocumentsDescriptor::kStageName << BSON("foo" << true));
     auto parseNodeHandle = handle.parse(stageBson);
-    ASSERT_EQ(shared_test_stages::SourceAggStageDescriptor::kStageName, handle.getName());
+    ASSERT_EQ(shared_test_stages::FruitsAsDocumentsDescriptor::kStageName, handle.getName());
 }
 
 class FieldPathQueryShapeParseNode : public sdk::AggStageParseNode {
@@ -838,13 +838,14 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativeValue
     ASSERT_BSONOBJ_EQ(BSON(LiteralQueryShapeParseNode::kStageName << spec), queryShape);
 }
 
-class ValidExtensionExecAggStage : public extension::sdk::ExecAggStage {
+class ValidExtensionExecAggStage : public extension::sdk::ExecAggStageSource {
 public:
-    ValidExtensionExecAggStage(std::string stageName) : extension::sdk::ExecAggStage(stageName) {}
+    ValidExtensionExecAggStage(std::string stageName)
+        : extension::sdk::ExecAggStageSource(stageName) {}
 
     extension::ExtensionGetNextResult getNext(
         const QueryExecutionContextHandle& expCtx,
-        const MongoExtensionExecAggStage* execAggStage,
+        MongoExtensionExecAggStage* execAggStage,
         MongoExtensionGetNextRequestType requestType) override {
         // TODO SERVER-113905: once we support metadata, we should only support returning both
         // document and metadata.
@@ -871,7 +872,7 @@ public:
 
     void close() override {}
 
-    static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
+    static inline std::unique_ptr<ExecAggStageBase> make() {
         return std::make_unique<ValidExtensionExecAggStage>("$noOp");
     }
 
@@ -884,12 +885,12 @@ private:
  * Test class that tracks resource allocation and cleanup for lifecycle method testing.
  * open() allocates a resource, close() cleans it up, and reopen() reinitializes without cleanup.
  */
-class ResourceTrackingExecAggStage : public ExecAggStage {
+class ResourceTrackingExecAggStage : public ExecAggStageSource {
 public:
-    ResourceTrackingExecAggStage(std::string_view stageName) : ExecAggStage(stageName) {}
+    ResourceTrackingExecAggStage(std::string_view stageName) : ExecAggStageSource(stageName) {}
 
     ExtensionGetNextResult getNext(const QueryExecutionContextHandle& execCtx,
-                                   const MongoExtensionExecAggStage* execAggStage,
+                                   MongoExtensionExecAggStage* execAggStage,
                                    MongoExtensionGetNextRequestType requestType) override {
         // TODO SERVER-113905: once we support metadata, we should only support returning both
         // document and metadata.
@@ -918,7 +919,7 @@ public:
         return _initialized;
     }
 
-    static inline std::unique_ptr<ExecAggStage> make() {
+    static inline std::unique_ptr<ExecAggStageBase> make() {
         return std::make_unique<ResourceTrackingExecAggStage>("$resourceTracking");
     }
 
@@ -984,15 +985,15 @@ private:
 };
 
 class GetMetricsExtensionExecAggStage
-    : public extension::sdk::ExecAggStage,
+    : public extension::sdk::ExecAggStageSource,
       std::enable_shared_from_this<GetMetricsExtensionExecAggStage> {
 public:
     GetMetricsExtensionExecAggStage(std::string stageName)
-        : extension::sdk::ExecAggStage(stageName) {}
+        : extension::sdk::ExecAggStageSource(stageName) {}
 
     extension::ExtensionGetNextResult getNext(
         const extension::sdk::QueryExecutionContextHandle& execCtx,
-        const MongoExtensionExecAggStage* execAggStage,
+        MongoExtensionExecAggStage* execAggStage,
         MongoExtensionGetNextRequestType requestType) override {
         // TODO SERVER-113905: once we support metadata, we should only support returning both
         // document and metadata.
@@ -1020,10 +1021,10 @@ public:
 
     void close() override {}
 
-    static inline std::unique_ptr<extension::sdk::ExecAggStage> make() {
+    static inline std::unique_ptr<ExecAggStageBase> make() {
         return std::make_unique<GetMetricsExtensionExecAggStage>("$getMetrics");
     }
-};
+};  // namespace
 
 TEST(AggregationStageTest, GetMetricsExtensionExecAggStageSucceeds) {
     QueryTestServiceContext testCtx;
@@ -1096,7 +1097,7 @@ TEST_F(AggStageTest, TestValidExecAggStageFromCompiledLogicalAggStage) {
     }
 }
 
-class TestSourceLogicalAggStage : public shared_test_stages::SourceLogicalAggStage {
+class TestSourceLogicalAggStage : public shared_test_stages::FruitsAsDocumentsLogicalAggStage {
 public:
     static inline std::unique_ptr<extension::sdk::LogicalAggStage> make() {
         return std::make_unique<TestSourceLogicalAggStage>();

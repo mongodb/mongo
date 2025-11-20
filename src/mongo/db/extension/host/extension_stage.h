@@ -47,9 +47,11 @@ public:
     ExtensionStage(StringData name,
                    const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                    extension::ExecAggStageHandle execAggStageHandle);
+    void setSource(Stage* source) override;
 
 private:
     extension::ExecAggStageHandle _execAggStageHandle;
+    extension::ExecAggStageHandle _sourceAggStageHandle;
     GetNextResult doGetNext() final;
 };
 }  // namespace agg

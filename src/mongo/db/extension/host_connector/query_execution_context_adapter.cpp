@@ -48,7 +48,7 @@ MongoExtensionStatus* QueryExecutionContextAdapter::_extCheckForInterrupt(
 
 MongoExtensionStatus* QueryExecutionContextAdapter::_extGetMetrics(
     const MongoExtensionQueryExecutionContext* ctx,
-    const MongoExtensionExecAggStage* execAggStage,
+    MongoExtensionExecAggStage* execAggStage,
     MongoExtensionOperationMetrics** metrics) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         const auto& execCtx = static_cast<const QueryExecutionContextAdapter*>(ctx)->getCtxImpl();

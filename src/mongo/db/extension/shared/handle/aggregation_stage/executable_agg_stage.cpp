@@ -32,16 +32,22 @@
 
 namespace mongo::extension {
 
-ExtensionGetNextResult ExecAggStageHandle::getNext(MongoExtensionQueryExecutionContext* execCtxPtr,
-                                                   ::MongoExtensionGetNextRequestType requestType) {
+void ExecAggStageHandle::setSource(const ExecAggStageHandle& input) {
+    invokeCAndConvertStatusToException([&]() { return vtable().set_source(get(), input.get()); });
+}
+
+namespace {
+ExtensionGetNextResult _internalGetNext(const MongoExtensionExecAggStageVTable& vtable,
+                                        MongoExtensionExecAggStage* stage,
+                                        MongoExtensionQueryExecutionContext* execCtxPtr,
+                                        ::MongoExtensionGetNextRequestType requestType) {
     ::MongoExtensionGetNextResult result{};
     invokeCAndConvertStatusToException(
-        [&]() { return vtable().get_next(get(), execCtxPtr, &result); });
+        [&]() { return vtable.get_next(stage, execCtxPtr, &result); });
 
     return convertCRepresentationToGetNextResult(&result);
 }
 
-namespace {
 std::string_view _internalGetName(const MongoExtensionExecAggStageVTable& vtable,
                                   const MongoExtensionExecAggStage* stage) {
     return byteViewAsStringView(vtable.get_name(stage));
@@ -59,6 +65,11 @@ host_connector::HostOperationMetricsHandle _internalCreateMetrics(
 }
 }  // namespace
 
+ExtensionGetNextResult ExecAggStageHandle::getNext(MongoExtensionQueryExecutionContext* execCtxPtr,
+                                                   ::MongoExtensionGetNextRequestType requestType) {
+    return _internalGetNext(vtable(), get(), execCtxPtr, requestType);
+}
+
 std::string_view ExecAggStageHandle::getName() const {
     return _internalGetName(vtable(), get());
 }
@@ -73,6 +84,12 @@ std::string_view UnownedExecAggStageHandle::getName() const {
 
 host_connector::HostOperationMetricsHandle UnownedExecAggStageHandle::createMetrics() const {
     return _internalCreateMetrics(vtable(), get());
+}
+
+ExtensionGetNextResult UnownedExecAggStageHandle::getNext(
+    MongoExtensionQueryExecutionContext* execCtxPtr,
+    ::MongoExtensionGetNextRequestType requestType) {
+    return _internalGetNext(vtable(), get(), execCtxPtr, requestType);
 }
 
 void ExecAggStageHandle::open() {

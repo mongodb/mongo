@@ -77,7 +77,7 @@ private:
         const MongoExtensionQueryExecutionContext* ctx, MongoExtensionStatus* queryStatus) noexcept;
 
     static MongoExtensionStatus* _extGetMetrics(const MongoExtensionQueryExecutionContext* ctx,
-                                                const MongoExtensionExecAggStage* execAggStage,
+                                                MongoExtensionExecAggStage* execAggStage,
                                                 MongoExtensionOperationMetrics** metrics) noexcept;
 
     static constexpr ::MongoExtensionQueryExecutionContextVTable VTABLE{
