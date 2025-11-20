@@ -105,7 +105,7 @@ private:
 
 // Ensures that only one command is operating on fsyncLock state at a time. As a 'ResourceMutex',
 // lock time will be reported for a given user operation.
-Lock::ResourceMutex fsyncSingleCommandExclusionMutex("fsyncSingleCommandExclusionMutex");
+ResourceMutex fsyncSingleCommandExclusionMutex("fsyncSingleCommandExclusionMutex");
 
 // Protects access to globalFsyncLockThread and other global fsync state.
 stdx::mutex fsyncStateMutex;

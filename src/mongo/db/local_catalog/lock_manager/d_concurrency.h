@@ -47,10 +47,6 @@ namespace mongo {
 
 class Lock {
 public:
-    // TODO (SERVER-102774): Remove this aliasing by substituting all usages of Lock::ResourceMutex
-    // with ResourceMutex.
-    using ResourceMutex = mongo::ResourceMutex;
-
     /**
      * General purpose RAII wrapper for a resource managed by the lock manager
      *

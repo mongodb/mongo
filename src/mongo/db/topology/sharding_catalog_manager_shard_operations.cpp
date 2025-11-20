@@ -432,7 +432,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     const std::string* shardProposedName,
     const ConnectionString& shardConnectionString,
     bool isConfigShard) {
-    static Lock::ResourceMutex _kAddShardLock("addShardLock");
+    static ResourceMutex _kAddShardLock("addShardLock");
 
     auto addShardLock = Lock::ExclusiveLock(opCtx, _kAddShardLock);
 

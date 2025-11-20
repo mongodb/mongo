@@ -174,7 +174,7 @@ enum ResourceType {
 
     /**
      * Resource type used for locking general resources not related to the storage hierarchy. These
-     * can't be created manually, use Lock::ResourceMutex::ResourceMutex() instead.
+     * can't be created manually, use ResourceMutex::ResourceMutex() instead.
      */
     RESOURCE_MUTEX,
 
@@ -298,9 +298,8 @@ private:
     ResourceId(uint64_t fullHash) : _fullHash(fullHash) {}
 
     static void verifyNoResourceMutex(ResourceType type) {
-        invariant(
-            type != RESOURCE_MUTEX,
-            "Can't create a ResourceMutex directly, use Lock::ResourceMutex::ResourceMutex().");
+        invariant(type != RESOURCE_MUTEX,
+                  "Can't create a ResourceMutex directly, use ResourceMutex::ResourceMutex().");
     }
 
     /**

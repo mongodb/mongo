@@ -213,7 +213,7 @@ public:
 
 private:
     const Lock::ResourceLock _resourceLock;
-    static inline const Lock::ResourceMutex _mutex{"ScopedRangeDeleterLock"};
+    static inline const ResourceMutex _mutex{"ScopedRangeDeleterLock"};
 };
 
 }  // namespace mongo

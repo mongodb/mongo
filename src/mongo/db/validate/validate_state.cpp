@@ -75,7 +75,7 @@ namespace {
  * opening a snapshot between these two transactions and result in an incorrectly reported fast
  * count discrepancy.
  */
-Lock::ResourceMutex validateLock("validateLock");
+ResourceMutex validateLock("validateLock");
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangDuringValidationInitialization);

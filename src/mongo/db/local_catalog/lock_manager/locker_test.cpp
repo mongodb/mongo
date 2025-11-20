@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/local_catalog/lock_manager/locker.h"
 
 #include "mongo/base/error_codes.h"
@@ -1340,8 +1339,8 @@ DEATH_TEST_F(LockerTestDeathTest, SaveAndRestoreGlobalRecursivelyIsFatal, "70338
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
 DEATH_TEST_F(LockerTestDeathTest, LockOrderingViolationCrashesTheServer, "9915000") {
-    Lock::ResourceMutex mutexA{"Lock A"};
-    Lock::ResourceMutex mutexB{"Lock B"};
+    ResourceMutex mutexA{"Lock A"};
+    ResourceMutex mutexB{"Lock B"};
 
     auto opCtx = makeOperationContext();
 

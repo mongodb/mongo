@@ -899,12 +899,12 @@ private:
     /**
      * Lock that is held in exclusive mode during the commit phase of an add/remove shard operation.
      */
-    Lock::ResourceMutex _kShardMembershipLock;
+    ResourceMutex _kShardMembershipLock;
 
     /**
      * Lock that guards changes to the cluster cardinality parameter.
      */
-    Lock::ResourceMutex _kClusterCardinalityParameterLock;
+    ResourceMutex _kClusterCardinalityParameterLock;
 
     /**
      * Lock for chunk split/merge/move operations. This should be acquired when doing split/merge/
@@ -913,7 +913,7 @@ private:
      * locks (for example to write to a local collection) those locks should be taken after
      * taking this.
      */
-    Lock::ResourceMutex _kChunkOpLock;
+    ResourceMutex _kChunkOpLock;
 
     /**
      * Lock for shard zoning operations. This should be acquired when doing any operations that
@@ -922,7 +922,7 @@ private:
      * locks (for example to write to a local collection) those locks should be taken after
      * taking this.
      */
-    Lock::ResourceMutex _kZoneOpLock;
+    ResourceMutex _kZoneOpLock;
 };
 
 }  // namespace mongo

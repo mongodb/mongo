@@ -243,7 +243,7 @@ private:
  *
  * setFCV takes this lock in exclusive mode when changing the FCV value.
  */
-Lock::ResourceMutex fcvDocumentLock("featureCompatibilityVersionDocumentLock");
+ResourceMutex fcvDocumentLock("featureCompatibilityVersionDocumentLock");
 // lastFCVUpdateTimestamp contains the latest oplog entry timestamp which updated the FCV.
 // It is reset on rollback.
 Timestamp lastFCVUpdateTimestamp;

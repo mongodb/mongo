@@ -608,7 +608,7 @@ public:
      * stdx::mutex lock order:
      * commitQuorumLock -> mutex.
      */
-    boost::optional<Lock::ResourceMutex> commitQuorumLock;
+    boost::optional<ResourceMutex> commitQuorumLock;
 
     struct IndexCatalogStats {
         int numIndexesBefore = 0;

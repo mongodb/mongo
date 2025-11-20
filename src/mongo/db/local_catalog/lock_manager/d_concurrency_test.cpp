@@ -173,7 +173,7 @@ public:
 };
 
 TEST_F(DConcurrencyTestFixture, ResourceMutex) {
-    Lock::ResourceMutex mtx("testMutex");
+    ResourceMutex mtx("testMutex");
     auto opCtx = makeOperationContext();
     auto clients = makeKClientsWithLockers(3);
 
@@ -1504,9 +1504,9 @@ TEST_F(DConcurrencyTestFixture, StressPartitioned) {
 TEST_F(DConcurrencyTestFixture, ResourceMutexLabels) {
     auto opCtx = makeOperationContext();
 
-    Lock::ResourceMutex mutex("label");
+    ResourceMutex mutex("label");
     ASSERT_EQ("label", *ResourceCatalog::get().name(mutex.getRid()));
-    Lock::ResourceMutex mutex2("label2");
+    ResourceMutex mutex2("label2");
     ASSERT_EQ("label2", *ResourceCatalog::get().name(mutex2.getRid()));
 }
 

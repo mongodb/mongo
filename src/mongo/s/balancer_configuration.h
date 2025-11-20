@@ -326,7 +326,7 @@ private:
 
     // Mutex used to serialize the balancer configuration refreshes. It should be taken in exclusive
     // mode to prevent having more than one refresh happening at the same time.
-    Lock::ResourceMutex _settingsRefreshMutex{"BalancerConfiguration::_settingsRefreshMutex"};
+    ResourceMutex _settingsRefreshMutex{"BalancerConfiguration::_settingsRefreshMutex"};
 };
 
 }  // namespace mongo

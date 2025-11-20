@@ -150,7 +150,7 @@ private:
     LockManager* _lockManager;
     Locker _locker;
 
-    Lock::ResourceMutex _mutex;
+    ResourceMutex _mutex;
     DataType _data;
 };
 
