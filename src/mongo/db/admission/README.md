@@ -2,121 +2,8 @@
 
 There are 2 separate ticketing mechanisms placed in front of the global lock acquisition. Both aim to limit the number of concurrent operations from overwhelming the system. Before an operation can acquire the global lock, it must acquire a ticket from one, or both, of the ticketing mechanisms. When both ticket mechanisms are necessary, the acquisition order is as follows:
 
-1. [Flow Control][] - Required only for global lock requests in MODE_IX
-2. [Execution Control] - Required for all global lock requests
-
-[Execution Control]: #execution-control
-[Flow Control]: ../repl/README.md#flow-control
-
-# Execution Control
-
-Execution control limits the number of concurrent storage engine transactions in a single mongod to
-reduce contention on storage engine resources.
-
-## Ticket Management
-
-There are 2 separate pools of available tickets: one pool for global lock read requests
-(MODE_S/MODE_IS), and one pool of tickets for global lock write requests (MODE_IX).
-
-As of v7.0, the size of each ticket pool is managed dynamically by the server to maximize
-throughput. Details of the algorithm can be found in [Throughput Probing](#throughput-probing) This
-dynamic management can be disabled by specifying the size of each pool manually via server
-parameters `executionControlConcurrentReadTransactions` (read ticket pool) and
-`executionControlConcurrentWriteTransactions` (write ticket pool). #
-
-Each pool of tickets is maintained in a
-[TicketHolder](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/util/concurrency/ticketholder.h#L52).
-Tickets distributed from a given TicketHolder will always be returned to the same TicketHolder (a
-write ticket will always be returned to the TicketHolder with the write ticket pool).
-
-## Throughput Probing
-
-Execution control limits concurrency with a throughput-probing algorithm, described below.
-
-### Server Parameters
-
-- `throughputProbingInitialConcurrency -> gInitialConcurrency`: initial number of concurrent read
-  and write transactions
-- `throughputProbingMinConcurrency -> gMinConcurrency`: minimum concurrent read and write
-  transactions
-- `throughputProbingMaxConcurrency -> gMaxConcurrency`: maximum concurrent read and write
-  transactions
-- `throughputProbingReadWriteRatio -> gReadWriteRatio`: ratio of read and write tickets where 0.5
-  indicates 1:1 ratio
-- `throughputProbingConcurrencyMovingAverageWeight -> gConcurrencyMovingAverageWeight`: weight of
-  new concurrency measurement in the exponentially-decaying moving average
-- `throughputProbingStepMultiple -> gStepMultiple`: step size for throughput probing
-
-### Pseudocode
-
-```
-setConcurrency(concurrency)
-    ticketsAllottedToReads := clamp((concurrency * gReadWriteRatio), gMinConcurrency, gMaxConcurrency)
-    ticketsAllottedToWrites := clamp((concurrency * (1-gReadWriteRatio)), gMinConcurrency, gMaxConcurrency)
-
-getCurrentConcurrency()
-    return ticketsAllocatedToReads + ticketsAllocatedToWrites
-
-exponentialMovingAverage(stableConcurrency, currentConcurrency)
-    return (currentConcurrency * gConcurrencyMovingAverageWeight) + (stableConcurrency * (1 - gConcurrencyMovingAverageWeight))
-
-run()
-    currentThroughput := (# read tickets returned + # write tickets returned) / time elapsed
-
-    Case of ProbingState
-        kStable     probeStable(currentThroughput)
-        kUp         probeUp(currentThroughput)
-        KDown       probeDown(currentThroughput)
-
-probeStable(currentThroughput)
-    stableThroughput := currentThroughput
-    currentConcurrency := getCurrentConcurrency()
-    if (currentConcurrency < gMaxConcurrency && tickets exhausted)
-        setConcurrency(stableConcurrency * (1 + gStepMultiple))
-        ProbingState := kUp
-    else if (currentConcurrency > gMinConcurrency)
-        setConcurrency(stableConcurrency * (1 - gStepMultiple))
-        ProbingState := kDown
-    else (currentConcurrency == gMinConcurrency), no changes
-
-probeUp(currentThroughput)
-    if (currentThroughput > stableThroughput)
-        stableConcurrency := exponentialMovingAverage(stableConcurrency, getCurrentConcurrency())
-        stableThroughput := currentThroughput
-    setConcurrency(stableConcurrency)
-    ProbingState := kStable
-
-probeDown(currentThroughput)
-    if (currentThroughput > stableThroughput)
-        stableConcurrency := exponentialMovingAverage(stableConcurrency, getCurrentConcurrency())
-        stableThroughput := currentThroughput
-    setConcurrency(stableConcurrency)
-    ProbingState := kStable
-
-```
-
-### Diagram
-
-```mermaid
-flowchart TB
-A(Stable Probe) --> |at minimum and tickets not exhausted|A
-
-A --> |"(above minimum and tickets not exhausted) or at maximum"|C(Probe Down)
-subgraph decrease
-C --> |throughput increased|F{{Decrease stable concurrency}}
-C --> |throughput did not increase|G{{Go back to stable concurrency}}
-end
-F --> H
-G --> H
-
-A --> |below maximum and tickets exhausted| B(Probe Up)
-subgraph increase
-B --> |throughput increased|D{{Increase stable concurrency}}
-B --> |throughput did not increase|E{{Go back to stable concurrency}}
-end
-D --> H(Stable Probe)
-E --> H
-```
+1. [Flow Control](./README_execution_control.md) - Required only for global lock requests in MODE_IX
+2. [Execution Control](./README_flow_control.md) - Required for all global lock requests
 
 ## Admission Priority
 
@@ -134,7 +21,7 @@ Flow Control is only concerned whether an operation is 'immediate' priority.
 The current version of Execution Control only takes into account if the priority is exempt or not,
 as exempt priority is the only one beside normal priority.
 
-**AdmissionContext::Priority**
+### Priority Levels
 
 - `kExempt` - Reserved for operations critical to availability (e.g replication workers), or
   observability (e.g. FTDC), and any operation releasing resources (e.g. committing or aborting
@@ -142,19 +29,8 @@ as exempt priority is the only one beside normal priority.
 - `kNormal` - An operation that should be throttled when the server is under load. If an operation
   is throttled, it will not affect availability or observability. Most operations, both user and
   internal, should use this priority unless they qualify as 'kExempt' priority.
-
-[See AdmissionContext::Priority for more
-details](https://github.com/mongodb/mongo/blob/r8.0.9/src/mongo/util/concurrency/admission_context.h#L49-L71).
-
-### How to Exempt an Operation
-
-Some operation may need to be exempt from execution control. In the cases where an operation must
-be explicitly set as exempt, use the RAII type
-[ScopedAdmissionPriority](https://github.com/mongodb/mongo/blob/r8.0.9/src/mongo/util/concurrency/admission_context.h#L136).
-
-```
-ScopedAdmissionPriority<ExecutionAdmissionContext> priority(opCtx, AdmissionContext::Priority::kExempt);
-```
+- `kLow`: Designates non-essential or deferrable operations. These tasks are throttled more
+  aggressively than `kNormal` operations when the server is under heavy load. This priority is typically used for long-running operations and background processes—such as building a secondary index, data cleanup, or non-critical maintenance—that can be delayed without impacting core system functionality. This priority level is only used by Execution Control and is not recognized by Flow Control.
 
 # RateLimiter
 
