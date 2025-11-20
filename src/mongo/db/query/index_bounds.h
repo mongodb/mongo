@@ -135,7 +135,7 @@ struct IndexBounds {
     // An example: [7, 20]
     // We can traverse this forward if indexed ascending
     // We can traverse this backwards if indexed descending.
-    bool isValidFor(const BSONObj& keyPattern, int direction);
+    bool isValidFor(const BSONObj& keyPattern, int direction, bool hasNonSimpleCollation);
 
     // Methods below used for debugging purpose only. Do not use outside testing code.
     size_t size() const;
