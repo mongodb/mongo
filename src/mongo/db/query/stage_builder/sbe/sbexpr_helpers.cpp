@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/stages/block_to_row.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
+#include "mongo/db/exec/sbe/stages/fetch.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
@@ -51,8 +52,6 @@
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/exec/sbe/stages/virtual_scan.h"
-#include "mongo/db/query/stage_builder/sbe/abt_defs.h"
-#include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/util/overloaded_visitor.h"
@@ -465,7 +464,6 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(
     UUID collectionUuid,
     DatabaseName dbName,
     bool forward,
-    boost::optional<SbSlot> seekSlot,
     std::vector<std::string> scanFieldNames,
     const SbScanBounds& scanBounds,
     const SbIndexInfoSlots& indexInfoSlots,
@@ -491,7 +489,6 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(
                                                 lower(indexInfoSlots.indexKeyPatternSlot),
                                                 std::move(scanFieldNames),
                                                 lower(scanFieldSlots),
-                                                lower(seekSlot),
                                                 lower(scanBounds.minRecordIdSlot),
                                                 lower(scanBounds.maxRecordIdSlot),
                                                 forward,
@@ -1165,6 +1162,45 @@ SbStage SbBuilder::makeMergeJoin(SbStage outerStage,
                                            lower(innerProjectSlots),
                                            std::move(dirs),
                                            _nodeId);
+}
+
+SbBuilder::FetchBuildResult SbBuilder::makeFetch(SbStage child,
+                                                 UUID collectionUuid,
+                                                 DatabaseName dbName,
+                                                 SbSlot seekSlot,
+                                                 std::vector<std::string> scanFieldNames,
+                                                 const SbIndexInfoSlots& indexInfoSlots,
+                                                 sbe::ScanCallbacks scanCallbacks) {
+    auto resultSlot = SbSlot{_state.slotId()};
+    auto recordIdSlot = SbSlot{_state.slotId()};
+
+    SbSlotVector scanFieldSlots;
+    scanFieldSlots.reserve(scanFieldNames.size());
+    for (size_t i = 0; i < scanFieldNames.size(); ++i) {
+        scanFieldSlots.emplace_back(SbSlot{_state.slotId()});
+    }
+
+    auto stageState =
+        std::make_shared<sbe::FetchStageState>(lower(seekSlot),
+                                               lower(indexInfoSlots.snapshotIdSlot),
+                                               lower(indexInfoSlots.indexIdentSlot),
+                                               lower(indexInfoSlots.indexKeySlot),
+                                               lower(indexInfoSlots.indexKeyPatternSlot),
+                                               lower(resultSlot),
+                                               lower(recordIdSlot),
+                                               StringListSet(scanFieldNames),
+                                               lower(scanFieldSlots),
+                                               scanCallbacks);
+
+    auto stage = sbe::makeS<sbe::FetchStage>(std::move(child),
+                                             collectionUuid,
+                                             dbName,
+                                             std::move(stageState),
+                                             _state.yieldPolicy,
+                                             _nodeId,
+                                             true /* participateInTrialRunTracking */);
+
+    return FetchBuildResult{std::move(stage), resultSlot, recordIdSlot, std::move(scanFieldSlots)};
 }
 
 SbIndexInfoSlots SbBuilder::allocateIndexInfoSlots(SbIndexInfoType indexInfoTypeMask,

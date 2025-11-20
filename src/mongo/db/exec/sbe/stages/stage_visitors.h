@@ -70,8 +70,8 @@ public:
 protected:
     void visit(const sbe::PlanStage* root) override {
         auto stats = root->getCommonStats();
-        if (stats->stageType == "seek"_sd) {
-            collectionSeeks += stats->opens;
+        if (stats->stageType == "fetch"_sd) {
+            collectionSeeks += stats->advances;
         } else if (stats->stageType == "scan"_sd) {
             collectionScans += stats->opens;
         } else if (stats->stageType == "ixseek"_sd || stats->stageType == "ixscan"_sd) {

@@ -288,6 +288,10 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
     return true;
 }
 
+sbe::ScanCallbacks makeScanCallbacks() {
+    return sbe::ScanCallbacks(indexKeyCorruptionCheckCallback, indexKeyConsistencyCheckCallback);
+}
+
 std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
     SbStage inputStage,
     std::vector<std::string> fields,
@@ -316,83 +320,84 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
     indexInfoSlots.indexKeyPatternSlot = indexKeyPatternSlot;
     indexInfoSlots.snapshotIdSlot = snapshotIdSlot;
 
-    // Create a limit-1/scan subtree to perform the seek.
-    auto [scanStage, resultSlot, recordIdSlot, fieldSlots] = b.makeScan(collToFetch->uuid(),
-                                                                        collToFetch->ns().dbName(),
-                                                                        true /* forward */,
-                                                                        seekRecordIdSlot,
-                                                                        fields,
-                                                                        {} /* scanBounds */,
-                                                                        std::move(indexInfoSlots),
-                                                                        std::move(callbacks));
+    auto makeFetchHelper = [&](SbStage fetchChild) {
+        return b.makeFetch(std::move(fetchChild),
+                           collToFetch->uuid(),
+                           collToFetch->ns().dbName(),
+                           seekRecordIdSlot,
+                           fields,
+                           indexInfoSlots,
+                           callbacks);
+    };
 
-    auto seekStage = b.makeLimit(std::move(scanStage), b.makeInt64Constant(1));
+    if (!prefetchedResultSlot) {
+        // If there's no prefetched result, we can use a simple Fetch stage.
+        auto [outStage, resultSlot, ridSlot, fieldSlots] = makeFetchHelper(std::move(inputStage));
 
-    if (prefetchedResultSlot) {
-        // Prepare to create a BranchStage, with one branch performing retrieving the result object
-        // by performing a seek, and with the other branch getting the result object by moving it
-        // from the kPrefetchedResult slot. The resulting subtree will look something like this:
-        //
-        //   branch {!exists(prefetchedResultSlot)} [resultSlot, recordIdSlot]
-        //     [thenResultSlot, thenRecordIdSlot]
-        //       limit 1
-        //       seek seekRecordId thenResultSlot thenRecordIdSlot snapshotIdSlot indexIdentSlot
-        //              indexKeySlot indexKeyPatternSlot none none [] @collUuid true false
-        //     [elseResultSlot, elseRecordIdSlot]
-        //       project [elseResultSlot = prefetchedResultSlot, elseRecordIdSlot = seekRecordId]
-        //       limit 1
-        //       coscan
+        return {std::move(outStage), resultSlot, ridSlot, std::move(fieldSlots)};
+    }
 
-        // Move 'resultSlot', 'recordIdSlot', and 'fieldSlots' to new variables
-        // 'thenResultSlot', 'thenRecordIdSlot', and 'thenFieldSlots', respectively.
-        SbSlot thenResultSlot = resultSlot;
-        SbSlot thenRecordIdSlot = recordIdSlot;
-        SbSlotVector thenFieldSlots = std::move(fieldSlots);
-        fieldSlots = SbSlotVector{};
+    // Prepare to create a BranchStage, with one branch performing retrieving the result object
+    // by performing a seek, and with the other branch getting the result object by moving it
+    // from the kPrefetchedResult slot. The resulting subtree will look something like this:
+    //   branch {!exists(prefetchedResultSlot)} [resultSlot, recordIdSlot]
+    //     [thenResultSlot, thenRecordIdSlot]
+    //       fetch seekRecordId thenResultSlot thenRecordIdSlot ...
+    //       limit 1
+    //       coscan
+    //     [elseResultSlot, elseRecordIdSlot]
+    //       project [elseResultSlot = prefetchedResultSlot, elseRecordIdSlot = seekRecordId]
+    //       limit 1
+    //       coscan
 
-        // Move 'seekStage' into 'thenStage'. We will re-initialize 'seekStage' later.
-        auto thenStage = std::move(seekStage);
-        seekStage = {};
+    // Move 'resultSlot', 'recordIdSlot', and 'fieldSlots' to new variables
+    // 'thenResultSlot', 'thenRecordIdSlot', and 'thenFieldSlots', respectively.
+    auto [fetchStage, resultSlot, ridSlot, thenFieldSlots] =
+        makeFetchHelper(b.makeLimitOneCoScanTree());
+    auto thenStage = std::move(fetchStage);
 
-        // Allocate new slots for the result and record ID produced by the else branch.
-        auto elseResultSlot = SbSlot{state.slotId()};
-        auto elseRecordIdSlot = SbSlot{state.slotId()};
+    SbSlot thenResultSlot = resultSlot;
+    SbSlot thenRecordIdSlot = ridSlot;
 
-        // Create a project/limit-1/coscan subtree for the else branch.
-        auto [elseStage, _] =
-            b.makeProject(b.makeLimitOneCoScanTree(),
-                          std::pair(SbExpr{*prefetchedResultSlot}, elseResultSlot),
-                          std::pair(SbExpr{seekRecordIdSlot}, elseRecordIdSlot));
+    // Allocate new slots for the result and record ID produced by the else branch.
+    auto elseResultSlot = SbSlot{state.slotId()};
+    auto elseRecordIdSlot = SbSlot{state.slotId()};
 
-        // Project the fields to slots for the else branch.
-        auto [projectStage, elseFieldSlots] = projectFieldsToSlots(
-            std::move(elseStage), fields, elseResultSlot, planNodeId, state.slotIdGenerator, state);
-        elseStage = std::move(projectStage);
+    // Create a project/limit-1/coscan subtree for the else branch.
+    auto [elseStage, _] = b.makeProject(b.makeLimitOneCoScanTree(),
+                                        std::pair(SbExpr{*prefetchedResultSlot}, elseResultSlot),
+                                        std::pair(SbExpr{seekRecordIdSlot}, elseRecordIdSlot));
 
-        auto conditionExpr = b.makeNot(b.makeFunction("exists", *prefetchedResultSlot));
+    // Project the fields to slots for the else branch.
+    auto [projectStage, elseFieldSlots] = projectFieldsToSlots(
+        std::move(elseStage), fields, elseResultSlot, planNodeId, state.slotIdGenerator, state);
+    elseStage = std::move(projectStage);
 
-        auto thenOutputSlots = SbExpr::makeSV(thenResultSlot, thenRecordIdSlot);
-        thenOutputSlots.insert(thenOutputSlots.end(), thenFieldSlots.begin(), thenFieldSlots.end());
+    auto conditionExpr = b.makeNot(b.makeFunction("exists", *prefetchedResultSlot));
 
-        auto elseOutputSlots = SbExpr::makeSV(elseResultSlot, elseRecordIdSlot);
-        elseOutputSlots.insert(elseOutputSlots.end(), elseFieldSlots.begin(), elseFieldSlots.end());
+    auto thenOutputSlots = SbExpr::makeSV(thenResultSlot, thenRecordIdSlot);
+    thenOutputSlots.insert(thenOutputSlots.end(), thenFieldSlots.begin(), thenFieldSlots.end());
 
-        // Create a BranchStage that combines 'thenStage' and 'elseStage' and store it in
-        // 'seekStage'.
-        auto [outStage, outputSlots] = b.makeBranch(std::move(thenStage),
-                                                    std::move(elseStage),
-                                                    std::move(conditionExpr),
-                                                    thenOutputSlots,
-                                                    elseOutputSlots);
-        seekStage = std::move(outStage);
+    auto elseOutputSlots = SbExpr::makeSV(elseResultSlot, elseRecordIdSlot);
+    elseOutputSlots.insert(elseOutputSlots.end(), elseFieldSlots.begin(), elseFieldSlots.end());
 
-        // Set 'resultSlot' and 'recordIdSlot' to point to newly allocated slots. Also,
-        // clear 'fieldSlots' and then fill it with newly allocated slots for each field.
-        resultSlot = outputSlots[0];
-        recordIdSlot = outputSlots[1];
-        for (size_t i = 2; i < outputSlots.size(); ++i) {
-            fieldSlots.emplace_back(outputSlots[i]);
-        }
+    // Create a BranchStage that combines 'thenStage' and 'elseStage' and store it in
+    // 'seekStage'.
+    auto [outStage, outputSlots] = b.makeBranch(std::move(thenStage),
+                                                std::move(elseStage),
+                                                std::move(conditionExpr),
+                                                thenOutputSlots,
+                                                elseOutputSlots);
+    auto seekStage = std::move(outStage);
+
+    // Set 'resultSlot' and 'recordIdSlot' to point to newly allocated slots. Also,
+    // clear 'fieldSlots' and then fill it with newly allocated slots for each field.
+    resultSlot = outputSlots[0];
+    ridSlot = outputSlots[1];
+
+    SbSlotVector fieldSlots;
+    for (size_t i = 2; i < outputSlots.size(); ++i) {
+        fieldSlots.emplace_back(outputSlots[i]);
     }
 
     auto correlatedSlots = SbExpr::makeSV(
@@ -405,7 +410,7 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
     auto loopJoinStage = b.makeLoopJoin(
         std::move(inputStage), std::move(seekStage), slotsToForward, correlatedSlots);
 
-    return {std::move(loopJoinStage), resultSlot, recordIdSlot, std::move(fieldSlots)};
+    return {std::move(loopJoinStage), resultSlot, ridSlot, std::move(fieldSlots)};
 }
 
 namespace {

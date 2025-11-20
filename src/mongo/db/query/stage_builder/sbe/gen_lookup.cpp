@@ -722,7 +722,6 @@ std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
         b.makeScan(foreignColl->uuid(),
                    foreignColl->ns().dbName(),
                    forwardScanDirection,
-                   boost::none /* seekSlot */,
                    std::vector<std::string>{std::string(foreignFieldName.front())});
 
     // Build the inner branch that will get the foreign key values, compare them to the local key
@@ -1058,7 +1057,6 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
         b.makeScan(foreignColl->uuid(),
                    foreignColl->ns().dbName(),
                    forwardScanDirection,
-                   boost::none /* seekSlot */,
                    std::vector<std::string>{std::string(foreignFieldName.front())});
 
     // Build the typeMatch filter expression
@@ -1139,7 +1137,6 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
         b.makeScan(foreignColl->uuid(),
                    foreignColl->ns().dbName(),
                    forwardScanDirection,
-                   boost::none /* seekSlot */,
                    std::vector<std::string>{std::string(foreignFieldName.front())});
 
     auto [foreignKeySlot, foreignKeyStage] = buildKeySetForForeign(state,

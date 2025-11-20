@@ -38,6 +38,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
+#include "mongo/db/exec/sbe/stages/fetch.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
@@ -77,7 +78,6 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToStreamingStage) {
                                            generateSlotId() /* indexKeyPatternSlot */,
                                            std::vector<std::string>{"field"} /* scanFieldNames */,
                                            makeSV(generateSlotId()) /* scanFieldSlots */,
-                                           generateSlotId() /* seekRecordIdSlot */,
                                            generateSlotId() /* minRecordIdSlot */,
                                            generateSlotId() /* maxRecordIdSlot */,
                                            true /* forward */,
@@ -92,7 +92,34 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToStreamingStage) {
     ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackReads);
 }
 
-TEST_F(TrialRunTrackerTest, TrackerAttachesToBlockingStage) {
+TEST_F(TrialRunTrackerTest, TrackerAttachesToFetchStage) {
+    auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
+    auto fetchState = std::make_shared<FetchStageState>(generateSlotId(),
+                                                        generateSlotId(),
+                                                        generateSlotId(),
+                                                        generateSlotId(),
+                                                        generateSlotId(),
+                                                        generateSlotId(),
+                                                        generateSlotId(),
+                                                        StringListSet({}),
+                                                        value::SlotVector(),
+                                                        ScanCallbacks());
+    auto fetchStage = makeS<sbe::FetchStage>(makeS<CoScanStage>(kEmptyPlanNodeId),
+                                             collUuid,
+                                             DatabaseName(),
+                                             fetchState,
+                                             nullptr,
+                                             kEmptyPlanNodeId,
+                                             true);
+
+    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none);
+    ON_BLOCK_EXIT([&]() { fetchStage->detachFromTrialRunTracker(); });
+
+    auto attachResult = fetchStage->attachToTrialRunTracker(tracker.get());
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackReads);
+}
+
+TEST_F(TrialRunTrackerTest, TrackerDoesNotAttachToBlockingStage) {
     auto sortStage =
         makeS<SortStage>(makeS<LimitSkipStage>(makeS<CoScanStage>(kEmptyPlanNodeId),
                                                makeE<EConstant>(value::TypeTags::NumberInt64, 0),
@@ -126,7 +153,6 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBothBlockingAndStreamingStages) {
                                            generateSlotId() /* indexKeyPatternSlot */,
                                            std::vector<std::string>{"field"} /* scanFieldNames */,
                                            makeSV(generateSlotId()) /* scanFieldSlots */,
-                                           generateSlotId() /* seekRecordIdSlot */,
                                            generateSlotId() /* minRecordIdSlot */,
                                            generateSlotId() /* maxRecordIdSlot */,
                                            true /* forward */,
@@ -165,7 +191,6 @@ TEST_F(TrialRunTrackerTest, TrialRunTrackingCanBeDisabled) {
                               generateSlotId() /* indexKeyPatternSlot */,
                               std::vector<std::string>{"field"} /* scanFieldNames */,
                               makeSV(generateSlotId()) /* scanFieldSlots */,
-                              generateSlotId() /* seekRecordIdSlot */,
                               generateSlotId() /* minRecordIdSlot */,
                               generateSlotId() /* maxRecordIdSlot */,
                               true /* forward */,
@@ -191,7 +216,6 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForChildDoesNotInhibitTrackingForPa
                               generateSlotId() /* indexKeyPatternSlot */,
                               std::vector<std::string>{"field"} /* scanFieldNames */,
                               makeSV(generateSlotId()) /* scanFieldSlots */,
-                              generateSlotId() /* seekRecordIdSlot */,
                               generateSlotId() /* minRecordIdSlot */,
                               generateSlotId() /* maxRecordIdSlot */,
                               true /* forward */,

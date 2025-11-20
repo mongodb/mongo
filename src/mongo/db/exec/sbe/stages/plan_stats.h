@@ -100,6 +100,26 @@ struct ScanStats final : public SpecificStats {
     size_t numReads{0};
 };
 
+struct FetchStats final : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<FetchStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const final {
+        return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    size_t numReads{0};
+};
+
 struct IndexScanStats final : public SpecificStats {
     std::unique_ptr<SpecificStats> clone() const final {
         return std::make_unique<IndexScanStats>(*this);
@@ -394,6 +414,9 @@ struct PlanStatsNumReadsVisitor : PlanStatsVisitorBase<true> {
     using PlanStatsConstVisitor::visit;
 
     void visit(tree_walker::MaybeConstPtr<true, sbe::ScanStats> stats) final {
+        numReads += stats->numReads;
+    }
+    void visit(tree_walker::MaybeConstPtr<true, sbe::FetchStats> stats) final {
         numReads += stats->numReads;
     }
     void visit(tree_walker::MaybeConstPtr<true, sbe::IndexScanStats> stats) final {

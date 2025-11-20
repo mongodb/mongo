@@ -138,7 +138,6 @@ std::pair<SbStage, PlanStageSlots> generateClusteredCollScan(
             !csn->stopApplyingFilterAfterFirstMatch);
 
     SbStage resumeRecordIdTree;
-    boost::optional<SbSlot> seekSlot;
 
     // Create minRecordId and/or maxRecordId slots as needed.
     boost::optional<SbSlot> minRecordSlot;
@@ -174,7 +173,6 @@ std::pair<SbStage, PlanStageSlots> generateClusteredCollScan(
         b.makeScan(collection->uuid(),
                    collection->ns().dbName(),
                    forward,
-                   seekSlot,
                    scanFieldNames,  // do not std::move - used later
                    std::move(scanBounds));
 
@@ -230,13 +228,11 @@ std::pair<SbStage, PlanStageSlots> generateGenericCollScan(StageBuilderState& st
     sbe::ScanCallbacks callbacks({}, {}, makeOpenCallbackIfNeeded(collection, csn));
 
     SbStage resumeRecordIdTree;
-    boost::optional<SbSlot> seekSlot;
     boost::optional<SbSlot> oplogTsSlot;
 
     auto [stage, resultSlot, recordIdSlot, fieldSlots] = b.makeScan(collection->uuid(),
                                                                     collection->ns().dbName(),
                                                                     forward,
-                                                                    seekSlot,
                                                                     fields,
                                                                     SbScanBounds{},
                                                                     SbIndexInfoSlots{},

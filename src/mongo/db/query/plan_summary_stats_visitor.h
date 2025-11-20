@@ -48,6 +48,9 @@ public:
     void visit(tree_walker::MaybeConstPtr<true, sbe::ScanStats> stats) final {
         _summary.totalDocsExamined += stats->numReads;
     }
+    void visit(tree_walker::MaybeConstPtr<true, sbe::FetchStats> stats) final {
+        _summary.totalDocsExamined += stats->numReads;
+    }
     void visit(tree_walker::MaybeConstPtr<true, sbe::IndexScanStats> stats) final {
         _summary.totalKeysExamined += stats->keysExamined;
     }

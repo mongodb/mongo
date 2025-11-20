@@ -167,7 +167,12 @@ function testSpillingMetrics({
     spillingMetrics.push(getServerStatusSpillingMetrics(db.serverStatus(), stageName, getLegacy));
 
     // Run an aggregation and hang at the fail point in the middle of the processing.
-    const failPointName = isSbe ? "hangScanGetNext" : isCollScan ? "hangCollScanDoWork" : "hangFetchDoWork";
+    let failPointName;
+    if (isSbe) {
+        failPointName = isCollScan ? "hangScanGetNext" : "hangFetchGetNext";
+    } else {
+        failPointName = isCollScan ? "hangCollScanDoWork" : "hangFetchDoWork";
+    }
     const failPoint = configureFailPoint(db, failPointName, {} /* data */, {"skip": nDocs / 2});
     const awaitShell = startParallelShell(
         funWithArgs(

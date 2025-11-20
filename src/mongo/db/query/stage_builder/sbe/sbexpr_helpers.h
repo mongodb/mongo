@@ -34,8 +34,9 @@
 #include "mongo/db/exec/sbe/stages/window.h"
 #include "mongo/db/exec/sbe/values/path_request.h"
 #include "mongo/db/query/stage_builder/sbe/builder_state.h"
+#include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
-#include "mongo/util/modules.h"
+
 
 namespace mongo::stage_builder {
 inline void makeSbExprOptSbSlotVecHelper(SbExprOptSlotVector& result) {}
@@ -336,7 +337,6 @@ public:
         UUID collectionUuid,
         DatabaseName dbName,
         bool forward = true,
-        boost::optional<SbSlot> seekSlot = boost::none,
         std::vector<std::string> scanFieldNames = {},
         const SbScanBounds& scanBounds = {},
         const SbIndexInfoSlots& indexInfoSlots = {},
@@ -707,6 +707,22 @@ public:
                           const SbSlotVector& innerKeySlots,
                           const SbSlotVector& innerProjectSlots,
                           std::vector<sbe::value::SortDirection> dirs);
+
+
+    struct FetchBuildResult {
+        SbStage stage;
+        SbSlot recordSlot;
+        SbSlot recordIdSlot;
+        SbSlotVector scanFieldSlots;
+    };
+    FetchBuildResult makeFetch(SbStage child,
+                               UUID collectionUuid,
+                               DatabaseName dbName,
+                               SbSlot seekSlot,
+                               std::vector<std::string> scanFieldNames,
+                               const SbIndexInfoSlots& indexInfoSlots,
+                               sbe::ScanCallbacks scanCallbacks);
+
 
 protected:
     SbIndexInfoSlots allocateIndexInfoSlots(SbIndexInfoType indexInfoTypeMask,

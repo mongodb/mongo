@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
+#include "mongo/db/exec/sbe/stages/scan_helpers.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -95,7 +96,6 @@ public:
                    boost::optional<value::SlotId> inIndexKeyPatternSlot,
                    std::vector<std::string> inScanFieldNames,
                    value::SlotVector inScanFieldSlots,
-                   boost::optional<value::SlotId> inSeekRecordIdSlot,
                    boost::optional<value::SlotId> inMinRecordIdSlot,
                    boost::optional<value::SlotId> inMaxRecordIdSlot,
                    bool inForward,
@@ -111,7 +111,6 @@ public:
           indexKeyPatternSlot(inIndexKeyPatternSlot),
           scanFieldNames(inScanFieldNames),
           scanFieldSlots(inScanFieldSlots),
-          seekRecordIdSlot(inSeekRecordIdSlot),
           minRecordIdSlot(inMinRecordIdSlot),
           maxRecordIdSlot(inMaxRecordIdSlot),
           forward(inForward),
@@ -141,7 +140,6 @@ public:
     const StringListSet scanFieldNames;
     const value::SlotVector scanFieldSlots;
 
-    const boost::optional<value::SlotId> seekRecordIdSlot;
     const boost::optional<value::SlotId> minRecordIdSlot;
     const boost::optional<value::SlotId> maxRecordIdSlot;
 
@@ -161,29 +159,16 @@ public:
  * an output slot with this slot id. Similarly, if 'recordIdSlot' is provided, then this slot is
  * populated with the record id on each advance.
  *
- * In addition, the scan/seek can extract a set of top-level fields from each document. The caller
+ * In addition, the scan can extract a set of top-level fields from each document. The caller
  * asks for this by passing a vector of 'scanFieldNames', along with a corresponding slot vector
  * 'scanFieldSlots' into which the resulting values should be stored. These vectors must have the
  * same length.
  *
  * The direction of the scan is controlled by the 'forward' parameter.
  *
- * If this scan is acting as a seek used to obtain the record assocated with a particular record id,
- * then a set of special slots will be provided. In this scenario, we need to detect whether a yield
- * has caused the storage snapshot to advance since the index key was obtained from storage. When
- * the snapshot has indeed advanced, the key may no longer be consistent with the 'RecordStore' and
- * we must verify at runtime that no such inconsistency exists. This requires the scan to know the
- * value of the index key, the identity of the index from which it was obtained, and the id of the
- * storage snapshot from which it was obtained. This information is made available to the seek stage
- * via 'snapshotIdSlot', 'indexIdentSlot', 'indexKeySlot', and 'indexKeyPatternSlot'.
- *
  * Debug string representations:
  *
  *  scan recordSlot? recordIdSlot? snapshotIdSlot? indexIdentSlot? indexKeySlot?
- *       indexKeyPatternSlot? minRecordIdSlot? maxRecordIdSlot? [slot1 = fieldName1, ...
- *       slot_n = fieldName_n] collUuid forward
- *
- *  seek seekKeySlot recordSlot? recordIdSlot? snapshotIdSlot? indexIdentSlot? indexKeySlot?
  *       indexKeyPatternSlot? minRecordIdSlot? maxRecordIdSlot? [slot1 = fieldName1, ...
  *       slot_n = fieldName_n] collUuid forward
  */
@@ -202,7 +187,6 @@ public:
               boost::optional<value::SlotId> indexKeyPatternSlot,
               std::vector<std::string> scanFieldNames,
               value::SlotVector scanFieldSlots,
-              boost::optional<value::SlotId> seekRecordIdSlot,
               boost::optional<value::SlotId> minRecordIdSlot,
               boost::optional<value::SlotId> maxRecordIdSlot,
               bool forward,
@@ -258,22 +242,11 @@ private:
      */
     void scanResetState(bool reOpen);
 
-    // Only for a resumed scan ("seek"), this sets '_seekRecordId' to the resume point at runtime.
-    void setSeekRecordId();
-
     // Only for a clustered collection scan, this sets '_minRecordId' to the lower scan bound.
     void setMinRecordId();
 
     // Only for a clustered collection scan, this sets '_maxRecordId' to the upper scan bound.
     void setMaxRecordId();
-
-    MONGO_COMPILER_ALWAYS_INLINE
-    value::OwnedValueAccessor* getFieldAccessor(StringData name) {
-        if (size_t pos = _state->scanFieldNames.findPos(name); pos != StringListSet::npos) {
-            return &_scanFieldAccessors[pos];
-        }
-        return nullptr;
-    }
 
     // Contains unchanging state that will be shared across clones instead of copied.
     const std::shared_ptr<ScanStageState> _state;
@@ -296,11 +269,6 @@ private:
     //         accessor in '_scanFieldAccessors'
     absl::InlinedVector<value::OwnedValueAccessor, 4> _scanFieldAccessors;
     value::SlotAccessorMap _scanFieldAccessorsMap;
-
-    // Only for a resumed scan ("seek"). Slot holding the TypeTags::RecordId of the record to resume
-    // the scan from. '_seekRecordId' is the RecordId value, initialized from the slot at runtime.
-    value::SlotAccessor* _seekRecordIdAccessor{nullptr};
-    RecordId _seekRecordId;
 
     // Only for clustered collection scans, holds the minimum record ID of the scan, if applicable.
     value::SlotAccessor* _minRecordIdAccessor{nullptr};

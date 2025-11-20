@@ -73,7 +73,6 @@ ScanStage::ScanStage(UUID collUuid,
                      boost::optional<value::SlotId> indexKeyPatternSlot,
                      std::vector<std::string> scanFieldNames,
                      value::SlotVector scanFieldSlots,
-                     boost::optional<value::SlotId> seekRecordIdSlot,
                      boost::optional<value::SlotId> minRecordIdSlot,
                      boost::optional<value::SlotId> maxRecordIdSlot,
                      bool forward,
@@ -85,7 +84,7 @@ ScanStage::ScanStage(UUID collUuid,
                      bool participateInTrialRunTracking,
                      bool includeScanStartRecordId,
                      bool includeScanEndRecordId)
-    : PlanStage(seekRecordIdSlot ? "seek"_sd : "scan"_sd,
+    : PlanStage("scan"_sd,
                 yieldPolicy,
                 nodeId,
                 participateInTrialRunTracking,
@@ -100,7 +99,6 @@ ScanStage::ScanStage(UUID collUuid,
                                               indexKeyPatternSlot,
                                               scanFieldNames,
                                               scanFieldSlots,
-                                              seekRecordIdSlot,
                                               minRecordIdSlot,
                                               maxRecordIdSlot,
                                               forward,
@@ -108,12 +106,9 @@ ScanStage::ScanStage(UUID collUuid,
                                               useRandomCursor)),
       _includeScanStartRecordId(includeScanStartRecordId),
       _includeScanEndRecordId(includeScanEndRecordId) {
-    tassert(11094716,
-            "seekRecordIdSlot field may only be used with forward scan",
-            !seekRecordIdSlot || forward);
     tassert(11094715,
-            "Cannot use a random cursor if we are seeking or requesting a reverse scan",
-            !useRandomCursor || (!seekRecordIdSlot && forward));
+            "Cannot use a random cursor if we are requesting a reverse scan",
+            !useRandomCursor || forward);
 }  // ScanStage regular constructor
 
 /**
@@ -125,7 +120,7 @@ ScanStage::ScanStage(const std::shared_ptr<ScanStageState>& state,
                      bool participateInTrialRunTracking,
                      bool includeScanStartRecordId,
                      bool includeScanEndRecordId)
-    : PlanStage(state->seekRecordIdSlot ? "seek"_sd : "scan"_sd,
+    : PlanStage("scan"_sd,
                 yieldPolicy,
                 nodeId,
                 participateInTrialRunTracking,
@@ -154,10 +149,6 @@ void ScanStage::prepare(CompileCtx& ctx) {
         uassert(4822815,
                 str::stream() << "duplicate field: " << _state->scanFieldSlots[idx],
                 insertedRename);
-    }
-
-    if (_state->seekRecordIdSlot) {
-        _seekRecordIdAccessor = ctx.getAccessor(*(_state->seekRecordIdSlot));
     }
 
     if (_state->minRecordIdSlot) {
@@ -303,16 +294,6 @@ RecordCursor* ScanStage::getActiveCursor() const {
     return _state->useRandomCursor ? _randomCursor.get() : _cursor.get();
 }
 
-void ScanStage::setSeekRecordId() {
-    auto [tag, val] = _seekRecordIdAccessor->getViewOfValue();
-    const auto msgTag = tag;
-    tassert(7104002,
-            str::stream() << "Seek key is wrong type: " << msgTag,
-            tag == value::TypeTags::RecordId);
-
-    _seekRecordId = *value::getRecordIdView(val);
-}
-
 void ScanStage::setMinRecordId() {
     auto [tag, val] = _minRecordIdAccessor->getViewOfValue();
     const auto msgTag = tag;
@@ -336,20 +317,14 @@ void ScanStage::setMaxRecordId() {
 void ScanStage::scanResetState(bool reOpen) {
     if (!_state->useRandomCursor) {
         // Reuse existing cursor if possible in the reOpen case (i.e. when we will do a seek).
-        if (!reOpen ||
-            (!_seekRecordIdAccessor &&
-             (_state->forward ? !_minRecordIdAccessor : !_maxRecordIdAccessor))) {
+        if (!reOpen || (_state->forward ? !_minRecordIdAccessor : !_maxRecordIdAccessor)) {
             _cursor = _coll.getPtr()->getCursor(_opCtx, _state->forward);
         }
-        if (_seekRecordIdAccessor) {
-            setSeekRecordId();
-        } else {
-            if (_minRecordIdAccessor) {
-                setMinRecordId();
-            }
-            if (_maxRecordIdAccessor) {
-                setMaxRecordId();
-            }
+        if (_minRecordIdAccessor) {
+            setMinRecordId();
+        }
+        if (_maxRecordIdAccessor) {
+            setMaxRecordId();
         }
     } else {
         _randomCursor = _coll.getPtr()->getRecordStore()->getRandomCursor(
@@ -419,43 +394,22 @@ PlanState ScanStage::getNext() {
     // PlanStage tree if a yield occurs.
     checkForInterruptAndYield(_opCtx);
 
-    // Optimized so the most common case has as short a codepath as possible. Info on bounds edge
-    // enforcement:
-    //   o '_seekRecordIdAccessor' existence means this is doing a single-record fetch or resuming a
-    //     prior paused scan and must do seekExact() to that recordId. In the fetch case this is the
-    //     record to be returned. In the resume case it is the last one returned before the pause,
-    //     and if it no longer exists the scan will fail because it doesn't know where to resume
-    //     from. If it is present, the code below expects us to leave the cursor on that record to
-    //     do some checks, and there will be a FilterStage above the scan to filter out this record.
-    //   o '_minRecordIdAccessor' and/or '_maxRecordIdAccessor' mean we are doing a bounded scan on
-    //     a clustered collection, and we will do a seek() to the start bound on the first call.
-    //     - If the bound(s) came in via an expression, we are to assume both bounds are inclusive.
-    //       A FilterStage above this stage will exist to filter out any that are really exclusive.
-    //     - If the bound(s) came in via the "min" and/or "max" keywords, this stage must enforce
-    //       them directly as there may be no FilterStage above it. In this case the start bound is
-    //       always inclusive, so the logic is unchanged, but the end bound is always exclusive, so
-    //       we use '_includeScanEndRecordId' to indicate this for scan termination.
-    bool doSeekExact = false;
+    // Optimized so the most common case has as short a codepath as possible.
+    // '_minRecordIdAccessor' and/or '_maxRecordIdAccessor' mean we are doing a bounded scan on
+    // a clustered collection, and we will do a seek() to the start bound on the first call.
+    // - If the bound(s) came in via an expression, we are to assume both bounds are inclusive.
+    //   A FilterStage above this stage will exist to filter out any that are really exclusive.
+    // - If the bound(s) came in via the "min" and/or "max" keywords, this stage must enforce
+    //   them directly as there may be no FilterStage above it. In this case the start bound is
+    //   always inclusive, so the logic is unchanged, but the end bound is always exclusive, so
+    //   we use '_includeScanEndRecordId' to indicate this for scan termination.
     boost::optional<Record> nextRecord;
     if (!_state->useRandomCursor) {
         if (!_firstGetNext) {
             nextRecord = _cursor->next();
         } else {
             _firstGetNext = false;
-            if (_seekRecordIdAccessor) {  // fetch or scan resume
-                if (_seekRecordId.isNull()) {
-                    // Attempting to resume from a null record ID gives a null '_seekRecordId'.
-                    uasserted(ErrorCodes::KeyNotFound,
-                              str::stream()
-                                  << "Failed to resume collection scan: the recordId from "
-                                     "which we are attempting to resume no longer exists in "
-                                     "the collection: "
-                                  << _seekRecordId);
-                }
-
-                doSeekExact = true;
-                nextRecord = _cursor->seekExact(_seekRecordId);
-            } else if (_minRecordIdAccessor && _state->forward) {
+            if (_minRecordIdAccessor && _state->forward) {
                 // The range may be exclusive of the start record.
                 // Find the first record equal to _minRecordId
                 // or, if exclusive, the first record "after" it.
@@ -479,18 +433,6 @@ PlanState ScanStage::getNext() {
     }
 
     if (!nextRecord) {
-        // Only check the index key for corruption if this getNext() call did seekExact(), as that
-        // expects the '_seekRecordId' to be found, but it was not.
-        if (doSeekExact && _state->scanCallbacks.indexKeyCorruptionCheckCallback) {
-            tassert(5777400, "Collection name should be initialized", _coll.getCollName());
-            _state->scanCallbacks.indexKeyCorruptionCheckCallback(_opCtx,
-                                                                  _snapshotIdAccessor,
-                                                                  _indexKeyAccessor,
-                                                                  _indexKeyPatternAccessor,
-                                                                  _seekRecordId,
-                                                                  *_coll.getCollName());
-        }
-
         // Indicate that the last recordId seen is null once EOF is hit.
         if (_state->recordIdSlot) {
             auto [tag, val] = sbe::value::makeCopyRecordId(RecordId());
@@ -536,49 +478,7 @@ PlanState ScanStage::getNext() {
     }
 
     if (!_scanFieldAccessors.empty()) {
-        auto rawBson = nextRecord->data.data();
-        auto start = rawBson + 4;
-        auto end = rawBson + ConstDataView(rawBson).read<LittleEndian<uint32_t>>();
-        auto last = end - 1;
-
-        if (_scanFieldAccessors.size() == 1) {
-            // If we're only looking for 1 field, then it's more efficient to forgo the hashtable
-            // and just use equality comparison.
-            auto name = StringData{_state->scanFieldNames[0]};
-            auto [tag, val] = [start, last, end, name] {
-                for (auto bsonElement = start; bsonElement != last;) {
-                    auto field = bson::fieldNameAndLength(bsonElement);
-                    if (field == name) {
-                        return bson::convertFrom<true>(bsonElement, end, field.size());
-                    }
-                    bsonElement = bson::advance(bsonElement, field.size());
-                }
-                return std::make_pair(value::TypeTags::Nothing, value::Value{0});
-            }();
-
-            _scanFieldAccessors.front().reset(false, tag, val);
-        } else {
-            // If we're looking for 2 or more fields, it's more efficient to use the hashtable.
-            for (auto& accessor : _scanFieldAccessors) {
-                accessor.reset();
-            }
-
-            auto fieldsToMatch = _scanFieldAccessors.size();
-            for (auto bsonElement = start; bsonElement != last;) {
-                auto field = bson::fieldNameAndLength(bsonElement);
-                auto accessor = getFieldAccessor(field);
-
-                if (accessor != nullptr) {
-                    auto [tag, val] = bson::convertFrom<true>(bsonElement, end, field.size());
-                    accessor->reset(false, tag, val);
-                    if ((--fieldsToMatch) == 0) {
-                        // No need to scan any further so bail out early.
-                        break;
-                    }
-                }
-                bsonElement = bson::advance(bsonElement, field.size());
-            }
-        }
+        placeFieldsFromRecordInAccessors(*nextRecord, _state->scanFieldNames, _scanFieldAccessors);
     }
 
     ++_specificStats.numReads;
@@ -609,10 +509,6 @@ std::unique_ptr<PlanStageStats> ScanStage::getStats(bool includeDebugInfo) const
         }
         if (_state->recordIdSlot) {
             bob.appendNumber("recordIdSlot", static_cast<long long>(*(_state->recordIdSlot)));
-        }
-        if (_state->seekRecordIdSlot) {
-            bob.appendNumber("seekRecordIdSlot",
-                             static_cast<long long>(*(_state->seekRecordIdSlot)));
         }
         if (_state->minRecordIdSlot) {
             bob.appendNumber("minRecordIdSlot", static_cast<long long>(*(_state->minRecordIdSlot)));
@@ -647,10 +543,6 @@ const SpecificStats* ScanStage::getSpecificStats() const {
 
 std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
     std::vector<DebugPrinter::Block> ret = PlanStage::debugPrint();
-
-    if (_state->seekRecordIdSlot) {
-        DebugPrinter::addIdentifier(ret, _state->seekRecordIdSlot.value());
-    }
 
     if (_state->recordSlot) {
         DebugPrinter::addIdentifier(ret, _state->recordSlot.value());

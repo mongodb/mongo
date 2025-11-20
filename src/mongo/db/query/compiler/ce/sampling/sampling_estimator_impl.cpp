@@ -152,7 +152,7 @@ double getZScore(SamplingConfidenceIntervalEnum confidenceInterval) {
 std::unique_ptr<sbe::PlanStage> makeScanStage(const CollectionPtr& collection,
                                               boost::optional<sbe::value::SlotId> recordSlot,
                                               boost::optional<sbe::value::SlotId> recordIdSlot,
-                                              boost::optional<sbe::value::SlotId> seekRecordIdSlot,
+                                              boost::optional<sbe::value::SlotId> minRecordIdSlot,
                                               bool useRandomCursor,
                                               PlanYieldPolicy* sbeYieldPolicy) {
     sbe::value::SlotVector scanFieldSlots;
@@ -168,8 +168,7 @@ std::unique_ptr<sbe::PlanStage> makeScanStage(const CollectionPtr& collection,
                                       boost::none /* keyPatternSlot */,
                                       scanFieldNames,
                                       scanFieldSlots,
-                                      seekRecordIdSlot,
-                                      boost::none /* minRecordIdSlot */,
+                                      minRecordIdSlot,
                                       boost::none /* maxRecordIdSlot */,
                                       true /* forward */,
                                       sbeYieldPolicy,

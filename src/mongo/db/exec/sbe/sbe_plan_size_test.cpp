@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/bson_scan.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
+#include "mongo/db/exec/sbe/stages/fetch.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
@@ -267,7 +268,6 @@ TEST_F(PlanSizeTest, Scan) {
                                        generateSlotId() /* indexKeyPatternSlot */,
                                        std::vector<std::string>{"field"} /* scanFieldNames */,
                                        mockSV() /* scanFieldSlots */,
-                                       generateSlotId() /* seekRecordIdSlot */,
                                        generateSlotId() /* minRecordIdSlot */,
                                        generateSlotId() /* maxRecordIdSlot */,
                                        true /* forward */,
@@ -330,6 +330,23 @@ TEST_F(PlanSizeTest, Unique) {
 TEST_F(PlanSizeTest, Unwind) {
     auto stage = makeS<UnwindStage>(
         mockS(), generateSlotId(), generateSlotId(), generateSlotId(), false, kEmptyPlanNodeId);
+    assertPlanSize(*stage);
+}
+
+TEST_F(PlanSizeTest, Fetch) {
+    auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
+    auto fetchState = std::make_shared<FetchStageState>(generateSlotId(),
+                                                        generateSlotId(),
+                                                        generateSlotId(),
+                                                        generateSlotId(),
+                                                        generateSlotId(),
+                                                        generateSlotId(),
+                                                        generateSlotId(),
+                                                        StringListSet({}),
+                                                        value::SlotVector(),
+                                                        ScanCallbacks());
+    auto stage = makeS<FetchStage>(
+        mockS(), collUuid, DatabaseName(), fetchState, nullptr, kEmptyPlanNodeId, true);
     assertPlanSize(*stage);
 }
 }  // namespace mongo::sbe

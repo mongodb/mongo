@@ -599,11 +599,19 @@ Execution Engine: sbe
 				{
 					"executionStages" : {
 						"inputStage" : {
+							"inputStage" : {
+								"inputStage" : {
+									"isEOF" : 0,
+									"nReturned" : 5,
+									"stage" : "ixseek"
+								},
+								"isEOF" : 0,
+								"nReturned" : 5,
+								"stage" : "filter"
+							},
 							"isEOF" : 0,
 							"nReturned" : 5,
-							"stage" : "nlj",
-							"totalDocsExamined" : 5,
-							"totalKeysExamined" : 5
+							"stage" : "fetch"
 						},
 						"isEOF" : 1,
 						"nReturned" : 5,
@@ -655,11 +663,24 @@ Execution Engine: sbe
 			"shards" : [
 				{
 					"executionStages" : {
+						"inputStage" : {
+							"inputStage" : {
+								"inputStage" : {
+									"isEOF" : 1,
+									"nReturned" : 9,
+									"stage" : "ixseek"
+								},
+								"isEOF" : 1,
+								"nReturned" : 9,
+								"stage" : "filter"
+							},
+							"isEOF" : 1,
+							"nReturned" : 4,
+							"stage" : "limitskip"
+						},
 						"isEOF" : 1,
 						"nReturned" : 4,
-						"stage" : "nlj",
-						"totalDocsExamined" : 4,
-						"totalKeysExamined" : 9
+						"stage" : "fetch"
 					},
 					"nReturned" : 4,
 					"totalDocsExamined" : 4,
@@ -710,11 +731,24 @@ Execution Engine: sbe
 				{
 					"executionStages" : {
 						"inputStage" : {
+							"inputStage" : {
+								"inputStage" : {
+									"inputStage" : {
+										"isEOF" : 1,
+										"nReturned" : 9,
+										"stage" : "ixseek"
+									},
+									"isEOF" : 1,
+									"nReturned" : 9,
+									"stage" : "filter"
+								},
+								"isEOF" : 1,
+								"nReturned" : 4,
+								"stage" : "limitskip"
+							},
 							"isEOF" : 1,
 							"nReturned" : 4,
-							"stage" : "nlj",
-							"totalDocsExamined" : 4,
-							"totalKeysExamined" : 9
+							"stage" : "fetch"
 						},
 						"isEOF" : 1,
 						"nReturned" : 4,

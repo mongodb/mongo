@@ -110,6 +110,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/stages:bson_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:co_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:extract_field_paths.cpp",
+        "//src/mongo/db/exec/sbe/stages:fetch.cpp",
         "//src/mongo/db/exec/sbe/stages:hash_agg.cpp",
         "//src/mongo/db/exec/sbe/stages:hash_agg_accumulator.cpp",
         "//src/mongo/db/exec/sbe/stages:hash_join.cpp",

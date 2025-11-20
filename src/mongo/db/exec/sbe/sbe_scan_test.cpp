@@ -120,7 +120,6 @@ TEST_F(ScanStageTest, scanStage) {
                                                     boost::none /* indexKeyPatternSlot */,
                                                     std::vector<std::string>{} /* scanFieldNames */,
                                                     scanFieldSlots,
-                                                    boost::none /* seekRecordIdSlot */,
                                                     boost::none /* minRecordIdSlot */,
                                                     boost::none /* maxRecordIdSlot */,
                                                     true /* forward */,

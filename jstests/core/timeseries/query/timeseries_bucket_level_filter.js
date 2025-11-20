@@ -9,6 +9,8 @@
  *   cannot_run_during_upgrade_downgrade,
  *   # "Explain of a resolved view must be executed by mongos"
  *   directly_against_shardsvrs_incompatible,
+ *   # SBE "fetch" stage only available >= 8.3
+ *   requires_fcv_83
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -75,7 +77,7 @@ assert.commandWorked(coll.insert({time: new Date(), tag: 1, a: 42, b: 17}));
 
     if (getEngine(explain) == "sbe") {
         // Ensure we get an ixscan/fetch plan, with one ixseek stage and one seek stage.
-        const seekStages = getSbePlanStages(explain, "seek");
+        const seekStages = getSbePlanStages(explain, "fetch");
         assert.eq(seekStages.length, 1, () => "Expected one seek stage " + tojson(explain));
         assert.eq(getSbePlanStages(explain, "ixseek").length, 1, () => "Expected one ixseek stage " + tojson(explain));
 
