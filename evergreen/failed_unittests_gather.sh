@@ -47,10 +47,12 @@ for core_file in $core_files; do
     fi
 
     # On Windows if a .pdb symbol file exists, include it in the archive.
-    pdb_file=$(echo "$binary_file_location" | sed "s/\.exe/.pdb/")
-    if [ -f "$pdb_file" ]; then
-      new_pdb_file=$unittest_bin_dir/$(echo "$pdb_file" | sed "s/.*\///")
-      cp "$pdb_file" "$new_pdb_file"
+    if [[ "$binary_file_location" == *".exe" ]]; then
+      pdb_file=$(echo "$binary_file_location" | sed "s/\.exe/.pdb/")
+      if [ -f "$pdb_file" ]; then
+        new_pdb_file=$unittest_bin_dir/$(echo "$pdb_file" | sed "s/.*\///")
+        cp "$pdb_file" "$new_pdb_file"
+      fi
     fi
 
     # On binutils platforms, if a .debug symbol file exists, include it
