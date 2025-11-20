@@ -123,8 +123,8 @@ size_t getSupportedMax() {
 #else
         struct rlimit limit;
         MONGO_verify(getrlimit(RLIMIT_NOFILE, &limit) == 0);
-
-        size_t max = (size_t)(limit.rlim_cur * .8);
+        const auto openFileLimit = limit.rlim_cur / 2;
+        size_t max = (size_t)(openFileLimit * .8);
 
         LOGV2_DEBUG(22940,
                     1,

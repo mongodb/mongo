@@ -231,6 +231,7 @@ tlEnv.CppUnitTest(
         'message_compressor_registry_test.cpp',
         'service_executor_test.cpp',
         'max_conns_override_test.cpp',
+        "service_entry_point_impl_test.cpp" if env.TargetOSIs("linux") else [],
         'session_workflow_test.cpp',
         'proxy_protocol_header_parser_test.cpp',
     ],
