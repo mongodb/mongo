@@ -9,7 +9,7 @@
  * ]
  */
 
-const collName = "search_rank_fusion";
+const collName = jsTestName();
 const coll = db[collName];
 
 function runPipeline(pipeline) {
