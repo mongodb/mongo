@@ -90,8 +90,7 @@ void AggProjectStage::open(bool reOpen) {
 
     for (size_t idx = 0; idx < _slots.size(); ++idx) {
         if (_initCodes[idx]) {
-            auto [owned, tag, val] = _bytecode.run(_initCodes[idx].get());
-            _outAccessors[idx]->reset(owned, tag, val);
+            _outAccessors[idx]->reset(_bytecode.run(_initCodes[idx].get()));
         } else {
             _outAccessors[idx]->reset();
         }
@@ -109,8 +108,7 @@ PlanState AggProjectStage::getNext() {
     if (state == PlanState::ADVANCED) {
         // Run the agg project expressions here.
         for (size_t idx = 0; idx < _slots.size(); ++idx) {
-            auto [owned, tag, val] = _bytecode.run(_aggCodes[idx].get());
-            _outAccessors[idx]->reset(owned, tag, val);
+            _outAccessors[idx]->reset(_bytecode.run(_aggCodes[idx].get()));
         }
     }
 

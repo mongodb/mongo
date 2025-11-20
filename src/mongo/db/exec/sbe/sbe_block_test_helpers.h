@@ -295,19 +295,19 @@ public:
     boost::optional<bool> tryDense() const override {
         return _isDense;
     }
-    std::pair<value::TypeTags, value::Value> tryMin() const override {
+    value::TagValueView tryMin() const override {
         if (_minVal) {
-            return *_minVal;
+            return value::rawToView(*_minVal);
         }
         return value::ValueBlock::tryMin();
     }
-    std::pair<value::TypeTags, value::Value> tryMax() const override {
+    value::TagValueView tryMax() const override {
         if (_maxVal) {
-            return *_maxVal;
+            return value::rawToView(*_maxVal);
         }
         return value::ValueBlock::tryMax();
     }
-    std::pair<value::TypeTags, value::Value> at(size_t idx) override {
+    value::TagValueView at(size_t idx) override {
         invariant(idx < _vals.size());
         return {_tags[idx], _vals[idx]};
     }

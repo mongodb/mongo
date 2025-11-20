@@ -102,7 +102,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoublePart
 
     // Replaces the first element by the corresponding 'BSONType'.
     auto bsonType = [=]() -> int {
-        switch (arr->getAt(AggSumValueElems::kNonDecimalTotalTag).first) {
+        switch (arr->getAt(AggSumValueElems::kNonDecimalTotalTag).tag) {
             case value::TypeTags::NumberInt32:
                 return static_cast<int>(BSONType::numberInt);
             case value::TypeTags::NumberInt64:

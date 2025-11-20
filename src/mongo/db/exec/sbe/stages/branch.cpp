@@ -132,12 +132,9 @@ void BranchStage::open(bool reOpen) {
     _specificStats.numTested++;
 
     // run the filter expressions here
-    auto [owned, tag, val] = _bytecode.run(_filterCode.get());
-    if (owned) {
-        value::releaseValue(tag, val);
-    }
-    if (tag == value::TypeTags::Boolean) {
-        if (value::bitcastTo<bool>(val)) {
+    value::TagValueMaybeOwned filterResult = _bytecode.run(_filterCode.get());
+    if (filterResult.tag() == value::TypeTags::Boolean) {
+        if (value::bitcastTo<bool>(filterResult.value())) {
             _activeBranch = 0;
             _children[0]->open(reOpen && _thenOpened);
             _thenOpened = true;

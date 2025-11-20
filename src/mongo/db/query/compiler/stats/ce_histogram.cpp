@@ -118,7 +118,7 @@ public:
         const auto& buckets = histogram.getBuckets();
         if (hasNext()) {
             // Update tag & frequency for the left-most bucket in the current type-bracket.
-            const auto tagL = bounds.getAt(_bracket).first;
+            const auto tagL = bounds.getAt(_bracket).tag;
             const auto& bucketL = buckets[_bracket];
             double freq = bucketL._equalFreq + bucketL._rangeFreq;
 
@@ -128,7 +128,7 @@ public:
             // Aggregate all frequencies for the current type bracket.
             for (; hasNext(); _bracket++) {
                 // Get the tag for the next bucket.
-                const auto tagR = bounds.getAt(_bracket).first;
+                const auto tagR = bounds.getAt(_bracket).tag;
                 if (!sameTypeBracket(tagL, tagR)) {
                     // Stop aggregating when the next bound belongs to a different type bracket.
                     return {tagL, freq};

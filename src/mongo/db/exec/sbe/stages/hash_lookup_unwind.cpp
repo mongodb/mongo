@@ -156,8 +156,7 @@ void HashLookupUnwindStage::open(bool reOpen) {
         value::FixedSizeRow<1 /*N*/> value;
 
         // Copy the projected value.
-        auto [tag, val] = _inInnerProjectAccessor->getCopyOfValue();
-        value.reset(0, true, tag, val);
+        value.reset(0, _inInnerProjectAccessor->getCopyOfValue());
 
         // This where we put the value in here. This can grow need to spill.
         size_t bufferIndex = _hashTable.bufferValueOrSpill(value);
@@ -198,11 +197,10 @@ PlanState HashLookupUnwindStage::getNext() {
 
         size_t matchIndex = _hashTable.htIter.getNextMatchingIndex();
         if (matchIndex != LookupHashTableIter::kNoMatchingIndex) {
-            boost::optional<std::pair<value::TypeTags, value::Value>> innerMatch =
+            boost::optional<value::TagValueView> innerMatch =
                 _hashTable.getValueAtIndex(matchIndex);
             if (innerMatch) {
-                _lookupStageOutputAccessor.reset(
-                    false /* owned */, innerMatch->first, innerMatch->second);
+                _lookupStageOutputAccessor.reset(*innerMatch);
                 return trackPlanState(PlanState::ADVANCED);
             }
         }

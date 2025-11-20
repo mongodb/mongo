@@ -365,7 +365,8 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
         } else if (_resumeRecordIdSlot) {
             tassert(11052110, "_resultRecordId must not be null", _resultRecordId);
 
-            std::tie(_tagLastRecordId, _valLastRecordId) = _resultRecordId->getViewOfValue();
+            auto lastRecordId = _resultRecordId->getViewOfValue();
+            std::tie(_tagLastRecordId, _valLastRecordId) = {lastRecordId.tag, lastRecordId.value};
         }
 
         tassert(11052111,

@@ -61,12 +61,12 @@ public:
      * until the content of this slot changes (usually as a result of calling getNext()). If the
      * caller needs to hold onto the value longer then it must make a copy of the value.
      */
-    virtual std::pair<TypeTags, Value> getViewOfValue() const = 0;
+    virtual TagValueView getViewOfValue() const = 0;
 
     /**
      * Returns an owned copy of the value currently stored in the slot.
      */
-    inline std::pair<TypeTags, Value> getCopyOfValue() const {
+    inline TagValueOwned getCopyOfValue() const {
         auto [tag, val] = getViewOfValue();
         return sbe::value::copyValue(tag, val);
     }
@@ -77,7 +77,7 @@ public:
      * saving the extra copy operation. Not all slots own the values stored in them so they must
      * make a deep copy. The returned value is owned by the caller.
      */
-    virtual std::pair<TypeTags, Value> copyOrMoveValue() = 0;
+    virtual TagValueOwned copyOrMoveValue() = 0;
 
     template <typename T>
     bool is() const {
@@ -105,6 +105,20 @@ public:
      * Assigns a new value to this slot and releases the previous value if it was owned.
      */
     virtual void reset(bool owned, TypeTags tag, Value val) = 0;
+
+    void reset(TagValueMaybeOwned value) {
+        auto [owned, tag, val] = value.releaseToRaw();
+        reset(owned, tag, val);
+    }
+
+    void reset(TagValueOwned value) {
+        auto [tag, val] = value.releaseToRaw();
+        reset(true, tag, val);
+    }
+
+    void reset(TagValueView value) {
+        reset(false, value.tag, value.value);
+    }
 };
 
 /**
@@ -115,14 +129,14 @@ public:
     /**
      * Returns non-owning view of the value.
      */
-    std::pair<TypeTags, Value> getViewOfValue() const override {
+    TagValueView getViewOfValue() const override {
         return {_tag, _val};
     }
 
     /**
      * Returns a copy of the value.
      */
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
+    TagValueOwned copyOrMoveValue() override {
         return copyValue(_tag, _val);
     }
 
@@ -135,6 +149,11 @@ public:
         _val = val;
     }
 
+    void reset(TagValueView valView) {
+        _tag = valView.tag;
+        _val = valView.value;
+    }
+
 private:
     TypeTags _tag{TypeTags::Nothing};
     Value _val{0};
@@ -145,6 +164,8 @@ private:
  */
 class OwnedValueAccessor final : public AssignableSlotAccessor {
 public:
+    using AssignableSlotAccessor::reset;
+
     OwnedValueAccessor() = default;
 
     OwnedValueAccessor(const OwnedValueAccessor& other) {
@@ -183,7 +204,7 @@ public:
     /**
      * Returns a non-owning view of the value.
      */
-    std::pair<TypeTags, Value> getViewOfValue() const override {
+    TagValueView getViewOfValue() const override {
         SlotAccessorHelper::dassertValidSlotValue(_tag, _val);
         return {_tag, _val};
     }
@@ -193,7 +214,7 @@ public:
      * value. Alternatively, if the value is unowned, then the caller receives a copy. Either way,
      * the caller owns the resulting value.
      */
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
+    TagValueOwned copyOrMoveValue() override {
         SlotAccessorHelper::dassertValidSlotValue(_tag, _val);
         if (_owned) {
             _owned = false;
@@ -257,10 +278,10 @@ public:
     }
 
     // Return non-owning view of the value.
-    std::pair<TypeTags, Value> getViewOfValue() const override {
+    TagValueView getViewOfValue() const override {
         return _enumerator.getViewOfValue();
     }
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
+    TagValueOwned copyOrMoveValue() override {
         // We can never move out values from array.
         auto [tag, val] = getViewOfValue();
         return copyValue(tag, val);
@@ -298,10 +319,10 @@ public:
         tassert(11093601, "Vector of SlotAccessor must not be empty", !_accessors.empty());
     }
 
-    std::pair<TypeTags, Value> getViewOfValue() const override {
+    TagValueView getViewOfValue() const override {
         return _accessors[_index]->getViewOfValue();
     }
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
+    TagValueOwned copyOrMoveValue() override {
         return _accessors[_index]->copyOrMoveValue();
     }
 
@@ -328,10 +349,10 @@ class MaterializedRowKeyAccessor final : public SlotAccessor {
 public:
     MaterializedRowKeyAccessor(T& it, size_t slot) : _it(it), _slot(slot) {}
 
-    std::pair<TypeTags, Value> getViewOfValue() const override {
+    TagValueView getViewOfValue() const override {
         return _it->first.getViewOfValue(_slot);
     }
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
+    TagValueOwned copyOrMoveValue() override {
         // We can never move out values from keys.
         auto [tag, val] = getViewOfValue();
         return copyValue(tag, val);
@@ -354,12 +375,14 @@ private:
 template <typename T>
 class MaterializedRowValueAccessor final : public AssignableSlotAccessor {
 public:
+    using AssignableSlotAccessor::reset;
+
     MaterializedRowValueAccessor(T& it, size_t slot) : _it(it), _slot(slot) {}
 
-    std::pair<TypeTags, Value> getViewOfValue() const override {
+    TagValueView getViewOfValue() const override {
         return _it->second.getViewOfValue(_slot);
     }
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
+    TagValueOwned copyOrMoveValue() override {
         return _it->second.copyOrMoveValue(_slot);
     }
 
@@ -379,6 +402,8 @@ private:
 template <typename T>
 class MaterializedRowAccessor final : public AssignableSlotAccessor {
 public:
+    using AssignableSlotAccessor::reset;
+
     /**
      * Constructs an accessor for the row with index 'it' inside the given 'container'. Within that
      * row, the resulting accessor provides a vew of the value at the given 'slot'.
@@ -386,10 +411,10 @@ public:
     MaterializedRowAccessor(T& container, const size_t& it, size_t slot)
         : _container(container), _it(it), _slot(slot) {}
 
-    std::pair<TypeTags, Value> getViewOfValue() const override {
+    TagValueView getViewOfValue() const override {
         return _container[_it].getViewOfValue(_slot);
     }
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
+    TagValueOwned copyOrMoveValue() override {
         return _container[_it].copyOrMoveValue(_slot);
     }
 
@@ -409,16 +434,18 @@ private:
 template <typename RowType>
 class SingleRowAccessor final : public AssignableSlotAccessor {
 public:
+    using AssignableSlotAccessor::reset;
+
     /**
      * Constructs an accessor that gives a view of the value at the given 'slot' of a
      * given single row.
      */
     SingleRowAccessor(RowType& row, size_t slot) : _row(row), _slot(slot) {}
 
-    std::pair<TypeTags, Value> getViewOfValue() const override {
+    TagValueView getViewOfValue() const override {
         return _row.getViewOfValue(_slot);
     }
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
+    TagValueOwned copyOrMoveValue() override {
         return _row.copyOrMoveValue(_slot);
     }
     void reset(bool owned, TypeTags tag, Value val) override {
@@ -485,6 +512,8 @@ void orderedSlotMapTraverse(const SlotMap<T>& map, C callback) {
  */
 class BSONObjValueAccessor final : public AssignableSlotAccessor {
 public:
+    using AssignableSlotAccessor::reset;
+
     BSONObjValueAccessor() = default;
 
     BSONObjValueAccessor(const BSONObjValueAccessor& other) {
@@ -531,7 +560,7 @@ public:
     /**
      * Returns a non-owning view of the value.
      */
-    std::pair<TypeTags, Value> getViewOfValue() const override {
+    TagValueView getViewOfValue() const override {
         SlotAccessorHelper::dassertValidSlotValue(_tag, _val);
         return {_tag, _val};
     }
@@ -541,7 +570,7 @@ public:
      * value. Alternatively, if the value is unowned, then the caller receives a copy. Either way,
      * the caller owns the resulting value.
      */
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
+    TagValueOwned copyOrMoveValue() override {
         SlotAccessorHelper::dassertValidSlotValue(_tag, _val);
         if (_owned && !_hasBsonObj) {
             _owned = false;

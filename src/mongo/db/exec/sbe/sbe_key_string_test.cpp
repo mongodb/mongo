@@ -69,7 +69,13 @@ using SBEKeyStringTest = EExpressionTestFixture;
 
 std::string valueDebugString(std::pair<value::TypeTags, value::Value> value) {
     std::stringstream stream;
-    stream << std::make_pair(value.first, value.second);
+    stream << value;
+    return stream.str();
+};
+
+std::string valueDebugString(value::TagValueView value) {
+    std::stringstream stream;
+    stream << value;
     return stream.str();
 };
 }  // namespace
@@ -239,14 +245,14 @@ TEST(SimpleSBEKeyStringTest, KeyComponentInclusion) {
         view, key_string::ALL_ASCENDING, &builder, &accessors, indexKeysToInclude);
 
     auto value = accessors[0].getViewOfValue();
-    ASSERT(value::TypeTags::NumberInt64 == value.first &&
-           12345 == value::bitcastTo<int64_t>(value.second))
+    ASSERT(value::TypeTags::NumberInt64 == value.tag &&
+           12345 == value::bitcastTo<int64_t>(value.value))
         << "Incorrect value from accessor: " << valueDebugString(value);
 
     value = accessors[1].getViewOfValue();
-    ASSERT(value::isString(value.first) &&
+    ASSERT(value::isString(value.tag) &&
            ("I know the kings of England, and I quote the fights historical" ==
-            value::getStringView(value.first, value.second)))
+            value::getStringView(value.tag, value.value)))
         << "Incorrect value from accessor: " << valueDebugString(value);
 }
 

@@ -333,16 +333,14 @@ void BlockHashAggStage::executeBlockLevelAccumulatorCode(const value::Materializ
         // Run accumulator initializers if needed.
         for (size_t i = 0; i < _initCodes.size(); ++i) {
             if (_initCodes[i]) {
-                auto [owned, tag, val] = _bytecode.run(_initCodes[i].get());
-                _rowAggHtAccessors[i]->reset(owned, tag, val);
+                _rowAggHtAccessors[i]->reset(_bytecode.run(_initCodes[i].get()));
             }
         }
     }
 
     // Run the block level accumulators.
     for (size_t i = 0; i < _blockAggCodes.size(); ++i) {
-        auto [owned, tag, val] = _bytecode.run(_blockAggCodes[i].get());
-        _rowAggHtAccessors[i]->reset(owned, tag, val);
+        _rowAggHtAccessors[i]->reset(_bytecode.run(_blockAggCodes[i].get()));
     }
 }
 
@@ -388,8 +386,7 @@ void BlockHashAggStage::executeRowLevelAccumulatorCode(
             // Run accumulator initializers if needed.
             for (size_t i = 0; i < _initCodes.size(); ++i) {
                 if (_initCodes[i]) {
-                    auto [owned, tag, val] = _bytecode.run(_initCodes[i].get());
-                    _rowAggHtAccessors[i]->reset(owned, tag, val);
+                    _rowAggHtAccessors[i]->reset(_bytecode.run(_initCodes[i].get()));
                 }
             }
         }
@@ -402,8 +399,7 @@ void BlockHashAggStage::executeRowLevelAccumulatorCode(
 
         // Run each row level accumulator.
         for (size_t i = 0; i < _aggCodes.size(); ++i) {
-            auto [rowOwned, rowTag, rowVal] = _bytecode.run(_aggCodes[i].get());
-            _rowAggHtAccessors[i]->reset(rowOwned, rowTag, rowVal);
+            _rowAggHtAccessors[i]->reset(_bytecode.run(_aggCodes[i].get()));
         }
     }
 }
@@ -805,8 +801,7 @@ bool BlockHashAggStage::getNextSpilledHelper() {
         // Merge in the new partial aggregate values.
         _spilledAggRow = std::move(recoveredRow.second);
         for (size_t idx = 0; idx < _mergingExprCodes.size(); ++idx) {
-            auto [rowOwned, rowTag, rowVal] = _bytecode.run(_mergingExprCodes[idx].get());
-            _rowAggRSAccessors[idx]->reset(rowOwned, rowTag, rowVal);
+            _rowAggRSAccessors[idx]->reset(_bytecode.run(_mergingExprCodes[idx].get()));
         }
     }
 
@@ -902,15 +897,13 @@ PlanState BlockHashAggStage::getNext() {
         // Copy the key from the current element in the HT into the out blocks.
         idx = 0;
         for (auto& idHtAccessor : _idHtAccessors) {
-            auto [t, v] = idHtAccessor->copyOrMoveValue();
-            _outIdBlocks[idx++].push_back(t, v);
+            _outIdBlocks[idx++].push_back(idHtAccessor->copyOrMoveValue());
         }
 
         // Copy the values from the current element in the HT into the out block.
         idx = 0;
         for (auto& rowAggHtAccessor : _rowAggHtAccessors) {
-            auto [t, v] = rowAggHtAccessor->copyOrMoveValue();
-            _outAggBlocks[idx++].push_back(t, v);
+            _outAggBlocks[idx++].push_back(rowAggHtAccessor->copyOrMoveValue());
         }
 
         ++numRows;

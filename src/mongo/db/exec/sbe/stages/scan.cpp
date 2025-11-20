@@ -199,7 +199,7 @@ void ScanStage::doSaveState() {
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     if (slotsAccessible()) {
         if (_state->recordSlot &&
-            _recordAccessor.getViewOfValue().first != value::TypeTags::Nothing) {
+            _recordAccessor.getViewOfValue().tag != value::TypeTags::Nothing) {
             auto [tag, val] = _recordAccessor.getViewOfValue();
             tassert(5975900, "expected scan to produce bson", tag == value::TypeTags::bsonObject);
 

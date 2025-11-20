@@ -146,40 +146,29 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArray(Arity
     return {ownAgg, tagAgg, valAgg};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArrayCappedImpl(
-    value::TypeTags tagAccumulatorState,
-    value::Value valAccumulatorState,  // Owned
-    bool ownedNewElem,
-    value::TypeTags tagNewElem,
-    value::Value valNewElem,
+value::TagValueMaybeOwned ByteCode::builtinAddToArrayCappedImpl(
+    value::TagValueOwned accumulatorStateTagVal,
+    value::TagValueMaybeOwned newElem,
     int32_t sizeCap) {
-    value::ValueGuard guardNewElem{ownedNewElem, tagNewElem, valNewElem};
 
     // The capped array accumulator holds a value of Nothing at first and gets initialized on demand
     // when the first value gets added. Once initialized, the state is a two-element array
     // containing the array and its size in bytes, which is necessary to enforce the memory cap.
-    if (tagAccumulatorState == value::TypeTags::Nothing) {
-        std::tie(tagAccumulatorState, valAccumulatorState) = value::makeNewArray();
-        value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
-        auto accumulatorState = value::getArrayView(valAccumulatorState);
-
-        auto [tagAccArray, valAccArray] = value::makeNewArray();
+    if (accumulatorStateTagVal.tag() == value::TypeTags::Nothing) {
+        accumulatorStateTagVal = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto accumulatorState = value::getArrayView(accumulatorStateTagVal.value());
 
         // The order is important! The accumulated array should be at index
         // AggArrayWithSize::kValues, and the size should be at index
         // AggArrayWithSize::kSizeOfValues.
-        accumulatorState->push_back(tagAccArray, valAccArray);
+        accumulatorState->push_back(value::makeNewArray());
         accumulatorState->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
-
-        // Transfer ownership to the 'ValueGuard' in the enclosing scope.
-        guardAccumulatorState.reset();
     }
-    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
     tassert(11004212,
             "Expected array for set accumulator state",
-            tagAccumulatorState == value::TypeTags::Array);
+            accumulatorStateTagVal.tag() == value::TypeTags::Array);
 
-    auto accumulatorState = value::getArrayView(valAccumulatorState);
+    auto accumulatorState = value::getArrayView(accumulatorStateTagVal.value());
     tassert(11004213,
             "Array accumulator with invalid length",
             accumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
@@ -191,7 +180,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArrayCapped
             "Expected integer value for array size",
             tagAccArraySize == value::TypeTags::NumberInt64);
     int64_t currentSize = value::bitcastTo<int64_t>(valAccArraySize);
-    int newElemSize = value::getApproximateSize(tagNewElem, valNewElem);
+    int newElemSize = value::getApproximateSize(newElem.tag(), newElem.value());
     int64_t newSize = currentSize + newElemSize;
 
     // Check that array with the new element will not exceed the limit.
@@ -214,42 +203,28 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArrayCapped
                             value::bitcastFrom<int64_t>(newSize));
 
     // Add an owned copy of the element to the array.
-    if (!ownedNewElem) {
-        std::tie(tagNewElem, valNewElem) = value::copyValue(tagNewElem, valNewElem);
-    }
-    guardNewElem.reset();
-    accArray->push_back(tagNewElem, valNewElem);
+    accArray->push_back(newElem.releaseToOwnedRaw());
 
-
-    guardAccumulatorState.reset();
-    return {true, tagAccumulatorState, valAccumulatorState};
+    return accumulatorStateTagVal;
 }
 
 // The value being accumulated is an SBE array that contains an integer and the accumulated array,
 // where the integer is the total size in bytes of the elements in the array.
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArrayCapped(ArityType arity) {
-    auto [tagAccumulatorState, valAccumulatorState] = moveOwnedFromStack(0);
-    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
-
-    auto [ownedNewElem, tagNewElem, valNewElem] = moveFromStack(1);
-    value::ValueGuard guardNewElem{ownedNewElem, tagNewElem, valNewElem};
+    auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    auto newElem = value::TagValueMaybeOwned::fromRaw(moveFromStack(1));
 
     auto [_, tagSizeCap, valSizeCap] = getFromStack(2);
 
     // Return the unmodified accumulator state when the collator or size cap is malformed.
     if (tagSizeCap != value::TypeTags::NumberInt32) {
-        guardAccumulatorState.reset();
-        return {true, tagAccumulatorState, valAccumulatorState};
+        return accumulatorState.releaseToMaybeOwnedRaw();
     }
 
-    guardAccumulatorState.reset();
-    guardNewElem.reset();
-    return builtinAddToArrayCappedImpl(tagAccumulatorState,
-                                       valAccumulatorState,
-                                       ownedNewElem,
-                                       tagNewElem,
-                                       valNewElem,
-                                       value::bitcastTo<int32_t>(valSizeCap));
+    return builtinAddToArrayCappedImpl(std::move(accumulatorState),
+                                       std::move(newElem),
+                                       value::bitcastTo<int32_t>(valSizeCap))
+        .releaseToRaw();
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArrays(ArityType arity) {
@@ -364,29 +339,24 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinZipArrays(ArityT
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArraysCapped(
     ArityType arity) {
-    auto [tagAccumulatorState, valAccumulatorState] = moveOwnedFromStack(0);
-    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
-
-    auto [tagNewArrayElements, valNewArrayElements] = moveOwnedFromStack(1);
-    value::ValueGuard guardNewArrayElements{tagNewArrayElements, valNewArrayElements};
+    auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    auto newArrayElements = value::TagValueOwned::fromRaw(moveOwnedFromStack(1));
 
     auto [_, tagSizeCap, valSizeCap] = getFromStack(2);
 
     // Return the unmodified accumulator state when the size cap is malformed.
     if (tagSizeCap != value::TypeTags::NumberInt32) {
-        guardAccumulatorState.reset();
-        return {true, tagAccumulatorState, valAccumulatorState};
+        return accumulatorState.releaseToMaybeOwnedRaw();
     }
 
-    guardAccumulatorState.reset();
-    guardNewArrayElements.reset();
-    return concatArraysAccumImpl(
-        tagAccumulatorState,
-        valAccumulatorState,
-        tagNewArrayElements,
-        valNewArrayElements,
-        value::getApproximateSize(tagNewArrayElements, valNewArrayElements),
-        value::bitcastTo<int32_t>(valSizeCap));
+    auto newArrayElemsSize =
+        value::getApproximateSize(newArrayElements.tag(), newArrayElements.value());
+
+    return concatArraysAccumImpl(std::move(accumulatorState),
+                                 std::move(newArrayElements),
+                                 newArrayElemsSize,
+                                 value::bitcastTo<int32_t>(valSizeCap))
+        .releaseToRaw();
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::isMemberImpl(value::TypeTags exprTag,
@@ -861,7 +831,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::topOrBottomImpl(ArityTy
     auto cmpInput = SbePatternValueCmp(specTag, specVal, collator);
 
     // Inverse comparator if the sense is kBottom
-    auto cmp = [sense, &cmpInput](const auto& lhs, const auto& rhs) {
+    auto cmp = [sense, &cmpInput](auto lhs, auto rhs) {
         if (sense == TopBottomSense::kTop) {
             return cmpInput(lhs, rhs);
         } else {
@@ -884,7 +854,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::topOrBottomImpl(ArityTy
             }
         }
 
-        auto [resultTag, resultVal] = copyValue(best_element.first, best_element.second);
+        auto [resultTag, resultVal] = copyValue(best_element.tag, best_element.value);
         return {true, resultTag, resultVal};
     } else if (inputType == value::TypeTags::bsonArray || inputType == value::TypeTags::ArraySet) {
         value::ArrayEnumerator enumerator{inputType, inputVal};
@@ -904,7 +874,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::topOrBottomImpl(ArityTy
             enumerator.advance();
         }
 
-        auto [resultTag, resultVal] = copyValue(best_element.first, best_element.second);
+        auto [resultTag, resultVal] = copyValue(best_element.tag, best_element.value);
         return {true, resultTag, resultVal};
     } else {
         // Earlier in this function we bailed out if the 'inputType' wasn't

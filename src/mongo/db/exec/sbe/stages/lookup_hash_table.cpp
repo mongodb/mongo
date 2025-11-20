@@ -208,8 +208,7 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
         if (!hasSpilledHtToDisk() && newMemUsage <= _memoryUseInBytesBeforeSpill) {
             // We have to insert an owned key, attempt a move, but force copy if necessary when we
             // haven't spilled to the '_recordStore' yet.
-            auto [tagKey, valKey] = keyAccessor->getCopyOfValue();
-            key.reset(0, true, tagKey, valKey);
+            key.reset(0, keyAccessor->getCopyOfValue());
 
             auto [it, inserted] = _memoryHt->try_emplace(std::move(key));
             tassert(11094720,
@@ -394,8 +393,7 @@ std::pair<RecordId, key_string::TypeBits> LookupHashTable::serializeKeyForRecord
     return encodeKeyString(kb, key);
 }
 
-boost::optional<std::pair<value::TypeTags, value::Value>> LookupHashTable::getValueAtIndex(
-    size_t index) {
+boost::optional<value::TagValueView> LookupHashTable::getValueAtIndex(size_t index) {
     if (index < _buffer.size()) {
         // Document is in memory buffer, always in column 0.
         return _buffer[index].getViewOfValue(0);

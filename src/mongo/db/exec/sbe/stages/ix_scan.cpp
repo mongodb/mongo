@@ -693,16 +693,17 @@ void GenericIndexScanStage::open(bool reOpen) {
 
     IndexScanStageBase::openImpl(reOpen);
 
-    auto [ownedBound, tagBound, valBound] = _bytecode.run(_indexBoundsCode.get());
-    if (tagBound == value::TypeTags::Nothing) {
+    value::TagValueMaybeOwned bound = _bytecode.run(_indexBoundsCode.get());
+    if (bound.tag() == value::TypeTags::Nothing) {
         _scanState = ScanState::kFinished;
         return;
     }
 
     tassert(11094722,
             "indexBounds should be unowned and IndexBounds type",
-            !ownedBound && tagBound == value::TypeTags::indexBounds);
-    _checker.emplace(value::getIndexBoundsView(valBound), _params.keyPattern, _params.direction);
+            !bound.owned() && bound.tag() == value::TypeTags::indexBounds);
+    _checker.emplace(
+        value::getIndexBoundsView(bound.value()), _params.keyPattern, _params.direction);
 
     if (!_checker->getStartSeekPoint(&_seekPoint)) {
         _scanState = ScanState::kFinished;

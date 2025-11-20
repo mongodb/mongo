@@ -134,7 +134,7 @@ std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeDeepCopy() const {
     env->_state = _state->makeCopyWithoutValues();
     for (auto&& [slotId, index] : _state->slots) {
         // Copy the slot value.
-        auto [tag, val] = _accessors.at(slotId).getCopyOfValue();
+        auto [tag, val] = _accessors.at(slotId).getCopyOfValue().releaseToRaw();
 
         env->emplaceAccessor(slotId, index);
         env->resetSlot(slotId, tag, val, true /* owned */);

@@ -48,10 +48,10 @@ TEST(CodeFragmentTest, TestPushEnvAccessorVal) {
     sbe::RuntimeEnvironment::Accessor accessor(&env, 0);
     fragment.appendAccessVal(&accessor);
     sbe::vm::ByteCode vm;
-    auto [owned, resultsTag, resultsVal] = vm.run(&fragment);
-    ASSERT(!owned);
-    ASSERT(resultsTag == testTag);
-    ASSERT(resultsVal == testValue);
+    auto res = vm.run(&fragment);
+    ASSERT(!res.owned());
+    ASSERT(res.tag() == testTag);
+    ASSERT(res.value() == testValue);
 }
 TEST(CodeFragmentTest, TestPushOwnedAccessorVal) {
     sbe::vm::CodeFragment fragment;
@@ -61,9 +61,9 @@ TEST(CodeFragmentTest, TestPushOwnedAccessorVal) {
     accessor.reset(testTag, testValue);
     fragment.appendAccessVal(&accessor);
     sbe::vm::ByteCode vm;
-    auto [owned, resultsTag, resultsVal] = vm.run(&fragment);
-    ASSERT(!owned);
-    ASSERT(resultsTag == testTag);
-    ASSERT(resultsVal == testValue);
+    auto res = vm.run(&fragment);
+    ASSERT(!res.owned());
+    ASSERT(res.tag() == testTag);
+    ASSERT(res.value() == testValue);
 }
 }  // namespace mongo

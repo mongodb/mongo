@@ -55,11 +55,10 @@ public:
         printCodeFragment(code);
 
         vm::ByteCode interpreter;
-        auto [owned, tag, val] = interpreter.run(&code);
-        value::ValueGuard guard(owned, tag, val);
+        auto res = interpreter.run(&code);
 
         os << "-- RESULT:" << std::endl;
-        makeValuePrinter(os).writeValueToStream(tag, val);
+        makeValuePrinter(os).writeValueToStream(res.tag(), res.value());
         os << std::endl << std::endl;
     }
 

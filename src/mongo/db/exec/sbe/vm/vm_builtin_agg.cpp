@@ -107,40 +107,29 @@ template FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggStdD
 template FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggStdDev<false>(
     ArityType arity);
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::concatArraysAccumImpl(
-    value::TypeTags tagAccumulatorState,
-    value::Value valAccumulatorState,  // Owned
-    value::TypeTags tagNewArrayElements,
-    value::Value valNewArrayElements,  // Owned
+value::TagValueMaybeOwned ByteCode::concatArraysAccumImpl(
+    value::TagValueOwned accumulatorStateTagVal,
+    value::TagValueOwned newArrayElements,
     int64_t newArrayElementsSize,
     int32_t sizeCap) {
-    value::ValueGuard guardNewArrayElements{tagNewArrayElements, valNewArrayElements};
-
     // The capped push accumulator holds a value of Nothing at first and gets initialized on
     // demand when the first value gets added. Once initialized, the state is a two-element array
     // containing the array and its size in bytes, which is necessary to enforce the memory cap.
-    if (tagAccumulatorState == value::TypeTags::Nothing) {
-        std::tie(tagAccumulatorState, valAccumulatorState) = value::makeNewArray();
-        value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
-        auto accumulatorState = value::getArrayView(valAccumulatorState);
-
-        auto [tagAccArray, valAccArray] = value::makeNewArray();
+    if (accumulatorStateTagVal.tag() == value::TypeTags::Nothing) {
+        accumulatorStateTagVal = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto accumulatorState = value::getArrayView(accumulatorStateTagVal.value());
 
         // The order is important! The accumulated array should be at index
         // AggArrayWithSize::kValues, and the size should be at index
         // AggArrayWithSize::kSizeOfValues.
-        accumulatorState->push_back(tagAccArray, valAccArray);
+        accumulatorState->push_back(value::makeNewArray());
         accumulatorState->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
-
-        // Transfer ownership to the 'ValueGuard' in the enclosing scope.
-        guardAccumulatorState.reset();
     }
-    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
     tassert(7039514,
             "Expected array for set accumulator state",
-            tagAccumulatorState == value::TypeTags::Array);
+            accumulatorStateTagVal.tag() == value::TypeTags::Array);
 
-    auto accumulatorState = value::getArrayView(valAccumulatorState);
+    auto accumulatorState = value::getArrayView(accumulatorStateTagVal.value());
     tassert(7039515,
             "Array accumulator with invalid length",
             accumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
@@ -158,10 +147,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::concatArraysAccumImpl(
 
     uassert(ErrorCodes::ExceededMemoryLimit,
             str::stream() << "Used too much memory for a single array. Memory limit: " << sizeCap
-                          << ". Concatentating array of " << accArray->size() << " elements and "
+                          << ". Concatenating array of " << accArray->size() << " elements and "
                           << currentSize << " bytes with array of "
-                          << (tagNewArrayElements != value::TypeTags::Nothing
-                                  ? value::getArraySize(tagNewArrayElements, valNewArrayElements)
+                          << (newArrayElements.tag() != value::TypeTags::Nothing
+                                  ? value::getArraySize(newArrayElements.tag(),
+                                                        newArrayElements.value())
                                   : 0)
                           << " elements and " << newArrayElementsSize << " bytes.",
             updatedSize < sizeCap);
@@ -172,25 +162,21 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::concatArraysAccumImpl(
                             value::bitcastFrom<int64_t>(updatedSize));
 
     // Move each element from the 'newArrayElements' array to the accumulator array.
-    if (tagNewArrayElements != value::TypeTags::Nothing) {
-        value::arrayForEach<true>(tagNewArrayElements,
-                                  valNewArrayElements,
+    if (newArrayElements.tag() != value::TypeTags::Nothing) {
+        value::arrayForEach<true>(newArrayElements.tag(),
+                                  newArrayElements.value(),
                                   [&](value::TypeTags tagNewElem, value::Value valNewElem) {
                                       accArray->push_back(tagNewElem, valNewElem);
                                   });
     }
 
-    guardAccumulatorState.reset();
-    return {true, tagAccumulatorState, valAccumulatorState};
+    return accumulatorStateTagVal;
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggConcatArraysCapped(
     ArityType arity) {
-    auto [tagLhsAccumulatorState, valLhsAccumulatorState] = moveOwnedFromStack(0);
-    value::ValueGuard guardLhsAccumulatorState{tagLhsAccumulatorState, valLhsAccumulatorState};
-
-    auto [tagRhsAccumulatorState, valRhsAccumulatorState] = moveOwnedFromStack(1);
-    value::ValueGuard guardRhsAccumulatorState{tagRhsAccumulatorState, valRhsAccumulatorState};
+    auto lhsAccumulatorStateTagVal = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    auto rhsAccumulatorStateTagVal = value::TagValueOwned::fromRaw(moveOwnedFromStack(1));
 
     auto [_, tagSizeCap, valSizeCap] = getFromStack(2);
     tassert(7039508,
@@ -202,33 +188,30 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggConcatArraysC
     // we need to destructure the RHS accumulator.
     tassert(7039512,
             "expected value of type 'Array'",
-            tagRhsAccumulatorState == value::TypeTags::Array);
-    auto rhsAccumulatorState = value::getArrayView(valRhsAccumulatorState);
+            rhsAccumulatorStateTagVal.tag() == value::TypeTags::Array);
+    auto rhsAccumulatorState = value::getArrayView(rhsAccumulatorStateTagVal.value());
 
     tassert(7039527,
             "Capped array concatenation accumulator with invalid length",
             rhsAccumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
 
     // Move ownership of the RHS array from the RHS accumulator to the local scope.
-    auto [tagNewArrayElements, valNewArrayElements] = rhsAccumulatorState->swapAt(
+    auto newArrayElements = rhsAccumulatorState->swapAt(
         static_cast<size_t>(AggArrayWithSize::kValues), value::TypeTags::Null, 0);
-    value::ValueGuard guardNewArrayElements{tagNewArrayElements, valNewArrayElements};
-    tassert(
-        7039519, "expected value of type 'Array'", tagNewArrayElements == value::TypeTags::Array);
+    tassert(7039519,
+            "expected value of type 'Array'",
+            newArrayElements.tag() == value::TypeTags::Array);
 
     auto [tagNewArrayElementsSize, valNewArrayElementsSize] =
         rhsAccumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
     tassert(
         7039517, "expected 64-bit int", tagNewArrayElementsSize == value::TypeTags::NumberInt64);
 
-    guardLhsAccumulatorState.reset();
-    guardNewArrayElements.reset();
-    return concatArraysAccumImpl(tagLhsAccumulatorState,
-                                 valLhsAccumulatorState,
-                                 tagNewArrayElements,
-                                 valNewArrayElements,
+    return concatArraysAccumImpl(std::move(lhsAccumulatorStateTagVal),
+                                 std::move(newArrayElements),
                                  value::bitcastTo<int64_t>(valNewArrayElementsSize),
-                                 value::bitcastTo<int32_t>(valSizeCap));
+                                 value::bitcastTo<int32_t>(valSizeCap))
+        .releaseToRaw();
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggSetUnion(ArityType arity) {
@@ -302,86 +285,63 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggCollSetUnion(
 
 namespace {
 FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnionCappedImpl(
-    value::TypeTags tagLhsAccumulatorState,
-    value::Value valLhsAccumulatorState,  // Owned
-    value::TypeTags tagRhsAccumulatorState,
-    value::Value valRhsAccumulatorState,  // Owned
+    value::TagValueOwned lhsAccumulatorStateTagVal,
+    value::TagValueOwned rhsAccumulatorStateTagVal,
     int32_t sizeCap,
     CollatorInterface* collator) {
-    value::ValueGuard guardLhsAccumulatorState{tagLhsAccumulatorState, valLhsAccumulatorState};
-    value::ValueGuard guardRhsAccumulatorState{tagRhsAccumulatorState, valRhsAccumulatorState};
 
     tassert(7039526,
             "Expected array for capped set union operand",
-            tagRhsAccumulatorState == value::TypeTags::Array);
+            rhsAccumulatorStateTagVal.tag() == value::TypeTags::Array);
 
-    auto rhsAccumulatorState = value::getArrayView(valRhsAccumulatorState);
+    auto rhsAccumulatorState = value::getArrayView(rhsAccumulatorStateTagVal.value());
     tassert(7039528,
             "Capped set union operand with invalid length",
             rhsAccumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
 
-    auto [tagNewSetMembers, valNewSetMembers] = rhsAccumulatorState->swapAt(
+    value::TagValueOwned newSetMembers = rhsAccumulatorState->swapAt(
         static_cast<size_t>(AggArrayWithSize::kValues), value::TypeTags::Null, 0);
-    value::ValueGuard guardNewSetMembers{tagNewSetMembers, valNewSetMembers};
     tassert(7039525,
             "Expected ArraySet in capped set union operand",
-            tagNewSetMembers == value::TypeTags::ArraySet);
+            newSetMembers.tag() == value::TypeTags::ArraySet);
 
-    guardLhsAccumulatorState.reset();
-    guardNewSetMembers.reset();
-    return ByteCode::setUnionAccumImpl(tagLhsAccumulatorState,
-                                       valLhsAccumulatorState,
-                                       tagNewSetMembers,
-                                       valNewSetMembers,
-                                       sizeCap,
-                                       collator);
+    return ByteCode::setUnionAccumImpl(
+               std::move(lhsAccumulatorStateTagVal), std::move(newSetMembers), sizeCap, collator)
+        .releaseToRaw();
 }
 }  // namespace
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggSetUnionCapped(ArityType arity) {
-    auto [tagLhsAccumulatorState, valLhsAccumulatorState] = moveOwnedFromStack(0);
-    value::ValueGuard guardLhsAccumulatorState{tagLhsAccumulatorState, valLhsAccumulatorState};
-
-    auto [tagRhsAccumulatorState, valRhsAccumulatorState] = moveOwnedFromStack(1);
-    value::ValueGuard guardRhsAccumulatorState{tagRhsAccumulatorState, valRhsAccumulatorState};
+    auto lhsAccumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    auto rhsAccumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(1));
 
     auto [_, tagSizeCap, valSizeCap] = getFromStack(2);
     tassert(7039509,
             "'cap' parameter must be a 32-bit int",
             tagSizeCap == value::TypeTags::NumberInt32);
 
-    guardLhsAccumulatorState.reset();
-    guardRhsAccumulatorState.reset();
-    return builtinAggSetUnionCappedImpl(tagLhsAccumulatorState,
-                                        valLhsAccumulatorState,
-                                        tagRhsAccumulatorState,
-                                        valRhsAccumulatorState,
+    return builtinAggSetUnionCappedImpl(std::move(lhsAccumulatorState),
+                                        std::move(rhsAccumulatorState),
                                         value::bitcastTo<int32_t>(valSizeCap),
                                         nullptr /*collator*/);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggCollSetUnionCapped(
     ArityType arity) {
-    auto [tagLhsAccumulatorState, valLhsAccumulatorState] = moveOwnedFromStack(0);
-    value::ValueGuard guardLhsAccumulatorState{tagLhsAccumulatorState, valLhsAccumulatorState};
+    auto lhsAccumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
 
     auto [_1, tagColl, valColl] = getFromStack(1);
     tassert(7039510, "expected value of type 'collator'", tagColl == value::TypeTags::collator);
 
-    auto [tagRhsAccumulatorState, valRhsAccumulatorState] = moveOwnedFromStack(2);
-    value::ValueGuard guardRhsAccumulatorState{tagRhsAccumulatorState, valRhsAccumulatorState};
+    auto rhsAccumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(2));
 
     auto [_2, tagSizeCap, valSizeCap] = getFromStack(3);
     tassert(7039511,
             "'cap' parameter must be a 32-bit int",
             tagSizeCap == value::TypeTags::NumberInt32);
 
-    guardLhsAccumulatorState.reset();
-    guardRhsAccumulatorState.reset();
-    return builtinAggSetUnionCappedImpl(tagLhsAccumulatorState,
-                                        valLhsAccumulatorState,
-                                        tagRhsAccumulatorState,
-                                        valRhsAccumulatorState,
+    return builtinAggSetUnionCappedImpl(std::move(lhsAccumulatorState),
+                                        std::move(rhsAccumulatorState),
                                         value::bitcastTo<int32_t>(valSizeCap),
                                         value::getCollatorView(valColl));
 }
@@ -416,16 +376,13 @@ int32_t aggFirstN(value::Array* state,
                   size_t maxSize,
                   int32_t memUsage,
                   int32_t memLimit,
-                  value::TypeTags fieldTag,
-                  value::Value fieldVal) {
-    value::ValueGuard fieldGuard{fieldTag, fieldVal};
+                  value::TagValueOwned field) {
     if (array->size() < maxSize) {
         memUsage = updateAndCheckMemUsage(
-            state, memUsage, value::getApproximateSize(fieldTag, fieldVal), memLimit);
+            state, memUsage, value::getApproximateSize(field.tag(), field.value()), memLimit);
 
         // add to array
-        fieldGuard.reset();
-        array->push_back(fieldTag, fieldVal);
+        array->push_back(std::move(field));
     }
     return memUsage;
 }
@@ -439,7 +396,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstN(ArityT
         getMultiAccState(stateTag, stateVal);
 
     auto [fieldTag, fieldVal] = moveOwnedFromStack(1);
-    aggFirstN(state, array, maxSize, memUsage, memLimit, fieldTag, fieldVal);
+    aggFirstN(state, array, maxSize, memUsage, memLimit, {fieldTag, fieldVal});
 
     stateGuard.reset();
     return {true, stateTag, stateVal};
@@ -470,9 +427,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstNMerge(A
             break;
         }
 
-        auto [tag, val] = array->swapAt(i, value::TypeTags::Null, 0);
-        mergeMemUsage =
-            aggFirstN(mergeState, mergeArray, mergeMaxSize, mergeMemUsage, mergeMemLimit, tag, val);
+        value::TagValueOwned field = array->swapAt(i, value::TypeTags::Null, 0);
+        mergeMemUsage = aggFirstN(
+            mergeState, mergeArray, mergeMaxSize, mergeMemUsage, mergeMemLimit, std::move(field));
     }
 
     mergeStateGuard.reset();
@@ -491,9 +448,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstNFinaliz
     auto isGroupAcc = value::bitcastTo<bool>(isGroupAccVal);
 
     if (isGroupAcc) {
-        auto [outputTag, outputVal] = state->swapAt(
+        auto output = state->swapAt(
             static_cast<size_t>(AggMultiElems::kInternalArr), value::TypeTags::Null, 0);
-        return {true, outputTag, outputVal};
+        return output.releaseToMaybeOwnedRaw();
     } else {
         auto [arrTag, arrVal] = state->getAt(static_cast<size_t>(AggMultiElems::kInternalArr));
         auto [outputTag, outputVal] = value::copyValue(arrTag, arrVal);
@@ -516,23 +473,19 @@ std::pair<size_t, int32_t> aggLastN(value::Array* state,
                                     size_t maxSize,
                                     int32_t memUsage,
                                     int32_t memLimit,
-                                    value::TypeTags fieldTag,
-                                    value::Value fieldVal) {
-    value::ValueGuard guard{fieldTag, fieldVal};
+                                    value::TagValueOwned field) {
+    auto fieldView = field.view();
     if (array->size() < maxSize) {
         invariant(startIdx == 0);
-        guard.reset();
-        array->push_back(fieldTag, fieldVal);
+        array->push_back(std::move(field));
     } else {
         invariant(array->size() == maxSize);
-        guard.reset();
-        auto [oldFieldTag, oldFieldVal] = array->swapAt(startIdx, fieldTag, fieldVal);
-        memUsage -= value::getApproximateSize(oldFieldTag, oldFieldVal);
-        value::releaseValue(oldFieldTag, oldFieldVal);
+        auto oldField = array->swapAt(startIdx, std::move(field));
+        memUsage -= value::getApproximateSize(oldField.tag(), oldField.value());
         startIdx = updateStartIdx(state, startIdx, maxSize);
     }
     memUsage = updateAndCheckMemUsage(
-        state, memUsage, value::getApproximateSize(fieldTag, fieldVal), memLimit);
+        state, memUsage, value::getApproximateSize(fieldView.tag, fieldView.value), memLimit);
     return {startIdx, memUsage};
 }
 }  // namespace
@@ -545,7 +498,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLastN(ArityTy
         getMultiAccState(stateTag, stateVal);
 
     auto [fieldTag, fieldVal] = moveOwnedFromStack(1);
-    aggLastN(state, array, startIdx, maxSize, memUsage, memLimit, fieldTag, fieldVal);
+    aggLastN(state, array, startIdx, maxSize, memUsage, memLimit, {fieldTag, fieldVal});
 
     stateGuard.reset();
     return {true, stateTag, stateVal};
@@ -575,15 +528,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLastNMerge(Ar
     if (array->size() < maxSize) {
         // add values from accArr to mergeArray
         for (size_t i = 0; i < array->size(); ++i) {
-            auto [tag, val] = array->swapAt(i, value::TypeTags::Null, 0);
+            value::TagValueOwned field = array->swapAt(i, value::TypeTags::Null, 0);
             std::tie(mergeStartIdx, mergeMemUsage) = aggLastN(mergeState,
                                                               mergeArray,
                                                               mergeStartIdx,
                                                               mergeMaxSize,
                                                               mergeMemUsage,
                                                               mergeMemLimit,
-                                                              tag,
-                                                              val);
+                                                              std::move(field));
         }
         mergeStateGuard.reset();
         return {true, mergeStateTag, mergeStateVal};
@@ -602,11 +554,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLastNFinalize
         getMultiAccState(stateTag, stateVal);
     if (startIdx == 0) {
         if (isGroupAccum) {
-            auto [outTag, outVal] = state->swapAt(0, value::TypeTags::Null, 0);
-            return {true, outTag, outVal};
+            auto out = state->swapAt(0, value::TypeTags::Null, 0);
+            return out.releaseToMaybeOwnedRaw();
         } else {
-            auto [arrTag, arrVal] = state->getAt(0);
-            auto [outTag, outVal] = value::copyValue(arrTag, arrVal);
+            auto arrView = state->getAt(0);
+            auto [outTag, outVal] = value::copyValue(arrView.tag, arrView.value);
             return {true, outTag, outVal};
         }
     }
@@ -619,8 +571,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLastNFinalize
     if (isGroupAccum) {
         for (size_t i = 0; i < maxSize; ++i) {
             auto srcIdx = (i + startIdx) % maxSize;
-            auto [elemTag, elemVal] = arr->swapAt(srcIdx, value::TypeTags::Null, 0);
-            outArray->push_back(elemTag, elemVal);
+            auto elem = arr->swapAt(srcIdx, value::TypeTags::Null, 0);
+            outArray->push_back(std::move(elem));
         }
     } else {
         for (size_t i = 0; i < maxSize; ++i) {
@@ -637,22 +589,22 @@ class ByteCode::TopBottomArgsDirect final : public ByteCode::TopBottomArgs {
 public:
     TopBottomArgsDirect(TopBottomSense sense,
                         SortSpec* sortSpec,
-                        FastTuple<bool, value::TypeTags, value::Value> key,
-                        FastTuple<bool, value::TypeTags, value::Value> value)
+                        value::TagValueMaybeOwned key,
+                        value::TagValueMaybeOwned value)
         : TopBottomArgs(sense, sortSpec, false, false) {
-        setDirectKeyArg(key);
-        setDirectValueArg(value);
+        setDirectKeyArg(std::move(key));
+        setDirectValueArg(std::move(value));
     }
 
     ~TopBottomArgsDirect() final = default;
 
-    bool keySortsBeforeImpl(std::pair<value::TypeTags, value::Value> item) final {
+    bool keySortsBeforeImpl(value::TagValueView item) final {
         MONGO_UNREACHABLE_TASSERT(8448721);
     }
-    std::pair<value::TypeTags, value::Value> getOwnedKeyImpl() final {
+    value::TagValueOwned getOwnedKeyImpl() final {
         MONGO_UNREACHABLE_TASSERT(8448722);
     }
-    std::pair<value::TypeTags, value::Value> getOwnedValueImpl() final {
+    value::TagValueOwned getOwnedValueImpl() final {
         MONGO_UNREACHABLE_TASSERT(8448723);
     }
 };
@@ -675,25 +627,27 @@ public:
           _valuesStartOffset(valuesStartOffset),
           _numValues(numValues) {
         if (!_decomposedKey) {
-            setDirectKeyArg(_bytecode->moveFromStack(_keysStartOffset));
+            setDirectKeyArg(
+                value::TagValueMaybeOwned::fromRaw(_bytecode->moveFromStack(_keysStartOffset)));
         }
         if (!_decomposedValue) {
-            setDirectValueArg(_bytecode->moveFromStack(_valuesStartOffset));
+            setDirectValueArg(
+                value::TagValueMaybeOwned::fromRaw(_bytecode->moveFromStack(_valuesStartOffset)));
         }
     }
 
     ~TopBottomArgsFromStack() final = default;
 
 protected:
-    bool keySortsBeforeImpl(std::pair<value::TypeTags, value::Value> item) final {
-        tassert(8448700, "Expected item to be an Array", item.first == value::TypeTags::Array);
+    bool keySortsBeforeImpl(value::TagValueView item) final {
+        tassert(8448700, "Expected item to be an Array", item.tag == value::TypeTags::Array);
 
         const SortPattern& sortPattern = _sortSpec->getSortPattern();
         tassert(8448701,
                 "Expected numKeys to be equal to number of sort pattern parts",
                 _numKeys == sortPattern.size());
 
-        auto itemArray = value::getArrayView(item.second);
+        auto itemArray = value::getArrayView(item.value);
         tassert(8448702,
                 "Expected size of item array to be equal to number of sort pattern parts",
                 sortPattern.size() == itemArray->size());
@@ -723,32 +677,28 @@ protected:
         return false;
     }
 
-    std::pair<value::TypeTags, value::Value> getOwnedKeyImpl() final {
-        auto [keysArrTag, keysArrVal] = value::makeNewArray();
-        value::ValueGuard keysArrGuard{keysArrTag, keysArrVal};
-        auto keysArr = value::getArrayView(keysArrVal);
+    value::TagValueOwned getOwnedKeyImpl() final {
+        auto keys = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto keysArr = value::getArrayView(keys.value());
 
         for (size_t i = 0; i < _numKeys; ++i) {
             auto [keyTag, keyVal] = _bytecode->moveOwnedFromStack(_keysStartOffset + i);
             keysArr->push_back(keyTag, keyVal);
         }
 
-        keysArrGuard.reset();
-        return std::pair{keysArrTag, keysArrVal};
+        return keys;
     }
 
-    std::pair<value::TypeTags, value::Value> getOwnedValueImpl() final {
-        auto [valuesArrTag, valuesArrVal] = value::makeNewArray();
-        value::ValueGuard valuesArrGuard{valuesArrTag, valuesArrVal};
-        auto valuesArr = value::getArrayView(valuesArrVal);
+    value::TagValueOwned getOwnedValueImpl() final {
+        auto values = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto valuesArr = value::getArrayView(values.value());
 
         for (size_t i = 0; i < _numValues; ++i) {
             auto [valueTag, valueVal] = _bytecode->moveOwnedFromStack(_valuesStartOffset + i);
             valuesArr->push_back(valueTag, valueVal);
         }
 
-        valuesArrGuard.reset();
-        return std::pair{valuesArrTag, valuesArrVal};
+        return values;
     }
 
 private:
@@ -790,10 +740,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNImp
     const size_t numValues = ValueIsDecomposedArray ? arity - valuesStartOffset : 1;
 
     if (!keyIsDecomposed && !ValueIsDecomposedArray) {
-        auto key = moveFromStack(keysStartOffset);
-        auto value = moveFromStack(valuesStartOffset);
+        auto [keyOwned, keyTag, keyVal] = moveFromStack(keysStartOffset);
+        auto [valueOwned, valueTag, valueVal] = moveFromStack(valuesStartOffset);
 
-        TopBottomArgsDirect topBottomArgs{Sense, ss, key, value};
+        TopBottomArgsDirect topBottomArgs{
+            Sense, ss, {keyOwned, keyTag, keyVal}, {valueOwned, valueTag, valueVal}};
 
         aggTopBottomNAdd<Sense>(state, array, maxSize, memUsage, memLimit, topBottomArgs);
     } else {
@@ -864,8 +815,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNMer
         auto key = pair->swapAt(0, value::TypeTags::Null, 0);
         auto value = pair->swapAt(1, value::TypeTags::Null, 0);
 
-        TopBottomArgsDirect topBottomArgs{
-            Sense, sortSpec, {true, key.first, key.second}, {true, value.first, value.second}};
+        TopBottomArgsDirect topBottomArgs{Sense, sortSpec, std::move(key), std::move(value)};
 
         mergeMemUsage = aggTopBottomNAdd<Sense>(
             mergeState, mergeArray, mergeMaxSize, mergeMemUsage, mergeMemLimit, topBottomArgs);
@@ -900,10 +850,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNFin
     auto keyLess = PairKeyComp(less);
     std::sort(array->values().begin(), array->values().end(), keyLess);
     for (size_t i = 0; i < array->size(); ++i) {
-        auto pair = value::getArrayView(array->getAt(i).second);
+        auto pair = value::getArrayView(array->getAt(i).value);
         if (isGroupAccum) {
-            auto [outTag, outVal] = pair->swapAt(1, value::TypeTags::Null, 0);
-            outputArray->push_back(outTag, outVal);
+            auto out = pair->swapAt(1, value::TypeTags::Null, 0);
+            outputArray->push_back(std::move(out));
         } else {
             auto [outTag, outVal] = pair->getAt(1);
             auto [copyTag, copyVal] = value::copyValue(outTag, outVal);
@@ -923,9 +873,7 @@ int32_t aggMinMaxN(value::Array* state,
                    int32_t memUsage,
                    int32_t memLimit,
                    const CollatorInterface* collator,
-                   value::TypeTags fieldTag,
-                   value::Value fieldVal) {
-    value::ValueGuard guard{fieldTag, fieldVal};
+                   value::TagValueOwned field) {
     auto& heap = array->values();
 
     constexpr auto less = []() -> bool {
@@ -938,10 +886,9 @@ int32_t aggMinMaxN(value::Array* state,
 
     if (array->size() < maxSize) {
         memUsage = updateAndCheckMemUsage(
-            state, memUsage, value::getApproximateSize(fieldTag, fieldVal), memLimit);
-        guard.reset();
+            state, memUsage, value::getApproximateSize(field.tag(), field.value()), memLimit);
 
-        array->push_back(fieldTag, fieldVal);
+        array->push_back(std::move(field));
         std::push_heap(heap.begin(), heap.end(), comp);
     } else {
         uassert(7548800,
@@ -949,16 +896,15 @@ int32_t aggMinMaxN(value::Array* state,
                 array->size() == maxSize);
 
         auto heapRoot = heap.front();
-        if (comp({fieldTag, fieldVal}, heapRoot)) {
+        if (comp(field.raw(), heapRoot)) {
             memUsage =
                 updateAndCheckMemUsage(state,
                                        memUsage,
                                        -value::getApproximateSize(heapRoot.first, heapRoot.second) +
-                                           value::getApproximateSize(fieldTag, fieldVal),
+                                           value::getApproximateSize(field.tag(), field.value()),
                                        memLimit);
             std::pop_heap(heap.begin(), heap.end(), comp);
-            guard.reset();
-            array->setAt(maxSize - 1, fieldTag, fieldVal);
+            array->setAt(maxSize - 1, std::move(field));
             std::push_heap(heap.begin(), heap.end(), comp);
         }
     }
@@ -991,7 +937,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxN(Arity
         collator = value::getCollatorView(collVal);
     }
     fieldGuard.reset();
-    aggMinMaxN<S>(state, array, maxSize, memUsage, memLimit, collator, fieldTag, fieldVal);
+    aggMinMaxN<S>(state, array, maxSize, memUsage, memLimit, collator, {fieldTag, fieldVal});
 
     stateGuard.reset();
     return {true, stateTag, stateVal};
@@ -1032,9 +978,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxNMerge(
     }
 
     for (size_t i = 0; i < array->size(); ++i) {
-        auto [tag, val] = array->swapAt(i, value::TypeTags::Null, 0);
-        mergeMemUsage = aggMinMaxN<S>(
-            mergeState, mergeArray, mergeMaxSize, mergeMemUsage, mergeMemLimit, collator, tag, val);
+        value::TagValueOwned field = array->swapAt(i, value::TypeTags::Null, 0);
+        mergeMemUsage = aggMinMaxN<S>(mergeState,
+                                      mergeArray,
+                                      mergeMaxSize,
+                                      mergeMemUsage,
+                                      mergeMemLimit,
+                                      collator,
+                                      std::move(field));
     }
 
     mergeStateGuard.reset();
@@ -1071,9 +1022,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxNFinali
     value::ValueCompare<less> comp{collator};
     std::sort(array->values().begin(), array->values().end(), comp);
     if (isGroupAccum) {
-        auto [arrayTag, arrayVal] = state->swapAt(
+        auto arrayVal = state->swapAt(
             static_cast<size_t>(AggMultiElems::kInternalArr), value::TypeTags::Null, 0);
-        return {true, arrayTag, arrayVal};
+        return arrayVal.releaseToMaybeOwnedRaw();
     } else {
         auto [arrTag, arrVal] = state->getAt(0);
         auto [outTag, outVal] = value::copyValue(arrTag, arrVal);
@@ -1086,13 +1037,8 @@ template FastTuple<bool, value::TypeTags, value::Value>
 ByteCode::builtinAggMinMaxNFinalize<(AccumulatorMinMax::Sense)1>(ArityType arity);
 
 namespace {
-std::tuple<value::Array*,
-           std::pair<value::TypeTags, value::Value>,
-           bool,
-           int64_t,
-           int64_t,
-           SortSpec*>
-rankState(value::TypeTags stateTag, value::Value stateVal) {
+std::tuple<value::Array*, value::TagValueView, bool, int64_t, int64_t, SortSpec*> rankState(
+    value::TypeTags stateTag, value::Value stateVal) {
     uassert(
         7795500, "The accumulator state should be an array", stateTag == value::TypeTags::Array);
     auto state = value::getArrayView(stateVal);
@@ -1176,8 +1122,8 @@ FastTuple<bool, value::TypeTags, value::Value> builtinAggRankImpl(
         rankState(stateTag, stateVal);
     // Update the last value to Nothing before comparison if the flag is set.
     if (lastValueIsNothing) {
-        lastValue.first = value::TypeTags::Nothing;
-        lastValue.second = 0;
+        lastValue.tag = value::TypeTags::Nothing;
+        lastValue.value = 0;
     }
 
     // Define sort-order compliant comparison function which uses fast pass logic for null and
@@ -1203,7 +1149,8 @@ FastTuple<bool, value::TypeTags, value::Value> builtinAggRankImpl(
         return compareTag == value::TypeTags::NumberInt32 && compareVal == 0;
     };
 
-    if (isSameValue(sortSpec, std::make_pair(valueTag, valueVal), lastValue)) {
+    if (isSameValue(
+            sortSpec, std::make_pair(valueTag, valueVal), {lastValue.tag, lastValue.value})) {
         state->setAt(AggRankElems::kSameRankCount,
                      value::TypeTags::NumberInt64,
                      value::bitcastFrom<int64_t>(sameRankCount + 1));
@@ -1349,9 +1296,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggExpMovingAvg(
     uassert(7821202, "alpha is not of decimal type", alphaTag == value::TypeTags::NumberDecimal);
     auto alpha = value::bitcastTo<Decimal128>(alphaVal);
 
-    value::TypeTags currentResultTag;
-    value::Value currentResultVal;
-    std::tie(currentResultTag, currentResultVal) =
+    auto [currentResultTag, currentResultVal] =
         state->getAt(static_cast<size_t>(AggExpMovingAvgElems::kResult));
 
     auto decimalVal = value::numericCast<Decimal128>(fieldTag, fieldVal);
@@ -1616,26 +1561,25 @@ void assertTypesForIntegeral(value::TypeTags inputTag,
 }  // namespace
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::integralOfTwoPointsByTrapezoidalRule(
-    std::pair<value::TypeTags, value::Value> prevInput,
-    std::pair<value::TypeTags, value::Value> prevSortByVal,
-    std::pair<value::TypeTags, value::Value> newInput,
-    std::pair<value::TypeTags, value::Value> newSortByVal) {
-    if (value::isNaN(prevInput.first, prevInput.second) ||
-        value::isNaN(prevSortByVal.first, prevSortByVal.second) ||
-        value::isNaN(newInput.first, newInput.second) ||
-        value::isNaN(newSortByVal.first, newSortByVal.second)) {
+    value::TagValueView prevInput,
+    value::TagValueView prevSortByVal,
+    value::TagValueView newInput,
+    value::TagValueView newSortByVal) {
+    if (value::isNaN(prevInput.tag, prevInput.value) ||
+        value::isNaN(prevSortByVal.tag, prevSortByVal.value) ||
+        value::isNaN(newInput.tag, newInput.value) ||
+        value::isNaN(newSortByVal.tag, newSortByVal.value)) {
         return {false, value::TypeTags::NumberInt64, 0};
     }
 
-    if ((prevSortByVal.first == value::TypeTags::Date &&
-         newSortByVal.first == value::TypeTags::Date) ||
-        (value::isNumber(prevSortByVal.first) && value::isNumber(newSortByVal.first))) {
+    if ((prevSortByVal.tag == value::TypeTags::Date && newSortByVal.tag == value::TypeTags::Date) ||
+        (value::isNumber(prevSortByVal.tag) && value::isNumber(newSortByVal.tag))) {
         auto [deltaOwned, deltaTag, deltaVal] = genericSub(
-            newSortByVal.first, newSortByVal.second, prevSortByVal.first, prevSortByVal.second);
+            newSortByVal.tag, newSortByVal.value, prevSortByVal.tag, prevSortByVal.value);
         value::ValueGuard deltaGuard{deltaOwned, deltaTag, deltaVal};
 
         auto [sumYOwned, sumYTag, sumYVal] =
-            genericAdd(newInput.first, newInput.second, prevInput.first, prevInput.second);
+            genericAdd(newInput.tag, newInput.value, prevInput.tag, prevInput.value);
         value::ValueGuard sumYGuard{sumYOwned, sumYTag, sumYVal};
 
         auto [integralOwned, integralTag, integralVal] =
@@ -1745,8 +1689,8 @@ void arrayQueuePush(value::Array* arrayQueue, value::TypeTags tag, value::Value 
             // existing values wrap over the array
             // need to rearrange the values from [startIdx, cap-1]
             for (size_t from = cap - 1, to = newCap - 1; from >= startIdx; --from, --to) {
-                auto [movTag, movVal] = array->swapAt(from, value::TypeTags::Null, 0);
-                array->setAt(to, movTag, movVal);
+                value::TagValueOwned mov = array->swapAt(from, value::TypeTags::Null, 0);
+                array->setAt(to, std::move(mov));
             }
             startIdx += extend;
         }
@@ -1760,7 +1704,7 @@ void arrayQueuePush(value::Array* arrayQueue, value::TypeTags tag, value::Value 
 }
 
 /* Pops an element {tag, value} from the queue and returns it */
-std::pair<value::TypeTags, value::Value> arrayQueuePop(value::Array* arrayQueue) {
+value::TagValueOwned arrayQueuePop(value::Array* arrayQueue) {
     auto [array, startIdx, queueSize] = getArrayQueueState(arrayQueue);
     if (queueSize == 0) {
         return {value::TypeTags::Nothing, 0};
@@ -1773,7 +1717,7 @@ std::pair<value::TypeTags, value::Value> arrayQueuePop(value::Array* arrayQueue)
     return pair;
 }
 
-std::pair<value::TypeTags, value::Value> arrayQueueFront(value::Array* arrayQueue) {
+value::TagValueView arrayQueueFront(value::Array* arrayQueue) {
     auto [array, startIdx, queueSize] = getArrayQueueState(arrayQueue);
     if (queueSize == 0) {
         return {value::TypeTags::Nothing, 0};
@@ -1781,7 +1725,7 @@ std::pair<value::TypeTags, value::Value> arrayQueueFront(value::Array* arrayQueu
     return array->getAt(startIdx);
 }
 
-std::pair<value::TypeTags, value::Value> arrayQueueBack(value::Array* arrayQueue) {
+value::TagValueView arrayQueueBack(value::Array* arrayQueue) {
     auto [array, startIdx, queueSize] = getArrayQueueState(arrayQueue);
     if (queueSize == 0) {
         return {value::TypeTags::Nothing, 0};
@@ -1877,10 +1821,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggIntegralAdd(A
     }
 
     if (isNonRemovable) {
-        auto [tag, val] = arrayQueuePop(inputQueue);
-        value::releaseValue(tag, val);
-        std::tie(tag, val) = arrayQueuePop(sortByQueue);
-        value::releaseValue(tag, val);
+        arrayQueuePop(inputQueue);
+        arrayQueuePop(sortByQueue);
     }
 
     inputGuard.reset();
@@ -1907,17 +1849,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggIntegralRemov
     assertTypesForIntegeral(inputTag, sortByTag, unitMillis);
 
     // verify that the input and sortby value to be removed are the first elements of the queues
-    auto [frontInputTag, frontInputVal] = arrayQueuePop(inputQueue);
-    value::ValueGuard frontInputGuard{frontInputTag, frontInputVal};
-    auto [cmpTag, cmpVal] = value::compareValue(frontInputTag, frontInputVal, inputTag, inputVal);
+    auto frontInput = arrayQueuePop(inputQueue);
+    auto [cmpTag, cmpVal] =
+        value::compareValue(frontInput.tag(), frontInput.value(), inputTag, inputVal);
     uassert(7821113,
             "Attempted to remove unexpected input value",
             cmpTag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(cmpVal) == 0);
 
-    auto [frontSortByTag, frontSortByVal] = arrayQueuePop(sortByQueue);
-    value::ValueGuard frontSortByGuard{frontSortByTag, frontSortByVal};
+    value::TagValueOwned frontSortBy = arrayQueuePop(sortByQueue);
     std::tie(cmpTag, cmpVal) =
-        value::compareValue(frontSortByTag, frontSortByVal, sortByTag, sortByVal);
+        value::compareValue(frontSortBy.tag(), frontSortBy.value(), sortByTag, sortByVal);
     uassert(7821117,
             "Attempted to remove unexpected sortby value",
             cmpTag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(cmpVal) == 0);
@@ -2478,8 +2419,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovablePush
 
     uassert(7993101, "State should be of array type", stateTag == value::TypeTags::Array);
     auto state = value::getArrayView(stateVal);
-    auto [tag, val] = arrayQueuePop(state);
-    value::releaseValue(tag, val);
+    auto poppedVal = arrayQueuePop(state);
     stateGuard.reset();
     return {true, stateTag, stateVal};
 }
@@ -2672,8 +2612,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableConc
             }
 
             // Remove the value.
-            auto [removedTag, removedVal] = arrayQueuePop(accArr);
-            value::releaseValue(removedTag, removedVal);
+            auto removedVal = arrayQueuePop(accArr);
 
             accArrSize -= elemSize;
         });
@@ -2882,11 +2821,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAvgF
  */
 namespace {
 std::tuple<value::Array*,
-           std::pair<value::TypeTags, value::Value>,
-           std::pair<value::TypeTags, value::Value>,
-           std::pair<value::TypeTags, value::Value>,
-           std::pair<value::TypeTags, value::Value>,
-           std::pair<value::TypeTags, value::Value>,
+           value::TagValueView,
+           value::TagValueView,
+           value::TagValueView,
+           value::TagValueView,
+           value::TagValueView,
            int64_t>
 linearFillState(value::TypeTags stateTag, value::Value stateVal) {
     tassert(
@@ -2920,7 +2859,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLinearFillCan
     // if y2 is non-null it means we have found a valid upper window bound. in that case if count is
     // positive it means there are still more finalize calls to be made. when count == 0 we have
     // exhausted this window.
-    if (y2.first != value::TypeTags::Null) {
+    if (y2.tag != value::TypeTags::Null) {
         return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(count == 0)};
     }
 
@@ -2949,17 +2888,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLinearFillAdd
 
     auto [state, x1, y1, x2, y2, prevX, count] = linearFillState(stateTag, stateVal);
 
-    // Valdiate the current sortBy value with the previous one and update prevX
-    auto [cmpTag, cmpVal] = value::compareValue(sortByTag, sortByVal, prevX.first, prevX.second);
+    // Validate the current sortBy value with the previous one and update prevX
+    auto [cmpTag, cmpVal] = value::compareValue(sortByTag, sortByVal, prevX.tag, prevX.value);
     uassert(7971205,
             "There can be no repeated values in the sort field",
             cmpTag == value::TypeTags::NumberInt32 && cmpVal != 0);
 
-    if (prevX.first != value::TypeTags::Null) {
+    if (prevX.tag != value::TypeTags::Null) {
         uassert(7971206,
                 "Conflicting sort value types, previous and current types don't match",
-                (coercibleToDate(sortByTag) && coercibleToDate(prevX.first)) ||
-                    (value::isNumber(sortByTag) && value::isNumber(prevX.first)));
+                (coercibleToDate(sortByTag) && coercibleToDate(prevX.tag)) ||
+                    (value::isNumber(sortByTag) && value::isNumber(prevX.tag)));
     }
 
     auto [copyXTag, copyXVal] = value::copyValue(sortByTag, sortByVal);
@@ -2967,24 +2906,18 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLinearFillAdd
 
     // Update x2/y2 to the current sortby/input values
     sortByGuard.reset();
-    auto [oldX2Tag, oldX2Val] =
-        state->swapAt(static_cast<size_t>(AggLinearFillElems::kX2), sortByTag, sortByVal);
-    value::ValueGuard oldX2Guard{oldX2Tag, oldX2Val};
+    auto oldX2 = state->swapAt(static_cast<size_t>(AggLinearFillElems::kX2), sortByTag, sortByVal);
 
     inputGuard.reset();
-    auto [oldY2Tag, oldY2Val] =
-        state->swapAt(static_cast<size_t>(AggLinearFillElems::kY2), inputTag, inputVal);
-    value::ValueGuard oldY2Guard{oldY2Tag, oldY2Val};
+    auto oldY2 = state->swapAt(static_cast<size_t>(AggLinearFillElems::kY2), inputTag, inputVal);
 
     // If (old) y2 is non-null, it means we need to look for new end-points (x1, y1), (x2, y2)
     // and the segment spanned be previous endpoints is exhausted. Count should be zero at
     // this point. Update (x1, y1) to the previous (x2, y2)
-    if (oldY2Tag != value::TypeTags::Null) {
+    if (oldY2.tag() != value::TypeTags::Null) {
         tassert(7971207, "count value should be zero", count == 0);
-        oldX2Guard.reset();
-        state->setAt(static_cast<size_t>(AggLinearFillElems::kX1), oldX2Tag, oldX2Val);
-        oldY2Guard.reset();
-        state->setAt(static_cast<size_t>(AggLinearFillElems::kY1), oldY2Tag, oldY2Val);
+        state->setAt(static_cast<size_t>(AggLinearFillElems::kX1), std::move(oldX2));
+        state->setAt(static_cast<size_t>(AggLinearFillElems::kY1), std::move(oldY2));
     }
 
     state->setAt(static_cast<size_t>(AggLinearFillElems::kCount),
@@ -2999,17 +2932,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLinearFillAdd
 // points, we solve (or fill) for y with the following formula: y = y1 + (x - x1) * ((y2 -
 // y1)/(x2 - x1))
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::linearFillInterpolate(
-    std::pair<value::TypeTags, value::Value> x1,
-    std::pair<value::TypeTags, value::Value> y1,
-    std::pair<value::TypeTags, value::Value> x2,
-    std::pair<value::TypeTags, value::Value> y2,
-    std::pair<value::TypeTags, value::Value> x) {
+    value::TagValueView x1,
+    value::TagValueView y1,
+    value::TagValueView x2,
+    value::TagValueView y2,
+    value::TagValueView x) {
     // (y2 - y1)
-    auto [delYOwned, delYTag, delYVal] = genericSub(y2.first, y2.second, y1.first, y1.second);
+    auto [delYOwned, delYTag, delYVal] = genericSub(y2.tag, y2.value, y1.tag, y1.value);
     value::ValueGuard delYGuard{delYOwned, delYTag, delYVal};
 
     // (x2 - x1)
-    auto [delXOwned, delXTag, delXVal] = genericSub(x2.first, x2.second, x1.first, x1.second);
+    auto [delXOwned, delXTag, delXVal] = genericSub(x2.tag, x2.value, x1.tag, x1.value);
     value::ValueGuard delXGuard{delXOwned, delXTag, delXVal};
 
     // (y2 - y1) / (x2 - x1)
@@ -3017,7 +2950,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::linearFillInterpolate(
     value::ValueGuard divGuard{divOwned, divTag, divVal};
 
     // (x - x1)
-    auto [subOwned, subTag, subVal] = genericSub(x.first, x.second, x1.first, x1.second);
+    auto [subOwned, subTag, subVal] = genericSub(x.tag, x.value, x1.tag, x1.value);
     value::ValueGuard subGuard{subOwned, subTag, subVal};
 
     // (x - x1) * ((y2 - y1) / (x2 - x1))
@@ -3025,7 +2958,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::linearFillInterpolate(
     value::ValueGuard mulGuard{mulOwned, mulTag, mulVal};
 
     // y1 + (x - x1) * ((y2 - y1) / (x2 - x1))
-    return genericAdd(y1.first, y1.second, mulTag, mulVal);
+    return genericAdd(y1.tag, y1.value, mulTag, mulVal);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLinearFillFinalize(
@@ -3040,20 +2973,20 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLinearFillFin
                  value::bitcastFrom<int64_t>(--count));
 
     // if y2 is null it means the current window is the last window frame in the partition
-    if (y2.first == value::TypeTags::Null) {
+    if (y2.tag == value::TypeTags::Null) {
         return {false, value::TypeTags::Null, 0};
     }
 
-    // If count == 0, we are currently handling the last docoument in the window frame (x2/y2)
+    // If count == 0, we are currently handling the last document in the window frame (x2/y2)
     // so we can return y2 directly. Note that the document represented by y1 was returned as
     // part of previous window (when it was y2)
     if (count == 0) {
-        auto [y2Tag, y2Val] = value::copyValue(y2.first, y2.second);
+        auto [y2Tag, y2Val] = value::copyValue(y2.tag, y2.value);
         return {true, y2Tag, y2Val};
     }
 
     // If y1 is null it means the current window is the first window frame in the partition
-    if (y1.first == value::TypeTags::Null) {
+    if (y1.tag == value::TypeTags::Null) {
         return {false, value::TypeTags::Null, 0};
     }
     return linearFillInterpolate(x1, y1, x2, y2, {sortByTag, sortByVal});
@@ -3127,10 +3060,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstLastNRem
 
     auto [queue, n] = firstLastNState(stateTag, stateVal);
 
-    auto [popTag, popVal] = arrayQueuePop(queue);
-    value::ValueGuard popValueGuard{popTag, popVal};
+    value::TagValueOwned poppedVal = arrayQueuePop(queue);
 
-    auto [cmpTag, cmpVal] = value::compareValue(popTag, popVal, fieldTag, fieldVal);
+    auto [cmpTag, cmpVal] =
+        value::compareValue(poppedVal.tag(), poppedVal.value(), fieldTag, fieldVal);
     tassert(8070604,
             "Encountered unexpected value",
             cmpTag == value::TypeTags::NumberInt32 && cmpVal == 0);

@@ -153,15 +153,13 @@ void HashJoinStage::open(bool reOpen) {
         size_t idx = 0;
         // Copy keys in order to do the lookup.
         for (auto& p : _inOuterKeyAccessors) {
-            auto [tag, val] = p->getCopyOfValue();
-            key.reset(idx++, true, tag, val);
+            key.reset(idx++, p->getCopyOfValue());
         }
 
         idx = 0;
         // Copy projects.
         for (auto& p : _inOuterProjectAccessors) {
-            auto [tag, val] = p->getCopyOfValue();
-            project.reset(idx++, true, tag, val);
+            project.reset(idx++, p->getCopyOfValue());
         }
 
         _ht->emplace(std::move(key), std::move(project));

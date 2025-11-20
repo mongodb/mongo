@@ -488,9 +488,7 @@ TsBlock::TsBlock(size_t ncells,
                  bool isTimeField,
                  std::pair<TypeTags, Value> controlMin,
                  std::pair<TypeTags, Value> controlMax)
-    : _blockOwned(owned),
-      _blockTag(blockTag),
-      _blockVal(blockVal),
+    : _block({owned, blockTag, blockVal}),
       _count(ncells),
       _bucketVersion(bucketVersion),
       _isTimeField(isTimeField),
@@ -498,17 +496,7 @@ TsBlock::TsBlock(size_t ncells,
       _controlMax(copyValue(controlMax.first, controlMax.second)) {
     tassert(11093604,
             "Expected bsonObject or bsonBinData tag type",
-            _blockTag == TypeTags::bsonObject || _blockTag == TypeTags::bsonBinData);
-}
-
-TsBlock::~TsBlock() {
-    if (_blockOwned) {
-        // The underlying buffer is owned by this TsBlock and so this releases it.
-        releaseValue(_blockTag, _blockVal);
-    }
-    // controlMin and controlMax are always owned so we always need to release them.
-    releaseValue(_controlMin.first, _controlMin.second);
-    releaseValue(_controlMax.first, _controlMax.second);
+            blockTag == TypeTags::bsonObject || blockTag == TypeTags::bsonBinData);
 }
 
 void TsBlock::deblockFromBsonObj() {
@@ -519,7 +507,7 @@ void TsBlock::deblockFromBsonObj() {
 
     ValueVectorGuard vectorGuard(tags, vals);
 
-    ObjectEnumerator enumerator(TypeTags::bsonObject, _blockVal);
+    ObjectEnumerator enumerator(TypeTags::bsonObject, _block.value());
     for (size_t i = 0; i < _count; ++i) {
         auto [tag, val] = [&] {
             if (enumerator.atEnd() || ItoA(i) != enumerator.getFieldName()) {
@@ -535,7 +523,7 @@ void TsBlock::deblockFromBsonObj() {
                 // always copy the values out of it. Since deblocking from a BSONObj is the
                 // uncommon case compared to deblocking from a BSONColumn, we don't bother with
                 // that optimization.
-                return copyValue(tagVal.first, tagVal.second);
+                return copyValue(tagVal.tag, tagVal.value);
             }
         }();
 
@@ -595,16 +583,15 @@ std::unique_ptr<TsBlock> TsBlock::cloneStrongTyped() const {
     // TODO: If we've already decoded the output, there's no need to re-copy the entire bson
     // column. We could instead just copy the decoded values and metadata.
 
-    auto [cpyTag, cpyVal] = copyValue(_blockTag, _blockVal);
-    ValueGuard guard(cpyTag, cpyVal);
+    TagValueOwned cpyTagVal = _block.getOwnedCopy();
     // The new copy must own the copied underlying buffer.
     auto cpy = std::make_unique<TsBlock>(_count,
                                          /*owned*/ true,
-                                         cpyTag,
-                                         cpyVal,
+                                         cpyTagVal.tag(),
+                                         cpyTagVal.value(),
                                          _bucketVersion,
                                          _isTimeField);
-    guard.reset();
+    cpyTagVal.disown();
 
     // TODO: This might not be necessary now that TsBlock doesn't really use _deblockedStorage
     // If the block has been deblocked, then we need to copy the deblocked values too to
@@ -633,15 +620,15 @@ DeblockedTagVals TsBlock::deblock(boost::optional<DeblockedTagValStorage>& stora
 BSONBinData TsBlock::getBinData() const {
     tassert(7796401,
             "Invalid BinDataType for BSONColumn",
-            getBSONBinDataSubtype(TypeTags::bsonBinData, _blockVal) == BinDataType::Column);
+            getBSONBinDataSubtype(TypeTags::bsonBinData, _block.value()) == BinDataType::Column);
 
     return BSONBinData{
-        value::getBSONBinData(TypeTags::bsonBinData, _blockVal),
-        static_cast<int>(value::getBSONBinDataSize(TypeTags::bsonBinData, _blockVal)),
+        value::getBSONBinData(TypeTags::bsonBinData, _block.value()),
+        static_cast<int>(value::getBSONBinDataSize(TypeTags::bsonBinData, _block.value())),
         BinDataType::Column};
 }
 
-std::pair<TypeTags, Value> TsBlock::tryMin() const {
+value::TagValueView TsBlock::tryMin() const {
     // V1 and v3 buckets store the time field unsorted. In all versions, the control.min of the time
     // field is rounded down. If computing the true minimum requires traversing the whole column, we
     // just return Nothing.
@@ -652,15 +639,20 @@ std::pair<TypeTags, Value> TsBlock::tryMin() const {
             auto blockColumn = BSONColumn(getBinData());
             auto it = blockColumn.begin();
             auto [trueMinTag, trueMinVal] = bson::convertFrom</*View*/ true>(*it);
-            return value::copyValue(trueMinTag, trueMinVal);
+
+            tassert(10801301,
+                    "Expected time field in a time-series collection to always contain a date",
+                    trueMinTag == TypeTags::Date);
+            // Its a shallow type so directly return the view.
+            return {trueMinTag, trueMinVal};
         }
-    } else if (canUseControlValue(_controlMin.first)) {
-        return _controlMin;
+    } else if (canUseControlValue(_controlMin.tag())) {
+        return _controlMin.view();
     }
-    return std::pair{TypeTags::Nothing, Value{0u}};
+    return {TypeTags::Nothing, Value{0u}};
 }
 
-std::pair<TypeTags, Value> TsBlock::tryMax() const {
+value::TagValueView TsBlock::tryMax() const {
     auto isControlFieldExact = [&]() {
         // For dates before 1970, the control.max time field is rounded rather than being a value
         // in the bucket. We can't use it as a reliable max if it's before or equal to the Unix
@@ -669,20 +661,20 @@ std::pair<TypeTags, Value> TsBlock::tryMax() const {
         if (_isTimeField) {
             tassert(9387400,
                     "Expected time field in a time-series collection to always contain a date",
-                    _controlMax.first == TypeTags::Date);
-            return value::bitcastTo<int64_t>(_controlMax.second) > 0;
+                    _controlMax.tag() == TypeTags::Date);
+            return value::bitcastTo<int64_t>(_controlMax.value()) > 0;
         }
         return true;
     };
-    if (canUseControlValue(_controlMax.first) && isControlFieldExact()) {
-        return _controlMax;
+    if (canUseControlValue(_controlMax.tag()) && isControlFieldExact()) {
+        return _controlMax.view();
     }
-    return std::pair{TypeTags::Nothing, Value{0u}};
+    return {TypeTags::Nothing, Value{0u}};
 }
 
 void TsBlock::ensureDeblocked() {
     if (!_decompressedBlock) {
-        if (_blockTag == TypeTags::bsonObject) {
+        if (_block.tag() == TypeTags::bsonObject) {
             deblockFromBsonObj();
         } else {
             deblockFromBsonColumn();
@@ -700,7 +692,7 @@ boost::optional<bool> TsBlock::tryHasArray() const {
     if (hasNoObjsOrArrays()) {
         return false;
     }
-    if (isArray(_controlMin.first) || isArray(_controlMax.first)) {
+    if (isArray(_controlMin.tag()) || isArray(_controlMax.tag())) {
         return true;
     }
     return boost::none;
@@ -712,15 +704,15 @@ std::unique_ptr<ValueBlock> TsBlock::fillEmpty(TypeTags fillTag, Value fillVal) 
 }
 
 std::unique_ptr<ValueBlock> TsBlock::fillType(uint32_t typeMask, TypeTags fillTag, Value fillVal) {
-    if (static_cast<bool>(getBSONTypeMask(_controlMin.first) & kNumberMask) &&
-        static_cast<bool>(getBSONTypeMask(_controlMax.first) & kNumberMask) &&
+    if (static_cast<bool>(getBSONTypeMask(_controlMin.tag()) & kNumberMask) &&
+        static_cast<bool>(getBSONTypeMask(_controlMax.tag()) & kNumberMask) &&
         !static_cast<bool>(kNumberMask & typeMask)) {
         // The control min and max tags are both numbers, and the target typeMask doesn't cover
         // numbers which are in the same canonical type bracket (see canonicalizeBSONType()). Even
         // though the block could have Nothings, fillType on Nothing always returns Nothing.
         return nullptr;
-    } else if (static_cast<bool>(getBSONTypeMask(_controlMin.first) & kDateMask) &&
-               _controlMin.first == _controlMax.first && !static_cast<bool>(kDateMask & typeMask)) {
+    } else if (static_cast<bool>(getBSONTypeMask(_controlMin.tag()) & kDateMask) &&
+               _controlMin.tag() == _controlMax.tag() && !static_cast<bool>(kDateMask & typeMask)) {
         // The control min and max tags are both dates and the target typeMask doesn't cover Dates.
         // Since Dates are in their own canonical type bracket (see canonicalizeBSONType()) and
         // fillType on Nothing returns Nothing, we can return the block unchanged without having to

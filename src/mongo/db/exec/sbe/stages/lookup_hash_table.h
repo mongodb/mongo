@@ -199,7 +199,7 @@ public:
      * Retrieves a slot view (tag, val) of the value at 'index' of the hash table's sequential
      * store, whether it is in the memory or disk portion.
      */
-    boost::optional<std::pair<value::TypeTags, value::Value>> getValueAtIndex(size_t index);
+    boost::optional<value::TagValueView> getValueAtIndex(size_t index);
 
     /**
      * Constructs a RecordId for a value index. It must be incremented since a valid RecordId with

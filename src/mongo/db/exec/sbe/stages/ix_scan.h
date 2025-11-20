@@ -301,21 +301,19 @@ private:
     const key_string::Value& getSeekKeyHigh() const;
 
     inline void initializeSeekKeyLow() {
-        auto [ownedLow, tagLow, valLow] = _bytecode.run(_seekKeyLowCode.get());
-        const auto msgTagLow = tagLow;
+        value::TagValueMaybeOwned seekKeyLow = _bytecode.run(_seekKeyLowCode.get());
         uassert(4822851,
-                str::stream() << "seek key is wrong type: " << msgTagLow,
-                tagLow == value::TypeTags::keyString);
-        _seekKeyLowHolder.reset(ownedLow, tagLow, valLow);
+                str::stream() << "seek key is wrong type: " << seekKeyLow.tag(),
+                seekKeyLow.tag() == value::TypeTags::keyString);
+        _seekKeyLowHolder.reset(std::move(seekKeyLow));
     };
     inline void initializeSeekKeyHigh() {
-        auto [ownedHi, tagHi, valHi] = _bytecode.run(_seekKeyHighCode.get());
-        const auto msgTagHi = tagHi;
+        value::TagValueMaybeOwned seekKeyHigh = _bytecode.run(_seekKeyHighCode.get());
         uassert(4822852,
-                str::stream() << "seek key is wrong type: " << msgTagHi,
-                tagHi == value::TypeTags::keyString);
+                str::stream() << "seek key is wrong type: " << seekKeyHigh.tag(),
+                seekKeyHigh.tag() == value::TypeTags::keyString);
 
-        _seekKeyHighHolder.reset(ownedHi, tagHi, valHi);
+        _seekKeyHighHolder.reset(std::move(seekKeyHigh));
     };
     inline void initializeSeekKeyDefault() {
         auto sdi = _entry->accessMethod()->asSortedData()->getSortedDataInterface();

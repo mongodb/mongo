@@ -141,8 +141,8 @@ inline auto _carray(auto&&... elements) {
 
     auto [tag, val] = makeNewArray();
     auto arr = getArrayView(val);
-    (arr->push_back(copyValue(elements._n.template cast<Constant>()->get().first,
-                              elements._n.template cast<Constant>()->get().second)),
+    (arr->push_back(copyValue(elements._n.template cast<Constant>()->get().tag,
+                              elements._n.template cast<Constant>()->get().value)),
      ...);
 
     return ExprHolder{make<Constant>(tag, val)};
@@ -284,17 +284,17 @@ public:
         if (expr.isValueBool()) {
             out << "_cbool(" << (expr.getValueBool() ? "true" : "false") << ")";
         } else if (expr.isArray()) {
-            if (getArrayView(expr.get().second)->size() == 0) {
+            if (getArrayView(expr.get().value)->size() == 0) {
                 out << "_cemparray()";
             } else {
                 out << "_carray(";
                 auto shouldTruncate = true;
                 size_t iter = 0;
 
-                if (auto ae = ArrayEnumerator{TypeTags::Array, expr.get().second}; !ae.atEnd()) {
+                if (auto ae = ArrayEnumerator{TypeTags::Array, expr.get().value}; !ae.atEnd()) {
                     while (iter < sbe::PrintOptions::kDefaultArrayObjectOrNestingMaxDepth) {
                         auto getMaker = [](auto&& arg) -> std::string {
-                            switch (arg.first) {
+                            switch (arg.tag) {
                                 case TypeTags::NumberDouble:
                                     return (std::stringstream{}
                                             << "sbe::value::bitcastFrom<double>(" << std::showpoint
@@ -308,7 +308,7 @@ public:
                             }
                         };
                         auto aeView = ae.getViewOfValue();
-                        out << "std::pair{sbe::value::TypeTags::" << aeView.first << ", "
+                        out << "std::pair{sbe::value::TypeTags::" << aeView.tag << ", "
                             << getMaker(aeView) << "}";
                         ae.advance();
                         if (ae.atEnd()) {
@@ -324,7 +324,7 @@ public:
                 }
                 out << ")";
             }
-        } else if (expr.isObject() && getObjectView(expr.get().second)->size() == 0) {
+        } else if (expr.isObject() && getObjectView(expr.get().value)->size() == 0) {
             out << "_cempobj()";
         } else if (expr.isString()) {
             out << expr.get() << "_cstr";

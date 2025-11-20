@@ -383,7 +383,7 @@ PlanState SearchCursorStage::doGetNext() {
         }
 
         if (!_isStoredSource && _idSlot &&
-            _idAccessor.getViewOfValue().first == value::TypeTags::Nothing) {
+            _idAccessor.getViewOfValue().tag == value::TypeTags::Nothing) {
             // For non-storedSource case, document without _id field is not valid.
             continue;
         }

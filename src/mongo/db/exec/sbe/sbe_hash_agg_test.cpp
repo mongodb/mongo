@@ -188,8 +188,7 @@ void HashAggStageTest::performHashAggWithSpillChecking(
     value::ValueGuard resultsGuard{resultsTag, resultsVal};
 
     // Sort results for stable compare, since the counts could come out in any order.
-    using ValuePair = std::pair<value::TypeTags, value::Value>;
-    std::vector<ValuePair> resultsContents;
+    std::vector<value::TagValueView> resultsContents;
     auto resultsView = value::getArrayView(resultsVal);
     for (size_t i = 0; i < resultsView->size(); i++) {
         resultsContents.push_back(resultsView->getAt(i));
@@ -198,7 +197,7 @@ void HashAggStageTest::performHashAggWithSpillChecking(
     // Sort 'resultContents' in descending order.
     std::sort(resultsContents.begin(),
               resultsContents.end(),
-              [](const ValuePair& lhs, const ValuePair& rhs) -> bool {
+              [](const value::TagValueView lhs, const value::TagValueView rhs) -> bool {
                   auto [lhsTag, lhsVal] = lhs;
                   auto [rhsTag, rhsVal] = rhs;
                   auto [compareTag, compareVal] =

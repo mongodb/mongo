@@ -48,8 +48,9 @@ TEST(SBERuntimeEnvironmentTest, CanCopy) {
     // Make a "shallow" copy. "State" in the RuntimeEnvironment is shared.
     auto envCopy = env->makeCopy();
 
-    auto tagValEnv = env->getAccessor(slotID)->getViewOfValue();
-    auto tagValCopy = envCopy->getAccessor(slotID)->getViewOfValue();
+    std::pair<value::TypeTags, value::Value> tagValEnv = env->getAccessor(slotID)->getViewOfValue();
+    std::pair<value::TypeTags, value::Value> tagValCopy =
+        envCopy->getAccessor(slotID)->getViewOfValue();
     ASSERT_EQUALS(tagValEnv, tagValCopy);
 
     auto [tag2, val2] = value::makeNewString("Modified");

@@ -63,29 +63,21 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSet(ArityTy
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSetCapped(ArityType arity) {
-    auto [tagAccumulatorState, valAccumulatorState] = moveOwnedFromStack(0);
-    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
-
-    auto [ownedNewElem, tagNewElem, valNewElem] = moveFromStack(1);
-    value::ValueGuard guardNewElem{ownedNewElem, tagNewElem, valNewElem};
+    auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    auto newElem = value::TagValueMaybeOwned::fromRaw(moveFromStack(1));
 
     auto [_ownedSizeCap, tagSizeCap, valSizeCap] = getFromStack(2);
 
     // Return the unmodified accumulator state when the size cap is malformed.
     if (tagSizeCap != value::TypeTags::NumberInt32) {
-        guardAccumulatorState.reset();
-        return {true, tagAccumulatorState, valAccumulatorState};
+        return accumulatorState.releaseToMaybeOwnedRaw();
     }
 
-    guardAccumulatorState.reset();
-    guardNewElem.reset();
-    return addToSetCappedImpl(tagAccumulatorState,
-                              valAccumulatorState,
-                              ownedNewElem,
-                              tagNewElem,
-                              valNewElem,
+    return addToSetCappedImpl(std::move(accumulatorState),
+                              std::move(newElem),
                               value::bitcastTo<int32_t>(valSizeCap),
-                              nullptr /*collator*/);
+                              nullptr /*collator*/)
+        .releaseToRaw();
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSet(ArityType arity) {
@@ -127,67 +119,51 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSet(Ari
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSetCapped(
     ArityType arity) {
-    auto [tagAccumulatorState, valAccumulatorState] = moveOwnedFromStack(0);
-    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
+    auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
 
     auto [_ownedCollator, tagCollator, valCollator] = getFromStack(1);
 
-    auto [ownedNewElem, tagNewElem, valNewElem] = moveFromStack(2);
-    value::ValueGuard guardNewElem{ownedNewElem, tagNewElem, valNewElem};
+    auto newElem = value::TagValueMaybeOwned::fromRaw(moveFromStack(2));
 
     auto [_ownedSizeCap, tagSizeCap, valSizeCap] = getFromStack(3);
 
     // Return the unmodified accumulator state when the collator or size cap is malformed.
     if (tagCollator != value::TypeTags::collator || tagSizeCap != value::TypeTags::NumberInt32) {
-        guardAccumulatorState.reset();
-        return {true, tagAccumulatorState, valAccumulatorState};
+        return accumulatorState.releaseToMaybeOwnedRaw();
     }
 
-    guardAccumulatorState.reset();
-    guardNewElem.reset();
-    return addToSetCappedImpl(tagAccumulatorState,
-                              valAccumulatorState,
-                              ownedNewElem,
-                              tagNewElem,
-                              valNewElem,
+    return addToSetCappedImpl(std::move(accumulatorState),
+                              std::move(newElem),
                               value::bitcastTo<int32_t>(valSizeCap),
-                              value::getCollatorView(valCollator));
+                              value::getCollatorView(valCollator))
+        .releaseToRaw();
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnionCapped(ArityType arity) {
-    auto [tagAccumulatorState, valAccumulatorState] = moveOwnedFromStack(0);
-    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
-
-    auto [tagNewSetMembers, valNewSetMembers] = moveOwnedFromStack(1);
-    value::ValueGuard guardNewSetMembers{tagNewSetMembers, valNewSetMembers};
+    auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    auto newSetMembers = value::TagValueOwned::fromRaw(moveOwnedFromStack(1));
 
     auto [_, tagSizeCap, valSizeCap] = getFromStack(2);
 
     // Return the unmodified accumulator state when the size cap is malformed.
     if (tagSizeCap != value::TypeTags::NumberInt32) {
-        guardAccumulatorState.reset();
-        return {true, tagAccumulatorState, valAccumulatorState};
+        return accumulatorState.releaseToMaybeOwnedRaw();
     }
 
-    guardAccumulatorState.reset();
-    guardNewSetMembers.reset();
-    return setUnionAccumImpl(tagAccumulatorState,
-                             valAccumulatorState,
-                             tagNewSetMembers,
-                             valNewSetMembers,
+    return setUnionAccumImpl(std::move(accumulatorState),
+                             std::move(newSetMembers),
                              value::bitcastTo<int32_t>(valSizeCap),
-                             nullptr /*collator*/);
+                             nullptr /*collator*/)
+        .releaseToRaw();
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetUnionCapped(
     ArityType arity) {
-    auto [tagAccumulatorState, valAccumulatorState] = moveOwnedFromStack(0);
-    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
+    auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
 
     auto [_ownedCollator, tagCollator, valCollator] = getFromStack(1);
 
-    auto [tagNewSetMembers, valNewSetMembers] = moveOwnedFromStack(2);
-    value::ValueGuard guardNewSetMembers{tagNewSetMembers, valNewSetMembers};
+    auto newSetMembers = value::TagValueOwned::fromRaw(moveOwnedFromStack(2));
 
     auto [_ownedSizeCap, tagSizeCap, valSizeCap] = getFromStack(3);
 
@@ -198,14 +174,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetUnionCapp
         return {arrOwned, arrTag, arrVal};
     }
 
-    guardAccumulatorState.reset();
-    guardNewSetMembers.reset();
-    return setUnionAccumImpl(tagAccumulatorState,
-                             valAccumulatorState,
-                             tagNewSetMembers,
-                             valNewSetMembers,
+    return setUnionAccumImpl(std::move(accumulatorState),
+                             std::move(newSetMembers),
                              value::bitcastTo<int32_t>(valSizeCap),
-                             value::getCollatorView(valCollator));
+                             value::getCollatorView(valCollator))
+        .releaseToRaw();
 }
 
 namespace {

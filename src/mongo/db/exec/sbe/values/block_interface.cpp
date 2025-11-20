@@ -543,14 +543,14 @@ template boost::optional<size_t> DateBlock::argMax();
 template boost::optional<size_t> DoubleBlock::argMax();
 template boost::optional<size_t> BoolBlock::argMax();
 
-std::pair<value::TypeTags, value::Value> ValueBlock::at(size_t idx) {
+value::TagValueView ValueBlock::at(size_t idx) {
     auto deblocked = extract();
     tassert(11089619, "Out of bounds read in ValueBlock", idx < deblocked.count());
     return deblocked[idx];
 }
 
 template <typename T, value::TypeTags TypeTag>
-std::pair<value::TypeTags, value::Value> HomogeneousBlock<T, TypeTag>::at(size_t idx) {
+value::TagValueView HomogeneousBlock<T, TypeTag>::at(size_t idx) {
     tassert(11089618, "Out of bounds read in HomogeneousBlock", idx < count());
     // Avoid extracting if possible.
     if (*tryDense()) {
@@ -559,11 +559,11 @@ std::pair<value::TypeTags, value::Value> HomogeneousBlock<T, TypeTag>::at(size_t
     return ValueBlock::at(idx);
 }
 
-template std::pair<value::TypeTags, value::Value> Int32Block::at(size_t idx);
-template std::pair<value::TypeTags, value::Value> Int64Block::at(size_t idx);
-template std::pair<value::TypeTags, value::Value> DateBlock::at(size_t idx);
-template std::pair<value::TypeTags, value::Value> DoubleBlock::at(size_t idx);
-template std::pair<value::TypeTags, value::Value> BoolBlock::at(size_t idx);
+template value::TagValueView Int32Block::at(size_t idx);
+template value::TagValueView Int64Block::at(size_t idx);
+template value::TagValueView DateBlock::at(size_t idx);
+template value::TagValueView DoubleBlock::at(size_t idx);
+template value::TagValueView BoolBlock::at(size_t idx);
 
 void HeterogeneousBlock::push_back(TypeTags t, Value v) {
     ValueGuard guard(t, v);

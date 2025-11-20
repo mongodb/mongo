@@ -322,7 +322,7 @@ TEST_F(HashLookupUnwindStageTest, ForceSpillTest) {
         std::vector<std::pair<value::TypeTags, value::Value>> results{};
         results.reserve(resultAccessors.size());
         for (size_t i = 0; i < resultAccessors.size(); ++i) {
-            flatValues.emplace_back(resultAccessors[i]->getCopyOfValue());
+            flatValues.emplace_back(resultAccessors[i]->getCopyOfValue().releaseToRaw());
             results.emplace_back(flatValues.back());
         }
         expectedResults.emplace_back(std::move(results));

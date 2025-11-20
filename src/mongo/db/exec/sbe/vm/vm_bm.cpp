@@ -86,10 +86,7 @@ public:
         for (auto keepRunning : state) {
             for (auto [inputTag, inputVal] : inputs) {
                 inputAccessor->reset(false, inputTag, inputVal);
-                auto [owned, tag, val] = vm.run(&code);
-                if (owned) {
-                    value::releaseValue(tag, val);
-                }
+                auto value = vm.run(&code);
             }
             benchmark::ClobberMemory();
         }

@@ -252,12 +252,12 @@ void GoldenSbeExprBuilderTestFixture::runTest(stage_builder::SbExpr sbExpr,
     sbe::CompileCtx _compileCtx(std::make_unique<sbe::RuntimeEnvironment>());
     sbe::vm::CodeFragment code = sbeEExpr->compileDirect(_env.ctx);
     sbe::vm::ByteCode vm;
-    auto [owned, resultsTag, resultsVal] = vm.run(&code);
-    sbe::value::ValueGuard resultGuard{owned, resultsTag, resultsVal};
+    auto results = vm.run(&code);
 
 
-    ASSERT_TRUE(PlanStageTestFixture::valueEquals(resultsTag, resultsVal, expectedTag, expectedVal))
+    ASSERT_TRUE(
+        PlanStageTestFixture::valueEquals(results.tag(), results.value(), expectedTag, expectedVal))
         << "for test: " << test << " expected: " << std::make_pair(expectedTag, expectedVal)
-        << " but got: " << std::make_pair(resultsTag, resultsVal);
+        << " but got: " << results.raw();
 }
 }  // namespace mongo

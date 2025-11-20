@@ -346,7 +346,8 @@ void addSbeValueToBSONBuilder(const SBEValue& sbeValue,
             value::Array* arr = value::getArrayView(sbeValue.getValue());
             size_t arrSize = arr->size();
             for (size_t i = 0; i < arrSize; i++) {
-                addSbeValueToBSONArrayBuilder(SBEValue(arr->getAt(i)), bsonArrayBuilder);
+                auto [tag, value] = arr->getAt(i);
+                addSbeValueToBSONArrayBuilder(SBEValue(copyValue(tag, value)), bsonArrayBuilder);
             }
             builder.appendArray(fieldName, bsonArrayBuilder.obj());
             break;

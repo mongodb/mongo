@@ -329,7 +329,7 @@ bool SbExpr::isLocalVarExpr() const {
     return false;
 }
 
-std::pair<sbe::value::TypeTags, sbe::value::Value> SbExpr::getConstantValue() const {
+sbe::value::TagValueView SbExpr::getConstantValue() const {
     tassert(8455801, "Expected SbExpr to be a constant expression", isConstantExpr());
 
     return getAbtInternal().cast<abt::Constant>()->get();

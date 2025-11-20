@@ -507,7 +507,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggDoubleDoubleSumFinal
                           << " elements but got: " << arr->size(),
             arr->size() >= AggSumValueElems::kMaxSizeOfArray - 1);
 
-    auto nonDecimalTotalTag = arr->getAt(AggSumValueElems::kNonDecimalTotalTag).first;
+    auto nonDecimalTotalTag = arr->getAt(AggSumValueElems::kNonDecimalTotalTag).tag;
     tassert(5755322,
             "The nonDecimalTag can't be NumberDecimal",
             nonDecimalTotalTag != value::TypeTags::NumberDecimal);

@@ -551,7 +551,7 @@ public:
     SbVar toVar() const;
     SbSlot toSlot() const;
     SbLocalVar toLocalVar() const;
-    std::pair<sbe::value::TypeTags, sbe::value::Value> getConstantValue() const;
+    sbe::value::TagValueView getConstantValue() const;
 
     /**
      * Lowers the contents of this SbExpr into SBE EExpression and returns it.

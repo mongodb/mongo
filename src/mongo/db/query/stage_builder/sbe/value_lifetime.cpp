@@ -39,8 +39,8 @@ void ValueLifetime::validate(abt::ABT& node) {
 ValueLifetime::ValueType ValueLifetime::operator()(abt::ABT& node, abt::Constant& value) {
     // Treat shallow types that don't require lifetime management as if they were
     // global values.
-    return sbe::value::isShallowType(value.get().first) ? ValueType::GlobalValue
-                                                        : ValueType::LocalValue;
+    return sbe::value::isShallowType(value.get().tag) ? ValueType::GlobalValue
+                                                      : ValueType::LocalValue;
 }
 
 ValueLifetime::ValueType ValueLifetime::operator()(abt::ABT& n, abt::Variable& var) {

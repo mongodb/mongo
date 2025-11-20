@@ -1441,13 +1441,13 @@ SbExpr SlotBasedStageBuilder::buildLimitSkipAmountExpression(
                                              false,
                                              &_slotIdGenerator);
     } else {
-        const auto& slotAmount = _env.runtimeEnv->getAccessor(*slot)->getViewOfValue();
+        auto slotAmount = _env.runtimeEnv->getAccessor(*slot)->getViewOfValue();
         tassert(8349204,
                 str::stream() << "Inconsistent value in limit or skip slot " << *slot
                               << ". Value in slot: " << sbe::value::print(slotAmount)
                               << ". Incoming value: " << amount,
-                slotAmount.first == sbe::value::TypeTags::NumberInt64 &&
-                    sbe::value::bitcastTo<long long>(slotAmount.second) == amount);
+                slotAmount.tag == sbe::value::TypeTags::NumberInt64 &&
+                    sbe::value::bitcastTo<long long>(slotAmount.value) == amount);
     }
 
     return SbSlot{*slot};

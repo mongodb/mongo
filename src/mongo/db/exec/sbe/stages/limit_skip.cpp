@@ -171,12 +171,11 @@ boost::optional<int64_t> LimitSkipStage::_runLimitOrSkipCode(const vm::CodeFragm
         return boost::none;
     }
 
-    auto [owned, tag, val] = _bytecode.run(code);
-    value::ValueGuard guard{owned, tag, val};
+    value::TagValueMaybeOwned res = _bytecode.run(code);
     tassert(8349200,
             "Expect limit or skip code to return an int64",
-            tag == value::TypeTags::NumberInt64);
-    return value::bitcastTo<int64_t>(val);
+            res.tag() == value::TypeTags::NumberInt64);
+    return value::bitcastTo<int64_t>(res.value());
 }
 
 }  // namespace mongo::sbe

@@ -180,8 +180,7 @@ void HashLookupStage::open(bool reOpen) {
     value::FixedSizeRow<1 /*N*/> value{1};
     while (innerChild()->getNext() == PlanState::ADVANCED) {
         // Copy the projected value.
-        auto [tag, val] = _inInnerProjectAccessor->getCopyOfValue();
-        value.reset(0, true, tag, val);
+        value.reset(0, _inInnerProjectAccessor->getCopyOfValue());
 
         // This where we put the value in here. This can grow need to spill.
         size_t bufferIndex = _hashTable.bufferValueOrSpill(value);
@@ -210,13 +209,12 @@ void HashLookupStage::open(bool reOpen) {
 template <typename Container>
 void HashLookupStage::accumulateFromValueIndices(const Container* bufferIndices) {
     for (const size_t bufferIdx : *bufferIndices) {
-        boost::optional<std::pair<value::TypeTags, value::Value>> innerMatch =
-            _hashTable.getValueAtIndex(bufferIdx);
-        _outInnerProjectAccessor.reset(false /* owned */, innerMatch->first, innerMatch->second);
+        boost::optional<value::TagValueView> innerMatch = _hashTable.getValueAtIndex(bufferIdx);
+        tassert(10801300, "Expected non-empty innerMatch", innerMatch);
+        _outInnerProjectAccessor.reset(*innerMatch);
 
         // Run the VM code to "accumulate" the current inner doc into the lookup output array.
-        auto [owned, tag, val] = _bytecode.run(_aggCode.get());
-        _lookupStageOutput.reset(0 /* column */, owned, tag, val);
+        _lookupStageOutput.reset(0 /* column */, _bytecode.run(_aggCode.get()));
     }
 }  // HashLookupStage::accumulateFromValueIndices
 

@@ -298,7 +298,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto accessor = readFromMemory<value::SlotAccessor*>(pcPointer);
                 pcPointer += sizeof(accessor);
 
-                auto [tag, val] = accessor->copyOrMoveValue();
+                auto [tag, val] = accessor->copyOrMoveValue().releaseToRaw();
                 pushStack(true, tag, val);
 
                 break;
@@ -1421,7 +1421,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
     }
 }  // ByteCode::runInternal
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::run(const CodeFragment* code) {
+value::TagValueMaybeOwned ByteCode::run(const CodeFragment* code) {
     try {
         uassert(6040900,
                 "The evaluation stack must be empty",
@@ -1437,7 +1437,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::run(const CodeFragment*
         // Transfer ownership of tag/val to the caller
         stackReset();
 
-        return readTuple(_argStack);
+        return value::TagValueMaybeOwned::fromRaw(readTuple(_argStack));
     } catch (...) {
         auto sentinel = _argStack - sizeOfElement;
         while (_argStackTop != sentinel) {
@@ -1448,15 +1448,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::run(const CodeFragment*
 }
 
 bool ByteCode::runPredicate(const CodeFragment* code) {
-    auto [owned, tag, val] = run(code);
+    value::TagValueMaybeOwned result = run(code);
 
-    bool pass = (tag == value::TypeTags::Boolean) && value::bitcastTo<bool>(val);
-
-    if (owned) {
-        value::releaseValue(tag, val);
-    }
-
-    return pass;
+    return (result.tag() == value::TypeTags::Boolean) && value::bitcastTo<bool>(result.value());
 }
 
 const char* Instruction::toStringConstants(Constants k) {

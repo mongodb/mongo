@@ -153,9 +153,7 @@ PlanState ExtractFieldPathsStage::getNext() {
 
     // Consume all outputs
     for (size_t i = 0; i < _recorders.size(); ++i) {
-        auto outputValue = _recorders[i].extractValue();
-        auto [owned, tag, value] = outputValue.releaseToRaw();
-        _outputAccessors[i].reset(owned, tag, value);
+        _outputAccessors[i].reset(_recorders[i].extractValue());
         // Ownership was transferred to the output accessor (if the value was owned).
     }
 

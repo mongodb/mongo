@@ -465,6 +465,119 @@ private:
 };
 
 /**
+ * A view of a tag & value, not owned here.
+ */
+struct TagValueView {
+    TypeTags tag;
+    Value value;
+
+    operator std::pair<TypeTags, Value>() {
+        return {tag, value};
+    }
+};
+
+inline TagValueView rawToView(std::pair<TypeTags, Value> tv) {
+    return TagValueView{tv.first, tv.second};
+}
+
+std::ostream& operator<<(std::ostream& os, TagValueView v);
+str::stream& operator<<(str::stream& str, TagValueView v);
+
+static_assert(std::is_trivially_copyable<TagValueView>::value, "Must be trivially copyable");
+static_assert(std::is_trivially_default_constructible<TagValueView>::value,
+              "Must be trivially default constructible");
+static_assert(std::is_trivially_constructible<TagValueView>::value,
+              "Must be trivially constructible");
+static_assert(sizeof(TagValueView) <= 16);
+
+/**
+ * A tag and value which are uniquely owned by this class. Supports moving and explicit copying.
+ */
+class TagValueOwned {
+public:
+    static TagValueOwned fromRaw(std::pair<TypeTags, Value> tv) {
+        auto [t, v] = tv;
+        return TagValueOwned(t, v);
+    }
+
+    static TagValueOwned fromRaw(TypeTags t, Value v) {
+        return TagValueOwned(t, v);
+    }
+
+    TagValueOwned() : _tag(TypeTags::Nothing), _value(0) {}
+
+    TagValueOwned(TypeTags tag, Value value) : _tag(tag), _value(value) {}
+
+    TagValueOwned(std::pair<TypeTags, Value> tv) : TagValueOwned(tv.first, tv.second) {}
+
+    TagValueOwned(TagValueOwned&& o) {
+        _tag = o._tag;
+        _value = o._value;
+        o.disown();
+    }
+
+    ~TagValueOwned() {
+        release();
+    }
+
+    TagValueOwned& operator=(TagValueOwned&& o) {
+        if (&o != this) {
+            release();
+            _tag = o._tag;
+            _value = o._value;
+            o.disown();
+        }
+        return *this;
+    }
+
+    TagValueOwned(const TagValueOwned&) = delete;
+
+    TagValueOwned& operator=(const TagValueOwned&) = delete;
+
+    std::pair<TypeTags, Value> raw() const {
+        return {_tag, _value};
+    }
+    TagValueView view() const {
+        return {_tag, _value};
+    }
+    TagValueOwned copy() const {
+        return TagValueOwned::fromRaw(copyValue(_tag, _value));
+    }
+
+    TypeTags tag() const {
+        return _tag;
+    }
+    Value value() const {
+        return _value;
+    }
+
+    std::pair<TypeTags, Value> releaseToRaw() {
+        std::pair<TypeTags, Value> ret{_tag, _value};
+        disown();
+        return ret;
+    }
+
+    FastTuple<bool, TypeTags, Value> releaseToMaybeOwnedRaw() {
+        FastTuple<bool, TypeTags, Value> ret{true, _tag, _value};
+        disown();
+        return ret;
+    }
+
+    void disown() {
+        _tag = TypeTags::Nothing;
+        _value = 0;
+    }
+
+private:
+    void release() {
+        releaseValue(_tag, _value);
+    }
+
+    TypeTags _tag;
+    Value _value;
+};
+
+/**
  * A value which behaves like a view or an owned value depending on 'owned' flag provided at
  * runtime.
  */
@@ -481,11 +594,20 @@ public:
 
     TagValueMaybeOwned() : _owned(false), _tag(TypeTags::Nothing), _value(0) {}
 
+    TagValueMaybeOwned(bool owned, TypeTags t, Value v) : _owned(owned), _tag(t), _value(v) {}
+
     TagValueMaybeOwned(TagValueMaybeOwned&& o) {
         _tag = o._tag;
         _value = o._value;
         _owned = o._owned;
         o.disownAndClear();
+    }
+
+    TagValueMaybeOwned(TagValueOwned&& o) {
+        _tag = o.tag();
+        _value = o.value();
+        _owned = true;
+        o.disown();
     }
 
     ~TagValueMaybeOwned() {
@@ -517,11 +639,32 @@ public:
         return ret;
     }
 
+    std::pair<TypeTags, Value> releaseToOwnedRaw() {
+        makeOwned();
+        std::pair<TypeTags, Value> ret{_tag, _value};
+        disownAndClear();
+        return ret;
+    }
+
     TypeTags tag() const {
         return _tag;
     }
     Value value() const {
         return _value;
+    }
+    bool owned() const {
+        return _owned;
+    }
+
+    TagValueOwned getOwnedCopy() const {
+        return TagValueOwned::fromRaw(value::copyValue(_tag, _value));
+    }
+
+    TagValueOwned moveToOwned() {
+        makeOwned();
+        TagValueOwned ret = TagValueOwned::fromRaw(_tag, _value);
+        disownAndClear();
+        return ret;
     }
 
     /**
@@ -545,8 +688,6 @@ public:
     }
 
 private:
-    TagValueMaybeOwned(bool owned, TypeTags t, Value v) : _owned(owned), _tag(t), _value(v) {}
-
     void release() {
         if (_owned) {
             releaseValue(_tag, _value);
@@ -1025,7 +1166,7 @@ public:
         }
     }
 
-    std::pair<TypeTags, Value> getField(StringData field) {
+    TagValueView getField(StringData field) {
         for (size_t idx = 0; idx < _typeTags.size(); ++idx) {
             if (_names[idx] == field) {
                 return {_typeTags[idx], _values[idx]};
@@ -1046,7 +1187,7 @@ public:
         return _names[idx];
     }
 
-    std::pair<TypeTags, Value> getAt(std::size_t idx) const {
+    TagValueView getAt(std::size_t idx) const {
         if (idx >= _values.size()) {
             return {TypeTags::Nothing, 0};
         }
@@ -1117,6 +1258,11 @@ public:
         MONGO_COMPILER_DIAGNOSTIC_POP
     }
 
+    void push_back(TagValueOwned value) {
+        auto [tag, val] = value.releaseToRaw();
+        push_back(tag, val);
+    }
+
     void pop_back() {
         if (_vals.size() > 0) {
             releaseValue(_vals.back().first, _vals.back().second);
@@ -1128,15 +1274,15 @@ public:
         return _vals.size();
     }
 
-    std::pair<TypeTags, Value> getAt(std::size_t idx) const {
+    TagValueView getAt(std::size_t idx) const {
         if (idx >= _vals.size()) {
             return {TypeTags::Nothing, 0};
         }
 
-        return _vals[idx];
+        return {_vals[idx].first, _vals[idx].second};
     }
 
-    std::pair<TypeTags, Value> swapAt(std::size_t idx, TypeTags tag, Value val) {
+    TagValueOwned swapAt(std::size_t idx, TypeTags tag, Value val) {
         if (idx >= _vals.size() || tag == TypeTags::Nothing) {
             return {TypeTags::Nothing, 0};
         }
@@ -1145,6 +1291,11 @@ public:
         _vals[idx].first = tag;
         _vals[idx].second = val;
         return ret;
+    }
+
+    TagValueOwned swapAt(std::size_t idx, TagValueOwned value) {
+        auto [tag, val] = value.releaseToRaw();
+        return swapAt(idx, tag, val);
     }
 
     auto& values() const noexcept {
@@ -1164,6 +1315,11 @@ public:
             releaseValue(_vals[idx].first, _vals[idx].second);
             _vals[idx] = {tag, val};
         }
+    }
+
+    void setAt(std::size_t idx, TagValueOwned value) {
+        auto [tag, val] = value.releaseToRaw();
+        setAt(idx, tag, val);
     }
 
     void reserve(size_t s) {
@@ -2271,7 +2427,7 @@ public:
             MONGO_UNREACHABLE_TASSERT(11122924);
         }
     }
-    std::pair<TypeTags, Value> getViewOfValue() const;
+    TagValueView getViewOfValue() const;
     StringData getFieldName() const;
 
     bool atEnd() const {
@@ -2345,7 +2501,7 @@ public:
         }
     }
 
-    std::pair<TypeTags, Value> getViewOfValue() const;
+    TagValueView getViewOfValue() const;
 
     bool atEnd() const {
         if (_array) {

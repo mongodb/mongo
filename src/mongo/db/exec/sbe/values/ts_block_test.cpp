@@ -564,13 +564,13 @@ TEST_F(TsSbeValueTest, TsBlockFillEmpty) {
         ASSERT(fillRes);
         auto extracted = fillRes->extract();
         ASSERT_EQ(extracted.count(), 3);
-        assertValuesEqual(extracted[0].first,
-                          extracted[0].second,
+        assertValuesEqual(extracted[0].tag,
+                          extracted[0].value,
                           value::TypeTags::NumberDouble,
                           value::bitcastFrom<double>(0));
-        assertValuesEqual(extracted[1].first, extracted[1].second, value::TypeTags::Null, 0);
-        assertValuesEqual(extracted[2].first,
-                          extracted[2].second,
+        assertValuesEqual(extracted[1].tag, extracted[1].value, value::TypeTags::Null, 0);
+        assertValuesEqual(extracted[2].tag,
+                          extracted[2].value,
                           value::TypeTags::NumberDouble,
                           value::bitcastFrom<double>(9));
     }
@@ -729,8 +729,8 @@ TEST_F(TsSbeValueTest, TsBlockMiscTest) {
         ASSERT_EQ(arrBlock->tryDense(), boost::optional<bool>(false));
         ASSERT(!arrBlock->hasNoObjsOrArrays());
         // We do not use control min/max when they are arrays.
-        ASSERT_EQ(arrBlock->tryLowerBound().first, value::TypeTags::Nothing);
-        ASSERT_EQ(arrBlock->tryMax().first, value::TypeTags::Nothing);
+        ASSERT_EQ(arrBlock->tryLowerBound().tag, value::TypeTags::Nothing);
+        ASSERT_EQ(arrBlock->tryMax().tag, value::TypeTags::Nothing);
     }
 }
 

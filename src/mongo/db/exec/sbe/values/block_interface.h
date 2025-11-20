@@ -60,7 +60,7 @@ public:
         tassert(7949501, "Values must exist", count > 0 || (tags == nullptr && vals == nullptr));
     }
 
-    std::pair<TypeTags, Value> operator[](size_t idx) const {
+    value::TagValueView operator[](size_t idx) const {
         return {_tags[idx], _vals[idx]};
     }
 
@@ -233,7 +233,7 @@ struct ValueBlock {
      * Returns an upper bound for the values in this block. This may be the maximum value, but
      * it's not necessarily.
      */
-    virtual std::pair<TypeTags, Value> tryLowerBound() const {
+    virtual TagValueView tryLowerBound() const {
         return tryMin();
     }
 
@@ -241,7 +241,7 @@ struct ValueBlock {
      * Returns an upper bound for the values in this block. This may be the maximum value, but
      * it's not necessarily.
      */
-    virtual std::pair<TypeTags, Value> tryUpperBound() const {
+    virtual TagValueView tryUpperBound() const {
         return tryMax();
     }
 
@@ -253,15 +253,15 @@ struct ValueBlock {
     /**
      * Returns the minimum value in the block in O(1) time, otherwise returns Nothing value.
      */
-    virtual std::pair<TypeTags, Value> tryMin() const {
-        return std::pair(TypeTags::Nothing, Value{0u});
+    virtual TagValueView tryMin() const {
+        return {TypeTags::Nothing, Value{0u}};
     }
 
     /**
      * Returns the maximum value in the block in O(1) time, otherwise returns Nothing value.
      */
-    virtual std::pair<TypeTags, Value> tryMax() const {
-        return std::pair(TypeTags::Nothing, Value{0u});
+    virtual TagValueView tryMax() const {
+        return {TypeTags::Nothing, Value{0u}};
     }
 
     /**
@@ -342,7 +342,7 @@ struct ValueBlock {
 
     // This function should never be used in loops or otherwise used repeatedly and should only be
     // used when you *really* need to only access a single value.
-    virtual std::pair<value::TypeTags, value::Value> at(size_t idx);
+    virtual TagValueView at(size_t idx);
 
     /*
      * Returns whether the block has any element of the given type, if it can be determined in
@@ -417,12 +417,12 @@ public:
         return _count;
     }
 
-    std::pair<TypeTags, Value> tryMin() const override {
-        return std::pair(_tag, _val);
+    value::TagValueView tryMin() const override {
+        return {_tag, _val};
     }
 
-    std::pair<TypeTags, Value> tryMax() const override {
-        return std::pair(_tag, _val);
+    value::TagValueView tryMax() const override {
+        return {_tag, _val};
     }
 
     boost::optional<bool> tryDense() const override {
@@ -475,7 +475,7 @@ public:
         return value::bitcastTo<bool>(_val);
     }
 
-    std::pair<value::TypeTags, value::Value> at(size_t idx) override {
+    value::TagValueView at(size_t idx) override {
         tassert(11089617, "Out of bounds read in MonoBlock", idx < _count);
         return {_tag, _val};
     }
@@ -539,6 +539,11 @@ public:
 
     void push_back(std::pair<TypeTags, Value> tv) {
         push_back(tv.first, tv.second);
+    }
+
+    void push_back(value::TagValueOwned tv) {
+        auto [tag, val] = tv.releaseToRaw();
+        push_back(tag, val);
     }
 
     size_t count() override {
@@ -768,7 +773,7 @@ public:
     boost::optional<size_t> argMin() override;
     boost::optional<size_t> argMax() override;
 
-    std::pair<value::TypeTags, value::Value> at(size_t idx) override;
+    value::TagValueView at(size_t idx) override;
 
     const std::vector<Value>& getVector() const {
         return _vals;

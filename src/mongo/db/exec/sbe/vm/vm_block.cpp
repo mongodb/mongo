@@ -334,7 +334,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockMinMaxImpl(
     value::Value accVal = 0;
     for (size_t i = 0; i < block.count(); ++i) {
         // Skip unselected and Nothing values.
-        if (!value::bitcastTo<bool>(bitset[i].second) ||
+        if (!value::bitcastTo<bool>(bitset[i].value) ||
             block.tags()[i] == value::TypeTags::Nothing) {
             continue;
         }
@@ -495,7 +495,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggCou
 
     int64_t count = 0;
     for (size_t i = 0; i < bitset.count(); ++i) {
-        if (value::bitcastTo<bool>(bitset[i].second)) {
+        if (value::bitcastTo<bool>(bitset[i].value)) {
             ++count;
         }
     }
@@ -540,7 +540,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggSum
     value::TypeTags blockResTag = value::TypeTags::Nothing;
     value::Value blockResVal = 0;
     for (size_t i = 0; i < bitset.count(); ++i) {
-        if (value::bitcastTo<bool>(bitset[i].second) && value::isNumber(block.tags()[i])) {
+        if (value::bitcastTo<bool>(bitset[i].value) && value::isNumber(block.tags()[i])) {
             // If 'blockRes' is Nothing, set 'blockRes' equal to 'block[i]'. Otherwise, compute the
             // sum of 'blockRes' and 'block[i]' and store the result back into 'blockRes'.
             if (blockResTag == value::TypeTags::Nothing) {
@@ -624,7 +624,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggDou
         8695110, "Expected block and bitset to be the same size", block.count() == bitset.count());
 
     for (size_t i = 0; i < block.count(); ++i) {
-        if (value::bitcastTo<bool>(bitset[i].second)) {
+        if (value::bitcastTo<bool>(bitset[i].value)) {
             aggDoubleDoubleSumImpl(accumulator, block.tags()[i], block.vals()[i]);
         }
     }
@@ -688,10 +688,9 @@ size_t homogeneousTopBottomHelper(bool isAscending,
     return bestIdx;
 }
 
-int memAdded(std::pair<value::TypeTags, value::Value> key,
-             std::pair<value::TypeTags, value::Value> output) {
-    return value::getApproximateSize(key.first, key.second) +
-        value::getApproximateSize(output.first, output.second);
+int memAdded(value::TagValueView key, value::TagValueView output) {
+    return value::getApproximateSize(key.tag, key.value) +
+        value::getApproximateSize(output.tag, output.value);
 }
 
 template <typename Comp>
@@ -701,7 +700,7 @@ int addNewPair(value::Array* mergeArr,
                value::TypeTags outTag,
                value::Value outVal,
                const PairKeyComp<Comp>& keyLess) {
-    int memDelta = memAdded(std::pair{keyTag, keyVal}, std::pair{outTag, outVal});
+    int memDelta = memAdded({keyTag, keyVal}, {outTag, outVal});
 
     auto [pairArrTag, pairArrVal] = value::makeNewArray();
     value::ValueGuard pairArrGuard{pairArrTag, pairArrVal};
@@ -737,7 +736,7 @@ int updateWorstPair(value::Array* mergeArr,
     std::pop_heap(mergeHeap.begin(), mergeHeap.end(), keyLess);
 
     int memDelta = -memAdded(worst->getAt(0), worst->getAt(1)) +
-        memAdded(std::pair{newKeyTag, newKeyVal}, std::pair{newOutTag, newOutVal});
+        memAdded({newKeyTag, newKeyVal}, {newOutTag, newOutVal});
 
     // Update the sort key. It is owned by the input sort key block so we will need to make a copy.
     auto [newKeyCpyTag, newKeyCpyVal] = value::copyValue(newKeyTag, newKeyVal);
@@ -757,8 +756,7 @@ int updateWorstPair(value::Array* mergeArr,
     return memDelta;
 }
 
-std::pair<value::Array*, std::pair<value::TypeTags, value::Value>> getWorst(
-    value::Array* mergeArr) {
+std::pair<value::Array*, value::TagValueView> getWorst(value::Array* mergeArr) {
     auto [worstTag, worstVal] = mergeArr->getAt(0);
     auto worstArr = value::getArrayView(worstVal);
     return {worstArr, worstArr->getAt(0)};
@@ -772,26 +770,27 @@ bool tryFullMergeArrFastPath(TopBottomSense sense,
                              value::ValueBlock* sortKeyBlock,
                              const Less& less) {
     if (mergeArr->size() == maxSize) {
-        value::TypeTags bestTag{value::TypeTags::Nothing};
-        value::Value bestVal{0u};
+
+        value::TagValueView bestVal{value::TypeTags::Nothing, 0u};
         // topN with descending sort and bottomN with ascending sort return the same values for
         // scalar keys. This is not true for array keys, but we also check that bestTag is not an
         // array or object before using this fast path. The "best" possible key in the block cannot
         // be better than the upper bound.
         if ((sense == TopBottomSense::kTop && !isAscending) ||
             (sense == TopBottomSense::kBottom && isAscending)) {
-            std::tie(bestTag, bestVal) = sortKeyBlock->tryUpperBound();
+            bestVal = sortKeyBlock->tryUpperBound();
         }
         // topN with ascending sort and bottomN with descending sort return the same values subject
         // to the same constraints described above. The "best" possible key in the block cannot be
         // better than the lower bound.
         else {
-            std::tie(bestTag, bestVal) = sortKeyBlock->tryLowerBound();
+            bestVal = sortKeyBlock->tryLowerBound();
         }
-        if (bestTag != value::TypeTags::Nothing && !isArray(bestTag) && !isObject(bestTag)) {
+        if (bestVal.tag != value::TypeTags::Nothing && !isArray(bestVal.tag) &&
+            !isObject(bestVal.tag)) {
             auto [_, worstKey] = getWorst(mergeArr);
 
-            if (!less(std::pair{bestTag, bestVal}, worstKey)) {
+            if (!less(bestVal, worstKey)) {
                 // Nothing in this block can beat the worst element in the accumulated heap, so
                 // return the input state unmodified.
                 return true;
@@ -849,7 +848,7 @@ bool tryArgMinMaxFastPath(TopBottomSense sense,
 
                     auto [worstArr, worstKey] = getWorst(mergeArr);
 
-                    if (less(std::pair{bestTag, bestVal}, worstKey)) {
+                    if (less({bestTag, bestVal}, worstKey)) {
                         auto [bestOutTag, bestOutVal] = valBlock->at(*bestIdx);
 
                         int memDelta = updateWorstPair(
@@ -928,7 +927,7 @@ void combineBlockNativeAggTopBottomN(const ByteCode::MultiAccState& stateTuple,
 
             auto [worstArr, worstKey] = getWorst(mergeArr);
 
-            if (less(std::pair{newSortKeyTag, newSortKeyVal}, worstKey)) {
+            if (less({newSortKeyTag, newSortKeyVal}, worstKey)) {
                 // Extract if we haven't done so yet.
                 if (!deblocked) {
                     deblocked = valBlock->extract();
@@ -1175,15 +1174,15 @@ public:
 
     ~TopBottomArgsFromBlocks() final = default;
 
-    bool keySortsBeforeImpl(std::pair<value::TypeTags, value::Value> item) final {
-        tassert(8448705, "Expected item to be an Array", item.first == value::TypeTags::Array);
+    bool keySortsBeforeImpl(value::TagValueView item) final {
+        tassert(8448705, "Expected item to be an Array", item.tag == value::TypeTags::Array);
 
         const SortPattern& sortPattern = _sortSpec->getSortPattern();
         tassert(8448706,
                 "Expected numKeys to be equal to number of sort pattern parts",
                 sortPattern.size() == _keys.size());
 
-        auto itemArray = value::getArrayView(item.second);
+        auto itemArray = value::getArrayView(item.value);
         tassert(8448707,
                 "Expected size of item array to be equal to number of sort pattern parts",
                 sortPattern.size() == itemArray->size());
@@ -1213,10 +1212,9 @@ public:
         return false;
     }
 
-    std::pair<value::TypeTags, value::Value> getOwnedKeyImpl() final {
-        auto [keysArrTag, keysArrVal] = value::makeNewArray();
-        value::ValueGuard keysArrGuard{keysArrTag, keysArrVal};
-        auto keysArr = value::getArrayView(keysArrVal);
+    value::TagValueOwned getOwnedKeyImpl() final {
+        auto keys = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto keysArr = value::getArrayView(keys.value());
 
         for (size_t i = 0; i < _keys.size(); ++i) {
             auto [keyTag, keyVal] = _keys[i][_blockIndex];
@@ -1224,14 +1222,12 @@ public:
             keysArr->push_back(keyTag, keyVal);
         }
 
-        keysArrGuard.reset();
-        return std::pair{keysArrTag, keysArrVal};
+        return keys;
     }
 
-    std::pair<value::TypeTags, value::Value> getOwnedValueImpl() final {
-        auto [valuesArrTag, valuesArrVal] = value::makeNewArray();
-        value::ValueGuard valuesArrGuard{valuesArrTag, valuesArrVal};
-        auto valuesArr = value::getArrayView(valuesArrVal);
+    value::TagValueOwned getOwnedValueImpl() final {
+        auto values = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto valuesArr = value::getArrayView(values.value());
 
         for (size_t i = 0; i < _values.size(); ++i) {
             auto [valueTag, valueVal] = _values[i][_blockIndex];
@@ -1239,8 +1235,7 @@ public:
             valuesArr->push_back(valueTag, valueVal);
         }
 
-        valuesArrGuard.reset();
-        return std::pair{valuesArrTag, valuesArrVal};
+        return values;
     }
 
     void initForBlockIndex(size_t blockIdx) {
@@ -1344,7 +1339,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggTop
         Sense, ss, keyIsDecomposed, ValueIsDecomposedArray, std::move(keys), std::move(values)};
 
     for (size_t blockIndex = 0; blockIndex < bitset.count(); ++blockIndex) {
-        if (value::bitcastTo<bool>(bitset[blockIndex].second)) {
+        if (value::bitcastTo<bool>(bitset[blockIndex].value)) {
             topBottomArgs.initForBlockIndex(blockIndex);
 
             if constexpr (Sense == TopBottomSense::kTop) {
@@ -1399,22 +1394,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockBlockArithm
         }
         if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
             auto [_, resTag, resVal] = genericAdd(
-                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
             auto [_, resTag, resVal] = genericSub(
-                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
             auto [_, resTag, resVal] = genericMul(
-                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
             auto [_, resTag, resVal] = genericDiv(
-                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         }
@@ -1439,22 +1434,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockBlockArithm
     for (size_t i = 0; i < valsNum; ++i) {
         if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
             auto [_, resTag, resVal] = genericAdd(
-                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
             auto [_, resTag, resVal] = genericSub(
-                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
             auto [_, resTag, resVal] = genericMul(
-                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
             auto [_, resTag, resVal] = genericDiv(
-                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+                leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         }
@@ -1471,7 +1466,7 @@ template <int op>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarBlockArithmeticOperation(
     const value::TypeTags* bitsetTags,
     const value::Value* bitsetVals,
-    std::pair<value::TypeTags, value::Value> scalar,
+    value::TagValueView scalar,
     value::ValueBlock* block,
     size_t valsNum) {
     auto extractedValues = block->extract();
@@ -1485,22 +1480,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarBlockArith
         }
         if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
             auto [_, resTag, resVal] = genericAdd(
-                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
             auto [_, resTag, resVal] = genericSub(
-                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
             auto [_, resTag, resVal] = genericMul(
-                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
             auto [_, resTag, resVal] = genericDiv(
-                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         }
@@ -1515,7 +1510,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarBlockArith
 
 template <int op>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarBlockArithmeticOperation(
-    std::pair<value::TypeTags, value::Value> scalar, value::ValueBlock* block, size_t valsNum) {
+    value::TagValueView scalar, value::ValueBlock* block, size_t valsNum) {
     auto extractedValues = block->extract();
 
     std::vector<value::TypeTags> tagsOut(valsNum, value::TypeTags::Nothing);
@@ -1524,22 +1519,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarBlockArith
     for (size_t i = 0; i < valsNum; ++i) {
         if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
             auto [_, resTag, resVal] = genericAdd(
-                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
             auto [_, resTag, resVal] = genericSub(
-                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
             auto [_, resTag, resVal] = genericMul(
-                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
             auto [_, resTag, resVal] = genericDiv(
-                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+                scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         }
@@ -1557,7 +1552,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockScalarArith
     const value::TypeTags* bitsetTags,
     const value::Value* bitsetVals,
     value::ValueBlock* block,
-    std::pair<value::TypeTags, value::Value> scalar,
+    value::TagValueView scalar,
     size_t valsNum) {
     auto extractedValues = block->extract();
 
@@ -1570,22 +1565,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockScalarArith
         }
         if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
             auto [_, resTag, resVal] = genericAdd(
-                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
             auto [_, resTag, resVal] = genericSub(
-                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
             auto [_, resTag, resVal] = genericMul(
-                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
             auto [_, resTag, resVal] = genericDiv(
-                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         }
@@ -1600,7 +1595,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockScalarArith
 
 template <int op>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockScalarArithmeticOperation(
-    value::ValueBlock* block, std::pair<value::TypeTags, value::Value> scalar, size_t valsNum) {
+    value::ValueBlock* block, value::TagValueView scalar, size_t valsNum) {
     auto extractedValues = block->extract();
 
     std::vector<value::TypeTags> tagsOut(valsNum, value::TypeTags::Nothing);
@@ -1609,22 +1604,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockScalarArith
     for (size_t i = 0; i < valsNum; ++i) {
         if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
             auto [_, resTag, resVal] = genericAdd(
-                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
             auto [_, resTag, resVal] = genericSub(
-                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
             auto [_, resTag, resVal] = genericMul(
-                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
             auto [_, resTag, resVal] = genericDiv(
-                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+                extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         }
@@ -1639,33 +1634,31 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockScalarArith
 
 template <int op>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarScalarArithmeticOperation(
-    std::pair<value::TypeTags, value::Value> leftInputScalar,
-    std::pair<value::TypeTags, value::Value> rightInputScalar,
-    size_t valsNum) {
+    value::TagValueView leftInputScalar, value::TagValueView rightInputScalar, size_t valsNum) {
     std::unique_ptr<value::MonoBlock> resBlock;
     if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
-        auto [_, resultTag, resultValue] = genericAdd(leftInputScalar.first,
-                                                      leftInputScalar.second,
-                                                      rightInputScalar.first,
-                                                      rightInputScalar.second);
+        auto [_, resultTag, resultValue] = genericAdd(leftInputScalar.tag,
+                                                      leftInputScalar.value,
+                                                      rightInputScalar.tag,
+                                                      rightInputScalar.value);
         resBlock = std::make_unique<value::MonoBlock>(valsNum, resultTag, resultValue);
     } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
-        auto [_, resultTag, resultValue] = genericSub(leftInputScalar.first,
-                                                      leftInputScalar.second,
-                                                      rightInputScalar.first,
-                                                      rightInputScalar.second);
+        auto [_, resultTag, resultValue] = genericSub(leftInputScalar.tag,
+                                                      leftInputScalar.value,
+                                                      rightInputScalar.tag,
+                                                      rightInputScalar.value);
         resBlock = std::make_unique<value::MonoBlock>(valsNum, resultTag, resultValue);
     } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
-        auto [_, resultTag, resultValue] = genericMul(leftInputScalar.first,
-                                                      leftInputScalar.second,
-                                                      rightInputScalar.first,
-                                                      rightInputScalar.second);
+        auto [_, resultTag, resultValue] = genericMul(leftInputScalar.tag,
+                                                      leftInputScalar.value,
+                                                      rightInputScalar.tag,
+                                                      rightInputScalar.value);
         resBlock = std::make_unique<value::MonoBlock>(valsNum, resultTag, resultValue);
     } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
-        auto [_, resultTag, resultValue] = genericDiv(leftInputScalar.first,
-                                                      leftInputScalar.second,
-                                                      rightInputScalar.first,
-                                                      rightInputScalar.second);
+        auto [_, resultTag, resultValue] = genericDiv(leftInputScalar.tag,
+                                                      leftInputScalar.value,
+                                                      rightInputScalar.tag,
+                                                      rightInputScalar.value);
         resBlock = std::make_unique<value::MonoBlock>(valsNum, resultTag, resultValue);
     } else {
         resBlock = std::make_unique<value::MonoBlock>(valsNum, value::TypeTags::Nothing, 0);
@@ -1746,31 +1739,23 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockArithm
                 return builtinScalarBlockArithmeticOperation<op>(
                     bitsetTags,
                     bitsetVals,
-                    std::pair<value::TypeTags, value::Value>{leftMonoBlock->getTag(),
-                                                             leftMonoBlock->getValue()},
+                    {leftMonoBlock->getTag(), leftMonoBlock->getValue()},
                     rightInputBlock,
                     valsNum);
             }
             return builtinScalarBlockArithmeticOperation<op>(
-                std::pair<value::TypeTags, value::Value>{leftMonoBlock->getTag(),
-                                                         leftMonoBlock->getValue()},
-                rightInputBlock,
-                valsNum);
+                {leftMonoBlock->getTag(), leftMonoBlock->getValue()}, rightInputBlock, valsNum);
         } else if (!leftMonoBlock && rightMonoBlock) {
             if (bitsetVals) {
                 return builtinBlockScalarArithmeticOperation<op>(
                     bitsetTags,
                     bitsetVals,
                     leftInputBlock,
-                    std::pair<value::TypeTags, value::Value>{rightMonoBlock->getTag(),
-                                                             rightMonoBlock->getValue()},
+                    {rightMonoBlock->getTag(), rightMonoBlock->getValue()},
                     valsNum);
             }
             return builtinBlockScalarArithmeticOperation<op>(
-                leftInputBlock,
-                std::pair<value::TypeTags, value::Value>{rightMonoBlock->getTag(),
-                                                         rightMonoBlock->getValue()},
-                valsNum);
+                leftInputBlock, {rightMonoBlock->getTag(), rightMonoBlock->getValue()}, valsNum);
         } else {
             if (bitsetVals) {
                 return builtinBlockBlockArithmeticOperation<op>(
@@ -1778,10 +1763,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockArithm
             }
 
             return builtinScalarScalarArithmeticOperation<op>(
-                std::pair<value::TypeTags, value::Value>{leftMonoBlock->getTag(),
-                                                         leftMonoBlock->getValue()},
-                std::pair<value::TypeTags, value::Value>{rightMonoBlock->getTag(),
-                                                         rightMonoBlock->getValue()},
+                {leftMonoBlock->getTag(), leftMonoBlock->getValue()},
+                {rightMonoBlock->getTag(), rightMonoBlock->getValue()},
                 valsNum);
         }
     } else if (lTag != value::TypeTags::valueBlock && rTag == value::TypeTags::valueBlock) {
@@ -1801,21 +1784,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockArithm
 
         if (bitsetVals) {
             return builtinScalarBlockArithmeticOperation<op>(
-                bitsetTags,
-                bitsetVals,
-                std::pair<value::TypeTags, value::Value>{lTag, lVal},
-                rightInputBlock,
-                valsNum);
+                bitsetTags, bitsetVals, {lTag, lVal}, rightInputBlock, valsNum);
         } else if (rightMonoBlock) {
             return builtinScalarScalarArithmeticOperation<op>(
-                std::pair<value::TypeTags, value::Value>{lTag, lVal},
-                std::pair<value::TypeTags, value::Value>{rightMonoBlock->getTag(),
-                                                         rightMonoBlock->getValue()},
-                valsNum);
+                {lTag, lVal}, {rightMonoBlock->getTag(), rightMonoBlock->getValue()}, valsNum);
 
         } else {
             return builtinScalarBlockArithmeticOperation<op>(
-                std::pair<value::TypeTags, value::Value>{lTag, lVal}, rightInputBlock, valsNum);
+                {lTag, lVal}, rightInputBlock, valsNum);
         }
 
     } else if (lTag == value::TypeTags::valueBlock && rTag != value::TypeTags::valueBlock) {
@@ -1835,20 +1811,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockArithm
 
         if (bitsetVals) {
             return builtinBlockScalarArithmeticOperation<op>(
-                bitsetTags,
-                bitsetVals,
-                leftInputBlock,
-                std::pair<value::TypeTags, value::Value>{rTag, rVal},
-                valsNum);
+                bitsetTags, bitsetVals, leftInputBlock, {rTag, rVal}, valsNum);
         } else if (leftMonoBlock) {
             return builtinScalarScalarArithmeticOperation<op>(
-                std::pair<value::TypeTags, value::Value>{leftMonoBlock->getTag(),
-                                                         leftMonoBlock->getValue()},
-                std::pair<value::TypeTags, value::Value>{rTag, rVal},
-                valsNum);
+                {leftMonoBlock->getTag(), leftMonoBlock->getValue()}, {rTag, rVal}, valsNum);
         } else {
-            return builtinBlockScalarArithmeticOperation<op>(
-                leftInputBlock, std::pair<value::TypeTags, value::Value>{rTag, rVal}, valsNum);
+            return builtinBlockScalarArithmeticOperation<op>(leftInputBlock, {rTag, rVal}, valsNum);
         }
 
     } else {
@@ -2458,8 +2426,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
                 tassert(8604101, "Corrupt position info", valIdx < valsExtracted.count());
 
                 const bool valForElement =
-                    valsExtracted[valIdx].first == sbe::value::TypeTags::Boolean &&
-                    value::bitcastTo<bool>(valsExtracted[valIdx].second);
+                    valsExtracted[valIdx].tag == sbe::value::TypeTags::Boolean &&
+                    value::bitcastTo<bool>(valsExtracted[valIdx].value);
                 ++valIdx;
 
                 foldedResultForRow = foldedResultForRow || valForElement;

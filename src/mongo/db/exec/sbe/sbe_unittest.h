@@ -84,6 +84,7 @@ private:
 class ValueEq : public mongo::unittest::match::Matcher {
 public:
     explicit ValueEq(TypedValue v) : _v{v} {}
+    explicit ValueEq(value::TagValueView v) : _v{v.tag, v.value} {}
 
     std::string describe() const {
         std::stringstream ss;
@@ -91,10 +92,14 @@ public:
         return ss.str();
     }
 
-    MatchResult match(const TypedValue& x) const {
+    MatchResult match(const TypedValue x) const {
         auto [tag, val] = sbe::value::compareValue(_v.first, _v.second, x.first, x.second);
         return MatchResult{tag == sbe::value::TypeTags::NumberInt32 &&
                            sbe::value::bitcastTo<int>(val) == 0};
+    }
+
+    MatchResult match(const value::TagValueView x) const {
+        return match(std::make_pair(x.tag, x.value));
     }
 
 private:

@@ -2550,7 +2550,7 @@ public:
             bsonElt = sbe::bson::advance(bsonElt, fieldName.size());
         }
 
-        return _aggAccessor.copyOrMoveValue();
+        return _aggAccessor.copyOrMoveValue().releaseToRaw();
     }
 
     /**
@@ -3138,8 +3138,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsDoubleDoubleSumLar
 
     // Feed the result back into the input accessor. We finalize the resulting aggregate in order
     // to make sure that the resulting sum is mathematically correct.
-    auto [resTag, resVal] = _aggAccessor.copyOrMoveValue();
-    _inputAccessor.reset(true, resTag, resVal);
+    _inputAccessor.reset(_aggAccessor.copyOrMoveValue());
     auto finalizeExpr =
         sbe::makeFunction("doubleDoubleSumFinalize", sbe::makeVariable(_inputSlotId.getId()));
     auto finalizeCode = compileExpression(*finalizeExpr);
@@ -3197,8 +3196,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevPop) {
     aggregateAndAssertResults(inputTag, inputVal, expectedTag, expectedVal, compiledExpr.get());
 
     // Feed the result back into the input accessor.
-    auto [resTag, resVal] = _aggAccessor.copyOrMoveValue();
-    _inputAccessor.reset(true, resTag, resVal);
+    _inputAccessor.reset(_aggAccessor.copyOrMoveValue());
     auto finalizeExpr =
         sbe::makeFunction("stdDevPopFinalize", sbe::makeVariable(_inputSlotId.getId()));
     auto finalizeCode = compileExpression(*finalizeExpr);
@@ -3223,8 +3221,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevSamp) {
     aggregateAndAssertResults(inputTag, inputVal, expectedTag, expectedVal, compiledExpr.get());
 
     // Feed the result back into the input accessor.
-    auto [resTag, resVal] = _aggAccessor.copyOrMoveValue();
-    _inputAccessor.reset(true, resTag, resVal);
+    _inputAccessor.reset(_aggAccessor.copyOrMoveValue());
     auto finalizeExpr =
         sbe::makeFunction("stdDevSampFinalize", sbe::makeVariable(_inputSlotId.getId()));
     auto finalizeCode = compileExpression(*finalizeExpr);

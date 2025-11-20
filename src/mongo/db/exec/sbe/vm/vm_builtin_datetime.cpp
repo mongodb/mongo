@@ -1175,8 +1175,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateAd
                 continue;
             }
 
-            auto [resTag, resVal] =
-                dateAddFunc(extractedValues[i].first, extractedValues[i].second);
+            auto [resTag, resVal] = dateAddFunc(extractedValues[i].tag, extractedValues[i].value);
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         }

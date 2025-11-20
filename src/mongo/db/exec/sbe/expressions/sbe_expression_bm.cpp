@@ -191,10 +191,7 @@ private:
     }
 
     void executeExpr(sbe::vm::ByteCode& vm, const sbe::vm::CodeFragment* compiledExpr) const {
-        auto [owned, tag, val] = vm.run(compiledExpr);
-        if (owned) {
-            sbe::value::releaseValue(tag, val);
-        }
+        auto result = vm.run(compiledExpr);
     }
 
     stage_builder::Environment _env;

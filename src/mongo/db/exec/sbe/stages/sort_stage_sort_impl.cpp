@@ -207,11 +207,11 @@ private:
     using SorterData = std::pair<KeyRow, ValueRow>;
 
     int64_t _runLimitCode() {
-        auto [owned, tag, val] = vm::ByteCode{}.run(_limitCode.get());
-        value::ValueGuard guard{owned, tag, val};
-        tassert(
-            8349205, "Limit code returned unexpected value", tag == value::TypeTags::NumberInt64);
-        return value::bitcastTo<size_t>(val);
+        value::TagValueMaybeOwned res = vm::ByteCode{}.run(_limitCode.get());
+        tassert(8349205,
+                "Limit code returned unexpected value",
+                res.tag() == value::TypeTags::NumberInt64);
+        return value::bitcastTo<size_t>(res.value());
     }
 
     SortOptions _makeSortOptions() {

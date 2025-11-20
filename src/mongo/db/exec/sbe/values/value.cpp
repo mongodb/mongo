@@ -298,6 +298,16 @@ str::stream& operator<<(str::stream& str, const std::pair<TypeTags, Value>& valu
     return str;
 }
 
+std::ostream& operator<<(std::ostream& os, TagValueView val) {
+    ValuePrinters::make(os, PrintOptions()).writeValueToStream(val.tag, val.value);
+    return os;
+}
+
+str::stream& operator<<(str::stream& str, TagValueView val) {
+    ValuePrinters::make(str, PrintOptions()).writeValueToStream(val.tag, val.value);
+    return str;
+}
+
 std::string print(const std::pair<TypeTags, Value>& value) {
     str::stream stream = str::stream();
     stream << value;
@@ -847,7 +857,7 @@ std::pair<TypeTags, Value> makeNewArraySet(TypeTags tag,
     return {resTag, reinterpret_cast<Value>(setValues)};
 }
 
-std::pair<TypeTags, Value> ArrayEnumerator::getViewOfValue() const {
+TagValueView ArrayEnumerator::getViewOfValue() const {
     if (_array) {
         return _array->getAt(_index);
     } else if (_arraySet) {
@@ -855,7 +865,7 @@ std::pair<TypeTags, Value> ArrayEnumerator::getViewOfValue() const {
     } else if (_arrayMultiSet) {
         return {_arrayMultiSetIter->first, _arrayMultiSetIter->second};
     } else {
-        return bson::convertFrom<true>(_arrayCurrent, _arrayEnd, _fieldNameSize);
+        return rawToView(bson::convertFrom<true>(_arrayCurrent, _arrayEnd, _fieldNameSize));
     }
 }
 
@@ -890,12 +900,12 @@ bool ArrayEnumerator::advance() {
     }
 }
 
-std::pair<TypeTags, Value> ObjectEnumerator::getViewOfValue() const {
+TagValueView ObjectEnumerator::getViewOfValue() const {
     if (_object) {
         return _object->getAt(_index);
     } else {
         auto sv = bson::fieldNameAndLength(_objectCurrent);
-        return bson::convertFrom<true>(_objectCurrent, _objectEnd, sv.size());
+        return rawToView(bson::convertFrom<true>(_objectCurrent, _objectEnd, sv.size()));
     }
 }
 

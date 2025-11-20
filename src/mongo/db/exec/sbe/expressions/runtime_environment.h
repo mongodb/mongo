@@ -75,24 +75,25 @@ public:
     RuntimeEnvironment& operator=(const RuntimeEnvironment&&) = delete;
     virtual ~RuntimeEnvironment();
 
-    class Accessor final : public value::SlotAccessor {
+    class Accessor final : public value::AssignableSlotAccessor {
     public:
+        using value::AssignableSlotAccessor::reset;
+
         Accessor(RuntimeEnvironment* env, size_t index) : _env{env}, _index{index} {}
 
-        std::pair<value::TypeTags, value::Value> getViewOfValue() const override {
+        value::TagValueView getViewOfValue() const override {
             auto [owned, tag, val] = _env->_state->values[_index];
             return {tag, val};
         }
 
-        std::pair<value::TypeTags, value::Value> copyOrMoveValue() override {
+        value::TagValueOwned copyOrMoveValue() override {
             // Always make a copy.
             auto [owned, tag, val] = _env->_state->values[_index];
             return copyValue(tag, val);
         }
 
-        void reset(bool owned, value::TypeTags tag, value::Value val) {
+        void reset(bool owned, value::TypeTags tag, value::Value val) override {
             release();
-
             _env->_state->values[_index] = {owned, tag, val};
         }
 

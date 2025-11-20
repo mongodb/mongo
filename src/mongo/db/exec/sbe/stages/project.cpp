@@ -96,10 +96,8 @@ PlanState ProjectStage::getNext() {
     if (state == PlanState::ADVANCED) {
         // Run the project expressions here.
         for (auto& p : _fields) {
-            auto [owned, tag, val] = _bytecode.run(p.second.first.get());
-
             // Set the accessors.
-            p.second.second.reset(owned, tag, val);
+            p.second.second.reset(_bytecode.run(p.second.first.get()));
         }
     }
 

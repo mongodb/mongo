@@ -211,12 +211,12 @@ public:
         return std::make_unique<MinMaxTestBlock>(*this);
     }
 
-    std::pair<value::TypeTags, value::Value> tryMin() const override {
-        return _minVal;
+    value::TagValueView tryMin() const override {
+        return value::rawToView(_minVal);
     }
 
-    std::pair<value::TypeTags, value::Value> tryMax() const override {
-        return _maxVal;
+    value::TagValueView tryMax() const override {
+        return value::rawToView(_maxVal);
     }
 
 private:
@@ -667,10 +667,10 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyDeepTest) {
     value::ValueGuard guard(runTag, runVal);
 
     auto extracted = block.extract();
-    assertBlockEq(
-        runTag,
-        runVal,
-        std::vector{extracted[0], {fillTag, fillVal}, extracted[2], extracted[3], extracted[4]});
+    assertBlockEq(runTag,
+                  runVal,
+                  std::vector<std::pair<value::TypeTags, value::Value>>{
+                      extracted[0], {fillTag, fillVal}, extracted[2], extracted[3], extracted[4]});
 }
 
 TEST_F(SBEBlockExpressionTest, BlockFillEmptyNothingTest) {
@@ -798,7 +798,10 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
         value::ValueGuard guard(runTag, runVal);
 
         auto extracted = monoBlock.extract();
-        assertBlockEq(runTag, runVal, std::vector{extracted[0], extracted[1]});
+        assertBlockEq(
+            runTag,
+            runVal,
+            std::vector<std::pair<value::TypeTags, value::Value>>{extracted[0], extracted[1]});
     }
 
     {
@@ -2588,10 +2591,10 @@ TEST_F(SBEBlockExpressionTest, ValueBlockAddHeterogeneousTest) {
     rightBlock.push_back(makeInt64(10));
     // 7 : Date + Number -> Date
     leftBlock.push_back(
-        {value::TypeTags::Date,
-         value::bitcastFrom<int64_t>(TimeZoneDatabase::utcZone()
-                                         .createFromDateParts(2023, 10, 20, 12, 30, 0, 0)
-                                         .toMillisSinceEpoch())});
+        value::TypeTags::Date,
+        value::bitcastFrom<int64_t>(TimeZoneDatabase::utcZone()
+                                        .createFromDateParts(2023, 10, 20, 12, 30, 0, 0)
+                                        .toMillisSinceEpoch()));
     rightBlock.push_back(makeInt32(std::numeric_limits<int32_t>::max()));
 
     {
@@ -2727,10 +2730,10 @@ TEST_F(SBEBlockExpressionTest, ValueBlockSubHeterogeneousTest) {
     rightBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
     // 9 : Date - Number -> Date
     leftBlock.push_back(
-        {value::TypeTags::Date,
-         value::bitcastFrom<int64_t>(TimeZoneDatabase::utcZone()
-                                         .createFromDateParts(2023, 10, 20, 12, 30, 0, 0)
-                                         .toMillisSinceEpoch())});
+        value::TypeTags::Date,
+        value::bitcastFrom<int64_t>(TimeZoneDatabase::utcZone()
+                                        .createFromDateParts(2023, 10, 20, 12, 30, 0, 0)
+                                        .toMillisSinceEpoch()));
     rightBlock.push_back(makeInt32(std::numeric_limits<int32_t>::min()));
 
     {
@@ -2859,10 +2862,10 @@ TEST_F(SBEBlockExpressionTest, ValueBlockMultHeterogeneousTest) {
     rightBlock.push_back(makeInt64(10));
     // 7 : Date * Number -> Date
     leftBlock.push_back(
-        {value::TypeTags::Date,
-         value::bitcastFrom<int64_t>(TimeZoneDatabase::utcZone()
-                                         .createFromDateParts(2023, 10, 20, 12, 30, 0, 0)
-                                         .toMillisSinceEpoch())});
+        value::TypeTags::Date,
+        value::bitcastFrom<int64_t>(TimeZoneDatabase::utcZone()
+                                        .createFromDateParts(2023, 10, 20, 12, 30, 0, 0)
+                                        .toMillisSinceEpoch()));
     rightBlock.push_back(makeInt32(5));
 
     {
@@ -2998,10 +3001,10 @@ TEST_F(SBEBlockExpressionTest, ValueBlockDivHeterogeneousTest) {
     rightBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
     // 9 : Date / Number -> Nothing
     leftBlock.push_back(
-        {value::TypeTags::Date,
-         value::bitcastFrom<int64_t>(TimeZoneDatabase::utcZone()
-                                         .createFromDateParts(2023, 10, 20, 12, 30, 0, 0)
-                                         .toMillisSinceEpoch())});
+        value::TypeTags::Date,
+        value::bitcastFrom<int64_t>(TimeZoneDatabase::utcZone()
+                                        .createFromDateParts(2023, 10, 20, 12, 30, 0, 0)
+                                        .toMillisSinceEpoch()));
     rightBlock.push_back(makeInt32(2));
 
     {

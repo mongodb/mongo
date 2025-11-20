@@ -122,14 +122,12 @@ public:
             setValue(row, i, true, value::makeNewString(longStrings[i % longStringsSize]));
 
             auto p1 = row.copyOrMoveValue(i);
-            value::ValueGuard guard1(p1);
-            ASSERT_THAT(p1, ValueEq(expected));
+            ASSERT_THAT(p1.raw(), ValueEq(expected));
             verifyValue(row, i, copyValue(expected));
 
             setValue(row, i, false, expected);
             auto p2 = row.copyOrMoveValue(i);
-            value::ValueGuard guard2(p2);
-            ASSERT_THAT(p2, ValueEq(expected));
+            ASSERT_THAT(p2.raw(), ValueEq(expected));
             verifyValue(row, i, copyValue(expected));
         }
     }

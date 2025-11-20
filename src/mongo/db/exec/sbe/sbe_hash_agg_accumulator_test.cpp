@@ -145,8 +145,7 @@ protected:
 
     void moveAccumulatorStateToMockSpillStorage() {
         _mockSpilledAggregateStorage.emplace_back();
-        auto [tagSpilled, valSpilled] = _accumulatorState->copyOrMoveValue();
-        _mockSpilledAggregateStorage.back().reset(true, tagSpilled, valSpilled);
+        _mockSpilledAggregateStorage.back().reset(_accumulatorState->copyOrMoveValue());
     }
 
     bool isMockSpillStorageEmpty() const {
@@ -156,7 +155,7 @@ protected:
     std::pair<value::TypeTags, value::Value> consumePartialAggregateFromMockSpillStorage() {
         invariant(!_mockSpilledAggregateStorage.empty());
         ON_BLOCK_EXIT([&]() { _mockSpilledAggregateStorage.pop_front(); });
-        return _mockSpilledAggregateStorage.front().copyOrMoveValue();
+        return _mockSpilledAggregateStorage.front().copyOrMoveValue().releaseToRaw();
     }
 
 private:
@@ -231,9 +230,9 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminal) {
 
     accumulator.finalize(bytecode, accumulatorState());
 
-    std::tie(tagResult, valResult) = accumulatorState().getViewOfValue();
-    ASSERT_EQ(tagResult, value::TypeTags::NumberDouble);
-    ASSERT_EQ(value::bitcastTo<double>(valResult), double{50});
+    auto result = accumulatorState().getViewOfValue();
+    ASSERT_EQ(result.tag, value::TypeTags::NumberDouble);
+    ASSERT_EQ(value::bitcastTo<double>(result.value), double{50});
 }
 
 TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminalEmpty) {
@@ -319,8 +318,7 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminalSpille
 
     // Repopulate the accumulator's state slot with the merged aggregate value so that we can
     // finalize it and validate the result.
-    auto [tagMerged, valMerged] = mergedAggregate.copyOrMoveValue(0);
-    accumulatorState().reset(true, tagMerged, valMerged);
+    accumulatorState().reset(mergedAggregate.copyOrMoveValue(0));
     accumulator.finalize(bytecode, accumulatorState());
 
     auto [tagResult, valResult] = accumulatorState().getViewOfValue();
@@ -387,11 +385,11 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartial) {
 
     accumulator.finalize(bytecode, accumulatorState());
 
-    std::tie(tagResult, valResult) = accumulatorState().getViewOfValue();
-    ASSERT_EQ(tagResult, value::TypeTags::Object);
+    auto result = accumulatorState().getViewOfValue();
+    ASSERT_EQ(result.tag, value::TypeTags::Object);
     resultObj = [&]() {
         BSONObjBuilder resultBuilder;
-        bson::convertToBsonObj(resultBuilder, value::getObjectView(valResult));
+        bson::convertToBsonObj(resultBuilder, value::getObjectView(result.value));
         return resultBuilder.obj();
     }();
     ASSERT_BSONOBJ_EQ_UNORDERED(BSON("count" << 2 << "ps" << BSON_ARRAY(1 << 100 << 0)), resultObj);
@@ -487,8 +485,7 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartialSpilled
 
     // Repopulate the accumulator's state slot with the merged aggregate value so that we can
     // finalize it and validate the result.
-    auto [tagMerged, valMerged] = mergedAggregate.copyOrMoveValue(0);
-    accumulatorState().reset(true, tagMerged, valMerged);
+    accumulatorState().reset(mergedAggregate.copyOrMoveValue(0));
     accumulator.finalize(bytecode, accumulatorState());
 
     auto [tagResult, valResult] = accumulatorState().getViewOfValue();
@@ -601,8 +598,8 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulator) {
 
     accumulator.finalize(bytecode, accumulatorState());
 
-    std::tie(tagResult, valResult) = accumulatorState().getViewOfValue();
-    ASSERT_BSONOBJ_EQ(BSON_ARRAY(1 << 10), sortSbeArray(tagResult, valResult));
+    auto result = accumulatorState().getViewOfValue();
+    ASSERT_BSONOBJ_EQ(BSON_ARRAY(1 << 10), sortSbeArray(result.tag, result.value));
 }
 
 TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorEmpty) {
@@ -743,8 +740,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorSpilled) {
 
     // Repopulate the accumulator's state slot with the merged aggregate value so that we can
     // finalize it and validate the result.
-    auto [tagMerged, valMerged] = mergedAggregate.copyOrMoveValue(0);
-    accumulatorState().reset(true, tagMerged, valMerged);
+    accumulatorState().reset(mergedAggregate.copyOrMoveValue(0));
     accumulator.finalize(bytecode, accumulatorState());
 
     auto [tagResult, valResult] = accumulatorState().getViewOfValue();
@@ -813,8 +809,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorWithCollatorSpilled) {
 
     // Repopulate the accumulator's state slot with the merged aggregate value so that we can
     // finalize it and validate the result.
-    auto [tagMerged, valMerged] = mergedAggregate.copyOrMoveValue(0);
-    accumulatorState().reset(true, tagMerged, valMerged);
+    accumulatorState().reset(mergedAggregate.copyOrMoveValue(0));
     accumulator.finalize(bytecode, accumulatorState());
 
     auto [tagResult, valResult] = accumulatorState().getViewOfValue();
@@ -992,7 +987,8 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulator) {
 
     accumulator.finalize(bytecode, accumulatorState());
 
-    std::tie(tagResult, valResult) = accumulatorState().getViewOfValue();
+    auto result = accumulatorState().getViewOfValue();
+    std::tie(tagResult, valResult) = {result.tag, result.value};
     ASSERT(value::isArray(tagResult));
     resultArr = [&]() {
         BSONArrayBuilder resultBuilder;
@@ -1093,8 +1089,7 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorSpilled) {
 
     // Repopulate the accumulator's state slot with the merged aggregate value so that we can
     // finalize it and validate the result.
-    auto [tagMerged, valMerged] = mergedAggregate.copyOrMoveValue(0);
-    accumulatorState().reset(true, tagMerged, valMerged);
+    accumulatorState().reset(mergedAggregate.copyOrMoveValue(0));
     accumulator.finalize(bytecode, accumulatorState());
 
     auto [tagResult, valResult] = accumulatorState().getViewOfValue();
@@ -1256,9 +1251,9 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulator) {
 
     accumulator.finalize(bytecode, accumulatorState());
 
-    std::tie(tagResult, valResult) = accumulatorState().getViewOfValue();
-    ASSERT(value::isString(tagResult));
-    ASSERT_EQ(value::getStringView(tagResult, valResult), "First among equals");
+    auto accumState = accumulatorState().getViewOfValue();
+    ASSERT(value::isString(accumState.tag));
+    ASSERT_EQ(value::getStringView(accumState.tag, accumState.value), "First among equals");
 }
 
 TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulatorEmpty) {
@@ -1350,8 +1345,7 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulatorSpilled) {
 
     // Repopulate the accumulator's state slot with the merged aggregate value so that we can
     // finalize it and validate the result.
-    auto [tagMerged, valMerged] = mergedAggregate.copyOrMoveValue(0);
-    accumulatorState().reset(true, tagMerged, valMerged);
+    accumulatorState().reset(mergedAggregate.copyOrMoveValue(0));
     accumulator.finalize(bytecode, accumulatorState());
 
     auto [tagResult, valResult] = accumulatorState().getViewOfValue();
@@ -1410,9 +1404,9 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminal) {
 
     accumulator.finalize(bytecode, accumulatorState());
 
-    std::tie(tagResult, valResult) = accumulatorState().getViewOfValue();
-    ASSERT_EQ(tagResult, value::TypeTags::NumberInt32);
-    ASSERT_EQ(value::bitcastTo<int32_t>(valResult), 2);
+    auto accumStateTagVal = accumulatorState().getViewOfValue();
+    ASSERT_EQ(accumStateTagVal.tag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(accumStateTagVal.value), 2);
 }
 
 TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminalEmpty) {
@@ -1540,8 +1534,7 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminalSpilled) {
 
     // Repopulate the accumulator's state slot with the merged aggregate value so that we can
     // finalize it and validate the result.
-    auto [tagMerged, valMerged] = mergedAggregate.copyOrMoveValue(0);
-    accumulatorState().reset(true, tagMerged, valMerged);
+    accumulatorState().reset(mergedAggregate.copyOrMoveValue(0));
     accumulator.finalize(bytecode, accumulatorState());
 
     auto [tagResult, valResult] = accumulatorState().getViewOfValue();
@@ -1606,11 +1599,12 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartial) {
 
     accumulator.finalize(bytecode, accumulatorState());
 
-    std::tie(tagResult, valResult) = accumulatorState().getViewOfValue();
-    ASSERT(value::isArray(tagResult));
+    auto accumStateTagVal = accumulatorState().getViewOfValue();
+    ASSERT(value::isArray(accumStateTagVal.tag));
     resultArr = [&]() {
         BSONArrayBuilder resultBuilder;
-        bson::convertToBsonArr(resultBuilder, value::ArrayEnumerator(tagResult, valResult));
+        bson::convertToBsonArr(
+            resultBuilder, value::ArrayEnumerator(accumStateTagVal.tag, accumStateTagVal.value));
         return resultBuilder.arr();
     }();
     ASSERT_BSONOBJ_EQ(BSON_ARRAY(16 << 2.0 << 0.0), resultArr);
@@ -1702,8 +1696,7 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartialSpilled) {
 
     // Repopulate the accumulator's state slot with the merged aggregate value so that we can
     // finalize it and validate the result.
-    auto [tagMerged, valMerged] = mergedAggregate.copyOrMoveValue(0);
-    accumulatorState().reset(true, tagMerged, valMerged);
+    accumulatorState().reset(mergedAggregate.copyOrMoveValue(0));
     accumulator.finalize(bytecode, accumulatorState());
 
     auto [tagResult, valResult] = accumulatorState().getViewOfValue();

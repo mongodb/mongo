@@ -100,7 +100,7 @@ public:
     bool operator==(const Constant& other) const;
 
     auto get() const {
-        return std::pair{_tag, _val};
+        return sbe::value::TagValueView{_tag, _val};
     }
 
     bool isString() const;

@@ -577,7 +577,7 @@ void ExpressionConstEval::transport(abt::ABT& n,
         // If the child node is a Constant, check if the type is inList, then directly set to
         // true/false.
         if (args.size() == 1 && args[0].is<abt::Constant>()) {
-            const auto tag = args[0].cast<abt::Constant>()->get().first;
+            const auto tag = args[0].cast<abt::Constant>()->get().tag;
             swapAndUpdate(n, abt::Constant::boolean(tag == sbe::value::TypeTags::inList));
         }
     }

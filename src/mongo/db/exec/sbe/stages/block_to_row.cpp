@@ -171,7 +171,7 @@ void BlockToRowStage::prepareDeblock() {
             size_t idxInTvVec = 0;
             for (size_t i = 0; i < deblocked.count(); ++i) {
                 if (selectivityVector.empty() || selectivityVector[i]) {
-                    tvVec[idxInTvVec++] = std::pair(deblocked[i].first, deblocked[i].second);
+                    tvVec[idxInTvVec++] = std::pair(deblocked[i].tag, deblocked[i].value);
                 }
             }
         }

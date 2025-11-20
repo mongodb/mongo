@@ -158,12 +158,12 @@ bool SortedStreamMerger<SortedStream>::BranchComparator::operator()(const Branch
         auto lhsTagVal = left->inputKeyAccessors[i]->getViewOfValue();
         auto rhsTagVal = right->inputKeyAccessors[i]->getViewOfValue();
 
-        auto [tag, val] = value::compareValue(
-            lhsTagVal.first, lhsTagVal.second, rhsTagVal.first, rhsTagVal.second);
+        auto [tag, val] =
+            value::compareValue(lhsTagVal.tag, lhsTagVal.value, rhsTagVal.tag, rhsTagVal.value);
 
         uassert(5073804,
-                str::stream() << "Could not compare values with type " << lhsTagVal.first << " and "
-                              << rhsTagVal.first,
+                str::stream() << "Could not compare values with type " << lhsTagVal.tag << " and "
+                              << rhsTagVal.tag,
                 tag == value::TypeTags::NumberInt32);
         const auto result = value::bitcastTo<int32_t>(val) * ((*_dirs)[i]);
         if (result < 0) {

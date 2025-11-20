@@ -133,7 +133,7 @@ protected:
      */
     FastTuple<bool, value::TypeTags, value::Value> runExpression(const EExpression& expr) {
         auto compiledExpr = expr.compile(_ctx);
-        return _vm.run(compiledExpr.get());
+        return _vm.run(compiledExpr.get()).releaseToRaw();
     }
 
     /**
@@ -143,15 +143,8 @@ protected:
      */
     std::pair<value::TypeTags, value::Value> runCompiledExpression(
         const vm::CodeFragment* compiledExpr) {
-        auto [owned, tag, val] = _vm.run(compiledExpr);
-        if (owned) {
-            return {tag, val};
-        } else {
-            // It is possible that this result is a "view" into memory that is owned somewhere else.
-            // By creating a copy, we ensure it is safe for the caller to call 'releaseValue()' on
-            // the copied Value.
-            return value::copyValue(tag, val);
-        }
+        auto res = _vm.run(compiledExpr);
+        return res.releaseToOwnedRaw();
     }
 
     bool runCompiledExpressionPredicate(const vm::CodeFragment* compiledExpr) {
@@ -191,10 +184,9 @@ protected:
         }
 
         try {
-            auto [owned, tag, val] = _vm.run(&code);
-            value::ValueGuard guard(owned, tag, val);
+            auto res = _vm.run(&code);
             os << "RESULT: ";
-            valuePrinter.writeValueToStream(tag, val);
+            valuePrinter.writeValueToStream(res.tag(), res.value());
             os << std::endl;
         } catch (const DBException& e) {
             os << "EXCEPTION: " << e.toString() << std::endl;

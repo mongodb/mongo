@@ -160,8 +160,7 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
     // into the array.
     size_t i = 0;
     for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext(), ++i) {
-        auto [tag, val] = accessor->getCopyOfValue();
-        resultsView->push_back(tag, val);
+        resultsView->push_back(accessor->getCopyOfValue());
 
         // Test out saveState() and restoreState() for 50% of the documents (the first document,
         // the third document, the fifth document, and so on).
@@ -192,8 +191,7 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMult
         value::ValueGuard guard{arrTag, arrVal};
         auto arrView = value::getArrayView(arrVal);
         for (size_t i = 0; i < accessors.size(); ++i) {
-            auto [tag, val] = accessors[i]->getCopyOfValue();
-            arrView->push_back(tag, val);
+            arrView->push_back(accessors[i]->getCopyOfValue());
         }
         guard.reset();
         resultsView->push_back(arrTag, arrVal);

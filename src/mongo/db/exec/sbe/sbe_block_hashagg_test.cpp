@@ -291,8 +291,8 @@ public:
 
             // Append corresponding bitset.
             auto bitsetBlock = makeBoolBlock(bucket.bitset);
-            arr->push_back({sbe::value::TypeTags::valueBlock,
-                            value::bitcastFrom<value::ValueBlock*>(bitsetBlock.release())});
+            arr->push_back(sbe::value::TypeTags::valueBlock,
+                           value::bitcastFrom<value::ValueBlock*>(bitsetBlock.release()));
 
             for (const auto& block : bucket.dataBlocks) {
                 auto clone = block->clone();

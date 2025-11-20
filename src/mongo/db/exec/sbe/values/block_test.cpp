@@ -1340,8 +1340,8 @@ TEST_F(ValueBlockTest, ArgMinMaxGetAt) {
         // Homogeneous blocks with Nothings call ValueBlock::getAt() which extracts first.
         block->pushNothing();
         block->pushNothing();
-        ASSERT_EQ(block->at(3).first, value::TypeTags::Nothing);
-        ASSERT_EQ(block->at(4).first, value::TypeTags::Nothing);
+        ASSERT_EQ(block->at(3).tag, value::TypeTags::Nothing);
+        ASSERT_EQ(block->at(4).tag, value::TypeTags::Nothing);
     }
 
     {

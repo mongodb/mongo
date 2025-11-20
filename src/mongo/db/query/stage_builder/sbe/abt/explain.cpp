@@ -451,6 +451,10 @@ public:
         return *this;
     }
 
+    ExplainPrinterImpl& print(const sbe::value::TagValueView v) {
+        return print(std::pair{v.tag, v.value});
+    }
+
     ExplainPrinterImpl& print(const std::string& s) {
         printStringInternal(s);
         return *this;
@@ -601,7 +605,7 @@ private:
             sbe::value::Object* obj = sbe::value::getObjectView(val);
             for (size_t i = 0; i < obj->size(); i++) {
                 const auto field = obj->getAt(i);
-                auto [fieldTag, fieldVal] = sbe::value::copyValue(field.first, field.second);
+                auto [fieldTag, fieldVal] = sbe::value::copyValue(field.tag, field.value);
                 addField(obj->field(i), fieldTag, fieldVal);
             }
         } else {
@@ -755,7 +759,7 @@ public:
 
         if (version == ExplainVersion::V3) {
             std::stringstream ss;
-            ss << expr.get().first;
+            ss << expr.get().tag;
             std::string tagAsString = ss.str();
             printer.print(tagAsString);
         }

@@ -232,7 +232,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMergeObjects(Ari
 
     auto obj = value::getObjectView(valAgg);
 
-    StringMap<std::pair<value::TypeTags, value::Value>> currObjMap;
+    StringMap<value::TagValueView> currObjMap;
     for (auto currObjEnum = value::ObjectEnumerator{tagField, valField}; !currObjEnum.atEnd();
          currObjEnum.advance()) {
         currObjMap[currObjEnum.getFieldName()] = currObjEnum.getViewOfValue();

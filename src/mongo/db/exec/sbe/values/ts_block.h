@@ -125,8 +125,6 @@ public:
     TsBlock(const TsBlock& other) = delete;
     TsBlock(TsBlock&& other) = delete;
 
-    ~TsBlock() override;
-
     std::unique_ptr<ValueBlock> clone() const override;
     std::unique_ptr<TsBlock> cloneStrongTyped() const;
 
@@ -141,8 +139,8 @@ public:
     // Returns true if none of the values in this block are arrays or objects. Returns false if
     // any _may_ be arrays or objects.
     bool hasNoObjsOrArrays() const {
-        if (_controlMin.first == _controlMax.first && !isArray(_controlMin.first) &&
-            !isObject(_controlMin.first) && _controlMin.first != TypeTags::Nothing) {
+        if (_controlMin.tag() == _controlMax.tag() && !isArray(_controlMin.tag()) &&
+            !isObject(_controlMin.tag()) && _controlMin.tag() != TypeTags::Nothing) {
             // Checking !isArray after the initial if statement is redundant but this is the
             // explicit condition we are using to see if a field cannot contain any array values.
             return true;
@@ -154,26 +152,26 @@ public:
         return _count;
     }
 
-    std::pair<TypeTags, Value> tryLowerBound() const override {
+    TagValueView tryLowerBound() const override {
         // The time field's control value is rounded down, so we can use it as a lower bound,
         // but cannot necessarily use it as the min().
-        if (canUseControlValue(_controlMin.first)) {
-            return _controlMin;
+        if (canUseControlValue(_controlMin.tag())) {
+            return _controlMin.view();
         }
-        return std::pair{TypeTags::Nothing, Value{0u}};
+        return {TypeTags::Nothing, Value{0u}};
     }
 
-    std::pair<TypeTags, Value> tryUpperBound() const override {
+    TagValueView tryUpperBound() const override {
         // Similar to tryLowerBound(), the control can be rounded up. It is a valid upper bound but
         // not a valid max.
-        if (canUseControlValue(_controlMax.first)) {
-            return _controlMax;
+        if (canUseControlValue(_controlMax.tag())) {
+            return _controlMax.view();
         }
-        return std::pair{TypeTags::Nothing, Value{0u}};
+        return {TypeTags::Nothing, Value{0u}};
     }
 
-    std::pair<TypeTags, Value> tryMin() const override;
-    std::pair<TypeTags, Value> tryMax() const override;
+    TagValueView tryMin() const override;
+    TagValueView tryMax() const override;
 
     boost::optional<bool> tryDense() const override {
         return _isTimeField;
@@ -195,13 +193,13 @@ public:
         return _decompressedBlock->argMax();
     }
 
-    std::pair<value::TypeTags, value::Value> at(size_t idx) override {
+    TagValueView at(size_t idx) override {
         ensureDeblocked();
         return _decompressedBlock->at(idx);
     }
 
     TypeTags getBlockTag() const {
-        return _blockTag;
+        return _block.tag();
     }
 
     /**
@@ -231,16 +229,14 @@ private:
     bool isTimeFieldSorted() const;
 
     // TsBlock owned by the TsCellBlockForTopLevelField which in turn is owned by the
-    // TsBucketToCellBlockStage can be in a special unowned state of '_blockVal', where it is merely
+    // TsBucketToCellBlockStage can be in a special unowned state of '_block', where it is merely
     // a view on the BSON provided by the stage tree below. This is done as an optimization to avoid
     // copying all the data we read. Any TsBlocks created outside that stage (either via clone() or
     // any other way) are fully owned, and have no pointers to outside data. So, we need to keep
-    // track of whether the underlying buffer '_blockVal' is owned or not via '_blockOwned'.
+    // track of whether the underlying buffer '_block' is owned or not.
     //
-    // If the '_blockVal' is not owned, this TsBlock is valid only as long as the underlying BSON.
-    const bool _blockOwned;
-    const TypeTags _blockTag;
-    const Value _blockVal;
+    // If the '_block' is not owned, this TsBlock is valid only as long as the underlying BSON.
+    const TagValueMaybeOwned _block;
 
     // The number of values in this block.
     const size_t _count;
@@ -253,8 +249,8 @@ private:
     const bool _isTimeField;
 
     // Store the min and max found in the control field of a bucket
-    std::pair<TypeTags, Value> _controlMin;
-    std::pair<TypeTags, Value> _controlMax;
+    TagValueOwned _controlMin;
+    TagValueOwned _controlMax;
 
     // A HeterogeneousBlock or HomogeneousBlock that stores the decompressed values of the original
     // TsBlock.

@@ -803,23 +803,17 @@ bool hasSeparatorAt(size_t idx, StringData input, StringData separator) {
         input.substr(idx, separator.size()) == separator;
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::addToSetCappedImpl(
-    value::TypeTags tagAccumulatorState,
-    value::Value valAccumulatorState,  // Owned
-    bool ownedNewElem,
-    value::TypeTags tagNewElem,
-    value::Value valNewElem,
-    int32_t sizeCap,
-    CollatorInterface* collator) {
-    value::ValueGuard guardNewElem{ownedNewElem, tagNewElem, valNewElem};
+value::TagValueMaybeOwned ByteCode::addToSetCappedImpl(value::TagValueOwned accumulatorStateTagVal,
+                                                       value::TagValueMaybeOwned newElem,
+                                                       int32_t sizeCap,
+                                                       CollatorInterface* collator) {
 
     // The capped addToSet accumulator holds a value of Nothing at first and gets initialized on
     // demand when the first value gets added. Once initialized, the state is a two-element array
     // containing the set and its size in bytes, which is necessary to enforce the memory cap.
-    if (tagAccumulatorState == value::TypeTags::Nothing) {
-        std::tie(tagAccumulatorState, valAccumulatorState) = value::makeNewArray();
-        value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
-        auto accumulatorState = value::getArrayView(valAccumulatorState);
+    if (accumulatorStateTagVal.tag() == value::TypeTags::Nothing) {
+        accumulatorStateTagVal = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto accumulatorState = value::getArrayView(accumulatorStateTagVal.value());
 
         auto [tagAccSet, valAccSet] = value::makeNewArraySet(collator);
 
@@ -828,16 +822,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::addToSetCappedImpl(
         // AggArrayWithSize::kSizeOfValues.
         accumulatorState->push_back(tagAccSet, valAccSet);
         accumulatorState->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
-
-        // Transfer ownership to the 'ValueGuard' in the enclosing scope.
-        guardAccumulatorState.reset();
     }
-    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
     tassert(10936800,
             "Expected array for set accumulator state",
-            tagAccumulatorState == value::TypeTags::Array);
+            accumulatorStateTagVal.tag() == value::TypeTags::Array);
 
-    auto accumulatorState = value::getArrayView(valAccumulatorState);
+    auto accumulatorState = value::getArrayView(accumulatorStateTagVal.value());
     tassert(10936801,
             "Set accumulator with invalid length",
             accumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
@@ -849,8 +839,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::addToSetCappedImpl(
     tassert(
         10936802, "Expected ArraySet in accumulator state", tagAccSet == value::TypeTags::ArraySet);
     auto accSet = value::getArraySetView(valAccSet);
-    if (!accSet->values().contains({tagNewElem, valNewElem})) {
-        auto elemSize = value::getApproximateSize(tagNewElem, valNewElem);
+    if (!accSet->values().contains(newElem.raw())) {
+        auto elemSize = value::getApproximateSize(newElem.tag(), newElem.value());
         auto [tagAccSize, valAccSize] =
             accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
         tassert(10936803,
@@ -872,35 +862,29 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::addToSetCappedImpl(
                                 value::bitcastFrom<int64_t>(newSize));
 
         // Insert the new value. Note that array will ignore Nothing.
-        guardNewElem.reset();
-        if (ownedNewElem) {
-            accSet->push_back(tagNewElem, valNewElem);
+        if (newElem.owned()) {
+            accSet->push_back(newElem.releaseToOwnedRaw());
         } else {
-            accSet->push_back_clone(tagNewElem, valNewElem);
+            accSet->push_back_clone(newElem.tag(), newElem.value());
         }
     }
 
-    guardAccumulatorState.reset();
-    return {true, tagAccumulatorState, valAccumulatorState};
+    return accumulatorStateTagVal;
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::setUnionAccumImpl(
-    value::TypeTags tagAccumulatorState,
-    value::Value valAccumulatorState,  // Owned
-    value::TypeTags tagNewSetMembers,
-    value::Value valNewSetMembers,  // Owned
-    int32_t sizeCap,
-    CollatorInterface* collator) {
-    value::ValueGuard guardNewSetMembers{tagNewSetMembers, valNewSetMembers};
+value::TagValueMaybeOwned ByteCode::setUnionAccumImpl(value::TagValueOwned accumulatorStateTagVal,
+                                                      value::TagValueOwned newSetMembers,
+                                                      int32_t sizeCap,
+                                                      CollatorInterface* collator) {
 
     // The capped addToSet accumulator holds a value of Nothing at first and gets initialized on
     // demand when the first value gets added. Once initialized, the state is a two-element array
     // containing the set and its size in bytes, which is necessary to enforce the memory cap.
-    if (tagAccumulatorState == value::TypeTags::Nothing) {
+    if (accumulatorStateTagVal.tag() == value::TypeTags::Nothing) {
         auto [tagAccSet, valAccSet] = value::makeNewArraySet(collator);
 
-        std::tie(tagAccumulatorState, valAccumulatorState) = value::makeNewArray();
-        auto accumulatorState = value::getArrayView(valAccumulatorState);
+        accumulatorStateTagVal = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto accumulatorState = value::getArrayView(accumulatorStateTagVal.value());
 
         // The order is important! The accumulated array should be at index
         // AggArrayWithSize::kValues, and the size should be at index
@@ -908,16 +892,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::setUnionAccumImpl(
         accumulatorState->push_back(tagAccSet, valAccSet);
         accumulatorState->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
     }
-    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
     tassert(7039521,
             "Expected array for set accumulator state",
-            tagAccumulatorState == value::TypeTags::Array);
+            accumulatorStateTagVal.tag() == value::TypeTags::Array);
 
     tassert(10936804,
             "Expected right-hand side of union to have array type",
-            value::isArray(tagNewSetMembers) || tagNewSetMembers == value::TypeTags::Nothing);
+            value::isArray(newSetMembers.tag()) || newSetMembers.tag() == value::TypeTags::Nothing);
 
-    auto accumulatorState = value::getArrayView(valAccumulatorState);
+    auto accumulatorState = value::getArrayView(accumulatorStateTagVal.value());
     tassert(1093605,
             "Set accumulator with invalid length",
             accumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
@@ -936,10 +919,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::setUnionAccumImpl(
     tassert(7039524, "expected 64-bit int", accSizeTag == value::TypeTags::NumberInt64);
     int64_t currentSize = value::bitcastTo<int64_t>(accSizeVal);
 
-    if (tagNewSetMembers != value::TypeTags::Nothing) {
+    if (newSetMembers.tag() != value::TypeTags::Nothing) {
         value::arrayForEach<true>(
-            tagNewSetMembers,
-            valNewSetMembers,
+            newSetMembers.tag(),
+            newSetMembers.value(),
             [&](value::TypeTags tagNewElem, value::Value valNewElem) {
                 value::ValueGuard guardNewElem{tagNewElem, valNewElem};
 
@@ -967,8 +950,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::setUnionAccumImpl(
                             value::TypeTags::NumberInt64,
                             value::bitcastFrom<int64_t>(currentSize));
 
-    guardAccumulatorState.reset();
-    return {true, tagAccumulatorState, valAccumulatorState};
+    return accumulatorStateTagVal;
 }
 
 ByteCode::MultiAccState ByteCode::getMultiAccState(value::TypeTags stateTag,
@@ -1045,10 +1027,9 @@ int32_t ByteCode::aggTopBottomNAdd(value::Array* state,
     using Less =
         std::conditional_t<Sense == TopBottomSense::kTop, SortPatternLess, SortPatternGreater>;
 
-    auto memAdded = [](std::pair<value::TypeTags, value::Value> key,
-                       std::pair<value::TypeTags, value::Value> value) {
-        return value::getApproximateSize(key.first, key.second) +
-            value::getApproximateSize(value.first, value.second);
+    auto memAdded = [](value::TagValueView key, value::TagValueView value) {
+        return value::getApproximateSize(key.tag, key.value) +
+            value::getApproximateSize(value.tag, value.value);
     };
 
     auto less = Less(args.getSortSpec());
@@ -1056,22 +1037,20 @@ int32_t ByteCode::aggTopBottomNAdd(value::Array* state,
     auto& heap = array->values();
 
     if (array->size() < maxSize) {
-        auto [pairTag, pairVal] = value::makeNewArray();
-        value::ValueGuard pairGuard{pairTag, pairVal};
-        auto pair = value::getArrayView(pairVal);
+        auto ownedPair = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto pair = value::getArrayView(ownedPair.value());
         pair->reserve(2);
 
-        auto [keyTag, keyVal] = args.getOwnedKey();
-        pair->push_back(keyTag, keyVal);
+        value::TagValueOwned key = args.getOwnedKey();
+        value::TagValueOwned value = args.getOwnedValue();
 
-        auto [valueTag, valueVal] = args.getOwnedValue();
-        pair->push_back(valueTag, valueVal);
+        memUsage =
+            updateAndCheckMemUsage(state, memUsage, memAdded(key.view(), value.view()), memLimit);
 
-        memUsage = updateAndCheckMemUsage(
-            state, memUsage, memAdded({keyTag, keyVal}, {valueTag, valueVal}), memLimit);
+        pair->push_back(std::move(key));
+        pair->push_back(std::move(value));
 
-        pairGuard.reset();
-        array->push_back(pairTag, pairVal);
+        array->push_back(std::move(ownedPair));
         std::push_heap(heap.begin(), heap.end(), keyLess);
     } else {
         tassert(5807005,
@@ -1083,25 +1062,19 @@ int32_t ByteCode::aggTopBottomNAdd(value::Array* state,
         auto worstKey = worst->getAt(0);
 
         if (args.keySortsBefore(worstKey)) {
-            auto [keyTag, keyVal] = args.getOwnedKey();
-            value::ValueGuard keyGuard{keyTag, keyVal};
-
-            auto [valueTag, valueVal] = args.getOwnedValue();
-            value::ValueGuard valueGuard{valueTag, valueVal};
+            value::TagValueOwned key = args.getOwnedKey();
+            value::TagValueOwned value = args.getOwnedValue();
 
             memUsage = updateAndCheckMemUsage(state,
                                               memUsage,
                                               -memAdded(worst->getAt(0), worst->getAt(1)) +
-                                                  memAdded({keyTag, keyVal}, {valueTag, valueVal}),
+                                                  memAdded(key.view(), value.view()),
                                               memLimit);
 
             std::pop_heap(heap.begin(), heap.end(), keyLess);
 
-            keyGuard.reset();
-            worst->setAt(0, keyTag, keyVal);
-
-            valueGuard.reset();
-            worst->setAt(1, valueTag, valueVal);
+            worst->setAt(0, std::move(key));
+            worst->setAt(1, std::move(value));
 
             std::push_heap(heap.begin(), heap.end(), keyLess);
         }

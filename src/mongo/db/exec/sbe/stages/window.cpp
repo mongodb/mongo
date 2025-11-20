@@ -214,8 +214,7 @@ bool WindowStage::fetchNextRow() {
         value::MaterializedRow row(rowSize);
         size_t idx = 0;
         for (auto accessor : _inCurrAccessors) {
-            auto [tag, val] = accessor->getCopyOfValue();
-            row.reset(idx++, true, tag, val);
+            row.reset(idx++, accessor->getCopyOfValue());
         }
         _rows.push_back(std::move(row));
         _lastRowId++;
@@ -532,8 +531,7 @@ void WindowStage::setPartition(int id) {
 
         for (size_t exprIdx = 0; exprIdx < windowInitCodes.size(); ++exprIdx) {
             if (windowInitCodes[exprIdx]) {
-                auto [owned, tag, val] = _bytecode.run(windowInitCodes[exprIdx].get());
-                windowAccessors[exprIdx]->reset(owned, tag, val);
+                windowAccessors[exprIdx]->reset(_bytecode.run(windowInitCodes[exprIdx].get()));
             } else {
                 windowAccessors[exprIdx]->reset();
             }
@@ -624,8 +622,8 @@ PlanState WindowStage::getNext() {
                 setCurrAccessors(id);
                 for (size_t exprIdx = 0; exprIdx < windowAddCodes.size(); ++exprIdx) {
                     if (windowAddCodes[exprIdx]) {
-                        auto [owned, tag, val] = _bytecode.run(windowAddCodes[exprIdx].get());
-                        windowAccessors[exprIdx]->reset(owned, tag, val);
+                        windowAccessors[exprIdx]->reset(
+                            _bytecode.run(windowAddCodes[exprIdx].get()));
                     }
                 }
                 idRange.second = id;
@@ -663,9 +661,8 @@ PlanState WindowStage::getNext() {
                     setCurrAccessors(id);
                     for (size_t exprIdx = 0; exprIdx < windowRemoveCodes.size(); ++exprIdx) {
                         if (windowRemoveCodes[exprIdx]) {
-                            auto [owned, tag, val] =
-                                _bytecode.run(windowRemoveCodes[exprIdx].get());
-                            windowAccessors[exprIdx]->reset(owned, tag, val);
+                            windowAccessors[exprIdx]->reset(
+                                _bytecode.run(windowRemoveCodes[exprIdx].get()));
                         }
                     }
                     idRange.first = id + 1;
