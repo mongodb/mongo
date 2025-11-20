@@ -29,6 +29,11 @@ parameters:
 - key: antithesis_image_tag
   description: "The docker tag to use when pushing images to Antithesis"
 
+- key: skip_symbolization
+  value: true
+  description: >-
+    Automatically disables symbolizing stack traces from Resmoke tasks. If this is set to false, the steps on how to manually symbolize the unsymbolized stacktraces will not be generated.
+
 ## Cron parameters.
 - key: project_required_suggested_cron
   value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC
@@ -78,6 +83,7 @@ post:
 - func: "save local client logs"
 - func: "save code coverage data"
 - func: "save jepsen artifacts"
+- func: "save unsymbolized stacktraces and local invocation"
 - func: "save mongo coredumps"
 - func: "save failed unittests"
 - func: "save hang analyzer debugger files"

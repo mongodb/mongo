@@ -109,6 +109,10 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     extra_args="$extra_args --mongodSetParameter \"{'jsHeapLimitMB':10}\""
   fi
 
+  if [ "${skip_symbolization}" = "true" ]; then
+    extra_args="$extra_args --skipSymbolization"
+  fi
+
   # Even though all feature flags may be enabled on a variant, often times we do not want to run
   # feature flag tests because they will most likely fail. For example, during multiversion testing,
   # all feature flags may be enabled on the latest version, but running feature flag specific tests on

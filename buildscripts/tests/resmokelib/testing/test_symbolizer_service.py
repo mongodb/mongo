@@ -28,46 +28,22 @@ class TestResmokeSymbolizer(unittest.TestCase):
         self.resmoke_symbolizer = under_test.ResmokeSymbolizer(
             self.config_mock, self.symbolizer_service_mock, self.file_service_mock)
 
-    def test_symbolize_test_logs_process_all_files(self):
-        stacktrace_files = [f"file{i}.stacktrace" for i in range(5)]
-        self.file_service_mock.filter_out_non_files.return_value = stacktrace_files
-        self.file_service_mock.filter_out_empty_files.return_value = stacktrace_files
-        self.file_service_mock.filter_out_already_processed_files.return_value = stacktrace_files
-
-        self.resmoke_symbolizer.symbolize_test_logs(MagicMock())
-
-        self.assertEqual(self.symbolizer_service_mock.run_symbolizer_script.call_count, 5)
-        for i, call in enumerate(self.symbolizer_service_mock.run_symbolizer_script.call_arg_list):
-            self.assertEqual(call.args[0], f"file{i}.stacktrace")
-
-    def test_symbolize_test_logs_hit_timeout(self):
-        stacktrace_files = [f"file{i}.stacktrace" for i in range(5)]
-        self.file_service_mock.filter_out_non_files.return_value = stacktrace_files
-        self.file_service_mock.filter_out_empty_files.return_value = stacktrace_files
-        self.file_service_mock.filter_out_already_processed_files.return_value = stacktrace_files
-
-        self.resmoke_symbolizer.symbolize_test_logs(MagicMock(), 0)
-
-        self.assertEqual(self.symbolizer_service_mock.run_symbolizer_script.call_count, 1)
-        for i, call in enumerate(self.symbolizer_service_mock.run_symbolizer_script.call_arg_list):
-            self.assertEqual(call.args[0], f"file{i}.stacktrace")
-
     def test_symbolize_test_logs_should_not_symbolize(self):
         self.config_mock.is_windows.return_value = True
 
-        self.resmoke_symbolizer.symbolize_test_logs(MagicMock())
+        self.resmoke_symbolizer.get_unsymbolized_stacktrace(MagicMock())
         self.symbolizer_service_mock.run_symbolizer_script.assert_not_called()
 
     def test_symbolize_test_logs_could_not_get_dbpath(self):
         self.file_service_mock.check_path_exists.return_value = False
 
-        self.resmoke_symbolizer.symbolize_test_logs(MagicMock())
+        self.resmoke_symbolizer.get_unsymbolized_stacktrace(MagicMock())
         self.symbolizer_service_mock.run_symbolizer_script.assert_not_called()
 
     def test_symbolize_test_logs_did_not_find_files(self):
         self.file_service_mock.find_all_children_recursively.return_value = []
 
-        self.resmoke_symbolizer.symbolize_test_logs(MagicMock())
+        self.resmoke_symbolizer.get_unsymbolized_stacktrace(MagicMock())
         self.symbolizer_service_mock.run_symbolizer_script.assert_not_called()
 
     def test_should_not_symbolize_if_not_in_evergreen(self):
