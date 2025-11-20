@@ -36,7 +36,7 @@ PROTO_GEN_SUFFIXES = (".grpc.pb.h", ".pb.h")  # order matters only for readabili
 
 SRC_ROOT_POSIX = SRC_ROOT.as_posix()
 AUTO_HEADER_PREFIX = f"//{SRC_ROOT_POSIX}/"
-VERSION_SALT = "autoheader-v6"  # bump to force regen
+VERSION_SALT = "autoheader-v7"  # bump to force regen
 MANIFEST_PATH = SRC_ROOT / AUTO_DIR / "last_run.json"
 
 # -------- single-pass file lister (cache) --------
@@ -51,7 +51,8 @@ GEN_HEADER_REMAP = {
 
 EXCLUDE_HEADERS = {
     "mongo/platform/windows_basic.h",  # forced via command line; don’t depend on it
-    "mongo/scripting/mozjs/freeOpToJSContext.h",  # wierd mongo include that lives in 3rd party
+    "mongo/scripting/mozjs/freeOpToJSContext.h",  # weird mongo include that lives in 3rd party
+    "mongo/scripting/mozjs/mongoErrorReportToString.h",  # weird mongo include that lives in 3rd party
 }
 
 # Generated *_cpp (or *_gen) left files that we want to emit regardless of rg.
