@@ -224,11 +224,14 @@ private:
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.
      *
      * Uses the collation specified on the CanonicalQuery for targeting. If there is no query
-     * collation, uses the collection default.
+     * collation, uses the collection default. If 'bypassIsFieldHashedCheck' is true, it skips
+     * checking if the shard key was hashed and assumes that any non-collatable shard key was not
+     * hashed from a collatable type.
      *
      * Returns !OK with message if query could not be targeted.
      */
-    StatusWith<std::vector<ShardEndpoint>> _targetQuery(const CanonicalQuery& query) const;
+    StatusWith<std::vector<ShardEndpoint>> _targetQuery(const CanonicalQuery& query,
+                                                        bool bypassIsFieldHashedCheck) const;
 
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.

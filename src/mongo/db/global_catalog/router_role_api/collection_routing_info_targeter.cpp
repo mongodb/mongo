@@ -525,8 +525,15 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
     // For all other kinds of updates, we call _targetQuery() to do targeting.
     //
     // In either case, if a non-OK status is returned we will throw an exception here.
-    result.endpoints = isMulti && isUpsert ? uassertStatusOK(_targetQueryForMultiUpsert(*cq))
-                                           : uassertStatusOK(_targetQuery(*cq));
+    //
+    // For now, a findAndModify request sets bypassIsFieldHashedCheck to be true in order to skip
+    // the isFieldHashedCheck in the special case where _id is hashed and used as the shard key.
+    // This means that we always assume that a findAndModify request using _id is targetable to a
+    // single shard.
+    const bool bypassIsFieldHashedCheck = isFindAndModify;
+    result.endpoints = isMulti && isUpsert
+        ? uassertStatusOK(_targetQueryForMultiUpsert(*cq))
+        : uassertStatusOK(_targetQuery(*cq, bypassIsFieldHashedCheck));
 
     // For multi:true updates/upserts, there are no other checks to perform. Increment query
     // counters as appropriate and return 'result'.
@@ -654,7 +661,13 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetDelete(
         _isExactIdQuery(*cq, _cri.getChunkManager()) && !_isTimeseriesLogicalOperation(opCtx);
 
     // Target based on the delete's filter.
-    auto endpoints = uassertStatusOK(_targetQuery(*cq));
+    //
+    // For now, a findAndModify request sets bypassIsFieldHashedCheck to be true in order to skip
+    // the isFieldHashedCheck in the special case where _id is hashed and used as the shard key.
+    // This means that we always assume that a findAndModify request using _id is targetable to a
+    // single shard.
+    const bool bypassIsFieldHashedCheck = isFindAndModify;
+    auto endpoints = uassertStatusOK(_targetQuery(*cq, bypassIsFieldHashedCheck));
     const bool multipleEndpoints = endpoints.size() > 1u;
 
     result.endpoints = std::move(endpoints);
@@ -722,11 +735,12 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CollectionRoutingInfoTargeter::_cano
 }
 
 StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQuery(
-    const CanonicalQuery& query) const {
+    const CanonicalQuery& query, bool bypassIsFieldHashedCheck) const {
 
     std::set<ShardId> shardIds;
     try {
-        getShardIdsForCanonicalQuery(query, _cri.getChunkManager(), &shardIds);
+        getShardIdsForCanonicalQuery(
+            query, _cri.getChunkManager(), &shardIds, bypassIsFieldHashedCheck);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
