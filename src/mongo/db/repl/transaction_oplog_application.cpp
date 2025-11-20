@@ -303,7 +303,10 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
     Status status = Status::OK();
 
     repl::writeConflictRetryWithLimit(
-        opCtx, "replaying prepared transaction", NamespaceString(dbName), [&] {
+        opCtx,
+        "replaying prepared transaction",
+        NamespaceString(dbName),
+        [&] {
             WriteUnitOfWork wunit(opCtx);
 
             // We might replay a prepared transaction behind oldest timestamp.
@@ -327,7 +330,8 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
                 shard_role_details::getRecoveryUnit(opCtx)->setDurableTimestamp(durableTimestamp);
                 wunit.commit();
             }
-        });
+        },
+        mode == repl::OplogApplication::Mode::kSecondary);
 
     return status;
 }
@@ -629,7 +633,10 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     }
 
     return repl::writeConflictRetryWithLimit(
-        opCtx, "applying prepare transaction", prepareOp.getNss(), [&] {
+        opCtx,
+        "applying prepare transaction",
+        prepareOp.getNss(),
+        [&] {
             // The write on transaction table may be applied concurrently, so refreshing
             // state from disk may read that write, causing starting a new transaction
             // on an existing txnNumber. Thus, we start a new transaction without
@@ -719,7 +726,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
             txnParticipant.stashTransactionResources(opCtx);
             return Status::OK();
-        });
+        },
+        mode == repl::OplogApplication::Mode::kSecondary);
 }
 
 /**

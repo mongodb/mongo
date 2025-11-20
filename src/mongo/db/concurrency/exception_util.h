@@ -37,6 +37,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -148,11 +149,14 @@ template <ErrorCodes::Error ec>
  * invocation of the argument function f without any exception handling and retry logic.
  */
 template <typename F>
-auto writeConflictRetry(OperationContext* opCtx,
-                        StringData opStr,
-                        const NamespaceStringOrUUID& nssOrUUID,
-                        F&& f,
-                        boost::optional<size_t> retryLimit = boost::none) {
+auto writeConflictRetry(
+    OperationContext* opCtx,
+    StringData opStr,
+    const NamespaceStringOrUUID& nssOrUUID,
+    F&& f,
+    boost::optional<size_t> retryLimit = boost::none,
+    /* Dump the WT state on every N times when you hit a WCE, where N == dumpStateRetryCount. */
+    int dumpStateRetryCount = 0) {
     invariant(opCtx);
     invariant(shard_role_details::getLocker(opCtx));
     invariant(shard_role_details::getRecoveryUnit(opCtx));
@@ -185,6 +189,10 @@ auto writeConflictRetry(OperationContext* opCtx,
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
             logWriteConflictAndBackoff(writeConflictAttempts, opStr, e.reason(), nssOrUUID);
             ++writeConflictAttempts;
+            if (MONGO_unlikely(dumpStateRetryCount &&
+                               (writeConflictAttempts % dumpStateRetryCount) == 0)) {
+                opCtx->getServiceContext()->getStorageEngine()->dump();
+            }
             shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             if (MONGO_unlikely(retryLimit && writeConflictAttempts > *retryLimit)) {
                 LOGV2_ERROR(7677402,

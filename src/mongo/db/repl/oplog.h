@@ -341,9 +341,14 @@ template <typename F>
 auto writeConflictRetryWithLimit(OperationContext* opCtx,
                                  StringData opStr,
                                  const NamespaceStringOrUUID& nssOrUUID,
-                                 F&& f) {
-    return writeConflictRetry(
-        opCtx, opStr, nssOrUUID, f, repl::writeConflictRetryLimit.loadRelaxed());
+                                 F&& f,
+                                 bool dump = false) {
+    return writeConflictRetry(opCtx,
+                              opStr,
+                              nssOrUUID,
+                              f,
+                              repl::writeConflictRetryLimit.loadRelaxed(),
+                              dump ? repl::writeConflictRetryCountForDumpState.loadRelaxed() : 0);
 }
 
 }  // namespace repl

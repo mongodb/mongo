@@ -960,6 +960,19 @@ server_parameters:
             gte: 0
         redact: false
 
+    writeConflictRetryCountForDumpState:
+        description: >-
+            The number of write conflict retries after which we dump a storage engine state
+            to assist with diagnostics during secondary oplog application unexpected behavior. If this parameter is less than
+            gMinimalWriteConflictRetryCountForStateDump, then the latter will be used to determine dump rate.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: writeConflictRetryCountForDumpState
+        default: 1000
+        validator:
+            gte: 1000
+        redact: false
+
 feature_flags:
     featureFlagShardMerge:
         description: When enabled, multitenant migration uses the "shard merge" protocol.

@@ -193,7 +193,8 @@ Status _applyOps(OperationContext* opCtx,
                                                        alwaysUpsert,
                                                        oplogApplicationMode,
                                                        isDataConsistent);
-                });
+                },
+                oplogApplicationMode == repl::OplogApplication::Mode::kSecondary);
         } catch (const DBException& ex) {
             ab.append(false);
             result->append("applied", ++(*numApplied));

@@ -49,6 +49,16 @@ server_parameters:
           gte: 0
         redact: false
 
+    minimalWriteConflictRetryCountForStateDump:
+        description: "We won't dump storage engine state more frequently than once in this many write conflict retries"
+        set_at: [startup, runtime]
+        cpp_varname: "gMinimalWriteConflictRetryCountForStateDump"
+        cpp_vartype: AtomicWord<int>
+        default: 10000
+        validator:
+            gte: 10000
+        redact: false
+        
     temporarilyUnavailableBackoffBaseMs:
         description: 'The base period of time to wait between each TemporarilyUnavailable retry
                       attempt. The backoff time is linear such that the Nth retry waits for N times
