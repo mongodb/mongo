@@ -141,7 +141,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     const BSONObj& requestCollation,
     const NamespaceString& nss,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
-    invariant(opCtx);
+    tassert(11321300, "opCtx must not be null", opCtx);
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx)
                       .ns(nss)
@@ -357,7 +357,7 @@ public:
           _cq{cq},
           _plannerParams(std::move(plannerParams)),
           _result{std::make_unique<ResultType>()} {
-        invariant(_cq);
+        tassert(11321301, "canonicalQuery must not be null", _cq);
         if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(2))) {
             _queryStringForDebugLog = _cq->toStringShort();
         }
@@ -1163,9 +1163,10 @@ boost::optional<ScopedCollectionFilter> getScopedCollectionFilter(
     const QueryPlannerParams& plannerParams) {
     if (plannerParams.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
         auto collFilter = collections.getMainCollectionPtrOrAcquisition().getShardingFilter();
-        invariant(collFilter,
-                  "Attempting to use shard filter when there's no shard filter available for "
-                  "the collection");
+        tassert(11321302,
+                "Attempting to use shard filter when there's no shard filter available for "
+                "the collection",
+                collFilter);
         return collFilter;
     }
     return boost::none;
@@ -1306,7 +1307,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     Pipeline* pipeline,
     bool needsMerge,
     boost::optional<TraversalPreference> traversalPreference) {
-    invariant(canonicalQuery);
+    tassert(11321303, "canonicalQuery must not be null", canonicalQuery);
 
     // Ensure that the shard filter option is set if this is a shard.
     if (OperationShardingState::isComingFromRouter(opCtx)) {
@@ -1559,7 +1560,7 @@ namespace {
 StatusWith<std::unique_ptr<projection_ast::Projection>> makeProjection(const BSONObj& projObj,
                                                                        bool allowPositional,
                                                                        CanonicalQuery* cq) {
-    invariant(!projObj.isEmpty());
+    tassert(11321304, "projObj must not be empty", !projObj.isEmpty());
 
     projection_ast::Projection proj =
         projection_ast::parseAndAnalyze(cq->getExpCtx(),
@@ -1725,7 +1726,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     std::unique_ptr<projection_ast::Projection> projection;
     if (!request->getProj().isEmpty()) {
-        invariant(request->getReturnDeleted());
+        tassert(11321305,
+                "returnDeleted must be true if the projection is not empty",
+                request->getReturnDeleted());
 
         const bool allowPositional = true;
         auto projectionWithStatus = makeProjection(request->getProj(), allowPositional, cq.get());
@@ -1786,9 +1789,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     // If there is no collection and this is an upsert, callers are supposed to create
     // the collection prior to calling this method. Explain, however, will never do
     // collection or database creation.
-    if (!coll.exists() && request->isUpsert()) {
-        invariant(request->explain());
-    }
+    tassert(11321306,
+            "Expected 'request' to be an explain if the underlying op is an upsert over a "
+            "non-existent collection",
+            !(!coll.exists() && request->isUpsert()) || request->explain().has_value());
 
     // If this is a user-issued update, then we want to return an error: you cannot perform
     // writes on a secondary. If this is an update to a secondary from the replication system,
@@ -1892,7 +1896,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     std::unique_ptr<projection_ast::Projection> projection;
     if (!request->getProj().isEmpty()) {
-        invariant(request->shouldReturnAnyDocs());
+        tassert(11321307,
+                "Expected 'shouldReturnAnyDocs' to be true if a projection is present",
+                request->shouldReturnAnyDocs());
 
         // If the plan stage is to return the newly-updated version of the documents, then it
         // is invalid to use a positional projection because the query expression need not

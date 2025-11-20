@@ -124,7 +124,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
         if (collectionExists) {
             _nss = collection->nss();
         } else {
-            invariant(_cq);
+            tassert(11321318, "canonicalQuery must not be null", _cq);
             if (_cq->getFindCommandRequest().getNamespaceOrUUID().isNamespaceString()) {
                 _nss = _cq->getFindCommandRequest().getNamespaceOrUUID().nss();
             }
@@ -356,7 +356,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
     }
 
     if (!_stash.empty()) {
-        invariant(objOut && !dlOut);
+        tassert(11321319, "objOut must not be null", objOut);
+        tassert(11321320, "dlOut must be null", !dlOut);
         *objOut = std::move(_stash.front());
         _stash.pop_front();
         return PlanExecutor::ADVANCED;
@@ -514,13 +515,20 @@ void PlanExecutorImpl::_handleNeedYield(size_t& writeConflictsInARow,
     }
 
     // Yield next time through the loop.
-    invariant(_yieldPolicy->canAutoYield());
+    tassert(
+        11321321,
+        fmt::format(
+            "Invalid call to PlanExecutorImpl::_handleNeedYield() without auto-yielding policy {}",
+            PlanYieldPolicy::serializeYieldPolicy(_yieldPolicy->getPolicy())),
+        _yieldPolicy->canAutoYield());
     _yieldPolicy->forceYield();
 }
 
 bool PlanExecutorImpl::_handleEOFAndExit(PlanStage::StageState code,
                                          std::unique_ptr<insert_listener::Notifier>& notifier) {
-    invariant(PlanStage::IS_EOF == code);
+    tassert(11321322,
+            fmt::format("Expected code to be IS_EOF, but found {}", PlanStage::stateStr(code)),
+            PlanStage::IS_EOF == code);
     hangBeforeShouldWaitForInsertsIfFailpointEnabled(this);
 
     // The !notifier check is necessary because shouldWaitForInserts can return 'true' when
@@ -655,8 +663,12 @@ void PlanExecutorImpl::dispose(OperationContext* opCtx) {
 }
 
 long long PlanExecutorImpl::executeCount() {
-    invariant(_root->stageType() == StageType::STAGE_COUNT ||
-              _root->stageType() == StageType::STAGE_RECORD_STORE_FAST_COUNT);
+    tassert(
+        11321323,
+        fmt::format("Invalid call to PlanExecutorImpl::executeCount() on non-countlike stage {}",
+                    static_cast<int>(_root->stageType())),
+        _root->stageType() == StageType::STAGE_COUNT ||
+            _root->stageType() == StageType::STAGE_RECORD_STORE_FAST_COUNT);
 
     // Iterate until EOF, returning no data.
     int numResults = getNextBatch(std::numeric_limits<int64_t>::max(), nullptr);
@@ -784,7 +796,11 @@ BatchedDeleteStats PlanExecutorImpl::getBatchedDeleteStats() {
         return BatchedDeleteStats();
     }
 
-    invariant(_root->stageType() == StageType::STAGE_BATCHED_DELETE);
+    tassert(11321324,
+            fmt::format("Invalid call to PlanExecutorImpl::getBatchedDeleteStats() on an executor "
+                        "with the root stage {}",
+                        static_cast<int>(_root->stageType())),
+            _root->stageType() == StageType::STAGE_BATCHED_DELETE);
 
     // If the collection exists, we expect the root of the plan tree to be a batched delete stage.
     // Note: findAndModify is incompatible with the batched delete stage so no need to handle
@@ -826,14 +842,19 @@ PlanExecutor::LockPolicy PlanExecutorImpl::lockPolicy() const {
 }
 
 const PlanExplainer& PlanExecutorImpl::getPlanExplainer() const {
-    invariant(_planExplainer);
+    tassert(11321325,
+            "Invalid call PlanExecutorImpl::getPlanExplainer() with null _planExplainer",
+            _planExplainer);
     return *_planExplainer;
 }
 
 MultiPlanStage* PlanExecutorImpl::getMultiPlanStage() const {
-    PlanStage* ps = getStageByType(_root.get(), StageType::STAGE_MULTI_PLAN);
-    invariant(ps == nullptr || ps->stageType() == StageType::STAGE_MULTI_PLAN);
-    return static_cast<MultiPlanStage*>(ps);
+    if (PlanStage* ps = getStageByType(_root.get(), StageType::STAGE_MULTI_PLAN)) {
+        auto* mps = dynamic_cast<MultiPlanStage*>(ps);
+        tassert(11321326, "PlanStage* could not be converted to a MultiPlanStage*", mps);
+        return mps;
+    }
+    return nullptr;
 }
 
 }  // namespace mongo
