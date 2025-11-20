@@ -1,11 +1,11 @@
 Graph:
-A -- B
+B -- A
 Solution with seed 0:
-NESTED_LOOP_JOIN
+INDEXED_NESTED_LOOP_JOIN
 ---leftEmbeddingField: (none)
----rightEmbeddingField: c
+---rightEmbeddingField: b
 ---joinPredicates:
-------a = c
+------a = b
 ---Outer:
 ------COLLSCAN
 ---------ns = test.a
@@ -15,20 +15,21 @@ NESTED_LOOP_JOIN
 ---------sortedByDiskLoc = 0
 ---------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 ---Inner:
-------COLLSCAN
----------ns = test.b
----------filter = $and
----------nodeId = 2
+------FETCH
+---------nodeId = 3
 ---------fetched = 1
 ---------sortedByDiskLoc = 0
 ---------providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---------Child:
+------------INDEX_PROBE
+---------------Namespace: test.b Index: { b: 1 }
 
 Solution with seed 1:
 INDEXED_NESTED_LOOP_JOIN
----leftEmbeddingField: c
+---leftEmbeddingField: b
 ---rightEmbeddingField: (none)
 ---joinPredicates:
-------c = a
+------b = a
 ---Outer:
 ------COLLSCAN
 ---------ns = test.b

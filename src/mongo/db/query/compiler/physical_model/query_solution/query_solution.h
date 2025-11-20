@@ -2227,6 +2227,11 @@ struct WindowNode : public QuerySolutionNode {
  *   - leftEmbeddingField = "b", rightEmbeddingField = boost::none
  *   - Left child: Scan(B)
  *   - Right child: Scan(A)
+ *
+ * A plan may also have no embeddings! This can happen when, for example, the base collection is on
+ * the RHS and a subtree of foreign collections being joined is on the LHS. In this case, neither
+ * side of the joins is embedded; instead, this implies that we want to merge the resulting objects
+ * on either side.
  */
 struct BinaryJoinEmbeddingNode : public QuerySolutionNode {
     BinaryJoinEmbeddingNode(std::unique_ptr<QuerySolutionNode> leftChildArg,
@@ -2239,11 +2244,6 @@ struct BinaryJoinEmbeddingNode : public QuerySolutionNode {
           rightEmbeddingField(std::move(rightEmbeddingFieldArg)) {
         children.push_back(std::move(leftChildArg));
         children.push_back(std::move(rightChildArg));
-        // Prevent accidental creation of a plan which doesn't have an embedding field for either
-        // side of the join.
-        tassert(10976201,
-                "BinaryJoinEmbeddingNode must have at least one child with an embedding field",
-                leftEmbeddingField.has_value() || rightEmbeddingField.has_value());
     }
 
     bool fetched() const override {

@@ -147,6 +147,10 @@ public:
         }
     }
 
+    const CanonicalQuery* accessPathAt(NodeId nodeId) const {
+        return getNode(nodeId).accessPath.get();
+    }
+
     const JoinEdge& getEdge(EdgeId edgeId) const {
         if constexpr (kDebugBuild) {
             return _edges.at(edgeId);

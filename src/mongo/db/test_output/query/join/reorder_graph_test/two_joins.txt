@@ -8,20 +8,22 @@ NESTED_LOOP_JOIN
 ------a = b
 ---Outer:
 ------NESTED_LOOP_JOIN
----------leftEmbeddingField: (none)
----------rightEmbeddingField: c
+---------leftEmbeddingField: c
+---------rightEmbeddingField: (none)
 ---------joinPredicates:
-------------a = c
+------------c = a
 ---------Outer:
 ------------COLLSCAN
----------------ns = test.a
+---------------ns = test.c
+---------------filter = $and
 ---------------nodeId = 1
 ---------------fetched = 1
 ---------------sortedByDiskLoc = 0
 ---------------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 ---------Inner:
 ------------COLLSCAN
----------------ns = test.c
+---------------ns = test.a
+---------------filter = $and
 ---------------nodeId = 2
 ---------------fetched = 1
 ---------------sortedByDiskLoc = 0
@@ -29,12 +31,13 @@ NESTED_LOOP_JOIN
 ---Inner:
 ------COLLSCAN
 ---------ns = test.b
+---------filter = $and
 ---------nodeId = 4
 ---------fetched = 1
 ---------sortedByDiskLoc = 0
 ---------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 
-Solution with seed 1:
+Solution with seed 4:
 NESTED_LOOP_JOIN
 ---leftEmbeddingField: (none)
 ---rightEmbeddingField: c
@@ -42,20 +45,22 @@ NESTED_LOOP_JOIN
 ------a = c
 ---Outer:
 ------NESTED_LOOP_JOIN
----------leftEmbeddingField: (none)
----------rightEmbeddingField: b
+---------leftEmbeddingField: b
+---------rightEmbeddingField: (none)
 ---------joinPredicates:
-------------a = b
+------------b = a
 ---------Outer:
 ------------COLLSCAN
----------------ns = test.a
+---------------ns = test.b
+---------------filter = $and
 ---------------nodeId = 1
 ---------------fetched = 1
 ---------------sortedByDiskLoc = 0
 ---------------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 ---------Inner:
 ------------COLLSCAN
----------------ns = test.b
+---------------ns = test.a
+---------------filter = $and
 ---------------nodeId = 2
 ---------------fetched = 1
 ---------------sortedByDiskLoc = 0
@@ -63,6 +68,7 @@ NESTED_LOOP_JOIN
 ---Inner:
 ------COLLSCAN
 ---------ns = test.c
+---------filter = $and
 ---------nodeId = 4
 ---------fetched = 1
 ---------sortedByDiskLoc = 0

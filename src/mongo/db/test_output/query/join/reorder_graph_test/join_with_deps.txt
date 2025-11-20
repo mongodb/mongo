@@ -1,20 +1,20 @@
 Graph:
-C -- A -- B
-Solution with seed 5:
-INDEXED_NESTED_LOOP_JOIN
+BASE -- F1 -- F2
+Solution with seed 0:
+NESTED_LOOP_JOIN
 ---leftEmbeddingField: (none)
----rightEmbeddingField: b
+---rightEmbeddingField: (none)
 ---joinPredicates:
-------a = b
+------f1.a = a
 ---Outer:
 ------NESTED_LOOP_JOIN
----------leftEmbeddingField: c
----------rightEmbeddingField: (none)
+---------leftEmbeddingField: f2
+---------rightEmbeddingField: f1
 ---------joinPredicates:
-------------c = a
+------------c = c
 ---------Outer:
 ------------COLLSCAN
----------------ns = test.c
+---------------ns = test.f2
 ---------------filter = $and
 ---------------nodeId = 1
 ---------------fetched = 1
@@ -22,58 +22,55 @@ INDEXED_NESTED_LOOP_JOIN
 ---------------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 ---------Inner:
 ------------COLLSCAN
----------------ns = test.a
+---------------ns = test.f1
 ---------------filter = $and
 ---------------nodeId = 2
 ---------------fetched = 1
 ---------------sortedByDiskLoc = 0
 ---------------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 ---Inner:
-------FETCH
----------nodeId = 5
+------COLLSCAN
+---------ns = test.base
+---------filter = $and
+---------nodeId = 4
 ---------fetched = 1
 ---------sortedByDiskLoc = 0
 ---------providedSorts = {baseSortPattern: {}, ignoredFields: []}
----------Child:
-------------INDEX_PROBE
----------------Namespace: test.b Index: { b: 1 }
 
-Solution with seed 7:
-INDEXED_NESTED_LOOP_JOIN
+Solution with seed 4:
+NESTED_LOOP_JOIN
 ---leftEmbeddingField: (none)
----rightEmbeddingField: b
+---rightEmbeddingField: (none)
 ---joinPredicates:
-------a = b
+------f1.a = a
 ---Outer:
-------INDEXED_NESTED_LOOP_JOIN
----------leftEmbeddingField: (none)
----------rightEmbeddingField: c
+------NESTED_LOOP_JOIN
+---------leftEmbeddingField: f1
+---------rightEmbeddingField: f2
 ---------joinPredicates:
-------------a = c
+------------c = c
 ---------Outer:
 ------------COLLSCAN
----------------ns = test.a
+---------------ns = test.f1
 ---------------filter = $and
 ---------------nodeId = 1
 ---------------fetched = 1
 ---------------sortedByDiskLoc = 0
 ---------------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 ---------Inner:
-------------FETCH
----------------nodeId = 3
+------------COLLSCAN
+---------------ns = test.f2
+---------------filter = $and
+---------------nodeId = 2
 ---------------fetched = 1
 ---------------sortedByDiskLoc = 0
 ---------------providedSorts = {baseSortPattern: {}, ignoredFields: []}
----------------Child:
-------------------INDEX_PROBE
----------------------Namespace: test.c Index: { c: 1 }
 ---Inner:
-------FETCH
----------nodeId = 6
+------COLLSCAN
+---------ns = test.base
+---------filter = $and
+---------nodeId = 4
 ---------fetched = 1
 ---------sortedByDiskLoc = 0
 ---------providedSorts = {baseSortPattern: {}, ignoredFields: []}
----------Child:
-------------INDEX_PROBE
----------------Namespace: test.b Index: { b: 1 }
 

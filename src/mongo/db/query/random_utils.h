@@ -30,6 +30,9 @@
 #pragma once
 
 #include "mongo/platform/random.h"
+#include "mongo/util/assert_util.h"
+
+#include <random>
 
 namespace mongo::random_utils {
 /**
@@ -58,6 +61,11 @@ public:
             std::size_t j = (gen() + 1) % i;
             std::swap(vec[i - 1], vec[j]);
         }
+    }
+
+    // Helper to generate integer values randomly distributed in the range [min, max].
+    auto generateUniformInt(int min, int max) {
+        return (gen() % (max - min + 1)) + min;
     }
 
 private:

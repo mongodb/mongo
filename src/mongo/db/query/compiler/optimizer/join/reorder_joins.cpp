@@ -34,9 +34,8 @@
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/random_utils.h"
+#include "mongo/db/query/util/bitset_iterator.h"
 #include "mongo/util/assert_util.h"
-
-#include <variant>
 
 namespace mongo::join_ordering {
 
@@ -84,15 +83,6 @@ public:
     ReorderContext& operator=(const ReorderContext&) = delete;
     ReorderContext& operator=(ReorderContext&&) = delete;
 
-    NodeId findMainCollectionNode() const {
-        for (size_t i = 0; i < _joinGraph.numNodes(); i++) {
-            if (_joinGraph.getNode(i).embedPath == boost::none) {
-                return i;
-            }
-        }
-        MONGO_UNREACHABLE_TASSERT(11075701);
-    }
-
     QSNJoinPredicate makePhysicalPredicate(JoinPredicate pred,
                                            bool expandLeftPath,
                                            bool expandRightPath) const {
@@ -103,10 +93,11 @@ public:
             }
             MONGO_UNREACHABLE_TASSERT(11075702);
         }();
+
         // Left field is a local field and potentially could come from already joined foreign
         // collection, so its embedPath is important to handle here. Right field is a foreign field
         // which comes from the current foreign collection, SBE does not expect it to be prefixed
-        // with the foreign's collection as field.
+        // with the foreign collection's as field.
         return {.op = op,
                 .leftField = expandEmbeddedPath(pred.left, expandLeftPath),
                 .rightField = expandEmbeddedPath(pred.right, expandRightPath)};
@@ -141,7 +132,7 @@ public:
         JoinPlanNodeId nodeId, const JoinPlanNodeRegistry& registry) const {
         std::unique_ptr<QuerySolutionNode> qsn;
         std::visit(OverloadedVisitor{[this, &qsn, &registry](const JoiningNode& join) {
-                                         qsn = this->buildQSNFromJoiningNode(join, registry);
+                                         qsn = buildQSNFromJoiningNode(join, registry);
                                      },
                                      [&qsn](const BaseNode& base) {
                                          // TODO SERVER-111913: Avoid this clone
@@ -149,6 +140,21 @@ public:
                                      }},
                    registry.get(nodeId));
         return qsn;
+    }
+
+    NodeId getLeftmostNodeIdOfJoinPlan(JoinPlanNodeId nodeId,
+                                       const JoinPlanNodeRegistry& registry) const {
+        // Traverse binary tree to get left-most node, so we can use it as the base collection for
+        // the aggregation itself- this is the first collection we join with.
+        return std::visit(
+            OverloadedVisitor{[this, &registry](const JoiningNode& join) {
+                                  return getLeftmostNodeIdOfJoinPlan(join.left, registry);
+                              },
+                              [](const BaseNode& base) {
+                                  BitsetIterator<kMaxNodesInJoin> it = begin(base.bitset);
+                                  return (NodeId)*it;
+                              }},
+            registry.get(nodeId));
     }
 
     JoinEdge getEdge(NodeSet left, NodeSet right) const {
@@ -176,13 +182,22 @@ public:
     }
 
 private:
+    /**
+     * Given a PathId we need to add to a join predicate, we need to fetch its corresponding name
+     * and (potentially) expand it to include the full path including where it is embedded.
+     *
+     * For example, consider the pipeline:
+     *   [{$lookup: {from: "b", localField: "foo", foreignField: "bar", as: "b"}}, {$unwind: "$b"}].
+     *
+     * The field "bar" resolves to "bar" when not expanded and to "b.bar" when expanded.
+     */
     FieldPath expandEmbeddedPath(PathId pathId, bool expand) const {
         const auto& resolvedPath = _resolvedPaths[pathId];
         if (!expand) {
             return resolvedPath.fieldName;
         }
 
-        const auto& node = _joinGraph.getNode(_resolvedPaths[pathId].nodeId);
+        const auto& node = _joinGraph.getNode(resolvedPath.nodeId);
         if (node.embedPath.has_value()) {
             return node.embedPath->concat(resolvedPath.fieldName);
         }
@@ -317,13 +332,14 @@ boost::optional<IndexEntry> bestIndexSatisfyingJoinPredicates(
     return boost::none;
 }
 
-std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
+ReorderedJoinSolution constructSolutionWithRandomOrder(
     QuerySolutionMap solns,
     const JoinGraph& joinGraph,
     const std::vector<ResolvedPath>& resolvedPaths,
     const MultipleCollectionAccessor& mca,
     int seed,
-    bool defaultHJ) {
+    bool defaultHJ,
+    bool enableBaseReordering) {
     random_utils::PseudoRandomGenerator rand(seed);
     ReorderContext ctx(joinGraph, resolvedPaths);
 
@@ -332,13 +348,15 @@ std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
     // Ordered queue of nodes we need to visit
     std::vector<NodeId> frontier;
 
-    // Currently the stage builders only support the main collection being the left-most in the
-    // tree.
-    // TODO SERVER-111581: Remove this restriction.
-    frontier.push_back(ctx.findMainCollectionNode());
+    // Randomly select a base collection.
+    NodeId baseId = enableBaseReordering
+        ? rand.generateUniformInt(0, (int)(joinGraph.numNodes() - 1))
+        : 0 /* Use first node seen by graph. */;
+    frontier.push_back(baseId);
 
     // Final query solution
     std::unique_ptr<QuerySolutionNode> soln;
+    boost::optional<FieldPath> leftMostFieldPath;
 
     while (!frontier.empty()) {
         auto current = frontier.back();
@@ -349,6 +367,7 @@ std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
             // This is the first node we encountered.
             // TODO SERVER-111913: Avoid this clone
             soln = solns.at(currentNode.accessPath.get())->root()->clone();
+            leftMostFieldPath = currentNode.embedPath;
         } else {
             // Generate an INLJ if possible, otherwise generate a NLJ.
 
@@ -359,13 +378,30 @@ std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
             currentNodeSet.set(current);
             // TODO SERVER-111798: Support join graphs with cycles & multiple predicates.
             auto edge = ctx.getEdge(visited, currentNodeSet);
+
+            boost::optional<FieldPath> lhsEmbedPath;
+            bool expandLeftPredicate;
+            if (auto lhs = dynamic_cast<BinaryJoinEmbeddingNode*>(soln.get()); !lhs) {
+                // We are joining two "base" nodes in the tree and thus don't need to expand the
+                // field referenced in the join predicate.
+                lhsEmbedPath = leftMostFieldPath;
+                // In this case, we don't want to expand either field in the predicate! Instead, we
+                // want to use the SBE slot for both fields.
+                expandLeftPredicate = false;
+            } else {
+                // Our rhs is an access path node, and our lhs is some embedding node tree. We want
+                // to expand only the path corresponding to the left subtree in the predicate;
+                // however, note that the order of paths may not match the order of nodes.
+                expandLeftPredicate = true;
+            }
+
             auto joinPreds = ctx.makeJoinPreds(
-                edge, true /* TODO: SERVER-111581 */, false /* TODO: SERVER-111581 */);
-            auto indexedJoinPreds = ctx.makeIndexedJoinPreds(edge, current);
+                edge, expandLeftPredicate, false /* Left-deep => never expand RHS. */);
 
             // Attempt to use INLJ if possible, otherwise fallback to NLJ or HJ depending on the
             // query knob.
             JoinMethod method = JoinMethod::NLJ;
+            auto indexedJoinPreds = ctx.makeIndexedJoinPreds(edge, current);
             if (auto indexEntry = bestIndexSatisfyingJoinPredicates(
                     *mca.lookupCollection(currentNode.collectionName)->getIndexCatalog(),
                     indexedJoinPreds);
@@ -385,7 +421,7 @@ std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
             soln = makeBinaryJoinEmbeddingQSN(method,
                                               std::move(joinPreds),
                                               std::move(soln),
-                                              boost::none,
+                                              lhsEmbedPath,
                                               std::move(rhs),
                                               currentNode.embedPath);
         }
@@ -415,14 +451,13 @@ std::unique_ptr<QuerySolution> constructSolutionWithRandomOrder(
 
     auto ret = std::make_unique<QuerySolution>();
     ret->setRoot(std::move(soln));
-    return ret;
+    return {.soln = std::move(ret), .baseNode = baseId};
 }
 
-std::unique_ptr<QuerySolution> constructSolutionBottomUp(
-    QuerySolutionMap solns,
-    const join_ordering::JoinGraph& joinGraph,
-    const std::vector<ResolvedPath>& resolvedPaths,
-    const MultipleCollectionAccessor& catalog) {
+ReorderedJoinSolution constructSolutionBottomUp(QuerySolutionMap solns,
+                                                const join_ordering::JoinGraph& joinGraph,
+                                                const std::vector<ResolvedPath>& resolvedPaths,
+                                                const MultipleCollectionAccessor& catalog) {
     PlanEnumeratorContext peCtx(joinGraph, solns);
     ReorderContext rCtx(joinGraph, resolvedPaths);
 
@@ -431,8 +466,10 @@ std::unique_ptr<QuerySolution> constructSolutionBottomUp(
 
     // Build QSN based on best plan.
     auto ret = std::make_unique<QuerySolution>();
-    ret->setRoot(rCtx.buildQSNFromJoinPlan(bestPlanNodeId, peCtx.registry()));
-    return ret;
+    const auto& registry = peCtx.registry();
+    auto baseNodeId = rCtx.getLeftmostNodeIdOfJoinPlan(bestPlanNodeId, registry);
+    ret->setRoot(rCtx.buildQSNFromJoinPlan(bestPlanNodeId, registry));
+    return {.soln = std::move(ret), .baseNode = baseNodeId};
 }
 
 }  // namespace mongo::join_ordering

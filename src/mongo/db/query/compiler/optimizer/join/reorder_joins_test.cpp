@@ -32,8 +32,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/local_catalog/index_catalog_entry_mock.h"
 #include "mongo/db/local_catalog/index_catalog_mock.h"
-#include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
@@ -41,8 +40,6 @@
 namespace mongo::join_ordering {
 
 unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/query/join"};
-
-using ReorderGraphTest = JoinOrderingTestFixture;
 
 QuerySolutionMap cloneSolnMap(const QuerySolutionMap& qsm) {
     QuerySolutionMap ret;
@@ -54,72 +51,104 @@ QuerySolutionMap cloneSolnMap(const QuerySolutionMap& qsm) {
     return ret;
 }
 
-TEST_F(ReorderGraphTest, SimpleGraph) {
-    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+class ReorderGraphTest : public JoinOrderingTestFixture {
+protected:
+    // Helper struct for intializing a namespace, its embedding, any residual filter, and indexes
+    // that are available.
+    struct TestNamespaceParams {
+        const std::string& collName;
+        boost::optional<FieldPath> embedPath;
+        BSONObj filter;
+        std::vector<BSONObj> indexes;
+    };
+
+    NodeId addNssWithEmbedding(TestNamespaceParams&& params) {
+        auto nss = NamespaceString::createNamespaceString_forTest("test", params.collName);
+        namespaces.push_back(nss);
+        auto cq = makeCanonicalQuery(nss, params.filter);
+        auto cs = makeCollScanPlan(nss, cq->getPrimaryMatchExpression()->clone());
+        auto p = std::pair<mongo::CanonicalQuery*, std::unique_ptr<mongo::QuerySolution>>{
+            cq.get(), std::move(cs)};
+        solnsPerQuery.insert(std::move(p));
+        idxMap.insert({nss, std::move(params.indexes)});
+
+        return graph.addNode(nss, std::move(cq), params.embedPath);
+    }
+
+    void outputSolutions(std::ostream& out) {
+        // Setup collections.
+        for (auto&& nss : namespaces) {
+            createCollection(nss);
+            if (auto it = idxMap.find(nss); it != idxMap.end()) {
+                ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+                    operationContext(), nss, it->second));
+            }
+        }
+        auto mca = multipleCollectionAccessor(operationContext(), namespaces);
+
+        // Ensure each solution has a different base node.
+        std::set<NodeId> baseNodes;
+        for (auto seed : seeds) {
+            auto r = constructSolutionWithRandomOrder(cloneSolnMap(solnsPerQuery),
+                                                      graph,
+                                                      resolvedPaths,
+                                                      mca,
+                                                      seed,
+                                                      false /* Default to NLJ. */,
+                                                      true /* Allow base collection reordering. */);
+            ASSERT(r.soln);
+            // Ensure our seeds produce different base collections.
+            ASSERT(!baseNodes.contains(r.baseNode));
+            baseNodes.emplace(r.baseNode);
+
+            out << "Solution with seed " << seed << ":" << std::endl;
+            out << r.soln->toString() << std::endl;
+        }
+    }
 
     JoinGraph graph;
-
-    auto nss1 = NamespaceString::createNamespaceString_forTest("test", "a");
-    auto nss2 = NamespaceString::createNamespaceString_forTest("test", "b");
-    createCollection(nss1);
-    createCollection(nss2);
-
+    std::vector<std::unique_ptr<CanonicalQuery>> cqs;
     QuerySolutionMap solnsPerQuery;
+    std::vector<ResolvedPath> resolvedPaths;
+    std::vector<int> seeds;
+    std::vector<NamespaceString> namespaces;
+    std::map<NamespaceString, std::vector<BSONObj>> idxMap;
+};
 
-    auto cq1 = makeCanonicalQuery(nss1);
-    solnsPerQuery.insert({cq1.get(), makeCollScanPlan(nss1)});
-    auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
-    auto cq2 = makeCanonicalQuery(nss2);
-    solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2)});
-    auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"b"});
+TEST_F(ReorderGraphTest, SimpleGraph) {
+    // Show that we can reorder the base in the simplest case.
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
+    seeds = {0, 1};
 
-    std::vector<ResolvedPath> resolvedPaths{
+    auto id1 = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto id2 = addNssWithEmbedding(
+        {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {}});
+
+    resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
         ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
 
-    auto soln = constructSolutionWithRandomOrder(
-        std::move(solnsPerQuery),
-        graph,
-        resolvedPaths,
-        multipleCollectionAccessor(operationContext(), {nss1, nss2}),
-        0);
-    ASSERT(soln);
-
-    goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
-    goldenCtx.outStream() << soln->toString() << std::endl;
+    outputSolutions(goldenCtx.outStream());
 }
 
 TEST_F(ReorderGraphTest, TwoJoins) {
-    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
-
     // This graph looks like:
     // C -- A -- B
     // where A is the main collection.
-    JoinGraph graph;
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    goldenCtx.outStream() << "Graph:\nC -- A -- B" << std::endl;
 
-    auto nss1 = NamespaceString::createNamespaceString_forTest("test", "a");
-    auto nss2 = NamespaceString::createNamespaceString_forTest("test", "b");
-    auto nss3 = NamespaceString::createNamespaceString_forTest("test", "c");
-    createCollection(nss1);
-    createCollection(nss2);
-    createCollection(nss3);
+    auto id1 = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto id2 = addNssWithEmbedding(
+        {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {}});
+    auto id3 = addNssWithEmbedding(
+        {.collName = "c", .embedPath = FieldPath{"c"}, .filter = {}, .indexes = {}});
 
-    QuerySolutionMap solnsPerQuery;
-
-    auto cq1 = makeCanonicalQuery(nss1);
-    solnsPerQuery.insert({cq1.get(), makeCollScanPlan(nss1)});
-    auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
-    auto cq2 = makeCanonicalQuery(nss2);
-    solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2)});
-    auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"b"});
-    auto cq3 = makeCanonicalQuery(nss3);
-    solnsPerQuery.insert({cq3.get(), makeCollScanPlan(nss3)});
-    auto id3 = graph.addNode(nss3, std::move(cq3), FieldPath{"c"});
-
-    std::vector<ResolvedPath> resolvedPaths{
+    resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
         ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
         ResolvedPath{.nodeId = id3, .fieldName = FieldPath{"c"}},
@@ -128,98 +157,69 @@ TEST_F(ReorderGraphTest, TwoJoins) {
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
     graph.addSimpleEqualityEdge(id1, id3, 0 /*a*/, 2 /*c.c*/);
 
-    auto solnsPerQueryCopy = cloneSolnMap(solnsPerQuery);
-
-    auto soln = constructSolutionWithRandomOrder(
-        std::move(solnsPerQuery),
-        graph,
-        resolvedPaths,
-        multipleCollectionAccessor(operationContext(), {nss1, nss2, nss3}),
-        0);
-    auto soln2 = constructSolutionWithRandomOrder(
-        std::move(solnsPerQueryCopy),
-        graph,
-        resolvedPaths,
-        multipleCollectionAccessor(operationContext(), {nss1, nss2, nss3}),
-        1);
-    ASSERT(soln);
-    ASSERT(soln2);
-
-    goldenCtx.outStream() << "Graph:\nC -- A -- B" << std::endl;
+    seeds = {0, 4};
 
     // Demonstrate that different join orders are constructed with different seeds
-    goldenCtx.outStream() << "Solution with seed 0:" << std::endl;
-    goldenCtx.outStream() << soln->toString() << std::endl;
-    goldenCtx.outStream() << "Solution with seed 1:" << std::endl;
-    goldenCtx.outStream() << soln2->toString() << std::endl;
+    outputSolutions(goldenCtx.outStream());
 }
 
 TEST_F(ReorderGraphTest, SimpleINLJ) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
 
-    auto nss1 = NamespaceString::createNamespaceString_forTest("test", "a");
-    auto nss2 = NamespaceString::createNamespaceString_forTest("test", "b");
-    createCollection(nss1);
-    createCollection(nss2);
-    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-        operationContext(), nss1, {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}));
-    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-        operationContext(), nss2, {BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1))}));
+    // Create namespaces with indexes.
+    auto id1 = addNssWithEmbedding(
+        {.collName = "a",
+         .embedPath = {},
+         .filter = {},
+         .indexes = {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}});
+    auto id2 = addNssWithEmbedding(
+        {.collName = "b",
+         .embedPath = FieldPath{"b"},
+         .filter = {},
+         .indexes = {BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1))}});
 
-    auto mca = multipleCollectionAccessor(operationContext(), {nss1, nss2});
+    resolvedPaths = {
+        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+    };
 
-    {
-        JoinGraph graph;
-        QuerySolutionMap solnsPerQuery;
+    graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
 
-        auto cq1 = makeCanonicalQuery(nss1);
-        solnsPerQuery.insert({cq1.get(), makeCollScanPlan(nss1)});
-        auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
-        auto cq2 = makeCanonicalQuery(nss2);
-        solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2)});
-        auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"b"});
+    seeds = {0, 1};
 
-        std::vector<ResolvedPath> resolvedPaths{
-            ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-            ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
-        };
+    // Demonstrate that different join orders are constructed with different seeds
+    outputSolutions(goldenCtx.outStream());
+}
 
-        graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
+TEST_F(ReorderGraphTest, SimpleINLJSwapEdge) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    goldenCtx.outStream() << "Graph:\nB -- A" << std::endl;
 
-        auto soln = constructSolutionWithRandomOrder(
-            std::move(solnsPerQuery), graph, resolvedPaths, mca, 0);
-        ASSERT(soln);
+    // Create namespaces with indexes.
+    auto id1 = addNssWithEmbedding(
+        {.collName = "a",
+         .embedPath = {},
+         .filter = {},
+         .indexes = {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}});
+    auto id2 = addNssWithEmbedding(
+        {.collName = "b",
+         .embedPath = FieldPath{"b"},
+         .filter = {},
+         .indexes = {BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1))}});
 
-        goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
-        goldenCtx.outStream() << soln->toString() << std::endl;
-    }
+    resolvedPaths = {
+        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+    };
 
-    {
-        JoinGraph graph;
-        QuerySolutionMap solnsPerQuery;
+    // Swap edge dir compared to previous.
+    graph.addSimpleEqualityEdge(id2, id1, 1 /*b.b*/, 0 /*a*/);
 
-        auto cq1 = makeCanonicalQuery(nss1);
-        solnsPerQuery.insert({cq1.get(), makeCollScanPlan(nss1)});
-        auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
-        auto cq2 = makeCanonicalQuery(nss2);
-        solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2)});
-        auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"b"});
+    seeds = {0, 1};
 
-        std::vector<ResolvedPath> resolvedPaths{
-            ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-            ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
-        };
-
-        // Swapped edge from above example
-        graph.addSimpleEqualityEdge(id2, id1, 1 /*b.b*/, 0 /*a*/);
-
-        auto soln = constructSolutionWithRandomOrder(
-            std::move(solnsPerQuery), graph, resolvedPaths, mca, 0);
-        ASSERT(soln);
-
-        goldenCtx.outStream() << "Graph:\nB -- A" << std::endl;
-        goldenCtx.outStream() << soln->toString() << std::endl;
-    }
+    // Demonstrate that different join orders are constructed with different seeds
+    outputSolutions(goldenCtx.outStream());
 }
 
 TEST_F(ReorderGraphTest, MultipleINLJ) {
@@ -228,32 +228,21 @@ TEST_F(ReorderGraphTest, MultipleINLJ) {
     // This graph looks like:
     // C -- A -- B
     // where A is the main collection.
-    JoinGraph graph;
+    goldenCtx.outStream() << "Graph:\nC -- A -- B" << std::endl;
 
-    auto nss1 = NamespaceString::createNamespaceString_forTest("test", "a");
-    auto nss2 = NamespaceString::createNamespaceString_forTest("test", "b");
-    auto nss3 = NamespaceString::createNamespaceString_forTest("test", "c");
-    createCollection(nss1);
-    createCollection(nss2);
-    createCollection(nss3);
-    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-        operationContext(), nss2, {BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1))}));
-    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-        operationContext(), nss3, {BSON("v" << 2 << "name" << "c_1" << "key" << BSON("c" << 1))}));
+    auto id1 = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto id2 = addNssWithEmbedding(
+        {.collName = "b",
+         .embedPath = FieldPath{"b"},
+         .filter = {},
+         .indexes = {BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1))}});
+    auto id3 = addNssWithEmbedding(
+        {.collName = "c",
+         .embedPath = FieldPath{"c"},
+         .filter = {},
+         .indexes = {BSON("v" << 2 << "name" << "c_1" << "key" << BSON("c" << 1))}});
 
-    QuerySolutionMap solnsPerQuery;
-
-    auto cq1 = makeCanonicalQuery(nss1);
-    solnsPerQuery.insert({cq1.get(), makeCollScanPlan(nss1)});
-    auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
-    auto cq2 = makeCanonicalQuery(nss2);
-    solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2)});
-    auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"b"});
-    auto cq3 = makeCanonicalQuery(nss3);
-    solnsPerQuery.insert({cq3.get(), makeCollScanPlan(nss3)});
-    auto id3 = graph.addNode(nss3, std::move(cq3), FieldPath{"c"});
-
-    std::vector<ResolvedPath> resolvedPaths{
+    resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
         ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
         ResolvedPath{.nodeId = id3, .fieldName = FieldPath{"c"}},
@@ -262,191 +251,153 @@ TEST_F(ReorderGraphTest, MultipleINLJ) {
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
     graph.addSimpleEqualityEdge(id1, id3, 0 /*a*/, 2 /*c.c*/);
 
-    auto solnsPerQueryCopy = cloneSolnMap(solnsPerQuery);
+    seeds = {5, 7};
+    // Demonstrate that different join orders are constructed with different seeds
+    outputSolutions(goldenCtx.outStream());
+}
 
-    auto soln = constructSolutionWithRandomOrder(
-        std::move(solnsPerQuery),
-        graph,
-        resolvedPaths,
-        multipleCollectionAccessor(operationContext(), {nss1, nss2, nss3}),
-        0);
-    auto soln2 = constructSolutionWithRandomOrder(
-        std::move(solnsPerQueryCopy),
-        graph,
-        resolvedPaths,
-        multipleCollectionAccessor(operationContext(), {nss1, nss2, nss3}),
-        1);
-    ASSERT(soln);
-    ASSERT(soln2);
+TEST_F(ReorderGraphTest, JoinWithDeps) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
 
-    goldenCtx.outStream() << "Graph:\nC -- A -- B" << std::endl;
+    /**
+     * This graph looks like:
+     * BASE -- F1 -- F2
+     * where BASE is the main collection.
+     *
+     * Example agg on collection "base": [
+     *  {$lookup: {from: “f1”, localField: “a”, foreignField: “a”, as: “f1”}},
+     *  {$unwind: “$f1”},
+     *  {$lookup: {from: “f2”, localField: “f1.c”, foreignField: “c”, as: “f2”}},
+     *  {$unwind: “$f2”}
+     * ]
+     */
+    goldenCtx.outStream() << "Graph:\nBASE -- F1 -- F2" << std::endl;
+
+    auto id1 =
+        addNssWithEmbedding({.collName = "base", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto id2 = addNssWithEmbedding(
+        {.collName = "f1", .embedPath = FieldPath{"f1"}, .filter = {}, .indexes = {}});
+    auto id3 = addNssWithEmbedding(
+        {.collName = "f2", .embedPath = FieldPath{"f2"}, .filter = {}, .indexes = {}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id3, .fieldName = FieldPath{"c"}},
+    };
+
+    graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*f1.a*/);
+    graph.addSimpleEqualityEdge(id2, id3, 2 /*f1.c*/, 3 /*f2.c*/);
+
+    seeds = {0, 4};
 
     // Demonstrate that different join orders are constructed with different seeds
-    goldenCtx.outStream() << "Solution with seed 0:" << std::endl;
-    goldenCtx.outStream() << soln->toString() << std::endl;
-    goldenCtx.outStream() << "Solution with seed 1:" << std::endl;
-    goldenCtx.outStream() << soln2->toString() << std::endl;
+    outputSolutions(goldenCtx.outStream());
 }
 
 TEST_F(ReorderGraphTest, INLJResidualPred) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
 
-    auto nss1 = NamespaceString::createNamespaceString_forTest("test", "a");
-    auto nss2 = NamespaceString::createNamespaceString_forTest("test", "b");
-    createCollection(nss1);
-    createCollection(nss2);
-    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-        operationContext(), nss1, {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}));
-    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-        operationContext(), nss2, {BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1))}));
-
-    auto mca = multipleCollectionAccessor(operationContext(), {nss1, nss2});
-
-    JoinGraph graph;
-    QuerySolutionMap solnsPerQuery;
-
-    auto cq1 = makeCanonicalQuery(nss1);
-    solnsPerQuery.insert({cq1.get(), makeCollScanPlan(nss1)});
-    auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
+    auto id1 = addNssWithEmbedding(
+        {.collName = "a",
+         .embedPath = {},
+         .filter = {},
+         .indexes = {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}});
 
     BSONObj filter = fromjson("{b: {$gt: 5}}");
-    auto cq2 = makeCanonicalQuery(nss2, filter);
-    auto expCtx = ExpressionContextBuilder{}.opCtx(operationContext()).build();
-    auto me = std::move(MatchExpressionParser::parse(filter, expCtx).getValue());
-    solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2, std::move(me))});
+    auto id2 = addNssWithEmbedding(
+        {.collName = "b",
+         .embedPath = FieldPath{"b"},
+         .filter = filter,
+         .indexes = {BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1))}});
 
-    auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"b"});
-
-    std::vector<ResolvedPath> resolvedPaths{
+    resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
         ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
 
-    auto soln =
-        constructSolutionWithRandomOrder(std::move(solnsPerQuery), graph, resolvedPaths, mca, 0);
-    ASSERT(soln);
+    seeds = {0};
 
     goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
-    goldenCtx.outStream() << soln->toString() << std::endl;
+    outputSolutions(goldenCtx.outStream());
 }
 
 // Probe using prefix
 TEST_F(ReorderGraphTest, INLJUseIndexPrefix) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
 
-    auto nss1 = NamespaceString::createNamespaceString_forTest("test", "a");
-    auto nss2 = NamespaceString::createNamespaceString_forTest("test", "b");
-    createCollection(nss1);
-    createCollection(nss2);
-    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-        operationContext(), nss1, {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}));
-    // Index on {b: 1, c: 1}
-    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-        operationContext(),
-        nss2,
-        {BSON("v" << 2 << "name" << "b_1_c_1" << "key" << BSON("b" << 1 << "c" << 1))}));
+    auto id1 = addNssWithEmbedding(
+        {.collName = "a",
+         .embedPath = {},
+         .filter = {},
+         .indexes = {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}});
 
-    auto mca = multipleCollectionAccessor(operationContext(), {nss1, nss2});
+    auto id2 = addNssWithEmbedding({.collName = "b",
+                                    .embedPath = FieldPath{"b"},
+                                    .filter = {},
+                                    .indexes = {BSON("v" << 2 << "name" << "b_1_c_1" << "key"
+                                                         << BSON("b" << 1 << "c" << 1))}});
 
-    JoinGraph graph;
-    QuerySolutionMap solnsPerQuery;
-
-    auto cq1 = makeCanonicalQuery(nss1);
-    solnsPerQuery.insert({cq1.get(), makeCollScanPlan(nss1)});
-    auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
-    auto cq2 = makeCanonicalQuery(nss2);
-    solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2)});
-
-    auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"b"});
-
-    std::vector<ResolvedPath> resolvedPaths{
+    resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
         ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
 
-    auto soln =
-        constructSolutionWithRandomOrder(std::move(solnsPerQuery), graph, resolvedPaths, mca, 0);
-    ASSERT(soln);
+    seeds = {0};
 
     goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
-    goldenCtx.outStream() << soln->toString() << std::endl;
+    outputSolutions(goldenCtx.outStream());
 }
 
 // Index {b: 1, c: 1} cannot be used to satisfy join predicate on c
 TEST_F(ReorderGraphTest, AvoidINLJOverIneligibleIndex) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
 
-    auto nss1 = NamespaceString::createNamespaceString_forTest("test", "a");
-    auto nss2 = NamespaceString::createNamespaceString_forTest("test", "b");
-    createCollection(nss1);
-    createCollection(nss2);
-    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-        operationContext(), nss1, {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}));
-    // Index on {b: 1, c: 1}
-    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-        operationContext(),
-        nss2,
-        {BSON("v" << 2 << "name" << "b_1_c_1" << "key" << BSON("b" << 1 << "c" << 1))}));
+    auto id1 = addNssWithEmbedding(
+        {.collName = "a",
+         .embedPath = {},
+         .filter = {},
+         .indexes = {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}});
+    auto id2 = addNssWithEmbedding({.collName = "b",
+                                    .embedPath = FieldPath{"c"},
+                                    .filter = {},
+                                    .indexes = {BSON("v" << 2 << "name" << "b_1_c_1" << "key"
+                                                         << BSON("b" << 1 << "c" << 1))}});
 
-    auto mca = multipleCollectionAccessor(operationContext(), {nss1, nss2});
-
-    JoinGraph graph;
-    QuerySolutionMap solnsPerQuery;
-
-    auto cq1 = makeCanonicalQuery(nss1);
-    solnsPerQuery.insert({cq1.get(), makeCollScanPlan(nss1)});
-    auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
-    auto cq2 = makeCanonicalQuery(nss2);
-    solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2)});
-    auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"c"});
-
-    std::vector<ResolvedPath> resolvedPaths{
+    resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
         ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"c"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.c*/);
 
-    auto soln =
-        constructSolutionWithRandomOrder(std::move(solnsPerQuery), graph, resolvedPaths, mca, 0);
-    ASSERT(soln);
+    seeds = {0, 1};
 
     goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
-    goldenCtx.outStream() << soln->toString() << std::endl;
+    outputSolutions(goldenCtx.outStream());
 }
 
 TEST_F(ReorderGraphTest, INLJCompoundJoinPredicate) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
 
-    auto nss1 = NamespaceString::createNamespaceString_forTest("test", "a");
-    auto nss2 = NamespaceString::createNamespaceString_forTest("test", "b");
-    createCollection(nss1);
-    createCollection(nss2);
-    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-        operationContext(), nss1, {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}));
-    // Index on {c: 1, d: 1}
-    ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-        operationContext(),
-        nss2,
-        {BSON("v" << 2 << "name" << "c_1_d_1" << "key" << BSON("c" << 1 << "d" << 1))}));
+    auto id1 = addNssWithEmbedding(
+        {.collName = "a",
+         .embedPath = {},
+         .filter = {},
+         .indexes = {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}});
 
-    auto mca = multipleCollectionAccessor(operationContext(), {nss1, nss2});
+    auto id2 = addNssWithEmbedding({.collName = "b",
+                                    .embedPath = FieldPath{"b"},
+                                    .filter = {},
+                                    .indexes = {BSON("v" << 2 << "name" << "c_1_d_1" << "key"
+                                                         << BSON("c" << 1 << "d" << 1))}});
 
-    JoinGraph graph;
-    QuerySolutionMap solnsPerQuery;
-
-    auto cq1 = makeCanonicalQuery(nss1);
-    solnsPerQuery.insert({cq1.get(), makeCollScanPlan(nss1)});
-    auto id1 = graph.addNode(nss1, std::move(cq1), boost::none);
-    auto cq2 = makeCanonicalQuery(nss2);
-    solnsPerQuery.insert({cq2.get(), makeCollScanPlan(nss2)});
-    auto id2 = graph.addNode(nss2, std::move(cq2), FieldPath{"b"});
-
-    std::vector<ResolvedPath> resolvedPaths{
+    resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"b"}},
         ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"c"}},
@@ -456,12 +407,10 @@ TEST_F(ReorderGraphTest, INLJCompoundJoinPredicate) {
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 2 /*b.c*/);
     graph.addSimpleEqualityEdge(id1, id2, 1 /*b*/, 3 /*b.d*/);
 
-    auto soln =
-        constructSolutionWithRandomOrder(std::move(solnsPerQuery), graph, resolvedPaths, mca, 0);
-    ASSERT(soln);
+    seeds = {0};
 
     goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
-    goldenCtx.outStream() << soln->toString() << std::endl;
+    outputSolutions(goldenCtx.outStream());
 }
 
 IndexDescriptor makeIndexDescriptor(BSONObj indexSpec) {
