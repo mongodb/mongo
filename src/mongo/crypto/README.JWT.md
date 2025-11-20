@@ -22,7 +22,7 @@ Since signature validation is not available on other platforms, use of the unval
 
 ## JWKManager
 
-[JWKManager](https://github.com/mongodb/mongo/blob/master/src/mongo/crypto/jwk_manager.h)
+[JWKManager](/src/mongo/crypto/jwk_manager.h)
 loads `JWKSet`s from an HTTPS endpoint, parses the received JSON using the
 `JWKSet`, `JWK`, and `JWKRSA` types from IDL, and instantiates [`JWSValidator`s](#jwsvalidator) with the key material.
 
@@ -67,7 +67,7 @@ A typical JSON file containing keys may look something like the following:
 
 ## JWSValidator
 
-The [`JWSValidator`](https://github.com/mongodb/mongo/blob/master/src/mongo/crypto/jws_validator.h)
+The [`JWSValidator`](/src/mongo/crypto/jws_validator.h)
 interface provides a platform agnostic API for verifying the signatures on `JWS` signed `JWT` payloads.
 Each instance of a `JWSValidator` is created (via `JWSValidator::create`) with a specific key,
 and may have it's `JWSValidator->validate()` invoked multiple times (concurrently) to validate tokens
@@ -75,10 +75,10 @@ as they are received from third parties such as connected clients.
 
 Platform specific implementations of the cryptographic functions may be found in:
 
-- Linux: [jws_validator_openssl.cpp](https://github.com/mongodb/mongo/blob/master/src/mongo/crypto/jws_validator_openssl.cpp)
-- Windows: [jws_validator_windows.cpp](https://github.com/mongodb/mongo/blob/master/src/mongo/crypto/jws_validator_windows.cpp) UNIMPLEMENTED
-- macOS: [jws_validator_apple.cpp](https://github.com/mongodb/mongo/blob/master/src/mongo/crypto/jws_validator_apple.cpp) UNIMPLEMENTED
-- Non-TLS builds: [jws_validator_none.cpp](https://github.com/mongodb/mongo/blob/master/src/mongo/crypto/jws_validator_none.cpp) UNIMPLEMENTED
+- Linux: [jws_validator_openssl.cpp](/src/mongo/crypto/jws_validator_openssl.cpp)
+- Windows: [jws_validator_windows.cpp](/src/mongo/crypto/jws_validator_windows.cpp) UNIMPLEMENTED
+- macOS: [jws_validator_apple.cpp](/src/mongo/crypto/jws_validator_apple.cpp) UNIMPLEMENTED
+- Non-TLS builds: [jws_validator_none.cpp](/src/mongo/crypto/jws_validator_none.cpp) UNIMPLEMENTED
 
 ## JWSValidatedToken
 

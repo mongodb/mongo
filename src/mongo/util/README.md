@@ -178,9 +178,9 @@ future_util::withCancellation(requestFuture, token)
 
 ### Links to Relevant Code + Example Tests
 
-- [CancellationSource/CancellationToken implementations](https://github.com/mongodb/mongo/blob/master/src/mongo/util/cancellation.h)
-- [CancellationSource/CancellationToken unit tests](https://github.com/mongodb/mongo/blob/master/src/mongo/util/cancellation_test.cpp)
-- [CancelableExecutor implementation](https://github.com/mongodb/mongo/blob/master/src/mongo/executor/cancelable_executor.h)
-- [CancelableExecutor unit tests](https://github.com/mongodb/mongo/blob/master/src/mongo/executor/cancelable_executor_test.cpp)
+- [CancellationSource/CancellationToken implementations](/src/mongo/util/cancellation.h)
+- [CancellationSource/CancellationToken unit tests](/src/mongo/util/cancellation_test.cpp)
+- [CancelableExecutor implementation](/src/mongo/executor/cancelable_executor.h)
+- [CancelableExecutor unit tests](/src/mongo/executor/cancelable_executor_test.cpp)
 - [future_util::withCancellation implementation](https://github.com/mongodb/mongo/blob/99d28dd184ada37720d0dae1f3d8c35fec85bd4b/src/mongo/util/future_util.h#L658)
 - [future_util::withCancellation unit tests](https://github.com/mongodb/mongo/blob/99d28dd184ada37720d0dae1f3d8c35fec85bd4b/src/mongo/util/future_util_test.cpp#L1268-L1343)

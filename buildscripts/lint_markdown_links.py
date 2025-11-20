@@ -12,6 +12,15 @@ Link Types Validated
 
 External (http/https) links are currently skipped (no network requests performed) except for a trivial malformed scheme check (e.g. `hhttps://`).
 
+GitHub Repository Link Policy
+-----------------------------
+Links to the MongoDB server repository (`github.com/mongodb/mongo` or private clone `github.com/10gen/mongo`) must not reference the mutable `master` branch. Allowed:
+* Release/tag branches (e.g. `r6.2.0`)
+* Specific commit SHAs (40 hex chars)
+* Any other non-`master` branch
+
+Unpinned `master` links are reported with an issue. Auto-fix rewrites them to a repo-root relative path (`/src/...`) preserving any line fragment (e.g. `#L89`).
+
 Anchor Normalization
 --------------------
 GitHub-style anchors derived from headings:
@@ -29,7 +38,13 @@ JSON output (exit code still meaningful):
 
 Auto-Fix Renamed Paths
 ----------------------
-If directories or files were renamed (e.g. `catalog` -> `local_catalog`), attempt automatic fixes:
+Auto-fix (`--auto-fix`) automatically handles:
+* Directory renames via `--rename-map old=new`
+* Moved files (searches by basename across the repository)
+* Broken anchors (relocates to correct file)
+* Common typos and malformed schemes
+
+Example with rename mapping:
     python buildscripts/lint_markdown_links.py --auto-fix --rename-map catalog=local_catalog --root src/mongo/db/storage --verbose
 
 Multiple mappings:
@@ -37,7 +52,7 @@ Multiple mappings:
         --rename-map catalog=local_catalog \
         --rename-map query_stats=query_shape_stats
 
-After auto-fix the script re-runs linting. Only simple missing-file cases where a path segment matches an OLD value are modified; anchors are preserved.
+After auto-fix the script re-runs linting to verify all fixes.
 
 Safety Characteristics
 ----------------------
@@ -349,6 +364,22 @@ def validate_link(current_file: str, line: int, text: str, target: str) -> Optio
             return LinkIssue(
                 current_file, line, text, target, "malformed scheme (did you mean https:// ?)"
             )
+        # Enforce pinned GitHub refs for mongodb/mongo and 10gen/mongo repositories.
+        gh_match = re.match(
+            r"^https://github.com/(mongodb|10gen)/mongo/(blob|tree)/([^/]+)/([^#]+)(?:#.*)?$",
+            target,
+        )
+        if gh_match:
+            owner, kind, ref, path_rest = gh_match.groups()
+            if ref == "master":
+                return LinkIssue(
+                    current_file,
+                    line,
+                    text,
+                    target,
+                    "unpinned GitHub master reference; use tag/commit or relative path",
+                )
+            return None  # Non-master GitHub link accepted
         return None
 
     # Remove query params if any
@@ -356,9 +387,9 @@ def validate_link(current_file: str, line: int, text: str, target: str) -> Optio
         parsed = urllib.parse.urlparse(file_part)
         file_part = parsed.path
 
-    # Normalize relative path. If path starts with '/src/' treat as repo-root relative.
+    # Normalize relative path. If path starts with '/' treat as repo-root relative.
     repo_root = REPO_ROOT  # resolved once; works under Bazel runfiles
-    if file_part.startswith("/src/"):
+    if file_part.startswith("/"):
         resolved_path = os.path.normpath(os.path.join(repo_root, file_part.lstrip("/")))
     else:
         current_dir = os.path.dirname(current_file)
@@ -458,10 +489,11 @@ def main(argv: List[str]) -> int:
 
     issues = lint_files(files, args.workers)
 
-    # Optional moved-file search index (basename -> list of full paths). We walk the entire
+    # Moved-file search index (basename -> list of full paths). We walk the entire
     # root tree to include non-markdown sources (e.g., .h/.cpp) since links may point to headers.
+    # Auto-enabled when --auto-fix is used; can also be explicitly enabled with --search-moved.
     moved_index: dict[str, list[str]] = {}
-    if args.search_moved:
+    if args.auto_fix or args.search_moved:
         for dirpath, dirnames, filenames in os.walk(root):
             # Avoid descending into very large generated output dirs if present.
             # (Heuristic: skip bazel-* dirs under root scan to reduce noise.)
@@ -533,6 +565,34 @@ def main(argv: List[str]) -> int:
             for iss in deduped:
                 # Always capture the current target early to avoid scope issues
                 original_target = iss.target
+
+                # 0. GitHub master link auto-fix: rewrite to repo-root relative path
+                if "unpinned GitHub master reference" in iss.message:
+                    m_gh = re.match(
+                        r"^https://github.com/(mongodb|10gen)/mongo/(blob|tree)/master/([^#]+)(?:#(.*))?$",
+                        original_target,
+                    )
+                    if m_gh:
+                        path_part = m_gh.group(
+                            3
+                        )  # path inside repository (corrected: group 3, not 2)
+                        frag_only = m_gh.group(4)  # fragment (corrected: group 4, not 3)
+                        # GitHub URLs point to any repo path (src/, buildscripts/, jstests/, etc)
+                        # All must become absolute repo-root refs like /buildscripts/... not buildscripts/...
+                        new_target = "/" + path_part
+                        if frag_only:
+                            new_target += "#" + frag_only  # append single fragment only
+                        for idx, line_text in enumerate(lines):
+                            token = f"]({original_target})"
+                            if token in line_text:
+                                lines[idx] = line_text.replace(token, f"]({new_target})", 1)
+                                modified = True
+                                fix_count += 1
+                                if args.verbose:
+                                    print(
+                                        f"Auto-fixed GitHub master link in {md_file}: {original_target} -> {new_target}"
+                                    )
+                                break
 
                 # 1. Scheme / common typo fixes
                 if "malformed scheme" in iss.message and original_target.startswith("hhttps://"):
@@ -711,12 +771,8 @@ def main(argv: List[str]) -> int:
                                         f"Auto-fixed link in {md_file}: {original_target} -> {new_target}"
                                     )
                                 break
-                # 5. Moved file basename search (only when enabled)
-                if (
-                    args.search_moved
-                    and "file does not exist:" in iss.message
-                    and "#" not in original_target
-                ):
+                # 5. Moved file basename search (auto-enabled with --auto-fix)
+                if "file does not exist:" in iss.message and "#" not in original_target:
                     # Extract the basename of the missing file
                     missing_base = os.path.basename(original_target)
                     # Skip obviously non-file references (contain spaces or wildcard characters)

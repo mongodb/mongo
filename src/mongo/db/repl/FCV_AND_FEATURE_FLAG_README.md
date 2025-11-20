@@ -1128,7 +1128,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "Toaster")) {
 
 - If a feature flag needs to be disabled on an "all feature flags" build variant, you can add it
   to the escape hatch here: buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
-  ([master branch link](https://github.com/mongodb/mongo/blob/master/buildscripts/resmokeconfig/fully_disabled_feature_flags.yml)).
+  ([master branch link](/buildscripts/resmokeconfig/fully_disabled_feature_flags.yml)).
 - It is not advisable to override the server parameter in the test (e.g. through the nodeOptions
   parameter of a ReplSetTest configuration) because this will make it inconvenient to control the
   feature flag through the CI configuration.
@@ -1150,7 +1150,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "Toaster")) {
   have any failures on the feature flag buildvariant which should be fixed first.
 
 - If you want to test upgrade/downgrade behavior for an FCV-gated feature flag, please refer to
-  [this test](https://github.com/mongodb/mongo/blob/master/jstests/multiVersion/genericBinVersion/example_fcv_upgrade_downgrade_test.js) as an example.
+  [this test](/jstests/multiVersion/genericBinVersion/example_fcv_upgrade_downgrade_test.js) as an example.
 
 # Overview of Multiversion and Upgrade/Downgrade Testing
 

@@ -11,7 +11,7 @@ The `OutOfLineExecutor` declares a function `void schedule(Task task)` to delega
 execution of `task` to the executor, and each executor type implements `schedule` when extending
 `OutOfLineExecutor`. A contract for `OutOfLineExecutor` is that calls to schedule will not block
 the caller.
-For more details and the semantics of executor APIs, see the comments in the [header file](https://github.com/mongodb/mongo/blob/master/src/mongo/util/out_of_line_executor.h).
+For more details and the semantics of executor APIs, see the comments in the [header file](/src/mongo/util/out_of_line_executor.h).
 
 ### OutOfLineExecutor Wrappers
 

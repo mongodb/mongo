@@ -801,7 +801,7 @@ exists) on the session by updating our `txnNumber`. Next, we update our `txnStat
 legal state transitions. Finally, we reset the in memory state of the transaction as well as any
 [corresponding transaction metrics](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/transaction_participant.cpp#L896-L902) from a previous transaction.
 
-When a node starts a transaction, it will [acquire the global lock in intent exclusive mode](https://github.com/mongodb/mongo/blob/master/src/mongo/db/transaction/transaction_participant.cpp#L1569)
+When a node starts a transaction, it will [acquire the global lock in intent exclusive mode](/src/mongo/db/transaction/transaction_participant.cpp#L1569)
 (and as a result, the [RSTL](#replication-state-transition-lock) in intent exclusive as well), which it will
 hold for the duration of the transaction. The only exception is when
 [preparing a transaction](#preparing-a-transaction-on-the-primary), which will release the RSTL and
@@ -870,7 +870,7 @@ Another key piece of the Two Phase Commit Protocol is the [**`TransactionCoordin
 the first shard to receive an operation for a particular transaction. The `TransactionCoordinator`
 will coordinate between all participating shards to ultimately commit or abort the transaction.
 
-When the `TransactionCoordinator` is [told to commit a transaction](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/transaction_coordinator_service.cpp#L175-L176), it must first make sure that all
+When the `TransactionCoordinator` is [told to commit a transaction](/src/mongo/db/s/transaction_coordinator_service.cpp#L175-L176), it must first make sure that all
 participating shards successfully prepare the transaction before telling them to commit the
 transaction. As a result, the coordinator will [issue the `prepareTransaction` command](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/s/transaction_coordinator.cpp#L286-L317), an internal
 command, on each shard participating in the transaction.
@@ -969,7 +969,7 @@ it will first [re-acquire](https://github.com/mongodb/mongo/blob/be38579dc72a409
 transitions from happening while the commit is in progress. It will then [reserve an oplog slot](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2021-L2030),
 [commit the storage transaction at the `commitTimestamp`](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2057-L2059),
 [write the `commitTransaction` oplog entry](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2065-L2069)
-into the oplog, [update the transactions table](https://github.com/mongodb/mongo/blob/master/src/mongo/db/op_observer/op_observer_impl.cpp#L201), transition the `txnState` to `kCommitted`, record
+into the oplog, [update the transactions table](/src/mongo/db/op_observer/op_observer_impl.cpp#L201), transition the `txnState` to `kCommitted`, record
 metrics, and [clean up the transaction resources](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2073-L2075).
 
 ### Aborting a Prepared Transaction
@@ -1357,7 +1357,7 @@ There are a number of ways that a node will run for election:
   longer than `catchUpTakeoverDelayMillis` (default 30 seconds), it will run for election. This
   behvarior is known as a **catchup takeover**. If primary catchup is taking too long, catchup
   takeover can help allow the replica set to accept writes sooner, since a more up-to-date node will
-  not spend as much time (or any time) in catchup. See the [Transitioning to `PRIMARY` section](https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/README.md#transitioning-to-primary) section for
+  not spend as much time (or any time) in catchup. See the [Transitioning to `PRIMARY` section](/src/mongo/db/repl/README.md#transitioning-to-primary) section for
   further details on primary catchup.
 - The `replSetStepUp` command can be run on an eligible node to cause it to run for election
   immediately. We don't expect users to call this command, but it is run internally for election

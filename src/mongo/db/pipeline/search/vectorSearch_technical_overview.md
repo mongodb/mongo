@@ -8,7 +8,7 @@ This document covers the `mongod` side of the vector search implementation.
 
 ## Overview
 
-Vector search is implemented as an aggregation stage that behaves similarly to [`$search`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/search/README.md). The `$vectorSearch` stage must be the first stage in the pipeline, always run on `mongod`. Users specify the query vector and path to search over as well as several `mongot`-specific knobs. `$vectorSearch` fetches results from `mongot` via a cursor-based protocol that parallels (and reuses code from) `$search`.
+Vector search is implemented as an aggregation stage that behaves similarly to [`$search`](/src/mongo/db/query/search/README.md). The `$vectorSearch` stage must be the first stage in the pipeline, always run on `mongod`. Users specify the query vector and path to search over as well as several `mongot`-specific knobs. `$vectorSearch` fetches results from `mongot` via a cursor-based protocol that parallels (and reuses code from) `$search`.
 
 ## Details
 
@@ -16,7 +16,7 @@ Vector search is implemented as an aggregation stage that behaves similarly to [
 
 #### Parameters
 
-[`$vectorSearch`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/search/document_source_vector_search.h) takes several parameters that are passed on to `mongot`. These include:
+[`$vectorSearch`](/src/mongo/db/pipeline/search/document_source_vector_search.h) takes several parameters that are passed on to `mongot`. These include:
 
 | Parameter     | Description                                                 |
 | ------------- | ----------------------------------------------------------- |
@@ -27,7 +27,7 @@ Vector search is implemented as an aggregation stage that behaves similarly to [
 | index         | index to use for the search                                 |
 | filter        | optional pre-filter to apply before searching               |
 
-Validation for most of these fields occurs on `mongot`, with the exception of `filter`. `mongot` does not yet support complex MQL semantics, so the `filter` is limited to simple comparisons (e.g. `$eq`, `$lt`, `$gte`) on basic field types. This is validated on `mongod` with a [custom `MatchExpressionVisitor`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/vector_search/filter_validator.cpp).
+Validation for most of these fields occurs on `mongot`, with the exception of `filter`. `mongot` does not yet support complex MQL semantics, so the `filter` is limited to simple comparisons (e.g. `$eq`, `$lt`, `$gte`) on basic field types. This is validated on `mongod` with a custom `MatchExpressionVisitor`.
 
 Additionally, `limit` may be used by `mongod` to ensure correct results in sharded clusters (described below). All other parameters are passed through to `mongot` for algorithm-specific behavior.
 
@@ -53,11 +53,11 @@ If a user-specified `$limit` exists in the pipeline following `$vectorSearch` th
 
 ### Index Management
 
-Vector indexes are managed through the existing [search index management commands](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/search/README.md#search-index-commands), due to the fact that they are stored in the same way as search indexes on `mongot`.
+Vector indexes are managed through the existing search index management commands, due to the fact that they are stored in the same way as search indexes on `mongot`.
 
 ### Explain
 
-'$vectorSearch' explains follow how $search/$searchMeta explains work. Check out [search_technical_overview.md](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/search/search_technical_overview.md) for more information.
+'$vectorSearch' explains follow how $search/$searchMeta explains work. Check out [search_technical_overview.md](/src/mongo/db/query/search/search_technical_overview.md) for more information.
 
 ### Testing
 
@@ -65,4 +65,4 @@ The `vectorSearch` command is supported by [`mongotmock`](https://github.com/mon
 
 ### Didn't Find What You're Looking For?
 
-Visit [the landing page](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/search/README.md) for all $search/$vectorSearch/$searchMeta related documentation for server contributors.
+Visit [the landing page](/src/mongo/db/query/search/README.md) for all $search/$vectorSearch/$searchMeta related documentation for server contributors.

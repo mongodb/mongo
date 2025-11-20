@@ -2,7 +2,7 @@
 
 The `config.rangeDeletions` collection is a shard-local internal collection containing a document for each range needing to be eventually cleared up; documents in `config.rangeDeletions` are usually referred as "range deletion tasks" or "range deleter documents".
 
-The complete format of range deletion tasks is defined in [range_deletion_tasks.idl](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/range_deletion_task.idl), with the relevant fields being the following:
+The complete format of range deletion tasks is defined in [range_deletion_tasks.idl](/src/mongo/db/s/range_deletion_task.idl), with the relevant fields being the following:
 
 - `collectioUUID`: the UUID of the collection the range belongs to
 - `range`: the `[min, max)` shard key range to be deleted

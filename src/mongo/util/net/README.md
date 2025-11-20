@@ -35,7 +35,7 @@ implementations of TLS:
    available exclusively on _MacOS_.
 
 We manage TLS through an interface called
-[`SSLManagerInterface`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L181). There are
+[`SSLManagerInterface`](/src/mongo/util/net/ssl_manager.h#L181). There are
 three different implementations of this interface for each implementation of TLS respectively:
 
 1. [`SSLManagerOpenSSL`](ssl_manager_openssl.cpp)
@@ -44,10 +44,10 @@ three different implementations of this interface for each implementation of TLS
 
 Every SSLManager has a set of key methods that describe the general idea of establishing a connection over TLS:
 
-- [`connect`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L193): initiates a TLS connection
-- [`accept`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L201): waits for a peer to
+- [`connect`](/src/mongo/util/net/ssl_manager.h#L193): initiates a TLS connection
+- [`accept`](/src/mongo/util/net/ssl_manager.h#L201): waits for a peer to
   initiate a TLS connection
-- [`parseAndValidatePeerCertificate`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L268):
+- [`parseAndValidatePeerCertificate`](/src/mongo/util/net/ssl_manager.h#L268):
   parses a certificate acquired from a peer during connection negotiation and validates it.
 
 The SSLManagers are wrappers around these TLS implementations such that they conform to our practices and standards, and
@@ -72,7 +72,7 @@ connection to determine if it needs to speak cleartext or TLS. If the transport 
 [it will create a new `asio::ssl::stream<GenericSocket>` object which wraps the underlying physical connection's `GenericSocket` object](../../transport/asio/asio_session.h).
 The outer `Socket` accepts requests to perform reads and writes, but encrypts/decrypts data before/after interacting
 with the physical socket. ASIO also provides the
-[implementation](https://github.com/mongodb/mongo/blob/master/src/mongo/transport/asio/asio_session.h#L75)
+[implementation](/src/mongo/transport/asio/asio_session.h#L75)
 for the TLS socket for OpenSSL, but we provide [our own implementation](ssl) for SChannel and Secure Transport.
 
 ### FIPS Mode
@@ -91,10 +91,10 @@ into certificates along with the public key and certificate metadata. Internal a
 stored in the database, is more commonly used for acquiring access rights, and X.509 authorization is not a typical
 use case of certificates in general. We do not provide any utility for generating these unique certificates, but the
 logic for parsing them is in
-[`parsePeerRoles`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L294).
+[`parsePeerRoles`](/src/mongo/util/net/ssl_manager.h#L294).
 
 X.509 certificates _are_ commonly used for _authentication_.
-[`SSLManager::parseAndValidatePeerCertificate`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L268)
+[`SSLManager::parseAndValidatePeerCertificate`](/src/mongo/util/net/ssl_manager.h#L268)
 extracts information required for authentication, such as the client name, during connection negotiation. We use
 TLS for authentication, as being able to successfully perform a cryptographic handshake after key exchange should be as
 sufficient proof of authenticity as providing a username and password. This idea is the same as using one's RSA public
@@ -104,7 +104,7 @@ with TLS (using the
 mechanism), it receives a certificate from the client during the initial TLS handshake, extracts the subject name, which
 MongoDB will consider a username, and performs the cryptographic handshake. If the handshake succeeds, then the server
 will note that the client proved ownership of the presented certificate. The authentication logic happens in the
-[`authX509`](https://github.com/mongodb/mongo/blob/master/src/mongo/client/authenticate.cpp#L127) function, although
+[`authX509`](/src/mongo/client/authenticate.cpp#L127) function, although
 there are many callers of this function that use it in different ways. Later, when that client tries to authenticate,
 the server will know that the previous TLS handshake has proved their authenticity, and will grant themm the appropriate
 access rights.
@@ -112,14 +112,14 @@ access rights.
 ### The Transport Layer
 
 The _transport layer_ calls appropriate TLS functions inside of its own related functions.
-[`TransportLayerManager::connect`](https://github.com/mongodb/mongo/blob/master/src/mongo/transport/transport_layer_manager.h#L66)
+[`TransportLayerManager::connect`](/src/mongo/transport/transport_layer_manager.h#L66)
 will make a call to
-[`AsioSession::handshakeSSLForEgress`](https://github.com/mongodb/mongo/blob/master/src/mongo/transport/asio_transport_layer.cpp#L496)
+[`AsioSession::handshakeSSLForEgress`](/src/mongo/transport/asio/asio_transport_layer.cpp#L496)
 when it needs to speak TLS. This works the same for
-[`asyncConnect`](https://github.com/mongodb/mongo/blob/master/src/mongo/transport/transport_layer.h#L85) as well.
-[`TransportLayerManager`](../../transport/transport_layer_manager.h) provides these and
-[`getReactor`](https://github.com/mongodb/mongo/blob/master/src/mongo/transport/transport_layer_manager.cpp#L78) as
-wrappers around synonymous functions in whichever [`SSLManager`](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/ssl_manager.h#L181)
+[`asyncConnect`](/src/mongo/transport/transport_layer.h#L85) as well.
+[`TransportLayerManager`](/src/mongo/transport/transport_layer_manager.h) provides these and
+[`getReactor`](/src/mongo/transport/transport_layer_manager.h) as
+wrappers around synonymous functions in whichever [`SSLManager`](/src/mongo/util/net/ssl_manager.h#L181)
 the server is using.
 
 ### SNI

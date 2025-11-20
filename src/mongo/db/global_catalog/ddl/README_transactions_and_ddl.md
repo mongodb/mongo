@@ -43,7 +43,7 @@ in itself cannot forbid the following anomalies:
   unable to observe the incoming range. Processing this request would miss data belonging to that
   range. This anomaly could occur when a range migration interleaves with an uncommitted transaction.
 - **Collection generation anomaly:** The router forwards a request to the shard relative to a
-  [collection generation](https://github.com/mongodb/mongo/blob/master/src/mongo/db/local_catalog/README_terminology.md)
+  [collection generation](/src/mongo/db/local_catalog/README_terminology.md)
   that is newer than the one in the shard's snapshot. This could occur, for instance, when the
   collection's namespace is recreated on the shard after the transaction has established a snapshot.
 - **Collection incarnation anomaly:** Similar to the collection generation anomaly, but concerning

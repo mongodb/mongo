@@ -111,7 +111,7 @@ Only if the field should be added to the Stable API, then you should mark the fi
 `stability: stable`in IDL. Additionally, in `idl_check_compatibility.py` you must add the field to
 the `ALLOWED_STABLE_FIELDS_LIST`. This list was added so that engineers are aware that by making a
 field part of the stable API, **_the field cannot be changed in any way that would violate the
-Stable API guidelines_** (see [above](https://github.com/mongodb/mongo/blob/master/src/mongo/db/STABLE_API_README.md#compatibility)).
+Stable API guidelines_** (see [above](/src/mongo/db/STABLE_API_README.md#compatibility)).
 Crucially, this means the field **_cannot be removed or changed to `stability: unstable` or
 `stability: internal`_** while we are in the current API version.
 

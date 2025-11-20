@@ -45,6 +45,6 @@ the topology.
 - The specifications for
   [**Server Discovery and Monitoring (SDAM)**](https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst)
 - [**TopologyDescription class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/sdam/topology_description.h)
-- [**Replication Architecture Guide**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/README.md#replication-and-topology-coordinators)
+- [**Replication Architecture Guide**](/src/mongo/db/repl/README.md#replication-and-topology-coordinators)
 
 ---
