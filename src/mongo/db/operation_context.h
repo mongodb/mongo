@@ -786,12 +786,14 @@ public:
     decltype(auto) runWithoutInterruptionExceptAtGlobalShutdown(Callback&& cb) {
         try {
             bool prevIgnoringInterrupts = _ignoreInterrupts;
-            DeadlineState prevDeadlineState{_deadline, _timeoutError, _hasArtificialDeadline};
+            DeadlineState prevDeadlineState{
+                _deadline, _maxTime, _timeoutError, _hasArtificialDeadline};
             ScopeGuard guard([&] {
                 // Restore the original interruption and deadline state.
                 stdx::lock_guard lg(*_client);
                 _ignoreInterrupts = prevIgnoringInterrupts;
-                setDeadlineByDate(prevDeadlineState.deadline, prevDeadlineState.error);
+                setDeadlineAndMaxTime(
+                    prevDeadlineState.deadline, prevDeadlineState.maxTime, prevDeadlineState.error);
                 _hasArtificialDeadline = prevDeadlineState.hasArtificialDeadline;
                 _markKilledIfDeadlineRequires();
             });
@@ -815,7 +817,7 @@ private:
         stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override;
 
     DeadlineState pushArtificialDeadline(Date_t deadline, ErrorCodes::Error error) override {
-        DeadlineState ds{_deadline, _timeoutError, _hasArtificialDeadline};
+        DeadlineState ds{_deadline, _maxTime, _timeoutError, _hasArtificialDeadline};
 
         _hasArtificialDeadline = true;
         setDeadlineByDate(std::min(_deadline, deadline), error);
@@ -824,7 +826,7 @@ private:
     }
 
     void popArtificialDeadline(DeadlineState ds) override {
-        setDeadlineByDate(ds.deadline, ds.error);
+        setDeadlineAndMaxTime(ds.deadline, ds.maxTime, ds.error);
         _hasArtificialDeadline = ds.hasArtificialDeadline;
 
         _markKilledIfDeadlineRequires();
@@ -959,6 +961,8 @@ private:
     // assigning unused execution time back to a cursor at the end of an operation, only. The
     // _deadline and the service context's fast clock are the only values consulted for determining
     // if the operation's timelimit has been exceeded.
+    // TODO (SERVER-108835): Both deadline and maxTime represent the maximum latency, consider to
+    // collapse them to mitigate the risk of bugs due to confusion.
     Microseconds _maxTime = Microseconds::max();
 
     // The value of the maxTimeMS requested by user in the case it was overwritten.
