@@ -65,6 +65,25 @@ TEST(LogSeveritySuppressorTest, SuppressorWorksCorrectly) {
     ASSERT_EQ(suppressor(), normalSeverity);
 }
 
+TEST(LogSeveritySuppressorTest, RateIncrease) {
+    LogSeverity normalSeverity = LogSeverity::Info();
+    LogSeverity quietSeverity = LogSeverity::Debug(2);
+    int quiesceMs = 1000;
+    Milliseconds quiescePeriod{quiesceMs};
+
+    ClockSourceMock clockSource;
+
+    SeveritySuppressor suppressor(&clockSource, quiescePeriod, normalSeverity, quietSeverity);
+    ASSERT_EQ(suppressor(), normalSeverity);
+
+    clockSource.advance(quiescePeriod / 2);
+    ASSERT_EQ(suppressor(), quietSeverity);
+
+    suppressor.setPeriod(quiescePeriod / 10);
+    ASSERT_EQ(suppressor(), normalSeverity);
+    ASSERT_EQ(suppressor(), quietSeverity);
+}
+
 TEST(LogSeveritySuppressorTest, BackwardsClockMovementRetainsQuietness) {
     LogSeverity normalSeverity = LogSeverity::Info();
     LogSeverity quietSeverity = LogSeverity::Debug(2);
