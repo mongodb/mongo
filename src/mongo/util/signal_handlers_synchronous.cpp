@@ -295,7 +295,7 @@ void printSigInfo(const siginfo_t* siginfo) {
     }
 
     mallocFreeOStream << "Dumping siginfo (si_code=" << siginfo->si_code
-                      << "): " << streamableHexdump(*siginfo);
+                      << "): " << StreamableHexdump(siginfo, sizeof(siginfo_t));
 
     writeMallocFreeStreamToLog();
 }

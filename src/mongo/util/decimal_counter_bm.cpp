@@ -56,19 +56,6 @@ void BM_decimalCounterPreInc(benchmark::State& state) {
     state.SetItemsProcessed(items);
 }
 
-void BM_decimalCounterPostInc(benchmark::State& state) {
-    uint64_t items = 0;
-    for (auto _ : state) {
-        DecimalCounter<uint32_t> count(state.range(1));
-        for (int i = state.range(0); i--;) {
-            benchmark::ClobberMemory();
-            benchmark::DoNotOptimize(StringData(count++));
-        }
-        items += state.range(0);
-    }
-    state.SetItemsProcessed(items);
-}
-
 void BM_ItoACounter(benchmark::State& state) {
     uint64_t items = 0;
     for (auto _ : state) {
@@ -96,7 +83,6 @@ void BM_ToStringCounter(benchmark::State& state) {
 }
 
 BENCHMARK(BM_decimalCounterPreInc)->Args({10000, 0})->Args({{10, nonzeroStart}});
-BENCHMARK(BM_decimalCounterPostInc)->Args({10000, 0})->Args({{10, nonzeroStart}});
 BENCHMARK(BM_ItoACounter)->Args({10000, 0})->Args({{10, nonzeroStart}});
 BENCHMARK(BM_ToStringCounter)->Args({10000, 0})->Args({{10, nonzeroStart}});
 

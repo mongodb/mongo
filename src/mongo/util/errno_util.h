@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <cerrno>
 #include <cstdlib>
@@ -37,7 +38,8 @@
 #include <system_error>
 #include <utility>
 
-namespace mongo {
+
+namespace MONGO_MOD_PUB mongo {
 
 #ifdef _WIN32
 namespace errno_util_win32_detail {
@@ -139,4 +141,4 @@ inline std::error_code lastSocketError() {
 #endif
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

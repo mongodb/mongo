@@ -30,13 +30,14 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/static_immortal.h"
 
 #include <memory>
 #include <string>
 #include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * A nullable handle pinning a ref-counted immutable string.
@@ -55,7 +56,7 @@ namespace mongo {
  * to the same string and will compare equal to each other.
  *
  */
-class ThreadNameRef {
+class MONGO_MOD_PRIVATE ThreadNameRef {
 public:
     /** An empty ref (empty refs still stringify as "-"). */
     ThreadNameRef() = default;
@@ -115,7 +116,7 @@ private:
  * This string is not limited in length, so it will be a better name
  * than the name the OS uses to refer to the same thread.
  */
-ThreadNameRef getThreadNameRef();
+MONGO_MOD_PRIVATE ThreadNameRef getThreadNameRef();
 
 /**
  * Swaps in a new active name, returns the old one if it was active.
@@ -126,7 +127,7 @@ ThreadNameRef getThreadNameRef();
  * - Populating the "ctx" field for log lines.
  * - Providing a thread name to GDB.
  */
-ThreadNameRef setThreadNameRef(ThreadNameRef name);
+MONGO_MOD_PRIVATE ThreadNameRef setThreadNameRef(ThreadNameRef name);
 
 /**
  * Marks the ThreadNameRef attached to the current thread as inactive.
@@ -139,7 +140,7 @@ ThreadNameRef setThreadNameRef(ThreadNameRef name);
  * temporarily set to the same `ThreadNameRef` repeatedly, so setting it and
  * resetting it with the OS on each change would be wasteful.
  */
-void releaseThreadNameRef();
+MONGO_MOD_PRIVATE void releaseThreadNameRef();
 
 /**
  * Sets the name of the current thread.
@@ -158,4 +159,4 @@ inline StringData getThreadName() {
     return *getThreadNameRef();
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

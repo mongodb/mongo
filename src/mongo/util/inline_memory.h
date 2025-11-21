@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <cstddef>

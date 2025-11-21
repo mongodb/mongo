@@ -431,7 +431,7 @@ boost::optional<BSONObj> decompressBucket(const BSONObj& bucketDoc) try {
                     if (!measurement.eoo()) {
                         builder.appendAs(measurement, count);
                     }
-                    count++;
+                    ++count;
                 }
             }
         } else {

@@ -29,14 +29,16 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 namespace mongo {
 
 // Sets SIGTRAP handler to launch debugger
 // Noop unless on *NIX and compiled with MONGO_CONFIG_DEBUG_BUILD
 void setupSIGTRAPforDebugger();
 
-void breakpoint();
-
 void waitForDebugger();
+
+MONGO_MOD_PUBLIC void breakpoint();
 
 }  // namespace mongo

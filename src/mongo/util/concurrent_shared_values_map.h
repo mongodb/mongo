@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
@@ -45,9 +46,13 @@ namespace mongo {
  * Whenever the map is modified, it will perform a copy of the current map with the modification and
  * redirect new readers to the new map. The old map version will be freed from memory once all
  * references to it are gone. This extends to the values returned by a find operation.
+ *
+ * TODO(modularity): We need to revisit this implementation because it isn't actually lock free.
+ * This may require some API changes, so users should avoid relying too much on the exact API
+ * shape.
  */
 template <typename Key, typename Value, typename... ExtraAbslArgs>
-class ConcurrentSharedValuesMap {
+class MONGO_MOD_NEEDS_REPLACEMENT ConcurrentSharedValuesMap {
 public:
     using Map = absl::flat_hash_map<Key, std::shared_ptr<Value>, ExtraAbslArgs...>;
 
@@ -70,6 +75,8 @@ public:
      * Returns a shared_ptr of the value associated with the given key.
      *
      * This is a lock-free operation and will not block under any circumstances.
+     *
+     * TODO(modularity): this isn't actually lock free, as atomic_load(shared_ptr) takes a lock.
      */
     std::shared_ptr<Value> find(const Key& key) const {
         auto currentMap = atomic_load(&_map);

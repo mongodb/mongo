@@ -31,6 +31,7 @@
 
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <climits>
@@ -41,7 +42,7 @@
 
 namespace mongo {
 /**
- * An InlinedStorage is a simplifed version of `absl::InlinedVector`, and optimized for perfomance
+ * An InlinedStorage is a simplified version of `absl::InlinedVector`, and optimized for performance
  * and minimal overhead. It has the capability to inline a maximum of 'inlinedCapacity' elements of
  * the 'BT' type. When the number of elements exceeds the 'inlinedCapacity' threshold, the data is
  * then stored in the heap.

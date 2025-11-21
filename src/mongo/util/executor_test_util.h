@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
 namespace mongo {
@@ -38,7 +39,8 @@ namespace mongo {
  * Multi-threaded accesses to instances of "InlineQueuedCountingExecutor" result in undefined
  * behavior.
  */
-class InlineQueuedCountingExecutor : public OutOfLineExecutor {
+class MONGO_MOD_USE_REPLACEMENT(other OutOfLineExecutors) InlineQueuedCountingExecutor
+    : public OutOfLineExecutor {
 public:
     void schedule(Task task) override {
         // Add the task to our queue

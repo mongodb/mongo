@@ -31,11 +31,12 @@
 
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <mutex>
 #include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * WithLock is an attestation to pass as an argument to functions that must be called only while
@@ -105,4 +106,4 @@ private:
     WithLock() = default;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

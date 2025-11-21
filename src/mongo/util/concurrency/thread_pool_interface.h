@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/util/functional.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class Status;
 
@@ -78,4 +78,4 @@ protected:
     ThreadPoolInterface() = default;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

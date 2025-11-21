@@ -30,13 +30,14 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <string>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * A utility class for performing itoa style integer formatting. This class is highly optimized
@@ -68,4 +69,4 @@ private:
     char _buf[kBufSize];
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

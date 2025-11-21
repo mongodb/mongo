@@ -30,6 +30,8 @@
 #pragma once
 
 
+#include "mongo/util/modules.h"
+
 namespace mongo {
 
 // utility class for assembling hierarchical objects

@@ -31,14 +31,14 @@
 
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util_core.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 
 #include <atomic>  // NOLINT
 #include <cstdlib>
 
 #include <boost/intrusive_ptr.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /// This is an alternative base class to the above ones (will replace them eventually)
 class MONGO_MOD_OPEN RefCountable {
@@ -113,4 +113,4 @@ boost::intrusive_ptr<T> make_intrusive(Args&&... args) {
     ptr->threadUnsafeIncRefCountTo(1);
     return boost::intrusive_ptr<T>(ptr, /*add ref*/ false);
 }
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

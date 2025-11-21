@@ -33,17 +33,18 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/inlined_storage.h"
+#include "mongo/util/modules.h"
 
 #include <bit>
 #include <type_traits>
 
-namespace mongo {
-namespace bitset_utils {
+namespace MONGO_MOD_PUB mongo {
+namespace bitset_details {
 template <typename T>
 T maskbit(size_t bitIndex) {
     return static_cast<T>(1) << bitIndex;
 }
-}  // namespace bitset_utils
+}  // namespace bitset_details
 
 /**
  * Bitset class implementation, which can dynamically grow and shrink. t has the capability to
@@ -53,12 +54,10 @@ T maskbit(size_t bitIndex) {
  */
 template <typename T, size_t nBlocks, typename Storage = InlinedStorage<T, nBlocks>>
 class DynamicBitset {
-public:
+private:
     using BlockType = T;
     static_assert(std::is_integral_v<BlockType>);
     static_assert(nBlocks > 0);
-
-    static constexpr size_t npos = static_cast<size_t>(-1);
 
     // Useful for bit operations constants.
     static constexpr BlockType kZero = 0;       // All bits unset: 0b00000000
@@ -106,7 +105,7 @@ public:
 
     private:
         BlockType maskbit() const noexcept {
-            return bitset_utils::maskbit<BlockType>(_bitIndex);
+            return bitset_details::maskbit<BlockType>(_bitIndex);
         }
 
         void _set(bool b) noexcept {
@@ -120,6 +119,9 @@ public:
         BlockType& _block;
         size_t _bitIndex;
     };
+
+public:
+    static constexpr size_t npos = static_cast<size_t>(-1);
 
     /**
      * Allocates a bitset of default size. The bitset of default size occupies all available inlined
@@ -443,7 +445,7 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE static BlockType maskbit(size_t bitIndex) noexcept {
-        return bitset_utils::maskbit<BlockType>(bitIndex);
+        return bitset_details::maskbit<BlockType>(bitIndex);
     }
 
     /**
@@ -469,4 +471,4 @@ private:
     Storage _storage;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

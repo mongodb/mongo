@@ -31,11 +31,14 @@
 
 #include "mongo/stdx/trusted_hasher.h"
 #include "mongo/util/immutable/details/memory_policy.h"
+#include "mongo/util/modules.h"
 
 #include <immer/set.hpp>
 #include <immer/set_transient.hpp>
 
+MONGO_MOD_PUBLIC;
 namespace mongo::immutable {
+
 
 /**
  * Immutable unordered hash set.

@@ -31,11 +31,13 @@
 
 #include "mongo/util/immutable/details/memory_policy.h"
 #include "mongo/util/immutable/details/set.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 
 #include <immer/flex_vector.hpp>
 
+MONGO_MOD_PUBLIC;
 namespace mongo::immutable {
 
 /**

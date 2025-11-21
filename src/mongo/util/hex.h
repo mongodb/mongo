@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>
@@ -38,7 +39,7 @@
 
 #include <fmt/format.h>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * A hex blob is a data interchange format, not meant to be
@@ -145,9 +146,7 @@ private:
     size_t _size;
 };
 
-template <typename T>
-StreamableHexdump streamableHexdump(const T& data) {
-    return {&data, sizeof(data)};
-}
+// Template removed as it could lead to unexpected behavior with reference types
+// Users should construct StreamableHexdump directly with appropriate data and size
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

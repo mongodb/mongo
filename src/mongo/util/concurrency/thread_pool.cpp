@@ -299,8 +299,6 @@ void ThreadPool::Impl::_joinRetired_inlock() {
     while (!_retiredThreads.empty()) {
         auto& t = _retiredThreads.front();
         t.join();
-        if (_options.onJoinRetiredThread)
-            _options.onJoinRetiredThread(t);
         _retiredThreads.pop_front();
     }
 }

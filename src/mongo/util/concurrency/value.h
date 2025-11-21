@@ -34,6 +34,7 @@
  */
 
 #include "mongo/util/concurrency/spin_lock.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -41,7 +42,7 @@ namespace mongo {
 /** there is now one mutex per DiagStr.  If you have hundreds or millions of
     DiagStrs you'll need to do something different.
 */
-class DiagStr {
+class MONGO_MOD_USE_REPLACEMENT(std::string + mutex) DiagStr {
     mutable SpinLock m;
     std::string _s;
 

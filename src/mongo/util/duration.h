@@ -38,6 +38,7 @@
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <chrono>
@@ -50,7 +51,7 @@
 
 #include <fmt/format.h>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class BSONObj;
 template <typename Allocator>
@@ -194,7 +195,7 @@ public:
      * OtherDuration. That is, if OtherDuration::period > period.
      */
     template <typename OtherDuration>
-    struct IsHigherPrecisionThan {
+    struct MONGO_MOD_FILE_PRIVATE IsHigherPrecisionThan {
         using OtherOverThis = std::ratio_divide<typename OtherDuration::period, period>;
         MONGO_STATIC_ASSERT_MSG(
             OtherOverThis::den == 1 || OtherOverThis::num == 1,
@@ -208,7 +209,7 @@ public:
      * OtherDuration. That is, if OtherDuration::period > period.
      */
     template <typename OtherDuration>
-    struct IsLowerPrecisionThan {
+    struct MONGO_MOD_FILE_PRIVATE IsLowerPrecisionThan {
         using OtherOverThis = std::ratio_divide<typename OtherDuration::period, period>;
         MONGO_STATIC_ASSERT_MSG(
             OtherOverThis::den == 1 || OtherOverThis::num == 1,
@@ -544,4 +545,4 @@ constexpr auto deduceChronoDuration(const Rep& count) {
     return stdx::chrono::duration<Rep, Per>{count};
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

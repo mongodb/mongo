@@ -41,6 +41,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <concepts>
@@ -49,7 +50,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  *
@@ -231,7 +232,7 @@ public:
      *       {"skip" : val}    // skip calls, activate on and after call number (val+1).
      *       {"activationProbability" : val}  // val is in interval [0.0, 1.0]
      */
-    static StatusWith<ModeOptions> parseBSON(const BSONObj& obj);
+    MONGO_MOD_FILE_PRIVATE static StatusWith<ModeOptions> parseBSON(const BSONObj& obj);
 
     /**
      * FailPoint state can be kept alive during shutdown by setting `immortal` true.
@@ -324,7 +325,7 @@ public:
     /**
      * @returns a BSON object showing the current mode and data stored.
      */
-    BSONObj toBSON() const {
+    MONGO_MOD_FILE_PRIVATE BSONObj toBSON() const {
         return _impl()->toBSON();
     }
 
@@ -581,7 +582,7 @@ private:
     std::aligned_storage_t<sizeof(Impl), alignof(Impl)> _implStorage;
 };
 
-class FailPointRegistry {
+class MONGO_MOD_FILE_PRIVATE FailPointRegistry {
 public:
     FailPointRegistry();
 
@@ -598,7 +599,7 @@ public:
     /**
      * @return a registered FailPoint, or nullptr if it was not registered.
      */
-    FailPoint* find(StringData name) const;
+    MONGO_MOD_PUBLIC FailPoint* find(StringData name) const;
 
     /**
      * Freezes this registry from being modified.
@@ -610,14 +611,14 @@ public:
      * failpoint to be set on the command line via --setParameter, but is only allowed when
      * running with '--setParameter enableTestCommands=1'.
      */
-    void registerAllFailPointsAsServerParameters();
+    MONGO_MOD_NEEDS_REPLACEMENT void registerAllFailPointsAsServerParameters();
 
     /**
      * Sets all registered FailPoints to Mode::off. Used primarily during unit test cleanup to
      * reset the state of all FailPoints set by the unit test. Does not prevent FailPoints from
      * being enabled again after.
      */
-    void disableAllFailpoints();
+    MONGO_MOD_PUBLIC void disableAllFailpoints();
 
 private:
     bool _frozen;
@@ -641,13 +642,8 @@ public:
     FailPointEnableBlock& operator=(const FailPointEnableBlock&) = delete;
 
     // Const access to the underlying FailPoint
-    const FailPoint* failPoint() const {
-        return _failPoint;
-    }
-
-    // Const access to the underlying FailPoint
     const FailPoint* operator->() const {
-        return failPoint();
+        return _failPoint;
     }
 
     // Return the value of timesEntered() when the block was entered
@@ -666,6 +662,7 @@ private:
  * @throw DBException corresponding to ErrorCodes::FailPointSetFailed if no failpoint
  * called failPointName exists.
  */
+MONGO_MOD_USE_REPLACEMENT(FailPointEnableBlock or globalFailPointRegistry().find())
 FailPoint::EntryCountT setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj);
 
 /**
@@ -689,4 +686,4 @@ FailPointRegistry& globalFailPointRegistry();
     ::mongo::FailPointRegisterer fp##failPointRegisterer(&fp);
 
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

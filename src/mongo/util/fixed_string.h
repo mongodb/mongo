@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <array>
@@ -40,7 +41,8 @@
 #include <type_traits>
 #include <utility>
 
-namespace mongo {
+
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * A string-valued "structural type".
@@ -199,4 +201,4 @@ consteval FixedString<1 + N> operator+(char ch, const FixedString<N>& a) {
     return FixedString{ch} + a;
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

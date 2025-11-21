@@ -35,6 +35,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <boost/optional.hpp>
@@ -45,7 +46,7 @@ namespace mongo {
  * Allows waiting for a result returned from an asynchronous operation.
  */
 template <class T>
-class Notification {
+class MONGO_MOD_USE_REPLACEMENT(Promise and Future) Notification {
 public:
     Notification() = default;
 
@@ -119,7 +120,7 @@ private:
 };
 
 template <>
-class Notification<void> {
+class MONGO_MOD_USE_REPLACEMENT(Promise and Future) Notification<void> {
 public:
     explicit operator bool() const {
         return _notification.operator bool();

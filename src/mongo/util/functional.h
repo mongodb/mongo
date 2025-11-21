@@ -31,6 +31,7 @@
 
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <iosfwd>
@@ -38,7 +39,8 @@
 #include <type_traits>
 #include <utility>
 
-namespace mongo {
+
+namespace MONGO_MOD_PUB mongo {
 template <typename Function>
 class function_ref;
 
@@ -274,6 +276,7 @@ private:
     std::unique_ptr<Impl> impl;
 };
 
+namespace MONGO_MOD_FILE_PRIVATE functional_details {
 /**
  * Helper to pattern-match the signatures for all combinations of const and l-value-qualifed member
  * function pointers. We don't currently support r-value-qualified call operators.
@@ -288,6 +291,7 @@ template <typename Class, typename Ret, typename... Args>
 struct UFDeductionHelper<Ret (Class::*)(Args...) const> : stdx::type_identity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>
 struct UFDeductionHelper<Ret (Class::*)(Args...) const&> : stdx::type_identity<Ret(Args...)> {};
+}  // namespace MONGO_MOD_FILE_PRIVATE functional_details
 
 /**
  * Deduction guides for unique_function<Sig> that pluck the signature off of function pointers and
@@ -295,7 +299,9 @@ struct UFDeductionHelper<Ret (Class::*)(Args...) const&> : stdx::type_identity<R
  */
 template <typename Ret, typename... Args>
 unique_function(Ret (*)(Args...)) -> unique_function<Ret(Args...)>;
-template <typename T, typename Sig = typename UFDeductionHelper<decltype(&T::operator())>::type>
+template <
+    typename T,
+    typename Sig = typename functional_details::UFDeductionHelper<decltype(&T::operator())>::type>
 unique_function(T) -> unique_function<Sig>;
 
 template <typename Signature>
@@ -317,4 +323,4 @@ template <typename Signature>
 bool operator!=(std::nullptr_t, const unique_function<Signature>& rhs) noexcept {
     return static_cast<bool>(rhs);
 }
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -448,7 +448,7 @@ std::vector<BSONElement> BSONElement::Array() const {
                             fieldName,
                             static_cast<StringData>(counter)),
                 fieldName == counter);
-        counter++;
+        ++counter;
         v.push_back(element);
     }
     return v;

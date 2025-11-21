@@ -29,11 +29,13 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 /**
  * Mongo exit codes.
  */
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 enum class ExitCode {
     clean = 0,
@@ -70,4 +72,4 @@ enum class ExitCode {
     auditRotateError = 102  // The startup rotation of audit logs failed
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

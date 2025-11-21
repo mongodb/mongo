@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <immer/memory_policy.hpp>
 
 namespace mongo::immutable::detail {

@@ -32,6 +32,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 
@@ -40,7 +41,7 @@
 #include <memory>
 #include <string>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * A configurable thread pool, for general use.
@@ -104,13 +105,6 @@ public:
 
         /** If callable, called before each worker thread begins consuming tasks. */
         std::function<void(const std::string&)> onCreateThread;
-
-        /**
-         * If callable, called after joining each retired thread.
-         * Since there could be multiple calls to this function in a single critical section,
-         * avoid complex logic in the callback.
-         */
-        std::function<void(const stdx::thread&)> onJoinRetiredThread;
     };
 
     /**
@@ -180,4 +174,4 @@ private:
     std::unique_ptr<Impl> _impl;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

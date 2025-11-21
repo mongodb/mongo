@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <atomic>
@@ -45,7 +46,8 @@
 
 #include <fmt/format.h>
 
-namespace mongo {
+
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Generic histogram that supports data collection into intervals based on user-specified partitions
@@ -60,7 +62,7 @@ namespace mongo {
 template <typename T,
           typename Cmp = std::less<T>,
           typename Counter = std::atomic_int64_t>  // NOLINT
-class Histogram {
+class MONGO_MOD_UNFORTUNATELY_OPEN Histogram {
     struct AtEnd {};
 
 public:
@@ -196,4 +198,4 @@ void appendHistogram(BSONObjBuilder& bob, const Histogram<Ts...>& hist, const St
     histBob.append("totalCount", totalCount);
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

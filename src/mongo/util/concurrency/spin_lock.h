@@ -38,10 +38,11 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <mutex>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 #if defined(_WIN32)
 class SpinLock {
@@ -140,4 +141,4 @@ private:
 
 using scoped_spinlock = stdx::lock_guard<SpinLock>;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -31,11 +31,12 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class ClockSource;
 
@@ -71,4 +72,4 @@ private:
     Date_t _last;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

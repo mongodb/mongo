@@ -33,13 +33,14 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * ShutdownTaskArgs holds any arguments we might like to pass from a manual invocation of the
@@ -109,4 +110,4 @@ MONGO_COMPILER_NORETURN inline void exitCleanly(ExitCode code) {
     shutdown(code);
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

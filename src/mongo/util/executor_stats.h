@@ -34,9 +34,10 @@
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * A utility to collect stats for tasks scheduled on an executor (e.g., the reactor thread).
@@ -80,4 +81,4 @@ private:
         Seconds{10}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <algorithm>
 
 namespace mongo::immutable::details::map {

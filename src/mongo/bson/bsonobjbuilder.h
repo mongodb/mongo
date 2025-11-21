@@ -1066,10 +1066,14 @@ public:
 
     // These two just use next position
     auto& subobjStart() {
-        return _b.subobjStart(_fieldCount++);
+        auto& ret = _b.subobjStart(_fieldCount);
+        ++_fieldCount;
+        return ret;
     }
     auto& subarrayStart() {
-        return _b.subarrayStart(_fieldCount++);
+        auto& ret = _b.subarrayStart(_fieldCount);
+        ++_fieldCount;
+        return ret;
     }
 
     Derived& appendRegex(StringData regex, StringData options = "") {

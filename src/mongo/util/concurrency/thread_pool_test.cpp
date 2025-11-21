@@ -316,39 +316,6 @@ TEST_F(ThreadPoolTest, ThreadPoolRunsOnCreateThreadFunctionBeforeConsumingTasks)
     ASSERT_EQ(journal, "[onCreate(mythread0)][Call(OK)]");
 }
 
-TEST_F(ThreadPoolTest, JoinAllRetiredThreads) {
-    Atomic<int> retiredThreads(0);
-    ThreadPool::Options options;
-    options.minThreads = 4;
-    options.maxThreads = 8;
-    options.maxIdleThreadAge = Milliseconds(100);
-    options.onJoinRetiredThread = [&](const stdx::thread& t) {
-        retiredThreads.addAndFetch(1);
-    };
-    unittest::Barrier barrier(options.maxThreads + 1);
-
-    auto& pool = makePool(options);
-    for (auto i = options.maxThreads; i > 0; i--) {
-        pool.schedule([&](auto status) {
-            ASSERT_OK(status);
-            barrier.countDownAndWait();
-        });
-    }
-    ASSERT_EQ(pool.getStats().numThreads, 0);
-    pool.startup();
-    barrier.countDownAndWait();
-
-    while (pool.getStats().numThreads > options.minThreads) {
-        sleepFor(Microseconds{1});
-    }
-
-    pool.shutdown();
-    pool.join();
-
-    ASSERT_EQ(retiredThreads.load(), options.maxThreads - options.minThreads);
-    ASSERT_EQ(pool.getStats().numIdleThreads, 0);
-}
-
 TEST_F(ThreadPoolTest, SafeToCallWaitForIdleBeforeShutdown) {
     ThreadPool::Options options;
     options.minThreads = 1;

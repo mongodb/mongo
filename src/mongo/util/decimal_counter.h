@@ -32,13 +32,14 @@
 #include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/itoa.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <type_traits>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 /**
  * Stores unsigned counter as well as its decimal ASCII representation, avoiding the need for
  * separate binary to decimal conversions. This speeds up code that needs string representations
@@ -91,16 +92,6 @@ public:
         return *this;
     }
 
-    /**
-     *  Post-inrement version of operator++. Typically slower than pre-increment due to the need
-     *  to return the pre-image by value.
-     */
-    DecimalCounter<T> operator++(int) {
-        auto pre = *this;
-        operator++();
-        return pre;
-    }
-
 private:
     uint8_t _getLastDigitIndex(T start) {
         if (!start) {
@@ -118,4 +109,4 @@ private:
     uint8_t _lastDigitIndex;         // Indicates the last digit in _digits.
     T _counter;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

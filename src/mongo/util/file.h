@@ -31,18 +31,21 @@
 
 // Cross-platform basic file class. Supports 64-bit offsets and such.
 
+#include "mongo/util/modules.h"
+
 #include <cstdint>
 #include <string>
 
-
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 typedef uint64_t fileofs;
 
 // NOTE: not thread-safe. (at least the windows implementation isn't)
 
-class File {
+class MONGO_MOD_NEEDS_REPLACEMENT File {
 public:
+    // NEEDS_REPLACEMENT: This is an old API with design issues (explicit bad() calls, no error
+    // reporting)
     File();
     ~File();
 
@@ -68,4 +71,4 @@ private:
 #endif
     std::string _name;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
