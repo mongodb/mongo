@@ -57,6 +57,7 @@ mongo_cc_library(
     name = "range_deleter_service_impl",
     srcs = [
         "range_deletion.cpp",
+        "range_deletion_recovery_tracker.cpp",
         "range_deletion_task_tracker.cpp",
     ],
     deps = [
@@ -1042,6 +1043,7 @@ mongo_cc_unit_test(
         "range_deleter_service_op_observer_test.cpp",
         "range_deleter_service_test.cpp",
         "range_deleter_service_test_util.cpp",
+        "range_deletion_recovery_tracker_test.cpp",
         "range_deletion_task_tracker_test.cpp",
         "range_deletion_util_test.cpp",
         "session_catalog_migration_destination_test.cpp",
