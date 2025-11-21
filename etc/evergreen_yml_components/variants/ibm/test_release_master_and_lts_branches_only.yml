@@ -21,6 +21,7 @@ buildvariants:
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     bazel_compile_flags: >-
       --define=MONGO_DISTMOD=rhel81
+    core_analyzer_distro_name: rhel81-power8-large
     resmoke_jobs_factor: 0.25
     has_packages: true
     packager_script: packager_enterprise.py
@@ -85,6 +86,7 @@ buildvariants:
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     bazel_compile_flags: >-
       --define=MONGO_DISTMOD=rhel9
+    core_analyzer_distro_name: rhel9-power-large
     resmoke_jobs_factor: 0.25
     has_packages: true
     packager_script: packager_enterprise.py
@@ -150,7 +152,7 @@ buildvariants:
     bazel_compile_flags: >-
       --define=MONGO_DISTMOD=rhel83
       --linker=gold
-
+    core_analyzer_distro_name: rhel83-zseries-large
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -213,6 +215,7 @@ buildvariants:
     bazel_compile_flags: >-
       --define=MONGO_DISTMOD=rhel9
       --linker=gold
+    core_analyzer_distro_name: rhel9-zseries-large
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
