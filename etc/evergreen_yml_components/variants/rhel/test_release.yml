@@ -263,7 +263,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel93
-    compile_flags: --define=MONGO_DISTMOD=rhel93
+    bazel_compile_flags: --define=MONGO_DISTMOD=rhel93
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: rhel93
     multiversion_edition: enterprise
@@ -349,7 +349,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-rhel93
-    compile_flags: >-
+    bazel_compile_flags: >-
       --define=MONGO_DISTMOD=rhel93
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     has_packages: true
@@ -386,7 +386,7 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=requires_latch_analyzer
       --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
-    compile_flags: >-
+    bazel_compile_flags: >-
       --dbg=True
       --define=MONGO_DISTMOD=rhel88
       --linkstatic=False
