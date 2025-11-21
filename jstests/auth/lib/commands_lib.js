@@ -242,9 +242,7 @@ export const authCommandsLib = {
           testname: "abortMoveCollection",
           command: {abortMoveCollection: "test.x"},
           skipUnlessSharded: true,
-          skipTest: (conn) => {
-            return !TestData.setParameters.featureFlagMoveCollection;
-          },
+          skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagMoveCollection"),
           testcases: [
               {
                 runOnDb: adminDbName,
@@ -273,9 +271,7 @@ export const authCommandsLib = {
           testname: "abortUnshardCollection",
           command: {abortUnshardCollection: "test.x"},
           skipUnlessSharded: true,
-          skipTest: (conn) => {
-            return !TestData.setParameters.featureFlagUnshardCollection;
-          },
+          skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagUnshardCollection"),
           testcases: [
               {
                 runOnDb: adminDbName,
@@ -2502,15 +2498,13 @@ export const authCommandsLib = {
             // command.
             command: {autoCompact: false},
             skipSharded: true,
-            skipTest: (conn) => {
-              return !TestData.setParameters.featureFlagAutoCompact;
-            },
+            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagAutoCompact"),
             testcases: [
                 {
                   runOnDb: adminDbName,
                   roles: roles_hostManager,
-                  privileges:
-                      [{resource: {cluster: true}, actions: ["compact"]}]
+                  privileges: [{resource: {cluster: true}, actions: ["compact"]}],
+                  expectFail: true,
                 }
             ]
           },
@@ -2532,9 +2526,7 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
-          skipTest: (conn) => {
-            return !TestData.setParameters.featureFlagBulkWriteCommand;
-          },
+          skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagBulkWriteCommand"),
           testcases: [{
             runOnDb: adminDbName,
             privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['insert']},
@@ -2552,9 +2544,7 @@ export const authCommandsLib = {
             bypassDocumentValidation: true,
           },
           skipSharded: true,
-          skipTest: (conn) => {
-            return !TestData.setParameters.featureFlagBulkWriteCommand;
-          },
+          skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagBulkWriteCommand"),
           testcases: [{
             runOnDb: adminDbName,
             privileges: [
@@ -2579,9 +2569,7 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
-          skipTest: (conn) => {
-            return !TestData.setParameters.featureFlagBulkWriteCommand;
-          },
+          skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagBulkWriteCommand"),
           testcases: [{
             runOnDb: adminDbName,
             privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['update']},
@@ -2599,9 +2587,7 @@ export const authCommandsLib = {
             bypassDocumentValidation: true,
           },
           skipSharded: true,
-          skipTest: (conn) => {
-            return !TestData.setParameters.featureFlagBulkWriteCommand;
-          },
+          skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagBulkWriteCommand"),
           testcases: [{
             runOnDb: adminDbName,
             privileges: [
@@ -2626,9 +2612,7 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
-          skipTest: (conn) => {
-            return !TestData.setParameters.featureFlagBulkWriteCommand;
-          },
+          skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagBulkWriteCommand"),
           testcases: [{
             runOnDb: adminDbName,
             privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['remove']},
@@ -2646,9 +2630,7 @@ export const authCommandsLib = {
             bypassDocumentValidation: true,
           },
           skipSharded: true,
-          skipTest: (conn) => {
-            return !TestData.setParameters.featureFlagBulkWriteCommand;
-          },
+          skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagBulkWriteCommand"),
           testcases: [{
             runOnDb: adminDbName,
             privileges: [
@@ -2677,9 +2659,7 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
-          skipTest: (conn) => {
-            return !TestData.setParameters.featureFlagBulkWriteCommand;
-          },
+          skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagBulkWriteCommand"),
           testcases: [{
             runOnDb: adminDbName,
             privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['insert', 'update', 'remove']},
@@ -5153,9 +5133,7 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
-          skipTest: (conn) => {
-            return !TestData.setParameters.featureFlagBulkWriteCommand;
-          },
+          skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagBulkWriteCommand"),
           testcases: [
             {
               runOnDb: adminDbName,
@@ -5881,9 +5859,7 @@ export const authCommandsLib = {
           testname: "moveCollection",
           command: {moveCollection: "test.x", toShard: "move_collection-rs"},
           skipUnlessSharded: true,
-          skipTest: (conn) => {
-            return !TestData.setParameters.featureFlagMoveCollection;
-          },
+          skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagMoveCollection"),
           testcases: [
               {
                 runOnDb: adminDbName,
@@ -6869,9 +6845,7 @@ export const authCommandsLib = {
           testname: "unshardCollection",
           command: {unshardCollection: "test.x", toShard: "unshard_collection-rs"},
           skipUnlessSharded: true,
-          skipTest: (conn) => {
-              return !TestData.setParameters.featureFlagUnshardCollection;
-          },
+          skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagUnshardCollection"),
           testcases: [
               {
                 runOnDb: adminDbName,
@@ -8104,7 +8078,7 @@ export const authCommandsLib = {
               cursor: {},
           },
           // TODO SERVER-74961: Windows is not yet supported in stream processing.
-          skipTest: (_) => _isWindows() || !getBuildInfo().modules.includes("enterprise") || getBuildInfo().version < "8.1",
+          skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagStreams") || _isWindows() || getBuildInfo().version < "8.1",
           skipSharded: true,
           testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
         },
@@ -8612,9 +8586,7 @@ export const authCommandsLib = {
         },
         skipSharded: false,
         disableSearch: true,
-        skipTest: (conn) => {
-          return !TestData.setParameters.featureFlagRankFusionBasic;
-        },
+        skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagRankFusionBasic"),
         // Expect this to fail since there's no mongot set up to execute the $search/vectorSearch.
         testcases: testcases_transformationOnlyExpectFail,
       },
@@ -8676,6 +8648,10 @@ export const authCommandsLib = {
     runOneTest: function(conn, t, impls, options) {
         options = options || {};
 
+        // A test may provide a secondary connection to be intermittently authed
+        // with admin privileges for setup/teardown.
+        const setupConn = "getSideChannel" in impls ? impls.getSideChannel(conn) : conn;
+
         const isMongos = !!options.isMongos || this.isMongos(conn);
         if (options.shard0Name) {
           shard0name = options.shard0Name;
@@ -8683,7 +8659,8 @@ export const authCommandsLib = {
 
         jsTest.log("Running test: " + t.testname);
 
-        if (t.skipTest && t.skipTest(conn)) {
+        if (t.skipTest && t.skipTest(setupConn)) {
+            jsTest.log("Skipping test: " + t.testname);
             return [];
         }
         // some tests shouldn't run in a sharded environment
@@ -8755,7 +8732,7 @@ export const authCommandsLib = {
         var failures = [];
 
 
-        for (var i = 0; i < this.tests.length; i++) {
+        for (let i = 0; i < this.tests.length; i++) {
             const res = this.runOneTest(conn, this.tests[i], impls, options);
             failures = failures.concat(res);
         }
@@ -8774,6 +8751,17 @@ function isStandalone(conn) {
     const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
     const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
     return isStandalone;
+}
+
+function isFeatureEnabled(conn, ...features) {
+    const adminDb = conn.getDB(adminDbName);
+    const authed = adminDb.auth("admin", "password");
+    const request = Object.fromEntries(features.map(k => [k, 1]));
+    const res = assert.commandWorked(adminDb.runCommand({getParameter: 1, ...request}));
+    if (authed) {
+        adminDb.logout();
+    }
+    return features.every(key => res[key]?.value);
 }
 
 /**
