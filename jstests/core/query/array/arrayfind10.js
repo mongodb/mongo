@@ -2,6 +2,8 @@
  * Tests some of the find command's semantics with respect to how arrays are handled.
  * @tags: [
  *   requires_getmore,
+ *   # Time series collections do not support indexing array values in measurement fields.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

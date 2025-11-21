@@ -18,6 +18,8 @@
  *   requires_getmore,
  *   # $text is not supported on views.
  *   incompatible_with_views,
+ *   # Time series collections do not support text indexes.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

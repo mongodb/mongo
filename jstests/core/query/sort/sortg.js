@@ -3,6 +3,8 @@
 // @tags: [
 //   assumes_no_implicit_index_creation,
 //   requires_getmore,
+//   # Sort takes much more memory for the time-series version.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 // Test that a memory exception is triggered for in memory sorts, but not for indexed sorts.

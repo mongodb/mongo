@@ -10,6 +10,8 @@
  *  does_not_support_stepdowns,
  *  # $text is not supported on views.
  *  incompatible_with_views,
+ *  # Time-series collections already have the default clustered index.
+ *  exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

@@ -15,6 +15,8 @@
  *   # TODO SERVER-89461 Investigate why test using huge batch size timeout in suites with balancer
  *   assumes_balancer_off,
  *   multiversion_incompatible,
+ *   # Time-series is not allowed with an explicit validator.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {cursorEntryValidator, cursorSizeValidator, summaryFieldsValidator} from "jstests/libs/bulk_write_utils.js";

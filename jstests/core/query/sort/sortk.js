@@ -12,6 +12,9 @@
 //   does_not_support_config_fuzzer,
 //   # TestData.setParameters is undefined when run from selinux/core.js
 //   no_selinux,
+//   # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
+//   # first stage in a pipeline. This will be incomplatible with timeseries.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 let t = db.jstests_sortk;

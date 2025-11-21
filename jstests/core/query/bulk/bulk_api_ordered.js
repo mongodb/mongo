@@ -1,5 +1,11 @@
 // This test creates secondary unique: true indexes without the shard key prefix.
-// @tags: [assumes_unsharded_collection, requires_multi_updates, requires_non_retryable_writes]
+// @tags: [
+//   assumes_unsharded_collection,
+//   requires_multi_updates,
+//   requires_non_retryable_writes,
+//   # Time series collections do not support unique indexes.
+//   exclude_from_timeseries_crud_passthrough,
+// ]
 
 const coll = db[jsTestName()];
 coll.drop();

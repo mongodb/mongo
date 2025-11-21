@@ -17,7 +17,12 @@
  * since the simplifier shouldn't change the query's semantics. We decided to disable the simplifier
  * for upsert operations until we come up the better solution.
  *
- * @tags: [assumes_unsharded_collection, requires_non_retryable_writes]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   requires_non_retryable_writes,
+ *   # Time-series collections have different _id properties.
+ *   exclude_from_timeseries_crud_passthrough,
+ * ]
  */
 
 const collectionName = jsTestName();

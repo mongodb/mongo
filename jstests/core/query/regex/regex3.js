@@ -3,6 +3,8 @@
 //   assumes_read_concern_local,
 //   requires_fcv_80,
 //   requires_getmore,
+//   # Ignore because the find command is rewritten for TS collections before reaching the failpoint.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 const colName = jsTestName();

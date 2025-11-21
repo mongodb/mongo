@@ -3,6 +3,10 @@
  * functions to create all collections as timeseries collections. As part of this override,
  * each insert/write will implicitly add a timeseries field to the document, which is
  * removed when calling any find methods.
+ *
+ * @tags: [
+ *  exclude_from_timeseries_crud_passthrough,
+ * ]
  */
 
 import {transformIndexHintsForTimeseriesCollection} from "jstests/core/timeseries/libs/timeseries_writes_util.js";

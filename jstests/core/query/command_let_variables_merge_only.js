@@ -14,6 +14,9 @@
  *   # where the collection doesn't live on the primary shard.
  *   assumes_balancer_off,
  *   requires_getmore,
+ *   # Time series collections (as views) have specific limitations on aggregation stages
+ *   # (e.g. $merge, $out) or cursor options (e.g. noCursorTimeout, singleBatch).
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 const coll = db.command_let_variables;

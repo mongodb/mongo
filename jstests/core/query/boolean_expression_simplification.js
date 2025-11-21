@@ -4,6 +4,9 @@
  * requires_fcv_72,
  * # explain command, used by the test, does not support majority read concern.
  *  assumes_read_concern_local,
+ *   # Explain will return different plan than expected when a collection becomes a time-series
+ *   # collection. Also, query shape will be different.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

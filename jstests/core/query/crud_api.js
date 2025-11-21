@@ -8,6 +8,8 @@
 //   requires_getmore,
 //   # Unacknowledged writes are prohibited with sessions:
 //   does_not_support_retryable_writes,
+//   # Time series collections do not support `sort` in `findAndModify` commands.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

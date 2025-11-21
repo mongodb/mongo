@@ -4,6 +4,8 @@
  * @tags: [
  *    # $elemMatch is not supported in find on a view.
  *    incompatible_with_views,
+ *    # Time series collections (as views) do not support this operation (e.g. $elemMatch, $slice).
+ *    exclude_from_timeseries_crud_passthrough,
  * ]
  */
 const t = db[jsTestName()];

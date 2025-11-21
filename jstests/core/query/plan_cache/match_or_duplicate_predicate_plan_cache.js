@@ -15,6 +15,8 @@
  *   assumes_balancer_off,
  *   assumes_unsharded_collection,
  *   requires_getmore,
+ *   # Time series collections (as views) do not support this operation (e.g. $elemMatch, $slice).
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

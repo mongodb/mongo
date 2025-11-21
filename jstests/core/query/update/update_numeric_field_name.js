@@ -2,6 +2,8 @@
 // constraint for indexes. This is designed to reproduce SERVER-37058.
 // @tags: [
 //   uses_full_validation,
+//   # Time series collections do not support indexing array values in measurement fields.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 const coll = db[jsTestName()];
 coll.drop();

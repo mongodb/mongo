@@ -8,6 +8,8 @@
  *   requires_fcv_83,
  *   requires_getmore,
  *   uses_getmore_outside_of_transaction,
+ *   # Ignore because the find command is rewritten for TS collections before reaching the failpoint.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

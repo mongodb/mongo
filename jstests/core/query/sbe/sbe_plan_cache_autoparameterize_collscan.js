@@ -16,6 +16,8 @@
  *   # This test is specifically verifying the behavior of the SBE plan cache, which is only enabled
  *   # when SBE is enabled.
  *   featureFlagSbeFull,
+ *   # Time series collections (as views) do not support this operation (e.g. $elemMatch, $slice).
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";

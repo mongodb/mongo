@@ -5,7 +5,11 @@
  *   - The hint() method should support both the name of the index, and the object spec of the
  *     index.
  *
- * @tags: [requires_fastcount]
+ * @tags: [
+ *   requires_fastcount,
+ *   # Time series collections have specific index limitations (e.g. count hints, collation updates).
+ *   exclude_from_timeseries_crud_passthrough,
+ * ]
  */
 let coll = db.jstests_count_hint;
 coll.drop();

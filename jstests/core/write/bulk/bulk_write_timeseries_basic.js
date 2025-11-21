@@ -9,6 +9,8 @@
  *   # TODO SERVER-80796 Timeseries unordered error handling incompatible with proxy simulation.
  *   simulate_atlas_proxy_incompatible,
  *   requires_fcv_80,
+ *   # Time-series collection behavior is already tested within this directory.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {cursorEntryValidator, cursorSizeValidator, summaryFieldsValidator} from "jstests/libs/bulk_write_utils.js";

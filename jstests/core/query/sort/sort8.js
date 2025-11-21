@@ -1,6 +1,8 @@
 // Check sorting of arrays indexed by key SERVER-2884
 // @tags: [
 //   requires_getmore,
+//   # Time series collections do not support indexing array values in measurement fields.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 let t = db.jstests_sort8;

@@ -1,6 +1,9 @@
 // @tags: [
 //      # The {$set: {"a.1500000": 1}} update takes multiple seconds to execute.
 //      operations_longer_than_stepdown_interval,
+//      # Time series collections pack measurements into buckets, potentially exceeding
+//      # BSON size limits earlier than regular collections.
+//      exclude_from_timeseries_crud_passthrough,
 // ]
 
 // test $set with array indicies

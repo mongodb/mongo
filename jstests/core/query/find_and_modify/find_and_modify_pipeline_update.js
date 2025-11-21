@@ -1,6 +1,10 @@
 /**
  * Tests the pipeline-style update is accepted by the findAndModify command.
- * @tags: [requires_non_retryable_writes]
+ * @tags: [
+ *   requires_non_retryable_writes,
+ *   # Ignore because the find command is rewritten for TS collections before reaching the failpoint.
+ *   exclude_from_timeseries_crud_passthrough,
+ * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getPlanStage, planHasStage} from "jstests/libs/query/analyze_plan.js";

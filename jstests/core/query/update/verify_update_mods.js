@@ -6,6 +6,8 @@
  *   assumes_unsharded_collection,
  *   # Performs modifications that if repeated would fail the test.
  *   requires_non_retryable_writes,
+ *   # Incompatible with the update option manipulation from the override.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 const testDB = db.getSiblingDB(jsTestName());

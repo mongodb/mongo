@@ -7,6 +7,9 @@
 //   requires_getmore,
 //   # $text is not supported on views.
 //   incompatible_with_views,
+//   # Explain will return different plan than expected when a collection becomes a time-series
+//   # collection. Also, query shape will be different.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 import {getAggPlanStage, getEngine, getPlanStage, hasRejectedPlans} from "jstests/libs/query/analyze_plan.js";

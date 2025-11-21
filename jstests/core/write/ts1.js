@@ -3,6 +3,8 @@
 // if the inserts are into a sharded collection.
 // @tags: [
 //   assumes_unsharded_collection,
+//   # Inserting into a time-series collection does not replace top-level empty timestamps.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 const t = db.ts1;
 t.drop();

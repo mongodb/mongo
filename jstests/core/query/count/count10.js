@@ -16,6 +16,9 @@
 //   # The balancer can interrupt the count operation, entering in a race with the parallel shell.
 //   assumes_balancer_off,
 //   requires_getmore,
+//   # Time series collections (as views) generate different profiling/plan
+//   # summary entries (e.g. distinct from underlying bucket collection).
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 let coll = db.count10;

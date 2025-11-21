@@ -9,6 +9,8 @@
  *   command_not_supported_in_serverless,
  *   directly_against_shardsvrs_incompatible,
  *   uses_parallel_shell,
+ *   # Ignore because the find command is rewritten for TS collections before reaching the failpoint.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

@@ -6,6 +6,8 @@
 //
 //     # Uses index building in background
 //     requires_background_index,
+//     # Time series collections do not support unique indexes.
+//     exclude_from_timeseries_crud_passthrough,
 // ]
 
 let res;

@@ -2,6 +2,9 @@
 // Test that sorting with .max() and .min() doesn't crash.
 // @tags: [
 //   requires_getmore,
+//   # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
+//   # first stage in a pipeline. This will be incomplatible with timeseries.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 let t = db[jsTestName()];

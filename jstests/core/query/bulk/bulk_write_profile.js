@@ -12,6 +12,8 @@
  *   assumes_no_implicit_index_creation,
  *   # The test runs getLatestProfileEntry(). The downstream syncing node affects the profiler.
  *   run_getLatestProfilerEntry,
+ *   # Ignore because the find command is rewritten for TS collections before reaching the failpoint.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

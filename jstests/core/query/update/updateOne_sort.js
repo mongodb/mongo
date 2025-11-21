@@ -8,6 +8,8 @@
  *   requires_multi_updates,
  *   requires_non_retryable_writes,
  *   requires_fcv_80,
+ *   # Time series collections do not support `sort` in `updateOne` commands.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";

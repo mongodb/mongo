@@ -2,6 +2,8 @@
  * Tests basic NaN handling. Note that WiredTiger indexes handle -NaN and NaN differently.
  * @tags: [
  *   requires_getmore,
+ *   # Time series collections do not support indexing array values in measurement fields.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";

@@ -8,6 +8,9 @@
  *   # This test could produce unexpected explain output if additional indexes are created.
  *   assumes_no_implicit_index_creation,
  *   requires_getmore,
+ *   # Explain will return different plan than expected when a collection becomes a time-series
+ *   # collection. Also, query shape will be different.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

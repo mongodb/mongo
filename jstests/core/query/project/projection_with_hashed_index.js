@@ -4,6 +4,8 @@
  * @tags: [
  *      # Explain may return incomplete results if interrupted by a stepdown.
  *      does_not_support_stepdowns,
+ *      # Time series collections do not support hashed indexes on measurement fields.
+ *      exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

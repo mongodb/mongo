@@ -16,6 +16,8 @@
  *     # under burn-in configuration.
  *     # TODO(SERVER-111328): Remove this tag after investigating memory resource issues.
  *     assumes_read_preference_unchanged,
+ *     # Time series collections pack measurements into buckets, potentially exceeding BSON size limits earlier than regular collections.
+ *     exclude_from_timeseries_crud_passthrough,
  *  ]
  */
 

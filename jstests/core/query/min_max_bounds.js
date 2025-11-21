@@ -3,6 +3,8 @@
  * @tags: [
  *   assumes_balancer_off,
  *   requires_getmore,
+ *   # Time series collections (as views) have specific limitations on aggregation stages (e.g. $merge, $out) or cursor options (e.g. noCursorTimeout, singleBatch).
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {resultsEq} from "jstests/aggregation/extras/utils.js";

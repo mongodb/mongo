@@ -7,6 +7,8 @@
 //   requires_fastcount,
 //   # TODO SERVER-89461 Investigate why test using huge batch size timeout in suites with balancer
 //   assumes_balancer_off,
+//   # Runs for too long for time-series collections.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 //

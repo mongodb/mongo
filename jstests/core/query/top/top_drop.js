@@ -7,6 +7,9 @@
  *   assumes_against_mongod_not_mongos,
  *   requires_non_retryable_writes,
  *   requires_getmore,
+ *   # Time series collections (as views) generate different profiling/plan summary entries
+ *   # (e.g. distinct from underlying bucket collection).
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 let topDB = db.getSiblingDB("topdrop");

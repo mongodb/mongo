@@ -3,6 +3,8 @@
 // @tags: [
 //   # Metadata projection behavior differs between find and aggregate.
 //   incompatible_with_views,
+//   # TODO(SERVER-85335): Try to include this test(s).
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 let coll = db.sortl;
 coll.drop();

@@ -17,6 +17,8 @@
  *   requires_capped,
  *   # TODO(SERVER-113809): Check query error on replicaset running as --shardsvr
  *   transitioning_replicaset_incompatible,
+ *   # Time-series collections already have the default clustered index.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

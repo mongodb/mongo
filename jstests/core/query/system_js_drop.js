@@ -12,6 +12,8 @@
  *   # system.js stored functions only work for collections that live on the db-primary shard so
  *   # we have to make sure it wont be moved anywhere by the balancer
  *   assumes_balancer_off,
+ *   # TODO(SERVER-84158): Try to include this test(s).
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 const testDB = db.getSiblingDB(jsTestName());

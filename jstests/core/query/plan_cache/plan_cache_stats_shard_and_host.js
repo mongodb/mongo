@@ -8,6 +8,9 @@
 //   does_not_support_stepdowns,
 //   # Plan cache key is not guaranteed to be stable across versions.
 //   multiversion_incompatible,
+//   # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
+//   # first stage in a pipeline. This will be incomplatible with timeseries.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getPlanCacheKeyFromExplain} from "jstests/libs/query/analyze_plan.js";

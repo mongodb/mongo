@@ -6,6 +6,8 @@
  *   assumes_no_implicit_index_creation,
  *   requires_fastcount,
  *   requires_getmore,
+ *   # Time series collections do not support hashed indexes on measurement fields.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";

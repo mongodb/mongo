@@ -22,6 +22,8 @@
  *   # The test examines the SBE plan cache, which initial sync may change the contents of.
  *   examines_sbe_cache,
  *   requires_getmore,
+ *   # Time series collections (as views) do not support this operation (e.g. $elemMatch, $slice).
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 (function () {

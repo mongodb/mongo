@@ -6,6 +6,8 @@
 //   requires_scripting,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
+//   # TODO(SERVER-84158): Try to include this test.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 const t = db.cursora;

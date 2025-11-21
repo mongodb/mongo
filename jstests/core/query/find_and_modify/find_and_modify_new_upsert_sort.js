@@ -1,3 +1,8 @@
+// @tags: [
+//   # Time series collections do not support `sort` in `findAndModify` commands.
+//   exclude_from_timeseries_crud_passthrough,
+// ]
+
 const t = db[jsTestName()];
 t.drop();
 

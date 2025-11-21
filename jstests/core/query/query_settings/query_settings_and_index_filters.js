@@ -16,6 +16,8 @@
 //   simulate_atlas_proxy_incompatible,
 //   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
 //   transitioning_replicaset_incompatible,
+//   # Ignore because index filters are applied directly to collections, not views (or TS).
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";

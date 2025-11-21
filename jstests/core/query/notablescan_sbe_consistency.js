@@ -8,6 +8,8 @@
 //   assumes_read_preference_unchanged,
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
+//   # Test relies on creating a collection without an index, so notablescan leads to a failure.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 // Populate foo and foo2 collections.

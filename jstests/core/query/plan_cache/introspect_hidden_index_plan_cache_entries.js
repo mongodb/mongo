@@ -10,6 +10,9 @@
  *   assumes_read_preference_unchanged,
  *   assumes_balancer_off,
  *   requires_getmore,
+ *   # Explain will return different plan than expected when a collection becomes a time-series
+ *   # collection. Also, query shape will be different.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

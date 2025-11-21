@@ -4,6 +4,9 @@
  * @tags: [
  *   not_allowed_with_signed_security_token,
  *   requires_fcv_81,
+ *   # For inserts on time-series collections, mongod does _not_ replace empty timestamp values
+ *   # with the current time.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

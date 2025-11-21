@@ -3,6 +3,8 @@
  *
  * @tags: [
  *   assumes_write_concern_unchanged,
+ *   # Time-series collections have different _id properties.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

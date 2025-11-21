@@ -1,4 +1,9 @@
 // Update with mods corner cases.
+//
+// @tags: [
+//   # Time-series collections have different _id properties.
+//   exclude_from_timeseries_crud_passthrough,
+// ]
 
 const f = db[jsTestName()];
 

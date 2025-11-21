@@ -10,6 +10,8 @@
 //   requires_non_retryable_commands,
 //   # In-memory data structures are not causally consistent.
 //   does_not_support_causal_consistency,
+//   # Time-series buckets processing may have different cursor behavior.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

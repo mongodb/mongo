@@ -23,6 +23,9 @@
 //   requires_getmore,
 //   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
 //   transitioning_replicaset_incompatible,
+//   # Ignore because the rewrite of the query for TS leads to other stages preceding
+//   # $planCacheStats, which is not allowed.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";

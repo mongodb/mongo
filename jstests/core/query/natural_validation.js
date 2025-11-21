@@ -5,6 +5,8 @@
  *   assumes_unsharded_collection,
  *   requires_fastcount,
  *   requires_fcv_70,
+ *   # Time series collections do not support `sort` in `findAndModify` commands.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

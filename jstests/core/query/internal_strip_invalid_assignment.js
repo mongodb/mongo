@@ -7,6 +7,8 @@
  * @tags: [
  *    # Explain command does not support read concerns other than local.
  *    assumes_read_concern_local,
+ *    # Time series collections do not support text indexes.
+ *    exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {planHasStage} from "jstests/libs/query/analyze_plan.js";

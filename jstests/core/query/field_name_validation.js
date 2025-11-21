@@ -10,6 +10,8 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   requires_getmore,
+ *   # Time-series collections have different _id properties.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 const coll = db.field_name_validation;

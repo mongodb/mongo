@@ -1,5 +1,10 @@
 /**
  * Test that 'distinct' command returns expected results for various inputs.
+ *
+ * @tags: [
+ *   # Known unclear issues with distinct on timeseries.
+ *   exclude_from_timeseries_crud_passthrough,
+ * ]
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";

@@ -11,6 +11,9 @@
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
 //   requires_getmore,
+//   # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
+//   # first stage in a pipeline. This will be incomplatible with timeseries.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";

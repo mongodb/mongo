@@ -1,5 +1,7 @@
 // @tags: [
 //   requires_getmore,
+//   # Time series collections do not support the `showRecordId` find option.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 // Sanity check for the showRecordId option.

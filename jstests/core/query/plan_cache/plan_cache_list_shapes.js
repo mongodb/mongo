@@ -12,6 +12,9 @@
 //   assumes_read_preference_unchanged,
 //   assumes_unsharded_collection,
 //   requires_getmore,
+//   # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
+//   # first stage in a pipeline. This will be incomplatible with timeseries.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 import {getPlanCacheShapeHashFromObject} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";

@@ -4,7 +4,12 @@
  * test reproduces several failing cases for passthrough suites.
  *
  * TODO BACKPORT-24552, BACKPORT-24553 - relax this fcv requirement.
- * @tags: [requires_fcv_82, requires_non_retryable_commands]
+ * @tags: [
+ *   requires_fcv_82,
+ *   requires_non_retryable_commands,
+ *   # Time series collections do not support hashed indexes on measurement fields.
+ *   exclude_from_timeseries_crud_passthrough,
+ * ]
  */
 import {TestCases} from "jstests/libs/query/index_with_hashed_path_prefix_of_nonhashed_path_tests.js";
 

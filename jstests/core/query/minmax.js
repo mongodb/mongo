@@ -2,6 +2,9 @@
 // @tags: [
 //  assumes_balancer_off,
 //  requires_getmore,
+//  # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
+//  # first stage in a pipeline. This will be incomplatible with timeseries.
+//  exclude_from_timeseries_crud_passthrough,
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

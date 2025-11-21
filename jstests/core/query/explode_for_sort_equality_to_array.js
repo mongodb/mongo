@@ -8,6 +8,8 @@
  * @tags: [
  *   # explain does not support majority read concern
  *   assumes_read_concern_local,
+ *   # Time series collections do not support indexing array values in measurement fields.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";

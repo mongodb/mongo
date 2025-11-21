@@ -21,6 +21,8 @@
  *   # Secondary read preference passthroughs don't set it on the explain which causes an
  *   # $initialSyncId mismatch.
  *   assumes_read_preference_unchanged,
+ *   # TODO(SERVER-85322): Try to include this test(s).
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

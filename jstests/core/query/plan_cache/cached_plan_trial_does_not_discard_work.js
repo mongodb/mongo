@@ -18,6 +18,9 @@
 //   requires_getmore,
 //   assumes_balancer_off,
 //   featureFlagSbeFull,
+//   # Time series collections (as views) generate different profiling/plan summary entries
+//   # (e.g. distinct from underlying bucket collection).
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 

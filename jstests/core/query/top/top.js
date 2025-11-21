@@ -15,6 +15,9 @@
  *    # The downstream syncing node affects the top output.
  *    incompatible_with_initial_sync,
  *    requires_getmore,
+ *    # Time series collections (as views) generate different profiling/plan summary entries
+ *    # (e.g. distinct from underlying bucket collection).
+ *    exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

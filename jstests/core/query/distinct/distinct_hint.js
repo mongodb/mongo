@@ -4,6 +4,8 @@
  * @tags: [
  *  assumes_unsharded_collection,
  *  requires_fcv_71,
+ *  # Time series collections do not support sparse indexes on measurement fields.
+ *  exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

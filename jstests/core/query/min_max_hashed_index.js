@@ -2,6 +2,8 @@
  * Check that min() and max() work with a hashed index.
  * @tags: [
  *   requires_getmore,
+ *   # Time series collections do not support hashed indexes on measurement fields.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 const coll = db.min_max_hashed_index;

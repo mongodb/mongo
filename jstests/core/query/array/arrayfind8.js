@@ -2,7 +2,9 @@
  * Matching behavior for $elemMatch applied to a top level element.
  * Includes tests for bugs described in SERVER-1264 and SERVER-4180.
  *  @tags: [
- *    requires_getmore
+ *    requires_getmore,
+ *    # Time series collections do not support indexing array values in measurement fields.
+ *    exclude_from_timeseries_crud_passthrough,
  *  ]
  */
 const collNamePrefix = "jstests_arrayfind8_";

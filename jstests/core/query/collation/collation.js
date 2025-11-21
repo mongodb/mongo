@@ -19,6 +19,9 @@
 //   # TODO(SERVER-112424): Instantiate ScopedAllowImplicitCollectionCreate_UNSAFE object in
 //   # cloneCollectionAsCapped command
 //   transitioning_replicaset_incompatible,
+//   # Time series collections cannot be used as a source for `viewOn` or have view-like
+//   # limitations in this context.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 // Integration tests for the collation feature.

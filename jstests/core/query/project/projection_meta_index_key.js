@@ -4,6 +4,8 @@
 //   requires_getmore,
 //   # Metadata projection behavior differs between find and aggregate.
 //   incompatible_with_views,
+//   # TODO(SERVER-85335): Try to include this test(s).
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

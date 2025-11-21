@@ -4,6 +4,8 @@
  *
  * @tags: [
  *   assumes_unsharded_collection,
+ *   # Time series collections do not support `sort` in `findAndModify` commands.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 const coll = db[jsTestName()];

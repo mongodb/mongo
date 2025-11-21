@@ -1,7 +1,9 @@
 // This test verifies that queries on GeoJSON work regardless of extra fields and their
 // position in respect to the GeoJSON fields.
 // @tags: [
-//   requires_fcv_82
+//   requires_fcv_82,
+//   # geoNear requires setup such as a optimizations to be enabled for TS. See timeseries_geonear.js
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 const testDB = db.geo_extra_fields;

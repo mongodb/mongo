@@ -5,6 +5,8 @@
  *   requires_fcv_81,
  *   # Makes assertions about the number of rejected plans
  *   assumes_no_implicit_index_creation,
+ *   # Time series collections do not support indexing array values in measurement fields.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {hasRejectedPlans, planHasStage} from "jstests/libs/query/analyze_plan.js";

@@ -5,6 +5,8 @@
  *   assumes_write_concern_unchanged,
  *   does_not_support_transactions,
  *   does_not_support_stepdowns,
+ *   # Known unclear issues with distinct on timeseries.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

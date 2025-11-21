@@ -3,6 +3,9 @@
  * Other edge cases are covered by C++ unit tests.
  * @tags: [
  *   requires_getmore,
+ *   # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
+ *   # first stage in a pipeline. This will be incomplatible with timeseries.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 const t = db.minmax_edge;

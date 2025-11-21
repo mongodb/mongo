@@ -1,5 +1,7 @@
 // @tags: [
 //   requires_getmore,
+//   # Time series collections may return fields in a different order due to internal rewriting or view semantics.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 let t = db.jstests_or1;

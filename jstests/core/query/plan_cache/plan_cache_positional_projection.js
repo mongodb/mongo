@@ -4,6 +4,9 @@
  *    requires_getmore,
  *    # Positional projection is not supported on views.
  *    incompatible_with_views,
+ *    # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
+ *    # first stage in a pipeline. This will be incomplatible with timeseries.
+ *    exclude_from_timeseries_crud_passthrough,
  *  ]
  */
 const coll = db.plan_cache_positional_projection;

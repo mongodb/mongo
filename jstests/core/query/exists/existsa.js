@@ -2,6 +2,9 @@
  * Tests that sparse indexes are disallowed for $exists:false queries.
  *  @tags: [
  *    requires_getmore,
+ *    # Explain will return different plan than expected when a collection becomes a time-series
+ *    # collection. Also, query shape will be different.
+ *    exclude_from_timeseries_crud_passthrough,
  *  ]
  */
 const coll = db.jstests_existsa;

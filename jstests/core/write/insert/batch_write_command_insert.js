@@ -10,6 +10,8 @@
 //   requires_background_index,
 //   # TODO SERVER-89461 Investigate why test using huge batch size timeout in suites with balancer
 //   assumes_balancer_off,
+//   # Time-series collections have different _id properties.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 //
 //

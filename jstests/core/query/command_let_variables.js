@@ -6,6 +6,9 @@
 //   does_not_support_config_fuzzer,
 //   requires_fcv_81,
 //   requires_getmore,
+//   # Explain will return different plan than expected when a collection becomes a time-series
+//   # collection. Also, query shape will be different.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 //
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

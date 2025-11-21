@@ -2,6 +2,8 @@
 //   does_not_support_stepdowns,
 //   requires_non_retryable_writes,
 //   requires_getmore,
+//   # Ignore because the find command is rewritten for TS collections before reaching the failpoint.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 /**

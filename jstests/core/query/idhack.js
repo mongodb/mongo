@@ -5,6 +5,9 @@
 //   requires_getmore,
 //   # $elemMatch is not supported in find on a view.
 //   incompatible_with_views,
+//   # Explain will return different plan than expected when a collection becomes a time-series
+//   # collection. Also, query shape will be different.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 // Include helpers for analyzing explain output.
 import {getWinningPlanFromExplain, isExpress, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";

@@ -8,6 +8,9 @@
  *   requires_multi_updates,
  *   requires_non_retryable_writes,
  *   requires_timeseries,
+ *   # For inserts on time-series collections, mongod does _not_ replace empty timestamp values
+ *   # with the current time.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

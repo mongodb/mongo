@@ -9,6 +9,8 @@
  *   uses_map_reduce_with_temp_collections,
  *   # Uses $where operator
  *   requires_scripting,
+ *   # Time-series collections are views which don't support map-reduce
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

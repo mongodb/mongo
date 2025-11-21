@@ -6,6 +6,8 @@
  *   requires_getmore,
  *   # Views do not inherit default collection collation.
  *   incompatible_with_views,
+ *   # Ignore because the find command is rewritten for TS collections before reaching the failpoint.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {getPlanStages} from "jstests/libs/query/analyze_plan.js";

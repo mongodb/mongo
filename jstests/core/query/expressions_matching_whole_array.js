@@ -4,6 +4,8 @@
 //     # Uses $where operator
 //     requires_scripting,
 //     requires_getmore,
+//     # TODO(SERVER-84158): Try to include this test.
+//     exclude_from_timeseries_crud_passthrough,
 // ]
 
 const coll = db.expressions_matching_whole_array;

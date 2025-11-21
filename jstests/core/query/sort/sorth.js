@@ -2,6 +2,9 @@
 //   # When the config fuzzer changes 'internalQueryFindCommandBatchSize' to a value < 3,
 //   # 'cursor.firstBatch' is too small for the limit.
 //   does_not_support_config_fuzzer,
+//   # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
+//   # first stage in a pipeline. This will be incomplatible with timeseries.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 // Tests for the $in/sort/limit optimization combined with inequality bounds.  SERVER-5777

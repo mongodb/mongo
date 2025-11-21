@@ -2,6 +2,8 @@
 // @tags: [
 //   # Uses $where operator
 //   requires_scripting,
+//   # TODO(SERVER-84158): Try to include this test(s).
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 function test() {

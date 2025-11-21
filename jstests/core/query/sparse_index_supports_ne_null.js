@@ -10,6 +10,8 @@
  *   # In 8.0, we changed behavior for equality to null.
  *   requires_fcv_80,
  *   requires_getmore,
+ *   # Time series collections do not support sparse indexes on measurement fields.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";

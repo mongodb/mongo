@@ -2,6 +2,8 @@
  * Tests behavior of the match language when using numeric path components.
  * @tags: [
  *   requires_getmore,
+ *   # Time series collections do not support indexing array values in measurement fields.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 const coll = db.match_numeric_components;

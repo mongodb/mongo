@@ -24,6 +24,8 @@
  * # Exercises hashed index bug in SERVER-102302. Once that fix is backported, this fcv
  * # requirement can be removed.
  * requires_fcv_82,
+ * # Time series collections do not support indexing array values in measurement fields.
+ * exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {getDifferentlyShapedQueries} from "jstests/libs/property_test_helpers/common_properties.js";

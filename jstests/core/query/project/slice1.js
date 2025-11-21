@@ -2,6 +2,8 @@
 //   requires_getmore,
 //   # $slice is not supported on views.
 //   incompatible_with_views,
+//   # Time series collections (as views) do not support this operation (e.g. $elemMatch, $slice).
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 let t = db.slice1;

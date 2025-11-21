@@ -3,6 +3,9 @@
  *
  * @tags: [
  *   requires_non_retryable_writes,
+ *   # Time series collections cannot be used as a source for `viewOn` or
+ *   # shave view-like limitations in this context.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 const viewNs = "test.view";

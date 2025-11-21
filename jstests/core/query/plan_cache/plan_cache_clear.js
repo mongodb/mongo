@@ -17,6 +17,9 @@
 //   requires_fcv_63,
 //   references_foreign_collection,
 //   requires_getmore,
+//   # Explain will return different plan than expected when a collection becomes a time-series
+//   # collection. Also, query shape will be different.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

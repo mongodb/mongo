@@ -4,7 +4,13 @@
  *   - The hint option should support both the name of the index, and the object spec of the
  *     index.
  *
- * @tags: [assumes_unsharded_collection, requires_multi_updates, requires_non_retryable_writes]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   requires_multi_updates,
+ *   requires_non_retryable_writes,
+ *   # Ignore because the find command is rewritten for TS collections before reaching the failpoint.
+ *   exclude_from_timeseries_crud_passthrough,
+ * ]
  */
 
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";

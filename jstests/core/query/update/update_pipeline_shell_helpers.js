@@ -5,6 +5,8 @@
  *   assumes_write_concern_unchanged,
  *   requires_multi_updates,
  *   requires_non_retryable_writes,
+ *   # Ignore because the find command is rewritten for TS collections before reaching the failpoint.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

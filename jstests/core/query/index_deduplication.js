@@ -11,7 +11,10 @@
  * # This test runs commands that are not allowed with security token: setParameter.
  * not_allowed_with_signed_security_token,
  * # Index deduping not available on earlier FCVs.
- * requires_fcv_80
+ * requires_fcv_80,
+ * # Explain will return different plan than expected when a collection becomes a time-series
+ * # collection. Also, query shape will be different.
+ * exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

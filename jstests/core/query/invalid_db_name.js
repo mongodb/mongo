@@ -2,7 +2,9 @@
 //
 // Can't create a collection with invalid database name
 // @tags: [
-//     assumes_no_implicit_collection_creation_on_get_collection
+//     assumes_no_implicit_collection_creation_on_get_collection,
+//     # The passthrough creates collections implicitly.
+//     exclude_from_timeseries_crud_passthrough,
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

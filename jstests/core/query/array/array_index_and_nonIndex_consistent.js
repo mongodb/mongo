@@ -7,6 +7,8 @@
  *     # This test runs too long for TSAN and code coverage builds.
  *     tsan_incompatible,
  *     incompatible_with_gcov,
+ *     # Time series collections do not support indexing array values in measurement fields.
+ *     exclude_from_timeseries_crud_passthrough,
  *  ]
  */
 

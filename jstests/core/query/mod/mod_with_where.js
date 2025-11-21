@@ -5,6 +5,8 @@
 //   requires_scripting,
 //   assumes_read_concern_local,
 //   requires_getmore,
+//   # TODO(SERVER-84158): Try to include this test(s).
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 const coll = db.mod_with_where;

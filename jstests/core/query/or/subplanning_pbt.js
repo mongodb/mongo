@@ -12,6 +12,8 @@
  * does_not_support_stepdowns,
  * # Runs queries that may return many results, requiring getmores
  * requires_getmore,
+ * # Time series collections do not support indexing array values in measurement fields.
+ * exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {createCacheCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";

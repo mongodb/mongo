@@ -6,6 +6,9 @@
 //   # in order to apply the SHARDING_FILTER stage.
 //   assumes_unsharded_collection,
 //   requires_getmore,
+//   # Explain will return different plan than expected when a collection becomes a time-series
+//   # collection. Also, query shape will be different.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 import {getPlanStage, getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";

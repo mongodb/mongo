@@ -1,4 +1,9 @@
-// @tags: [requires_getmore, requires_fastcount]
+// @tags: [
+//   requires_getmore,
+//   requires_fastcount,
+//   # Cursor manipulation incompatible on timeseries with count 'applySkipLimit' option.
+//   exclude_from_timeseries_crud_passthrough,
+// ]
 const coll = db.count2;
 coll.drop();
 

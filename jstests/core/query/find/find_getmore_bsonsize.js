@@ -4,6 +4,9 @@
 //   does_not_support_config_fuzzer,
 //   # This test relies on query commands returning specific batch-sized responses.
 //   assumes_no_implicit_cursor_exhaustion,
+//   # Time series collections pack measurements into buckets, potentially exceeding
+//   # BSON size limits earlier than regular collections.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 // Ensure that the find and getMore commands can handle documents nearing the 16 MB size limit for

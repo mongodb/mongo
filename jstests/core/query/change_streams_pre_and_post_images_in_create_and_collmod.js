@@ -4,6 +4,8 @@
  * @tags: [
  * requires_fcv_60,
  * requires_replication,
+ * # Change stream pre-/post-images are not available for time-series collections.
+ * exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";

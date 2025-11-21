@@ -11,6 +11,8 @@
 //   uses_testing_only_commands,
 //   # This test relies on find commands returning specific batch-sized responses.
 //   assumes_no_implicit_cursor_exhaustion,
+//   # Time series collections (as views) have specific limitations on aggregation stages (e.g. $merge, $out) or cursor options (e.g. noCursorTimeout, singleBatch).
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 let cmdRes;

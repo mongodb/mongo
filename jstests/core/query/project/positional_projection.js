@@ -3,6 +3,8 @@
 //   requires_getmore,
 //   # Positional projection is not supported on views.
 //   incompatible_with_views,
+//   # Time series collections (as views) have specific limitations on aggregation stages (e.g. $merge, $out) or cursor options (e.g. noCursorTimeout, singleBatch).
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 import "jstests/libs/query/sbe_assert_error_override.js";
 

@@ -1,3 +1,8 @@
+// @tags: [
+//   # Time-series collections have different _id properties.
+//   exclude_from_timeseries_crud_passthrough,
+// ]
+
 // don't allow regex as _id: SERVER-9502
 
 let testColl = db.regex_not_id;

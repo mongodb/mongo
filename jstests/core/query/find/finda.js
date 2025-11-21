@@ -2,6 +2,9 @@
 //   requires_getmore,
 //   # This test relies on query commands returning specific batch-sized responses.
 //   assumes_no_implicit_cursor_exhaustion,
+//   # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
+//   # first stage in a pipeline. This will be incomplatible with timeseries.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 // Tests where the QueryOptimizerCursor enters takeover mode during a query rather than a get more.

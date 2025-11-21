@@ -1,7 +1,10 @@
 /*
  * Tests the rewrite of queries that contain $and inside $expr.
  * @tags: [
- *   requires_fcv_82
+ *   requires_fcv_82,
+ *   # Explain will return different plan than expected when a collection becomes a time-series
+ *   # collection. Also, query shape will be different.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

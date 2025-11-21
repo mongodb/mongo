@@ -1,6 +1,8 @@
 // @tags: [
 //     # Uses $where operator
-//     requires_scripting
+//     requires_scripting,
+//     # TODO(SERVER-84158): Try to include this test.
+//     exclude_from_timeseries_crud_passthrough,
 // ]
 
 let t = db.jstests_ora;

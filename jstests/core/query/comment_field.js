@@ -13,6 +13,8 @@
  *   requires_profiling,
  *   uses_parallel_shell,
  *   no_selinux,
+ *   # Parallel shell not running through the override.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

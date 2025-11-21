@@ -5,6 +5,8 @@
  *   # TODO SERVER-111689 - remove this tag when isEOF() is supported on router.
  *   assumes_against_mongod_not_mongos,
  *   requires_fcv_83,
+ *   # Time-series buckets processing may have different cursor behavior.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

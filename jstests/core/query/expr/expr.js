@@ -15,6 +15,8 @@
 //   requires_getmore,
 //   # This test relies on query commands returning specific batch-sized responses.
 //   assumes_no_implicit_cursor_exhaustion,
+//   # Test relies on mapReduce or unsupported $expr behaviors (e.g. $divide error codes) on time-series.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 import "jstests/libs/query/sbe_assert_error_override.js";

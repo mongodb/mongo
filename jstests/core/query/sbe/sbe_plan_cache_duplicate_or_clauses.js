@@ -17,6 +17,9 @@
  *   # This test assumes that the queries are using the SBE plan cache.
  *   featureFlagSbeFull,
  *   assumes_balancer_off,
+ *   # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
+ *   # first stage in a pipeline. This will be incomplatible with timeseries.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

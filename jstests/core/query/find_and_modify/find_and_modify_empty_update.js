@@ -1,4 +1,8 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [
+//   requires_non_retryable_writes,
+//   # Time series collections do not support `sort` in `findAndModify` commands.
+//   exclude_from_timeseries_crud_passthrough,
+// ]
 
 // Test passing update:{} to findAndModify.  SERVER-13883.
 

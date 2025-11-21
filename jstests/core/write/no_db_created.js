@@ -5,7 +5,9 @@
 //   # The test runs commands that are not allowed with security token: compact.
 //   not_allowed_with_signed_security_token,
 //   requires_non_retryable_commands,
-//   uses_compact
+//   uses_compact,
+//   # The passthrough creates collections implicitly.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 let adminDB = db.getSiblingDB("admin");

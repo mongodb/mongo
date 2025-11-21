@@ -1,7 +1,11 @@
 // SERVER-4516 and SERVER-6913: test that update and findAndModify tolerate
 // an _id in the update document, as long as the _id will not be modified
 //
-// @tags: [requires_fastcount]
+// @tags: [
+//   requires_fastcount,
+//   # Time-series collections have different _id properties.
+//   exclude_from_timeseries_crud_passthrough,
+// ]
 
 const t = db[jsTestName()];
 const startingDoc = {

@@ -1,4 +1,10 @@
 // This tests that $setOnInsert works and allow setting the _id
+//
+// @tags: [
+//   # Time-series collections have different _id properties.
+//   exclude_from_timeseries_crud_passthrough,
+// ]
+
 const t = db[jsTestName()];
 let res;
 

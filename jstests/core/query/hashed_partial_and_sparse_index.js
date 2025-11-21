@@ -4,7 +4,9 @@
  * prefix.
  * @tags: [
  *   assumes_read_concern_local,
- *   requires_getmore
+ *   requires_getmore,
+ *   # Time series collections do not support hashed indexes on measurement fields.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

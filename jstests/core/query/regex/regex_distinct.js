@@ -6,6 +6,8 @@
  *  assumes_read_concern_local,
  *  # Makes checks about the number of shards in the collection.
  *  assumes_balancer_off,
+ *  # Ignore because the find command is rewritten for TS collections before reaching the failpoint.
+ *  exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

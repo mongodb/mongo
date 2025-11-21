@@ -1,4 +1,9 @@
-// @tags: [requires_non_retryable_writes, requires_fastcount]
+// @tags: [
+//   requires_non_retryable_writes,
+//   requires_fastcount,
+//   # Time series collections do not support indexing array values in measurement fields.
+//   exclude_from_timeseries_crud_passthrough,
+// ]
 
 const t = db[jsTestName()];
 t.drop();

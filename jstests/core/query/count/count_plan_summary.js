@@ -17,6 +17,9 @@
 //   # shell to finish.
 //   does_not_support_stepdowns,
 //   assumes_balancer_off,
+//   # Time series collections (as views) generate different profiling/plan summary entries
+//   # (e.g. distinct from underlying bucket collection).
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 

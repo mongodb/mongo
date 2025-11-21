@@ -1,6 +1,10 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
+// @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
+//   # Update operator results in document without a time field.
+//   exclude_from_timeseries_crud_passthrough,
+// ]
 
 // Integration tests for collation-aware findAndModify.
 const coll = db[jsTestName()];

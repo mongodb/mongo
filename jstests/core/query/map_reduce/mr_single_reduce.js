@@ -5,6 +5,8 @@
 //   not_allowed_with_signed_security_token,
 //   # Uses mapReduce command.
 //   requires_scripting,
+//   # Time-series collections are views which don't support map-reduce
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 const coll = db.bar;
 

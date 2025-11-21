@@ -7,6 +7,8 @@
  *   requires_multi_updates,
  *   requires_non_retryable_writes,
  *   requires_fcv_81,
+ *   # Time series collections do not support `sort` in `updateOne` commands.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

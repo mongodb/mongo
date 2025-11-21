@@ -3,6 +3,8 @@
  * @tags: [
  *   requires_multi_updates,
  *   requires_non_retryable_writes,
+ *   # Buckets collection creates compounded secondary indexes, which is not compatible with wildcard indexes.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

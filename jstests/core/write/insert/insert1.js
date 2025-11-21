@@ -1,3 +1,8 @@
+// @tags: [
+//   # Time-series collections have different _id properties.
+//   exclude_from_timeseries_crud_passthrough,
+// ]
+
 const collNamePrefix = "insert1_";
 let collCount = 0;
 

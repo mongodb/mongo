@@ -19,6 +19,8 @@
  *   # This test expects stable query plans, creating unanticipated indexes can lead to variations
  *   # in the plans.
  *   assumes_no_implicit_index_creation,
+ *   # Time series collections do not support sparse indexes on measurement fields.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

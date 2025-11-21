@@ -9,6 +9,9 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
+ *   # Explain will return different plan than expected when a collection becomes a time-series
+ *   # collection. Also, query shape will be different.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {getAggPlanStages, getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";

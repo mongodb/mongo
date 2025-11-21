@@ -8,6 +8,8 @@
 //   does_not_support_causal_consistency,
 //   # Uses $where operator
 //   requires_scripting,
+//   # Different error message due to the override.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 // Tests for the arrayFilters option to update and findAndModify.

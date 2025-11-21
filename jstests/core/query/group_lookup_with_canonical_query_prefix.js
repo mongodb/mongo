@@ -15,6 +15,8 @@
  *    assumes_read_concern_unchanged,
  *    requires_fcv_80,
  *    no_selinux,
+ *    # Time series collections may return fields in a different order due to internal rewriting or view semantics.
+ *    exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

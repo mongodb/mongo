@@ -12,6 +12,8 @@
  *     requires_getmore,
  *     # This test relies on query commands returning specific batch-sized responses.
  *     assumes_no_implicit_cursor_exhaustion,
+ *     # Inserts documents that are too large for a timeseries collection.
+ *     exclude_from_timeseries_crud_passthrough,
  * ]
  */
 const collName = jsTestName();

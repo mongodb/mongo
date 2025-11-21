@@ -5,6 +5,8 @@
 //   requires_multi_updates,
 //   requires_non_retryable_writes,
 //   requires_fastcount,
+//   # Time-series collections have different _id properties.
+//   exclude_from_timeseries_crud_passthrough,
 // ]
 
 //

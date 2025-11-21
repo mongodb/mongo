@@ -9,7 +9,9 @@
  *  requires_fcv_82,
  *  simulate_atlas_proxy_incompatible,
  *  simulate_mongoq_incompatible,
- *  not_allowed_with_signed_security_token
+ *  not_allowed_with_signed_security_token,
+ *  # Time series collections do not support hashed indexes on measurement fields.
+ *  exclude_from_timeseries_crud_passthrough,
  * ]
  */
 

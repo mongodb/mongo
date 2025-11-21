@@ -7,6 +7,8 @@
  *   # Runs listCollections and asserts on the output.
  *   assumes_no_implicit_index_creation,
  *   assumes_stable_collection_uuid,
+ *   # Time series collections have specific index limitations (e.g. count hints, collation updates).
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

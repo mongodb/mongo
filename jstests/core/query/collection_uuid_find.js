@@ -4,6 +4,9 @@
  * @tags: [
  *   requires_fcv_60,
  *   assumes_stable_collection_uuid,
+ *   # Time series collections cannot be used as a source for `viewOn` or have view-like
+ *   # limitations in this context.
+ *   exclude_from_timeseries_crud_passthrough,
  * ]
  */
 const testDB = db.getSiblingDB(jsTestName());
