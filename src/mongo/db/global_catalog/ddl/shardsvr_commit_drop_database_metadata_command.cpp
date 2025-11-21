@@ -81,6 +81,7 @@ void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseNa
     {
         repl::MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+        oplogEntry.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
         oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
         oplogEntry.setObject(DropDatabaseMetadataOplogEntry{dbNameStr, dbName}.toBSON());
         oplogEntry.setOpTime(OplogSlot());

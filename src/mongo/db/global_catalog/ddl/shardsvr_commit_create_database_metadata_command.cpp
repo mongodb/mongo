@@ -85,6 +85,7 @@ void commitCreateDatabaseMetadataLocally(OperationContext* opCtx,
     {
         repl::MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+        oplogEntry.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
         oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
         oplogEntry.setObject(
             CreateDatabaseMetadataOplogEntry{dbNameStr, dbMetadata, fromClone}.toBSON());

@@ -144,6 +144,7 @@ StatusWith<repl::OpTime> _logOp(OperationContext* opCtx,
                                 const BSONObj& obj) {
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
     oplogEntry.setNss(nss);
     oplogEntry.setTid(nss.tenantId() ? nss.tenantId() : tenantIdForStartStop);
     oplogEntry.setUuid(uuid);

@@ -80,7 +80,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/version_context.h"
-#include "mongo/db/version_context_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -121,16 +120,12 @@ Date_t getWallClockTimeForOpLog(OperationContext* opCtx) {
 
 repl::OpTime logOperation(OperationContext* opCtx,
                           MutableOplogEntry* oplogEntry,
-                          bool assignWallClockTime,
+                          bool assignCommonFields,
                           OperationLogger* operationLogger) {
-    if (assignWallClockTime) {
+    if (assignCommonFields) {
         oplogEntry->setWallClockTime(getWallClockTimeForOpLog(opCtx));
-    }
-    if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.hasOperationFCV()) {
-        if (feature_flags::gReplicateOFCVInOplog.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            oplogEntry->setVersionContext(vCtx);
+        if (oplogEntry->getOpType() != repl::OpTypeEnum::kNoop) {
+            oplogEntry->setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
         }
     }
     auto& times = OpObserver::Times::get(opCtx).reservedOpTimes;
@@ -163,10 +158,13 @@ repl::OpTime logMutableOplogEntry(OperationContext* opCtx,
     }
 
     if (inMultiDocumentTransaction) {
+        if (entry->getOpType() != repl::OpTypeEnum::kNoop) {
+            entry->setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
+        }
         txnParticipant.addTransactionOperation(opCtx, entry->toReplOperation());
         return {};
     } else {
-        return logOperation(opCtx, entry, /*assignWallClockTime=*/true, operationLogger);
+        return logOperation(opCtx, entry, /*assignCommonFields=*/true, operationLogger);
     }
 }
 
@@ -258,7 +256,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
         oplogEntry->setOpTime(args.updateArgs->oplogSlots.back());
     }
     opTimes.writeOpTime =
-        logOperation(opCtx, oplogEntry, true /*assignWallClockTime*/, operationLogger);
+        logOperation(opCtx, oplogEntry, true /*assignCommonFields*/, operationLogger);
     opTimes.wallClockTime = oplogEntry->getWallClockTime();
     return opTimes;
 }
@@ -292,7 +290,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     oplogEntry->setObject(documentKey.getShardKeyAndId());
     oplogEntry->setFromMigrateIfTrue(fromMigrate);
     opTimes.writeOpTime =
-        logOperation(opCtx, oplogEntry, true /*assignWallClockTime*/, operationLogger);
+        logOperation(opCtx, oplogEntry, true /*assignCommonFields*/, operationLogger);
     opTimes.wallClockTime = oplogEntry->getWallClockTime();
     return opTimes;
 }
@@ -435,7 +433,7 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
         oplogEntry.setObject2(BSON("indexes" << o2IndexesArr.arr()));
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
-    logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 }
 
 void OpObserverImpl::onStartIndexBuildSinglePhase(OperationContext* opCtx,
@@ -510,7 +508,7 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
     oplogEntry.setUuid(collUUID);
     oplogEntry.setObject(oplogEntryBuilder.done());
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
-    logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 }
 
 void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
@@ -557,7 +555,7 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
     oplogEntry.setUuid(collUUID);
     oplogEntry.setObject(oplogEntryBuilder.done());
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
-    logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 }
 
 namespace {
@@ -729,6 +727,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                 iter->doc,
                 docKey,
                 /*isTimeseries=*/coll->isNewTimeseriesWithoutView());
+            // versionContext is set in the batched write oplog entry, but not each individual op.
+            operation.setVersionContext(boost::none);
             operation.setDestinedRecipient(
                 shardingWriteRouter->getReshardingDestinedRecipient(iter->doc));
 
@@ -757,6 +757,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
+            operation.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
             if (!recordIds.empty()) {
                 operation.setRecordId(recordIds[i++]);
             }
@@ -781,6 +782,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             oplogEntryTemplate.setIsTimeseries();
         }
         oplogEntryTemplate.setOpType(repl::OpTypeEnum::kInsert);
+        oplogEntryTemplate.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
         oplogEntryTemplate.setTid(nss.tenantId());
         oplogEntryTemplate.setNss(nss);
         oplogEntryTemplate.setUuid(uuid);
@@ -871,6 +873,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
             args.updateArgs->update,
             args.updateArgs->criteria,
             /*isTimeseries=*/args.coll->isNewTimeseriesWithoutView());
+        // versionContext is set in the batched write oplog entry, but not each individual op.
+        operation.setVersionContext(boost::none);
         operation.setDestinedRecipient(
             shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
@@ -893,6 +897,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
 
         auto operation = MutableOplogEntry::makeUpdateOperation(
             nss, args.coll->uuid(), args.updateArgs->update, args.updateArgs->criteria);
+        operation.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
 
         if (inRetryableInternalTransaction) {
             operation.setInitializedStatementIds(args.updateArgs->stmtIds);
@@ -1032,6 +1037,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             uuid,
             documentKey.getShardKeyAndId(),
             /*isTimeseries=*/coll->isNewTimeseriesWithoutView());
+        // versionContext is set in the batched write oplog entry, but not each individual op.
+        operation.setVersionContext(boost::none);
         operation.setDestinedRecipient(destinedRecipient);
         operation.setFromMigrateIfTrue(args.fromMigrate);
 
@@ -1052,6 +1059,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
         auto operation =
             MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
+        operation.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
 
         if (!args.replicatedRecordId.isNull()) {
             operation.setRecordId(args.replicatedRecordId);
@@ -1163,7 +1171,7 @@ OpTimeBundle logContainerInsert(OperationContext* opCtx,
     entry.setObject(buildContainerOpObject(key, value));
 
     OpTimeBundle opTime;
-    opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignWallClockTime*/, &logger);
+    opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignCommonFields*/, &logger);
     opTime.wallClockTime = entry.getWallClockTime();
 
     return opTime;
@@ -1189,6 +1197,7 @@ void _onContainerInsert(OperationContext* opCtx,
     if (inBatchedWrite) {
         BatchedWriteContext::BatchedOperation op;
         op.setOpType(repl::OpTypeEnum::kContainerInsert);
+        op.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
         op.setTid(ns.tenantId());
         op.setNss(ns);
         op.setUuid(collUUID);
@@ -1229,7 +1238,7 @@ OpTimeBundle logContainerDelete(OperationContext* opCtx,
     entry.setObject(buildContainerOpObject(key));
 
     OpTimeBundle opTime;
-    opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignWallClockTime*/, &logger);
+    opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignCommonFields*/, &logger);
     opTime.wallClockTime = entry.getWallClockTime();
 
     return opTime;
@@ -1254,6 +1263,7 @@ void _onContainerDelete(OperationContext* opCtx,
     if (inBatchedWrite) {
         BatchedWriteContext::BatchedOperation op;
         op.setOpType(repl::OpTypeEnum::kContainerDelete);
+        op.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
         op.setTid(ns.tenantId());
         op.setNss(ns);
         op.setUuid(collUUID);
@@ -1344,7 +1354,7 @@ void OpObserverImpl::onInternalOpMessage(
     if (slot) {
         oplogEntry.setOpTime(*slot);
     }
-    logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 }
 
 void OpObserverImpl::onCreateCollection(
@@ -1465,7 +1475,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         oplogEntry.setObject(makeCollModCmdObj(collModOplogCmd, oldCollOptions, indexInfo));
         oplogEntry.setObject2(o2Builder.done());
         auto opTime =
-            logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
+            logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(7360104,
                   "Wrote oplog entry for collMod",
@@ -1506,7 +1516,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx,
     oplogEntry.setFromMigrate(markFromMigrate);
     oplogEntry.setObject(BSON("dropDatabase" << 1));
     auto opTime =
-        logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
+        logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
     if (opCtx->writesAreReplicated() && !serverGlobalParams.quiet.load()) {
         LOGV2(7360105,
               "Wrote oplog entry for dropDatabase",
@@ -1548,7 +1558,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     oplogEntry.setObject(BSON("drop" << collectionName.coll()));
     oplogEntry.setObject2(makeObject2ForDropOrRename(numRecords));
     auto opTime =
-        logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
+        logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(7360106,
               "Wrote oplog entry for drop",
@@ -1586,7 +1596,7 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
     oplogEntry.setObject(BSON("dropIndexes" << nss.coll() << "index" << indexName));
     oplogEntry.setObject2(indexInfo);
     auto opTime =
-        logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
+        logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(7360107,
               "Wrote oplog entry for dropIndexes",
@@ -1639,7 +1649,7 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
     if (dropTargetUUID)
         oplogEntry.setObject2(makeObject2ForDropOrRename(numRecords));
     auto opTime =
-        logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
+        logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(7360108,
               "Wrote oplog entry for renameCollection",
@@ -1711,7 +1721,7 @@ void OpObserverImpl::onImportCollection(OperationContext* opCtx,
     }
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setObject(importCollection.toBSON());
-    logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 }
 
 namespace {
@@ -1792,7 +1802,7 @@ repl::OpTime logApplyOps(OperationContext* opCtx,
 
     try {
         auto writeOpTime =
-            logOperation(opCtx, oplogEntry, false /*assignWallClockTime*/, operationLogger);
+            logOperation(opCtx, oplogEntry, false /*assignCommonFields*/, operationLogger);
         if (updateTxnTable) {
             SessionTxnRecord sessionTxnRecord;
             sessionTxnRecord.setLastWriteOpTime(writeOpTime);
@@ -1848,7 +1858,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 
             WriteUnitOfWork wuow(opCtx);
             const auto oplogOpTime =
-                logOperation(opCtx, oplogEntry, true /*assignWallClockTime*/, operationLogger);
+                logOperation(opCtx, oplogEntry, true /*assignCommonFields*/, operationLogger);
             invariant(oplogEntry->getOpTime().isNull() || oplogEntry->getOpTime() == oplogOpTime);
 
             SessionTxnRecord sessionTxnRecord;
@@ -2066,6 +2076,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                 oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
             }
             oplogEntry->setFromMigrateIfTrue(defaultFromMigrate);
+            oplogEntry->setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
             const bool updateTxnTable =
                 oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
             return logApplyOps(opCtx,
@@ -2326,6 +2337,6 @@ void OpObserverImpl::onTruncateRange(OperationContext* opCtx,
     oplogEntry.setNss(coll->ns().getCommandNS());
     oplogEntry.setUuid(coll->uuid());
     oplogEntry.setObject(objectEntry.toBSON());
-    opTime = logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
+    opTime = logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 }
 }  // namespace mongo

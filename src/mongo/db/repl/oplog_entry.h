@@ -46,6 +46,7 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/version_context_feature_flags_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -209,6 +210,14 @@ public:
 
     const std::vector<StmtId>& getStatementIds() const {
         return DurableReplOperation::getStatementIds();
+    }
+
+    void setVersionContextIfHasOperationFCV(const VersionContext& vCtx) {
+        if (vCtx.hasOperationFCV() &&
+            mongo::feature_flags::gReplicateOFCVInOplog.isEnabled(
+                vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            setVersionContext(vCtx);
+        }
     }
 
     void setFromMigrateIfTrue(bool value) & {
@@ -409,6 +418,14 @@ public:
 
     void setVersionContext(boost::optional<VersionContext> value) {
         getDurableReplOperation().setVersionContext(std::move(value));
+    }
+
+    void setVersionContextIfHasOperationFCV(const VersionContext& vCtx) {
+        if (vCtx.hasOperationFCV() &&
+            mongo::feature_flags::gReplicateOFCVInOplog.isEnabled(
+                vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            setVersionContext(vCtx);
+        }
     }
 
     /**
