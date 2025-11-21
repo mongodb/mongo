@@ -68,17 +68,14 @@ public:
                                                                const BSONElement& spec,
                                                                const LiteParserOptions& options) {
             auto parseNode = descriptor.parse(spec.wrap());
-            return std::make_unique<LiteParsedExpandable>(
-                spec.fieldName(), std::move(parseNode), nss, options);
+            return std::make_unique<LiteParsedExpandable>(spec, std::move(parseNode), nss, options);
         }
 
-        // TODO SERVER-114037 Preserve original spec if available. For now we create a dummy
-        // spec with the stage name, which is fine since it is only used to retrieve the name.
-        LiteParsedExpandable(std::string stageName,
+        LiteParsedExpandable(const BSONElement& spec,
                              AggStageParseNodeHandle parseNode,
                              const NamespaceString& nss,
                              const LiteParserOptions& options)
-            : LiteParsedDocumentSource(BSON(stageName << BSONObj()).firstElement()),
+            : LiteParsedDocumentSource(spec),
               _parseNode(std::move(parseNode)),
               _nss(nss),
               _options(options),
@@ -163,14 +160,20 @@ public:
     /**
      * A LiteParsedDocumentSource implementation for extension stages mapping to an
      * AggStageAstNode.
+     *
+     * NOTE: This class is only instantiated during expansion of an extension stage, existing in the
+     * LiteParseExpandable's _expanded list. That means it will never exist at the top-level
+     * LiteParsedPipeline.
      */
     class LiteParsedExpanded : public LiteParsedDocumentSource {
     public:
         LiteParsedExpanded(std::string stageName,
                            AggStageAstNodeHandle astNode,
                            const NamespaceString& nss)
-            // TODO SERVER-114037 Preserve original spec if available. For now we create a dummy
-            // spec with the stage name, which is fine since it is only used to retrieve the name.
+            // NOTE: There is no original BSON since this stage is created from an AST node
+            // desugared without BSON. For now we create a dummy spec with the stage name, but it
+            // will go unused since LiteParsedExpanded will not exist at the top-level
+            // LiteParsedPipeline.
             : LiteParsedDocumentSource(BSON(stageName << BSONObj()).firstElement()),
               _astNode(std::move(astNode)),
               _properties(_astNode.getProperties()),

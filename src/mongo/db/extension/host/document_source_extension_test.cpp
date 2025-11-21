@@ -75,6 +75,10 @@ public:
         return Pipeline::parse(rawPipeline, expCtx);
     }
 
+    BSONObj createDummySpecFromStageName(std::string_view stageName) {
+        return BSON(std::string(stageName) << BSONObj());
+    }
+
     // Runs after each individual test
     void tearDown() override {
         DocumentSourceExtensionTest::unregisterParsers();
@@ -131,11 +135,9 @@ TEST_F(DocumentSourceExtensionTest, ExpandToExtAst) {
     auto rootParseNode = new sdk::ExtensionAggStageParseNode(
         std::make_unique<sdk::shared_test_stages::ExpandToExtAstParseNode>());
     AggStageParseNodeHandle rootHandle{rootParseNode};
+    BSONObj stageBson = createDummySpecFromStageName(sdk::shared_test_stages::kExpandToExtAstName);
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kExpandToExtAstName),
-        std::move(rootHandle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
 
     const auto& expanded = lp.getExpandedPipeline();
     ASSERT_EQUALS(expanded.size(), 1);
@@ -151,11 +153,10 @@ TEST_F(DocumentSourceExtensionTest, ExpandToExtParse) {
     auto rootParseNode = new sdk::ExtensionAggStageParseNode(
         std::make_unique<sdk::shared_test_stages::ExpandToExtParseParseNode>());
     AggStageParseNodeHandle rootHandle{rootParseNode};
+    BSONObj stageBson =
+        createDummySpecFromStageName(sdk::shared_test_stages::kExpandToExtParseName);
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kExpandToExtParseName),
-        std::move(rootHandle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
 
     const auto& expanded = lp.getExpandedPipeline();
     ASSERT_EQUALS(expanded.size(), 1);
@@ -171,12 +172,11 @@ TEST_F(DocumentSourceExtensionTest, ExpandToHostParse) {
     auto rootParseNode = new sdk::ExtensionAggStageParseNode(
         std::make_unique<sdk::shared_test_stages::ExpandToHostParseParseNode>());
     AggStageParseNodeHandle rootHandle{rootParseNode};
+    BSONObj stageBson =
+        createDummySpecFromStageName(sdk::shared_test_stages::kExpandToHostParseName);
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kExpandToHostParseName),
-        std::move(rootHandle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
 
     const auto& expanded = lp.getExpandedPipeline();
     ASSERT_EQUALS(expanded.size(), 1);
@@ -196,11 +196,9 @@ TEST_F(DocumentSourceExtensionTest, ExpandToMixed) {
     auto rootParseNode = new sdk::ExtensionAggStageParseNode(
         std::make_unique<sdk::shared_test_stages::ExpandToMixedParseNode>());
     AggStageParseNodeHandle rootHandle{rootParseNode};
+    BSONObj stageBson = createDummySpecFromStageName(sdk::shared_test_stages::kExpandToMixedName);
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kExpandToMixedName),
-        std::move(rootHandle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
 
     const auto& expanded = lp.getExpandedPipeline();
     ASSERT_EQUALS(expanded.size(), 4);
@@ -238,11 +236,10 @@ TEST_F(DocumentSourceExtensionTest, ExpandedPipelineIsComputedOnce) {
     auto rootParseNode = new sdk::ExtensionAggStageParseNode(
         std::make_unique<sdk::shared_test_stages::ExpandToExtParseParseNode>());
     AggStageParseNodeHandle rootHandle{rootParseNode};
+    BSONObj stageBson =
+        createDummySpecFromStageName(sdk::shared_test_stages::kExpandToExtParseName);
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kExpandToExtParseName),
-        std::move(rootHandle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
 
     // expand() was called during LiteParsedExpandable construction
     ASSERT_EQUALS(sdk::shared_test_stages::ExpandToExtParseParseNode::expandCalls, 1);
@@ -290,11 +287,9 @@ TEST_F(DocumentSourceExtensionTest, ExpandToHostAst) {
         std::make_unique<sdk::shared_test_stages::ExpandToHostAstParseNode>());
     AggStageParseNodeHandle rootHandle{rootParseNode};
 
+    BSONObj stageBson = createDummySpecFromStageName(sdk::shared_test_stages::kExpandToHostAstName);
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kExpandToHostAstName),
-        std::move(rootHandle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
 
     const auto& expanded = lp.getExpandedPipeline();
     ASSERT_EQUALS(expanded.size(), 1);
@@ -311,10 +306,11 @@ TEST_F(DocumentSourceExtensionTest, ExpandPropagatesHostLiteParseFailure) {
         new sdk::ExtensionAggStageParseNode(std::make_unique<ExpandToHostParseBadSpecParseNode>());
     AggStageParseNodeHandle rootHandle{rootParseNode};
 
+    BSONObj stageBson = createDummySpecFromStageName(kExpandToHostBadSpecName);
     ASSERT_THROWS_CODE(
         [&] {
             host::DocumentSourceExtension::LiteParsedExpandable lp(
-                std::string(kExpandToHostBadSpecName), std::move(rootHandle), _nss, {});
+                stageBson.firstElement(), std::move(rootHandle), _nss, {});
         }(),
         AssertionException,
         7746800);
@@ -324,11 +320,9 @@ TEST_F(DocumentSourceExtensionTest, ExpandRecursesMultipleLevels) {
     auto rootParseNode = new sdk::ExtensionAggStageParseNode(
         std::make_unique<sdk::shared_test_stages::TopParseNode>());
     AggStageParseNodeHandle rootHandle{rootParseNode};
+    BSONObj stageBson = createDummySpecFromStageName(sdk::shared_test_stages::kTopName);
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kTopName),
-        std::move(rootHandle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
 
     const auto& expanded = lp.getExpandedPipeline();
     ASSERT_EQUALS(expanded.size(), 4);
@@ -511,11 +505,9 @@ TEST_F(DocumentSourceExtensionTest, ExpandToMaxDepthSucceeds) {
         new sdk::ExtensionAggStageParseNode(std::make_unique<DepthChainParseNode>(depth));
     AggStageParseNodeHandle rootHandle{rootParseNode};
 
+    BSONObj stageBson = createDummySpecFromStageName(makeRecursiveDepthName(depth));
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(makeRecursiveDepthName(depth)),
-        std::move(rootHandle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
 
     const auto& expanded = lp.getExpandedPipeline();
     // Final expansion produces exactly one AST leaf.
@@ -533,22 +525,21 @@ DEATH_TEST_F(DocumentSourceExtensionTestDeathTest, ExpandExceedsMaxDepthFails, "
         new sdk::ExtensionAggStageParseNode(std::make_unique<DepthChainParseNode>(depth));
     AggStageParseNodeHandle rootHandle{rootParseNode};
 
+    BSONObj stageBson = createDummySpecFromStageName(makeRecursiveDepthName(depth));
     [[maybe_unused]] host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(makeRecursiveDepthName(depth)),
-        std::move(rootHandle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
 }
 
 TEST_F(DocumentSourceExtensionTest, ExpandAdjacentCycleFails) {
     auto* rootParseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<AdjacentCycleParseNode>());
     AggStageParseNodeHandle rootHandle{rootParseNode};
+    BSONObj stageBson = createDummySpecFromStageName(kAdjCycleName);
 
     ASSERT_THROWS_WITH_CHECK(
         [&] {
             [[maybe_unused]] host::DocumentSourceExtension::LiteParsedExpandable lp(
-                std::string(kAdjCycleName), std::move(rootHandle), _nss, LiteParserOptions{});
+                stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
         }(),
         AssertionException,
         [](const AssertionException& ex) {
@@ -565,11 +556,12 @@ TEST_F(DocumentSourceExtensionTest, ExpandAdjacentCycleFails) {
 TEST_F(DocumentSourceExtensionTest, ExpandNonAdjacentCycleFails) {
     auto* rootParseNode = new sdk::ExtensionAggStageParseNode(std::make_unique<NodeAParseNode>());
     AggStageParseNodeHandle rootHandle{rootParseNode};
+    BSONObj stageBson = createDummySpecFromStageName(kNodeAName);
 
     ASSERT_THROWS_WITH_CHECK(
         [&] {
             [[maybe_unused]] host::DocumentSourceExtension::LiteParsedExpandable lp(
-                std::string(kNodeAName), std::move(rootHandle), _nss, LiteParserOptions{});
+                stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
         }(),
         AssertionException,
         [](const AssertionException& ex) {
@@ -587,9 +579,10 @@ TEST_F(DocumentSourceExtensionTest, ExpandSameStageOnDifferentBranchesSucceeds) 
     auto* rootParseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<TopSameNameChildrenParseNode>());
     AggStageParseNodeHandle rootHandle{rootParseNode};
+    BSONObj stageBson = createDummySpecFromStageName(kTopSameNameChildren);
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(kTopSameNameChildren), std::move(rootHandle), _nss, LiteParserOptions{});
+        stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
 
     const auto& expanded = lp.getExpandedPipeline();
     ASSERT_EQUALS(expanded.size(), 2);
@@ -864,12 +857,10 @@ TEST_F(DocumentSourceExtensionTest, NoOpParseNodeInheritsDefaultGetPropertiesFro
     auto parseNode =
         new sdk::ExtensionAggStageParseNode(sdk::shared_test_stages::NoOpAggStageParseNode::make());
     auto handle = AggStageParseNodeHandle{parseNode};
+    BSONObj stageBson = createDummySpecFromStageName(sdk::shared_test_stages::kNoOpName);
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kNoOpName),
-        std::move(handle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(handle), _nss, LiteParserOptions{});
     ASSERT_FALSE(lp.isInitialSource());
     ASSERT_FALSE(lp.requiresAuthzChecks());
     ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false),
@@ -900,12 +891,10 @@ TEST_F(DocumentSourceExtensionTest,
        TransformAggStageParseNodeInheritsInitialSourceFromFirstAstNode) {
     auto parseNode = new sdk::ExtensionAggStageParseNode(TransformAggStageParseNode::make());
     auto handle = AggStageParseNodeHandle{parseNode};
+    BSONObj stageBson = createDummySpecFromStageName(sdk::shared_test_stages::kTransformName);
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kTransformName),
-        std::move(handle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(handle), _nss, LiteParserOptions{});
     ASSERT_FALSE(lp.isInitialSource());
 }
 
@@ -913,12 +902,11 @@ TEST_F(DocumentSourceExtensionTest,
        SearchLikeSourceAggStageParseNodeInheritsInitialSourceFromFirstAstNode) {
     auto parseNode = new sdk::ExtensionAggStageParseNode(SearchLikeSourceAggStageParseNode::make());
     auto handle = AggStageParseNodeHandle{parseNode};
+    BSONObj stageBson =
+        createDummySpecFromStageName(sdk::shared_test_stages::kSearchLikeSourceStageName);
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kSearchLikeSourceStageName),
-        std::move(handle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(handle), _nss, LiteParserOptions{});
     ASSERT_TRUE(lp.isInitialSource());
 }
 
@@ -926,12 +914,11 @@ TEST_F(DocumentSourceExtensionTest, ExpandToMatchParseNodeInheritsPropertiesFrom
     auto parseNode = new sdk::ExtensionAggStageParseNode(
         std::make_unique<sdk::shared_test_stages::ExpandToHostParseParseNode>());
     auto handle = AggStageParseNodeHandle{parseNode};
+    BSONObj stageBson =
+        createDummySpecFromStageName(sdk::shared_test_stages::kExpandToHostParseName);
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(sdk::shared_test_stages::kExpandToHostParseName),
-        std::move(handle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(handle), _nss, LiteParserOptions{});
     ASSERT_FALSE(lp.isInitialSource());
     ASSERT_FALSE(lp.requiresAuthzChecks());
     ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false),
@@ -942,9 +929,10 @@ TEST_F(DocumentSourceExtensionTest, ExpandToSearchParseNodeInheritsPropertiesFro
     auto parseNode =
         new sdk::ExtensionAggStageParseNode(std::make_unique<ExpandToSearchAggStageParseNode>());
     auto handle = AggStageParseNodeHandle{parseNode};
+    BSONObj stageBson = createDummySpecFromStageName(kExpandToSearchName);
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(kExpandToSearchName), std::move(handle), _nss, LiteParserOptions{});
+        stageBson.firstElement(), std::move(handle), _nss, LiteParserOptions{});
     ASSERT_TRUE(lp.isInitialSource());
 
     auto privileges = lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
@@ -1056,12 +1044,11 @@ TEST_F(DocumentSourceExtensionTest, ExpandableToMultipleMixedChildrenUnionsRequi
     auto parseNode = new sdk::ExtensionAggStageParseNode(
         MultipleChildrenRequiredPrivilegesAggStageParseNode::make());
     auto handle = AggStageParseNodeHandle{parseNode};
+    BSONObj stageBson =
+        createDummySpecFromStageName(MultipleChildrenRequiredPrivilegesAggStageParseNode::kName);
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
-        std::string(MultipleChildrenRequiredPrivilegesAggStageParseNode::kName),
-        std::move(handle),
-        _nss,
-        LiteParserOptions{});
+        stageBson.firstElement(), std::move(handle), _nss, LiteParserOptions{});
 
     auto privileges = lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
 
