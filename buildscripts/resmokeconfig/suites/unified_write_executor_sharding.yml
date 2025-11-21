@@ -55,6 +55,7 @@ selector:
     - jstests/noPassthrough/crud/bulk_write_metrics.js
     - jstests/noPassthrough/crud/bulk_write_metrics_single_shard.js
     - jstests/noPassthrough/crud/bulk_write_currentop.js
+    - jstests/noPassthrough/query/current_op/currentop_query.js
 
     # - jstests/noPassthrough/query/command_diagnostics_sharded.js
     # - jstests/noPassthrough/query/profile/profile_planning_time_stats.js

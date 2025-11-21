@@ -10,6 +10,7 @@
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
@@ -22,6 +23,8 @@ const st = new ShardingTest({
     shards: 2,
     rs: {nodes: 1, setParameter: {internalQueryExecYieldIterations: 1}},
 });
+
+const uweEnabled = isUweEnabled(st.s);
 
 // Obtain one mongoS connection and a second direct to the shard.
 const rsConn = st.rs0.getPrimary();
@@ -79,8 +82,9 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
     }
     assert.commandWorked(coll2.insert({_id: 0, a: 0}));
 
-    const isLocalMongosCurOp = FixtureHelpers.isMongos(testDB) && localOps;
-    const isRemoteShardCurOp = FixtureHelpers.isMongos(testDB) && !localOps;
+    const isMongos = FixtureHelpers.isMongos(testDB);
+    const isLocalMongosCurOp = isMongos && localOps;
+    const isRemoteShardCurOp = isMongos && !localOps;
 
     const sbeEnabled = checkSbeFullyEnabled(testDB);
     const sbeRestrictedOrEnabled = checkSbeRestrictedOrFullyEnabled(testDB);
@@ -374,7 +378,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
             test: function (db) {
                 assert.commandWorked(db.currentop_query.remove({a: 2}, {collation: {locale: "fr"}}));
             },
-            operation: "remove",
+            operation: uweEnabled && isRemoteShardCurOp ? "bulkWrite" : "remove",
             planSummary: "COLLSCAN",
             currentOpFilter: isLocalMongosCurOp
                 ? {"command.delete": coll.getName(), "command.ordered": true}
@@ -387,7 +391,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                     db.currentop_query.update({a: 1}, {$inc: {b: 1}}, {collation: {locale: "fr"}, multi: true}),
                 );
             },
-            operation: "update",
+            operation: uweEnabled && isRemoteShardCurOp ? "bulkWrite" : "update",
             planSummary: "COLLSCAN",
             currentOpFilter: isLocalMongosCurOp
                 ? {"command.update": coll.getName(), "command.ordered": true}
