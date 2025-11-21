@@ -36,6 +36,7 @@
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -381,6 +382,8 @@ REGISTER_DOCUMENT_SOURCE(trackingMock,
                          DocumentSourceTrackingMock::createFromBson,
                          AllowedWithApiStrict::kAlways);
 ALLOCATE_DOCUMENT_SOURCE_ID(trackingMock, DocumentSourceTrackingMock::id)
+
+REGISTER_RULES(DocumentSourceTrackingMock, OPTIMIZE_IN_PLACE_RULE(DocumentSourceTrackingMock));
 
 class TrackingMockStage : public mongo::exec::agg::MockStage {
     using GetNextResult = exec::agg::GetNextResult;

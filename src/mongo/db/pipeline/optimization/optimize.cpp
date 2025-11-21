@@ -65,27 +65,14 @@ void optimizePipeline(Pipeline& pipeline) {
         return;
     }
     applyRuleBasedRewrites(rbr::PipelineRewriteContext(pipeline), Tags::Reordering);
-    // Not converted to rules yet.
-    optimizeEachStage(&pipeline.getSources());
+    applyRuleBasedRewrites(rbr::PipelineRewriteContext(pipeline), Tags::InPlace);
 }
 
 /**
  * Modifies the container, optimizes each stage individually.
  */
-void optimizeEachStage(DocumentSourceContainer* container) {
-    DocumentSourceContainer optimizedSources;
-    try {
-        // We should have our final number of stages. Optimize each individually.
-        for (auto&& source : *container) {
-            if (auto out = source->optimize()) {
-                optimizedSources.push_back(std::move(out));
-            }
-        }
-        container->swap(optimizedSources);
-    } catch (DBException& ex) {
-        ex.addContext("Failed to optimize pipeline");
-        throw;
-    }
+void optimizeEachStage(const ExpressionContext& expCtx, DocumentSourceContainer* container) {
+    applyRuleBasedRewrites(rbr::PipelineRewriteContext(expCtx, *container), Tags::InPlace);
 }
 
 /**
@@ -111,7 +98,7 @@ DocumentSourceContainer::iterator optimizeEndOfPipeline(const ExpressionContext&
     // wish to optimize, since otherwise calls to optimizeAt() will overrun these limits.
     auto endOfPipeline = DocumentSourceContainer(std::next(itr), container->end());
     optimizeContainer(expCtx, &endOfPipeline);
-    optimizeEachStage(&endOfPipeline);
+    optimizeEachStage(expCtx, &endOfPipeline);
     container->erase(std::next(itr), container->end());
     container->splice(std::next(itr), endOfPipeline);
 

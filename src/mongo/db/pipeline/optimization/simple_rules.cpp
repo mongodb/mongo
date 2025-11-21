@@ -72,7 +72,8 @@ REGISTER_RULES(DocumentSourceSingleDocumentTransformation,
                    .priority = kDefaultPushdownPriority,
                    .tags = PipelineRewriteContext::Tags::Reordering,
                },
-               OPTIMIZE_AT_RULE(DocumentSourceSingleDocumentTransformation));
+               OPTIMIZE_AT_RULE(DocumentSourceSingleDocumentTransformation),
+               OPTIMIZE_IN_PLACE_RULE(DocumentSourceSingleDocumentTransformation));
 REGISTER_RULES(DocumentSourceRedact,
                {
                    .name = "PUSHDOWN_REDACT",
@@ -81,5 +82,6 @@ REGISTER_RULES(DocumentSourceRedact,
                    .priority = kDefaultPushdownPriority,
                    .tags = PipelineRewriteContext::Tags::Reordering,
                },
-               OPTIMIZE_AT_RULE(DocumentSourceRedact));
+               OPTIMIZE_AT_RULE(DocumentSourceRedact),
+               OPTIMIZE_IN_PLACE_RULE(DocumentSourceRedact));
 }  // namespace mongo::rule_based_rewrites::pipeline

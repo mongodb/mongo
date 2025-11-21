@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/pipeline/document_source_list_sessions.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -225,6 +226,7 @@ bool pushMatchBeforeCurrentStage(PipelineRewriteContext& ctx) {
 
 REGISTER_RULES(DocumentSourceMatch,
                OPTIMIZE_AT_RULE(DocumentSourceMatch),
+               OPTIMIZE_IN_PLACE_RULE(DocumentSourceMatch),
                {
                    .name = "MATCH_PUSHDOWN",
                    .precondition = matchCanSwapWithPrecedingStage,
@@ -235,8 +237,20 @@ REGISTER_RULES(DocumentSourceMatch,
 
 REGISTER_RULES(DocumentSourceInternalChangeStreamMatch,
                OPTIMIZE_AT_RULE(DocumentSourceInternalChangeStreamMatch),
+               OPTIMIZE_IN_PLACE_RULE(DocumentSourceInternalChangeStreamMatch),
                {
                    .name = "INTERNAL_CHANGE_STREAM_MATCH_PUSHDOWN",
+                   .precondition = matchCanSwapWithPrecedingStage,
+                   .transform = pushMatchBeforePrecedingStage,
+                   .priority = kDefaultPushdownPriority,
+                   .tags = PipelineRewriteContext::Tags::Reordering,
+               });
+
+REGISTER_RULES(DocumentSourceListSessions,
+               OPTIMIZE_AT_RULE(DocumentSourceListSessions),
+               OPTIMIZE_IN_PLACE_RULE(DocumentSourceListSessions),
+               {
+                   .name = "LIST_SESSIONS_MATCH_PUSHDOWN",
                    .precondition = matchCanSwapWithPrecedingStage,
                    .transform = pushMatchBeforePrecedingStage,
                    .priority = kDefaultPushdownPriority,

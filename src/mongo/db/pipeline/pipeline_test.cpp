@@ -60,6 +60,7 @@
 #include "mongo/db/pipeline/document_source_test_optimizations.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
+#include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/pipeline_test_util.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/common_process_interface.h"
@@ -6260,6 +6261,9 @@ private:
     OrderedPathSet _generated;
     DepsTracker::State _depsState;
 };
+
+REGISTER_RULES(DocumentSourceProducerConsumer,
+               OPTIMIZE_IN_PLACE_RULE(DocumentSourceProducerConsumer));
 
 TEST_F(PipelineDependenciesTest, ShouldNotReturnDependenciesOnGeneratedPaths) {
     auto ctx = getExpCtx();

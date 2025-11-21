@@ -50,7 +50,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void optimizePipeline(Pipeline& pipeline);
 /**
  * Modifies the container, optimizes each stage individually.
  */
-void optimizeEachStage(DocumentSourceContainer* container);
+void optimizeEachStage(const ExpressionContext&, DocumentSourceContainer* container);
 
 /**
  * Modifies the container, optimizing it by combining, swapping, dropping and/or inserting

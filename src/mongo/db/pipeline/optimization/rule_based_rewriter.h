@@ -47,29 +47,42 @@ namespace mongo::rule_based_rewrites::pipeline {
  *                OPTIMIZE_RULE(DocumentSourceMatch),
  *                {"SOME_OTHER_RULE", precondition, transform, 1.0});
  */
-#define REGISTER_RULES(DS, ...)                                                                  \
-    const ServiceContext::ConstructorActionRegisterer documentSourcePrereqsRegisterer_##DS {     \
-        "PipelineOptimizationContext" #DS, [](ServiceContext* service) {                         \
-            registration_detail::enforceUniqueRuleNames(service, {__VA_ARGS__});                 \
-            auto& registry = getDocumentSourceVisitorRegistry(service);                          \
-            registry.registerVisitorFunc<registration_detail::RuleRegisteringVisitorCtx, DS>(    \
-                [](DocumentSourceVisitorContextBase* ctx, const DocumentSource&) {               \
-                    static_cast<registration_detail::RuleRegisteringVisitorCtx*>(ctx)->addRules( \
-                        {__VA_ARGS__});                                                          \
-                });                                                                              \
-        }                                                                                        \
+#define REGISTER_RULES(DS, ...)                                                                    \
+    const ServiceContext::ConstructorActionRegisterer documentSourcePrereqsRegisterer_##DS {       \
+        "PipelineOptimizationContext" #DS, [](ServiceContext* service) {                           \
+            namespace rbr = rule_based_rewrites::pipeline;                                         \
+            rbr::registration_detail::enforceUniqueRuleNames(service, {__VA_ARGS__});              \
+            auto& registry = getDocumentSourceVisitorRegistry(service);                            \
+            registry.registerVisitorFunc<rbr::registration_detail::RuleRegisteringVisitorCtx, DS>( \
+                [](DocumentSourceVisitorContextBase* ctx, const DocumentSource&) {                 \
+                    static_cast<rbr::registration_detail::RuleRegisteringVisitorCtx*>(ctx)         \
+                        ->addRules({__VA_ARGS__});                                                 \
+                });                                                                                \
+        }                                                                                          \
     }
 
 /**
  * Helper for defining a rule that calls optimizeAt() for a given document source.
  */
-#define OPTIMIZE_AT_RULE(DS)                              \
-    {                                                     \
-        .name = "OPTIMIZE_AT_" #DS,                       \
-        .precondition = alwaysTrue,                       \
-        .transform = Transforms::optimizeAtWrapper<DS>,   \
-        .priority = kDefaultOptimizeAtPriority,           \
-        .tags = PipelineRewriteContext::Tags::Reordering, \
+#define OPTIMIZE_AT_RULE(DS)                                   \
+    {                                                          \
+        .name = "OPTIMIZE_AT_" #DS,                            \
+        .precondition = rbr::alwaysTrue,                       \
+        .transform = rbr::Transforms::optimizeAtWrapper<DS>,   \
+        .priority = rbr::kDefaultOptimizeAtPriority,           \
+        .tags = rbr::PipelineRewriteContext::Tags::Reordering, \
+    }
+
+/**
+ * Helper for defining a rule that calls optimize() for a given document source.
+ */
+#define OPTIMIZE_IN_PLACE_RULE(DS)                          \
+    {                                                       \
+        .name = "OPTIMIZE_IN_PLACE_" #DS,                   \
+        .precondition = rbr::alwaysTrue,                    \
+        .transform = rbr::Transforms::optimizeWrapper<DS>,  \
+        .priority = rbr::kDefaultOptimizeInPlacePriority,   \
+        .tags = rbr::PipelineRewriteContext::Tags::InPlace, \
     }
 
 // For high priority rules that e.g. attempt to push a $match as early as possible.
@@ -197,6 +210,25 @@ struct Transforms {
      */
     static inline bool noop(PipelineRewriteContext&) {
         return false;
+    }
+
+    template <typename DS>
+    static bool optimizeWrapper(PipelineRewriteContext& ctx) {
+        if (auto result = ctx.current().optimize()) {
+            *ctx._itr = std::move(result);
+            return false;
+        }
+
+        // If the current stage optimized to null, remove it and move on to the next one. Note that
+        // we can advance here only because we know that in-place optimizations are the last rules
+        // to be applied. If that changes in the future, we must not advance here. The advantage of
+        // advancing is that we don't end up redundantly re-attempting rules that have already been
+        // applied to the previous stage.
+        eraseCurrent(ctx);
+        if (ctx.hasMore()) {
+            ctx.advance();
+        }
+        return true;
     }
 
     template <typename DS>

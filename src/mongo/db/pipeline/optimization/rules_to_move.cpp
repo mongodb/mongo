@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/document_source_bucket_auto.h"
 #include "mongo/db/pipeline/document_source_densify.h"
+#include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -41,6 +43,7 @@
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_skip.h"
+#include "mongo/db/pipeline/document_source_streaming_group.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
@@ -53,12 +56,18 @@ namespace mongo::rule_based_rewrites::pipeline {
 // TODO(SERVER-112281): Split these into separate files by team ownership.
 
 // Owned by the Query Optimization team.
-REGISTER_RULES(DocumentSourceSkip, OPTIMIZE_AT_RULE(DocumentSourceSkip));
+REGISTER_RULES(DocumentSourceSkip,
+               OPTIMIZE_AT_RULE(DocumentSourceSkip),
+               OPTIMIZE_IN_PLACE_RULE(DocumentSourceSkip));
 REGISTER_RULES(DocumentSourceListMqlEntities, OPTIMIZE_AT_RULE(DocumentSourceListMqlEntities));
 REGISTER_RULES(DocumentSourceLimit, OPTIMIZE_AT_RULE(DocumentSourceLimit));
-REGISTER_RULES(DocumentSourceGroup, OPTIMIZE_AT_RULE(DocumentSourceGroup));
+REGISTER_RULES(DocumentSourceGroup,
+               OPTIMIZE_AT_RULE(DocumentSourceGroup),
+               OPTIMIZE_IN_PLACE_RULE(DocumentSourceGroup));
 REGISTER_RULES(DocumentSourceLookUp, OPTIMIZE_AT_RULE(DocumentSourceLookUp));
-REGISTER_RULES(DocumentSourceUnionWith, OPTIMIZE_AT_RULE(DocumentSourceUnionWith));
+REGISTER_RULES(DocumentSourceUnionWith,
+               OPTIMIZE_AT_RULE(DocumentSourceUnionWith),
+               OPTIMIZE_IN_PLACE_RULE(DocumentSourceUnionWith));
 REGISTER_RULES(DocumentSourcePlanCacheStats, OPTIMIZE_AT_RULE(DocumentSourcePlanCacheStats));
 REGISTER_RULES(DocumentSourceUnwind, OPTIMIZE_AT_RULE(DocumentSourceUnwind));
 REGISTER_RULES(DocumentSourceInternalReplaceRoot,
@@ -67,6 +76,9 @@ REGISTER_RULES(DocumentSourceGraphLookUp, OPTIMIZE_AT_RULE(DocumentSourceGraphLo
 REGISTER_RULES(DocumentSourceInternalProjection,
                OPTIMIZE_AT_RULE(DocumentSourceInternalProjection));
 REGISTER_RULES(DocumentSourceSort, OPTIMIZE_AT_RULE(DocumentSourceSort));
+REGISTER_RULES(DocumentSourceBucketAuto, OPTIMIZE_IN_PLACE_RULE(DocumentSourceBucketAuto));
+REGISTER_RULES(DocumentSourceFacet, OPTIMIZE_IN_PLACE_RULE(DocumentSourceFacet));
+REGISTER_RULES(DocumentSourceStreamingGroup, OPTIMIZE_IN_PLACE_RULE(DocumentSourceStreamingGroup));
 
 // Owned by the Query Execution team.
 REGISTER_RULES(DocumentSourceSequentialDocumentCache,
@@ -75,8 +87,11 @@ REGISTER_RULES(DocumentSourceSequentialDocumentCache,
 // Owned by the Query Integration team.
 REGISTER_RULES(DocumentSourceVectorSearch, OPTIMIZE_AT_RULE(DocumentSourceVectorSearch));
 REGISTER_RULES(DocumentSourceInternalSetWindowFields,
-               OPTIMIZE_AT_RULE(DocumentSourceInternalSetWindowFields));
-REGISTER_RULES(DocumentSourceGeoNear, OPTIMIZE_AT_RULE(DocumentSourceGeoNear));
+               OPTIMIZE_AT_RULE(DocumentSourceInternalSetWindowFields),
+               OPTIMIZE_IN_PLACE_RULE(DocumentSourceInternalSetWindowFields));
+REGISTER_RULES(DocumentSourceGeoNear,
+               OPTIMIZE_AT_RULE(DocumentSourceGeoNear),
+               OPTIMIZE_IN_PLACE_RULE(DocumentSourceGeoNear));
 REGISTER_RULES(DocumentSourceInternalSearchIdLookUp,
                OPTIMIZE_AT_RULE(DocumentSourceInternalSearchIdLookUp));
 REGISTER_RULES(DocumentSourceSearch, OPTIMIZE_AT_RULE(DocumentSourceSearch));

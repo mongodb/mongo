@@ -104,7 +104,7 @@ void addCacheStageAndOptimize(boost::intrusive_ptr<DocumentSource> source,
     }
 
     // Optimize the pipeline, with the cache in its correct position if it exists.
-    pipeline_optimization::optimizeEachStage(&container);
+    pipeline_optimization::optimizeEachStage(*pipeline.getContext(), &container);
 }
 }  // namespace
 
