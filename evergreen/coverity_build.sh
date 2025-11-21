@@ -14,6 +14,7 @@ else
 fi
 
 activate_venv
+export MONGO_WRAPPER_OUTPUT_ALL=1
 # number of parallel jobs to use for build.
 # Even with scale=0 (the default), bc command adds decimal digits in case of multiplication. Division by 1 gives us a whole number with scale=0
 bazel_jobs=$(bc <<<"$(grep -c '^processor' /proc/cpuinfo) * .85 / 1")

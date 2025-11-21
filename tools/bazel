@@ -145,10 +145,10 @@ if [ "$skip_python" == "1" ]; then
 fi  
 
 
-if [[ "$SLOW_PATH" == "1" ]]; then      
+if [[ "$SLOW_PATH" == "1" ]] && [[ -z "${MONGO_WRAPPER_OUTPUT_ALL}" ]]; then
     ORIGINAL_ARGS=("$@")      
   
-    # Save original terminal output FDs      
+    # Save original terminal output FDs
     exec 3>&1 4>&2      
     export MONGO_WRAPPER_STDOUT_FD=3      
     export MONGO_WRAPPER_STDERR_FD=4        
@@ -293,8 +293,9 @@ if [[ $autocomplete_query == 1 ]]; then
 else  
   trap 'cleanup_logfile' EXIT
   # Slow path: restore stdout/stderr so Bazel prints normally  
-  exec 1>&3 2>&4
-
+  if [[ -z "${MONGO_WRAPPER_OUTPUT_ALL}" ]]; then
+      exec 1>&3 2>&4
+  fi
   
   $bazel_real "${new_args[@]}"  
   bazel_exit_code=$?  

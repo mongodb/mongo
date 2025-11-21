@@ -27,4 +27,5 @@ BAZEL_BINARY=bazel
 echo "python buildscripts/install_bazel.py" >bazel-invocation.txt
 
 echo "  bazel coverage ${args} ${target}" >>bazel-invocation.txt
+export MONGO_WRAPPER_OUTPUT_ALL=1
 $BAZEL_BINARY coverage ${args} ${target}
