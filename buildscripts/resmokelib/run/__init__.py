@@ -548,7 +548,9 @@ class TestRunner(Subcommand):
                 if task:
                     break
 
-        local_args = to_local_args()
+        # Skip mongod/mongos set parameters - they'll be conditionally re-added below if non-empty
+        skip_args = ["mongod_set_parameters", "mongos_set_parameters"]
+        local_args = to_local_args(additional_skipped_args=skip_args)
         local_args = strip_fuzz_config_params(local_args)
 
         # We have two lines that are provided to the user. The local_resmoke_invocation has the --configFuzzSeed and --fuzzMongo(d/s)Configs
@@ -583,7 +585,7 @@ class TestRunner(Subcommand):
                 f" --wiredTigerIndexConfigString '{config.WT_INDEX_CONFIG}'"
             )
 
-        if config.MONGOD_SET_PARAMETERS:
+        if config.MONGOD_SET_PARAMETERS and config.MONGOD_SET_PARAMETERS != "{}":
             local_resmoke_invocation_with_params += f" --mongodSetParameters='{self._get_fuzzed_param_resmoke_invocation(config.MONGOD_SET_PARAMETERS)}'"
 
         if config.MONGOD_EXTRA_CONFIG:
@@ -591,7 +593,7 @@ class TestRunner(Subcommand):
                 if v:
                     local_resmoke_invocation_with_params += f" --{k}"
 
-        if config.MONGOS_SET_PARAMETERS:
+        if config.MONGOS_SET_PARAMETERS and config.MONGOS_SET_PARAMETERS != "{}":
             local_resmoke_invocation_with_params += f" --mongosSetParameters='{self._get_fuzzed_param_resmoke_invocation(config.MONGOS_SET_PARAMETERS)}'"
 
         if multiversion_bin_version:
@@ -2509,12 +2511,19 @@ class RunPlugin(PluginInterface):
         )
 
 
-def to_local_args(input_args: Optional[List[str]] = None):
+def to_local_args(
+    input_args: Optional[List[str]] = None, additional_skipped_args: Optional[List[str]] = None
+):
     """
     Return a command line invocation for resmoke.py suitable for being run outside of Evergreen.
 
     This function parses the 'args' list of command line arguments, removes any Evergreen-centric
     options, and returns a new list of command line arguments.
+
+    Args:
+        input_args: If provided, uses these args instead of sys.argv[1:].
+        additional_skipped_args: Additional argument destination names to skip (e.g., ["mongod_set_parameters"]).
+                                 These are added to the default skipped args set for this invocation.
     """
 
     if input_args is None:
@@ -2539,8 +2548,10 @@ def to_local_args(input_args: Optional[List[str]] = None):
 
     run_parser = command_subparser.choices.get("run")
 
-    # arguments that are in the standard run parser that we do not want to include in the local invocation
-    skipped_args = ["install_dir", "tag_files"]
+    # Arguments that we don't want to include in the local invocation
+    skipped_args = {"install_dir", "tag_files", "skip_symbolization"}
+    if additional_skipped_args:
+        skipped_args.update(additional_skipped_args)
 
     suites_arg = None
     storage_engine_arg = None
