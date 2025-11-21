@@ -1,6 +1,6 @@
 """
-Hook that periodically rotates the 'storageEngineConcurrencyAdjustmentAlgorithm' server parameter to
-a new random valid value on all mongod processes.
+Hook that periodically rotates the 'executionControlConcurrencyAdjustmentAlgorithm' and deprioritization
+parameters to new random valid values on all mongod processes.
 """
 
 import random
@@ -17,19 +17,16 @@ from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interfa
 
 class RotateConcurrencyAdjustmentAlgorithm(interface.Hook):
     """
-    Periodically sets 'storageEngineConcurrencyAdjustmentAlgorithm' to a random valid value from a
-    predefined list.
+    Periodically sets 'executionControlConcurrencyAdjustmentAlgorithm' and deprioritization parameters
+    to random valid values.
     """
 
-    DESCRIPTION = (
-        "Periodically rotates 'storageEngineConcurrencyAdjustmentAlgorithm' to a random valid value"
-    )
+    DESCRIPTION = "Periodically rotates 'executionControlConcurrencyAdjustmentAlgorithm' and deprioritization parameters to random valid values"
     IS_BACKGROUND = True
 
     # The list of valid values to choose from.
     _ALGORITHM_OPTIONS = [
         "fixedConcurrentTransactions",
-        "fixedConcurrentTransactionsWithPrioritization",
         "throughputProbing",
     ]
 
@@ -140,21 +137,43 @@ class RotateConcurrencyAdjustmentAlgorithm(interface.Hook):
 
     def _invoke_get_parameter_and_log(self, node):
         """
-        Helper to print the current state of the 'storageEngineConcurrencyAdjustmentAlgorithm' parameter.
+        Helper to print the current state of the execution control parameters.
         """
         client = fixture_interface.build_client(node, self._auth_options)
         try:
-            get_result = client.admin.command(
-                "getParameter", 1, storageEngineConcurrencyAdjustmentAlgorithm=1
+            algorithm_result = client.admin.command(
+                "getParameter",
+                1,
+                executionControlConcurrencyAdjustmentAlgorithm=1,
+            )
+            heuristic_result = client.admin.command(
+                "getParameter",
+                1,
+                executionControlHeuristicDeprioritization=1,
+            )
+            background_result = client.admin.command(
+                "getParameter",
+                1,
+                executionControlBackgroundTasksDeprioritization=1,
+            )
+            deprioritization_result = client.admin.command(
+                "getParameter",
+                1,
+                executionControlDeprioritizationGate=1,
             )
             self.logger.info(
-                "Current state of 'storageEngineConcurrencyAdjustmentAlgorithm' on node %d: %s",
+                "Current state on node %d: algorithm=%s, heuristic=%s, background=%s, deprio=%s",
                 node.port,
-                get_result.get("storageEngineConcurrencyAdjustmentAlgorithm", "NOT_FOUND"),
+                algorithm_result.get("executionControlConcurrencyAdjustmentAlgorithm", "NOT_FOUND"),
+                heuristic_result.get("executionControlHeuristicDeprioritization", "NOT_FOUND"),
+                background_result.get(
+                    "executionControlBackgroundTasksDeprioritization", "NOT_FOUND"
+                ),
+                deprioritization_result.get("executionControlDeprioritizationGate", "NOT_FOUND"),
             )
         except Exception as e:
             self.logger.warning(
-                "Failed to getParameter 'storageEngineConcurrencyAdjustmentAlgorithm' from node %d: %s",
+                "Failed to getParameter from node %d: %s",
                 node.port,
                 e,
             )
@@ -261,16 +280,23 @@ class _SetConcurrencyAlgorithmThread(threading.Thread):
             self.logger.error(msg)
             raise errors.ServerFailure(msg)
 
-    def _invoke_set_parameter(self, client, params):
-        """Helper to invoke setParameter on a given client."""
-        client.admin.command("setParameter", 1, **params)
+    def _invoke_set_parameter(self, client, param_name, param_value):
+        """Helper to invoke setParameter on a given client for a single parameter."""
+        client.admin.command("setParameter", 1, **{param_name: param_value})
 
     def _do_set_parameter(self):
         """
-        Picks a new random algorithm and applies it to all standalone and replica set nodes.
+        Picks a new random algorithm and random boolean values for the deprioritization parameters,
+        then applies them to all standalone and replica set nodes.
         """
-        new_algorithm = self._rng.choice(self._algorithm_options)
-        params_to_set = {"storageEngineConcurrencyAdjustmentAlgorithm": new_algorithm}
+        params_to_set = {
+            "executionControlConcurrencyAdjustmentAlgorithm": self._rng.choice(
+                self._algorithm_options
+            ),
+            "executionControlHeuristicDeprioritization": self._rng.choice([True, False]),
+            "executionControlBackgroundTasksDeprioritization": self._rng.choice([True, False]),
+            "executionControlDeprioritizationGate": self._rng.choice([True, False]),
+        }
 
         for repl_set in self._rs_fixtures:
             self.logger.info(
@@ -280,7 +306,8 @@ class _SetConcurrencyAlgorithmThread(threading.Thread):
             )
             for node in repl_set.nodes:
                 client = fixture_interface.build_client(node, self._auth_options)
-                self._invoke_set_parameter(client, params_to_set)
+                for param_name, param_value in params_to_set.items():
+                    self._invoke_set_parameter(client, param_name, param_value)
 
         for standalone in self._standalone_fixtures:
             self.logger.info(
@@ -289,4 +316,5 @@ class _SetConcurrencyAlgorithmThread(threading.Thread):
                 params_to_set,
             )
             client = fixture_interface.build_client(standalone, self._auth_options)
-            self._invoke_set_parameter(client, params_to_set)
+            for param_name, param_value in params_to_set.items():
+                self._invoke_set_parameter(client, param_name, param_value)

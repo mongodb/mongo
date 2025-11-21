@@ -12,56 +12,94 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/crud/crud_and_commands.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
-    $config.data.algorithms = [
-        "fixedConcurrentTransactions",
-        "fixedConcurrentTransactionsWithPrioritization",
-        "throughputProbing",
-    ];
+    $config.data.algorithms = ["fixedConcurrentTransactions", "throughputProbing"];
+    $config.data.originalParams = {};
 
-    $config.data.originalAlgorithmValue = "";
+    const getServerParameterValue = (cluster, paramName) => {
+        let value;
+        cluster.executeOnMongodNodes((db) => {
+            value = assert.commandWorked(db.adminCommand({getParameter: 1, [paramName]: 1}))[paramName];
+        });
+        return value;
+    };
+
+    const setServerParameterOnAllNodes = (cluster, paramName, value) => {
+        cluster.executeOnMongodNodes((db) => {
+            assert.commandWorked(db.adminCommand({setParameter: 1, [paramName]: value}));
+        });
+    };
+
+    const setServerParameter = (db, paramName, value) => {
+        jsTest.log.info(`Attempting to set ${paramName} to: ${value}`);
+
+        assert.commandWorked(db.adminCommand({setParameter: 1, [paramName]: value}));
+
+        jsTest.log.info(`Successfully set ${paramName} to: ${value}`);
+    };
 
     $config.setup = function (db, collName, cluster) {
-        cluster.executeOnMongodNodes(function (db) {
-            $config.data.originalAlgorithmValue = assert.commandWorked(
-                db.adminCommand({
-                    getParameter: 1,
-                    executionControlConcurrencyAdjustmentAlgorithm: 1,
-                }),
-            ).executionControlConcurrencyAdjustmentAlgorithm;
-        });
+        this.originalParams = {
+            algorithm: getServerParameterValue(cluster, "executionControlConcurrencyAdjustmentAlgorithm"),
+            deprioritizationGate: getServerParameterValue(cluster, "executionControlDeprioritizationGate"),
+            heuristicDeprioritization: getServerParameterValue(cluster, "executionControlHeuristicDeprioritization"),
+            backgroundTasksDeprioritization: getServerParameterValue(
+                cluster,
+                "executionControlBackgroundTasksDeprioritization",
+            ),
+        };
     };
 
     $config.teardown = function (db, collName, cluster) {
-        cluster.executeOnMongodNodes(function (db) {
-            assert.commandWorked(
-                db.adminCommand({
-                    setParameter: 1,
-                    executionControlConcurrencyAdjustmentAlgorithm: $config.data.originalAlgorithmValue,
-                }),
-            );
-        });
+        setServerParameterOnAllNodes(
+            cluster,
+            "executionControlConcurrencyAdjustmentAlgorithm",
+            this.originalParams.algorithm,
+        );
+        setServerParameterOnAllNodes(
+            cluster,
+            "executionControlDeprioritizationGate",
+            this.originalParams.deprioritizationGate,
+        );
+        setServerParameterOnAllNodes(
+            cluster,
+            "executionControlHeuristicDeprioritization",
+            this.originalParams.heuristicDeprioritization,
+        );
+        setServerParameterOnAllNodes(
+            cluster,
+            "executionControlBackgroundTasksDeprioritization",
+            this.originalParams.backgroundTasksDeprioritization,
+        );
     };
 
     $config.states.setConcurrencyAlgorithm = function (db, collName) {
-        const targetAlgorithm = $config.data.algorithms[Random.randInt($config.data.algorithms.length)];
+        const targetAlgorithm = this.algorithms[Random.randInt(this.algorithms.length)];
+        setServerParameter(db, "executionControlConcurrencyAdjustmentAlgorithm", targetAlgorithm);
+    };
 
-        jsTest.log.info(`Attempting to set executionControlConcurrencyAdjustmentAlgorithm to: ${targetAlgorithm}`);
+    $config.states.setDeprioritizationGate = function (db, collName) {
+        setServerParameter(db, "executionControlDeprioritizationGate", Random.randInt(2) === 1);
+    };
 
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, executionControlConcurrencyAdjustmentAlgorithm: targetAlgorithm}),
-        );
+    $config.states.setHeuristicDeprioritization = function (db, collName) {
+        setServerParameter(db, "executionControlHeuristicDeprioritization", Random.randInt(2) === 1);
+    };
 
-        jsTest.log.info(`Successfully set executionControlConcurrencyAdjustmentAlgorithm to: ${targetAlgorithm}`);
+    $config.states.setBackgroundTasksDeprioritization = function (db, collName) {
+        setServerParameter(db, "executionControlBackgroundTasksDeprioritization", Random.randInt(2) === 1);
     };
 
     const statesProbability = {
-        insertDocs: 0.16,
-        updateDocs: 0.16,
-        findAndModifyDocs: 0.16,
-        readDocs: 0.16,
-        deleteDocs: 0.16,
-        dropCollection: 0.16,
+        insertDocs: 0.14,
+        updateDocs: 0.14,
+        findAndModifyDocs: 0.14,
+        readDocs: 0.14,
+        deleteDocs: 0.14,
+        dropCollection: 0.14,
         setConcurrencyAlgorithm: 0.04,
+        setDeprioritizationGate: 0.04,
+        setHeuristicDeprioritization: 0.04,
+        setBackgroundTasksDeprioritization: 0.04,
     };
     $config.transitions = {
         init: statesProbability,
@@ -72,6 +110,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         deleteDocs: statesProbability,
         dropCollection: statesProbability,
         setConcurrencyAlgorithm: statesProbability,
+        setDeprioritizationGate: statesProbability,
+        setHeuristicDeprioritization: statesProbability,
+        setBackgroundTasksDeprioritization: statesProbability,
     };
 
     return $config;

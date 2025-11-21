@@ -118,6 +118,21 @@ bool wasOperationDowngradedToLowPriority(OperationContext* opCtx,
     return admCtx->getAdmissions() >= gHeuristicNumAdmissionsDeprioritizeThreshold.load();
 }
 
+Status checkPrioritizationTransition(bool oldStateUsesPrioritization,
+                                     bool newStateUsesPrioritization) {
+    const bool transitioningAwayFromPrioritization =
+        oldStateUsesPrioritization && !newStateUsesPrioritization;
+
+    if (transitioningAwayFromPrioritization &&
+        (gConcurrentReadLowPriorityTransactions.load() == 0 ||
+         gConcurrentWriteLowPriorityTransactions.load() == 0)) {
+        return Status{ErrorCodes::IllegalOperation,
+                      "Cannot transition to not use prioritization when low-priority read or write "
+                      "tickets are set to 0"};
+    }
+    return Status::OK();
+}
+
 }  // namespace
 
 Status TicketingSystem::NormalPrioritySettings::updateWriteMaxQueueDepth(
@@ -221,7 +236,6 @@ Status TicketingSystem::LowPrioritySettings::updateConcurrentWriteTransactions(
     const int32_t& newWriteTransactions) {
     const auto spName = "low priority concurrent write transactions limit";
     return updateSettings(spName, [&](Client* client, TicketingSystem* ticketingSystem) {
-        warnIfDynamicAdjustmentEnabled(ticketingSystem, spName);
         warnIfPrioritizationDisabled(ticketingSystem, spName);
 
         ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
@@ -236,7 +250,6 @@ Status TicketingSystem::LowPrioritySettings::updateConcurrentReadTransactions(
     const int32_t& newReadTransactions) {
     const auto spName = "low priority concurrent read transactions limit";
     return updateSettings(spName, [&](Client* client, TicketingSystem* ticketingSystem) {
-        warnIfDynamicAdjustmentEnabled(ticketingSystem, spName);
         warnIfPrioritizationDisabled(ticketingSystem, spName);
 
         ticketingSystem->setConcurrentTransactions(client->getOperationContext(),
@@ -272,8 +285,30 @@ Status TicketingSystem::LowPrioritySettings::validateConcurrentReadTransactions(
 Status TicketingSystem::updateConcurrencyAdjustmentAlgorithm(std::string algorithmName) {
     return updateSettings("concurrency adjustment algorithm",
                           [&](Client* client, TicketingSystem* ticketingSystem) {
-                              return ticketingSystem->setConcurrencyAdjustmentAlgorithm(
+                              ticketingSystem->setConcurrencyAdjustmentAlgorithm(
                                   client->getOperationContext(), algorithmName);
+                              return Status::OK();
+                          });
+}
+
+Status TicketingSystem::updateDeprioritizationGate(bool enabled) {
+    return updateSettings("deprioritization gate",
+                          [&](Client* client, TicketingSystem* ticketingSystem) {
+                              return ticketingSystem->setDeprioritizationGate(enabled);
+                          });
+}
+
+Status TicketingSystem::updateHeuristicDeprioritization(bool enabled) {
+    return updateSettings("heuristic deprioritization",
+                          [&](Client* client, TicketingSystem* ticketingSystem) {
+                              return ticketingSystem->setHeuristicDeprioritization(enabled);
+                          });
+}
+
+Status TicketingSystem::updateBackgroundTasksDeprioritization(bool enabled) {
+    return updateSettings("background tasks deprioritization",
+                          [&](Client* client, TicketingSystem* ticketingSystem) {
+                              return ticketingSystem->setBackgroundTasksDeprioritization(enabled);
                           });
 }
 
@@ -299,7 +334,12 @@ TicketingSystem::TicketingSystem(
     RWTicketHolder normal,
     RWTicketHolder low,
     ExecutionControlConcurrencyAdjustmentAlgorithmEnum concurrencyAdjustmentAlgorithm)
-    : _state({concurrencyAdjustmentAlgorithm}),
+    : _state({.usesThroughputProbing = concurrencyAdjustmentAlgorithm ==
+                  ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing,
+
+              .deprioritization = {.gate = gDeprioritizationGate.load(),
+                                   .heuristic = gHeuristicDeprioritization.load(),
+                                   .backgroundTasks = gBackgroundTasksDeprioritization.load()}}),
       _throughputProbing(svcCtx,
                          normal.read.get(),
                          normal.write.get(),
@@ -309,7 +349,7 @@ TicketingSystem::TicketingSystem(
 };
 
 bool TicketingSystem::isRuntimeResizable() const {
-    return _state.loadRelaxed().isRuntimeResizable();
+    return !_state.loadRelaxed().usesThroughputProbing;
 }
 
 bool TicketingSystem::usesPrioritization() const {
@@ -333,39 +373,28 @@ void TicketingSystem::setConcurrentTransactions(OperationContext* opCtx,
     holder->resize(opCtx, transactions, Date_t::max());
 }
 
-Status TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
-                                                          std::string algorithmName) {
+void TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
+                                                        std::string algorithmName) {
     const auto parsedAlgorithm = ExecutionControlConcurrencyAdjustmentAlgorithm_parse(
         algorithmName, IDLParserContext{"executionControlConcurrencyAdjustmentAlgorithm"});
 
     const TicketingState oldState = _state.loadRelaxed();
-    const TicketingState newState = {parsedAlgorithm};
 
-    const bool wasThroughputProbingRunning = oldState.usesThroughputProbing();
-    const bool isThroughputProbingRunningNow = newState.usesThroughputProbing();
-    const bool transitioningAwayFromPrioritization =
-        oldState.usesPrioritization() && !newState.usesPrioritization();
-
-    if (transitioningAwayFromPrioritization &&
-        (gConcurrentReadLowPriorityTransactions.load() == 0 ||
-         gConcurrentWriteLowPriorityTransactions.load() == 0)) {
-        return Status{ErrorCodes::IllegalOperation,
-                      "Cannot transition to not use prioritization when low-priority read or write "
-                      "tickets are set to 0"};
-    }
+    TicketingState newState = oldState;
+    newState.usesThroughputProbing =
+        (parsedAlgorithm == ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing);
 
     _state.store(newState);
 
-    if (wasThroughputProbingRunning == isThroughputProbingRunningNow) {
-        // There has been a change in the algorithm related to the prioritization of operations, but
-        // no change in the throughput probing state. There is nothing more to update.
-        return Status::OK();
+    if (oldState.usesThroughputProbing == newState.usesThroughputProbing) {
+        // No-op. Nothing has changed.
+        return;
     }
 
-    if (isThroughputProbingRunningNow) {
+    if (newState.usesThroughputProbing) {
         // Throughput probing needs to start. Apart from that, there is nothing more to update.
         _throughputProbing.start();
-        return Status::OK();
+        return;
     }
 
     // There has been a change in the algorithm from throughput probing to fixed concurrency. We
@@ -381,18 +410,39 @@ Status TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCt
                               AdmissionContext::Priority::kNormal,
                               OperationType::kWrite,
                               gConcurrentWriteTransactions.load());
-    setConcurrentTransactions(
-        opCtx,
-        AdmissionContext::Priority::kLow,
-        OperationType::kRead,
-        TicketingSystem::resolveLowPriorityTickets(gConcurrentReadLowPriorityTransactions));
-    setConcurrentTransactions(
-        opCtx,
-        AdmissionContext::Priority::kLow,
-        OperationType::kWrite,
-        TicketingSystem::resolveLowPriorityTickets(gConcurrentWriteLowPriorityTransactions));
+}
 
+Status TicketingSystem::_setDeprioritizationFlag(bool enabled,
+                                                 std::function<void(TicketingState&)> setFlag) {
+    const TicketingState oldState = _state.loadRelaxed();
+
+    TicketingState newState = oldState;
+    setFlag(newState);
+
+    auto status =
+        checkPrioritizationTransition(oldState.usesPrioritization(), newState.usesPrioritization());
+    if (!status.isOK()) {
+        return status;
+    }
+
+    _state.store(newState);
     return Status::OK();
+}
+
+Status TicketingSystem::setDeprioritizationGate(bool enabled) {
+    return _setDeprioritizationFlag(
+        enabled, [enabled](TicketingState& state) { state.deprioritization.gate = enabled; });
+}
+
+Status TicketingSystem::setHeuristicDeprioritization(bool enabled) {
+    return _setDeprioritizationFlag(
+        enabled, [enabled](TicketingState& state) { state.deprioritization.heuristic = enabled; });
+}
+
+Status TicketingSystem::setBackgroundTasksDeprioritization(bool enabled) {
+    return _setDeprioritizationFlag(enabled, [enabled](TicketingState& state) {
+        state.deprioritization.backgroundTasks = enabled;
+    });
 }
 
 void TicketingSystem::appendStats(BSONObjBuilder& b) const {
@@ -402,7 +452,6 @@ void TicketingSystem::appendStats(BSONObjBuilder& b) const {
     int32_t writeOut = 0, writeAvailable = 0, writeTotalTickets = 0;
     _state.loadRelaxed().appendStats(b);
     b.append("totalDeprioritizations", _opsDeprioritized.loadRelaxed());
-    b.append("prioritizationEnabled", usesPrioritization());
 
     for (size_t i = 0; i < _holders.size(); ++i) {
         const auto priority = static_cast<AdmissionContext::Priority>(i);
@@ -558,7 +607,7 @@ void TicketingSystem::startThroughputProbe() {
     tassert(11132202,
             "The throughput probing parameter should be enabled. This is only safe to use for "
             "initialization purposes.",
-            _state.loadRelaxed().usesThroughputProbing());
+            _state.loadRelaxed().usesThroughputProbing);
 
     _throughputProbing.start();
 }
@@ -577,21 +626,15 @@ TicketHolder* TicketingSystem::_getHolder(AdmissionContext::Priority p, Operatio
 }
 
 bool TicketingSystem::TicketingState::usesPrioritization() const {
-    return algorithm ==
-        ExecutionControlConcurrencyAdjustmentAlgorithmEnum::
-            kFixedConcurrentTransactionsWithPrioritization;
-}
-
-bool TicketingSystem::TicketingState::usesThroughputProbing() const {
-    return algorithm == ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing;
-}
-
-bool TicketingSystem::TicketingState::isRuntimeResizable() const {
-    return !usesThroughputProbing();
+    return deprioritization.isActive();
 }
 
 void TicketingSystem::TicketingState::appendStats(BSONObjBuilder& b) const {
-    b.append("executionControlConcurrencyAdjustmentAlgorithm", algorithm);
+    b.append("usesThroughputProbing", usesThroughputProbing);
+    b.append("usesPrioritization", usesPrioritization());
+    b.append("deprioritizationGate", deprioritization.gate);
+    b.append("heuristicDeprioritization", deprioritization.heuristic);
+    b.append("backgroundTasksDeprioritization", deprioritization.backgroundTasks);
 }
 
 }  // namespace mongo::admission::execution_control

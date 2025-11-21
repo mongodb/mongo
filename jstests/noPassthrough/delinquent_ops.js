@@ -28,18 +28,12 @@ const delinquentIntervalMs = waitPerIterationMs - 20;
 const findComment = "delinquent_ops.js-COMMENT";
 
 function disableDeprioritizationHeuristic(conn) {
-    let algorithm = assert.commandWorked(
-        conn.adminCommand({getParameter: 1, executionControlConcurrencyAdjustmentAlgorithm: 1}),
+    assert.commandWorked(
+        conn.adminCommand({
+            setParameter: 1,
+            executionControlHeuristicDeprioritization: false,
+        }),
     );
-    if (algorithm.executionControlConcurrencyAdjustmentAlgorithm == "fixedConcurrentTransactionsWithPrioritization") {
-        // Set a very high number of admissions, effectively disabling the heuristic.
-        assert.commandWorked(
-            conn.adminCommand({
-                setParameter: 1,
-                executionControlHeuristicNumAdmissionsDeprioritizeThreshold: 999999,
-            }),
-        );
-    }
 }
 
 function assertDelinquentStats(metrics, count, msg, previousOperationMetrics) {

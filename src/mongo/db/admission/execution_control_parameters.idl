@@ -39,18 +39,10 @@ enums:
         # executionControlConcurrentWriteTransactions/executionControlConcurrentReadTransactions and
         # will not be adjusted automatically based on overall system throughput.
         #
-        # 'kFixedConcurrentTransactionsWithPrioritization': The number of concurrent transactions is
-        # controlled by server parameters and divided into two pools based on operation priority
-        # (normal and low priority). These values are not adjusted automatically based on overall
-        # system throughput. Instead, this algorithm is intended for use with an external server-side
-        # policy (e.g., mongotune) that dynamically adjusts the number of concurrent transactions in
-        # each pool.
-        #
         # 'kThroughputProbing': Number of concurrent transactions are dynamically adjusted, either
         # increasing or decreasing concurrency in the execution control, based on system throughput.
         values:
             kFixedConcurrentTransactions: "fixedConcurrentTransactions"
-            kFixedConcurrentTransactionsWithPrioritization: "fixedConcurrentTransactionsWithPrioritization"
             kThroughputProbing: "throughputProbing"
 
 server_parameters:
@@ -190,15 +182,27 @@ server_parameters:
             callback: TicketingSystem::validateConcurrencyAdjustmentAlgorithm
         redact: false
 
+    executionControlDeprioritizationGate:
+        description: >-
+            Global gate for enabling deprioritization in the ticketing system. When true, feature-specific
+            deprioritization controls (such as heuristic and background task deprioritization) are
+            permitted to take effect. When false, all deprioritization mechanisms are blocked,
+            regardless of their individual settings.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gDeprioritizationGate
+        on_update: "TicketingSystem::updateDeprioritizationGate"
+        default: false
+        redact: false
+
     executionControlHeuristicDeprioritization:
         description: >-
             Enables a heuristic that will evaluate long-running operations and deprioritize them to
-            the low priority ticket pool. This parameter only takes effect if the execution
-            admission control with prioritization is enabled. This only takes effect if
-            `executionControlConcurrencyAdjustmentAlgorithm` is "fixedConcurrentTransactionsWithPrioritization".
+            the low priority ticket pool.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gHeuristicDeprioritization
+        on_update: "TicketingSystem::updateHeuristicDeprioritization"
         default: true
         redact: false
 
@@ -206,7 +210,7 @@ server_parameters:
         description: >-
             The number of admissions an operation must perform before it is deprioritized to the low-priority
             ticket pool. This parameter only takes effect when `executionControlHeuristicDeprioritization`
-            is true and `executionControlConcurrencyAdjustmentAlgorithm` is "fixedConcurrentTransactionsWithPrioritization".
+            is true.
         set_at: [startup, runtime]
         cpp_vartype: Atomic<int>
         cpp_varname: gHeuristicNumAdmissionsDeprioritizeThreshold
@@ -221,10 +225,10 @@ server_parameters:
             TTL deletions) are automatically deprioritized to the low-priority pool. If set to false,
             these tasks will not be automatically deprioritized upon starting. However, they can
             still be deprioritized later by the heuristic if the operation exceeds the admissions
-            threshold. This only takes effect if `executionControlConcurrencyAdjustmentAlgorithm` is
-            "fixedConcurrentTransactionsWithPrioritization".
+            threshold.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gBackgroundTasksDeprioritization
+        on_update: "TicketingSystem::updateBackgroundTasksDeprioritization"
         default: true
         redact: false

@@ -117,6 +117,12 @@ public:
 
     static Status updateConcurrencyAdjustmentAlgorithm(std::string newAlgorithm);
 
+    static Status updateDeprioritizationGate(bool enabled);
+
+    static Status updateHeuristicDeprioritization(bool enabled);
+
+    static Status updateBackgroundTasksDeprioritization(bool enabled);
+
     /**
      * Resolves the configured number of low-priority tickets.
      *
@@ -160,7 +166,33 @@ public:
      * adjust the number of concurrent transactions. This includes switching between fixed
      * concurrency and throughput probing-based algorithms.
      */
-    Status setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx, std::string algorithmName);
+    void setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx, std::string algorithmName);
+
+    /**
+     * Opens or closes the global deprioritization gate in the ticketing system.
+     *
+     * When opened (`enabled = true`), feature-specific deprioritization controls (such as heuristic
+     * and background task deprioritization) are allowed to take effect. When closed (`enabled =
+     * false`), all deprioritization mechanisms are blocked, regardless of their individual
+     * settings.
+     */
+    Status setDeprioritizationGate(bool enabled);
+
+    /**
+     * Enables or disables automatic deprioritization of operations based on a heuristic.
+     *
+     * When enabled, operations that yield frequently are automatically assigned to the low-priority
+     * ticket pool.
+     */
+    Status setHeuristicDeprioritization(bool enabled);
+
+    /**
+     * Enables or disables automatic deprioritization of background tasks.
+     *
+     * When enabled, certain background operations (index builds, range deletions, and TTL
+     * deletions) are automatically assigned to the low-priority ticket pool upon starting.
+     */
+    Status setBackgroundTasksDeprioritization(bool enabled);
 
     /**
      * Appends statistics about the ticketing system's state to a BSON.
@@ -201,11 +233,53 @@ private:
      * Encapsulates the ticketing system's concurrency mode and the logic that defines its behavior.
      */
     struct TicketingState {
-        ExecutionControlConcurrencyAdjustmentAlgorithmEnum algorithm;
+        /**
+         * If true, the system uses the throughput probing algorithm (dynamic). Otherwise, it uses
+         * the fixed concurrency algorithm (static).
+         */
+        bool usesThroughputProbing = false;
 
+        /**
+         * Logically groups the settings related to operation deprioritization.
+         */
+        struct DeprioritizationPolicy {
+            /**
+             * The global switch. If false, NO deprioritization occurs, regardless of the heuristic
+             * or background flags.
+             */
+            bool gate = false;
+
+            /**
+             * If true (and gate is true), operations may be deprioritized based on admissions
+             * frequency.
+             */
+            bool heuristic = false;
+
+            /**
+             * If true (and gate is true), specific background tasks (e.g., index builds) start as
+             * low priority.
+             */
+            bool backgroundTasks = false;
+
+            /**
+             * Returns true if the gate is open and at least one specific policy is enabled.
+             */
+            bool isActive() const {
+                return gate && (heuristic || backgroundTasks);
+            }
+        };
+
+        /**
+         * Holds the current configuration for all deprioritization mechanisms (heuristic,
+         * background tasks).
+         */
+        DeprioritizationPolicy deprioritization;
+
+        /**
+         * Returns true if the system is configured to use multiple ticket pools (prioritization).
+         */
         bool usesPrioritization() const;
-        bool usesThroughputProbing() const;
-        bool isRuntimeResizable() const;
+
         void appendStats(BSONObjBuilder& b) const;
     };
 
@@ -214,6 +288,12 @@ private:
      * contains both the raw algorithm enum and the logic to interpret it.
      */
     AtomicWord<TicketingState> _state;
+
+    /**
+     * Helper method to set a deprioritization flag with proper state transition checking.
+     * The setFlag function is invoked to modify the new state before storing it.
+     */
+    Status _setDeprioritizationFlag(bool enabled, std::function<void(TicketingState&)> setFlag);
 
     /**
      * Holds the ticket pools for different priority levels.

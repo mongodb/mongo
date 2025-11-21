@@ -44,6 +44,13 @@ export function getExecutionControlAlgorithm(node) {
 }
 
 /**
+ * Enables or disables the global deprioritization gate.
+ */
+export function setDeprioritizationGate(node, enabled) {
+    setExecutionControlParameter(node, "executionControlDeprioritizationGate", enabled);
+}
+
+/**
  * Enables or disables heuristic deprioritization for long-running operations.
  */
 export function setHeuristicDeprioritization(node, enabled) {

@@ -22,7 +22,6 @@ import {
     getLowPriorityReadCount,
     getLowPriorityWriteCount,
     insertTestDocuments,
-    kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
     setBackgroundTaskDeprioritization,
 } from "jstests/noPassthrough/admission/execution_control/libs/execution_control_helper.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
@@ -41,8 +40,7 @@ describe("Execution control deprioritization mechanisms", function () {
                         // Force the query to yield frequently to better expose the low-priority
                         // behavior.
                         internalQueryExecYieldIterations: 1,
-                        executionControlConcurrencyAdjustmentAlgorithm:
-                            kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
+                        executionControlDeprioritizationGate: true,
                     },
                 },
             });
@@ -202,8 +200,7 @@ describe("Execution control deprioritization mechanisms", function () {
                 nodes: 2,
                 nodeOptions: {
                     setParameter: {
-                        executionControlConcurrencyAdjustmentAlgorithm:
-                            kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
+                        executionControlDeprioritizationGate: true,
                         executionControlHeuristicDeprioritization: false,
                     },
                 },
@@ -265,8 +262,7 @@ describe("Execution control deprioritization mechanisms", function () {
                     setParameter: {
                         ttlMonitorSleepSecs: 1,
                         ttlMonitorEnabled: false,
-                        executionControlConcurrencyAdjustmentAlgorithm:
-                            kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
+                        executionControlDeprioritizationGate: true,
                         executionControlHeuristicDeprioritization: false,
                     },
                 },
@@ -344,8 +340,7 @@ describe("Execution control deprioritization mechanisms", function () {
                 other: {
                     rsOptions: {
                         setParameter: {
-                            executionControlConcurrencyAdjustmentAlgorithm:
-                                kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
+                            executionControlDeprioritizationGate: true,
                             executionControlHeuristicDeprioritization: false,
                         },
                     },

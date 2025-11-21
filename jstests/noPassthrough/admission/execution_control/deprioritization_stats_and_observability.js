@@ -20,9 +20,11 @@ import {
     getTotalDeprioritizationCount,
     insertTestDocuments,
     kFixedConcurrentTransactionsAlgorithm,
-    kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
     kThroughputProbingAlgorithm,
+    setBackgroundTaskDeprioritization,
+    setDeprioritizationGate,
     setExecutionControlAlgorithm,
+    setHeuristicDeprioritization,
 } from "jstests/noPassthrough/admission/execution_control/libs/execution_control_helper.js";
 
 describe("Execution control statistics and observability", function () {
@@ -53,6 +55,30 @@ describe("Execution control statistics and observability", function () {
             assertFunc(obj1.totalTickets, obj2.totalTickets);
         }
 
+        /**
+         * Verifies that execution control stats from serverStatus match the expected values.
+         * Checks algorithm type, prioritization settings, and ticket aggregation stats.
+         *
+         * The 'expected' object should contain:
+         * - usesThroughputProbing: whether throughput probing algorithm is active.
+         * - usesPrioritization: whether any form of prioritization is enabled.
+         * - deprioritizationGate: the state of the deprioritization gate.
+         * - heuristicDeprioritization: whether heuristic deprioritization is enabled.
+         * - backgroundTasksDeprioritization: whether background task deprioritization is enabled.
+         * - ticketAssertFunc: assertion function (assert.eq or assert.gt) for comparing aggregated
+         * ticket stats to normal priority ticket stats.
+         */
+        function verifyExecutionControlStats(expected) {
+            const stats = getExecutionControlStats(mongod);
+            assert.eq(expected.usesThroughputProbing, stats.usesThroughputProbing);
+            assert.eq(expected.usesPrioritization, stats.usesPrioritization);
+            assert.eq(expected.deprioritizationGate, stats.deprioritizationGate);
+            assert.eq(expected.heuristicDeprioritization, stats.heuristicDeprioritization);
+            assert.eq(expected.backgroundTasksDeprioritization, stats.backgroundTasksDeprioritization);
+            verifyTicketAggregationStats(expected.ticketAssertFunc, stats.read, stats.read.normalPriority);
+            verifyTicketAggregationStats(expected.ticketAssertFunc, stats.write, stats.write.normalPriority);
+        }
+
         before(function () {
             replTest = new ReplSetTest({
                 nodes: 1,
@@ -77,36 +103,154 @@ describe("Execution control statistics and observability", function () {
 
         it("should report throughput probing correctly", function () {
             setExecutionControlAlgorithm(mongod, kThroughputProbingAlgorithm);
+            setDeprioritizationGate(mongod, false);
 
-            const stats = getExecutionControlStats(mongod);
-            assert.eq(2, stats.executionControlConcurrencyAdjustmentAlgorithm);
-            assert.eq(false, stats.prioritizationEnabled);
-            verifyTicketAggregationStats(assert.eq, stats.read, stats.read.normalPriority);
-            verifyTicketAggregationStats(assert.eq, stats.write, stats.write.normalPriority);
+            verifyExecutionControlStats({
+                usesThroughputProbing: true,
+                usesPrioritization: false,
+                deprioritizationGate: false,
+                heuristicDeprioritization: true,
+                backgroundTasksDeprioritization: true,
+                ticketAssertFunc: assert.eq,
+            });
         });
 
         it("should report fixed algorithm correctly", function () {
             setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
+            setDeprioritizationGate(mongod, false);
 
-            const stats = getExecutionControlStats(mongod);
-            assert.eq(0, stats.executionControlConcurrencyAdjustmentAlgorithm);
-            assert.eq(false, stats.prioritizationEnabled);
-            verifyTicketAggregationStats(assert.eq, stats.read, stats.read.normalPriority);
-            verifyTicketAggregationStats(assert.eq, stats.write, stats.write.normalPriority);
+            verifyExecutionControlStats({
+                usesThroughputProbing: false,
+                usesPrioritization: false,
+                deprioritizationGate: false,
+                heuristicDeprioritization: true,
+                backgroundTasksDeprioritization: true,
+                ticketAssertFunc: assert.eq,
+            });
+        });
+
+        it("should report throughput probing with prioritization correctly", function () {
+            setExecutionControlAlgorithm(mongod, kThroughputProbingAlgorithm);
+            setDeprioritizationGate(mongod, true);
+
+            verifyExecutionControlStats({
+                usesThroughputProbing: true,
+                usesPrioritization: true,
+                deprioritizationGate: true,
+                heuristicDeprioritization: true,
+                backgroundTasksDeprioritization: true,
+                ticketAssertFunc: assert.gt,
+            });
         });
 
         it("should report fixed algorithm with prioritization correctly", function () {
-            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsWithPrioritizationAlgorithm);
+            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
+            setDeprioritizationGate(mongod, true);
 
-            const stats = getExecutionControlStats(mongod);
-            assert.eq(1, stats.executionControlConcurrencyAdjustmentAlgorithm);
-            assert.eq(true, stats.prioritizationEnabled);
-            verifyTicketAggregationStats(assert.gt, stats.read, stats.read.normalPriority);
-            verifyTicketAggregationStats(assert.gt, stats.write, stats.write.normalPriority);
+            verifyExecutionControlStats({
+                usesThroughputProbing: false,
+                usesPrioritization: true,
+                deprioritizationGate: true,
+                heuristicDeprioritization: true,
+                backgroundTasksDeprioritization: true,
+                ticketAssertFunc: assert.gt,
+            });
         });
 
-        // TODO SERVER-113367: Once we can enable the heuristic with throughput probing, we need to
-        // add cases of the heuristic and algorithms combinations.
+        it("should report heuristic deprioritization disabled correctly", function () {
+            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
+            setDeprioritizationGate(mongod, true);
+            setHeuristicDeprioritization(mongod, false);
+
+            verifyExecutionControlStats({
+                usesThroughputProbing: false,
+                usesPrioritization: true,
+                deprioritizationGate: true,
+                heuristicDeprioritization: false,
+                backgroundTasksDeprioritization: true,
+                ticketAssertFunc: assert.gt,
+            });
+        });
+
+        it("should report background tasks deprioritization disabled correctly", function () {
+            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
+            setDeprioritizationGate(mongod, true);
+            setHeuristicDeprioritization(mongod, true);
+            setBackgroundTaskDeprioritization(mongod, false);
+
+            verifyExecutionControlStats({
+                usesThroughputProbing: false,
+                usesPrioritization: true,
+                deprioritizationGate: true,
+                heuristicDeprioritization: true,
+                backgroundTasksDeprioritization: false,
+                ticketAssertFunc: assert.gt,
+            });
+        });
+
+        it("should report both heuristic and background tasks disabled correctly", function () {
+            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
+            setDeprioritizationGate(mongod, true);
+            setHeuristicDeprioritization(mongod, false);
+            setBackgroundTaskDeprioritization(mongod, false);
+
+            verifyExecutionControlStats({
+                usesThroughputProbing: false,
+                usesPrioritization: false,
+                deprioritizationGate: true,
+                heuristicDeprioritization: false,
+                backgroundTasksDeprioritization: false,
+                ticketAssertFunc: assert.eq,
+            });
+        });
+
+        it("should report prioritization with throughput probing and only heuristic enabled", function () {
+            setExecutionControlAlgorithm(mongod, kThroughputProbingAlgorithm);
+            setDeprioritizationGate(mongod, true);
+            setHeuristicDeprioritization(mongod, true);
+            setBackgroundTaskDeprioritization(mongod, false);
+
+            verifyExecutionControlStats({
+                usesThroughputProbing: true,
+                usesPrioritization: true,
+                deprioritizationGate: true,
+                heuristicDeprioritization: true,
+                backgroundTasksDeprioritization: false,
+                ticketAssertFunc: assert.gt,
+            });
+        });
+
+        it("should report prioritization with throughput probing and only background tasks enabled", function () {
+            setExecutionControlAlgorithm(mongod, kThroughputProbingAlgorithm);
+            setDeprioritizationGate(mongod, true);
+            setHeuristicDeprioritization(mongod, false);
+            setBackgroundTaskDeprioritization(mongod, true);
+
+            verifyExecutionControlStats({
+                usesThroughputProbing: true,
+                usesPrioritization: true,
+                deprioritizationGate: true,
+                heuristicDeprioritization: false,
+                backgroundTasksDeprioritization: true,
+                ticketAssertFunc: assert.gt,
+            });
+        });
+
+        it("should report no prioritization when gate is open but both flags are disabled", function () {
+            setExecutionControlAlgorithm(mongod, kThroughputProbingAlgorithm);
+            setDeprioritizationGate(mongod, true);
+            setHeuristicDeprioritization(mongod, false);
+            setBackgroundTaskDeprioritization(mongod, false);
+
+            verifyExecutionControlStats({
+                usesThroughputProbing: true,
+                usesPrioritization: false,
+                deprioritizationGate: true,
+                heuristicDeprioritization: false,
+                backgroundTasksDeprioritization: false,
+                ticketAssertFunc: assert.eq,
+            });
+        });
     });
 
     describe("Deprioritized operation statistics and observability", function () {
@@ -121,8 +265,7 @@ describe("Execution control statistics and observability", function () {
                         // Force the query to yield frequently to better expose the low-priority
                         // behavior.
                         internalQueryExecYieldIterations: 1,
-                        executionControlConcurrencyAdjustmentAlgorithm:
-                            kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
+                        executionControlDeprioritizationGate: true,
                         executionControlHeuristicNumAdmissionsDeprioritizeThreshold: 1,
                         logComponentVerbosity: {command: 2},
                     },
@@ -262,8 +405,7 @@ describe("Execution control statistics and observability", function () {
                 nodes: 1,
                 nodeOptions: {
                     setParameter: {
-                        executionControlConcurrencyAdjustmentAlgorithm:
-                            kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
+                        executionControlDeprioritizationGate: true,
                         executionControlHeuristicNumAdmissionsDeprioritizeThreshold: 1,
                         internalQueryExecYieldIterations: 1,
                         featureFlagRecordDelinquentMetrics: true,

@@ -16,8 +16,8 @@ import {
     getExecutionControlAlgorithm,
     getExecutionControlStats,
     kFixedConcurrentTransactionsAlgorithm,
-    kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
     kThroughputProbingAlgorithm,
+    setDeprioritizationGate,
     setExecutionControlAlgorithm,
     setExecutionControlTickets,
 } from "jstests/noPassthrough/admission/execution_control/libs/execution_control_helper.js";
@@ -134,40 +134,19 @@ describe("Execution control concurrency adjustment algorithm", function () {
             assert.eq(kFixedConcurrentTransactionsAlgorithm, getExecutionControlAlgorithm(mongod));
         });
 
-        it("should not override to fixed concurrency adjustment algorithm when prioritization is set at startup", function () {
+        it("should allow resizing all tickets with deprioritization enabled", function () {
             replTest = new ReplSetTest({
                 nodes: 1,
                 nodeOptions: {
                     setParameter: {
-                        executionControlConcurrencyAdjustmentAlgorithm:
-                            kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
-                        executionControlConcurrentReadTransactions: 20,
+                        executionControlDeprioritizationGate: true,
                     },
                 },
             });
             replTest.startSet();
             replTest.initiate();
             const mongod = replTest.getPrimary();
-
-            assert.eq(kFixedConcurrentTransactionsWithPrioritizationAlgorithm, getExecutionControlAlgorithm(mongod));
-
-            assertTicketSizing(mongod);
-        });
-
-        it("should allow resizing all ticket types with fixed concurrency adjustment algorithm and prioritization", function () {
-            replTest = new ReplSetTest({
-                nodes: 1,
-                nodeOptions: {
-                    setParameter: {
-                        executionControlConcurrencyAdjustmentAlgorithm:
-                            kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
-                    },
-                },
-            });
-            replTest.startSet();
-            replTest.initiate();
-            const mongod = replTest.getPrimary();
-            assertTicketSizing(mongod);
+            assertTicketSizing(mongod, {expectDynamicAdjustmentWarnings: true});
         });
     });
 
@@ -233,14 +212,14 @@ describe("Execution control concurrency adjustment algorithm", function () {
             it("should allow transitions to other algorithms and enabling/disabling prioritization", function () {
                 assertTicketSizing(mongod, {expectPrioritizationWarnings: true});
 
-                setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsWithPrioritizationAlgorithm);
+                setDeprioritizationGate(mongod, true);
                 assertTicketSizing(mongod);
 
                 setExecutionControlAlgorithm(mongod, kThroughputProbingAlgorithm);
-                assertTicketSizing(mongod, {expectDynamicAdjustmentWarnings: true, expectPrioritizationWarnings: true});
+                assertTicketSizing(mongod, {expectDynamicAdjustmentWarnings: true});
 
                 setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
-                assertTicketSizing(mongod, {expectPrioritizationWarnings: true});
+                assertTicketSizing(mongod);
             });
         });
 
@@ -252,8 +231,7 @@ describe("Execution control concurrency adjustment algorithm", function () {
                     nodes: 1,
                     nodeOptions: {
                         setParameter: {
-                            executionControlConcurrencyAdjustmentAlgorithm:
-                                kFixedConcurrentTransactionsWithPrioritizationAlgorithm,
+                            executionControlDeprioritizationGate: true,
                         },
                     },
                 });
@@ -272,15 +250,13 @@ describe("Execution control concurrency adjustment algorithm", function () {
             });
 
             it("should allow transitions to other algorithms and back", function () {
+                setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
                 assertTicketSizing(mongod);
 
-                setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
-                assertTicketSizing(mongod, {expectPrioritizationWarnings: true});
-
                 setExecutionControlAlgorithm(mongod, kThroughputProbingAlgorithm);
-                assertTicketSizing(mongod, {expectDynamicAdjustmentWarnings: true, expectPrioritizationWarnings: true});
+                assertTicketSizing(mongod, {expectDynamicAdjustmentWarnings: true});
 
-                setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsWithPrioritizationAlgorithm);
+                setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
                 assertTicketSizing(mongod);
             });
         });
@@ -317,11 +293,11 @@ describe("Execution control concurrency adjustment algorithm", function () {
                 setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
                 assertTicketSizing(mongod, {expectPrioritizationWarnings: true});
 
-                setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsWithPrioritizationAlgorithm);
+                setDeprioritizationGate(mongod, true);
                 assertTicketSizing(mongod);
 
                 setExecutionControlAlgorithm(mongod, kThroughputProbingAlgorithm);
-                assertTicketSizing(mongod, {expectDynamicAdjustmentWarnings: true, expectPrioritizationWarnings: true});
+                assertTicketSizing(mongod, {expectDynamicAdjustmentWarnings: true});
             });
         });
     });
@@ -365,11 +341,11 @@ describe("Execution control concurrency adjustment algorithm", function () {
 
         it("should preserve low priority ticket values across prioritization changes", function () {
             const customTicketCount = 40;
-            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsWithPrioritizationAlgorithm);
+            setDeprioritizationGate(mongod, true);
             setExecutionControlTickets(mongod, {readLowPriority: customTicketCount});
 
-            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
-            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsWithPrioritizationAlgorithm);
+            setDeprioritizationGate(mongod, false);
+            setDeprioritizationGate(mongod, true);
 
             const res = assert.commandWorked(
                 mongod.adminCommand({
@@ -419,7 +395,7 @@ describe("Execution control concurrency adjustment algorithm", function () {
         });
 
         beforeEach(function () {
-            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsWithPrioritizationAlgorithm);
+            setDeprioritizationGate(mongod, true);
         });
 
         afterEach(function () {
@@ -434,16 +410,7 @@ describe("Execution control concurrency adjustment algorithm", function () {
             assert.commandFailedWithCode(
                 mongod.adminCommand({
                     setParameter: 1,
-                    executionControlConcurrencyAdjustmentAlgorithm: kFixedConcurrentTransactionsAlgorithm,
-                }),
-                ErrorCodes.IllegalOperation,
-            );
-
-            // Attempt to transition to kThroughputProbing should also fail.
-            assert.commandFailedWithCode(
-                mongod.adminCommand({
-                    setParameter: 1,
-                    executionControlConcurrencyAdjustmentAlgorithm: kThroughputProbingAlgorithm,
+                    executionControlDeprioritizationGate: false,
                 }),
                 ErrorCodes.IllegalOperation,
             );
@@ -456,40 +423,31 @@ describe("Execution control concurrency adjustment algorithm", function () {
             assert.commandFailedWithCode(
                 mongod.adminCommand({
                     setParameter: 1,
-                    executionControlConcurrencyAdjustmentAlgorithm: kFixedConcurrentTransactionsAlgorithm,
-                }),
-                ErrorCodes.IllegalOperation,
-            );
-
-            // Attempt to transition to kThroughputProbing should also fail.
-            assert.commandFailedWithCode(
-                mongod.adminCommand({
-                    setParameter: 1,
-                    executionControlConcurrencyAdjustmentAlgorithm: kThroughputProbingAlgorithm,
+                    executionControlDeprioritizationGate: false,
                 }),
                 ErrorCodes.IllegalOperation,
             );
         });
 
         it("should allow staying in prioritization mode regardless of low-priority ticket values", function () {
-            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsWithPrioritizationAlgorithm);
+            setDeprioritizationGate(mongod, true);
 
             // Set low-priority tickets to 0.
             setExecutionControlTickets(mongod, {readLowPriority: 0, writeLowPriority: 0});
 
             // Staying in prioritization mode should succeed.
-            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsWithPrioritizationAlgorithm);
+            setDeprioritizationGate(mongod, true);
         });
 
         it("should allow enabling deprioritization regardless of low-priority ticket values", function () {
             // Start with non-prioritization mode.
-            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
+            setDeprioritizationGate(mongod, false);
 
             // Set low-priority tickets to 0 (this is allowed in non-prioritization modes).
             setExecutionControlTickets(mongod, {readLowPriority: 0, writeLowPriority: 0});
 
             // Transition to prioritization should succeed even with 0 low-priority tickets.
-            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsWithPrioritizationAlgorithm);
+            setDeprioritizationGate(mongod, true);
         });
     });
 
@@ -535,7 +493,7 @@ describe("Execution control concurrency adjustment algorithm", function () {
         });
 
         it("should align tickets when transitioning from throughput probing to fixed concurrency adjustment algorithm with prioritization", function () {
-            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsWithPrioritizationAlgorithm);
+            setDeprioritizationGate(mongod, true);
 
             const customReadTickets = 35;
             const customWriteTickets = 45;

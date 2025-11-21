@@ -548,9 +548,13 @@ config_fuzzer_params = {
         "executionControlConcurrencyAdjustmentAlgorithm": {
             "choices": [
                 "fixedConcurrentTransactions",
-                "fixedConcurrentTransactionsWithPrioritization",
                 "throughputProbing",
             ],
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "executionControlDeprioritizationGate": {
+            "choices": [True, False],
             "period": 60,
             "fuzz_at": ["startup", "runtime"],
         },
