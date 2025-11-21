@@ -756,21 +756,6 @@ tasks:
             - "src/mongodb-${push_name}-${push_arch}*"
             - "src/mongodb-cryptd-${push_name}-${push_arch}*"
 
-  - name: streams_publish_manifest_gen
-    tags: ["assigned_to_jira_team_streams", "auxiliary"]
-    depends_on:
-      - name: version_gen
-        variant: generate-tasks-for-version
-        # This is added because of EVG-18211.
-        # Without this we are adding extra dependencies on evergreen and it is causing strain
-        omit_generated_tasks: true
-      - name: streams_build_and_push_gen
-        variant: enterprise-amazon2-streams
-      - name: streams_build_and_push_gen
-        variant: enterprise-amazon2-streams-arm64
-    commands:
-      - func: "streams publish manifest"
-
   - name: streams_publish_manifest_al2023_gen
     tags: ["assigned_to_jira_team_streams", "auxiliary"]
     depends_on:

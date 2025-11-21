@@ -21,8 +21,8 @@ fi
 
 TAG_SUFFIX="$ARCH"
 
-# Only these 2 distros are supported today
-if [ "$DISTRO" != "amazon2" ] && [ "$DISTRO" != "amazon2023" ]; then
+# Only amazon2023 distros are supported today
+if [ "$DISTRO" != "amazon2023" ]; then
     echo "Unsupported distro: $DISTRO" >&2
     exit 1
 fi
@@ -78,11 +78,7 @@ else
     echo "JS_ENGINE_PATH does not exist: $JS_ENGINE_PATH_ABS (skipping build arg)"
 fi
 
-if [ "$DISTRO" == "amazon2" ]; then
-    docker build "${BUILD_ARGS[@]}" -t "$IMAGE" -f ./src/mongo/db/modules/enterprise/src/streams/build/Dockerfile .
-else
-    docker build "${BUILD_ARGS[@]}" -t "$IMAGE" -f ./src/mongo/db/modules/enterprise/src/streams/build/Dockerfile.al2023 .
-fi
+docker build "${BUILD_ARGS[@]}" -t "$IMAGE" -f ./src/mongo/db/modules/enterprise/src/streams/build/Dockerfile.al2023 .
 
 docker tag "$IMAGE" "$IMAGE:$GITSHA-$TAG_SUFFIX"
 
