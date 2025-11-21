@@ -28,7 +28,7 @@
  */
 #pragma once
 
-#include "mongo/db/extension/host_connector/logger_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/logger_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/util/concurrency/idle_thread_block.h"

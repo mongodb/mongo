@@ -29,7 +29,7 @@
 
 #include "mongo/db/extension/host/query_execution_context.h"
 
-#include "mongo/db/extension/host_connector/query_execution_context_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_test_service_context.h"

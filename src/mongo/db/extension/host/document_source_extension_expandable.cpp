@@ -34,7 +34,7 @@
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/document_source_extension.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
-#include "mongo/db/extension/host_connector/query_shape_opts_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/query_shape_opts_adapter.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 
 namespace mongo::extension::host {

@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host_connector/host_portal_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/host_portal_adapter.h"
 
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"

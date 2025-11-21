@@ -26,44 +26,38 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
-
-#include "mongo/db/curop.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/util/modules.h"
 
-namespace mongo::extension::host {
+#include "mongo/db/extension/shared/extension_status.h"
 
-/**
- * QueryExecutionContext provides concrete host implementation of the query execution context
- * interface for extensions running within the host process.
- *
- * The context wraps an ExpressionContext, which holds references to the active OperationContext
- * and other query state needed during pipeline execution. It delegates interrupt checks to the
- * underlying OperationContext and exposes operation metrics through OpDebug's extension metrics
- * registry.
- *
- * This class is intended for use by the extension host connector framework and should not be
- * instantiated directly by extension code.
- */
-class QueryExecutionContext : public host_connector::QueryExecutionContextBase {
-public:
-    QueryExecutionContext(const ExpressionContext* ctx) : _ctx(ctx) {}
+namespace mongo::extension::host_connector {
 
-    Status checkForInterrupt() const override {
-        return _ctx->getOperationContext()->checkForInterruptNoAssert();
-    }
+MongoExtensionStatus* QueryExecutionContextAdapter::_extCheckForInterrupt(
+    const MongoExtensionQueryExecutionContext* ctx, MongoExtensionStatus* queryStatus) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        const auto& execCtx = static_cast<const QueryExecutionContextAdapter*>(ctx)->getCtxImpl();
+        Status interrupted = execCtx.checkForInterrupt();
 
-    host_connector::HostOperationMetricsHandle* getMetrics(
-        const std::string& stageName, const UnownedExecAggStageHandle& execStage) const override {
-        auto& opDebug = CurOp::get(_ctx->getOperationContext())->debug();
-        auto& opDebugMetrics = opDebug.extensionMetrics;
-        return opDebugMetrics.getOrCreateMetrics(stageName, execStage);
-    }
+        MongoExtensionByteView reasonByteView{stringViewAsByteView(interrupted.reason())};
+        // Note that we don't need invokeCAndConvertStatusToException here because
+        // set_code/set_reason do not throw errors.
+        queryStatus->vtable->set_code(queryStatus, interrupted.code());
+        queryStatus->vtable->set_reason(queryStatus, reasonByteView);
+    });
+}
 
-private:
-    const ExpressionContext* _ctx;
-};
+MongoExtensionStatus* QueryExecutionContextAdapter::_extGetMetrics(
+    const MongoExtensionQueryExecutionContext* ctx,
+    MongoExtensionExecAggStage* execAggStage,
+    MongoExtensionOperationMetrics** metrics) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        const auto& execCtx = static_cast<const QueryExecutionContextAdapter*>(ctx)->getCtxImpl();
 
-}  // namespace mongo::extension::host
+        auto execStageHandle = UnownedExecAggStageHandle(execAggStage);
+        const std::string stageName = std::string(execStageHandle.getName());
+
+        *metrics = execCtx.getMetrics(stageName, execStageHandle)->get();
+    });
+}
+
+}  // namespace mongo::extension::host_connector

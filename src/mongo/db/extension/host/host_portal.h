@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/db/extension/host/document_source_extension.h"
-#include "mongo/db/extension/host_connector/host_portal_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/host_portal_adapter.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/util/assert_util.h"
 

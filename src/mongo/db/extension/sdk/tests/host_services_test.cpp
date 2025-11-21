@@ -29,7 +29,7 @@
 
 #include "mongo/db/extension/sdk/host_services.h"
 
-#include "mongo/db/extension/host_connector/host_services_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

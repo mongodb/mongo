@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/host_connector/executable_agg_stage_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/executable_agg_stage_adapter.h"
 
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"

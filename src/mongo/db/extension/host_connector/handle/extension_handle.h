@@ -26,38 +26,52 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host_connector/query_execution_context_adapter.h"
+#pragma once
 
+#include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/handle.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::host_connector {
 
-MongoExtensionStatus* QueryExecutionContextAdapter::_extCheckForInterrupt(
-    const MongoExtensionQueryExecutionContext* ctx, MongoExtensionStatus* queryStatus) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& execCtx = static_cast<const QueryExecutionContextAdapter*>(ctx)->getCtxImpl();
-        Status interrupted = execCtx.checkForInterrupt();
+/**
+ * Wrapper for ::MongoExtension providing safe access to its public API via the vtable.
+ * This is an unowned handle, meaning extensions remain fully owned by themselves, and ownership
+ * is never transferred to the host.
+ */
+class ExtensionHandle : public UnownedHandle<const ::MongoExtension> {
 
-        MongoExtensionByteView reasonByteView{stringViewAsByteView(interrupted.reason())};
-        // Note that we don't need invokeCAndConvertStatusToException here because
-        // set_code/set_reason do not throw errors.
-        queryStatus->vtable->set_code(queryStatus, interrupted.code());
-        queryStatus->vtable->set_reason(queryStatus, reasonByteView);
-    });
-}
+public:
+    ExtensionHandle(const ::MongoExtension* ext) : UnownedHandle<const ::MongoExtension>(ext) {
+        _assertValidVTable();
+    }
 
-MongoExtensionStatus* QueryExecutionContextAdapter::_extGetMetrics(
-    const MongoExtensionQueryExecutionContext* ctx,
-    MongoExtensionExecAggStage* execAggStage,
-    MongoExtensionOperationMetrics** metrics) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& execCtx = static_cast<const QueryExecutionContextAdapter*>(ctx)->getCtxImpl();
+    /**
+     * Initialize the extension by providing it with a HostPortal and HostServices.
+     *
+     * Note that the HostServices is passed as a pointer since its lifetime extends beyond
+     * the call to initialize() and will be saved by the extension. The HostPortal, on the other
+     * hand, will go out of scope immediately after the call to initialize() so it is passed by
+     * reference.
+     */
+    void initialize(const MongoExtensionHostPortal* portal,
+                    const MongoExtensionHostServices* hostServices) const {
+        invokeCAndConvertStatusToException([&] {
+            assertValid();
+            return vtable().initialize(get(), portal, hostServices);
+        });
+    }
 
-        auto execStageHandle = UnownedExecAggStageHandle(execAggStage);
-        const std::string stageName = std::string(execStageHandle.getName());
+    ::MongoExtensionAPIVersion getVersion() const {
+        assertValid();
+        return get()->version;
+    }
 
-        *metrics = execCtx.getMetrics(stageName, execStageHandle)->get();
-    });
-}
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(10930101, "Extension 'initialize' is null", vtable.initialize != nullptr);
+    };
+};
 
 }  // namespace mongo::extension::host_connector

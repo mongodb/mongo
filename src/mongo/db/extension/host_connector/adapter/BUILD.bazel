@@ -11,13 +11,15 @@ exports_files(
 # Like the C++ SDK, we should do our best to minimize the dependencies of this connector layer so
 # that it can be mostly self-contained.
 mongo_cc_library(
-    name = "extensions_host_connector",
+    name = "host_adapters",
     srcs = [
+        "executable_agg_stage_adapter.cpp",
         "host_portal_adapter.cpp",
         "query_execution_context_adapter.cpp",
         "query_shape_opts_adapter.cpp",
     ],
     deps = [
+        "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/public:extensions_api_public",
         # Note, for the time being we are linking in the C++ SDK here to reduce code duplication.
         # Eventually, we may decouple the C++ SDK from the server and remove this dependency.
@@ -33,14 +35,13 @@ mongo_cc_library(
 mongo_cc_library(
     name = "host_services_adapter",
     srcs = [
-        "executable_agg_stage_adapter.cpp",
         "host_services_adapter.cpp",
         "logger_adapter.cpp",
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/public:api",
         "//src/mongo/db/extension/sdk:sdk_cpp",
+        "//src/mongo/db/pipeline:lite_parsed_document_source",
     ],
 )
