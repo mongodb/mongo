@@ -135,6 +135,7 @@ public:
         friend class VersionContextTest;
         friend class FCVGatedFeatureFlagBase;
         friend class ShardingDDLCoordinator;
+        friend class ServerParameter;
         Passkey() = default;
         ~Passkey() = default;
     };

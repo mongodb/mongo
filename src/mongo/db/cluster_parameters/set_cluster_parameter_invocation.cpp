@@ -129,7 +129,7 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "Server parameter: '" << sp->name() << "' is disabled",
-            skipValidation || sp->isEnabled());
+            skipValidation || sp->isEnabled(VersionContext::getDecoration(opCtx)));
 
     Timestamp clusterTime =
         clusterParameterTime ? *clusterParameterTime : _dbService.getUpdateClusterTime(opCtx);

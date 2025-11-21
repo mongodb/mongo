@@ -38,11 +38,11 @@ std::set<std::string> getDefaultReportedParameters() {
     return {"pauseMigrationsDuringMultiUpdates"};
 }
 
-bool isParameterSet(ServerParameter* param) {
+bool isParameterSet(OperationContext* opCtx, ServerParameter* param) {
     if (!param) {
         return false;
     }
-    if (!param->isEnabled()) {
+    if (!param->isEnabled(VersionContext::getDecoration(opCtx))) {
         return false;
     }
     if (param->getClusterParameterTime(boost::none) == LogicalTime::kUninitialized) {
@@ -73,7 +73,7 @@ BSONObj ClusterServerParameterServerStatus::_getParametersToReport(OperationCont
     BSONObjBuilder mapBuilder;
     for (const auto& name : _reportedParameters) {
         auto param = _clusterParameters->getIfExists(name);
-        if (!isParameterSet(param)) {
+        if (!isParameterSet(opCtx, param)) {
             continue;
         }
         BSONObjBuilder elementBuilder(mapBuilder.subobjStart(name));

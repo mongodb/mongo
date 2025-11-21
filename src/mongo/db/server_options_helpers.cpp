@@ -165,7 +165,7 @@ Status validateBaseOptions(const moe::Environment& params) {
                     str::stream() << "Unknown --setParameter '" << setParam.first << "'"};
         }
 
-        if (!param->isEnabled()) {
+        if (!param->isEnabled(kNoVersionContext)) {
             return {ErrorCodes::BadValue,
                     str::stream() << "--setParameter '" << setParam.first
                                   << "' only available when used with 'enableTestCommands'"};

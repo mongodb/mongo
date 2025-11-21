@@ -181,7 +181,7 @@ void FCVGatedFeatureFlagBase::appendFlagValueAndMetadata(BSONObjBuilder& flagBui
 
     auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (fcvSnapshot.isVersionInitialized()) {
-        // TODO (SERVER-102076): Use VersionContext from opCtx instead of
+        // TODO (SERVER-114119): Use VersionContext from opCtx instead of
         // kVersionContextIgnored_UNSAFE.
         flagBuilder.append("currentlyEnabled",
                            isEnabled(kVersionContextIgnored_UNSAFE, fcvSnapshot));

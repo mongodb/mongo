@@ -60,6 +60,9 @@ filters:
   - "rotate_certificates*":
     approvers:
       - 10gen/server-security
+  - "parameters.cpp":
+    approvers:
+      - 10gen/server-security
   - "profile*":
     approvers:
       - 10gen/query-integration-observability

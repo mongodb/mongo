@@ -292,7 +292,7 @@ public:
         for (ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i) {
             // Skip any parameters that should be filtered out according to the command options, as
             // well as any disabled parameters.
-            if (!i->second->isEnabled() ||
+            if (!i->second->isEnabled(VersionContext::getDecoration(opCtx)) ||
                 (requireNameMatch && !cmdObj.hasElement(i->first.c_str())) ||
                 (requireRuntimeSettable && !i->second->allowedToChangeAtRuntime()) ||
                 (requireStartupSettable && !i->second->allowedToChangeAtStartup()) ||
@@ -398,7 +398,7 @@ public:
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "Server parameter: '" << foundParameter->second->name()
                                   << "' is disabled",
-                    foundParameter->second->isEnabled());
+                    foundParameter->second->isEnabled(VersionContext::getDecoration(opCtx)));
 
             // Make sure we are allowed to change this parameter
             uassert(ErrorCodes::IllegalOperation,

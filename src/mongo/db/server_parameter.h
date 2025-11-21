@@ -299,8 +299,12 @@ public:
      */
     bool enable();
 
-    bool isEnabled() const {
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    bool isEnabled(const VersionContext& vCtx) const {
+        const auto optFcvSnapshot = vCtx.getOperationFCV(VersionContext::Passkey());
+
+        const auto fcvSnapshot = optFcvSnapshot.has_value()
+            ? *optFcvSnapshot
+            : serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         return isEnabledOnVersion(
             fcvSnapshot.isVersionInitialized()
                 ? fcvSnapshot.getVersion()

@@ -68,7 +68,7 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
 
     // For each parameter, generate a BSON representation of it and retrieve its name.
     auto makeBSON = [&](ServerParameter* requestedParameter, bool skipOnError) {
-        if (!requestedParameter->isEnabled()) {
+        if (!requestedParameter->isEnabled(VersionContext::getDecoration(opCtx))) {
             uassert(ErrorCodes::BadValue,
                     str::stream() << "Server parameter: '" << requestedParameter->name()
                                   << "' is disabled",

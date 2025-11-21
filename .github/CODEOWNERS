@@ -1912,6 +1912,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/validate.cpp @10gen/server-validate @svc-auto-approve-bot
 /src/mongo/db/commands/**/vote*index_build* @10gen/server-index-builds @svc-auto-approve-bot
 /src/mongo/db/commands/**/rotate_certificates* @10gen/server-security @svc-auto-approve-bot
+/src/mongo/db/commands/**/parameters.cpp @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/profile* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/commands/**/set_profiling_filter_globally_cmd* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/commands/**/top_command.cpp @10gen/query-integration-observability @svc-auto-approve-bot
