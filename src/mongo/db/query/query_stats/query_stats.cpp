@@ -274,7 +274,7 @@ void updateQueryExecStatistics(QueryExecEntry& queryExecEntryToUpdate,
     // query runs.
     auto secondCount = durationCount<Seconds>(Milliseconds{snapshot.workingTimeMillis});
     auto numInterruptChecksPerSec =
-        secondCount == 0 ? 0 : snapshot.numInterruptChecks / (static_cast<double>(secondCount));
+        secondCount <= 0 ? 0 : snapshot.numInterruptChecks / (static_cast<double>(secondCount));
     queryExecEntryToUpdate.numInterruptChecksPerSec.aggregate(numInterruptChecksPerSec);
     queryExecEntryToUpdate.overdueInterruptApproxMaxMillis.aggregate(
         snapshot.overdueInterruptApproxMaxMillis);
