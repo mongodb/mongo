@@ -49,6 +49,7 @@
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index/s2_bucket_access_method.h"
+#include "mongo/db/index/wildcard_validation.h"
 #include "mongo/db/index_builds/index_build_block.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_names.h"
@@ -270,6 +271,23 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
                           "uuid"_attr = collection->uuid(),
                           "index"_attr = indexName,
                           "spec"_attr = spec);
+        }
+
+        // Look for an invalid compound wildcard index.
+        if (IndexNames::findPluginName(keyPattern) == IndexNames::WILDCARD &&
+            keyPattern.nFields() > 1 && spec.hasField("wildcardProjection")) {
+            auto validationStatus =
+                validateWildcardProjection(keyPattern, spec.getObjectField("wildcardProjection"));
+            if (!validationStatus.isOK()) {
+                LOGV2_OPTIONS(11389700,
+                              {logv2::LogTag::kStartupWarnings},
+                              "Found a compound wildcard index with an invalid wildcardProjection. "
+                              "Such indexes can no longer be created.",
+                              "ns"_attr = collection->ns(),
+                              "uuid"_attr = collection->uuid(),
+                              "index"_attr = indexName,
+                              "spec"_attr = spec);
+            }
         }
 
         auto descriptor = IndexDescriptor(_getAccessMethodName(keyPattern), spec);
