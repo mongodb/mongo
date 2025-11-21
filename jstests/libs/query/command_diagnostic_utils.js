@@ -23,7 +23,7 @@ export function getDiagnosticLogs({description, logFile}) {
     assert.gt(logLines.length, 0, `${description}: no log lines`);
 
     return logLines.filter(function (logLine) {
-        return logLine.includes("ScopedDebugInfo");
+        return logLine.includes("ScopedDebugInfo") && logLine.includes("4106400");
     });
 }
 
