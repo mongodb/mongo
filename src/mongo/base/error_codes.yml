@@ -980,6 +980,11 @@ error_codes:
 
   # Bad BSON column format found during decompression
   - {code: 472, name: InvalidBSONColumn, categories: [ValidationError]}
+  - {
+      code: 473,
+      name: InterruptedDueToOverload,
+      categories: [Interruption, SystemOverloadedError],
+    }
 
   # Error codes 4000-8999 are reserved.
 

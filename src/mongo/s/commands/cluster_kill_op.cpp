@@ -67,16 +67,18 @@ public:
         BSONElement element = cmdObj.getField("op");
         uassert(50759, "Did not provide \"op\" field", element.ok());
 
+        ErrorCodes::Error errorCode = KillOpCmdBase::parseErrorCode(opCtx, cmdObj);
+
         if (isKillingLocalOp(element)) {
             const unsigned int opId = KillOpCmdBase::parseOpId(cmdObj);
-            killLocalOperation(opCtx, opId);
+            killLocalOperation(opCtx, opId, errorCode);
             reportSuccessfulCompletion(opCtx, dbName, cmdObj);
 
             // killOp always reports success once past the auth check.
             return true;
         } else if (element.type() == BSONType::string) {
             // It's a string. Should be of the form shardid:opid.
-            if (_killShardOperation(opCtx, element.str(), result)) {
+            if (_killShardOperation(opCtx, element.str(), errorCode, result)) {
                 reportSuccessfulCompletion(opCtx, dbName, cmdObj);
                 return true;
             } else {
@@ -91,6 +93,7 @@ public:
 private:
     static bool _killShardOperation(OperationContext* opCtx,
                                     const std::string& opToKill,
+                                    ErrorCodes::Error errorCode,
                                     BSONObjBuilder& result) {
         // The format of op is shardid:opid
         // This is different than the format passed to the mongod killOp command.
@@ -119,7 +122,7 @@ private:
         result.append("shard", shardIdent);
         result.append("shardid", opId);
 
-        auto cmdToSend = BSON("killOp" << 1 << "op" << opId);
+        BSONObj cmdToSend = _makeShardCommand(opId, errorCode);
         shard
             ->runCommandWithIndefiniteRetries(opCtx,
                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -133,6 +136,16 @@ private:
         // whether the shard reported success or not.
         return true;
     }
+
+    static BSONObj _makeShardCommand(int opId, ErrorCodes::Error errorCode) {
+        BSONObjBuilder builder;
+        builder.append("killOp", 1);
+        builder.append("op", opId);
+        if (errorCode != kDefaultErrorCode) {
+            builder.append("errorCode", errorCode);
+        }
+        return builder.obj();
+    };
 };
 MONGO_REGISTER_COMMAND(ClusterKillOpCommand).forRouter();
 

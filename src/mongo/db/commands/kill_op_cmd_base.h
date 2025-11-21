@@ -68,10 +68,14 @@ public:
                                  const BSONObj& cmdObj) const final;
 
 protected:
+    static constexpr ErrorCodes::Error kDefaultErrorCode = ErrorCodes::Interrupted;
+
     /**
      * Kill an operation running on this instance of mongod or mongos.
      */
-    static void killLocalOperation(OperationContext* opCtx, OperationId opToKill);
+    static void killLocalOperation(OperationContext* opCtx,
+                                   OperationId opToKill,
+                                   ErrorCodes::Error killCode);
 
     /**
      * Extract the "op" field from 'cmdObj' and convert the value to unsigned int. Since BSON only
@@ -80,6 +84,12 @@ protected:
      * taken care of here.
      */
     static unsigned int parseOpId(const BSONObj& cmdObj);
+
+    /**
+     * Extract the "errorCode" field from 'cmdObj' and convert the value to ErrorCodes::Error. If
+     * the field is missing, will return the default kill code for the command.
+     */
+    static ErrorCodes::Error parseErrorCode(OperationContext* opCtx, const BSONObj& cmdObj);
 
     static void reportSuccessfulCompletion(OperationContext* opCtx,
                                            const DatabaseName& dbName,

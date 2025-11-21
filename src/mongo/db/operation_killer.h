@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/service_context.h"
 
@@ -61,8 +60,9 @@ public:
     /**
      * Kill an operation running on this instance of mongod or mongos.
      */
-    void killOperation(OperationId opId);
-    void killOperation(const OperationKey& opKey);
+    void killOperation(OperationId opId, ErrorCodes::Error killCode = ErrorCodes::Interrupted);
+    void killOperation(const OperationKey& opKey,
+                       ErrorCodes::Error killCode = ErrorCodes::Interrupted);
 
 private:
     Client* const _myClient;

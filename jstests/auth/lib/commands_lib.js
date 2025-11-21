@@ -5756,6 +5756,58 @@ export const authCommandsLib = {
                 {runOnDb: secondDbName, roles: {}},
             ],
         },
+        {
+            testname: "killOpWrongErrorCode",
+            command: {killOp: 1, op: 123, errorCode: ErrorCodes.DuplicateKey},
+            skipSharded: true,
+            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagKillOpErrorCodeOverride"),
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: {},
+                },
+            ],
+        },
+        {
+            testname: "killOpWrongErrorCode",
+            command: {killOp: 1, op: "shard1:123", errorCode: ErrorCodes.DuplicateKey},
+            skipUnlessSharded: true,
+            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagKillOpErrorCodeOverride"),
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: {},
+                    expectFail: true, // we won't be able to find the shardId
+                },
+            ],
+        },
+        {
+            testname: "killOpErrorCode",
+            command: {killOp: 1, op: 123, errorCode: ErrorCodes.InterruptedDueToOverload},
+            skipSharded: true,
+            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagKillOpErrorCodeOverride"),
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_hostManager,
+                    privileges: [{resource: {cluster: true}, actions: ["killop"]}],
+                },
+            ],
+        },
+        {
+            testname: "killOpErrorCode",
+            command: {killOp: 1, op: "shard1:123", errorCode: ErrorCodes.InterruptedDueToOverload},
+            skipUnlessSharded: true,
+            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagKillOpErrorCodeOverride"),
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_hostManager,
+                    privileges: [{resource: {cluster: true}, actions: ["killop"]}],
+                    expectFail: true, // we won't be able to find the shardId
+                },
+            ],
+        },
         // The rest of kill sessions auth testing is in the kill_sessions fixture (because calling
         // the commands logged in as a different user needs to have different results).  These tests
         // merely verify that the hostManager is the only role with killAnySession.

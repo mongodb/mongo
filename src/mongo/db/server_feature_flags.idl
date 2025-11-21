@@ -216,3 +216,9 @@ feature_flags:
         cpp_varname: gFeatureFlagDedicatedPortForMaintenanceOperations
         default: false
         fcv_gated: false
+    featureFlagKillOpErrorCodeOverride:
+        description: "Feature flag to enable specifying custom error codes when killing operations"
+        cpp_varname: gFeatureFlagKillOpErrorCodeOverride
+        default: true
+        version: 8.3
+        fcv_gated: true

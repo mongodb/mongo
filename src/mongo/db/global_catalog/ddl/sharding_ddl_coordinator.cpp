@@ -617,8 +617,8 @@ bool ShardingDDLCoordinator::_isRetriableErrorForDDLCoordinator(const Status& st
         status.isA<ErrorCategory::CancellationError>() ||
         status.isA<ErrorCategory::ExceededTimeLimitError>() ||
         status.isA<ErrorCategory::WriteConcernError>() ||
-        status == ErrorCodes::FailedToSatisfyReadPreference || status == ErrorCodes::Interrupted ||
-        status == ErrorCodes::LockBusy || status == ErrorCodes::CommandNotFound;
+        status == ErrorCodes::FailedToSatisfyReadPreference || status == ErrorCodes::LockBusy ||
+        status == ErrorCodes::CommandNotFound;
 }
 
 ShardingDDLCoordinatorExternalState* ShardingDDLCoordinator::_getExternalState() {

@@ -1022,6 +1022,9 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
                 LOGV2(6183601,
                       "Timestamp monitor got interrupted due to repl state change, retrying");
                 return;
+            } catch (const ExceptionFor<ErrorCodes::InterruptedDueToOverload>&) {
+                LOGV2(6183602, "Timestamp monitor got interrupted due to overload, retrying");
+                return;
             } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>& ex) {
                 if (_shuttingDown) {
                     return;

@@ -2051,6 +2051,8 @@ private:
                         opCtx);
             } catch (const ExceptionFor<ErrorCodes::Interrupted>&) {
                 throw;
+            } catch (const ExceptionFor<ErrorCodes::InterruptedDueToOverload>&) {
+                throw;
             } catch (const DBException& ex) {
                 uasserted(ErrorCodes::TemporarilyUnavailable,
                           str::stream()

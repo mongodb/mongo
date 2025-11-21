@@ -65,7 +65,7 @@ bool OperationKiller::isAuthorizedToKill(const ClientLock& target) const {
     return false;
 }
 
-void OperationKiller::killOperation(OperationId opId) {
+void OperationKiller::killOperation(OperationId opId, ErrorCodes::Error killCode) {
     auto serviceContext = _myClient->getServiceContext();
 
     auto target = serviceContext->getLockedClient(opId);
@@ -79,12 +79,12 @@ void OperationKiller::killOperation(OperationId opId) {
         return;
     }
 
-    serviceContext->killOperation(target, target->getOperationContext());
+    serviceContext->killOperation(target, target->getOperationContext(), killCode);
 
     LOGV2(20884, "Killed operation", "opId"_attr = opId);
 }
 
-void OperationKiller::killOperation(const OperationKey& opKey) {
+void OperationKiller::killOperation(const OperationKey& opKey, ErrorCodes::Error killCode) {
     auto opId = OperationKeyManager::get(_myClient).at(opKey);
 
     if (!opId) {
@@ -92,7 +92,7 @@ void OperationKiller::killOperation(const OperationKey& opKey) {
         return;
     }
 
-    killOperation(*opId);
+    killOperation(*opId, killCode);
 }
 
 }  // namespace mongo

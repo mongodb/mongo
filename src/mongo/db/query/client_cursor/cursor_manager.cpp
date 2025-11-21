@@ -282,7 +282,8 @@ void CursorManager::unpin(OperationContext* opCtx,
     // interesting in proactively cleaning up that cursor's resources. In these cases, we
     // proactively delete the cursor. In other cases we preserve the error code so that the client
     // will see the reason the cursor was killed when asking for the next batch.
-    if (interruptStatus == ErrorCodes::Interrupted || cursor->isKillPending()) {
+    if (interruptStatus == ErrorCodes::Interrupted ||
+        interruptStatus == ErrorCodes::InterruptedDueToOverload || cursor->isKillPending()) {
         LOGV2(20530,
               "Removing cursor after completing batch",
               "cursorId"_attr = cursor->cursorid(),

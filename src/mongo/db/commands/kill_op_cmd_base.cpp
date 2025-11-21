@@ -36,6 +36,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_killer.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -50,8 +51,16 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-
 namespace mongo {
+
+namespace {
+
+const static absl::flat_hash_set<ErrorCodes::Error> kAllowedKillOpErrorCodes = {
+    ErrorCodes::Interrupted,
+    ErrorCodes::InterruptedDueToOverload,
+};
+
+}  // namespace
 
 void KillOpCmdBase::reportSuccessfulCompletion(OperationContext* opCtx,
                                                const DatabaseName& dbName,
@@ -91,8 +100,16 @@ Status KillOpCmdBase::checkAuthForOperation(OperationContext* workerOpCtx,
     auto* worker = workerOpCtx->getClient();
     auto opKiller = OperationKiller(worker);
 
+    ErrorCodes::Error errorCode = parseErrorCode(workerOpCtx, cmdObj);
+    if (!kAllowedKillOpErrorCodes.contains(errorCode)) {
+        return Status(ErrorCodes::Unauthorized, "Unauthorized");
+    }
     if (opKiller.isGenerallyAuthorizedToKill()) {
         return Status::OK();
+    }
+    // Only generally authorized to kill users can specify a custom error code.
+    if (errorCode != kDefaultErrorCode) {
+        return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
     if (isKillingLocalOp(cmdObj.getField("op"))) {
@@ -102,7 +119,7 @@ Status KillOpCmdBase::checkAuthForOperation(OperationContext* workerOpCtx,
         long long opId = parseOpId(cmdObj);
         auto target = worker->getServiceContext()->getLockedClient(opId);
 
-        if (OperationKiller(worker).isAuthorizedToKill(target)) {
+        if (opKiller.isAuthorizedToKill(target)) {
             // We were authorized to interact with the target Client
             return Status::OK();
         }
@@ -111,8 +128,10 @@ Status KillOpCmdBase::checkAuthForOperation(OperationContext* workerOpCtx,
     return Status(ErrorCodes::Unauthorized, "Unauthorized");
 }
 
-void KillOpCmdBase::killLocalOperation(OperationContext* opCtx, OperationId opToKill) {
-    OperationKiller(opCtx->getClient()).killOperation(opToKill);
+void KillOpCmdBase::killLocalOperation(OperationContext* opCtx,
+                                       OperationId opToKill,
+                                       ErrorCodes::Error killCode) {
+    OperationKiller(opCtx->getClient()).killOperation(opToKill, killCode);
 }
 
 bool KillOpCmdBase::isKillingLocalOp(const BSONElement& opElem) {
@@ -128,6 +147,17 @@ unsigned int KillOpCmdBase::parseOpId(const BSONObj& cmdObj) {
             (op >= std::numeric_limits<int>::min()) && (op <= std::numeric_limits<int>::max()));
 
     return static_cast<unsigned int>(op);
+}
+
+ErrorCodes::Error KillOpCmdBase::parseErrorCode(OperationContext* opCtx, const BSONObj& cmdObj) {
+    if (gFeatureFlagKillOpErrorCodeOverride.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (auto bsonErrorCode = cmdObj.getField("errorCode")) {
+            return ErrorCodes::Error{bsonErrorCode.numberInt()};
+        }
+    }
+    return kDefaultErrorCode;
 }
 
 }  // namespace mongo
