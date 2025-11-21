@@ -85,6 +85,7 @@
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
+#include "mongo/db/timeseries/metadata.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -169,7 +170,7 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
 
         auto actualMeta = docToWrite.getField(kBucketMetaFieldName);
         auto expectedMeta = batch->bucketKey.metadata.element();
-        if (!actualMeta.binaryEqualValues(expectedMeta)) {
+        if (!timeseries::metadata::areMetadataEqual(actualMeta, expectedMeta)) {
             failed(
                 "mismatched metaField value",
                 [](logv2::DynamicAttributes&) {},

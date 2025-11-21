@@ -158,6 +158,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db:query_expressions",
     ],
 )
 
@@ -212,5 +213,19 @@ mongo_idl_library(
     ],
     deps = [
         "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_timeseries_metadata_test",
+    srcs = [
+        "timeseries_metadata_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_third_group",
+        "server-timeseries-bucket-catalog",
+    ],
+    deps = [
+        ":timeseries_metadata",
     ],
 )

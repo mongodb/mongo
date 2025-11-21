@@ -29,6 +29,9 @@
 
 #include "mongo/db/timeseries/metadata.h"
 
+#include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/bson/unordered_fields_bsonelement_comparator.h"
+
 #include <boost/container/small_vector.hpp>
 
 #include "mongo/util/tracking_allocator.h"
@@ -107,6 +110,78 @@ void normalizeObject(const BSONObj& obj, allocator_aware::BSONObjBuilder<Allocat
     }
 }
 
+bool areBSONObjectsEqualUnordered(const BSONObj& lhs, const BSONObj& rhs);
+bool areBSONArraysEqualUnordered(const BSONObj& lhs, const BSONObj& rhs);
+
+bool areBSONArraysEqualUnordered(const BSONObj& lhs, const BSONObj& rhs) {
+    BSONObjIterator it1(lhs);
+    BSONObjIterator it2(rhs);
+
+    while (it1.more() && it2.more()) {
+        auto l = it1.next();
+        auto r = it2.next();
+        if (l.type() != r.type()) {
+            return false;
+        }
+
+        if (l.type() == BSONType::Object) {
+            if (!areBSONObjectsEqualUnordered(l.Obj(), r.Obj())) {
+                return false;
+            }
+        } else if (l.type() == BSONType::Array) {
+            if (!areBSONArraysEqualUnordered(l.Obj(), r.Obj())) {
+                return false;
+            }
+        } else {
+            // In order to match the behavior of timeseries::metadata::normalize, we ignore field
+            // names when comparing array elements.
+            UnorderedFieldsBSONElementComparator comparator;
+            if (comparator.compare(l, r) != 0) {
+                return false;
+            }
+        }
+    }
+
+    if (it1.more() || it2.more()) {
+        return false;
+    }
+
+    return true;
+}
+
+bool areBSONObjectsEqualUnordered(const BSONObj& lhs, const BSONObj& rhs) {
+    BSONObjIteratorSorted it1(lhs);
+    BSONObjIteratorSorted it2(rhs);
+
+    while (it1.more() && it2.more()) {
+        auto l = it1.next();
+        auto r = it2.next();
+        if (l.type() != r.type()) {
+            return false;
+        }
+
+        if (l.type() == BSONType::Object) {
+            if (!areBSONObjectsEqualUnordered(l.Obj(), r.Obj())) {
+                return false;
+            }
+        } else if (l.type() == BSONType::Array) {
+            if (!areBSONArraysEqualUnordered(l.Obj(), r.Obj())) {
+                return false;
+            }
+        } else {
+            SimpleBSONElementComparator comparator;
+            if (comparator.compare(l, r) != 0) {
+                return false;
+            }
+        }
+    }
+
+    if (it1.more() || it2.more()) {
+        return false;
+    }
+
+    return true;
+}
 }  // namespace
 
 template <class Allocator>
@@ -137,4 +212,16 @@ template void normalize(const BSONElement& elem,
                         allocator_aware::BSONObjBuilder<TrackingAllocator<void>>& builder,
                         boost::optional<StringData> as);
 
+bool areMetadataEqual(const BSONElement& elem1, const BSONElement& elem2) {
+    if (elem1.type() != elem2.type()) {
+        return false;
+    }
+    if (elem1.type() == BSONType::Object) {
+        return areBSONObjectsEqualUnordered(elem1.Obj(), elem2.Obj());
+    } else if (elem1.type() == BSONType::Array) {
+        return areBSONArraysEqualUnordered(elem1.Obj(), elem2.Obj());
+    } else {
+        return elem1.binaryEqualValues(elem2);
+    }
+}
 }  // namespace mongo::timeseries::metadata
