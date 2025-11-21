@@ -23,8 +23,8 @@ const assertExplain = function (coll, commandResult) {
     assert(commandResult.ok);
     assert.eq(
         commandResult.command[commandName],
-        coll.getName(),
-        `Expected command namespace to be ${tojson(coll.getName())} but got ${tojson(
+        getTimeseriesCollForDDLOps(db, coll).getName(),
+        `Expected command namespace to be ${tojson(getTimeseriesCollForDDLOps(db, coll).getName())} but got ${tojson(
             commandResult.command[commandName],
         )}`,
     );

@@ -739,8 +739,12 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
             if (isTrackedTimeseries && !isRawDataOperation(opCtx)) {
                 isTimeseriesLogicalRequest = true;
             }
-            if (isTrackedTimeseries && !cm.isNewTimeseriesWithoutView()) {
-                nss = std::move(cm.getNss());
+            if (isTrackedTimeseries && !cm.isNewTimeseriesWithoutView() && nss != cm.getNss()) {
+                // The namespace has been translated from timeseries view to timeseries buckets
+                // collection
+                const auto& translatedNss = cm.getNss();
+                nss = translatedNss;
+                cmdObj = replaceNamespaceByBucketNss(opCtx, cmdObj, translatedNss);
             }
             // Note: at this point, 'nss' should be the timeseries buckets collection namespace if
             // we're writing to a tracked timeseries collection.
@@ -752,12 +756,6 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
             const auto let = getLet(cmdObj);
             const auto rc = getLegacyRuntimeConstants(cmdObj);
             if (cri.hasRoutingTable()) {
-                // If the request is for a view on a sharded timeseries buckets collection, we need
-                // to replace the namespace by buckets collection namespace in the command object.
-                if (isTimeseriesLogicalRequest &&
-                    !cri.getChunkManager().isNewTimeseriesWithoutView()) {
-                    cmdObj = replaceNamespaceByBucketNss(opCtx, cmdObj, nss);
-                }
                 auto expCtx = makeExpressionContextWithDefaultsForTargeter(
                     opCtx, nss, cri, collation, boost::none /* verbosity */, let, rc);
                 if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
@@ -909,8 +907,13 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
             !originalNss.isTimeseriesBucketsCollection()) {
             isTimeseriesLogicalRequest = true;
         }
-        if (isTrackedTimeseries && !cm.isNewTimeseriesWithoutView()) {
-            nss = std::move(cm.getNss());
+
+        if (isTrackedTimeseries && !cm.isNewTimeseriesWithoutView() && nss != cm.getNss()) {
+            // The namespace has been translated from timeseries view to timeseries buckets
+            // collection
+            const auto& translatedNss = cm.getNss();
+            nss = translatedNss;
+            cmdObjForShard = replaceNamespaceByBucketNss(opCtx, cmdObjForShard, translatedNss);
         }
         // Note: at this point, 'nss' should be the timeseries buckets collection namespace if we're
         // writing to a sharded timeseries collection.
@@ -926,12 +929,6 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObjForShard);
 
         if (cri.hasRoutingTable()) {
-            // If the request is for a view on a sharded legacy timeseries buckets collection, we
-            // need to replace the namespace by buckets collection namespace in the command object.
-            if (isTrackedTimeseries && !cm.isNewTimeseriesWithoutView()) {
-                cmdObjForShard = replaceNamespaceByBucketNss(opCtx, cmdObjForShard, nss);
-            }
-
             // Evaluate let parameters once before forwarding to the shards for non-deterministic
             // operators like $rand.
             cmdObjForShard = expandLetParams(opCtx, nss, cmdObjForShard);
