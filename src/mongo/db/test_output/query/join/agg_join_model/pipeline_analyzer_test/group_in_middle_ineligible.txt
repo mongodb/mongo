@@ -1,0 +1,88 @@
+{
+    "graph": {
+        "nodes": [
+            {
+                "collectionName": "test.pipeline_test",
+                "accessPath": {
+                    "filter": {},
+                    "projection": {
+                        "a": true,
+                        "c": true,
+                        "key": true,
+                        "_id": false
+                    }
+                },
+                "embedPath": ""
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "fromA"
+            }
+        ],
+        "edges": [
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"1"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000000000000010"
+            }
+        ]
+    },
+    "resolvedPaths": [
+        {
+            "nodeId": {"$numberInt":"0"},
+            "fieldName": "a"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "fieldName": "b"
+        }
+    ],
+    "prefix": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "fromA",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromA"
+            }
+        }
+    ],
+    "suffix": [
+        {
+            "$group": {
+                "_id": "$key",
+                "a": {
+                    "$avg": "$c"
+                },
+                "$willBeMerged": false
+            }
+        },
+        {
+            "$lookup": {
+                "from": "B",
+                "as": "fromB",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromB"
+            }
+        }
+    ]
+}

@@ -31,10 +31,13 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::join_ordering {
 namespace {
+unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/query/join/agg_join_model"};
+
 std::vector<BSONObj> pipelineFromJsonArray(StringData jsonArray) {
     auto inputBson = fromjson("{pipeline: " + jsonArray + "}");
     ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
@@ -66,7 +69,21 @@ protected:
     }
 };
 
-TEST_F(PipelineAnalyzerTest, pipelineEligibleForJoinReordering_noLocalForeignFeilds) {
+TEST_F(PipelineAnalyzerTest, PipelineIneligibleForJoinReorderingNoLocalForeignFields) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+            {$lookup: {from: "B", as: "fromB", pipeline: [{$match: {a: 1}}]}},
+            {$unwind: "$fromB"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A", "B"});
+
+    // This pipeline is not eligible for join reordering due to a sub-pipeline.
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+}
+
+TEST_F(PipelineAnalyzerTest, PipelinePrefixEligibleForJoinReorderingNoLocalForeignFields) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
             {$unwind: "$fromA"},
@@ -76,45 +93,57 @@ TEST_F(PipelineAnalyzerTest, pipelineEligibleForJoinReordering_noLocalForeignFei
 
     auto pipeline = makePipeline(query, {"A", "B"});
 
-    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    // This pipeline's prefix is eligible for reordering.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    ASSERT_OK(swJoinModel);
+
+    auto& joinModel = swJoinModel.getValue();
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
 
-TEST_F(PipelineAnalyzerTest, pipelineEligibleForJoinReordering_singleLookupUnwind) {
+TEST_F(PipelineAnalyzerTest, PipelineEligibleForJoinReorderingSingleLookupUnwind) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
             {$unwind: "$fromA"}
         ])";
 
     auto pipeline = makePipeline(query, {"A"});
-    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    // This pipeline is eligible for reordering.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    ASSERT_OK(swJoinModel);
+
+    auto& joinModel = swJoinModel.getValue();
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
 
-TEST_F(PipelineAnalyzerTest, pipelineEligibleForJoinReordering_noUnwind) {
+TEST_F(PipelineAnalyzerTest, PipelineIneligibleForJoinReordering) {
     const auto query = R"([
-            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
-            {$unwind: "$fromA"},
-            {$lookup: {from: "B", localField: "a", foreignField: "b", as: "fromB"}}
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}}
         ])";
 
-    auto pipeline = makePipeline(query, {"A", "B"});
+    auto pipeline = makePipeline(query, {"A"});
 
     ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
-TEST_F(PipelineAnalyzerTest, pipelineEligibleForJoinReordering_nonAbsorbableUnwind) {
+TEST_F(PipelineAnalyzerTest, PipelineIneligibleForJoinReorderingNonAbsorbableUnwind) {
     const auto query = R"([
-            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
-            {$unwind: "$fromA"},
             {$lookup: {from: "B", localField: "a", foreignField: "b", as: "fromB"}},
             {$unwind: "$hello"}
         ])";
 
-    auto pipeline = makePipeline(query, {"A", "B"});
+    auto pipeline = makePipeline(query, {"B"});
 
     ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
 TEST_F(PipelineAnalyzerTest, TwoLookupUnwinds) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
             {$unwind: "$fromA"},
@@ -127,14 +156,12 @@ TEST_F(PipelineAnalyzerTest, TwoLookupUnwinds) {
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
-    ASSERT_OK(swJoinModel);
     auto& joinModel = swJoinModel.getValue();
-    ASSERT_EQ(joinModel.graph.numNodes(), 3);
-    ASSERT_EQ(joinModel.graph.numEdges(), 2);
-    ASSERT_EQ(joinModel.resolvedPaths.size(), 3);
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
 
 TEST_F(PipelineAnalyzerTest, MatchOnMainCollection) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     const auto query = R"([
             {$match: {c: 1}},
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
@@ -150,11 +177,7 @@ TEST_F(PipelineAnalyzerTest, MatchOnMainCollection) {
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
     ASSERT_OK(swJoinModel);
     auto& joinModel = swJoinModel.getValue();
-    ASSERT_EQ(joinModel.graph.numNodes(), 3);
-    ASSERT_EQ(joinModel.graph.numEdges(), 2);
-    ASSERT_EQ(joinModel.resolvedPaths.size(), 3);
-    ASSERT_EQ(joinModel.graph.getNode(0).accessPath->getPrimaryMatchExpression()->debugString(),
-              "c $eq 1\n");
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
 
 TEST_F(PipelineAnalyzerTest, MatchInSubPipeline) {
@@ -203,6 +226,7 @@ TEST_F(PipelineAnalyzerTest, GroupOnMainCollection) {
 }
 
 TEST_F(PipelineAnalyzerTest, GroupInMiddleIneligible) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
             {$unwind: "$fromA"},
@@ -216,9 +240,11 @@ TEST_F(PipelineAnalyzerTest, GroupInMiddleIneligible) {
     // We don't detect ineligibility here.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    // But we fail to construct a model here, because $group isn't pushed into SBE.
+    // This should show that our suffix starts at the $group.
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
-    ASSERT_EQ(swJoinModel.getStatus(), ErrorCodes::QueryFeatureNotAllowed);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
 
 TEST_F(PipelineAnalyzerTest, GroupInSubPipeline) {
@@ -365,6 +391,7 @@ TEST_F(PipelineAnalyzerTest, IneligibleSubPipelineStage) {
 }
 
 TEST_F(PipelineAnalyzerTest, LongPrefix) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     const auto query = R"([
             {$match: {c: 1}},
             {$sort: {e: 1}},
@@ -382,14 +409,6 @@ TEST_F(PipelineAnalyzerTest, LongPrefix) {
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
     ASSERT_OK(swJoinModel);
     auto& joinModel = swJoinModel.getValue();
-    ASSERT_EQ(joinModel.graph.numNodes(), 3);
-    ASSERT_EQ(joinModel.graph.numEdges(), 2);
-    ASSERT_EQ(joinModel.resolvedPaths.size(), 3);
-    const auto& baseCQ = joinModel.graph.getNode(0).accessPath;
-    ASSERT_EQ(baseCQ->getPrimaryMatchExpression()->debugString(), "c $eq 1\n");
-    ASSERT_TRUE(baseCQ->getSortPattern().has_value());
-    ASSERT_EQ(baseCQ->getSortPattern()->front().fieldPath->fullPath(), std::string("e"));
-    ASSERT_NE(baseCQ->getProj(), nullptr);
-    ASSERT_TRUE(baseCQ->getProj()->isExclusionOnly());
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
 }  // namespace mongo::join_ordering

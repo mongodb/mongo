@@ -66,6 +66,7 @@ mongo_cc_unit_test(
         "reorder_joins_test.cpp",
     ],
     data = [
+        "//src/mongo/db/test_output/query/join/agg_join_model/pipeline_analyzer_test:test_data",
         "//src/mongo/db/test_output/query/join/join_plan_enumerator_test:test_data",
         "//src/mongo/db/test_output/query/join/reorder_graph_test:test_data",
     ],

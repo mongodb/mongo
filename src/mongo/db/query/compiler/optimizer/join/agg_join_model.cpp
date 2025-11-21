@@ -97,25 +97,24 @@ std::vector<BSONObj> pipelineToBSON(const std::unique_ptr<Pipeline>& pipeline) {
 }  // namespace
 
 bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
-    size_t numLookupsWithUnwind = 0;
-
     // Pipelines starting with $geoNear are not eligible.
     if (!pipeline.getSources().empty() &&
         dynamic_cast<DocumentSourceGeoNear*>(pipeline.peekFront())) {
         return false;
     }
 
-    for (auto&& stage : pipeline.getSources()) {
-        if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(stage.get());
+    // Since we can reorder base collections, any pipeline with even just one eligible $lookup +
+    // $unwind pair could be eligible.
+    return std::any_of(pipeline.getSources().begin(), pipeline.getSources().end(), [](auto ds) {
+        if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(ds.get());
             // TODO SERVER-111164: once we start adding edge from $expr we need to remove check for
             // hasLocalFieldForeignFieldJoin().
             lookup != nullptr && lookup->hasUnwindSrc() &&
             lookup->hasLocalFieldForeignFieldJoin()) {
-            ++numLookupsWithUnwind;
+            return true;
         }
-    }
-
-    return numLookupsWithUnwind >= 2;
+        return false;
+    });
 }
 
 StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeline) {
@@ -197,8 +196,8 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
         }
     }
 
-    if (graph.numNodes() < 3) {
-        // We need at least 2 eligible $lookups and a fully SBE-pushed-down prefix.
+    if (graph.numNodes() < 2) {
+        // We need at least 1 eligible $lookup and a fully SBE-pushed-down prefix.
         return Status(ErrorCodes::QueryFeatureNotAllowed, "Join reordering not allowed");
     }
 
