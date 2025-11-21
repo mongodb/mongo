@@ -15,7 +15,7 @@ from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
 
 
-class RotateConcurrencyAdjustmentAlgorithm(interface.Hook):
+class RotateExecutionControlParams(interface.Hook):
     """
     Periodically sets 'executionControlConcurrencyAdjustmentAlgorithm' and deprioritization parameters
     to random valid values.
@@ -37,7 +37,7 @@ class RotateConcurrencyAdjustmentAlgorithm(interface.Hook):
         seed=random.randrange(sys.maxsize),
         auth_options=None,
     ):
-        """Initialize the RotateConcurrencyAdjustmentAlgorithm hook.
+        """Initialize the RotateExecutionControlParams hook.
 
         Args:
             hook_logger: the logger instance for this hook.
@@ -46,7 +46,7 @@ class RotateConcurrencyAdjustmentAlgorithm(interface.Hook):
             auth_options: dictionary of auth options.
         """
         interface.Hook.__init__(
-            self, hook_logger, fixture, RotateConcurrencyAdjustmentAlgorithm.DESCRIPTION
+            self, hook_logger, fixture, RotateExecutionControlParams.DESCRIPTION
         )
         self._fixture = fixture
         self._auth_options = auth_options
@@ -66,7 +66,7 @@ class RotateConcurrencyAdjustmentAlgorithm(interface.Hook):
             f"Found {len(self._standalone_fixtures)} standalone and {len(self._rs_fixtures)} replica set fixtures."
         )
 
-        self._set_param_thread = _SetConcurrencyAlgorithmThread(
+        self._set_param_thread = _RotateExecutionControlParamsThread(
             self.logger,
             self._rs_fixtures,
             self._standalone_fixtures,
@@ -75,15 +75,15 @@ class RotateConcurrencyAdjustmentAlgorithm(interface.Hook):
             lifecycle_interface.FlagBasedThreadLifecycle(),
             self._auth_options,
         )
-        self.logger.info("Starting the concurrency adjustment algorithm rotation thread.")
+        self.logger.info("Starting the execution control parameters rotation thread.")
         self._set_param_thread.start()
 
     def after_suite(self, test_report, teardown_flag=None):
         """After suite."""
-        self.logger.info("Stopping the concurrency adjustment algorithm rotation thread.")
+        self.logger.info("Stopping the execution control parameters rotation thread.")
         if self._set_param_thread:
             self._set_param_thread.stop()
-        self.logger.info("Concurrency adjustment algorithm rotation thread stopped.")
+        self.logger.info("Execution control parameters rotation thread stopped.")
 
     def before_test(self, test, test_report):
         """Before test. Log current config."""
@@ -95,15 +95,15 @@ class RotateConcurrencyAdjustmentAlgorithm(interface.Hook):
         for standalone in self._standalone_fixtures:
             self._invoke_get_parameter_and_log(standalone)
 
-        self.logger.info("Resuming the concurrency adjustment algorithm rotation thread.")
+        self.logger.info("Resuming the execution control parameters rotation thread.")
         self._set_param_thread.pause()
         self._set_param_thread.resume()
 
     def after_test(self, test, test_report):
         """After test. Log current config."""
-        self.logger.info("Pausing the concurrency adjustment algorithm rotation thread.")
+        self.logger.info("Pausing the execution control parameters rotation thread.")
         self._set_param_thread.pause()
-        self.logger.info("Paused the concurrency adjustment algorithm rotation thread.")
+        self.logger.info("Paused the execution control parameters rotation thread.")
 
         self.logger.info("Logging current parameter state after test...")
         for repl_set in self._rs_fixtures:
@@ -179,7 +179,7 @@ class RotateConcurrencyAdjustmentAlgorithm(interface.Hook):
             )
 
 
-class _SetConcurrencyAlgorithmThread(threading.Thread):
+class _RotateExecutionControlParamsThread(threading.Thread):
     def __init__(
         self,
         logger,
@@ -190,8 +190,8 @@ class _SetConcurrencyAlgorithmThread(threading.Thread):
         lifecycle,
         auth_options=None,
     ):
-        """Initialize _SetConcurrencyAlgorithmThread."""
-        threading.Thread.__init__(self, name="RotateConcurrencyAlgorithmThread")
+        """Initialize _RotateExecutionControlParamsThread."""
+        threading.Thread.__init__(self, name="RotateExecutionControlParamsThread")
         self.daemon = True
         self.logger = logger
         self._rs_fixtures = rs_fixtures
@@ -238,7 +238,7 @@ class _SetConcurrencyAlgorithmThread(threading.Thread):
                 self.__lifecycle.wait_for_action_interval(wait_secs)
         except Exception:
             # Proactively log the exception
-            self.logger.exception("RotateConcurrencyAlgorithmThread threw exception")
+            self.logger.exception("RotateExecutionControlParamsThread threw exception")
             self._is_idle_evt.set()
 
     def stop(self):
@@ -276,7 +276,7 @@ class _SetConcurrencyAlgorithmThread(threading.Thread):
 
     def _check_thread(self):
         if not self.is_alive():
-            msg = "The RotateConcurrencyAlgorithmThread thread is not running."
+            msg = "The RotateExecutionControlParamsThread thread is not running."
             self.logger.error(msg)
             raise errors.ServerFailure(msg)
 

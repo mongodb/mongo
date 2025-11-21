@@ -3,7 +3,7 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_jscore_passthrough_with_dynamic_concurrency_adjustment_algorithm.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_jscore_passthrough_with_dynamic_execution_control.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
@@ -15,7 +15,7 @@ executor:
       - CheckReplDBHash
       - CheckReplOplogs
       - ValidateCollections
-      - RotateConcurrencyAdjustmentAlgorithm
+      - RotateExecutionControlParams
     test: true
   config:
     shell_options:
@@ -35,7 +35,7 @@ executor:
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20
-    - class: RotateConcurrencyAdjustmentAlgorithm
+    - class: RotateExecutionControlParams
 matrix_suite: true
 selector:
   exclude_files:

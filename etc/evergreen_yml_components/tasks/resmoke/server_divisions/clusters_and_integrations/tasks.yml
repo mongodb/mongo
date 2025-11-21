@@ -2373,7 +2373,7 @@ tasks:
             --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
 
   - <<: *gen_task_template
-    name: sharding_jscore_passthrough_with_dynamic_concurrency_adjustment_algorithm_gen
+    name: sharding_jscore_passthrough_with_dynamic_execution_control_gen
     tags:
       [
         "assigned_to_jira_team_server_workload_scheduling",
@@ -2386,7 +2386,7 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
-    name: replica_sets_jscore_passthrough_with_dynamic_concurrency_adjustment_algorithm_gen
+    name: replica_sets_jscore_passthrough_with_dynamic_execution_control_gen
     tags:
       [
         "assigned_to_jira_team_server_workload_scheduling",

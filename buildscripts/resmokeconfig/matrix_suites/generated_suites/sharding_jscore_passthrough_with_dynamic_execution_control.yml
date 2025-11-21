@@ -3,7 +3,7 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_jscore_passthrough_with_dynamic_concurrency_adjustment_algorithm.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_jscore_passthrough_with_dynamic_execution_control.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
@@ -12,7 +12,7 @@ executor:
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
-      - RotateConcurrencyAdjustmentAlgorithm
+      - RotateExecutionControlParams
   config:
     shell_options: {}
   fixture:
@@ -32,7 +32,7 @@ executor:
     - class: CheckOrphansDeleted
     - class: CleanEveryN
       n: 20
-    - class: RotateConcurrencyAdjustmentAlgorithm
+    - class: RotateExecutionControlParams
 matrix_suite: true
 selector:
   exclude_files:

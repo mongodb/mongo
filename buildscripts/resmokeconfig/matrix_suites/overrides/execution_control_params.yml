@@ -1,6 +1,6 @@
-### Overrides for some suites with RotateConcurrencyAdjustmentAlgorithm hook ###
+### Overrides for some suites with RotateExecutionControlParams hook ###
 
-- name: replica_sets_reconfig_hooks
+- name: replica_sets_reconfig_hooks_with_dynamic_execution_control
   value:
     executor:
       hooks:
@@ -15,9 +15,9 @@
         - class: ValidateCollections
         - class: CleanEveryN
           n: 20
-        - class: RotateConcurrencyAdjustmentAlgorithm
+        - class: RotateExecutionControlParams
 
-- name: replica_sets_reconfig_archive
+- name: replica_sets_reconfig_archive_hooks_with_dynamic_execution_control
   value:
     executor:
       archive:
@@ -29,9 +29,9 @@
           - CheckReplDBHash
           - CheckReplOplogs
           - ValidateCollections
-          - RotateConcurrencyAdjustmentAlgorithm
+          - RotateExecutionControlParams
 
-- name: sharding_reconfig_hooks
+- name: sharding_reconfig_hooks_with_dynamic_execution_control
   value:
     executor:
       hooks:
@@ -41,9 +41,9 @@
         - class: CheckOrphansDeleted
         - class: CleanEveryN
           n: 20
-        - class: RotateConcurrencyAdjustmentAlgorithm
+        - class: RotateExecutionControlParams
 
-- name: sharding_reconfig_archive
+- name: sharding_reconfig_archive_hooks_with_dynamic_execution_control
   value:
     executor:
       archive:
@@ -51,4 +51,4 @@
           - CheckReplDBHash
           - CheckMetadataConsistencyInBackground
           - ValidateCollections
-          - RotateConcurrencyAdjustmentAlgorithm
+          - RotateExecutionControlParams

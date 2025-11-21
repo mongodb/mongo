@@ -52,7 +52,7 @@ Specify any of the following as the `hooks` in your [Suite](../../../../buildscr
   - Also verifies that the secondaries can reach the SECONDARY state without having connectivity to the primary after an unclean shutdown.
 - [`PeriodicStackTrace`](./periodic_stack_trace.py) - Test hook that sends the stacktracing signal to mongo processes at randomized intervals.
 - [`QueryableServerHook`](./queryable_server_hook.py) - Starts the queryable server before each test for queryable restores. Restarts the queryable server between tests.
-- [`RotateConcurrencyAdjustmentAlgorithm`](./rotate_concurrency_adjustment_algorithm.py) - Periodically sets 'storageEngineConcurrencyAdjustmentAlgorithm' to a random valid value from a predefined list.
+- [`RotateExecutionControlParams`](./rotate_execution_control_params.py) - Periodically rotates 'executionControlConcurrencyAdjustmentAlgorithm' and deprioritization server parameters to random valid values.
 - [`RunChangeStreamsInBackground`](./change_streams.py) - Run in the background full cluster change streams while a test is running. Open and close the change stream every `1..10` tests (random using `config.RANDOM_SEED`).
 - [`RunDBCheckInBackground`](./dbcheck_background.py) - A hook for running `dbCheck` on a replica set while a test is running.
   - This includes dbhashes for all non-local databases and non-replicated system collections that match on the primary and secondaries.

@@ -42,7 +42,7 @@ filters:
   - "generated_suites/replica_sets_recordids_replicated_jscore_passthrough.yml":
     approvers:
       - 10gen/server-collection-write-path
-  - "generated_suites/*with_dynamic_concurrency_adjustment_algorithm.yml":
+  - "generated_suites/*execution_control*":
     approvers:
       - 10gen/server-workload-resilience
   - "generated_suites/transitioning_replica_sets_jscore_passthrough.yml":
