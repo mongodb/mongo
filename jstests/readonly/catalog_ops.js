@@ -1,9 +1,3 @@
-/*
- * @tags: [
- *   # TODO SERVER-112059 re-enable this test in viewless timeseries suites
- *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
- * ]
- */
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {runReadOnlyTest} from "jstests/readonly/lib/read_only_test.js";
 
