@@ -1170,19 +1170,21 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
         self.logger.info("Performing Internode Validation")
 
-        # Collections we exclude from the hash comparisons. This is because these collections can contain different document contents for valid reasons (i.e. implicitly replicated, TTL indexes, etc)
+        # Collections we exclude from the hash comparisons. This is because these collections can contain different document contents for valid reasons (i.e. implicitly replicated, TTL indexes, updated by background threads, etc)
         excluded_config_collections = [
-            "system.preimages",
+            "actionlog",
+            "analyzeShardKeySplitPoints",
+            "cache.collections",
+            "image_collection",
             "mongos",
             "rangeDeletions",
             "sampledQueries",
             "sampledQueriesDiff",
-            "analyzeShardKeySplitPoints",
-            "system.sessions",
-            "actionlog",
-            "transactions",
-            "image_collection",
+            "shards",
             "system.change_collection",
+            "system.preimages",
+            "system.sessions",
+            "transactions",
         ]
 
         # the 'system.profile' collections are unreplicated and should not be compared.

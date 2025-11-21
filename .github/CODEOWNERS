@@ -257,6 +257,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./buildscripts/resmokelib/testing/OWNERS.yml
 /buildscripts/resmokelib/testing/**/queryable_server.py @10gen/server-backup-restore @svc-auto-approve-bot
 
+# The following patterns are parsed from ./buildscripts/resmokelib/testing/fixtures/OWNERS.yml
+/buildscripts/resmokelib/testing/fixtures/**/replicaset.py @10gen/server-replication-reviewers @svc-auto-approve-bot
+
 # The following patterns are parsed from ./buildscripts/resmokelib/testing/hooks/OWNERS.yml
 /buildscripts/resmokelib/testing/hooks/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/README.md @10gen/devprod-correctness @svc-auto-approve-bot
