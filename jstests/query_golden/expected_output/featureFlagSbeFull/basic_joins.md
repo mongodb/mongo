@@ -1191,6 +1191,860 @@ Execution Engine: sbe
 }
 ```
 
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a",
+			"pipeline" : [
+				{
+					"$match" : {
+						"d" : {
+							"$lt" : 3
+						}
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign2",
+			"as" : "y",
+			"localField" : "b",
+			"foreignField" : "b",
+			"pipeline" : [
+				{
+					"$match" : {
+						"b" : {
+							"$gt" : "aaa"
+						}
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$y"
+	},
+	{
+		"$sortByCount" : "$x.a"
+	}
+]
+```
+### Results
+```json
+{  "_id" : 1,  "count" : 2 }
+{  "_id" : 2,  "count" : 2 }
+```
+### Summarized explain
+Execution Engine: sbe
+```json
+{
+	"queryShapeHash" : "39062D46AC66A096B98DB7B9AD3C198F432183DF3436553F59C3EC8B5252F1EA",
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : {
+					"inputStage" : {
+						"direction" : "forward",
+						"filter" : {
+							
+						},
+						"stage" : "COLLSCAN"
+					},
+					"planNodeId" : 2,
+					"stage" : "PROJECTION_SIMPLE",
+					"transformBy" : {
+						"_id" : false,
+						"a" : true,
+						"b" : true
+					}
+				}
+			}
+		},
+		{
+			"$lookup" : {
+				"as" : "x",
+				"foreignField" : "a",
+				"from" : "basic_joins_md_foreign1",
+				"let" : {
+					
+				},
+				"localField" : "a",
+				"pipeline" : [
+					{
+						"$match" : {
+							"d" : {
+								"$lt" : 3
+							}
+						}
+					}
+				],
+				"unwinding" : {
+					"preserveNullAndEmptyArrays" : false
+				}
+			}
+		},
+		{
+			"$lookup" : {
+				"as" : "y",
+				"foreignField" : "b",
+				"from" : "basic_joins_md_foreign2",
+				"let" : {
+					
+				},
+				"localField" : "b",
+				"pipeline" : [
+					{
+						"$match" : {
+							"b" : {
+								"$gt" : "aaa"
+							}
+						}
+					}
+				],
+				"unwinding" : {
+					"preserveNullAndEmptyArrays" : false
+				}
+			}
+		},
+		{
+			"$group" : {
+				"$willBeMerged" : false,
+				"_id" : "$x.a",
+				"count" : {
+					"$sum" : {
+						"$const" : 1
+					}
+				}
+			}
+		},
+		{
+			"$sort" : {
+				"sortKey" : {
+					"count" : -1
+				}
+			}
+		}
+	]
+}
+```
+
+### With bottom-up plan enumeration
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a",
+			"pipeline" : [
+				{
+					"$match" : {
+						"d" : {
+							"$lt" : 3
+						}
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign2",
+			"as" : "y",
+			"localField" : "b",
+			"foreignField" : "b",
+			"pipeline" : [
+				{
+					"$match" : {
+						"b" : {
+							"$gt" : "aaa"
+						}
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$y"
+	},
+	{
+		"$sortByCount" : "$x.a"
+	}
+]
+```
+### Results
+```json
+{  "_id" : 1,  "count" : 2 }
+{  "_id" : 2,  "count" : 2 }
+```
+### Summarized explain
+Execution Engine: sbe
+```json
+{
+	"queryShapeHash" : "39062D46AC66A096B98DB7B9AD3C198F432183DF3436553F59C3EC8B5252F1EA",
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : {
+					"inputStages" : [
+						{
+							"inputStages" : [
+								{
+									"inputStage" : {
+										"direction" : "forward",
+										"filter" : {
+											
+										},
+										"stage" : "COLLSCAN"
+									},
+									"stage" : "PROJECTION_SIMPLE",
+									"transformBy" : {
+										"_id" : false,
+										"a" : true,
+										"b" : true
+									}
+								},
+								{
+									"direction" : "forward",
+									"filter" : {
+										"d" : {
+											"$lt" : 3
+										}
+									},
+									"stage" : "COLLSCAN"
+								}
+							],
+							"joinPredicates" : [
+								"a = a"
+							],
+							"leftEmbeddingField" : "none",
+							"rightEmbeddingField" : "x",
+							"stage" : "HASH_JOIN_EMBEDDING"
+						},
+						{
+							"direction" : "forward",
+							"filter" : {
+								"b" : {
+									"$gt" : "aaa"
+								}
+							},
+							"stage" : "COLLSCAN"
+						}
+					],
+					"joinPredicates" : [
+						"b = b"
+					],
+					"leftEmbeddingField" : "none",
+					"planNodeId" : 6,
+					"rightEmbeddingField" : "y",
+					"stage" : "HASH_JOIN_EMBEDDING"
+				}
+			}
+		},
+		{
+			"$group" : {
+				"$willBeMerged" : false,
+				"_id" : "$x.a",
+				"count" : {
+					"$sum" : {
+						"$const" : 1
+					}
+				}
+			}
+		},
+		{
+			"$sort" : {
+				"sortKey" : {
+					"count" : -1
+				}
+			}
+		}
+	]
+}
+```
+
+### With random order, seed 44, nested loop joins
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a",
+			"pipeline" : [
+				{
+					"$match" : {
+						"d" : {
+							"$lt" : 3
+						}
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign2",
+			"as" : "y",
+			"localField" : "b",
+			"foreignField" : "b",
+			"pipeline" : [
+				{
+					"$match" : {
+						"b" : {
+							"$gt" : "aaa"
+						}
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$y"
+	},
+	{
+		"$sortByCount" : "$x.a"
+	}
+]
+```
+### Results
+```json
+{  "_id" : 1,  "count" : 2 }
+{  "_id" : 2,  "count" : 2 }
+```
+### Summarized explain
+Execution Engine: sbe
+```json
+{
+	"queryShapeHash" : "39062D46AC66A096B98DB7B9AD3C198F432183DF3436553F59C3EC8B5252F1EA",
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : {
+					"inputStages" : [
+						{
+							"inputStages" : [
+								{
+									"inputStage" : {
+										"direction" : "forward",
+										"filter" : {
+											
+										},
+										"stage" : "COLLSCAN"
+									},
+									"stage" : "PROJECTION_SIMPLE",
+									"transformBy" : {
+										"_id" : false,
+										"a" : true,
+										"b" : true
+									}
+								},
+								{
+									"direction" : "forward",
+									"filter" : {
+										"b" : {
+											"$gt" : "aaa"
+										}
+									},
+									"stage" : "COLLSCAN"
+								}
+							],
+							"joinPredicates" : [
+								"b = b"
+							],
+							"leftEmbeddingField" : "none",
+							"rightEmbeddingField" : "y",
+							"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
+						},
+						{
+							"direction" : "forward",
+							"filter" : {
+								"d" : {
+									"$lt" : 3
+								}
+							},
+							"stage" : "COLLSCAN"
+						}
+					],
+					"joinPredicates" : [
+						"a = a"
+					],
+					"leftEmbeddingField" : "none",
+					"planNodeId" : 6,
+					"rightEmbeddingField" : "x",
+					"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
+				}
+			}
+		},
+		{
+			"$group" : {
+				"$willBeMerged" : false,
+				"_id" : "$x.a",
+				"count" : {
+					"$sum" : {
+						"$const" : 1
+					}
+				}
+			}
+		},
+		{
+			"$sort" : {
+				"sortKey" : {
+					"count" : -1
+				}
+			}
+		}
+	]
+}
+```
+
+### With random order, seed 44, hash join enabled
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a",
+			"pipeline" : [
+				{
+					"$match" : {
+						"d" : {
+							"$lt" : 3
+						}
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign2",
+			"as" : "y",
+			"localField" : "b",
+			"foreignField" : "b",
+			"pipeline" : [
+				{
+					"$match" : {
+						"b" : {
+							"$gt" : "aaa"
+						}
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$y"
+	},
+	{
+		"$sortByCount" : "$x.a"
+	}
+]
+```
+### Results
+```json
+{  "_id" : 1,  "count" : 2 }
+{  "_id" : 2,  "count" : 2 }
+```
+### Summarized explain
+Execution Engine: sbe
+```json
+{
+	"queryShapeHash" : "39062D46AC66A096B98DB7B9AD3C198F432183DF3436553F59C3EC8B5252F1EA",
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : {
+					"inputStages" : [
+						{
+							"inputStages" : [
+								{
+									"inputStage" : {
+										"direction" : "forward",
+										"filter" : {
+											
+										},
+										"stage" : "COLLSCAN"
+									},
+									"stage" : "PROJECTION_SIMPLE",
+									"transformBy" : {
+										"_id" : false,
+										"a" : true,
+										"b" : true
+									}
+								},
+								{
+									"direction" : "forward",
+									"filter" : {
+										"b" : {
+											"$gt" : "aaa"
+										}
+									},
+									"stage" : "COLLSCAN"
+								}
+							],
+							"joinPredicates" : [
+								"b = b"
+							],
+							"leftEmbeddingField" : "none",
+							"rightEmbeddingField" : "y",
+							"stage" : "HASH_JOIN_EMBEDDING"
+						},
+						{
+							"direction" : "forward",
+							"filter" : {
+								"d" : {
+									"$lt" : 3
+								}
+							},
+							"stage" : "COLLSCAN"
+						}
+					],
+					"joinPredicates" : [
+						"a = a"
+					],
+					"leftEmbeddingField" : "none",
+					"planNodeId" : 6,
+					"rightEmbeddingField" : "x",
+					"stage" : "HASH_JOIN_EMBEDDING"
+				}
+			}
+		},
+		{
+			"$group" : {
+				"$willBeMerged" : false,
+				"_id" : "$x.a",
+				"count" : {
+					"$sum" : {
+						"$const" : 1
+					}
+				}
+			}
+		},
+		{
+			"$sort" : {
+				"sortKey" : {
+					"count" : -1
+				}
+			}
+		}
+	]
+}
+```
+
+### With random order, seed 420, nested loop joins
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a",
+			"pipeline" : [
+				{
+					"$match" : {
+						"d" : {
+							"$lt" : 3
+						}
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign2",
+			"as" : "y",
+			"localField" : "b",
+			"foreignField" : "b",
+			"pipeline" : [
+				{
+					"$match" : {
+						"b" : {
+							"$gt" : "aaa"
+						}
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$y"
+	},
+	{
+		"$sortByCount" : "$x.a"
+	}
+]
+```
+### Results
+```json
+{  "_id" : 1,  "count" : 2 }
+{  "_id" : 2,  "count" : 2 }
+```
+### Summarized explain
+Execution Engine: sbe
+```json
+{
+	"queryShapeHash" : "39062D46AC66A096B98DB7B9AD3C198F432183DF3436553F59C3EC8B5252F1EA",
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : {
+					"inputStages" : [
+						{
+							"inputStages" : [
+								{
+									"inputStage" : {
+										"direction" : "forward",
+										"filter" : {
+											
+										},
+										"stage" : "COLLSCAN"
+									},
+									"stage" : "PROJECTION_SIMPLE",
+									"transformBy" : {
+										"_id" : false,
+										"a" : true,
+										"b" : true
+									}
+								},
+								{
+									"direction" : "forward",
+									"filter" : {
+										"d" : {
+											"$lt" : 3
+										}
+									},
+									"stage" : "COLLSCAN"
+								}
+							],
+							"joinPredicates" : [
+								"a = a"
+							],
+							"leftEmbeddingField" : "none",
+							"rightEmbeddingField" : "x",
+							"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
+						},
+						{
+							"direction" : "forward",
+							"filter" : {
+								"b" : {
+									"$gt" : "aaa"
+								}
+							},
+							"stage" : "COLLSCAN"
+						}
+					],
+					"joinPredicates" : [
+						"b = b"
+					],
+					"leftEmbeddingField" : "none",
+					"planNodeId" : 6,
+					"rightEmbeddingField" : "y",
+					"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
+				}
+			}
+		},
+		{
+			"$group" : {
+				"$willBeMerged" : false,
+				"_id" : "$x.a",
+				"count" : {
+					"$sum" : {
+						"$const" : 1
+					}
+				}
+			}
+		},
+		{
+			"$sort" : {
+				"sortKey" : {
+					"count" : -1
+				}
+			}
+		}
+	]
+}
+```
+
+### With random order, seed 420, hash join enabled
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a",
+			"pipeline" : [
+				{
+					"$match" : {
+						"d" : {
+							"$lt" : 3
+						}
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign2",
+			"as" : "y",
+			"localField" : "b",
+			"foreignField" : "b",
+			"pipeline" : [
+				{
+					"$match" : {
+						"b" : {
+							"$gt" : "aaa"
+						}
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$y"
+	},
+	{
+		"$sortByCount" : "$x.a"
+	}
+]
+```
+### Results
+```json
+{  "_id" : 1,  "count" : 2 }
+{  "_id" : 2,  "count" : 2 }
+```
+### Summarized explain
+Execution Engine: sbe
+```json
+{
+	"queryShapeHash" : "39062D46AC66A096B98DB7B9AD3C198F432183DF3436553F59C3EC8B5252F1EA",
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : {
+					"inputStages" : [
+						{
+							"inputStages" : [
+								{
+									"inputStage" : {
+										"direction" : "forward",
+										"filter" : {
+											
+										},
+										"stage" : "COLLSCAN"
+									},
+									"stage" : "PROJECTION_SIMPLE",
+									"transformBy" : {
+										"_id" : false,
+										"a" : true,
+										"b" : true
+									}
+								},
+								{
+									"direction" : "forward",
+									"filter" : {
+										"d" : {
+											"$lt" : 3
+										}
+									},
+									"stage" : "COLLSCAN"
+								}
+							],
+							"joinPredicates" : [
+								"a = a"
+							],
+							"leftEmbeddingField" : "none",
+							"rightEmbeddingField" : "x",
+							"stage" : "HASH_JOIN_EMBEDDING"
+						},
+						{
+							"direction" : "forward",
+							"filter" : {
+								"b" : {
+									"$gt" : "aaa"
+								}
+							},
+							"stage" : "COLLSCAN"
+						}
+					],
+					"joinPredicates" : [
+						"b = b"
+					],
+					"leftEmbeddingField" : "none",
+					"planNodeId" : 6,
+					"rightEmbeddingField" : "y",
+					"stage" : "HASH_JOIN_EMBEDDING"
+				}
+			}
+		},
+		{
+			"$group" : {
+				"$willBeMerged" : false,
+				"_id" : "$x.a",
+				"count" : {
+					"$sum" : {
+						"$const" : 1
+					}
+				}
+			}
+		},
+		{
+			"$sort" : {
+				"sortKey" : {
+					"count" : -1
+				}
+			}
+		}
+	]
+}
+```
+
 ## 3. Basic example with referencing field from previous lookup
 ### No join opt
 ### Pipeline

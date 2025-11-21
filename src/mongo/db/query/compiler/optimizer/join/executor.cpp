@@ -30,6 +30,8 @@
 #include "mongo/db/query/compiler/optimizer/join/executor.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
@@ -112,6 +114,23 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         const auto status = swModel.getStatus();
         LOGV2_DEBUG(11083903, 5, "Unable to construct join model", "status"_attr = status);
         return status;
+    }
+
+    // Validate we have all the collection acquisitions we need here.
+    bool missingAcquisitions = std::any_of(swModel.getValue().prefix->getSources().begin(),
+                                           swModel.getValue().prefix->getSources().end(),
+                                           [&](const auto& stage) {
+                                               auto* lookup =
+                                                   dynamic_cast<DocumentSourceLookUp*>(stage.get());
+                                               if (!lookup) {
+                                                   return false;
+                                               }
+                                               return !mca.knowsNamespace(lookup->getFromNs());
+                                           });
+    if (missingAcquisitions) {
+        return Status(
+            ErrorCodes::QueryFeatureNotAllowed,
+            "Pipeline ineligible for join-reordering due to missing foreign namespace acquisition");
     }
 
     LOGV2_DEBUG(11083902,
