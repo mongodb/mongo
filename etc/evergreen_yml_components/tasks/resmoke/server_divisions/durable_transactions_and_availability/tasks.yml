@@ -2357,3 +2357,19 @@ tasks:
         vars:
           suite: disagg_two_nodes_repl_jscore_passthrough
           use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: disagg_backup_restore_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_disagg",
+        "default",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_backup_restore_jscore_passthrough
+          use_large_distro: "true"
