@@ -446,6 +446,8 @@ public:
 
     virtual std::unique_ptr<SortIteratorInterface<Key, Value>> makeIteratorUnique(
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer) = 0;
+
+    virtual size_t getIteratorSize() = 0;
 };
 
 /**
@@ -469,6 +471,8 @@ public:
 
     std::unique_ptr<SortIteratorInterface<Key, Value>> makeIteratorUnique(
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer) override;
+
+    size_t getIteratorSize() override;
 
 private:
     std::shared_ptr<SorterFile> _file;

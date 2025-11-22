@@ -1420,6 +1420,11 @@ FileBasedSorterStorage<Key, Value>::makeIteratorUnique(
     return writer->doneUnique();
 }
 
+template <typename Key, typename Value>
+size_t FileBasedSorterStorage<Key, Value>::getIteratorSize() {
+    return sizeof(sorter::FileIterator<Key, Value>);
+}
+
 //
 // SorterFile members
 //
