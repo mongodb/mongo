@@ -18,7 +18,9 @@ if grep -q Microsoft /proc/version; then
 fi
 
 NAME=zstandard
-REVISION=1.5.2
+# the VERSION variable name is used by the SBOM automation
+VERSION=1.5.2
+REVISION=$VERSION
 if grep -q Microsoft /proc/version; then
     SRC_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
     SRC_ROOT+="$(mktemp -u /zstandard.XXXXXX)"

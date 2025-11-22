@@ -23,14 +23,6 @@ $component_chart
 
 $component_links
 
-## WiredTiger Vendored Test Libraries
-
-The following libraries are transitively included by WiredTiger,
-and are used by that component for testing. They don't appear in
-released binary artifacts.
-
-$wiredtiger_chart
-
 ## Dynamically Linked Libraries
 
 Sometimes MongoDB needs to load libraries provided and managed by the

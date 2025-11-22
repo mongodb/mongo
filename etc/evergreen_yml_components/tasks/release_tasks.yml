@@ -56,6 +56,85 @@ tasks:
           permissions: private
           visibility: signed
 
+  - name: update_sbom
+    tags: []
+    exec_timeout_secs: 3600 # 60 minute timeout
+    commands:
+      - command: manifest.load
+      - command: git.get_project
+        params:
+          directory: src
+          clone_depth: 1
+      - func: "add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - command: ec2.assume_role
+        display_name: Assume Silkbomb IAM role (access to Endor Labs API key)
+        params:
+          role_arn: arn:aws:iam::119629040606:role/silkbomb
+      - command: subprocess.exec
+        display_name: Pull and write Endor Labs API credentials to config.yml
+        params:
+          binary: bash
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+            - ENDOR_API_CREDENTIALS_KEY
+            - ENDOR_API_CREDENTIALS_SECRET
+          env:
+            ENDOR_CONFIG_PATH: "${workdir}/.endorctl"
+          args:
+            - "src/buildscripts/sbom/get_endor_creds.sh"
+      - command: subprocess.exec
+        display_name: Install endorctl and verify authentication
+        params:
+          binary: bash
+          env:
+            ENDOR_INSTALL_PATH: ${workdir}
+            ENDOR_CONFIG_PATH: "${workdir}/.endorctl"
+          args:
+            - "src/buildscripts/sbom/install_endorctl.sh"
+      - command: subprocess.exec
+        display_name: Generate SBOM file
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "buildscripts/sbom/generate_sbom.py"
+            - "--project=https://github.com/10gen/mongo.git"
+            - "--target=branch"
+            - "--branch=${branch_name}"
+            - "--endorctl-path=${workdir}/endorctl"
+            - "--config-path=${workdir}/.endorctl"
+            - "--namespace=${ENDOR_NAMESPACE}"
+            - "--save-warnings=${workdir}/warnings-generate_sbom.txt"
+      - command: subprocess.exec
+        display_name: Generate third-party readme file
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "src/third_party/scripts/gen_thirdpartyreadme.py"
+      - command: subprocess.exec
+        display_name: Create pull request for SBOM files, if changed
+        params:
+          binary: bash
+          include_expansions_in_env:
+            - MONGO_PR_BOT_APP_ID
+            - MONGO_PR_BOT_PRIVATE_KEY
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "buildscripts/sbom/sbom_files_pr.py"
+            - "--github-owner=${github_org}"
+            - "--github-repo=${github_repo}"
+            - "--base-branch=${branch_name}"
+            - "--new-branch=SERVER-111072/sbom_update_${revision}"
+            - "--pr-title=SERVER-111072_Auto-generated_SBOM_files_[${branch_name}]_${revision}"
+            - "--saved-warnings=${workdir}/warnings-generate_sbom.txt"
+
   - name: upload_sbom_via_silkbomb_if_changed
     allowed_requesters: ["commit", "patch"]
     tags: []

@@ -22,3 +22,14 @@ etc/coverity.yml
 etc/coverity_parse_warnings.conf
 etc/evergreen_yml_components/tasks/coverity_tasks.yml
 etc/evergreen_yml_components/variants/coverity.yml
+
+# Exclude sbom-related files from server-release approvals
+README.third_party.md
+sbom.json
+buildscripts/sbom_linter.py
+buildscripts/sbom/*
+buildscripts/tests/test_generate_sbom.py
+buildscripts/tests/sbom_linter/*
+buildscripts/tests/sbom_linter/inputs/*
+src/third_party/scripts/gen_thirdpartyreadme.py
+src/third_party/scripts/README.third_party.md.template

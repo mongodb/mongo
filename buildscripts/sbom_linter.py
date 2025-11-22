@@ -1,16 +1,20 @@
 import argparse
 import json
+import jsonschema
 import os
 import sys
 from typing import List
 
-import jsonschema
+from jsonschema import validate, ValidationError
 from license_expression import get_spdx_licensing
-from referencing import Registry, Resource
 
 BOM_SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "bom-1.5.schema.json")
 SPDX_SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "spdx.schema.json")
 SPDX_SCHEMA_REF = "spdx.schema.json"
+
+# use newer license database than what is included in license-expression@v30.2.0, the last version to support python3.7
+LICENSE_DB_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter",
+                                   "scancode-licensedb-index.json")
 
 # directory to scan for third party libraries
 THIRD_PARTY_DIR = os.path.join("src", "third_party")
@@ -33,7 +37,7 @@ MISSING_VERSION_IN_SBOM_COMPONENT_ERROR = "Component must include a version."
 MISSING_VERSION_IN_IMPORT_FILE_ERROR = "Missing version in the import file: "
 MISSING_LICENSE_IN_SBOM_COMPONENT_ERROR = "Component must include a license."
 COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR = "Could not find or read the import script file"
-VERSION_MISMATCH_ERROR = "Version mismatch: "
+VERSION_MISMATCH_ERROR = "Version mismatch (may simply be an artifact of SBOM automation): "
 
 
 # A class for managing error messages for components
@@ -77,14 +81,6 @@ def get_schema() -> dict:
         return json.load(schema_data)
 
 
-def local_schema_registry():
-    """Create a local registry which is used to resolve references to external schema."""
-
-    with open(SPDX_SCHEMA_LOCATION, "r") as spdx:
-        spdx_schema = Resource.from_contents(json.load(spdx))
-    return Registry().with_resources([(SPDX_SCHEMA_REF, spdx_schema)])
-
-
 # The script_path is a file which may contain a line where two tokens script_version_key and
 # the version string are separated by a separtor value of "=" and some optional spaces.
 # There is an "end of line" delimiter at the end of the line which needs to be stripped.
@@ -109,15 +105,15 @@ def get_script_version(script_path: str, script_version_key: str,
 
 # A version string sometimes contains an extra prefix like "v1.2" instead of "1.2"
 # This function strips that extra prefix.
-def strip_extra_prefixes(string_with_prefix: str) -> str:
-    def remove_prefix(text, prefix):
+def remove_prefixes_py37(text: str, prefixes: list):
+    for prefix in prefixes:
         if text.startswith(prefix):
             return text[len(prefix):]
-        return text
+    return text
 
-    string_with_prefix = remove_prefix(string_with_prefix, "mongo/")
-    string_with_prefix = remove_prefix(string_with_prefix, "v")
-    return string_with_prefix
+
+def strip_extra_prefixes(string_with_prefix: str) -> str:
+    return remove_prefixes_py37(string_with_prefix, ["mongo/", "v"])
 
 
 def validate_license(component: dict, error_manager: ErrorManager) -> None:
@@ -126,6 +122,7 @@ def validate_license(component: dict, error_manager: ErrorManager) -> None:
         return
 
     valid_license = False
+    expression = None
     for component_license in component["licenses"]:
         if "expression" in component_license:
             expression = component_license.get("expression")
@@ -138,13 +135,14 @@ def validate_license(component: dict, error_manager: ErrorManager) -> None:
                 valid_license = True
 
         if not valid_license:
-            licensing_validate = get_spdx_licensing().validate(expression, validate=True)
+            licensing_validate = get_spdx_licensing(LICENSE_DB_LOCATION).validate(
+                expression, validate=True)
             # ExpressionInfo(
             #   original_expression='',
             #   normalized_expression='',
             #   errors=[],
             #   invalid_symbols=[]
-            #)
+            # )
             valid_license = not licensing_validate.errors or not licensing_validate.invalid_symbols
             if not valid_license:
                 error_manager.append_full_error_message(licensing_validate)
@@ -152,7 +150,7 @@ def validate_license(component: dict, error_manager: ErrorManager) -> None:
 
 
 def validate_evidence(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
-    if component["scope"] == "required":
+    if component.get("scope") == "required":
         if "evidence" not in component or "occurrences" not in component["evidence"]:
             error_manager.append_full_error_message(MISSING_EVIDENCE_ERROR)
             return
@@ -161,46 +159,32 @@ def validate_evidence(component: dict, third_party_libs: set, error_manager: Err
 
 
 def validate_properties(component: dict, error_manager: ErrorManager) -> None:
-    has_team_responsible_property = False or component["scope"] == "excluded"
+    has_team_responsible_property = False or component.get("scope") == "excluded"
     script_path = ""
     if "properties" in component:
         for prop in component["properties"]:
             if prop["name"] == "internal:team_responsible":
                 has_team_responsible_property = True
-            elif prop["name"] == "import_script_path" and component["scope"] == "required":
+            elif prop["name"] == "import_script_path":
                 script_path = prop["value"]
+
     if not has_team_responsible_property:
         error_manager.append_full_error_message(MISSING_TEAM_ERROR)
+
+    if script_path:
+        script_path_is_file = os.path.isfile(script_path)
+        if not script_path_is_file:
+            error_manager.append_full_error_message(COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR)
+        # Only look for VERSION if the import script is a shell script file
+        elif script_path.endswith(".sh"):
+            script_version = get_script_version(script_path, "VERSION", error_manager)
+            if script_version == "":
+                error_manager.append_full_error_message(MISSING_VERSION_IN_IMPORT_FILE_ERROR +
+                                                        script_path)
 
     if not component.get("version"):
         error_manager.append_full_error_message(MISSING_VERSION_IN_SBOM_COMPONENT_ERROR)
         return
-
-    comp_version = component["version"]
-    # If the version is unknown or the script path property is absent, the version
-    # check is not possible (these are valid options and no error is generated).
-    if comp_version == "Unknown" or script_path == "":
-        return
-
-    # Include the .pedigree.descendants[0] version for version matching
-    if "pedigree" in component and "descendants" in component[
-            "pedigree"] and "version" in component["pedigree"]["descendants"][0]:
-        comp_pedigree_version = component["pedigree"]["descendants"][0]["version"]
-    else:
-        comp_pedigree_version = ""
-
-    # At this point a version is attempted to be read from the import script file
-    script_version = get_script_version(script_path, "VERSION",
-                                        error_manager) or get_script_version(
-                                            script_path, "REVISION", error_manager)
-    if script_version == "":
-        error_manager.append_full_error_message(MISSING_VERSION_IN_IMPORT_FILE_ERROR + script_path)
-    elif strip_extra_prefixes(script_version) != strip_extra_prefixes(comp_version) and \
-        strip_extra_prefixes(script_version) != strip_extra_prefixes(comp_pedigree_version):
-        error_manager.append_full_error_message(
-            VERSION_MISMATCH_ERROR +
-            f"\nscript version:{script_version}\nsbom component version:{comp_version}\nsbom component pedigree version:{comp_pedigree_version}"
-        )
 
 
 def validate_component(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
@@ -218,23 +202,23 @@ def validate_component(component: dict, third_party_libs: set, error_manager: Er
 
 
 def validate_location(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
-    if "evidence" in component and "occurrences" in component["evidence"]:
+    if "evidence" in component:
+        if "occurrences" not in component["evidence"]:
+            error_manager.append_full_error_message(
+                "'evidence.occurrences' field must include at least one location.")
+
         occurrences = component["evidence"]["occurrences"]
         for occurrence in occurrences:
             if "location" in occurrence:
                 location = occurrence["location"]
 
-                if not os.path.exists(
-                        location) and not SKIP_FILE_CHECKING and component["scope"] == "required":
+                if not os.path.exists(location) and not SKIP_FILE_CHECKING:
                     error_manager.append_full_error_message("location does not exist in repo.")
 
                 if location.startswith(THIRD_PARTY_LOCATION_PREFIX):
-                    lib = location.removeprefix(THIRD_PARTY_LOCATION_PREFIX)
+                    lib = remove_prefixes_py37(location, [THIRD_PARTY_LOCATION_PREFIX])
                     if lib in third_party_libs:
                         third_party_libs.remove(lib)
-    elif component["scope"] == "required":
-        error_manager.append_full_error_message(
-            "'evidence.occurrences' field must include at least one location.")
 
 
 def lint_sbom(input_file: str, output_file: str, third_party_libs: set,
@@ -252,8 +236,7 @@ def lint_sbom(input_file: str, output_file: str, third_party_libs: set,
 
     try:
         schema = get_schema()
-        jsonschema.validators.validator_for(schema)(schema,
-                                                    registry=local_schema_registry()).validate(sbom)
+        jsonschema.validate(sbom, schema)
     except jsonschema.ValidationError as error:
         error_manager.append(f"{SCHEMA_MATCH_FAILURE} {input_file}")
         error_manager.append(error.message)
@@ -299,9 +282,11 @@ def main() -> int:
     should_format = args.format
     input_file = args.input_file
     output_file = args.output_file
-    third_party_libs = set(
-        path for path in os.listdir(THIRD_PARTY_DIR)
-        if not os.path.isfile(os.path.join(THIRD_PARTY_DIR, path)))
+    third_party_libs = {
+        path
+        for path in os.listdir(THIRD_PARTY_DIR)
+        if os.path.isdir(os.path.join(THIRD_PARTY_DIR, path))
+    }
     # the only files in this dir that are not third party libs
     third_party_libs.remove("scripts")
     error_manager = lint_sbom(input_file, output_file, third_party_libs, should_format)

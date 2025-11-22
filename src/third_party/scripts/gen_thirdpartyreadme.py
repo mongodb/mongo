@@ -8,10 +8,11 @@ import warnings
 warnings.filterwarnings("ignore", message="\nYou don't have the C version of NameMapper installed")
 
 from Cheetah.Template import Template
+from typing import List
 
-SBOM_PATH = "../../../sbom.json"
-TEMPLATE_PATH = "README.third_party.md.template"
-README_PATH = "../../../README.third_party.md"
+SBOM_PATH = "sbom.json"
+TEMPLATE_PATH = "src/third_party/scripts/README.third_party.md.template"
+README_PATH = "README.third_party.md"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -26,14 +27,9 @@ def main():
 
     component_links_string = sbom_to_component_links_string(sbom)
 
-    wiredtiger_chart = sbom_to_wiredtiger_chart(sbom)
-    right_pad_chart_values(wiredtiger_chart)
-    wiredtiger_chart_string = chart_to_string(wiredtiger_chart)
-
     template_data = {
         "component_chart": component_chart_string,
         "component_links": component_links_string,
-        "wiredtiger_chart": wiredtiger_chart_string,
     }
     create_markdown_with_template(template_data)
 
@@ -56,7 +52,7 @@ def load_sbom() -> dict:
         sys.exit(1)
 
 
-def sbom_to_component_chart(sbom: dict) -> list[list[str]]:
+def sbom_to_component_chart(sbom: dict) -> List[List[str]]:
     components = sbom["components"]
     component_chart = []
 
@@ -70,10 +66,10 @@ def sbom_to_component_chart(sbom: dict) -> list[list[str]]:
                     if key in lic["license"]:
                         license_string.append(lic["license"][key])
             elif "expression" in lic:
-                license_string.append(lic["expression"])                
+                license_string.append(lic["expression"])
         license_string = ", ".join(license_string)
         version = component["version"]
-        if component["scope"] == "excluded":
+        if component.get("scope") == "excluded":
             emits_persisted_data = ""
         else:
             emits_persisted_data = "unknown"
@@ -82,7 +78,7 @@ def sbom_to_component_chart(sbom: dict) -> list[list[str]]:
                 k, v = prop["name"], prop["value"]
                 if k == "emits_persisted_data":
                     emits_persisted_data = ("", "✗")[v == "true"]
-        distributed_in_release_binaries = ("", "✗")[component["scope"] == "required"]
+        distributed_in_release_binaries = ("", "✗")[component.get("scope") == "required"]
 
         row = [
             item.replace("|", "")
@@ -94,7 +90,10 @@ def sbom_to_component_chart(sbom: dict) -> list[list[str]]:
                 distributed_in_release_binaries,
             ]
         ]
-        bisect.insort(component_chart, row, key=lambda c: c[0].lower())
+        bisect.insort(component_chart, row)
+        
+    for component in component_chart:
+        component = component[0].lower()
 
     component_chart.insert(
         0,
@@ -109,30 +108,16 @@ def sbom_to_component_chart(sbom: dict) -> list[list[str]]:
     return component_chart
 
 
-def sbom_to_component_links_string(sbom: dict) -> list[list[str]]:
+def sbom_to_component_links_string(sbom: dict) -> List[List[str]]:
     components = sbom["components"]
     link_list = []
 
     for component in components:
         check_component_validity(component)
         info_link = get_component_info_link(component)
-        bisect.insort(link_list, f"[{component['name'].replace('|','')}]: {info_link}")
+        bisect.insort(link_list, f"[{component['name'].replace('|', '')}]: {info_link}")
 
     return "\n".join(link_list)
-
-
-def sbom_to_wiredtiger_chart(sbom: dict) -> list[list[str]]:
-    components = sbom["components"]
-    wiredtiger_chart = [["Name"]]
-
-    for component in components:
-        check_component_validity(component)
-        locations = get_component_locations(component)
-        for location in locations:
-            if location.startswith("src/third_party/wiredtiger/"):
-                bisect.insort(wiredtiger_chart, ([component["name"].replace("|", "")+"@"+component["version"]]))
-
-    return wiredtiger_chart
 
 
 def check_component_validity(component) -> None:
@@ -144,33 +129,39 @@ def check_component_validity(component) -> None:
 
 
 def get_component_info_link(component) -> str:
+    # Get externalReferences or "info_link" properties
     name = component["name"]
     links = []
+    if "externalReferences" in component:
+        for externalReference in component["externalReferences"]:
+            u, t = externalReference["url"], externalReference["type"]
+            if t in ["distribution","vcs","website"]:
+                links.append(u)
     if "properties" in component:
         for prop in component["properties"]:
             k, v = prop["name"], prop["value"]
             if k == "info_link":
                 links.append(v)
         if len(links) != 1:
-            logging.warning("Warning: Expected 1 info_link for %s. Got %d:", name, len(links))
+            logging.warning("Warning: Expected 1 externalReferences or info_link for %s. Got %d:", name, len(links))
             if len(links) > 1:
                 logging.warning(" ".join(links))
                 logging.warning("Using first link only.")
             else:
-                logging.warning("Falling back to `purl` value: %s", component["purl"])
-                links.append(component["purl"])
+                logging.warning("Falling back to `purl` value: %s", component.get("purl"))
+                links.append(component.get("purl"))
         return links[0]
     else:
         return ""
 
 
-def get_component_locations(component) -> list[str]:
+def get_component_locations(component) -> List[str]:
     if "evidence" not in component or "occurrences" not in component["evidence"]:
         return []
     return [occurence["location"] for occurence in component["evidence"]["occurrences"]]
 
 
-def right_pad_chart_values(chart: list[list[str]]) -> list[list[str]]:
+def right_pad_chart_values(chart: List[List[str]]) -> List[List[str]]:
     h, w = len(chart), len(chart[0])
     max_lens = [3 for _ in range(w)]
     for row in chart:
@@ -183,7 +174,7 @@ def right_pad_chart_values(chart: list[list[str]]) -> list[list[str]]:
     chart.insert(1, ["-" * max_len for max_len in max_lens])
 
 
-def chart_to_string(chart: list[list[str]]) -> str:
+def chart_to_string(chart: List[List[str]]) -> str:
     chart = [" | ".join(row) for row in chart]
     chart = "\n".join(["| " + row + " |" for row in chart])
     return chart
@@ -203,7 +194,7 @@ def create_markdown_with_template(data):
 
     with open(README_PATH, "w") as f:
         f.write(
-            "[DO NOT MODIFY THIS FILE MANUALLY. It is generated by src/third_party/tools/gen_thirdpartyreadme.py]: #\n\n"
+            "[DO NOT MODIFY THIS FILE MANUALLY. It is generated by src/third_party/scripts/gen_thirdpartyreadme.py]: #\n\n"
         )
         f.write(output)
 
