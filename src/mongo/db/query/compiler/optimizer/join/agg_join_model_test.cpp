@@ -181,7 +181,6 @@ TEST_F(PipelineAnalyzerTest, MatchOnMainCollection) {
 }
 
 TEST_F(PipelineAnalyzerTest, MatchInSubPipeline) {
-    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
                        pipeline: [{$match: {d: 11}}] }
@@ -196,14 +195,15 @@ TEST_F(PipelineAnalyzerTest, MatchInSubPipeline) {
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
-    ASSERT_OK(swJoinModel);
+    ASSERT_NOT_OK(swJoinModel);
 
-    const auto& joinModel = swJoinModel.getValue();
-    ASSERT_EQ(joinModel.graph.numNodes(), 3);
-    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
-    ASSERT_EQ(cq->nss().coll(), "A");
-    ASSERT_EQ("{ d: { $eq: 11 } }", cq->getPrimaryMatchExpression()->toString());
-    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+    // TODO SERVER-111910: re-enable this.
+    // auto& joinModel = swJoinModel.getValue();
+    // ASSERT_EQ(joinModel.graph.numNodes(), 3);
+    // ASSERT_EQ(joinModel.graph.numEdges(), 2);
+    // ASSERT_EQ(joinModel.resolvedPaths.size(), 3);
+    // ASSERT_EQ(joinModel.graph.getNode(1).accessPath->getPrimaryMatchExpression()->debugString(),
+    //           "d $eq 11\n");
 }
 
 TEST_F(PipelineAnalyzerTest, GroupOnMainCollection) {

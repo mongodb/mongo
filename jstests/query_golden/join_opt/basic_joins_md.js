@@ -120,29 +120,30 @@ runBasicJoinTest([
     {$sortByCount: "$y.b"},
 ]);
 
-runBasicJoinTest([
-    {
-        $lookup: {
-            from: foreignColl1.getName(),
-            as: "x",
-            localField: "a",
-            foreignField: "a",
-            pipeline: [{$match: {d: {$lt: 3}}}],
-        },
-    },
-    {$unwind: "$x"},
-    {
-        $lookup: {
-            from: foreignColl2.getName(),
-            as: "y",
-            localField: "b",
-            foreignField: "b",
-            pipeline: [{$match: {b: {$gt: "aaa"}}}],
-        },
-    },
-    {$unwind: "$y"},
-    {$sortByCount: "$x.a"},
-]);
+// TODO SERVER-111910: Enable $lookup stages with sub-pipelines for join-opt, and add access-path selection tests.
+// runBasicJoinTest([
+//     {
+//         $lookup: {
+//             from: foreignColl1.getName(),
+//             as: "x",
+//             localField: "a",
+//             foreignField: "a",
+//             pipeline: [{$match: {d: {$lt: 3}}}, {$project: {_id: 0, a: 1}}],
+//         },
+//     },
+//     {$unwind: "$x"},
+//     {
+//         $lookup: {
+//             from: foreignColl2.getName(),
+//             as: "y",
+//             localField: "b",
+//             foreignField: "b",
+//             pipeline: [{$project: {_id: 0, b: 1}}],
+//         },
+//     },
+//     {$unwind: "$y"},
+//     {$sortByCount: "$x.a"},
+// ]);
 
 const foreignColl3 = db[jsTestName() + "_foreign3"];
 foreignColl3.drop();

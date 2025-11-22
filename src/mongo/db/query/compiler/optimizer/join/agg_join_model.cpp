@@ -94,33 +94,6 @@ std::vector<BSONObj> pipelineToBSON(const std::unique_ptr<Pipeline>& pipeline) {
         return {};
     }
 }
-
-bool isLookupEligible(const DocumentSourceLookUp& lookup) {
-    if (!lookup.hasUnwindSrc()) {
-        return false;
-    }
-
-    if (!lookup.hasLocalFieldForeignFieldJoin()) {
-        // TODO SERVER-111164: once we start adding edge from $expr we need to remove check for
-        // hasLocalFieldForeignFieldJoin().
-        return false;
-    }
-
-    if (!lookup.hasPipeline()) {
-        // A $lookup with no sub-pipeline is eligible.
-        return true;
-    }
-
-    if (lookup.getLetVariables().size() > 0) {
-        // TODO SERVER-111164: permit let variables/ correlated sub-pipelines.
-        return false;
-    }
-
-    // If the $lookup has a sub-pipeline, then it may only contain a $match stage.
-    return lookup.getResolvedIntrospectionPipeline().size() == 1 &&
-        dynamic_cast<DocumentSourceMatch*>(lookup.getResolvedIntrospectionPipeline().peekFront());
-}
-
 }  // namespace
 
 bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
@@ -133,8 +106,12 @@ bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
     // Since we can reorder base collections, any pipeline with even just one eligible $lookup +
     // $unwind pair could be eligible.
     return std::any_of(pipeline.getSources().begin(), pipeline.getSources().end(), [](auto ds) {
-        if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(ds.get()); lookup) {
-            return isLookupEligible(*lookup);
+        if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(ds.get());
+            // TODO SERVER-111164: once we start adding edge from $expr we need to remove check for
+            // hasLocalFieldForeignFieldJoin().
+            lookup != nullptr && lookup->hasUnwindSrc() &&
+            lookup->hasLocalFieldForeignFieldJoin()) {
+            return true;
         }
         return false;
     });
@@ -171,7 +148,16 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
     while (!suffix->getSources().empty()) {
         auto* stage = suffix->getSources().front().get();
         if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(stage); lookup) {
-            if (!isLookupEligible(*lookup)) {
+            // TODO SERVER-111164: once we start adding edge from $expr we need to remove check for
+            // hasLocalFieldForeignFieldJoin(). The same check below is kept below for the future
+            // needs.
+            if (!lookup->hasUnwindSrc() || !lookup->hasLocalFieldForeignFieldJoin()) {
+                // We can't push this $lookup to the prefix.
+                break;
+            }
+
+            if (lookup->hasPipeline()) {
+                // TODO SERVER-111910: Enable lookup with sub-pipelines for join-opt.
                 break;
             }
 

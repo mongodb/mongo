@@ -101,13 +101,6 @@ public:
         return _lookupCollectionAcquisitionAndGetCollPtr(nss);
     }
 
-    bool knowsNamespace(const NamespaceString& nss) const {
-        if (nss == _mainAcq->nss()) {
-            return true;
-        }
-        return _secondaryAcq.find(nss) != _secondaryAcq.end();
-    }
-
     boost::optional<CollectionAcquisition> getCollectionAcquisitionFromUuid(const UUID uuid) const {
         return _lookupCollectionAcquisition(uuid);
     }
