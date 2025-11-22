@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "gen_thirdpartyreadme.py":
+    approvers:
+      - 10gen/code-review-team-ssdlc
+  - "README.third_party.md.template":
+    approvers:
+      - 10gen/code-review-team-ssdlc
