@@ -44,6 +44,8 @@ extensions_with_config(
         ":foo_source_mongo_extension",
         ":match_topN_mongo_extension",
         ":native_vector_search_mongo_extension",
+        ":metrics_mongo_extension",
+        ":other_metrics_mongo_extension",
 
         #################### EXTENSIONS FOR NO-PASSTHROUGH TESTS ####################
         # Any extension that is just loaded in a no-passthrough test MUST NOT have the
@@ -138,6 +140,8 @@ pkg_name = "//" + package_name() + "/"
         "sharded_execution_serialization",
         "explain",
         "shapify",
+        "metrics",
+        "other_metrics",
     ]
 ]
 

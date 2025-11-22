@@ -17,6 +17,9 @@ exports_files(
 # Note that this is a standalone library such that it doesn't need to have any server dependencies like the rest of the extension_host target does.
 mongo_cc_library(
     name = "extension_operation_metrics_registry",
+    srcs = [
+        "operation_metrics_registry.cpp",
+    ],
     hdrs = [
         "operation_metrics_registry.h",
     ],
