@@ -67,3 +67,17 @@ buildvariants:
     tasks:
       - name: sync_repo_with_copybara
         priority: 50
+
+  - name: create_sbom_and_pr
+    display_name: "Generate SBOM files and create PR"
+    tags: ["assigned_to_jira_team_platsec_server"]
+    # Don't run as part of patch builds
+    patchable: false
+    # Run at 6 am UTC daily
+    cron: "0 6 * * *"
+    run_on: rhel92-small
+    expansions:
+      ENDOR_NAMESPACE: mongodb.10gen
+    stepback: false
+    tasks:
+      - name: update_sbom

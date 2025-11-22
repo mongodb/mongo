@@ -68,9 +68,12 @@ filters:
     approvers:
       - 10gen/devprod-correctness
       - 10gen/devprod-build
+  - "README.third_party.md":
+    approvers:
+      - 10gen/code-review-team-ssdlc
   - "sbom.json":
     approvers:
-      - 10gen/server-security
+      - 10gen/code-review-team-ssdlc
   - "MODULE.bazel*":
     approvers:
       - 10gen/devprod-build
