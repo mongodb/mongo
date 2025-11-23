@@ -269,6 +269,7 @@ conn_stats = [
     CacheStat('cache_eviction_internal_pages_already_queued', 'internal pages seen by eviction walk that are already queued'),
     CacheStat('cache_eviction_internal_pages_queued', 'internal pages queued for eviction'),
     CacheStat('cache_eviction_internal_pages_seen', 'internal pages seen by eviction walk'),
+    CacheStat('cache_eviction_maximum_gen_gap', 'maximum gap between page and connection evict pass generation seen at eviction', 'no_clear,no_scale,size'),
     CacheStat('cache_eviction_maximum_page_size', 'maximum page size seen at eviction', 'no_clear,no_scale,size'),
     CacheStat('cache_eviction_maximum_milliseconds', 'maximum milliseconds spent at a single eviction', 'no_clear,no_scale,size'),
     CacheStat('cache_eviction_pages_already_queued', 'pages seen by eviction walk that are already queued'),

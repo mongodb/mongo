@@ -511,6 +511,7 @@ struct __wt_connection_stats {
     int64_t cache_eviction_split_leaf;
     int64_t cache_eviction_random_sample_inmem_root;
     int64_t cache_bytes_max;
+    int64_t cache_eviction_maximum_gen_gap;
     int64_t cache_eviction_maximum_milliseconds;
     int64_t cache_eviction_maximum_page_size;
     int64_t cache_eviction_dirty;

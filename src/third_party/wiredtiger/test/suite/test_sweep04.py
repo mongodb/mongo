@@ -109,6 +109,8 @@ class test_sweep04(wttest.WiredTigerTestCase):
             c.close()
 
     def test_big_run(self):
+        # FIXME-WT-13706
+        self.skipTest("FIXME-WT-13706")
         # populate
         r = suite_random()
 
