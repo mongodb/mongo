@@ -177,7 +177,7 @@ public:
         return DistributedPlanLogic{nullptr, this, boost::none};
     }
 
-    boost::intrusive_ptr<DocumentSource> optimize() final;
+    boost::intrusive_ptr<DocumentSource> optimize();
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 

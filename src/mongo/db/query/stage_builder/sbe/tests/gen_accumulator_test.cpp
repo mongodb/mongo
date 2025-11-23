@@ -99,7 +99,7 @@ protected:
         auto docSrcGrp = DocumentSourceGroup::createFromBson(specElement, expCtx);
         // $group may end up being incompatible with SBE after optimize(). We call 'optimize()' to
         // reveal such cases.
-        docSrcGrp->optimize();
+        checked_cast<DocumentSourceGroup*>(docSrcGrp.get())->optimize();
 
         return docSrcGrp;
     }

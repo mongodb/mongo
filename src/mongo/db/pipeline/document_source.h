@@ -464,19 +464,6 @@ public:
         return mergeShardId.get();
     }
 
-    /**
-     * Returns an optimized DocumentSource that is semantically equivalent to this one, or
-     * nullptr if this stage is a no-op. Implementations are allowed to modify themselves
-     * in-place and return a pointer to themselves. For best results, first optimize the pipeline
-     * with the pipeline_optimization::optimizePipeline() method defined in optimize.cpp.
-     *
-     * This is intended for any operations that include expressions, and provides a hook for
-     * those to optimize those operations.
-     *
-     * The default implementation is to do nothing and return yourself.
-     */
-    virtual boost::intrusive_ptr<DocumentSource> optimize();
-
     //
     // Property Analysis - These methods allow a DocumentSource to expose information about
     // properties of themselves, such as which fields they need to apply their transformations, and

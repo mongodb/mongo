@@ -640,7 +640,7 @@ TEST_F(DocumentSourceFacetTest, ShouldOptimizeInnerPipelines) {
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
     ASSERT_FALSE(dummy->isOptimized);
-    facetStage->optimize();
+    checked_cast<DocumentSourceFacet*>(facetStage.get())->optimize();
     ASSERT_TRUE(dummy->isOptimized);
 }
 

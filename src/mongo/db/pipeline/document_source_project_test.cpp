@@ -89,7 +89,7 @@ TEST_F(ProjectStageTest, ShouldOptimizeInnerExpressions) {
         BSON("a" << BSON("$and" << BSON_ARRAY(BSON("$const" << true)))),
         getExpCtx(),
         "$project"_sd);
-    project->optimize();
+    checked_cast<DocumentSourceSingleDocumentTransformation*>(project.get())->optimize();
     // The $and should have been replaced with its only argument.
     vector<Value> serializedArray;
     project->serializeToArray(serializedArray);

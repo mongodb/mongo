@@ -92,7 +92,7 @@ public:
     using GroupsMap = ValueUnorderedMap<Accumulators>;
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
-    boost::intrusive_ptr<DocumentSource> optimize() final;
+    boost::intrusive_ptr<DocumentSource> optimize();
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
     GetModPathsReturn getModifiedPaths() const final;

@@ -99,7 +99,7 @@ public:
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    boost::intrusive_ptr<DocumentSource> optimize() final;
+    boost::intrusive_ptr<DocumentSource> optimize();
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         return DepsTracker::State::SEE_NEXT;  // This doesn't affect needed fields

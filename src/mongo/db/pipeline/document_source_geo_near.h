@@ -104,7 +104,7 @@ public:
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    boost::intrusive_ptr<DocumentSource> optimize() final;
+    boost::intrusive_ptr<DocumentSource> optimize();
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pCtx);

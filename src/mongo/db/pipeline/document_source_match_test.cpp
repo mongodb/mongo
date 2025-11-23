@@ -724,7 +724,7 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateJSONSchemaPredicate) {
 TEST_F(DocumentSourceMatchTest, ShouldShowOptimizationsInExplainOutputWhenOptimized) {
     const auto match = DocumentSourceMatch::create(fromjson("{$and: [{a: 1}]}"), getExpCtx());
 
-    auto optimizedMatch = match->optimize();
+    auto optimizedMatch = checked_cast<DocumentSourceMatch*>(match.get())->optimize();
 
     auto expectedMatch = fromjson("{$match: {a:{$eq: 1}}}");
 

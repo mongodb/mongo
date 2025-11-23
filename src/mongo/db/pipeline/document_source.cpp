@@ -145,10 +145,6 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
     return it->second.parser(stageSpec, expCtx);
 }
 
-intrusive_ptr<DocumentSource> DocumentSource::optimize() {
-    return this;
-}
-
 BSONObj DocumentSource::serializeToBSONForDebug() const {
     std::vector<Value> serialized;
     auto opts = SerializationOptions{

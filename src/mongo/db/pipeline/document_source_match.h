@@ -113,7 +113,7 @@ public:
      */
     void rebuild(BSONObj filter);
 
-    boost::intrusive_ptr<DocumentSource> optimize() final;
+    boost::intrusive_ptr<DocumentSource> optimize();
 
     const char* getSourceName() const override;
 

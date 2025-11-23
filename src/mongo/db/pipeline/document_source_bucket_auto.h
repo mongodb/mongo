@@ -69,7 +69,7 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
 
     const char* getSourceName() const final;
-    boost::intrusive_ptr<DocumentSource> optimize() final;
+    boost::intrusive_ptr<DocumentSource> optimize();
 
     static const Id& id;
 

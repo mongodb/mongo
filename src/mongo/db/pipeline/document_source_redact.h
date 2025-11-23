@@ -55,7 +55,7 @@ class DocumentSourceRedact final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$redact"_sd;
     const char* getSourceName() const final;
-    boost::intrusive_ptr<DocumentSource> optimize() final;
+    boost::intrusive_ptr<DocumentSource> optimize();
 
     static const Id& id;
 

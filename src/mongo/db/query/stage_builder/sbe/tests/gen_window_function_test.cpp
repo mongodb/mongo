@@ -53,7 +53,7 @@ public:
 
         auto docSrc =
             DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), expCtx);
-        docSrc->optimize();
+        checked_cast<DocumentSourceInternalSetWindowFields*>(docSrc.get())->optimize();
 
         return docSrc;
     }

@@ -100,7 +100,7 @@ TEST_F(DocumentSourceGeoNearTest, CanParseAndSerializeWithoutDistanceField) {
     auto stageObj = fromjson("{$geoNear: {near: [0, 0]}}");
     auto geoNear = DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx());
     std::vector<Value> serialized;
-    geoNear->optimize();
+    checked_cast<DocumentSourceGeoNear*>(geoNear.get())->optimize();
     geoNear->serializeToArray(serialized);
     ASSERT_EQ(serialized.size(), 1u);
     auto expectedSerialization =
@@ -116,7 +116,7 @@ TEST_F(DocumentSourceGeoNearTest, CanParseAndSerializeKeyField) {
         fromjson("{$geoNear: {distanceField: 'dist', near: [0, 0], key: 'a.b', query: {}}}");
     auto geoNear = DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx());
     std::vector<Value> serialized;
-    geoNear->optimize();
+    checked_cast<DocumentSourceGeoNear*>(geoNear.get())->optimize();
     geoNear->serializeToArray(serialized);
     ASSERT_EQ(serialized.size(), 1u);
     auto expectedSerialization =

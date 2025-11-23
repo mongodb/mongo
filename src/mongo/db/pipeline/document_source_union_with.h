@@ -239,8 +239,7 @@ public:
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
                                                  DocumentSourceContainer* container);
 
-protected:
-    boost::intrusive_ptr<DocumentSource> optimize() final {
+    boost::intrusive_ptr<DocumentSource> optimize() {
         pipeline_optimization::optimizePipeline(*_sharedState->_pipeline);
         return this;
     }

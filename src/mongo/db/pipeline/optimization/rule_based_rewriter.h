@@ -214,7 +214,7 @@ struct Transforms {
 
     template <typename DS>
     static bool optimizeWrapper(PipelineRewriteContext& ctx) {
-        if (auto result = ctx.current().optimize()) {
+        if (auto result = ctx.currentAs<DS>().optimize()) {
             *ctx._itr = std::move(result);
             return false;
         }

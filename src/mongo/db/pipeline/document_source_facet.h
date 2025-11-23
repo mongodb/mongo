@@ -151,7 +151,7 @@ public:
     /**
      * Optimizes inner pipelines.
      */
-    boost::intrusive_ptr<DocumentSource> optimize() final;
+    boost::intrusive_ptr<DocumentSource> optimize();
 
     /**
      * Takes a union of all sub-pipelines, and adds them to 'deps'.

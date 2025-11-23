@@ -83,7 +83,7 @@ public:
         return id;
     }
 
-    boost::intrusive_ptr<DocumentSource> optimize() final;
+    boost::intrusive_ptr<DocumentSource> optimize();
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final;

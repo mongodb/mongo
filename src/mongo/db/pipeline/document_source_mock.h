@@ -107,7 +107,7 @@ public:
         isDetachedFromOpCtx = true;
     }
 
-    boost::intrusive_ptr<DocumentSource> optimize() override {
+    boost::intrusive_ptr<DocumentSource> optimize() {
         isOptimized = true;
         return this;
     }
