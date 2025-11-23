@@ -4460,7 +4460,7 @@ tasks:
             set -o verbose
             ${PREPARE_TEST_ENV}
             # Check if we running in disagg mode.
-            disagg_args=""x
+            disagg_args=""
             if [[ "${disagg_run|false}" == "true" ]]; then
                 disagg_args="-D"
             fi
