@@ -1874,7 +1874,7 @@ selects.config_setting_group(
 
 skip_archive(
     name = "skip_archive",
-    build_setting_default = False,
+    build_setting_default = True,
 )
 
 config_setting(

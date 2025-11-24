@@ -460,6 +460,7 @@ common:macos --//bazel/config:compress_debug_compile=False
 
 # Dynamic linking on Windows (DLL generation) is currently not supported.
 common:windows --//bazel/config:linkstatic=True
+common:windows --//bazel/config:skip_archive=False
 
 # The only Windows compiler we support is MSVC.
 common:windows --//bazel/config:compiler_type=msvc

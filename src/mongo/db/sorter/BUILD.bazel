@@ -63,6 +63,9 @@ mongo_cc_unit_test(
         "sorter_stats_test.cpp",
         "sorter_test.cpp",
     ],
+    minimum_test_resources = {
+        "cpu_cores": 2,
+    },
     tags = [
         "mongo_unittest_second_group",
         "server-external-sorter",

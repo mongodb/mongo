@@ -1,5 +1,5 @@
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "symlink")
+load("//bazel:mongo_src_rules.bzl", "TCMALLOC_DEPS", "mongo_cc_binary", "mongo_cc_library", "symlink")
 load("//bazel/config:generate_config_header.bzl", "generate_config_header")
 load(
     "//src/third_party/wiredtiger:dist/filelist.bzl",
@@ -148,11 +148,11 @@ mongo_cc_library(
         "@platforms//os:macos": ["oss/apple"],
         "//conditions:default": [],
     }),
-    local_defines = WT_DEFINES,
-    non_transitive_dyn_linkopts = select({
+    linkopts = select({
         "//bazel/config:posix": ["-ldl"],
         "//conditions:default": [],
     }),
+    local_defines = WT_DEFINES,
     srcs_select = [
         {
             "//bazel/config:posix": WT_FILELIST_POSIX_HOST,
@@ -164,7 +164,7 @@ mongo_cc_library(
         "//src/third_party/snappy",
         "//src/third_party/zlib",
         "//src/third_party/zstandard:zstd",
-    ],
+    ] + TCMALLOC_DEPS,
 )
 
 mongo_cc_binary(

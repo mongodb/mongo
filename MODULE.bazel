@@ -1,10 +1,6 @@
 # Apple cc toolchain needs to be loaded before regular cc toolchain or else Apple will just use regular cc toolchain
 bazel_dep(name = "apple_support", version = "1.17.1", repo_name = "build_bazel_apple_support")
-bazel_dep(name = "bazel_features", version = "1.10.0")
-single_version_override(
-    module_name = "bazel_features",
-    version = "1.10.0",
-)
+bazel_dep(name = "bazel_features", version = "1.37.0")
 
 bazel_features_deps = use_extension("//bazel:bzlmod.bzl", "bazel_features_deps")
 use_repo(bazel_features_deps, "bazel_features_globals", "bazel_features_version")
@@ -85,6 +81,7 @@ http_file(
     ] * 5,
 )
 
+bazel_dep(name = "rules_cc", version = "0.2.10")
 bazel_dep(name = "platforms", version = "0.0.9")
 single_version_override(
     module_name = "platforms",

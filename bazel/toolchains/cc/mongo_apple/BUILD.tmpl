@@ -72,6 +72,7 @@ feature_attrs = get_common_features_attrs()
         builtin_sysroot = "@//bazel/config:sdkroot",
         optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
         debug_level = DEBUG_LEVEL,
+        supports_start_end_lib = True,
     )
     for arch, cpu in get_supported_apple_archs().items()
 ]

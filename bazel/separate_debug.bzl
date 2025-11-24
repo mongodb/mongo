@@ -40,8 +40,11 @@ def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
                 if file.path.endswith(WITH_DEBUG_SUFFIX + shared_ext):
                     shared_lib = file
 
-        if shared_lib:
-            basename = shared_lib.basename[:-len(WITH_DEBUG_SUFFIX + shared_ext + CC_SHARED_LIBRARY_SUFFIX)]
+        if file.path.endswith(WITH_DEBUG_SUFFIX + shared_ext) or shared_lib:
+            basename = file.basename[:-len(WITH_DEBUG_SUFFIX + shared_ext)]
+            if shared_lib:
+                basename = shared_lib.basename[:-len(WITH_DEBUG_SUFFIX + shared_ext + CC_SHARED_LIBRARY_SUFFIX)]
+
             if ctx.attr.enabled:
                 if debug_ext == MAC_DEBUG_FOLDER_EXTENSION:
                     debug_info = ctx.actions.declare_directory(basename + shared_ext + debug_ext)
@@ -50,7 +53,9 @@ def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
             else:
                 debug_info = None
             output_bin = ctx.actions.declare_file(basename + shared_ext)
-            input_bin = shared_lib
+            input_bin = file
+            if shared_lib:
+                input_bin = shared_lib
         else:
             debug_info = None
             output_bin = None
@@ -162,7 +167,7 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
                 cc_toolchain = cc_toolchain,
                 dynamic_library = shared_lib,
                 dynamic_library_symlink_path = so_path,
-                static_library = static_lib if cc_shared_library == None else None,
+                static_library = static_lib if shared_lib == None else None,
                 alwayslink = True,
             )
 
@@ -293,13 +298,12 @@ def linux_extraction(ctx, cc_toolchain, inputs):
     unstripped_static_bin = None
     input_bin, output_bin, debug_info, static_lib = get_inputs_and_outputs(ctx, ".so", ".a", ".debug")
     input_file = ctx.attr.binary_with_debug.files.to_list()
-
     if input_bin:
         if ctx.attr.enabled:
             ctx.actions.run(
                 executable = cc_toolchain.objcopy_executable,
                 outputs = [debug_info],
-                inputs = inputs,
+                inputs = [input_bin],
                 resource_set = linux_extract_resource_set if ctx.attr.type == "program" else None,
                 arguments = [
                     "--only-keep-debug",
@@ -312,7 +316,7 @@ def linux_extraction(ctx, cc_toolchain, inputs):
             ctx.actions.run(
                 executable = cc_toolchain.objcopy_executable,
                 outputs = [output_bin],
-                inputs = depset([debug_info], transitive = [inputs]),
+                inputs = depset([debug_info]),
                 resource_set = linux_strip_resource_set if ctx.attr.type == "program" else None,
                 arguments = [
                     "--strip-debug",
@@ -385,7 +389,7 @@ def macos_extraction(ctx, cc_toolchain, inputs):
             ctx.actions.run(
                 executable = "dsymutil",
                 outputs = [debug_info],
-                inputs = inputs,
+                inputs = [input_bin],
                 arguments = [
                     "-num-threads",
                     "1",
@@ -399,7 +403,7 @@ def macos_extraction(ctx, cc_toolchain, inputs):
             ctx.actions.run(
                 executable = cc_toolchain.strip_executable,
                 outputs = [output_bin],
-                inputs = depset([debug_info], transitive = [inputs]),
+                inputs = depset([debug_info]),
                 arguments = [
                     "-S",
                     "-o",
@@ -563,21 +567,22 @@ def extract_debuginfo_impl(ctx):
     macos_constraint = ctx.attr._macos_constraint[platform_common.ConstraintValueInfo]
     windows_constraint = ctx.attr._windows_constraint[platform_common.ConstraintValueInfo]
 
-    if ctx.target_platform_has_constraint(linux_constraint):
-        # When skipping the archives we have to skip modifying debug info
-        # for the intermediates because we end up taking a dependency
-        # on the _with_debug .a files
-        if ctx.attr.skip_archive and ctx.attr.cc_shared_library == None:
-            return_info = [ctx.attr.binary_with_debug[CcInfo]]
-        else:
-            return_info = linux_extraction(ctx, cc_toolchain, inputs)
-    elif ctx.target_platform_has_constraint(macos_constraint):
-        if ctx.attr.skip_archive and ctx.attr.cc_shared_library == None:
-            return_info = [ctx.attr.binary_with_debug[CcInfo]]
-        else:
-            return_info = macos_extraction(ctx, cc_toolchain, inputs)
-    elif ctx.target_platform_has_constraint(windows_constraint):
+    dynamic_libraries = 0
+    if "dynamic_library" in ctx.attr.binary_with_debug[OutputGroupInfo]:
+        dynamic_libraries = len(ctx.attr.binary_with_debug[OutputGroupInfo].dynamic_library.to_list())
+
+    if ctx.target_platform_has_constraint(windows_constraint):
         return_info = windows_extraction(ctx, cc_toolchain, inputs)
+    elif ctx.attr.type == "library" and ctx.attr.linkstatic == True and ctx.attr.cc_shared_library == None and ctx.attr.skip_archive == True:
+        # On static builds we always skip separating debug in libraries
+        return_info = [ctx.attr.binary_with_debug[CcInfo]]
+    elif ctx.attr.type == "library" and dynamic_libraries == 0 and ctx.attr.cc_shared_library == None and ctx.attr.skip_archive == True:
+        # On dynamic builds we skip separating debug if there are no dynamic libraries
+        return_info = [ctx.attr.binary_with_debug[CcInfo]]
+    elif ctx.target_platform_has_constraint(linux_constraint):
+        return_info = linux_extraction(ctx, cc_toolchain, inputs)
+    elif ctx.target_platform_has_constraint(macos_constraint):
+        return_info = macos_extraction(ctx, cc_toolchain, inputs)
 
     tag_provider = TagInfo(tags = ctx.attr.tags)
     return_info.append(tag_provider)
@@ -596,6 +601,7 @@ extract_debuginfo = rule(
         "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
         "enable_pdb": attr.bool(default = False, doc = "Flag to enable pdb outputs on windows."),
         "deps": attr.label_list(providers = [CcInfo]),
+        "linkstatic": attr.bool(default = True, doc = "If binaries are meant to be statically linked."),
         "cc_shared_library": attr.label(
             doc = "If extracting from a shared library, the target of the cc_shared_library. Otherwise empty.",
             allow_files = True,
@@ -613,6 +619,7 @@ extract_debuginfo = rule(
     doc = "Extract debuginfo into a separate file",
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
     fragments = ["cpp"],
+    provides = [CcInfo],
 )
 
 extract_debuginfo_binary = rule(

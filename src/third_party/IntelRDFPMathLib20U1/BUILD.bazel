@@ -411,36 +411,20 @@ mongo_cc_library(
         "LIBRARY/float128/dpml_ux_radian_reduce.c",
         "LIBRARY/float128/dpml_four_over_pi.c",
     ],
-    additional_linker_inputs = select({
-        "@platforms//os:linux": [
-            ":libintel_decimal128.version_script.lds",
-        ],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:macos": [
-            ":libintel_decimal128.exported_symbols_list.lds",
-        ],
-        "//conditions:default": [],
+    copts = IGNORE_WARNINGS_COPT + select({
+        "@//bazel/config:linkstatic_enabled": [],
+        "@//conditions:default": ["-fPIC"],
     }),
-    copts = IGNORE_WARNINGS_COPT,
     features = [
         "-win_level_3_warning",
     ],
     includes = [
         "LIBRARY/src",
     ],
+    # intel_decimal128 needs to be statically linked in our dynamic builds
+    # See SERVER-41835
+    linkstatic = True,
     local_defines = INTEL_RDFP_MATHLIB_DEFINES,
-    non_transitive_dyn_linkopts = select({
-        "@platforms//os:linux": [
-            "-Wl,--version-script=$(location :libintel_decimal128.version_script.lds)",
-        ],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:macos": [
-            "-Wl,-exported_symbols_list,$(location :libintel_decimal128.exported_symbols_list.lds)",
-        ],
-        "//conditions:default": [],
-    }),
     deps = select({
         "@platforms//os:macos": [
             ":dpml_log1p_t",

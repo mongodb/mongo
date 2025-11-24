@@ -16,7 +16,7 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load("@com_github_grpc_grpc//bazel:generate_cc.bzl", "generate_cc")
 load("@poetry//:dependencies.bzl", "dependency")
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_shared_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "//bazel:separate_debug.bzl",
@@ -175,13 +175,13 @@ LINKSTATIC_ENABLED = select({
 }, no_match_error = REQUIRED_SETTINGS_DYNAMIC_LINK_ERROR_MESSAGE)
 
 SKIP_ARCHIVE_ENABLED = select({
-    "//bazel/config:skip_archive_linkstatic_not_windows": True,
-    "//conditions:default": False,
+    "//bazel/config:skip_archive_disabled": False,
+    "//conditions:default": True,
 })
 
 SKIP_ARCHIVE_FEATURE = select({
-    "//bazel/config:skip_archive_linkstatic_not_windows": ["supports_start_end_lib"],
-    "//conditions:default": [],
+    "@platforms//os:windows": [],
+    "//conditions:default": ["supports_start_end_lib"],
 })
 
 SEPARATE_DEBUG_ENABLED = select({
@@ -281,63 +281,6 @@ def force_includes_hdr(package_name, name):
 
     return []
 
-def remap_linker_inputs_ownership_impl(ctx):
-    cc_toolchain = find_cpp_toolchain(ctx)
-    feature_configuration = cc_common.configure_features(
-        ctx = ctx,
-        cc_toolchain = cc_toolchain,
-        requested_features = ctx.features,
-        unsupported_features = ctx.disabled_features,
-    )
-
-    linker_inputs = []
-    for linker_input in ctx.attr.input[CcInfo].linking_context.linker_inputs.to_list():
-        linker_input = cc_common.create_linker_input(
-            owner = Label(ctx.attr.new_owner),
-            libraries = depset(linker_input.libraries),
-            user_link_flags = linker_input.user_link_flags,
-            additional_inputs = depset(linker_input.additional_inputs),
-        )
-        linker_inputs += [linker_input]
-
-    linking_context = cc_common.create_linking_context(linker_inputs = depset(direct = linker_inputs, transitive = []))
-
-    output = [DefaultInfo(files = ctx.attr.input.files), CcInfo(
-        compilation_context = ctx.attr.input[CcInfo].compilation_context,
-        linking_context = linking_context,
-    )]
-
-    return output
-
-# Bazel cc_shared_library's implementation ignores static linker inputs that
-# are owned by a different target than the cc_shared_library itself. Since we
-# need to transitively collect the list of static linker inputs for the shared
-# archive implementation, we need to transtiively remap ownership of each linker
-# input to make Bazel actually link them in.
-#
-# Ex:
-# mongo_crypt_v1.so
-# -> libserver_base.a (linker input owned by mongo_crypt_v1.so)
-#    -> libbase.a (linker input owned by libserver_base.a, will be ignored normally)
-#
-# Since we effectively want to flatten this down into:
-# mongo_crypt_v1.so
-# -> libserver_base.a, libbase.a
-#
-# We need to the remap libbase.a linker input to be owned by mongo_crypt_v1.so
-remap_linker_inputs_ownership = rule(
-    remap_linker_inputs_ownership_impl,
-    attrs = {
-        "input": attr.label(
-            providers = [CcInfo],
-        ),
-        "new_owner": attr.string(),
-    },
-    provides = [CcInfo],
-    toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
-    fragments = ["cpp"],
-)
-
 def tidy_config_filegroup():
     if native.existing_rule("clang_tidy_config") == None:
         native.filegroup(
@@ -425,16 +368,8 @@ def mongo_cc_library(
         configuration. This should only be used for shared archive support,
         aka. a shared library with all of its dependencies linked to it statically.
     """
-    if linkstatic == True:
-        fail("""Linking specific targets statically is not supported.
-        The mongo build must link entirely statically or entirely dynamically.
-        This can be configured via //config/bazel:linkstatic.""")
-
     if "libunwind" not in skip_global_deps:
         deps += LIBUNWIND_DEPS
-
-    if "allocator" not in skip_global_deps:
-        deps += TCMALLOC_DEPS
 
     # 0) Build real select(...) objects + a flat list of files (strings)
     _select_objs, _select_flat_files = build_selects_and_flat_files(
@@ -543,34 +478,6 @@ def mongo_cc_library(
 
     tidy_config_filegroup()
 
-    # Create a cc_library entry to generate a shared archive of the target.
-    cc_library(
-        name = name + SHARED_ARCHIVE_SUFFIX,
-        srcs = srcs + SANITIZER_DENYLIST_HEADERS,
-        hdrs = hdrs + fincludes_hdr,
-        deps = deps + cc_deps,
-        textual_hdrs = textual_hdrs,
-        visibility = visibility,
-        testonly = testonly,
-        copts = copts,
-        cxxopts = cxxopts,
-        data = data,
-        tags = tags + ["mongo_library"],
-        linkopts = linkopts,
-        linkstatic = True,
-        local_defines = MONGO_GLOBAL_DEFINES + visibility_support_defines + local_defines,
-        defines = defines,
-        includes = includes,
-        features = features,
-        target_compatible_with = select({
-            "//bazel/config:shared_archive_enabled": [],
-            "//conditions:default": ["@platforms//:incompatible"],
-        }) + target_compatible_with,
-        additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
-        exec_properties = exec_properties,
-        **kwargs
-    )
-
     # Did not want to expose alwayslink for cc_library as it ends up getting
     # modified in extract_debuginfo
     if "alwayslink" not in kwargs:
@@ -589,7 +496,10 @@ def mongo_cc_library(
         data = data,
         tags = tags + ["mongo_library", "check_symbol_target"],
         linkopts = linkopts,
-        linkstatic = True,
+        linkstatic = select({
+            "@platforms//os:windows": True,
+            "//conditions:default": linkstatic,
+        }),
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         defines = defines,
         includes = includes,
@@ -600,68 +510,38 @@ def mongo_cc_library(
         **kwargs
     )
 
-    dynamic_deps = deps
-    shared_library_compatible_with = select({
-        "//bazel/config:linkstatic_disabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    })
-
-    # Always build shared if specified & remove dynamic deps to allow
-    # for static linking dependencies.
+    # This is used to build our static shared objects such as mongo_crypt_v1.so
+    shared_library = None
     if linkshared:
-        shared_library_compatible_with = []
-        dynamic_deps = []
+        if "allocator" not in skip_global_deps:
+            deps += TCMALLOC_DEPS
 
-        remap_linker_inputs_ownership(
-            name = name + WITH_DEBUG_SUFFIX + "_ownership_remapped",
-            input = name + WITH_DEBUG_SUFFIX,
-            new_owner = "//" + native.package_name() + ":" + name + WITH_DEBUG_SUFFIX,
+        cc_shared_library(
+            name = name + CC_SHARED_LIBRARY_SUFFIX + WITH_DEBUG_SUFFIX,
+            deps = [name + WITH_DEBUG_SUFFIX],
+            visibility = visibility,
+            tags = tags + ["mongo_library"],
+            user_link_flags = get_linkopts(native.package_name()) + undefined_ref_flag + non_transitive_dyn_linkopts + rpath_flags + visibility_support_shared_flags + select({
+                "//bazel/config:simple_build_id_enabled": ["-Wl,--build-id=0x" +
+                                                           hex32(hash(name)) +
+                                                           hex32(hash(name)) +
+                                                           hex32(hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT)))],
+                "//conditions:default": [],
+            }),
+            target_compatible_with = target_compatible_with,
+            shared_lib_name = shared_lib_name,
+            features = select({
+                "//bazel/config:windows_debug_symbols_enabled": ["generate_pdb_file"],
+                "//conditions:default": [],
+            }) + select({
+                "//bazel/config:simple_build_id_enabled": ["-build_id"],
+                "//conditions:default": [],
+            }),
+            additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
+            exec_properties = exec_properties,
+            win_def_file = win_def_file,
         )
-
-    # Creates a shared library version of our target only if
-    # //bazel/config:linkstatic_disabled is true. This uses the
-    # CcSharedLibraryInfo provided from extract_debuginfo to allow it to declare
-    # all dependencies in dynamic_deps.
-    native.cc_shared_library(
-        name = name + CC_SHARED_LIBRARY_SUFFIX + WITH_DEBUG_SUFFIX,
-        deps = [name + WITH_DEBUG_SUFFIX + "_ownership_remapped"] if linkshared else [name + WITH_DEBUG_SUFFIX],
-        visibility = visibility,
-        tags = tags + ["mongo_library"],
-        user_link_flags = get_linkopts(native.package_name()) + undefined_ref_flag + non_transitive_dyn_linkopts + rpath_flags + visibility_support_shared_flags + select({
-            "//bazel/config:simple_build_id_enabled": ["-Wl,--build-id=0x" +
-                                                       hex32(hash(name)) +
-                                                       hex32(hash(name)) +
-                                                       hex32(hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT)))],
-            "//conditions:default": [],
-        }),
-        target_compatible_with = shared_library_compatible_with + target_compatible_with,
-        dynamic_deps = dynamic_deps,
-        shared_lib_name = shared_lib_name,
-        features = select({
-            "//bazel/config:windows_debug_symbols_enabled": ["generate_pdb_file"],
-            "//conditions:default": [],
-        }) + select({
-            "//bazel/config:simple_build_id_enabled": ["-build_id"],
-            "//conditions:default": [],
-        }),
-        additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
-        exec_properties = exec_properties,
-        win_def_file = win_def_file,
-    )
-
-    shared_library = select({
-        "//bazel/config:linkstatic_disabled": ":" + name + CC_SHARED_LIBRARY_SUFFIX + WITH_DEBUG_SUFFIX,
-        "//conditions:default": None,
-    })
-
-    shared_archive = select({
-        "//bazel/config:shared_archive_enabled": ":" + name + SHARED_ARCHIVE_SUFFIX,
-        "//conditions:default": None,
-    })
-
-    if linkshared:
         shared_library = name + CC_SHARED_LIBRARY_SUFFIX + WITH_DEBUG_SUFFIX
-        shared_archive = None
 
     extract_debuginfo(
         name = name,
@@ -671,33 +551,12 @@ def mongo_cc_library(
         enabled = SEPARATE_DEBUG_ENABLED,
         enable_pdb = PDB_GENERATION_ENABLED,
         cc_shared_library = shared_library,
-        shared_archive = shared_archive,
+        linkstatic = LINKSTATIC_ENABLED,
         skip_archive = SKIP_ARCHIVE_ENABLED,
         visibility = visibility,
         deps = deps + cc_deps,
         exec_properties = exec_properties,
     )
-
-def write_sources_impl(ctx):
-    out = ctx.actions.declare_file(ctx.label.name + ".sources_list")
-    ctx.actions.write(
-        out,
-        "\n".join(ctx.attr.sources),
-    )
-    return [
-        DefaultInfo(
-            files = depset([out]),
-        ),
-    ]
-
-write_sources = rule(
-    write_sources_impl,
-    attrs = {
-        "sources": attr.string_list(
-            doc = "the sources used to build the binary",
-        ),
-    },
-)
 
 def _mongo_cc_binary_and_test(
         name,
@@ -861,10 +720,6 @@ def _mongo_cc_binary_and_test(
             "//conditions:default": [],
         }) + select({
             "//bazel/config:simple_build_id_enabled": ["-build_id"],
-            "//conditions:default": [],
-        }),
-        "dynamic_deps": select({
-            "//bazel/config:linkstatic_disabled": deps,
             "//conditions:default": [],
         }),
         "target_compatible_with": target_compatible_with,

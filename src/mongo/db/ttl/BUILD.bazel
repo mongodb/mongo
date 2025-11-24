@@ -56,6 +56,9 @@ mongo_cc_unit_test(
         "ttl_collection_cache_test.cpp",
         "ttl_test.cpp",
     ],
+    minimum_test_resources = {
+        "cpu_cores": 2,
+    },
     tags = [
         "mongo_unittest_fifth_group",
         "server-ttl",

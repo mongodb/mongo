@@ -661,32 +661,32 @@ buildvariants:
         --runAllFeatureFlagTests --disableUnreleasedIFRFlags
     tasks: *enterprise-rhel8-debug-tsan-task-list
 
-  - name: &enterprise-rhel8-unoptimized-64-bit enterprise-rhel8-unoptimized-64-bit
-    display_name: "~ Enterprise RHEL 8 DEBUG (Unoptimized)"
-    tags: ["bazel_check"]
-    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
-    expansions:
-      bazel_compile_flags: >-
-        --define=MONGO_DISTMOD=rhel88
-        --dbg=True
-        --opt=off
-        --detect_odr_violations=True
-        --linker=gold
-        --linkstatic=False
-      compile_variant: *enterprise-rhel8-unoptimized-64-bit
-    tasks:
-      - name: compile_test_parallel_core_stream_TG
-        distros:
-          - rhel8.8-large
-      - name: run_unit_tests_TG
-        distros:
-          - rhel8.8-large
-      - name: compile_test_parallel_dbtest_stream_TG
-        distros:
-          - rhel8.8-large
-      - name: generate_buildid_to_debug_symbols_mapping
-        distros:
-          - rhel8.8-large
+  # - name: &enterprise-rhel8-unoptimized-64-bit enterprise-rhel8-unoptimized-64-bit
+  #   display_name: "~ Enterprise RHEL 8 DEBUG (Unoptimized)"
+  #   tags: ["bazel_check"]
+  #   cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
+  #   expansions:
+  #     bazel_compile_flags: >-
+  #       --define=MONGO_DISTMOD=rhel88
+  #       --dbg=True
+  #       --opt=off
+  #       --detect_odr_violations=True
+  #       --linker=gold
+  #       --linkstatic=False
+  #     compile_variant: *enterprise-rhel8-unoptimized-64-bit
+  #   tasks:
+  #     - name: compile_test_parallel_core_stream_TG
+  #       distros:
+  #         - rhel8.8-large
+  #     - name: run_unit_tests_TG
+  #       distros:
+  #         - rhel8.8-large
+  #     - name: compile_test_parallel_dbtest_stream_TG
+  #       distros:
+  #         - rhel8.8-large
+  #     - name: generate_buildid_to_debug_symbols_mapping
+  #       distros:
+  #         - rhel8.8-large
 
   - name: &linux-debug-aubsan-compile-grpc linux-debug-aubsan-compile-grpc
     display_name: "~ Linux x86 Shared Library {A,UB}SAN Enterprise Compile with Ingress GRPC"
