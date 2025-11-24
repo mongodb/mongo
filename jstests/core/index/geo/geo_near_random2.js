@@ -1,7 +1,6 @@
 // this tests 1% of all points
 //
 // @tags: [
-//     # TODO(SERVER-60823): remove incompatible_with_gcov
 //     incompatible_with_gcov,
 // ]
 
