@@ -795,6 +795,7 @@ private:
         std::shared_ptr<const ProfileFilter> filter);
 
     logv2::DynamicAttributes _reportDebugAndStats(const logv2::LogOptions& logOptions,
+                                                  const Date_t* opreationDeadline,
                                                   bool isFinalStorageStatsUpdate);
 
     /**

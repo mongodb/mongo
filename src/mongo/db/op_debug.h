@@ -241,11 +241,17 @@ public:
      *
      * Generally, the metrics/fields reported here should be a subset of what is reported in
      * append(). The profiler is meant to be more verbose than the slow query log.
+     *
+     * Due to logging implementation, the lifetime of operationDeadline must exceed the lifetime of
+     * pAttrs. Accepting pointer to Date_t instead of reference to avoid compiler extending the
+     * lifetime of temporary objects.
+     * TODO SERVER-114266 - remove this.
      */
     void report(OperationContext* opCtx,
                 const SingleThreadedLockStats* lockStats,
                 const SingleThreadedStorageMetrics& storageMetrics,
                 long long prepareReadConflicts,
+                const Date_t* operationDeadline,
                 logv2::DynamicAttributes* pAttrs) const;
 
     void reportStorageStats(logv2::DynamicAttributes* pAttrs) const;

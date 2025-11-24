@@ -184,6 +184,7 @@ void OpDebug::report(OperationContext* opCtx,
                      const SingleThreadedLockStats* lockStats,
                      const SingleThreadedStorageMetrics& storageMetrics,
                      long long prepareReadConflicts,
+                     const Date_t* operationDeadline,
                      logv2::DynamicAttributes* pAttrs) const {
     Client* client = opCtx->getClient();
     auto& curop = *CurOp::get(opCtx);
@@ -508,6 +509,10 @@ void OpDebug::report(OperationContext* opCtx,
             durationCount<Nanoseconds>(ts->ticksTo<Nanoseconds>(ts->getTicks() - killTime)));
     }
 
+    if (operationDeadline != nullptr && *operationDeadline != Date_t::max()) {
+        pAttrs->add("deadline", *operationDeadline);
+    }
+
     // durationMillis should always be present for any operation
     pAttrs->add("durationMillis",
                 durationCount<Milliseconds>(CurOp::get(opCtx)->elapsedTimeTotal()));
@@ -777,6 +782,10 @@ void OpDebug::append(OperationContext* opCtx,
         b.appendNumber(
             "interruptLatencyNanos",
             durationCount<Nanoseconds>(ts->ticksTo<Nanoseconds>(ts->getTicks() - killTime)));
+    }
+
+    if (auto deadline = opCtx->getDeadline(); deadline != Date_t::max()) {
+        b.appendDate("deadline", deadline);
     }
 }
 

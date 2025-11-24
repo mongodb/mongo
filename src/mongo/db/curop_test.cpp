@@ -887,6 +887,44 @@ TEST(CurOpTest, KilledOperationReportsLatency) {
     ASSERT_EQ(killLatency, res.getIntField("interruptLatencyNanos"));
 }
 
+TEST(CurOpTest, ShouldReportDeadline) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    Date_t expectedDeadline = Date_t::now();
+    opCtx->setDeadlineByDate(expectedDeadline, ErrorCodes::MaxTimeMSExpired);
+
+    auto curop = CurOp::get(*opCtx);
+    const OpDebug& opDebug = curop->debug();
+    SingleThreadedLockStats ls;
+
+    BSONObjBuilder bob;
+    opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bob);
+
+    auto res = bob.done();
+    ASSERT_TRUE(res.hasField("deadline")) << res.toString();
+    ASSERT_EQ(res.getField("deadline").Date(), expectedDeadline);
+
+    unittest::LogCaptureGuard logs;
+
+    curop->completeAndLogOperation(logv2::LogOptions{logv2::LogComponent::kTest},
+                                   nullptr,
+                                   boost::none,
+                                   boost::none,
+                                   true /*forceLog*/);
+
+
+    static constexpr long long kSlowQueryLogId = 51803;
+    ASSERT_GTE(logs.countBSONContainingSubset(BSON("id" << kSlowQueryLogId)), 1);
+    for (const auto& logObj : logs.getBSON()) {
+        if (logObj.getField("id").numberLong() != kSlowQueryLogId) {
+            continue;
+        }
+
+        BSONObj attrs = logObj.getField("attr").Obj();
+        ASSERT_EQ(attrs.getField("deadline").Date(), expectedDeadline);
+    }
+}
+
 TEST(CurOpTest, SlowLogFinishesWithDuration) {
     // Best effort test to try and verify that durationMillis is the last field reported by
     // report(). This doesn't populate every possible fields but makes some attempt to ensure
@@ -917,10 +955,11 @@ TEST(CurOpTest, SlowLogFinishesWithDuration) {
     curop->done();
     curop->calculateCpuTime();
 
-    auto pattrs = std::make_unique<logv2::DynamicAttributes>();
-    opDebug.report(opCtx.get(), &lockStats, {}, 0, pattrs.get());
+    logv2::DynamicAttributes pattrs;
+    Date_t deadline = opCtx->getDeadline();
+    opDebug.report(opCtx.get(), &lockStats, {}, 0, &deadline, &pattrs);
 
-    logv2::TypeErasedAttributeStorage attrs{*pattrs};
+    logv2::TypeErasedAttributeStorage attrs{pattrs};
     ASSERT_GTE(attrs.size(), 1);
     std::string lastName = (attrs.end() - 1)->name;
     ASSERT_EQ("durationMillis", lastName);

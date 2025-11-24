@@ -842,13 +842,15 @@ void stashTransactionResourcesFromOperationContextAndDontAttachNewOnes(
     stasher->stashTransactionResources(std::move(stashedResources));
 }
 
-logv2::DynamicAttributes getCurOpLogAttrs(OperationContext* opCtx) {
+logv2::DynamicAttributes getCurOpLogAttrs(OperationContext* opCtx,
+                                          const Date_t* operationDeadline) {
     logv2::DynamicAttributes attr;
     const auto curop = CurOp::get(opCtx);
     curop->debug().report(opCtx,
                           nullptr,
                           curop->getOperationStorageMetrics(),
                           curop->getPrepareReadConflicts(),
+                          operationDeadline,
                           &attr);
     return attr;
 }
@@ -1929,10 +1931,11 @@ void restoreTransactionResourcesToOperationContext(
                     static constexpr char errMsg[] =
                         "Read has been terminated due to orphan range cleanup";
                     if (enableQueryKilledByRangeDeletionLog.load()) {
+                        Date_t deadline = opCtx->getDeadline();
                         LOGV2(10016300,
                               errMsg,
                               logv2::DynamicAttributes{
-                                  getCurOpLogAttrs(opCtx),
+                                  getCurOpLogAttrs(opCtx, &deadline),
                                   "orphanCleanupDelaySecs"_attr = orphanCleanupDelaySecs.load(),
                               });
                     }
