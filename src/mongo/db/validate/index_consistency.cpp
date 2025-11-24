@@ -122,8 +122,7 @@ IndexInfo::IndexInfo(const IndexDescriptor& descriptor)
       indexNameHash(hash(descriptor.indexName())),
       ord(Ordering::make(descriptor.keyPattern())),
       unique(descriptor.unique()),
-      accessMethod(descriptor.getEntry()->accessMethod()),
-      indexType(descriptor.getIndexType()) {}
+      accessMethod(descriptor.getEntry()->accessMethod()) {}
 
 IndexConsistency::IndexConsistency(OperationContext* opCtx,
                                    CollectionValidation::ValidateState* validateState,
@@ -314,9 +313,6 @@ void KeyStringIndexConsistency::addDocKey(OperationContext* opCtx,
                                           IndexInfo* indexInfo,
                                           const RecordId& recordId,
                                           ValidateResults* results) {
-    if (skipTrackingIndexKeyCount(*indexInfo)) {
-        return;
-    }
     auto rawHash = ks.hash(indexInfo->indexNameHash);
     auto hashLower = rawHash % kNumHashBuckets;
     auto hashUpper = (rawHash / kNumHashBuckets) % kNumHashBuckets;
@@ -356,9 +352,6 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
                                             IndexInfo* indexInfo,
                                             const RecordId& recordId,
                                             ValidateResults* results) {
-    if (skipTrackingIndexKeyCount(*indexInfo)) {
-        return;
-    }
     auto rawHash = ks.hash(indexInfo->indexNameHash);
     auto hashLower = rawHash % kNumHashBuckets;
     auto hashUpper = (rawHash / kNumHashBuckets) % kNumHashBuckets;
@@ -423,12 +416,6 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
             _missingIndexEntries.erase(key);
         }
     }
-}
-
-bool KeyStringIndexConsistency::skipTrackingIndexKeyCount(const IndexInfo& indexInfo) {
-    return indexInfo.indexType == IndexType::INDEX_2D ||
-        indexInfo.indexType == IndexType::INDEX_2DSPHERE ||
-        indexInfo.indexType == IndexType::INDEX_2DSPHERE_BUCKET;
 }
 
 bool KeyStringIndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* result) {
