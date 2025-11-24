@@ -36,6 +36,7 @@
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/expression_geo_index_mapping.h"
 #include "mongo/db/query/index_bounds_builder_test_fixture.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/time_support.h"
 
@@ -2000,9 +2001,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTMaxKeyDoesNotGenerateBound
     assertIET(inputParamIdMap, ietBuilder, elt, testIndex, oil);
 }
 
-DEATH_TEST_F(IndexBoundsBuilderTest,
-             TranslateInternalExprGTMultikeyPathFails,
-             "$expr comparison predicates on multikey paths cannot use an index") {
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTMultikeyPathFails) {
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
     BSONElement elt = keyPattern.firstElement();
     auto testIndex = buildMultikeyIndexEntry(keyPattern, {{0U}, {}});
@@ -2011,7 +2010,9 @@ DEATH_TEST_F(IndexBoundsBuilderTest,
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
     interval_evaluation_tree::Builder ietBuilder{};
-    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
+    ASSERT_THROWS(
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder),
+        DBException);
 }
 
 TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTNonMultikeyPathOnMultikeyIndexSucceeds) {
@@ -2108,9 +2109,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTEMaxKeyGeneratesBounds) {
     assertIET(inputParamIdMap, ietBuilder, elt, testIndex, oil);
 }
 
-DEATH_TEST_F(IndexBoundsBuilderTest,
-             TranslateInternalExprGTEMultikeyPathFails,
-             "$expr comparison predicates on multikey paths cannot use an index") {
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTEMultikeyPathFails) {
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
     BSONElement elt = keyPattern.firstElement();
     auto testIndex = buildMultikeyIndexEntry(keyPattern, {{0U}, {}});
@@ -2119,7 +2118,9 @@ DEATH_TEST_F(IndexBoundsBuilderTest,
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
     interval_evaluation_tree::Builder ietBuilder{};
-    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
+    ASSERT_THROWS(
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder),
+        DBException);
 }
 
 TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTENonMultikeyPathOnMultikeyIndexSucceeds) {
@@ -2213,9 +2214,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTMinKeyDoesNotGenerateBound
     assertIET(inputParamIdMap, ietBuilder, elt, testIndex, oil);
 }
 
-DEATH_TEST_F(IndexBoundsBuilderTest,
-             TranslateInternalExprLTMultikeyPathFails,
-             "$expr comparison predicates on multikey paths cannot use an index") {
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTMultikeyPathFails) {
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
     BSONElement elt = keyPattern.firstElement();
     auto testIndex = buildMultikeyIndexEntry(keyPattern, {{0U}, {}});
@@ -2224,7 +2223,9 @@ DEATH_TEST_F(IndexBoundsBuilderTest,
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
     interval_evaluation_tree::Builder ietBuilder{};
-    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
+    ASSERT_THROWS(
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder),
+        DBException);
 }
 
 TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTNonMultikeyPathOnMultikeyIndexSucceeds) {
@@ -2321,9 +2322,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTEMinKeyGeneratesBounds) {
     assertIET(inputParamIdMap, ietBuilder, elt, testIndex, oil);
 }
 
-DEATH_TEST_F(IndexBoundsBuilderTest,
-             TranslateInternalExprLTEMultikeyPathFails,
-             "$expr comparison predicates on multikey paths cannot use an index") {
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTEMultikeyPathFails) {
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
     BSONElement elt = keyPattern.firstElement();
     auto testIndex = buildMultikeyIndexEntry(keyPattern, {{0U}, {}});
@@ -2333,7 +2332,9 @@ DEATH_TEST_F(IndexBoundsBuilderTest,
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
     interval_evaluation_tree::Builder ietBuilder{};
-    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
+    ASSERT_THROWS(
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder),
+        DBException);
 }
 
 TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTENonMultikeyPathOnMultikeyIndexSucceeds) {

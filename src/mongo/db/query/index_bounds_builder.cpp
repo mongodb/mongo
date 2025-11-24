@@ -814,7 +814,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // for when dataElt is MaxKey or NaN because it doesn't do type bracketing for any operand.
         // Another difference is that $internalExprLt predicates on multikey paths will not use an
         // index.
-        tassert(3994304,
+        uassert(3994304,
                 "$expr comparison predicates on multikey paths cannot use an index",
                 !index.pathHasMultikeyComponent(elt.fieldNameStringData()));
 
@@ -895,7 +895,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // for when dataElt is MaxKey or NaN because it doesn't do type bracketing for any operand.
         // Another difference is that $internalExprLte predicates on multikey paths will not use an
         // index.
-        tassert(3994305,
+        uassert(3994305,
                 "$expr comparison predicates on multikey paths cannot use an index",
                 !index.pathHasMultikeyComponent(elt.fieldNameStringData()));
 
@@ -972,7 +972,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // for when dataElt is MinKey or NaN because it doesn't do type bracketing for any operand.
         // Another difference is that $internalExprGt predicates on multikey paths will not use an
         // index.
-        tassert(3994302,
+        uassert(3994302,
                 "$expr comparison predicates on multikey paths cannot use an index",
                 !index.pathHasMultikeyComponent(elt.fieldNameStringData()));
 
@@ -1054,7 +1054,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // for when dataElt is MinKey or NaN because it doesn't do type bracketing for any operand.
         // Another difference is that $internalExprGte predicates on multikey paths will not use an
         // index.
-        tassert(3994303,
+        uassert(3994303,
                 "$expr comparison predicates on multikey paths cannot use an index",
                 !index.pathHasMultikeyComponent(elt.fieldNameStringData()));
 
