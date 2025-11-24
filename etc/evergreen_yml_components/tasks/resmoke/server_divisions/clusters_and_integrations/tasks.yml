@@ -2377,10 +2377,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_workload_scheduling",
-        "default",
+        "execution_control_with_prioritization",
         "sharding",
         "jscore",
-        "common",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2390,9 +2389,96 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_workload_scheduling",
-        "default",
+        "execution_control_with_prioritization",
         "jscore",
-        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: sharding_execution_control_with_prioritization_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_workload_scheduling",
+        "execution_control_with_prioritization",
+        "sharding",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: replica_sets_execution_control_with_prioritization_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_workload_scheduling",
+        "execution_control_with_prioritization",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: sharding_jscore_passthrough_execution_control_with_prioritization_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_workload_scheduling",
+        "sharding",
+        "jscore",
+        "execution_control_with_prioritization",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: replica_sets_jscore_passthrough_execution_control_with_prioritization_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_workload_scheduling",
+        "execution_control_with_prioritization",
+        "jscore",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: no_passthrough_execution_control_with_prioritization_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_workload_scheduling",
+        "execution_control_with_prioritization",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: concurrency_sharded_replication_execution_control_with_prioritization_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_workload_scheduling",
+        "execution_control_with_prioritization",
+        "sharding",
+        "concurrency",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: concurrency_replication_execution_control_with_prioritization_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_workload_scheduling",
+        "execution_control_with_prioritization",
+        "concurrency",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: auth_execution_control_with_prioritization_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_workload_scheduling",
+        "execution_control_with_prioritization",
+        "auth",
       ]
     commands:
       - func: "generate resmoke tasks"
