@@ -1162,6 +1162,26 @@ private:
         }
     }
 
+    // This helper function is for any actions that should be done before taking the global lock in
+    // S mode. It is required that the code in this helper function is idempotent and could be done
+    // after _runDowngrade even if it failed at any point in the middle of
+    // _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
+    void _prepareToUpgradeActionsBeforeGlobalLock(
+        OperationContext* opCtx,
+        const multiversion::FeatureCompatibilityVersion requestedVersion,
+        boost::optional<Timestamp> changeTimestamp) {
+        auto role = ShardingState::get(opCtx)->pollClusterRole();
+        // Note the config server is also considered a shard, so the ConfigServer and ShardServer
+        // roles aren't mutually exclusive.
+        if (role && role->has(ClusterRole::ConfigServer)) {
+            // Config server role actions.
+        }
+
+        if (role && role->has(ClusterRole::ShardServer)) {
+            // Shard server role actions.
+        }
+    }
+
     // This helper function is for any user collections creations, changes or deletions that need
     // to happen during the upgrade. It is required that the code in this helper function is
     // idempotent and could be done after _runDowngrade even if it failed at any point in the middle
@@ -1281,6 +1301,8 @@ private:
     // _prepareToUpgrade performs all actions and checks that need to be done before proceeding to
     // make any metadata changes as part of FCV upgrade. Any new feature specific upgrade code
     // should be placed in the _prepareToUpgrade helper functions:
+    //  * _prepareToUpgradeActionsBeforeGlobalLock: for any actions that need to be done before
+    //  acquiring the global lock
     //  * _userCollectionsUassertsForUpgrade: for any checks on user data or settings that will
     //    uassert with the `CannotUpgrade` code if users need to manually clean up.
     //  * _userCollectionsWorkForUpgrade: for any user collections creations, changes or deletions
@@ -1294,6 +1316,8 @@ private:
         invariant(fcvSnapshot.isUpgradingOrDowngrading());
         const auto originalVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
         const auto requestedVersion = request.getCommandParameter();
+
+        _prepareToUpgradeActionsBeforeGlobalLock(opCtx, requestedVersion, changeTimestamp);
 
         // This wait serves as a barrier to guarantee that, from now on:
         // - No operations with an OFCV lower than the upgrading OFCV will be running
