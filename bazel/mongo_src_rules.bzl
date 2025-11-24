@@ -1075,19 +1075,6 @@ def mongo_cc_test(
         })
     elif minimum_core_count > 2:
         fail("minimum_test_resources[\"cpu_cores\"] > 2 is not supported")
-    else:
-        # TSAN will use more memory and EngFlow currently does not surface a good
-        # error message to users when an OOM occurs.
-        # TOOD(SERVER-112889): Remove this once OOM errors are better surfaced by EngFlow
-        exec_properties = exec_properties | select({
-            "//bazel/config:tsan_enabled_x86_64": {
-                "test.Pool": "large_mem_x86_64",
-            },
-            "//bazel/config:tsan_enabled_arm64": {
-                "test.Pool": "large_memory_arm64",
-            },
-            "//conditions:default": {},
-        })
 
     _mongo_cc_binary_and_test(
         name,
