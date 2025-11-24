@@ -33,7 +33,6 @@
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -44,6 +43,7 @@
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/modules.h"
 
 #include <memory>

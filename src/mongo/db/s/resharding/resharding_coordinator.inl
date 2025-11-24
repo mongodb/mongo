@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/global_catalog/catalog_cache/routing_information_cache.h"
 #include "mongo/db/global_catalog/ddl/drop_collection_if_uuid_not_matching_gen.h"
 #include "mongo/db/global_catalog/ddl/notify_sharding_event_utils.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
-#include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/router_role/router_role.h"
+#include "mongo/db/router_role/routing_cache/routing_information_cache.h"
 #include "mongo/db/s/balancer/balance_stats.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/resharding/resharding_coordinator.h"
@@ -47,7 +47,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/request_types/commit_reshard_collection_gen.h"

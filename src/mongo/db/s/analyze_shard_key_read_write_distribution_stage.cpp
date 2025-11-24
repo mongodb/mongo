@@ -31,13 +31,13 @@
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
-#include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/router_role/collection_routing_info_targeter.h"
 #include "mongo/db/s/analyze_shard_key_read_write_distribution.h"
 #include "mongo/db/s/document_source_analyze_shard_key_read_write_distribution.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 
 namespace mongo {

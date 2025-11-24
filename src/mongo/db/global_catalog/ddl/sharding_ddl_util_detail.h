@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
-#include "mongo/db/user_write_block/write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/write_block_bypass.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/async_rpc_targeter.h"

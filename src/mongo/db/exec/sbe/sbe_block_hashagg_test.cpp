@@ -33,7 +33,7 @@
 #include "mongo/db/exec/sbe/stages/block_hashagg.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 
 #include <algorithm>
 #include <functional>

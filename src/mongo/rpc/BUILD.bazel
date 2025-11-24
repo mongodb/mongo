@@ -275,8 +275,8 @@ mongo_cc_fuzzer_test(
     deps = [
         "message",
         "rpc",
-        "//src/mongo/db/local_catalog/lock_manager",
         "//src/mongo/db/query/write_ops:write_ops_parsers",
+        "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/transport:message_compressor",
     ],
 )

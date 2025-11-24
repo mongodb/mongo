@@ -60,7 +60,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/shard_registry.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"

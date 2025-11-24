@@ -32,8 +32,8 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/untrack_unsplittable_collection_gen.h"
-#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/sharding_environment/grid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

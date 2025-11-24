@@ -34,7 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index/s2_common.h"
-#include "mongo/db/local_catalog/index_catalog_entry.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {

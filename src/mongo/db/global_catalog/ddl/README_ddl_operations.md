@@ -1,6 +1,6 @@
 # DDL Operations
 
-On the Sharding team, we use the term _DDL_ to mean any operation that needs to update any subset of [catalog containers](../../local_catalog/README_sharding_catalog.md#catalog-containers). Within this definition, there are standard DDLs that use the DDL coordinator infrastructure as well as non-standard DDLs that each have their own implementations.
+On the Sharding team, we use the term _DDL_ to mean any operation that needs to update any subset of [catalog containers](../../shard_role/shard_catalog/README_sharding_catalog.md#catalog-containers). Within this definition, there are standard DDLs that use the DDL coordinator infrastructure as well as non-standard DDLs that each have their own implementations.
 
 ## Standard DDLs
 
@@ -72,7 +72,7 @@ When a new primary node is elected, the DDL primary only service is rebuilt, and
 
 ### Sections about specific standard DDL operations
 
-- [User write blocking](../../user_write_block/README_user_write_blocking.md)
+- [User write blocking](../../topology/user_write_block/README_user_write_blocking.md)
 
 ## Non-Standard DDLs
 

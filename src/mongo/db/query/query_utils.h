@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/db/local_catalog/clustered_collection_util.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 
 namespace mongo {
 /**

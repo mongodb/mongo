@@ -39,7 +39,6 @@
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/local_catalog/collection_mock.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
@@ -50,6 +49,7 @@
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/collection_mock.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
 

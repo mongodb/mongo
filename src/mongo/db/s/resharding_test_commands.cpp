@@ -44,7 +44,7 @@
 #include "mongo/db/s/resharding_test_commands_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/vector_clock/vector_clock_metadata_hook.h"
+#include "mongo/db/topology/vector_clock/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"

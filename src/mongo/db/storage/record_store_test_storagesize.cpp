@@ -29,10 +29,10 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
-#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/write_unit_of_work.h"

@@ -32,10 +32,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status/server_status.h"
-#include "mongo/db/local_catalog/lock_manager/lock_stats.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/lock_stats.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 

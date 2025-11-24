@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {

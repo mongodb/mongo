@@ -32,8 +32,8 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/local_catalog/index_catalog_entry.h"
-#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/key_format.h"
 
 #include <utility>

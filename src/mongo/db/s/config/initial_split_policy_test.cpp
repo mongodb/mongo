@@ -44,7 +44,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/topology/shard_registry.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

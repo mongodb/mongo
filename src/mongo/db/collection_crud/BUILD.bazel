@@ -19,11 +19,11 @@ mongo_cc_library(
         "//src/mongo/db:record_id_helpers",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:shard_role_api",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:write_stage_common",
-        "//src/mongo/db/local_catalog:document_validation",
-        "//src/mongo/db/local_catalog:local_oplog_info",
         "//src/mongo/db/op_observer:op_observer_util",
         "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/shard_role/shard_catalog:document_validation",
+        "//src/mongo/db/shard_role/shard_catalog:local_oplog_info",
         "//src/mongo/db/storage:index_entry_comparison",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:record_store_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
@@ -55,9 +55,9 @@ mongo_cc_unit_test(
     ],
     deps = [
         "//src/mongo/db:service_context_d_test_fixture",
-        "//src/mongo/db/local_catalog:catalog_control",
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_control",
     ],
 )

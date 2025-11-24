@@ -30,7 +30,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/util/assert_util.h"
 
 #include <utility>

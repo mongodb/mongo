@@ -33,7 +33,6 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/rwmutex.h"
 

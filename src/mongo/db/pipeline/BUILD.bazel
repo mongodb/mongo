@@ -135,9 +135,9 @@ mongo_cc_library(
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db/auth:security_token_auth",
         "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/local_catalog:local_oplog_info",
         "//src/mongo/db/query/query_shape",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats:query_stats_parse",
+        "//src/mongo/db/shard_role/shard_catalog:local_oplog_info",
         "//src/mongo/db/storage/key_string",
         "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/idl:idl_parser",
@@ -554,7 +554,6 @@ mongo_cc_library(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/index:index_access_method",
-        "//src/mongo/db/local_catalog:collection_catalog",
         "//src/mongo/db/memory_tracking",
         "//src/mongo/db/pipeline/spilling",
         "//src/mongo/db/query:bucket_predicate_generator",
@@ -589,6 +588,7 @@ mongo_cc_library(
         "//src/mongo/db/session:logical_session_cache",
         "//src/mongo/db/session:logical_session_id_helpers",
         "//src/mongo/db/session:sessions_collection",
+        "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
         "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/storage:encryption_hooks",
@@ -1291,7 +1291,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/host:extension_loader",
         "//src/mongo/db/extension/sdk:sdk_cpp",
         "//src/mongo/db/extension/sdk/tests:shared_test_stages",
-        "//src/mongo/db/local_catalog:catalog_test_fixture",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_impl",
         "//src/mongo/db/op_observer:operation_logger_impl",
@@ -1309,6 +1308,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
         "//src/mongo/db/s:shard_server_test_fixture",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/storage/devnull:storage_devnull_core",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
         "//src/mongo/s:sharding_mongos_test_fixture",

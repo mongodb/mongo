@@ -47,8 +47,8 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::sbe {

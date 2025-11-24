@@ -46,7 +46,7 @@
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
-#include "mongo/db/local_catalog/util/partitioned.h"
+#include "mongo/db/partitioned.h"
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_callbacks.h"

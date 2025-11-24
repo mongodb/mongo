@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_router.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 namespace mongo {

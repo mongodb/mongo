@@ -34,12 +34,12 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 
 #include <string>
 

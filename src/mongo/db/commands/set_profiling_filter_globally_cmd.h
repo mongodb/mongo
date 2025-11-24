@@ -35,9 +35,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/local_catalog/collection_catalog.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/util/modules.h"
 
 #include <string>

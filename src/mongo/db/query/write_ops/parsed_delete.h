@@ -30,13 +30,13 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/assert_util.h"
 
 #include <memory>

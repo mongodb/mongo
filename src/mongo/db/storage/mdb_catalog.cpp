@@ -30,10 +30,10 @@
 #include "mongo/db/storage/mdb_catalog.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/feature_document_util.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"

@@ -30,10 +30,10 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_external_state.h"
 
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
-#include "mongo/db/local_catalog/shard_role_catalog/database_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/user_write_block/global_user_write_block_state.h"
-#include "mongo/db/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 
 namespace mongo {
 

@@ -22,7 +22,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/cluster_parameters/cluster_server_parameter.idl"
+    - "mongo/db/topology/cluster_parameters/cluster_server_parameter.idl"
 
 structs:
     CWSPIntStorage:

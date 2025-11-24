@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/db/local_catalog/collection.h"  // for CollectionPtr
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog.h"                  // for OplogLink
-#include "mongo/db/repl/oplog_entry.h"            // for MutableOplogEntry
-#include "mongo/db/session/logical_session_id.h"  // for StmtId
-#include "mongo/db/storage/record_store.h"        // for Record
+#include "mongo/db/repl/oplog.h"                           // for OplogLink
+#include "mongo/db/repl/oplog_entry.h"                     // for MutableOplogEntry
+#include "mongo/db/session/logical_session_id.h"           // for StmtId
+#include "mongo/db/shard_role/shard_catalog/collection.h"  // for CollectionPtr
+#include "mongo/db/storage/record_store.h"                 // for Record
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"  // for Date_t
 

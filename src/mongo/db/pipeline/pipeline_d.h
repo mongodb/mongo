@@ -36,7 +36,6 @@
 #include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
@@ -55,6 +54,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/modules.h"
 
 #include <functional>

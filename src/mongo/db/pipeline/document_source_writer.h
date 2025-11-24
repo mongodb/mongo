@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/db/local_catalog/db_raii.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/read_concern.h"
+#include "mongo/db/shard_role/shard_catalog/db_raii.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/modules.h"
 

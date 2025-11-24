@@ -41,7 +41,6 @@
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
@@ -50,6 +49,7 @@
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>

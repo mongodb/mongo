@@ -31,9 +31,9 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/router_role/router_role.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/shard_id.h"

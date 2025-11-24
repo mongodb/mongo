@@ -29,12 +29,12 @@
 
 #include "mongo/db/s/ready_range_deletions_processor.h"
 
-#include "mongo/db/local_catalog/catalog_raii.h"
-#include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
-#include "mongo/db/local_catalog/shard_role_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_util.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/idle_thread_block.h"

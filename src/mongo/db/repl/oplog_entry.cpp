@@ -32,10 +32,10 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"

@@ -49,7 +49,7 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/raw_data_operation.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/idl/idl_parser.h"

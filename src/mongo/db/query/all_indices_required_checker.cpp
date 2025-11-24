@@ -30,10 +30,10 @@
 #include "mongo/db/query/all_indices_required_checker.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/local_catalog/index_catalog.h"
-#include "mongo/db/local_catalog/index_catalog_entry.h"
-#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

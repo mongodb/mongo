@@ -17,11 +17,11 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:write_stage_common",
         "//src/mongo/db/collection_crud",
-        "//src/mongo/db/local_catalog:catalog_control",
-        "//src/mongo/db/local_catalog:catalog_test_fixture",
         "//src/mongo/db/query:query_planner",
         "//src/mongo/db/query/compiler/ce:ce_test_utils",
         "//src/mongo/db/query/compiler/optimizer/index_bounds_builder",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_control",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )
 

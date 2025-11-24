@@ -33,9 +33,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index_builds/multi_index_block.h"
-#include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/util/modules.h"
 
 namespace MONGO_MOD_PUBLIC mongo {

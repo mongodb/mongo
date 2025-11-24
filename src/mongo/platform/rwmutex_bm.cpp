@@ -29,9 +29,9 @@
 
 #include "mongo/platform/rwmutex.h"
 
-#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
-#include "mongo/db/local_catalog/lock_manager/lock_manager.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/lock_manager.h"
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"

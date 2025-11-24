@@ -33,12 +33,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 

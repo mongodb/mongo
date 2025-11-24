@@ -30,7 +30,7 @@
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 
 #include "mongo/db/curop.h"
-#include "mongo/db/local_catalog/collection_uuid_mismatch.h"
+#include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/stats/top.h"

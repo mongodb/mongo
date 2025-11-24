@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"

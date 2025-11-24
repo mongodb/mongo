@@ -42,7 +42,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/pcre_util.h"

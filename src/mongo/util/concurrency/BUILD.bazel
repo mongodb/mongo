@@ -135,7 +135,7 @@ mongo_cc_benchmark(
         ":ticketholder",
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db/admission:execution_admission_context",
-        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/db/shard_role/lock_manager",
     ],
 )
 

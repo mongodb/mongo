@@ -29,12 +29,12 @@
 #pragma once
 
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/local_catalog/shard_role_catalog/collection_metadata.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
+#include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"

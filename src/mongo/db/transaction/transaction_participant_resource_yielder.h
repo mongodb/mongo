@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/local_catalog/shard_role_api/resource_yielder.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/resource_yielder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 

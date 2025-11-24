@@ -28,9 +28,6 @@
  */
 #pragma once
 
-#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
-#include "mongo/db/local_catalog/db_raii.h"
-#include "mongo/db/local_catalog/external_data_source_scope_guard.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -40,6 +37,9 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/read_concern.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache.h"
+#include "mongo/db/shard_role/shard_catalog/db_raii.h"
+#include "mongo/db/shard_role/shard_catalog/external_data_source_scope_guard.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/util/modules.h"

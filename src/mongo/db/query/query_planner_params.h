@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/local_catalog/clustered_collection_options_gen.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -40,6 +38,8 @@
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 
 #include <vector>
 

@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"

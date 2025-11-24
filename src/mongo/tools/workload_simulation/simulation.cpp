@@ -29,7 +29,7 @@
 
 #include "mongo/tools/workload_simulation/simulation.h"
 
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/tools/workload_simulation/simulator_options.h"
 #include "mongo/util/pcre.h"

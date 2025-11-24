@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
-#include "mongo/db/local_catalog/shard_role_catalog/flush_routing_table_cache_updates_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_dao.h"
+#include "mongo/db/shard_role/shard_catalog/flush_routing_table_cache_updates_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/async_requests_sender.h"

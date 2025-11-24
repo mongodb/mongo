@@ -98,7 +98,7 @@ A placement version change indicates that something has changed about what data 
 
 ## Routing (a.k.a. Placement) Information Refreshes
 
-For sharded collections, routing is driven by the chunk placement information, for which the config server represents the [authoritative source](../local_catalog/README_sharding_catalog.md#authoritative-containers).
+For sharded collections, routing is driven by the chunk placement information, for which the config server represents the [authoritative source](../shard_role/shard_catalog/README_sharding_catalog.md#authoritative-containers).
 
 MongoS and shard primaries refresh their placement information from the config server. Shard secondaries, however, refresh from the shard primaries through a component called the Shard Server Catalog Cache Loader. When a shard primary refreshes from a config server, it persists the refreshed information to disk. This information is then replicated to secondaries who will refresh their cache from this on-disk information.
 

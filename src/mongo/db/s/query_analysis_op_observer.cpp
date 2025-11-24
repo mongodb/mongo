@@ -30,9 +30,9 @@
 #include "mongo/db/s/query_analysis_op_observer.h"
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/s/query_analysis_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"

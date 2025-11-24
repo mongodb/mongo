@@ -33,12 +33,12 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
-#include "mongo/db/local_catalog/catalog_raii.h"
-#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
-#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>

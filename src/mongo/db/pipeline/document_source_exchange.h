@@ -31,12 +31,12 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/exchange_stage.h"
-#include "mongo/db/local_catalog/shard_role_api/resource_yielder.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/shard_role/resource_yielder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 

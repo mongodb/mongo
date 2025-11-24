@@ -33,11 +33,11 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/compact_gen.h"
-#include "mongo/db/local_catalog/collection_catalog.h"
-#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/logv2/log.h"
 
 #include <boost/cstdint.hpp>

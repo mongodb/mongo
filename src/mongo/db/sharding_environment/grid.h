@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/executor/connection_pool_stats.h"

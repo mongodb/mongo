@@ -31,7 +31,6 @@
 #include "mongo/db/session/logical_session_cache_impl.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"

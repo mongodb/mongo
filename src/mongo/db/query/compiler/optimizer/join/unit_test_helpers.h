@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 
 namespace mongo::join_ordering {
 

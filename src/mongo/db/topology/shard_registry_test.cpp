@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 

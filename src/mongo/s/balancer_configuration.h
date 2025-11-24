@@ -32,7 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/balancer_configuration_gen.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"

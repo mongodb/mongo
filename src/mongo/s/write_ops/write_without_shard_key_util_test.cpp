@@ -31,8 +31,6 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
-#include "mongo/db/global_catalog/catalog_cache/catalog_cache_test_fixture.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -42,6 +40,8 @@
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"

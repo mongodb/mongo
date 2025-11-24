@@ -34,9 +34,9 @@
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_join_ddl_coordinators_request_gen.h"
-#include "mongo/db/local_catalog/drop_collection.h"
+#include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

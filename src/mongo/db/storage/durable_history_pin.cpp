@@ -35,8 +35,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/client.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/decorable.h"

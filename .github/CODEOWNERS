@@ -1882,15 +1882,21 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/flow_control_ticketholder* @10gen/server-workload-resilience @svc-auto-approve-bot
 /src/mongo/db/**/replication_state_transition_lock_guard* @10gen/server-replication-reviewers @svc-auto-approve-bot
 /src/mongo/db/**/local_executor* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
+/src/mongo/db/**/collection_compact* @10gen/server-compact @svc-auto-approve-bot
+/src/mongo/db/**/import* @10gen/server-catalog-and-routing-shard-catalog @10gen/server-storage-engine-integration @svc-auto-approve-bot
+/src/mongo/db/**/index_key_validate* @10gen/server-index-builds @svc-auto-approve-bot
+/src/mongo/db/**/index_spec_validate* @10gen/server-index-builds @svc-auto-approve-bot
+/src/mongo/db/**/index_repair* @10gen/server-index-builds @svc-auto-approve-bot
+/src/mongo/db/**/throttle_cursor* @10gen/server-validate @svc-auto-approve-bot
+/src/mongo/db/**/cleanup_structured* @10gen/server-catalog-and-routing-ddl @10gen/server-security @svc-auto-approve-bot
+/src/mongo/db/**/compact_structured* @10gen/server-catalog-and-routing-ddl @10gen/server-security @svc-auto-approve-bot
+/src/mongo/db/**/partitioned* @10gen/server-programmability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/admission/OWNERS.yml
 /src/mongo/db/admission/**/* @10gen/server-workload-resilience @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/auth/OWNERS.yml
 /src/mongo/db/auth/**/* @10gen/server-security @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/mongo/db/cluster_parameters/OWNERS.yml
-/src/mongo/db/cluster_parameters/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/collection_crud/OWNERS.yml
 /src/mongo/db/collection_crud/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
@@ -2088,20 +2094,12 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/global_catalog/**/* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
 /src/mongo/db/global_catalog/**/type_tags* @10gen/server-cluster-scalability @svc-auto-approve-bot
 
-# The following patterns are parsed from ./src/mongo/db/global_catalog/catalog_cache/OWNERS.yml
-/src/mongo/db/global_catalog/catalog_cache/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
-
 # The following patterns are parsed from ./src/mongo/db/global_catalog/ddl/OWNERS.yml
 /src/mongo/db/global_catalog/ddl/**/* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
 /src/mongo/db/global_catalog/ddl/**/*chunk_migration_command* @10gen/server-catalog-and-routing-ddl @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/global_catalog/ddl/**/sharding_catalog_manager_assign_key_range_to_zone_test.cpp @10gen/server-catalog-and-routing-ddl @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/global_catalog/ddl/**/sharding_catalog_manager_zone_operations.cpp @10gen/server-catalog-and-routing-ddl @10gen/server-cluster-scalability @svc-auto-approve-bot
-/src/mongo/db/global_catalog/ddl/**/cleanup_structured* @10gen/server-catalog-and-routing-ddl @10gen/server-security @svc-auto-approve-bot
-/src/mongo/db/global_catalog/ddl/**/compact_structured* @10gen/server-catalog-and-routing-ddl @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/global_catalog/ddl/**/*refine_collection_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/mongo/db/global_catalog/router_role_api/OWNERS.yml
-/src/mongo/db/global_catalog/router_role_api/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/index/OWNERS.yml
 /src/mongo/db/index/**/index_access_method* @10gen/server-index-builds @svc-auto-approve-bot
@@ -2122,32 +2120,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/index_builds/OWNERS.yml
 /src/mongo/db/index_builds/**/* @10gen/server-index-builds @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/mongo/db/local_catalog/OWNERS.yml
-/src/mongo/db/local_catalog/**/* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
-/src/mongo/db/local_catalog/**/collection_compact* @10gen/server-compact @svc-auto-approve-bot
-/src/mongo/db/local_catalog/**/import* @10gen/server-catalog-and-routing-shard-catalog @10gen/server-storage-engine-integration @svc-auto-approve-bot
-/src/mongo/db/local_catalog/**/index_key_validate* @10gen/server-index-builds @svc-auto-approve-bot
-/src/mongo/db/local_catalog/**/index_spec_validate* @10gen/server-index-builds @svc-auto-approve-bot
-/src/mongo/db/local_catalog/**/index_repair* @10gen/server-index-builds @svc-auto-approve-bot
-/src/mongo/db/local_catalog/**/throttle_cursor* @10gen/server-validate @svc-auto-approve-bot
-/src/mongo/db/local_catalog/**/durable_catalog* @10gen/server-catalog-and-routing-shard-catalog @10gen/server-storage-engine-integration @svc-auto-approve-bot
-/src/mongo/db/local_catalog/**/index_catalog_entry_helpers* @10gen/query-execution-write-exec @svc-auto-approve-bot
-/src/mongo/db/local_catalog/**/local_oplog_info* @10gen/server-oplog @svc-auto-approve-bot
-/src/mongo/db/local_catalog/**/document_validation* @10gen/query-execution @svc-auto-approve-bot
-/src/mongo/db/local_catalog/**/external_data_source_scope_guard* @10gen/query-integration-features @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/mongo/db/local_catalog/ddl/OWNERS.yml
-/src/mongo/db/local_catalog/ddl/**/* @10gen/server-catalog-and-routing-ddl @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/mongo/db/local_catalog/lock_manager/OWNERS.yml
-/src/mongo/db/local_catalog/lock_manager/**/* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/mongo/db/local_catalog/shard_role_api/OWNERS.yml
-/src/mongo/db/local_catalog/shard_role_api/**/* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/mongo/db/local_catalog/shard_role_catalog/OWNERS.yml
-/src/mongo/db/local_catalog/shard_role_catalog/**/* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/matcher/OWNERS.yml
 /src/mongo/db/matcher/**/* @10gen/query-optimization @svc-auto-approve-bot
@@ -2765,6 +2737,12 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/repl/split_horizon/OWNERS.yml
 /src/mongo/db/repl/split_horizon/**/* @10gen/server-split-horizon @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/router_role/OWNERS.yml
+/src/mongo/db/router_role/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/router_role/routing_cache/OWNERS.yml
+/src/mongo/db/router_role/routing_cache/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/rss/OWNERS.yml
 /src/mongo/db/rss/**/* @10gen/server-rss @svc-auto-approve-bot
 
@@ -2803,6 +2781,22 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/session/OWNERS.yml
 /src/mongo/db/session/**/* @10gen/server-transactions @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/shard_role/OWNERS.yml
+/src/mongo/db/shard_role/**/* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/shard_role/ddl/OWNERS.yml
+/src/mongo/db/shard_role/ddl/**/* @10gen/server-catalog-and-routing-ddl @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/shard_role/lock_manager/OWNERS.yml
+/src/mongo/db/shard_role/lock_manager/**/* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/shard_role/shard_catalog/OWNERS.yml
+/src/mongo/db/shard_role/shard_catalog/**/* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+/src/mongo/db/shard_role/shard_catalog/**/durable_catalog* @10gen/server-catalog-and-routing-shard-catalog @10gen/server-storage-engine-integration @svc-auto-approve-bot
+/src/mongo/db/shard_role/shard_catalog/**/index_catalog_entry_helpers* @10gen/query-execution-write-exec @svc-auto-approve-bot
+/src/mongo/db/shard_role/shard_catalog/**/document_validation* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/shard_role/shard_catalog/**/external_data_source_scope_guard* @10gen/query-integration-features @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/sharding_environment/OWNERS.yml
 /src/mongo/db/sharding_environment/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
@@ -2889,6 +2883,18 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/topology/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /src/mongo/db/topology/**/*coordinator* @10gen/server-catalog-and-routing-ddl @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/topology/cluster_parameters/OWNERS.yml
+/src/mongo/db/topology/cluster_parameters/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/topology/user_write_block/OWNERS.yml
+/src/mongo/db/topology/user_write_block/**/* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+/src/mongo/db/topology/user_write_block/**/*shardsvr* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
+/src/mongo/db/topology/user_write_block/**/*configsvr* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
+/src/mongo/db/topology/user_write_block/**/*cluster* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/topology/vector_clock/OWNERS.yml
+/src/mongo/db/topology/vector_clock/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/traffic_recorder/OWNERS.yml
 /src/mongo/db/traffic_recorder/**/* @10gen/query-optimization @svc-auto-approve-bot
 
@@ -2902,17 +2908,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/update/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/db/update/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
 
-# The following patterns are parsed from ./src/mongo/db/user_write_block/OWNERS.yml
-/src/mongo/db/user_write_block/**/* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
-/src/mongo/db/user_write_block/**/*shardsvr* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
-/src/mongo/db/user_write_block/**/*configsvr* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
-/src/mongo/db/user_write_block/**/*cluster* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
-
 # The following patterns are parsed from ./src/mongo/db/validate/OWNERS.yml
 /src/mongo/db/validate/**/* @10gen/server-validate @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/mongo/db/vector_clock/OWNERS.yml
-/src/mongo/db/vector_clock/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/versioning_protocol/OWNERS.yml
 /src/mongo/db/versioning_protocol/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot

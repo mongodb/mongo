@@ -30,11 +30,11 @@
 #include "mongo/db/s/query_analysis_op_observer_configsvr.h"
 
 #include "mongo/db/global_catalog/type_mongos.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/query_analysis_coordinator.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/unittest/unittest.h"

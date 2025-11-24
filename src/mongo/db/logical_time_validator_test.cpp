@@ -41,7 +41,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/db/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 

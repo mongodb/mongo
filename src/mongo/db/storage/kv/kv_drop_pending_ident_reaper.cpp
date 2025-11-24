@@ -31,9 +31,9 @@
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/attribute_storage.h"

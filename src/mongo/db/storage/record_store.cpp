@@ -29,8 +29,8 @@
 
 #include "mongo/db/storage/record_store.h"
 
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/damage_vector.h"
 
 #include <boost/move/utility_core.hpp>

@@ -29,9 +29,9 @@
 
 #include "mongo/db/op_observer/batched_write_context.h"
 
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 

@@ -39,7 +39,7 @@ mongo_cc_unit_test(
     deps = [
         "//src/mongo/db/auth:security_token",
         "//src/mongo/db/commands:core",
-        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/transport:transport_layer_common",
         "//src/mongo/util:clock_source_mock",
     ],

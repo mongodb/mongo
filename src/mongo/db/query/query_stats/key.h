@@ -33,11 +33,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/local_catalog/collection_type.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/modules.h"
 

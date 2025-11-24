@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/cluster_parameters/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/topology/cluster_parameters/cluster_server_parameter_cmds_gen.h"
 
 namespace mongo::query_settings {
 using SetClusterParameterFn = std::function<void(OperationContext*,

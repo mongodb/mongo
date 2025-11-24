@@ -30,11 +30,11 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 
 #include "mongo/base/initializer.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"

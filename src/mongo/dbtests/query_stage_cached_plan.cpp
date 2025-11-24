@@ -43,8 +43,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/index_builds/index_build_test_helpers.h"
-#include "mongo/db/local_catalog/database_holder.h"
-#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -60,6 +58,8 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep

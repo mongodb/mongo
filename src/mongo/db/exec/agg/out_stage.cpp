@@ -31,11 +31,11 @@
 
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
-#include "mongo/db/local_catalog/collection_catalog.h"
-#include "mongo/db/local_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/writer_util.h"
-#include "mongo/db/raw_data_operation.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
 

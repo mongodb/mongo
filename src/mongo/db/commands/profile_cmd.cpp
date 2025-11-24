@@ -32,15 +32,15 @@
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/local_catalog/database.h"
-#include "mongo/db/local_catalog/database_holder.h"
-#include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/profile_collection.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/shard_role/shard_catalog/database.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
+#include "mongo/db/shard_role/shard_catalog/db_raii.h"
 
 namespace mongo {
 namespace {

@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/db/global_catalog/chunk_manager.h"
-#include "mongo/db/local_catalog/shard_role_catalog/collection_metadata.h"
+#include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"

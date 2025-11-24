@@ -55,7 +55,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"

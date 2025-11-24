@@ -30,11 +30,11 @@
 #include "mongo/db/query/timeseries/timeseries_translation.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/local_catalog/create_collection.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"

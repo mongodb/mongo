@@ -29,8 +29,8 @@
 
 #include "mongo/db/service_entry_point_shard_role_helpers.h"
 
-#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
-#include "mongo/db/global_catalog/router_role_api/gossiped_routing_cache_gen.h"
+#include "mongo/db/router_role/gossiped_routing_cache_gen.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"

@@ -121,7 +121,7 @@ idl_generator(
     name = "fle_options_gen",
     src = "fle_options.idl",
     deps = [
-        "//src/mongo/db/cluster_parameters:cluster_server_parameter_gen",
+        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_gen",
     ],
 )
 

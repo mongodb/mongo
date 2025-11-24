@@ -30,14 +30,14 @@
 #include "mongo/db/s/resharding/resharding_coordinator_service_external_state.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/global_catalog/catalog_cache/routing_information_cache.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/router_role/routing_cache/routing_information_cache.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/resharding/recipient_resume_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 

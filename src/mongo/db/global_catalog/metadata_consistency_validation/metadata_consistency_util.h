@@ -36,12 +36,12 @@
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/global_catalog/type_tags.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 
 #include <memory>

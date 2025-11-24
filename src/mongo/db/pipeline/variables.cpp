@@ -45,7 +45,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/str.h"

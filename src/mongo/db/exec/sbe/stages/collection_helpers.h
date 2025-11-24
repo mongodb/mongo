@@ -30,12 +30,12 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/local_catalog/collection.h"
-#include "mongo/db/local_catalog/index_catalog_entry.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"

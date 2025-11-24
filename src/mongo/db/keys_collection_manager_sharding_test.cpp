@@ -46,7 +46,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/db/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"

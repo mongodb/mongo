@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/global_catalog/catalog_cache/catalog_cache_test_fixture.h"
-#include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
+#include "mongo/db/router_role/collection_routing_info_targeter.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
 #include "mongo/rpc/write_concern_error_gen.h"
 #include "mongo/util/fail_point.h"
 
@@ -48,9 +48,7 @@
 #include "mongo/db/baton.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
-#include "mongo/db/global_catalog/catalog_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
-#include "mongo/db/global_catalog/router_role_api/mock_ns_targeter.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/logical_time.h"
@@ -60,10 +58,12 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/router_role/mock_ns_targeter.h"
+#include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"

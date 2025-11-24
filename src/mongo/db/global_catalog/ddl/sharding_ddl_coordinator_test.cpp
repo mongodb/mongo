@@ -30,7 +30,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_external_state_for_test.h"
-#include "mongo/db/local_catalog/lock_manager/locker.h"
+#include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 

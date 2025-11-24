@@ -36,12 +36,12 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/local_catalog/collection.h"
-#include "mongo/db/local_catalog/collection_mock.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection_mock.h"
+#include "mongo/db/shard_role/shard_role_mock.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/optional/optional.hpp>

@@ -31,10 +31,10 @@
 #include "mongo/s/cluster_write.h"
 
 #include "mongo/db/fle_crud.h"
-#include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
-#include "mongo/db/global_catalog/router_role_api/ns_targeter.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
+#include "mongo/db/router_role/collection_routing_info_targeter.h"
+#include "mongo/db/router_role/ns_targeter.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/write_ops/bulk_write_exec.h"

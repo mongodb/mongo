@@ -32,9 +32,9 @@ Additionally, users can specify that they'd like to perform a `full` validation.
 ## Types of Validation
 
 - Verifies the collection's durable catalog entry and in-memory state match.
-- Indexes are marked as [multikey](../local_catalog/README.md#multikey-indexes) correctly.
-- Index [multikey](../local_catalog/README.md#multikey-indexes) paths cover all of the records in the `RecordStore`.
-- Indexes are not missing [multikey](../local_catalog/README.md#multikey-indexes) metadata information.
+- Indexes are marked as [multikey](../shard_role/shard_catalog/README.md#multikey-indexes) correctly.
+- Index [multikey](../shard_role/shard_catalog/README.md#multikey-indexes) paths cover all of the records in the `RecordStore`.
+- Indexes are not missing [multikey](../shard_role/shard_catalog/README.md#multikey-indexes) metadata information.
 - Index entries are in increasing order if the sort order is ascending.
 - Index entries are in decreasing order if the sort order is descending.
 - Unique indexes do not have duplicate keys.

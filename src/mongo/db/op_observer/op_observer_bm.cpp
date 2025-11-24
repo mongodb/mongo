@@ -29,8 +29,6 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_op_observer.h"
-#include "mongo/db/cluster_parameters/cluster_server_parameter_op_observer.h"
-#include "mongo/db/local_catalog/collection_mock.h"
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
 #include "mongo/db/op_observer/fallback_op_observer.h"
 #include "mongo/db/op_observer/fcv_op_observer.h"
@@ -47,10 +45,12 @@
 #include "mongo/db/s/query_analysis_op_observer_rs.h"
 #include "mongo/db/s/query_analysis_op_observer_shardsvr.h"
 #include "mongo/db/s/resharding/resharding_op_observer.h"
+#include "mongo/db/shard_role/shard_catalog/collection_mock.h"
 #include "mongo/db/sharding_environment/config_server_op_observer.h"
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/timeseries/timeseries_op_observer.h"
-#include "mongo/db/user_write_block/user_write_block_mode_op_observer.h"
+#include "mongo/db/topology/cluster_parameters/cluster_server_parameter_op_observer.h"
+#include "mongo/db/topology/user_write_block/user_write_block_mode_op_observer.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/platform/compiler.h"
 

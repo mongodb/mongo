@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -38,6 +37,7 @@
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_indexability.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {

@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_stats.h"

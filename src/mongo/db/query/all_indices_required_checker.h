@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/db/local_catalog/collection.h"
-#include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 

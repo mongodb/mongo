@@ -47,7 +47,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/db/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/commit_reshard_collection_gen.h"

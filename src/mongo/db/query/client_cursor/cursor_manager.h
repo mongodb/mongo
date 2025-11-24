@@ -31,9 +31,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/local_catalog/util/partitioned.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/partitioned.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"

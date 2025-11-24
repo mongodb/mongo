@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/local_catalog/ddl/create_gen.h"
+#include "mongo/db/shard_role/ddl/create_gen.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 

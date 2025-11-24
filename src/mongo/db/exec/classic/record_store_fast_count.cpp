@@ -30,7 +30,7 @@
 
 #include "mongo/db/exec/classic/record_store_fast_count.h"
 
-#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

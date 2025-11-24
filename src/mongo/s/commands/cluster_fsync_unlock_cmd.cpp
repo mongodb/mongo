@@ -32,7 +32,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
+#include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"

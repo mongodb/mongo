@@ -7,7 +7,7 @@ places with more detailed documentation.
 Third-party storage engines are integrated through self-contained modules that can be dropped into
 an existing MongoDB source tree, and will be automatically configured and included.
 
-For more context and information on how this API is used, see the [Catalog](../local_catalog/README.md).
+For more context and information on how this API is used, see the [Catalog](../shard_role/shard_catalog/README.md).
 
 ## Record Stores
 
@@ -16,7 +16,7 @@ them. All MongoDB collections are implemented with a [RecordStore](record_store.
 implemented with a [SortedDataInterface](sorted_data_interface.h). By using the
 [KVEngine](kv/kv_engine.h) class, you only have to deal with the abstraction, as the
 [StorageEngineImpl](storage_engine_impl.h) implements the [StorageEngine](storage_engine.h)
-interface, using record stores for catalogs. See the [Catalog](../local_catalog/README.md) for more information.
+interface, using record stores for catalogs. See the [Catalog](../shard_role/shard_catalog/README.md) for more information.
 
 ### Record Identities
 
@@ -41,7 +41,7 @@ MongoDB uses multi-granular intent locking; see the [Concurrency FAQ][]. In all 
 ensure that operations to meta-data, such as creation and deletion of record stores, are serialized
 with respect to other accesses.
 
-See the [Catalog](../local_catalog/README.md) and [Concurrency Control](../local_catalog/lock_manager/README.md) for more information.
+See the [Catalog](../shard_role/shard_catalog/README.md) and [Concurrency Control](../shard_role/lock_manager/README.md) for more information.
 
 ## Transactions
 
@@ -283,7 +283,7 @@ There are three components to startup recovery. The first step, of course, is st
 engine. More detail about WiredTiger's startup recovery procedure can be found
 [here](wiredtiger/README.md#startup-recovery).
 
-The other two parts of storage startup recovery bring the [catalog](../local_catalog/README.md) back into
+The other two parts of storage startup recovery bring the [catalog](../shard_role/shard_catalog/README.md) back into
 a consistent state. The catalog typically refers to MongoDB's notion of collections and indexes, but
 it's important to note that storage engines such as WiredTiger have their own notion of a catalog.
 
@@ -456,7 +456,7 @@ A new truncate marker is created when either:
 CollectionTruncateMarkers support collections that meet the following requirements:
 
 - Insert and truncate only. No updates or individual document deletes.
-- [Clustered](../local_catalog/README.md#clustered-collections) with no secondary indexes.
+- [Clustered](../shard_role/shard_catalog/README.md#clustered-collections) with no secondary indexes.
 - RecordId's in Timestamp order.
 - Deletion of content follows RecordId ordering.
   - This is a general property of clustered capped collections.

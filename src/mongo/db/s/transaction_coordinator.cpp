@@ -47,7 +47,7 @@
 #include "mongo/db/s/transaction_coordinator_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"

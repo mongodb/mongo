@@ -32,10 +32,10 @@
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_pre_image_test_helpers.h"
 #include "mongo/db/change_stream_pre_image_util.h"
-#include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/clock_source_mock.h"
 

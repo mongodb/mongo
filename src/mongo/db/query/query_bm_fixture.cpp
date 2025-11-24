@@ -29,7 +29,7 @@
 
 #include "mongo/db/query/query_bm_fixture.h"
 
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/transport/service_entry_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

@@ -36,12 +36,12 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/shard_role/shard_catalog/collection_options.h"
 
 #include <boost/optional/optional.hpp>
 

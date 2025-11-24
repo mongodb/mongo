@@ -44,7 +44,7 @@
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/shard_registry.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/unittest/unittest.h"
 
 #include <typeinfo>

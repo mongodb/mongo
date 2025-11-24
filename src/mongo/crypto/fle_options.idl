@@ -30,7 +30,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/db/cluster_parameters/cluster_server_parameter.idl"
+    - "mongo/db/topology/cluster_parameters/cluster_server_parameter.idl"
 
 structs:
     FLECompactionOptions:

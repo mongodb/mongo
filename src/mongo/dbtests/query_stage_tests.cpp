@@ -37,8 +37,6 @@
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/index_builds/index_build_test_helpers.h"
-#include "mongo/db/local_catalog/index_descriptor.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -51,6 +49,8 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

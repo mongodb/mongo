@@ -28,11 +28,11 @@
  */
 
 #pragma once
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::ce {

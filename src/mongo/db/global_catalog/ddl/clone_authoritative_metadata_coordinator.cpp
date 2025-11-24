@@ -32,9 +32,9 @@
 
 #include "mongo/db/global_catalog/ddl/ddl_lock_manager.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_commit_create_database_metadata_command.h"
-#include "mongo/db/local_catalog/shard_role_catalog/database_sharding_runtime.h"
-#include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
-#include "mongo/db/local_catalog/shard_role_catalog/shard_filtering_metadata_refresh.h"
+#include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/executor/scoped_task_executor.h"

@@ -36,7 +36,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/local_catalog/ddl/drop_indexes.idl"
+    - "mongo/db/shard_role/ddl/drop_indexes.idl"
     - "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.idl"
     - "mongo/db/sharding_environment/sharding_types.idl"
 

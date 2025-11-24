@@ -31,9 +31,9 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 
 #include <boost/none.hpp>

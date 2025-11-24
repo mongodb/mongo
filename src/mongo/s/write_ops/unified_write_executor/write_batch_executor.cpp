@@ -31,8 +31,8 @@
 
 #include "mongo/db/error_labels.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
-#include "mongo/db/raw_data_operation.h"
+#include "mongo/db/router_role/cluster_commands_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/s/request_types/coordinate_multi_update_gen.h"

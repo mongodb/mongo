@@ -30,8 +30,8 @@
 #include "mongo/db/global_catalog/ddl/drop_indexes_coordinator.h"
 
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util_detail.h"
-#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
-#include "mongo/db/raw_data_operation.h"
+#include "mongo/db/router_role/cluster_commands_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/db/topology/sharding_state.h"

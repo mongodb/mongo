@@ -29,12 +29,12 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/modules.h"
 
 #include <vector>

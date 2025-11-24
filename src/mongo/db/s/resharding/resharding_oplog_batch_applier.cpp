@@ -32,8 +32,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role_loop.h"
-#include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/intent_guard.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -43,6 +41,8 @@
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/shard_role/shard_role_loop.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"

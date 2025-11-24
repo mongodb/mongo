@@ -35,8 +35,8 @@
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/field_ref_set.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {

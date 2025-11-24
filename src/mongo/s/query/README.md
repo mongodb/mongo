@@ -2,7 +2,7 @@
 
 On sharded clusters, the router will route CRUD operations to the shard(s) that own the ranges relevant to the query predicate. If the query includes the shard key, then a router will only target the shard(s) that own that shard key (or ranges of shard keys). Conversely, if the query does not include the shard key, then a router will broadcast to all shards that own data for the collection.
 
-Routers use a cache of collection routing tables to determine what shard owns each range of the collection. This cache can sometimes be stale (e.g. after a range migration commits). In order to ensure that the query was routed correctly, the router will use the [placement versioning protocol](/src/mongo/db/versioning_protocol/README_versioning_protocols.md) when forwarding requests to the shard. This ensures that the routing table used for targeting was not stale — if it was, shards will reject the request and inform the router that its routing information is stale.
+Routers use a cache of collection routing tables to determine what shard owns each range of the collection. This cache can sometimes be stale (e.g. after a range migration commits). In order to ensure that the query was routed correctly, the router will use the [placement versioning protocol](../../db/versioning_protocol/README_versioning_protocols.md) when forwarding requests to the shard. This ensures that the routing table used for targeting was not stale — if it was, shards will reject the request and inform the router that its routing information is stale.
 
 If more than one shard was targeted, then the results returned by each shard will be merged by the router which will then return the results to the client.
 
@@ -36,5 +36,5 @@ CRUD operations with a read concern weaker than snapshot roughly match the "read
 ## See Also
 
 - The [MoveRange TLA+ specification](https://github.com/mongodb/mongo/blob/d40899bd45db62def8941cc6ba65c44a2cbbb83a/src/mongo/tla_plus/MoveRange/MoveRange.tla), which models the distributed query protocol and verifies the safety and liveness properties described in this readme.
-- The [Sharded Transactions and DDLs readme](/src/mongo/db/global_catalog/ddl/README_transactions_and_ddl.md), covering aspects pertaining to CRUD operations in distributed transactions.
-- The [RoutingContext readme](../../db/global_catalog/router_role_api/README_routing_context.md) for information about routing operations safely with the `RoutingContext`
+- The [Sharded Transactions and DDLs readme](../../db/global_catalog/ddl/README_transactions_and_ddl.md), covering aspects pertaining to CRUD operations in distributed transactions.
+- The [RoutingContext readme](../../db/router_role/README_routing_context.md) for information about routing operations safely with the `RoutingContext`

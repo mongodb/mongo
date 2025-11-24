@@ -34,10 +34,10 @@
 #include "mongo/db/admission/flow_control_parameters_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/flow_control_ticketholder.h"
-#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
-#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 

@@ -29,7 +29,6 @@
 
 
 #include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/local_catalog/lock_manager/dump_lock_manager.h"
 #include "mongo/db/repl/auto_get_rstl_for_stepup_stepdown.h"
 #include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
@@ -38,6 +37,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/db/shard_role/lock_manager/dump_lock_manager.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/executor/thread_pool_task_executor.h"

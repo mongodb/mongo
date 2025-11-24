@@ -39,13 +39,13 @@
 #include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/index/s2_common.h"
-#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/util/modules.h"
 
 #include <memory>

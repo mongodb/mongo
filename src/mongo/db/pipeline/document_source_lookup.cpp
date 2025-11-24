@@ -60,7 +60,7 @@
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/raw_data_operation.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/views/resolved_view.h"

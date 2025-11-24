@@ -31,8 +31,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/db/local_catalog/catalog_raii.h"
-#include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/ce/ce_test_utils.h"
@@ -40,6 +38,8 @@
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/modules.h"

@@ -36,8 +36,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
-#include "mongo/db/local_catalog/catalog_raii.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
@@ -46,6 +44,8 @@
 #include "mongo/db/repl/dbcheck/health_log_gen.h"
 #include "mongo/db/repl/dbcheck/health_log_interface.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/util/fail_point.h"
 

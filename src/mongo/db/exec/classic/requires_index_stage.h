@@ -32,10 +32,10 @@
 #include "mongo/db/exec/classic/requires_collection_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/local_catalog/index_catalog_entry.h"
-#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/util/modules.h"
 
 #include <string>

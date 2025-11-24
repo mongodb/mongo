@@ -30,10 +30,10 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
-#include "mongo/db/local_catalog/ddl/direct_connection_ddl_hook.h"
-#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/db/shard_role/ddl/direct_connection_ddl_hook.h"
+#include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
 
 namespace mongo {
 namespace {

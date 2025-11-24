@@ -39,7 +39,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/explain_common.h"
-#include "mongo/db/raw_data_operation.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"

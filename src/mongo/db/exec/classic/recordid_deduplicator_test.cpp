@@ -33,10 +33,10 @@
 
 #include "mongo/db/exec/classic/recordid_deduplicator.h"
 
-#include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 #include "mongo/db/pipeline/spilling/spilling_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;

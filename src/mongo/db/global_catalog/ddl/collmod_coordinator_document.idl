@@ -36,7 +36,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/local_catalog/ddl/coll_mod.idl"
+    - "mongo/db/shard_role/ddl/coll_mod.idl"
     - "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.idl"
     - "mongo/db/sharding_environment/sharding_types.idl"
 

@@ -31,8 +31,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
-#include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
-#include "mongo/db/global_catalog/router_role_api/routing_context.h"
+#include "mongo/db/router_role/collection_routing_info_targeter.h"
+#include "mongo/db/router_role/routing_context.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/write_ops/pause_migrations_during_multi_updates_enablement.h"
 #include "mongo/s/write_ops/unified_write_executor/stats.h"

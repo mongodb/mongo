@@ -29,9 +29,9 @@
 
 #include "mongo/db/exec/trial_period_utils.h"
 
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_knob_configuration.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 
 #include <algorithm>
 

@@ -31,12 +31,12 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/local_catalog/collection_type.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/util/modules.h"
 
 #include <utility>

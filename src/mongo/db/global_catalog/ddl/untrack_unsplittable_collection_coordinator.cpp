@@ -32,11 +32,11 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
-#include "mongo/db/local_catalog/shard_role_catalog/shard_filtering_metadata_refresh.h"
+#include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/db/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

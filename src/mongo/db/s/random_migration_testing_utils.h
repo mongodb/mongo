@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/util/modules.h"
 
 #include <boost/move/utility_core.hpp>

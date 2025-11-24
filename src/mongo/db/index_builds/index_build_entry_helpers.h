@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/db/index_builds/index_build_entry_gen.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/modules.h"
 
 /**

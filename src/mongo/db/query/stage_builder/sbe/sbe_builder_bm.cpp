@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 
 #include <benchmark/benchmark.h>
 

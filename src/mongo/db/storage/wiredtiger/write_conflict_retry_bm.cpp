@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
-#include "mongo/db/local_catalog/lock_manager/exception_util.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/write_unit_of_work.h"

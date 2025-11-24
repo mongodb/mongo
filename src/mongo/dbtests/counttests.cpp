@@ -39,11 +39,11 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/local_catalog/database.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"

@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/matcher/extensions_callback.h"
@@ -43,6 +42,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/util/assert_util.h"
 

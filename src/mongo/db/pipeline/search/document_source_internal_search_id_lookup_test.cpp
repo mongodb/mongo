@@ -35,7 +35,6 @@
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/local_catalog/catalog_test_fixture.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/catalog_resource_handle.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
@@ -47,6 +46,7 @@
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 

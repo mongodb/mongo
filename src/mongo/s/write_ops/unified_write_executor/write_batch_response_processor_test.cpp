@@ -31,8 +31,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/error_labels.h"
-#include "mongo/db/global_catalog/catalog_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
+#include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"

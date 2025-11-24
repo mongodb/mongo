@@ -36,7 +36,6 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -50,6 +49,7 @@
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/query/wildcard_test_utils.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 

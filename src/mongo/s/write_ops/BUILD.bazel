@@ -64,7 +64,7 @@ mongo_cc_library(
     name = "pause_migrations_during_multi_updates_enablement",
     srcs = [
         "pause_migrations_during_multi_updates_enablement.cpp",
-        "//src/mongo/db/cluster_parameters:migration_blocking_operation_cluster_parameters_gen",
+        "//src/mongo/db/topology/cluster_parameters:migration_blocking_operation_cluster_parameters_gen",
     ],
     deps = [
         "//src/mongo:base",

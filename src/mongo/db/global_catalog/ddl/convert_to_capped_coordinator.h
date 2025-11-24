@@ -31,7 +31,7 @@
 
 #include "mongo/db/global_catalog/ddl/convert_to_capped_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/local_catalog/shard_role_catalog/participant_block_gen.h"
+#include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 
 namespace mongo {
 

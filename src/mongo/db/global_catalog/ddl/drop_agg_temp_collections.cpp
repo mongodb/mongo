@@ -32,12 +32,12 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
-#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
-#include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/router_role/cluster_commands_helpers.h"
+#include "mongo/db/router_role/router_role.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/user_write_block/write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/write_block_bypass.h"
 #include "mongo/util/log_and_backoff.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

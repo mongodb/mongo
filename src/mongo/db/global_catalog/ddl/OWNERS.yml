@@ -15,14 +15,6 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing-ddl
       - 10gen/server-cluster-scalability
-  - "cleanup_structured*":
-    approvers:
-      - 10gen/server-catalog-and-routing-ddl
-      - 10gen/server-security
-  - "compact_structured*":
-    approvers:
-      - 10gen/server-catalog-and-routing-ddl
-      - 10gen/server-security
   - "*refine_collection_shard_key*":
     approvers:
       - 10gen/server-cluster-scalability

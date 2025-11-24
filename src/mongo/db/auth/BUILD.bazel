@@ -468,8 +468,8 @@ mongo_cc_library(
         "//src/mongo/db:commands",
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/local_catalog:document_validation",
         "//src/mongo/db/pipeline:lite_parsed_document_source",
+        "//src/mongo/db/shard_role/shard_catalog:document_validation",
     ],
 )
 
@@ -678,10 +678,10 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:audit",
         "//src/mongo/db/index:index_access_method",
-        "//src/mongo/db/local_catalog:collection_options",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_util",
         "//src/mongo/db/repl:oplog_entry",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
     ],
 )
 

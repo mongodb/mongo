@@ -30,8 +30,8 @@
 #include "mongo/s/write_ops/write_op_helper.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/cluster_parameters/sharding_cluster_parameters_gen.h"
-#include "mongo/db/local_catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/topology/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 
 namespace mongo {

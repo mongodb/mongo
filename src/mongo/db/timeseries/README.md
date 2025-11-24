@@ -1,6 +1,6 @@
 # Time-Series Collections
 
-MongoDB supports a new collection type for storing time-series data with the [timeseries](../local_catalog/ddl/create.idl)
+MongoDB supports a new collection type for storing time-series data with the [timeseries](../shard_role/ddl/create.idl)
 collection option. A time-series collection presents a simple interface for inserting and querying
 measurements while organizing the actual data in buckets.
 
@@ -9,7 +9,7 @@ at creation. Optionally, a [metaField](https://github.com/mongodb/mongo/blob/r8.
 measurements in the buckets. MongoDB also supports an expiration mechanism on measurements through
 the `expireAfterSeconds` option.
 
-A (viewful) time-series collection `mytscoll` in the `mydb` database is represented in the [catalog](../local_catalog/README.md) by a
+A (viewful) time-series collection `mytscoll` in the `mydb` database is represented in the [catalog](../shard_role/shard_catalog/README.md) by a
 combination of a view and a system collection:
 
 - The non-materialized view `mydb.mytscoll` is defined with the bucket collection as the source collection with

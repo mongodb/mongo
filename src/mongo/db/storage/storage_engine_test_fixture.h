@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include "mongo/db/local_catalog/catalog_raii.h"
-#include "mongo/db/local_catalog/catalog_repair.h"
-#include "mongo/db/local_catalog/collection_catalog.h"
-#include "mongo/db/local_catalog/collection_impl.h"
-#include "mongo/db/local_catalog/durable_catalog.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_repair.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/collection_impl.h"
+#include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/spill_table.h"

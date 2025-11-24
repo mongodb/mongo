@@ -30,13 +30,13 @@
 
 #include "mongo/db/query/query_planner_common.h"
 
-#include "mongo/db/local_catalog/clustered_collection_options_gen.h"
-#include "mongo/db/local_catalog/clustered_collection_util.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"

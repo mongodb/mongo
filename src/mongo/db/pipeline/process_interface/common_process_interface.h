@@ -32,7 +32,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/global_catalog/router_role_api/router_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -41,6 +40,7 @@
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/router_role/router_role.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/util/uuid.h"
 

@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/recovery_unit.h"
 

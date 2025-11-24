@@ -31,14 +31,14 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/local_catalog/collection.h"
-#include "mongo/db/local_catalog/collection_mock.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection_mock.h"
+#include "mongo/db/shard_role/shard_role_mock.h"
 #include "mongo/unittest/unittest.h"
 
 #include <utility>

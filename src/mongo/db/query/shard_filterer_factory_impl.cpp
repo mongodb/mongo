@@ -30,7 +30,7 @@
 #include "mongo/db/query/shard_filterer_factory_impl.h"
 
 #include "mongo/db/exec/shard_filterer_impl.h"
-#include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 
 namespace mongo {
 

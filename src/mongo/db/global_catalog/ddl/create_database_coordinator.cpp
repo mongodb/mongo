@@ -34,7 +34,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
-#include "mongo/db/local_catalog/shard_role_catalog/participant_block_gen.h"
+#include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/executor/async_rpc.h"
 
 namespace mongo {

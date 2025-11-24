@@ -37,9 +37,9 @@
 #include "mongo/db/commands/fle2_cleanup_gen.h"
 #include "mongo/db/commands/fle2_compact_gen.h"
 #include "mongo/db/fle_crud.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 

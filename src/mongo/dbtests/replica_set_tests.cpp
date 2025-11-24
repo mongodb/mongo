@@ -33,7 +33,6 @@
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/last_vote.h"
@@ -44,6 +43,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/admission_context.h"
 

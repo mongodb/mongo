@@ -34,7 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"

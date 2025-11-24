@@ -29,8 +29,8 @@
 
 #include "mongo/db/repl/intent_registry.h"
 
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/decorable.h"

@@ -34,8 +34,8 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/local_catalog/ddl/list_collections_gen.h"
 #include "mongo/db/pipeline/document_source_internal_list_collections.h"
+#include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/util/assert_util.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>

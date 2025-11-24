@@ -30,12 +30,12 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/local_catalog/catalog_raii.h"
-#include "mongo/db/local_catalog/database.h"
-#include "mongo/db/local_catalog/db_raii.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/database.h"
+#include "mongo/db/shard_role/shard_catalog/db_raii.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>

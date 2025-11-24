@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/db/session/kill_sessions_local.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"

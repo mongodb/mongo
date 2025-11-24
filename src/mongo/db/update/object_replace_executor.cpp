@@ -43,9 +43,9 @@
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
-#include "mongo/db/vector_clock/vector_clock_mutable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

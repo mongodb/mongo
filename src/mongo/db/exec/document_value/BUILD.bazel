@@ -49,6 +49,6 @@ mongo_cc_benchmark(
     deps = [
         ":document_value",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/db/shard_role/lock_manager",
     ],
 )

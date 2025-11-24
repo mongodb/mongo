@@ -31,8 +31,6 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/global_catalog/type_shard.h"
-#include "mongo/db/local_catalog/lock_manager/exception_util.h"
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
@@ -40,6 +38,8 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"

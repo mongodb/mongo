@@ -30,8 +30,8 @@
 #include "mongo/db/repl/auto_get_rstl_for_stepup_stepdown.h"
 
 #include "mongo/db/curop.h"
-#include "mongo/db/local_catalog/lock_manager/dump_lock_manager.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/shard_role/lock_manager/dump_lock_manager.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication

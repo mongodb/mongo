@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/db/global_catalog/chunk_manager.h"
-#include "mongo/db/global_catalog/router_role_api/ns_targeter.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/router_role/ns_targeter.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/modules.h"

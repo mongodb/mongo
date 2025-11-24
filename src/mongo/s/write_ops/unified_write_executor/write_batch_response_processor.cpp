@@ -30,10 +30,10 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/global_catalog/router_role_api/collection_uuid_mismatch.h"
-#include "mongo/db/local_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
+#include "mongo/db/router_role/collection_uuid_mismatch.h"
+#include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/s/commands/query_cmd/populate_cursor.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_response.h"

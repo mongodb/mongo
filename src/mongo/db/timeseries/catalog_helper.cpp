@@ -29,10 +29,10 @@
 
 #include "mongo/db/timeseries/catalog_helper.h"
 
-#include "mongo/db/local_catalog/collection.h"
-#include "mongo/db/local_catalog/collection_catalog.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 
 #include <boost/none.hpp>

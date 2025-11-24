@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -43,6 +42,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 
 #include <cstddef>
 #include <functional>

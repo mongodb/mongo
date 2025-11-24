@@ -30,10 +30,10 @@
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/local_catalog/index_catalog_entry_mock.h"
-#include "mongo/db/local_catalog/index_catalog_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry_mock.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_mock.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 

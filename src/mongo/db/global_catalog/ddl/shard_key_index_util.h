@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/local_catalog/clustered_collection_options_gen.h"
-#include "mongo/db/local_catalog/index_catalog.h"
-#include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 
 #include <string>
 

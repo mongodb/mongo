@@ -33,7 +33,7 @@
 #include "mongo/db/pipeline/document_source_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
-#include "mongo/db/raw_data_operation.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 

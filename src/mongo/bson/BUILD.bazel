@@ -55,7 +55,7 @@ mongo_cc_unit_test(
         "//src/mongo:base",
         "//src/mongo/bson:bson_validate",
         "//src/mongo/bson/column",
-        "//src/mongo/db/local_catalog:index_catalog",
+        "//src/mongo/db/shard_role/shard_catalog:index_catalog",
     ],
 )
 

@@ -39,7 +39,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
-#include "mongo/db/raw_data_operation.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"

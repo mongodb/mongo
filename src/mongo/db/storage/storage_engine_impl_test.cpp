@@ -29,8 +29,8 @@
 
 #include "mongo/db/storage/storage_engine_impl.h"
 
-#include "mongo/db/local_catalog/catalog_helper.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_helper.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/util/periodic_runner_factory.h"
 

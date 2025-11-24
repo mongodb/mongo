@@ -30,8 +30,8 @@
 #include "mongo/s/client_metadata_propagation_egress_hook.h"
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/raw_data_operation.h"
-#include "mongo/db/user_write_block/write_block_bypass.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
+#include "mongo/db/topology/user_write_block/write_block_bypass.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"

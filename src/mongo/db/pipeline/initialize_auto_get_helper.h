@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/global_catalog/router_role_api/router_role.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role_loop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/router_role/router_role.h"
+#include "mongo/db/shard_role/shard_role_loop.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/s/transaction_router.h"

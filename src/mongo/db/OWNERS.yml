@@ -309,3 +309,33 @@ filters:
   - "local_executor*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "collection_compact*":
+    approvers:
+      - 10gen/server-compact
+  - "import*":
+    approvers:
+      - 10gen/server-storage-engine-integration
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "index_key_validate*":
+    approvers:
+      - 10gen/server-index-builds
+  - "index_spec_validate*":
+    approvers:
+      - 10gen/server-index-builds
+  - "index_repair*":
+    approvers:
+      - 10gen/server-index-builds
+  - "throttle_cursor*":
+    approvers:
+      - 10gen/server-validate
+  - "cleanup_structured*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+      - 10gen/server-security
+  - "compact_structured*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+      - 10gen/server-security
+  - "partitioned*":
+    approvers:
+      - 10gen/server-programmability

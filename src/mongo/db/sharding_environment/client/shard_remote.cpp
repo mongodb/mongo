@@ -50,7 +50,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_pool.h"

@@ -33,11 +33,11 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/index/index_constants.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/modules.h"
 

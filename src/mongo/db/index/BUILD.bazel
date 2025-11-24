@@ -56,7 +56,7 @@ mongo_cc_library(
         "wildcard_access_method.cpp",
         "wildcard_key_generator.cpp",
         "wildcard_validation.cpp",
-        "//src/mongo/db/local_catalog:index_descriptor.cpp",
+        "//src/mongo/db/shard_role/shard_catalog:index_descriptor.cpp",
     ],
     deps = [
         ":expression_params",
@@ -77,15 +77,15 @@ mongo_cc_library(
         "//src/mongo/db/index:preallocated_container_pool",
         "//src/mongo/db/index_builds:index_build_interceptor",
         "//src/mongo/db/index_builds:resumable_index_builds_idl",
-        "//src/mongo/db/local_catalog:index_catalog",
-        "//src/mongo/db/local_catalog/lock_manager",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/local_catalog/lock_manager:exception_util",
         "//src/mongo/db/pipeline:document_path_support",
         "//src/mongo/db/query:spill_util",
         "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/shard_role/lock_manager",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/shard_role/lock_manager:exception_util",
+        "//src/mongo/db/shard_role/shard_catalog:index_catalog",
         "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/db/sorter:sorter_stats",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:encryption_hooks",  # TODO(SERVER-93876): Remove.
@@ -152,11 +152,11 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec:working_set",
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/index_builds:index_build_test_helpers",
-        "//src/mongo/db/local_catalog:catalog_test_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/storage:storage_options",
         "//src/third_party/snappy",

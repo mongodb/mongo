@@ -29,7 +29,7 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 
-#include "mongo/db/raw_data_operation.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
 #include "mongo/s/write_ops/write_op_helper.h"
 

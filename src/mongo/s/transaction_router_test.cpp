@@ -50,7 +50,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_gen.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"

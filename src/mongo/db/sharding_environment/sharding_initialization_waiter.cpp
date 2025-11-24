@@ -31,7 +31,7 @@
 
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 
 namespace mongo {
 

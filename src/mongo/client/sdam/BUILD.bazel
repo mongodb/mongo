@@ -104,7 +104,7 @@ mongo_cc_binary(
         "sdam",
         "sdam_test_util",
         "//src/mongo/client:connection_string",
-        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/util:clock_source_mock",
     ],
 )

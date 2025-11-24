@@ -58,7 +58,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"

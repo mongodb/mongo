@@ -30,7 +30,7 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_scheduler.h"
 
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
-#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
+#include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/server_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

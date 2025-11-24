@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/modules.h"
 
 #include <string>

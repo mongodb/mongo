@@ -55,7 +55,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/executor/task_executor_test_fixture.h"

@@ -30,7 +30,7 @@
 
 #include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/local_catalog/db_raii.h"
+#include "mongo/db/shard_role/shard_catalog/db_raii.h"
 
 namespace mongo::auth {
 

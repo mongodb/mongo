@@ -46,7 +46,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/shard_registry.h"
-#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/pcre_util.h"
 

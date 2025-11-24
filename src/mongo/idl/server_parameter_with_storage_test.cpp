@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/cluster_parameters/cluster_server_parameter_gen.h"
+#include "mongo/db/topology/cluster_parameters/cluster_server_parameter_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/idl/server_parameter_with_storage_test.h"
 #include "mongo/idl/server_parameter_with_storage_test_gen.h"

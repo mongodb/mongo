@@ -30,10 +30,10 @@
 
 #include "mongo/db/storage/write_unit_of_work.h"
 
-#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/assert_util.h"
 

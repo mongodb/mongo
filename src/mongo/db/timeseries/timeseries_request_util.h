@@ -31,7 +31,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/raw_data_operation.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/util/modules.h"

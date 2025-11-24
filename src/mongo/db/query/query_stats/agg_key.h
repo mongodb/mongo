@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/local_catalog/collection_type.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_stats/key.h"
+#include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>

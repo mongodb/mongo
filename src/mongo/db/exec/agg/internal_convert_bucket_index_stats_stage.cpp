@@ -31,9 +31,9 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
-#include "mongo/db/local_catalog/ddl/list_indexes_gen.h"
-#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
+#include "mongo/db/shard_role/ddl/list_indexes_gen.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
 namespace mongo {

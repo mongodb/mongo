@@ -30,8 +30,8 @@
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 
 #include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/local_catalog/lock_manager/exception_util.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

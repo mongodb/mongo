@@ -300,7 +300,7 @@ mongo_install(
     }),
     pretty_printer_tests = {
         "//src/mongo/util:pretty_printer_test.py": "//src/mongo/util:pretty_printer_test_program",
-        "//src/mongo/db/local_catalog/lock_manager:lock_gdb_test.py": "//src/mongo/db:mongod",
+        "//src/mongo/db/shard_role/lock_manager:lock_gdb_test.py": "//src/mongo/db:mongod",
         "//src/mongo/db/query/stage_builder/sbe/abt:optimizer_gdb_test.py": "//src/mongo/db/query/stage_builder/sbe/abt:optimizer_gdb_test_program",
     },
     try_zstd = True,

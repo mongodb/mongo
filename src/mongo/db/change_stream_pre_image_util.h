@@ -30,11 +30,11 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 

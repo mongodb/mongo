@@ -30,7 +30,6 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/local_catalog/collection_type.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
