@@ -15,6 +15,7 @@
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/crud_base_partitioned.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = 10;
@@ -696,6 +697,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.setup = function setup(db, collName, cluster) {
+        // TODO SERVER-104122: Handle WCOS error in UWE.
+        const uweEnabled = isUweEnabled(db);
+        if (uweEnabled) {
+            quit();
+        }
+
         // There isn't a way to determine what the thread ids are in setup phase so just assume
         // that they are [0, 1, ..., this.threadCount-1].
         for (let tid = 0; tid < this.threadCount; ++tid) {
