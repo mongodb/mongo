@@ -400,6 +400,10 @@ public:
     static DocumentSourceContainer parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          BSONObj stageObj);
 
+    static DocumentSourceContainer parseFromLiteParsed(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const LiteParsedDocumentSource& liteParsed);
+
     /**
      * Function that will be used as an alternate parser for a document source that has been
      * disabled.
@@ -719,6 +723,11 @@ protected:
     static void unregisterParser_forTest(const std::string& name);
 
 private:
+    static DocumentSourceContainer parseCommon(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement stageSpec,
+        StringData stageName);
+
     // Give access to 'getParserMap()' for the implementation of $listMqlEntities but hiding
     // it from all other stages.
     friend class exec::agg::ListMqlEntitiesStage;

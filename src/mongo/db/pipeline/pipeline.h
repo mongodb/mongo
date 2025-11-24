@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline_split_state.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
@@ -114,6 +115,14 @@ public:
     static std::unique_ptr<Pipeline> parse(const std::vector<BSONObj>& rawPipeline,
                                            const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            PipelineValidatorCallback validator = nullptr);
+
+    /**
+     * Like parse, but takes a LiteParsedPipeline instead of raw BSONObjs.
+     */
+    static std::unique_ptr<Pipeline> parseFromLiteParsed(
+        const LiteParsedPipeline& liteParsedPipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        PipelineValidatorCallback validator = nullptr);
 
     /**
      * Parses sub-pipelines from a $facet aggregation. Like parse(), but skips top-level
@@ -482,7 +491,7 @@ private:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         PipelineValidatorCallback validator,
         bool isFacetPipeline,
-        std::function<BSONObj(T)> getElemFunc);
+        std::function<DocumentSourceContainer(const T&)> getDocSourceFn);
 
     DocumentSourceContainer _sources;
 

@@ -123,6 +123,10 @@ public:
         return getRequest();
     }
 
+    virtual const LiteParsedPipeline& getOriginalLiteParsedPipeline() const {
+        return _aggReqDerivatives->liteParsedPipeline;
+    }
+
     const NamespaceString& getExecutionNss() const {
         return _executionNss;
     }
@@ -402,6 +406,11 @@ public:
     const AggregateCommandRequest& getOriginalRequest() const override {
         return _originalAggReqDerivatives->request;
     }
+
+    const LiteParsedPipeline& getOriginalLiteParsedPipeline() const override {
+        return _originalAggReqDerivatives->liteParsedPipeline;
+    }
+
 
     boost::optional<NamespaceString> getViewNss() const override {
         return boost::make_optional(getOriginalNss());

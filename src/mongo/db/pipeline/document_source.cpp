@@ -130,6 +130,19 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
     BSONElement stageSpec = stageObj.firstElement();
     auto stageName = stageSpec.fieldNameStringData();
 
+    return parseCommon(expCtx, stageSpec, stageName);
+}
+
+std::list<intrusive_ptr<DocumentSource>> DocumentSource::parseFromLiteParsed(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const LiteParsedDocumentSource& liteParsed) {
+    return parseCommon(expCtx, liteParsed.getOriginalBson(), liteParsed.getParseTimeName());
+}
+
+std::list<intrusive_ptr<DocumentSource>> DocumentSource::parseCommon(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    BSONElement stageSpec,
+    StringData stageName) {
     // Get the registered parser and call that.
     auto it = parserMap.find(stageName);
 

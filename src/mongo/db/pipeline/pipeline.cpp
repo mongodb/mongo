@@ -204,7 +204,7 @@ std::unique_ptr<Pipeline> Pipeline::parseCommon(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     PipelineValidatorCallback validator,
     bool isFacetPipeline,
-    std::function<BSONObj(T)> getElemFunc) {
+    std::function<std::list<boost::intrusive_ptr<DocumentSource>>(const T&)> getDocSourceFn) {
 
     // Before parsing the pipeline, make sure it's not so long that it will make us run out of
     // memory.
@@ -215,7 +215,7 @@ std::unique_ptr<Pipeline> Pipeline::parseCommon(
 
     DocumentSourceContainer stages;
     for (auto&& stageElem : rawPipeline) {
-        auto parsedSources = DocumentSource::parse(expCtx, getElemFunc(stageElem));
+        auto parsedSources = getDocSourceFn(stageElem);
         stages.insert(stages.end(), parsedSources.begin(), parsedSources.end());
     }
 
@@ -248,23 +248,41 @@ std::unique_ptr<Pipeline> Pipeline::parseFromArray(
             rawPipelineElement.type() == BSONType::array);
     auto rawStages = rawPipelineElement.Array();
 
-    return parseCommon<BSONElement>(rawStages, expCtx, validator, false, [](BSONElement e) {
+    return parseCommon<BSONElement>(rawStages, expCtx, validator, false, [&expCtx](BSONElement e) {
         uassert(6253720, "Pipeline array element must be an object", e.type() == BSONType::object);
-        return e.embeddedObject();
+        return DocumentSource::parse(expCtx, e.embeddedObject());
     });
 }
 
 std::unique_ptr<Pipeline> Pipeline::parse(const std::vector<BSONObj>& rawPipeline,
                                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           PipelineValidatorCallback validator) {
-    return parseCommon<BSONObj>(rawPipeline, expCtx, validator, false, [](BSONObj o) { return o; });
+    return parseCommon<BSONObj>(rawPipeline, expCtx, validator, false, [&expCtx](BSONObj o) {
+        return DocumentSource::parse(expCtx, o);
+    });
+}
+
+std::unique_ptr<Pipeline> Pipeline::parseFromLiteParsed(
+    const LiteParsedPipeline& liteParsedPipeline,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    PipelineValidatorCallback validator) {
+    return parseCommon<std::unique_ptr<LiteParsedDocumentSource>>(
+        liteParsedPipeline.getStages(),
+        expCtx,
+        validator,
+        false,
+        [&expCtx](const std::unique_ptr<LiteParsedDocumentSource>& lp) {
+            return DocumentSource::parseFromLiteParsed(expCtx, *lp);
+        });
 }
 
 std::unique_ptr<Pipeline> Pipeline::parseFacetPipeline(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     PipelineValidatorCallback validator) {
-    return parseCommon<BSONObj>(rawPipeline, expCtx, validator, true, [](BSONObj o) { return o; });
+    return parseCommon<BSONObj>(rawPipeline, expCtx, validator, true, [&expCtx](BSONObj o) {
+        return DocumentSource::parse(expCtx, o);
+    });
 }
 
 std::unique_ptr<Pipeline> Pipeline::create(DocumentSourceContainer stages,

@@ -304,6 +304,10 @@ public:
         return _parseTimeName;
     }
 
+    BSONElement getOriginalBson() const {
+        return _originalBson;
+    }
+
 protected:
     BSONElement _originalBson;
 

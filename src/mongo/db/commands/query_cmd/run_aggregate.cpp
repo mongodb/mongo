@@ -976,7 +976,8 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // the two pipelines together below.
     auto userRequest = aggExState.getOriginalRequest();
     expCtx->startExpressionCounters();
-    auto pipeline = Pipeline::parse(userRequest.getPipeline(), expCtx);
+    auto pipeline =
+        Pipeline::parseFromLiteParsed(aggExState.getOriginalLiteParsedPipeline(), expCtx);
     expCtx->stopExpressionCounters();
 
     const auto& request = aggExState.getRequest();

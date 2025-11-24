@@ -294,6 +294,10 @@ public:
         return _isRunningAgainstView_ForHybridSearch;
     }
 
+    const std::vector<std::unique_ptr<LiteParsedDocumentSource>>& getStages() const {
+        return _stageSpecs;
+    }
+
 private:
     // This is logically const - any changes to _stageSpecs will invalidate cached copies of
     // "_hasChangeStream" and "_involvedNamespaces" below.
