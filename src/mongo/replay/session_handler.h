@@ -89,11 +89,10 @@ private:
     std::string _uri;           // uri of the mongo shadow instance
     std::string _perfFileName;  // perf recording file name if specified
 
-    void addToRunningSessionCache(key_t);
-    void removeFromRunningSessionCache(key_t);
+    SessionSimulator& createSession(key_t);
+    void destroySession(key_t);
 
-    bool isSessionActive(int64_t);
-    bool isSessionActive(int64_t) const;
+    bool isSessionActive(key_t) const;
 
     SessionSimulator& getSessionSimulator(key_t);
     const SessionSimulator& getSessionSimulator(key_t) const;

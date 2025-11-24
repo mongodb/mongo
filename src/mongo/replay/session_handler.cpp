@@ -36,11 +36,8 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
 void SessionHandler::onSessionStart(Microseconds offset, int64_t sessionId) {
-    addToRunningSessionCache(sessionId);
-    // now initialize the session.
-    auto& session = getSessionSimulator(sessionId);
+    auto& session = createSession(sessionId);
     // connects to the server
     session.start(_uri, _replayStartTime, offset);
 }
@@ -56,10 +53,11 @@ void SessionHandler::onSessionStop(const ReplayCommand& stopCommand) {
 
     const auto& [offset, sessionId] = extractOffsetAndSessionFromCommand(stopCommand);
     auto& session = getSessionSimulator(sessionId);
+
     session.stop(offset);
     // this is correct, because the scheduler will wait until the stop command would have run. In
     // case of errors, the session will need to be deleted either way.
-    removeFromRunningSessionCache(sessionId);
+    destroySession(sessionId);
 }
 
 void SessionHandler::onBsonCommand(const ReplayCommand& command) {
@@ -76,7 +74,8 @@ void SessionHandler::clear() {
     _runningSessions.clear();
 }
 
-void SessionHandler::addToRunningSessionCache(SessionHandler::key_t key) {
+
+SessionSimulator& SessionHandler::createSession(key_t key) {
     uassert(ErrorCodes::ReplayClientSessionSimulationError,
             "Error, running session cannot contain the same key",
             !isSessionActive(key));
@@ -86,10 +85,10 @@ void SessionHandler::addToRunningSessionCache(SessionHandler::key_t key) {
     auto perfReporter = std::make_unique<PerformanceReporter>(_uri, _perfFileName);
     auto session = std::make_unique<SessionSimulator>(
         std::move(commandExecutor), std::move(sessionScheduler), std::move(perfReporter));
-    _runningSessions.insert({key, std::move(session)});
+    return *_runningSessions.insert({key, std::move(session)}).first->second;
 }
 
-void SessionHandler::removeFromRunningSessionCache(SessionHandler::key_t key) {
+void SessionHandler::destroySession(key_t key) {
     uassert(ErrorCodes::ReplayClientSessionSimulationError,
             "Error, running session must contain the key passed",
             isSessionActive(key));
@@ -110,10 +109,7 @@ const SessionSimulator& SessionHandler::getSessionSimulator(SessionHandler::key_
     return *(_runningSessions.at(key));
 }
 
-bool SessionHandler::isSessionActive(SessionHandler::key_t key) {
-    return _runningSessions.contains(key);
-}
-bool SessionHandler::isSessionActive(SessionHandler::key_t key) const {
+bool SessionHandler::isSessionActive(key_t key) const {
     return _runningSessions.contains(key);
 }
 }  // namespace mongo
