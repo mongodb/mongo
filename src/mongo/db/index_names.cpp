@@ -136,4 +136,19 @@ IndexType IndexNames::nameToType(StringData accessMethod) {
     }
     return typeIt->second;
 }
+
+// static
+bool IndexNames::isInternalOnly(const std::string& name) {
+    if (isKnownName(name)) {
+        switch (nameToType(name)) {
+            case INDEX_2DSPHERE_BUCKET:
+            case INDEX_ENCRYPTED_RANGE:
+                return true;
+            default:
+                return false;
+        }
+    }
+    return false;
+}
+
 }  // namespace mongo

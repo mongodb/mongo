@@ -16,47 +16,34 @@ describe("Index validation log message", function () {
 
         // Set verbosity to 1 to show otherwise production-only logs.
         assert.commandWorked(this.db.adminCommand({setParameter: 1, logComponentVerbosity: {index: {verbosity: 1}}}));
-
-        this.db.createCollection("coll");
     });
 
-    it("contains indexType 2d", function () {
-        this.db.coll.createIndex({"foo": "2d"});
-        checkIndexTypeLogExists(this.db.coll, "2d");
-    });
+    const tests = [
+        {indexType: "2d"},
+        {indexType: "2dsphere"},
+        {indexType: "text"},
+        {indexType: "hashed"},
+        {indexType: 1, expectedType: "btree"},
+        {indexType: 1, indexName: "$**", expectedType: "wildcard"},
+        {
+            indexType: "2dsphere",
+            collectionOptions: {timeseries: {timeField: "t", metaField: "m"}},
+            expectedType: "2dsphere_bucket",
+        },
+    ];
 
-    it("contains indexType 2dsphere", function () {
-        this.db.coll.createIndex({"foo": "2dsphere"});
-        checkIndexTypeLogExists(this.db.coll, "2dsphere");
-    });
-
-    it("contains indexType 2dsphere_bucket", function () {
-        this.db.coll.createIndex({"foo": "2dsphere_bucket"});
-        checkIndexTypeLogExists(this.db.coll, "2dsphere_bucket");
-    });
-
-    it("contains indexType text", function () {
-        this.db.coll.createIndex({"foo": "text"});
-        checkIndexTypeLogExists(this.db.coll, "text");
-    });
-
-    it("contains indexType hashed", function () {
-        this.db.coll.createIndex({"foo": "hashed"});
-        checkIndexTypeLogExists(this.db.coll, "hashed");
-    });
-
-    it("contains indexType btree", function () {
-        this.db.coll.createIndex({"foo": 1});
-        checkIndexTypeLogExists(this.db.coll, "btree");
-    });
-
-    it("contains indexType wildcard", function () {
-        this.db.coll.createIndex({"$**": 1});
-        checkIndexTypeLogExists(this.db.coll, "wildcard");
+    tests.forEach(function (params) {
+        const expectedType = params.expectedType || params.indexType;
+        it(`contains indexType ${expectedType}`, function () {
+            this.db.createCollection("coll", params.collectionOptions);
+            this.db.coll.createIndex({[params.indexName || "foo"]: params.indexType});
+            checkIndexTypeLogExists(this.db.coll, expectedType);
+        });
     });
 
     afterEach(function () {
         this.db.coll.dropIndexes();
+        this.db.coll.drop();
         clearRawMongoProgramOutput();
     });
 
