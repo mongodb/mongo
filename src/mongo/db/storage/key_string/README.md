@@ -128,3 +128,5 @@ its `TypeBits` if any and can be used for passing around values.
 representation, from lower memory addresses to higher addresses, is the same as the defined ordering
 for that type. For example, ASCII strings are binary comparable, but double precision floating point
 numbers and little-endian integers are not.
+
+[initial sync]: /src/mongo/db/repl/README.md#initial-sync
