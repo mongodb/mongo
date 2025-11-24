@@ -158,6 +158,7 @@ DEFAULTS = {
     "validate_selector_paths": True,
     # Internal testing options.
     "internal_params": [],
+    "hang_analyzer_hook_timeout": 180.0,  # seconds
     # Evergreen options.
     "evergreen_url": "evergreen.mongodb.com",
     "build_id": None,
@@ -506,6 +507,9 @@ INCLUDE_TAGS = None
 # Params that can be set to change internal resmoke behavior. Used to test resmoke and should
 # not be set by the user.
 INTERNAL_PARAMS = []
+
+# The timeout (in seconds) that hooks are allowed to run after the hang analyzer has signaled Resmoke.
+HANG_ANALYZER_HOOK_TIMEOUT = None
 
 # If set, then resmoke.py starts the specified number of Job instances to run tests.
 JOBS = None

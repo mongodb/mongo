@@ -13,6 +13,7 @@ py_library(
         "plugin.py",
         "process.py",
         "process_list.py",
+        "timeout_for_hang_analyzer.py",
     ],
     visibility = ["//visibility:public"],
     deps = [

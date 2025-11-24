@@ -12,6 +12,9 @@ from opentelemetry.context.context import Context
 from opentelemetry.trace.status import StatusCode
 
 from buildscripts.resmokelib import config, errors
+from buildscripts.resmokelib.hang_analyzer.timeout_for_hang_analyzer import (
+    TimeoutForHangAnalyzer,
+)
 from buildscripts.resmokelib.testing import testcases
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.fixtures.interface import Fixture, create_fixture_table
@@ -318,8 +321,16 @@ class Job(object):
         """Provide helper to run hook and archival."""
         try:
             success = False
-            hook_function(test, self.report)
+            TimeoutForHangAnalyzer(
+                timeout=config.HANG_ANALYZER_HOOK_TIMEOUT,
+                func=hook_function,
+                args=(test, self.report),
+            ).run()
             success = True
+        except TimeoutError:
+            self.logger.error(
+                f"The '{hook_function.__name__}' of hook {hook.__class__.__name__} did not complete in {config.HANG_ANALYZER_HOOK_TIMEOUT} seconds. The hook may continue to run in the background. When the hang analyzer is called, this timeout is enforced to ensure Resmoke can complete a graceful shutdown."
+            )
         finally:
             if not success and hook_failure_flag is not None:
                 hook_failure_flag.set()
@@ -353,8 +364,16 @@ class Job(object):
         hooks_failed = True
         try:
             for hook in self.hooks:
-                hook.after_suite(self.report, teardown_flag)
+                TimeoutForHangAnalyzer(
+                    timeout=config.HANG_ANALYZER_HOOK_TIMEOUT,
+                    func=hook.after_suite,
+                    args=(self.report, teardown_flag),
+                ).run()
             hooks_failed = False
+        except TimeoutError:
+            self.logger.error(
+                f"The 'after_suite' of hook {hook.__class__.__name__} did not complete in {config.HANG_ANALYZER_HOOK_TIMEOUT} seconds. The hook may continue to run in the background. When the hang analyzer is called, this timeout is enforced to ensure Resmoke can complete a graceful shutdown."
+            )
         finally:
             if hooks_failed and hook_failure_flag is not None:
                 hook_failure_flag.set()

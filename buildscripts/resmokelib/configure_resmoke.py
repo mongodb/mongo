@@ -787,6 +787,7 @@ flags in common: {common_set}
     _config.PAUSE_AFTER_POPULATE = config.pop("pause_after_populate")
     _config.LOAD_ALL_EXTENSIONS = config.pop("load_all_extensions")
     _config.NO_HOOKS = config.pop("no_hooks")
+    _config.HANG_ANALYZER_HOOK_TIMEOUT = config.pop("hang_analyzer_hook_timeout")
 
     # Internal testing options.
     _config.INTERNAL_PARAMS = config.pop("internal_params")
