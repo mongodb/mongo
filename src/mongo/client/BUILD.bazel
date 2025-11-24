@@ -393,6 +393,11 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "remote_command_targeter_server_parameters_gen",
+    src = "remote_command_targeter_server_parameters.idl",
+)
+
 mongo_cc_library(
     name = "remote_command_targeter",
     srcs = [
@@ -400,6 +405,7 @@ mongo_cc_library(
         "remote_command_targeter_factory_impl.cpp",
         "remote_command_targeter_rs.cpp",
         "remote_command_targeter_standalone.cpp",
+        ":remote_command_targeter_server_parameters_gen",
     ],
     deps = [
         ":clientdriver_network",

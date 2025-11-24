@@ -34,6 +34,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_targeter_server_parameters_gen.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_server_parameters_gen.h"
 #include "mongo/db/operation_context.h"
@@ -73,10 +74,15 @@ HostAndPort getLocalHostAndPort(ServiceContext* serviceContext) {
     return localHostAndPort;
 }
 
-auto getFirstHostPriotitizedWith(const TargetingMetadata& targetingMetadata) {
+auto getFirstHostPrioritizedWith(const TargetingMetadata& targetingMetadata) {
     return [deprioritizedServers =
                 targetingMetadata.deprioritizedServers](std::span<const HostAndPort> hosts) {
-        return RemoteCommandTargeter::firstHostPrioritized(hosts, deprioritizedServers);
+        if (gOverloadAwareRetargetingEnabled.load()) {
+            return RemoteCommandTargeter::firstHostPrioritized(hosts, deprioritizedServers);
+        } else {
+            invariant(!hosts.empty());
+            return hosts.front();
+        }
     };
 }
 
@@ -118,7 +124,7 @@ SemiFuture<HostAndPort> RemoteCommandTargeterRS::findHost(
     }
 
     return _rsMonitor->getHostsOrRefresh(readPref, {}, cancelToken)
-        .then(getFirstHostPriotitizedWith(targetingMetadata))
+        .then(getFirstHostPrioritizedWith(targetingMetadata))
         .semi();
 }
 
@@ -146,7 +152,7 @@ StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(
     bool maxTimeMsLesser = (opCtx->getRemainingMaxTimeMillis() <
                             Milliseconds(gDefaultFindReplicaSetHostTimeoutMS.load()));
     auto swHostAndPort = _rsMonitor->getHostsOrRefresh(readPref, opCtx->getCancellationToken())
-                             .then(getFirstHostPriotitizedWith(targetingMetadata))
+                             .then(getFirstHostPrioritizedWith(targetingMetadata))
                              .getNoThrow(opCtx);
 
     // If opCtx is interrupted, getHostOrRefresh may be canceled through the token (rather than
