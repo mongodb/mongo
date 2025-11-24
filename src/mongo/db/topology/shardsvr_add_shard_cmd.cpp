@@ -53,7 +53,6 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/balancer_configuration.h"
 #include "mongo/util/assert_util.h"
 
 #include <memory>
@@ -153,11 +152,6 @@ public:
             } else {
                 waitForMajority(opCtx);
             }
-
-            const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-            invariant(balancerConfig);
-            // Ensure we have the most up-to-date balancer configuration
-            uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
 
             // Since we know that some above write (either the shard identity or the noop write) was
             // done with the session info, there is no need to do another noop write here (in fact,
