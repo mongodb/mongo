@@ -49,7 +49,7 @@ namespace mongo {
  * usages (throwers or catchers) should be added without consultation with the Shard Local Catalog
  * Team (CAR).
  *
- * TODO (SERVER-113356): This exception needs to be removed.
+ * TODO (SPM-3971): Remove this exception once its last user has stopped relying on it.
  */
 class MONGO_MOD_NEEDS_REPLACEMENT ShardCannotRefreshDueToLocksHeldInfo final
     : public ErrorExtraInfo {

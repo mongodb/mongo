@@ -62,7 +62,7 @@ namespace mongo {
  *
  * The interface must not be used from multiple threads.
  *
- * TODO (SERVER-113356): The NSTargeter(s) hierarchy is a mixture of router role and query-specific
+ * TODO (SERVER-114286): The NSTargeter(s) hierarchy is a mixture of router role and query-specific
  * canonicalization logic. It needs to be decomposed into these parts and removed.
  */
 class MONGO_MOD_NEEDS_REPLACEMENT NSTargeter {
