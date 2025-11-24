@@ -190,7 +190,7 @@ TEST_F(DesugarerTest, ExpandsSingleExpandToExtAstOnly) {
     auto it = pipeline->getSources().begin();
     ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable*>(it->get()));
     ASSERT_EQ(std::string(it->get()->getSourceName()),
-              extension::sdk::shared_test_stages::kNoOpName);
+              extension::sdk::shared_test_stages::kTransformName);
 }
 
 TEST_F(DesugarerTest, ExpandsSingleExpandToExtParseOnly) {
@@ -213,7 +213,7 @@ TEST_F(DesugarerTest, ExpandsSingleExpandToExtParseOnly) {
     auto it = pipeline->getSources().begin();
     ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable*>(it->get()));
     ASSERT_EQ(std::string(it->get()->getSourceName()),
-              extension::sdk::shared_test_stages::kNoOpName);
+              extension::sdk::shared_test_stages::kTransformName);
 }
 
 TEST_F(DesugarerTest, ExpandsSingleExpandToHostParseOnly) {
@@ -298,11 +298,11 @@ TEST_F(DesugarerTest, ExpandsMixedToMultipleStagesSplicingIntoPipeline) {
     ++it;
     ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable*>(it->get()));
     ASSERT_EQ(std::string(it->get()->getSourceName()),
-              extension::sdk::shared_test_stages::kNoOpName);
+              extension::sdk::shared_test_stages::kTransformName);
     ++it;
     ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable*>(it->get()));
     ASSERT_EQ(std::string(it->get()->getSourceName()),
-              extension::sdk::shared_test_stages::kNoOpName);
+              extension::sdk::shared_test_stages::kTransformName);
     ++it;
     ASSERT(dynamic_cast<DocumentSourceMatch*>(it->get()));
     ++it;
@@ -339,11 +339,11 @@ TEST_F(DesugarerTest, ExpandsMultipleExpandablesSequentially) {
     ++it;
     ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable*>(it->get()));
     ASSERT_EQ(std::string(it->get()->getSourceName()),
-              extension::sdk::shared_test_stages::kNoOpName);
+              extension::sdk::shared_test_stages::kTransformName);
     ++it;
     ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable*>(it->get()));
     ASSERT_EQ(std::string(it->get()->getSourceName()),
-              extension::sdk::shared_test_stages::kNoOpName);
+              extension::sdk::shared_test_stages::kTransformName);
     ++it;
     ASSERT(dynamic_cast<DocumentSourceMatch*>(it->get()));
     ++it;
@@ -376,7 +376,7 @@ TEST_F(DesugarerTest, DesugaringIsIdempotentForExtensionOnlyExpansion) {
         ++it;
         ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable*>(it->get()));
         ASSERT_EQ(std::string(it->get()->getSourceName()),
-                  extension::sdk::shared_test_stages::kNoOpName);
+                  extension::sdk::shared_test_stages::kTransformName);
         ++it;
         ASSERT(dynamic_cast<DocumentSourceMock*>(it->get()));
     };

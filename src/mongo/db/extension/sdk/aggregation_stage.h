@@ -661,6 +661,11 @@ private:
     static ::MongoExtensionStatus* _extSetSource(::MongoExtensionExecAggStage* execAggStage,
                                                  ::MongoExtensionExecAggStage* input) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
+            // This method should only ever be called by an extension transform stage (getImpl()
+            // should return an ExecAggStageTransform). Source extension stages, by definition,
+            // cannot have their source set. Thus, this method should never be called on a source
+            // extension stage. If it is, then the tassert in ExecAggStageSource::setSource(...)
+            // will be triggered.
             static_cast<ExtensionExecAggStage*>(execAggStage)
                 ->getImpl()
                 .setSource(UnownedExecAggStageHandle(input));

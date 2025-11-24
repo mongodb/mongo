@@ -179,19 +179,19 @@ TEST_F(ExecAggStageTest, IsHostAllocated) {
 }
 
 TEST_F(ExecAggStageTest, IsNotHostAllocated) {
-    auto noOpExtensionExecAggStage =
-        new sdk::ExtensionExecAggStage(sdk::shared_test_stages::NoOpExtensionExecAggStage::make());
-    auto handle = ExecAggStageHandle{noOpExtensionExecAggStage};
+    auto transformExecAggStage =
+        new sdk::ExtensionExecAggStage(sdk::shared_test_stages::TransformExecAggStage::make());
+    auto handle = ExecAggStageHandle{transformExecAggStage};
 
     ASSERT_FALSE(host_connector::HostExecAggStageAdapter::isHostAllocated(*handle.get()));
 }
 
 TEST_F(ExecAggStageTest, GetNameFromExtensionStage) {
-    auto noOpExtensionExecAggStage =
-        new sdk::ExtensionExecAggStage(sdk::shared_test_stages::NoOpExtensionExecAggStage::make());
-    auto handle = ExecAggStageHandle{noOpExtensionExecAggStage};
+    auto transformExecAggStage =
+        new sdk::ExtensionExecAggStage(sdk::shared_test_stages::TransformExecAggStage::make());
+    auto handle = ExecAggStageHandle{transformExecAggStage};
 
-    ASSERT_EQ(handle.getName(), "$noOpExt");
+    ASSERT_EQ(handle.getName(), sdk::shared_test_stages::kTransformName);
 }
 
 TEST_F(ExecAggStageTest, GetNameFromHostStage) {

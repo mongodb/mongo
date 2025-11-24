@@ -86,7 +86,7 @@ public:
 
     static void unregisterParsers() {
         host::DocumentSourceExtension::unregisterParser_forTest(
-            sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
+            sdk::shared_test_stages::TransformAggStageDescriptor::kStageName);
         host::DocumentSourceExtension::unregisterParser_forTest("$noOp2");
     }
 
@@ -94,16 +94,16 @@ protected:
     NamespaceString _nss = NamespaceString::createNamespaceString_forTest(
         boost::none, "document_source_extension_test");
 
-    sdk::ExtensionAggStageDescriptor _noOpStaticDescriptor{
-        sdk::shared_test_stages::NoOpAggStageDescriptor::make()};
+    sdk::ExtensionAggStageDescriptor _transformStaticDescriptor{
+        sdk::shared_test_stages::TransformAggStageDescriptor::make()};
 
-    static inline BSONObj kValidSpec =
-        BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true));
+    static inline BSONObj kValidSpec = BSON(
+        sdk::shared_test_stages::TransformAggStageDescriptor::kStageName << BSON("foo" << true));
     static inline BSONObj kInvalidSpec =
-        BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSONObj());
+        BSON(sdk::shared_test_stages::TransformAggStageDescriptor::kStageName << BSONObj());
 };
 
-TEST_F(DocumentSourceExtensionTest, ParseNoOpSuccess) {
+TEST_F(DocumentSourceExtensionTest, ParseTransformSuccess) {
     // Try to parse pipeline with custom extension stage before registering the extension,
     // should fail.
     std::vector<BSONObj> testPipeline{kValidSpec};
@@ -113,7 +113,7 @@ TEST_F(DocumentSourceExtensionTest, ParseNoOpSuccess) {
     std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
     host_connector::HostPortalAdapter portal{
         MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
-    portal.getImpl().registerStageDescriptor(&_noOpStaticDescriptor);
+    portal.getImpl().registerStageDescriptor(&_transformStaticDescriptor);
 
     auto parsedPipeline = buildTestPipeline(testPipeline);
     ASSERT(parsedPipeline);
@@ -122,7 +122,7 @@ TEST_F(DocumentSourceExtensionTest, ParseNoOpSuccess) {
     const auto* stagePtr = parsedPipeline->peekFront();
     ASSERT_TRUE(stagePtr != nullptr);
     ASSERT_EQUALS(std::string(stagePtr->getSourceName()),
-                  sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
+                  sdk::shared_test_stages::TransformAggStageDescriptor::kStageName);
     auto serializedPipeline =
         parsedPipeline->serializeToBson(SerializationOptions::kDebugQueryShapeSerializeOptions);
     ASSERT_EQUALS(serializedPipeline.size(), 1u);
@@ -146,7 +146,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandToExtAst) {
     auto* first =
         dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded.front().get());
     ASSERT_TRUE(first != nullptr);
-    ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kNoOpName));
+    ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kTransformName));
 }
 
 TEST_F(DocumentSourceExtensionTest, ExpandToExtParse) {
@@ -165,7 +165,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandToExtParse) {
     auto* first =
         dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded.front().get());
     ASSERT_TRUE(first != nullptr);
-    ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kNoOpName));
+    ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kTransformName));
 }
 
 TEST_F(DocumentSourceExtensionTest, ExpandToHostParse) {
@@ -223,8 +223,8 @@ TEST_F(DocumentSourceExtensionTest, ExpandToMixed) {
     auto* fourth = dynamic_cast<LiteParsedDocumentSource*>(it3->get());
     ASSERT_TRUE(fourth != nullptr);
 
-    ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kNoOpName));
-    ASSERT_EQ(second->getParseTimeName(), std::string(sdk::shared_test_stages::kNoOpName));
+    ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kTransformName));
+    ASSERT_EQ(second->getParseTimeName(), std::string(sdk::shared_test_stages::kTransformName));
     ASSERT_EQ(third->getParseTimeName(), std::string(DocumentSourceMatch::kStageName));
     ASSERT_EQ(fourth->getParseTimeName(),
               std::string(DocumentSourceInternalSearchIdLookUp::kStageName));
@@ -272,7 +272,7 @@ public:
         out.reserve(kExpansionSize);
         // $querySettings stage expects a document as argument
         out.emplace_back(new host::HostAggStageParseNode(
-            sdk::shared_test_stages::NoOpHostParseNode::make(kBadQuerySettingsSpec)));
+            sdk::shared_test_stages::TransformHostParseNode::make(kBadQuerySettingsSpec)));
         return out;
     }
 
@@ -362,7 +362,7 @@ public:
     DepthLeafAstNode() : sdk::AggStageAstNode(kDepthLeafName) {}
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+        return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 };
 
@@ -486,9 +486,9 @@ public:
         std::vector<VariantNodeHandle> out;
         out.reserve(2);
         out.emplace_back(new sdk::ExtensionAggStageParseNode(
-            std::make_unique<sdk::shared_test_stages::NoOpAggStageParseNode>()));
+            std::make_unique<sdk::shared_test_stages::TransformAggStageParseNode>()));
         out.emplace_back(new sdk::ExtensionAggStageParseNode(
-            std::make_unique<sdk::shared_test_stages::NoOpAggStageParseNode>()));
+            std::make_unique<sdk::shared_test_stages::TransformAggStageParseNode>()));
         return out;
     }
 
@@ -595,9 +595,9 @@ TEST_F(DocumentSourceExtensionTest, ExpandSameStageOnDifferentBranchesSucceeds) 
     ASSERT_TRUE(first != nullptr);
     ASSERT_TRUE(second != nullptr);
 
-    // Both leaves are the NoOp leaf from NoOpAggStageParseNode.
-    ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kNoOpName));
-    ASSERT_EQ(second->getParseTimeName(), std::string(sdk::shared_test_stages::kNoOpName));
+    // Both leaves are the Transform leaf from TransformAggStageParseNode.
+    ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kTransformName));
+    ASSERT_EQ(second->getParseTimeName(), std::string(sdk::shared_test_stages::kTransformName));
 }
 
 namespace {
@@ -679,7 +679,7 @@ public:
         std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(new host::HostAggStageParseNode(
-            sdk::shared_test_stages::NoOpHostParseNode::make(kSearchSpec)));
+            sdk::shared_test_stages::TransformHostParseNode::make(kSearchSpec)));
         return expanded;
     }
 
@@ -705,7 +705,7 @@ public:
     }
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+        return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -728,7 +728,7 @@ public:
     }
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+        return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -752,7 +752,7 @@ public:
     }
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+        return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -776,11 +776,11 @@ public:
         std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(new host::HostAggStageParseNode(
-            sdk::shared_test_stages::NoOpHostParseNode::make(kSearchSpec)));
+            sdk::shared_test_stages::TransformHostParseNode::make(kSearchSpec)));
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
             std::make_unique<SingleActionRequiredPrivilegesAggStageAstNode>()));
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
-            std::make_unique<sdk::shared_test_stages::NoOpAggStageAstNode>()));
+            std::make_unique<sdk::shared_test_stages::TransformAggStageAstNode>()));
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
             std::make_unique<MultipleActionsRequiredPrivilegesAggStageAstNode>()));
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
@@ -812,7 +812,7 @@ public:
     }
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+        return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -831,7 +831,7 @@ public:
     }
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+        return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -840,24 +840,24 @@ public:
 };
 }  // namespace
 
-TEST_F(DocumentSourceExtensionTest, NoOpAstNodeWithDefaultGetPropertiesSucceeds) {
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
+TEST_F(DocumentSourceExtensionTest, TransformAstNodeWithDefaultGetPropertiesSucceeds) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::TransformAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
 
     host::DocumentSourceExtension::LiteParsedExpanded lp(
-        std::string(sdk::shared_test_stages::kNoOpName), std::move(handle), _nss);
+        std::string(sdk::shared_test_stages::kTransformName), std::move(handle), _nss);
     ASSERT_FALSE(lp.isInitialSource());
     ASSERT_FALSE(lp.requiresAuthzChecks());
     ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false),
                   PrivilegeVector{});
 }
 
-TEST_F(DocumentSourceExtensionTest, NoOpParseNodeInheritsDefaultGetPropertiesFromAstNode) {
-    auto parseNode =
-        new sdk::ExtensionAggStageParseNode(sdk::shared_test_stages::NoOpAggStageParseNode::make());
+TEST_F(DocumentSourceExtensionTest, TransformParseNodeInheritsDefaultGetPropertiesFromAstNode) {
+    auto parseNode = new sdk::ExtensionAggStageParseNode(
+        sdk::shared_test_stages::TransformAggStageParseNode::make());
     auto handle = AggStageParseNodeHandle{parseNode};
-    BSONObj stageBson = createDummySpecFromStageName(sdk::shared_test_stages::kNoOpName);
+    BSONObj stageBson = createDummySpecFromStageName(sdk::shared_test_stages::kTransformName);
 
     host::DocumentSourceExtension::LiteParsedExpandable lp(
         stageBson.firstElement(), std::move(handle), _nss, LiteParserOptions{});
@@ -1035,9 +1035,9 @@ TEST_F(DocumentSourceExtensionTest, MultipleRequiredPrivilegesAstNodeProducesUni
 
 TEST_F(DocumentSourceExtensionTest, ExpandableToMultipleMixedChildrenUnionsRequiredPrivileges) {
     // Build the parse node that expands to:
-    //   1) Host node (e.g., $search via NoOpHostParseNode(kSearchSpec)) -> find
+    //   1) Host node (e.g., $search via TransformHostParseNode(kSearchSpec)) -> find
     //   2) SingleActionRequiredPrivilegesAggStageAstNode -> find
-    //   3) NoOpAggStageAstNode -> no privileges
+    //   3) TransformAggStageAstNode -> no privileges
     //   4) MultipleActionsRequiredPrivilegesAggStageAstNode -> find, listIndexes, planCacheRead
     //   6) MultipleChildrenRequiredPrivilegesAggStageParseNode -> find, indexStats
     //   6) NonePosAggStageAstNode -> no privileges

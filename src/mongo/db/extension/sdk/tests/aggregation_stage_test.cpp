@@ -261,17 +261,17 @@ TEST_F(AggStageTest, ExtExpandPreventsMemoryLeaksOnFailure) {
     failExpand->setMode(FailPoint::off, 0);
 }
 
-TEST_F(AggStageTest, NoOpAstNodeTest) {
-    auto noOpAggStageAstNode =
-        new ExtensionAggStageAstNode(shared_test_stages::NoOpAggStageAstNode::make());
-    auto handle = extension::AggStageAstNodeHandle{noOpAggStageAstNode};
+TEST_F(AggStageTest, TransformAstNodeTest) {
+    auto transformAggStageAstNode =
+        new ExtensionAggStageAstNode(shared_test_stages::TransformAggStageAstNode::make());
+    auto handle = extension::AggStageAstNodeHandle{transformAggStageAstNode};
 
     [[maybe_unused]] auto logicalStageHandle = handle.bind();
 }
 
-TEST_F(AggStageTest, NoOpAstNodeWithDefaultGetPropertiesSucceeds) {
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
+TEST_F(AggStageTest, TransformAstNodeWithDefaultGetPropertiesSucceeds) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::TransformAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
     auto props = handle.getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
@@ -378,7 +378,7 @@ public:
     }
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+        return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -399,7 +399,7 @@ public:
     }
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+        return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -420,7 +420,7 @@ public:
     }
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<sdk::shared_test_stages::NoOpLogicalAggStage>();
+        return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -618,11 +618,11 @@ TEST_F(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithTransformation) 
 
 TEST_F(AggStageTest, DesugarToEmptyDescriptorParseTest) {
     auto descriptor = std::make_unique<ExtensionAggStageDescriptor>(
-        shared_test_stages::NoOpAggStageDescriptor::make());
+        shared_test_stages::TransformAggStageDescriptor::make());
     auto handle = extension::AggStageDescriptorHandle{descriptor.get()};
 
     BSONObj stageBson =
-        BSON(shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true));
+        BSON(shared_test_stages::TransformAggStageDescriptor::kStageName << BSON("foo" << true));
     auto parseNodeHandle = handle.parse(stageBson);
 
     auto expanded = parseNodeHandle.expand();
@@ -836,49 +836,6 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativeValue
 
     ASSERT_BSONOBJ_EQ(BSON(LiteralQueryShapeParseNode::kStageName << spec), queryShape);
 }
-
-class ValidExtensionExecAggStage : public extension::sdk::ExecAggStageSource {
-public:
-    ValidExtensionExecAggStage(std::string stageName)
-        : extension::sdk::ExecAggStageSource(stageName) {}
-
-    extension::ExtensionGetNextResult getNext(
-        const QueryExecutionContextHandle& expCtx,
-        MongoExtensionExecAggStage* execAggStage,
-        MongoExtensionGetNextRequestType requestType) override {
-        // TODO SERVER-113905: once we support metadata, we should only support returning both
-        // document and metadata.
-        if (_results.empty()) {
-            return extension::ExtensionGetNextResult::eof();
-        }
-        if (_results.size() == 2) {
-            // The result at the front of the queue is removed so that the size doesn't stay at 2.
-            // This needs to be done so that the EOF case can be tested. Note that the behavior of
-            // removing from the results queue for a "pause execution" state does not accurately
-            // represent a "paused execution" state in a getNext() function.
-            _results.pop_front();
-            return extension::ExtensionGetNextResult::pauseExecution();
-        } else {
-            auto result = extension::ExtensionGetNextResult::advanced(_results.front());
-            _results.pop_front();
-            return result;
-        }
-    }
-
-    void open() override {}
-
-    void reopen() override {}
-
-    void close() override {}
-
-    static inline std::unique_ptr<ExecAggStageBase> make() {
-        return std::make_unique<ValidExtensionExecAggStage>("$noOp");
-    }
-
-private:
-    std::deque<BSONObj> _results = {
-        BSON("meow" << "adithi"), BSON("meow" << "josh"), BSON("meow" << "cedric")};
-};
 
 /**
  * Test class that tracks resource allocation and cleanup for lifecycle method testing.

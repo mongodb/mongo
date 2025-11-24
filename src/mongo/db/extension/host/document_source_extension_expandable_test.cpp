@@ -61,8 +61,8 @@ protected:
     static inline NamespaceString _nss = NamespaceString::createNamespaceString_forTest(
         boost::none, "document_source_extension_expandable_test");
 
-    sdk::ExtensionAggStageDescriptor _noOpStageDescriptor{
-        sdk::shared_test_stages::NoOpAggStageDescriptor::make()};
+    sdk::ExtensionAggStageDescriptor _transformStageDescriptor{
+        sdk::shared_test_stages::TransformAggStageDescriptor::make()};
     sdk::ExtensionAggStageDescriptor _expandToExtAstDescriptor{
         sdk::shared_test_stages::ExpandToExtAstDescriptor::make()};
     sdk::ExtensionAggStageDescriptor _expandToExtParseDescriptor{
@@ -77,11 +77,11 @@ protected:
 };
 
 TEST_F(DocumentSourceExtensionExpandableTest, ExpandToExtAst) {
-    auto rawStage =
-        BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true));
+    auto rawStage = BSON(sdk::shared_test_stages::TransformAggStageDescriptor::kStageName
+                         << BSON("foo" << true));
 
     auto expandable = host::DocumentSourceExtensionExpandable::create(
-        getExpCtx(), rawStage, AggStageDescriptorHandle(&_noOpStageDescriptor));
+        getExpCtx(), rawStage, AggStageDescriptorHandle(&_transformStageDescriptor));
 
     auto expanded = expandable->expand();
 
@@ -90,7 +90,7 @@ TEST_F(DocumentSourceExtensionExpandableTest, ExpandToExtAst) {
         dynamic_cast<host::DocumentSourceExtensionOptimizable*>(expanded.front().get());
     ASSERT(optimizable != nullptr);
     ASSERT_EQ(std::string(optimizable->getSourceName()),
-              sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
+              sdk::shared_test_stages::TransformAggStageDescriptor::kStageName);
 }
 
 TEST_F(DocumentSourceExtensionExpandableTest, FullParseExpandToHostParse) {
@@ -130,12 +130,13 @@ TEST_F(DocumentSourceExtensionExpandableTest, FullParseExpandToMixed) {
 
     auto* first = dynamic_cast<host::DocumentSourceExtensionOptimizable*>(it0->get());
     ASSERT(first != nullptr);
-    ASSERT_EQ(std::string(first->getSourceName()), std::string(sdk::shared_test_stages::kNoOpName));
+    ASSERT_EQ(std::string(first->getSourceName()),
+              std::string(sdk::shared_test_stages::kTransformName));
 
     auto* second = dynamic_cast<host::DocumentSourceExtensionOptimizable*>(it1->get());
     ASSERT(second != nullptr);
     ASSERT_EQ(std::string(second->getSourceName()),
-              std::string(sdk::shared_test_stages::kNoOpName));
+              std::string(sdk::shared_test_stages::kTransformName));
 
     auto* third = dynamic_cast<DocumentSourceMatch*>(it2->get());
     ASSERT(third != nullptr);
@@ -182,11 +183,11 @@ using DocumentSourceExtensionExpandableTestDeathTest = DocumentSourceExtensionEx
 DEATH_TEST_F(DocumentSourceExtensionExpandableTestDeathTest,
              SerializeWithWrongOptsFails,
              "10978000") {
-    auto rawStage =
-        BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName << BSON("foo" << true));
+    auto rawStage = BSON(sdk::shared_test_stages::TransformAggStageDescriptor::kStageName
+                         << BSON("foo" << true));
 
     auto expandable = host::DocumentSourceExtensionExpandable::create(
-        getExpCtx(), rawStage, AggStageDescriptorHandle(&_noOpStageDescriptor));
+        getExpCtx(), rawStage, AggStageDescriptorHandle(&_transformStageDescriptor));
 
     [[maybe_unused]] auto serialized = expandable->serialize(SerializationOptions{});
 }

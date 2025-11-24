@@ -47,13 +47,13 @@ protected:
     static inline NamespaceString _nss = NamespaceString::createNamespaceString_forTest(
         boost::none, "document_source_extension_optimizable_test");
 
-    sdk::ExtensionAggStageDescriptor _noOpAggregationStageDescriptor{
-        sdk::shared_test_stages::NoOpAggStageDescriptor::make()};
+    sdk::ExtensionAggStageDescriptor _transformAggregationStageDescriptor{
+        sdk::shared_test_stages::TransformAggStageDescriptor::make()};
 };
 
-TEST_F(DocumentSourceExtensionOptimizableTest, noOpConstructionSucceeds) {
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
+TEST_F(DocumentSourceExtensionOptimizableTest, transformConstructionSucceeds) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::TransformAggStageAstNode::make());
     auto astHandle = AggStageAstNodeHandle(astNode);
 
     DepsTracker deps(QueryMetadataBitSet{});
@@ -61,13 +61,13 @@ TEST_F(DocumentSourceExtensionOptimizableTest, noOpConstructionSucceeds) {
         host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
 
     ASSERT_EQ(std::string(optimizable->getSourceName()),
-              sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName);
+              sdk::shared_test_stages::TransformAggStageDescriptor::kStageName);
     ASSERT_DOES_NOT_THROW(optimizable->getDependencies(&deps));
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, stageCanSerializeForQueryExecution) {
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::TransformAggStageAstNode::make());
     auto astHandle = AggStageAstNodeHandle(astNode);
 
     auto optimizable =
@@ -76,7 +76,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, stageCanSerializeForQueryExecutio
     // Test that an extension can provide its own implementation of serialize, that might change
     // the raw spec provided.
     ASSERT_BSONOBJ_EQ(optimizable->serialize(SerializationOptions()).getDocument().toBson(),
-                      BSON(sdk::shared_test_stages::NoOpAggStageDescriptor::kStageName
+                      BSON(sdk::shared_test_stages::TransformAggStageDescriptor::kStageName
                            << "serializedForExecution"));
 }
 
@@ -84,8 +84,8 @@ using DocumentSourceExtensionOptimizableTestDeathTest = DocumentSourceExtensionO
 DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
              serializeWithWrongOptsFails,
              "11217800") {
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::TransformAggStageAstNode::make());
     auto astHandle = AggStageAstNodeHandle(astNode);
 
     auto optimizable =
@@ -97,8 +97,8 @@ DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
 
 TEST_F(DocumentSourceExtensionOptimizableTest, stageWithDefaultStaticProperties) {
     // These should also be the default static properties for Transform stages.
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NoOpAggStageAstNode::make());
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::TransformAggStageAstNode::make());
     auto astHandle = AggStageAstNodeHandle(astNode);
 
     auto optimizable =

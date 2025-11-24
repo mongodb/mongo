@@ -104,8 +104,7 @@ public:
     };
 };
 
-class InvalidExtensionExecAggStageAdvancedState
-    : public shared_test_stages::NoOpExtensionExecAggStage {
+class InvalidExtensionExecAggStageAdvancedState : public shared_test_stages::TransformExecAggStage {
 public:
     extension::ExtensionGetNextResult getNext(
         const QueryExecutionContextHandle& expCtx,
@@ -126,7 +125,7 @@ public:
 };
 
 class InvalidExtensionExecAggStagePauseExecutionState
-    : public shared_test_stages::NoOpExtensionExecAggStage {
+    : public shared_test_stages::TransformExecAggStage {
 public:
     extension::ExtensionGetNextResult getNext(
         const QueryExecutionContextHandle& expCtx,
@@ -147,7 +146,7 @@ public:
     }
 };
 
-class InvalidExtensionExecAggStageEofState : public shared_test_stages::NoOpExtensionExecAggStage {
+class InvalidExtensionExecAggStageEofState : public shared_test_stages::TransformExecAggStage {
 public:
     extension::ExtensionGetNextResult getNext(
         const QueryExecutionContextHandle& expCtx,
@@ -168,8 +167,7 @@ public:
     }
 };
 
-class InvalidExtensionExecAggStageGetNextCode
-    : public shared_test_stages::NoOpExtensionExecAggStage {
+class InvalidExtensionExecAggStageGetNextCode : public shared_test_stages::TransformExecAggStage {
 public:
     extension::ExtensionGetNextResult getNext(
         const QueryExecutionContextHandle& expCtx,
@@ -251,9 +249,9 @@ DEATH_TEST_F(AggStageDeathTest, DescriptorAndParseNodeNameMismatchFails, "112176
 }
 
 DEATH_TEST_F(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetName, "11217600") {
-    auto noOpParseNode =
-        new ExtensionAggStageParseNode(shared_test_stages::NoOpAggStageParseNode::make());
-    auto handle = TestParseNodeVTableHandle{noOpParseNode};
+    auto transformParseNode =
+        new ExtensionAggStageParseNode(shared_test_stages::TransformAggStageParseNode::make());
+    auto handle = TestParseNodeVTableHandle{transformParseNode};
 
     auto vtable = handle.vtable();
     vtable.get_name = nullptr;
@@ -261,9 +259,9 @@ DEATH_TEST_F(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetName, "1121
 };
 
 DEATH_TEST_F(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetQueryShape, "10977600") {
-    auto noOpParseNode =
-        new ExtensionAggStageParseNode(shared_test_stages::NoOpAggStageParseNode::make());
-    auto handle = TestParseNodeVTableHandle{noOpParseNode};
+    auto transformParseNode =
+        new ExtensionAggStageParseNode(shared_test_stages::TransformAggStageParseNode::make());
+    auto handle = TestParseNodeVTableHandle{transformParseNode};
 
     auto vtable = handle.vtable();
     vtable.get_query_shape = nullptr;
@@ -271,9 +269,9 @@ DEATH_TEST_F(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetQueryShape,
 };
 
 DEATH_TEST_F(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetExpandedSize, "11113800") {
-    auto noOpParseNode =
-        new ExtensionAggStageParseNode(shared_test_stages::NoOpAggStageParseNode::make());
-    auto handle = TestParseNodeVTableHandle{noOpParseNode};
+    auto transformParseNode =
+        new ExtensionAggStageParseNode(shared_test_stages::TransformAggStageParseNode::make());
+    auto handle = TestParseNodeVTableHandle{transformParseNode};
 
     auto vtable = handle.vtable();
     vtable.get_expanded_size = nullptr;
@@ -281,9 +279,9 @@ DEATH_TEST_F(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetExpandedSiz
 };
 
 DEATH_TEST_F(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsExpand, "10977601") {
-    auto noOpParseNode =
-        new ExtensionAggStageParseNode(shared_test_stages::NoOpAggStageParseNode::make());
-    auto handle = TestParseNodeVTableHandle{noOpParseNode};
+    auto transformParseNode =
+        new ExtensionAggStageParseNode(shared_test_stages::TransformAggStageParseNode::make());
+    auto handle = TestParseNodeVTableHandle{transformParseNode};
 
     auto vtable = handle.vtable();
     vtable.expand = nullptr;
@@ -291,9 +289,9 @@ DEATH_TEST_F(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsExpand, "10977
 };
 
 DEATH_TEST_F(AstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetName, "11217601") {
-    auto noOpAstNode =
-        new ExtensionAggStageAstNode(shared_test_stages::NoOpAggStageAstNode::make());
-    auto handle = TestAstNodeVTableHandle{noOpAstNode};
+    auto transformAstNode =
+        new ExtensionAggStageAstNode(shared_test_stages::TransformAggStageAstNode::make());
+    auto handle = TestAstNodeVTableHandle{transformAstNode};
 
     auto vtable = handle.vtable();
     vtable.get_name = nullptr;
@@ -301,9 +299,9 @@ DEATH_TEST_F(AstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetName, "11217601
 }
 
 DEATH_TEST_F(AstNodeVTableDeathTest, InvalidAstNodeVTableBind, "11113700") {
-    auto noOpAstNode =
-        new ExtensionAggStageAstNode(shared_test_stages::NoOpAggStageAstNode::make());
-    auto handle = TestAstNodeVTableHandle{noOpAstNode};
+    auto transformAstNode =
+        new ExtensionAggStageAstNode(shared_test_stages::TransformAggStageAstNode::make());
+    auto handle = TestAstNodeVTableHandle{transformAstNode};
 
     auto vtable = handle.vtable();
     vtable.bind = nullptr;
@@ -311,9 +309,9 @@ DEATH_TEST_F(AstNodeVTableDeathTest, InvalidAstNodeVTableBind, "11113700") {
 }
 
 DEATH_TEST_F(AstNodeVTableDeathTest, InvalidAstNodeVTableGetProperties, "11347800") {
-    auto noOpAstNode =
-        new ExtensionAggStageAstNode(shared_test_stages::NoOpAggStageAstNode::make());
-    auto handle = TestAstNodeVTableHandle{noOpAstNode};
+    auto transformAstNode =
+        new ExtensionAggStageAstNode(shared_test_stages::TransformAggStageAstNode::make());
+    auto handle = TestAstNodeVTableHandle{transformAstNode};
 
     auto vtable = handle.vtable();
     vtable.get_properties = nullptr;
@@ -321,9 +319,9 @@ DEATH_TEST_F(AstNodeVTableDeathTest, InvalidAstNodeVTableGetProperties, "1134780
 }
 
 DEATH_TEST_F(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsGetNext, "10956800") {
-    auto noOpExecAggStage = new extension::sdk::ExtensionExecAggStage(
-        shared_test_stages::NoOpExtensionExecAggStage::make());
-    auto handle = TestExecAggStageVTableHandle{noOpExecAggStage};
+    auto transformExecAggStage = new extension::sdk::ExtensionExecAggStage(
+        shared_test_stages::TransformExecAggStage::make());
+    auto handle = TestExecAggStageVTableHandle{transformExecAggStage};
 
     auto vtable = handle.vtable();
     vtable.get_next = nullptr;
@@ -331,9 +329,9 @@ DEATH_TEST_F(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsGetNext,
 };
 
 DEATH_TEST_F(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsSetSource, "10957202") {
-    auto noOpExecAggStage = new extension::sdk::ExtensionExecAggStage(
-        shared_test_stages::NoOpExtensionExecAggStage::make());
-    auto handle = TestExecAggStageVTableHandle{noOpExecAggStage};
+    auto transformExecAggStage = new extension::sdk::ExtensionExecAggStage(
+        shared_test_stages::TransformExecAggStage::make());
+    auto handle = TestExecAggStageVTableHandle{transformExecAggStage};
 
     auto vtable = handle.vtable();
     vtable.set_source = nullptr;
@@ -341,9 +339,9 @@ DEATH_TEST_F(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsSetSourc
 };
 
 DEATH_TEST_F(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsOpen, "11216705") {
-    auto noOpExecAggStage = new extension::sdk::ExtensionExecAggStage(
-        shared_test_stages::NoOpExtensionExecAggStage::make());
-    auto handle = TestExecAggStageVTableHandle{noOpExecAggStage};
+    auto transformExecAggStage = new extension::sdk::ExtensionExecAggStage(
+        shared_test_stages::TransformExecAggStage::make());
+    auto handle = TestExecAggStageVTableHandle{transformExecAggStage};
 
     auto vtable = handle.vtable();
     vtable.open = nullptr;
@@ -351,9 +349,9 @@ DEATH_TEST_F(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsOpen, "1
 };
 
 DEATH_TEST_F(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsReopen, "11216706") {
-    auto noOpExecAggStage = new extension::sdk::ExtensionExecAggStage(
-        shared_test_stages::NoOpExtensionExecAggStage::make());
-    auto handle = TestExecAggStageVTableHandle{noOpExecAggStage};
+    auto transformExecAggStage = new extension::sdk::ExtensionExecAggStage(
+        shared_test_stages::TransformExecAggStage::make());
+    auto handle = TestExecAggStageVTableHandle{transformExecAggStage};
 
     auto vtable = handle.vtable();
     vtable.reopen = nullptr;
@@ -361,9 +359,9 @@ DEATH_TEST_F(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsReopen, 
 };
 
 DEATH_TEST_F(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsClose, "11216707") {
-    auto noOpExecAggStage = new extension::sdk::ExtensionExecAggStage(
-        shared_test_stages::NoOpExtensionExecAggStage::make());
-    auto handle = TestExecAggStageVTableHandle{noOpExecAggStage};
+    auto transformExecAggStage = new extension::sdk::ExtensionExecAggStage(
+        shared_test_stages::TransformExecAggStage::make());
+    auto handle = TestExecAggStageVTableHandle{transformExecAggStage};
 
     auto vtable = handle.vtable();
     vtable.close = nullptr;
