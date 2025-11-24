@@ -198,3 +198,6 @@ filters:
   - "sharding_change_streams_v2.yml":
     approvers:
       - 10gen/query-execution-change-streams
+  - "*rate_limited.yml":
+    approvers:
+      - 10gen/server-workload-resilience

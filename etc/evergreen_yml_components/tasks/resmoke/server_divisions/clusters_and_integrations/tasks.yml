@@ -1306,6 +1306,22 @@ tasks:
           resmoke_jobs_max: 0 # No cap on number of jobs.
 
   - <<: *gen_task_template
+    name: multi_shard_multi_stmt_txn_jscore_passthrough_rate_limited_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_workload_scheduling",
+        "default",
+        "multi_shard",
+        "multi_stmt",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 0 # No cap on number of jobs.
+
+  - <<: *gen_task_template
     name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
     tags:
       [
@@ -1555,6 +1571,19 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
+        "release_critical",
+        "incompatible_mac",
+        "sharding",
+        "jscore",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: sharded_collections_jscore_passthrough_rate_limited_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_workload_scheduling",
         "release_critical",
         "incompatible_mac",
         "sharding",
@@ -2214,6 +2243,19 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
+        "release_critical",
+        "sharding",
+        "jscore",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: sharding_jscore_passthrough_with_balancer_rate_limited_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_workload_scheduling",
         "release_critical",
         "sharding",
         "jscore",

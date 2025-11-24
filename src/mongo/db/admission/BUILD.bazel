@@ -45,6 +45,9 @@ mongo_cc_library(
         "ingress_admission_controller.cpp",
         ":ingress_admission_control_gen",
     ],
+    hdrs = [
+        "ingress_admission_controller.h",
+    ],
     deps = [
         ":ingress_admission_context",
         ":rate_limiter",
