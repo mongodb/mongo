@@ -189,10 +189,11 @@ for (const metric of ["cosine", "dotProduct", "euclidean"]) {
 
     // Expected:
     //   1. $cursor
-    //   2. $setMetadata
-    //   3. $sort  (limit is folded into sort)
+    //   2. $vectorSearchMetrics
+    //   3. $setMetadata
+    //   4. $sort  (limit is folded into sort)
     const stages = expl.stages ? expl.stages : expl.shards[Object.keys(expl.shards)[0]].stages;
     const names = stages.map((s) => Object.keys(s)[0]);
-    assert.eq(names, ["$cursor", "$setMetadata", "$sort"]);
-    assert.eq(stages[2].$sort.limit, 2);
+    assert.eq(names, ["$cursor", "$vectorSearchMetrics", "$setMetadata", "$sort"]);
+    assert.eq(stages[3].$sort.limit, 2);
 }

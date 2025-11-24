@@ -31,6 +31,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/host_portal.h"
+#include "mongo/db/extension/sdk/log_util.h"
 #include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
@@ -41,12 +42,179 @@ static const std::string kMatchName = "$match";
 static const std::string kSetMetadataName = "$setMetadata";
 static const std::string kSortName = "$sort";
 static const std::string kLimitName = "$limit";
+static const std::string kMetricsStageName = "$vectorSearchMetrics";
 
 static const std::string kCosineExpr = "$similarityCosine";
 static const std::string kDotProdExpr = "$similarityDotProduct";
 static const std::string kEuclidExpr = "$similarityEuclidean";
 
 static const std::string kMetaVectorSearchScore = "vectorSearchScore";
+
+/**
+ * Implementation of operation metrics for vector search operations.
+ * Tracks execution start time, number of documents examined, and the algorithm used.
+ */
+class OperationMetricsImpl : public sdk::OperationMetricsBase {
+public:
+    OperationMetricsImpl() = default;
+    /**
+     * Serialize current metrics as BSON.
+     * Returns format: {start: <Date>, docsExamined: <int>, algorithm: <string>}.
+     */
+    BSONObj serialize() const override {
+        return BSON("start" << _start << "docsExamined" << _counter << "algorithm" << _algorithm);
+    }
+
+    void update(MongoExtensionByteView arguments) override {
+        // Convert ByteView to BSON object
+        BSONObj updateObj = extension::bsonObjFromByteView(arguments);
+
+        // Check which update type is present
+        _start = updateObj.getField("start").date();
+        _algorithm = updateObj.getField("algorithm").String();
+        _counter++;
+    }
+
+private:
+    Date_t _start;
+    int _counter = 0;
+    std::string _algorithm;
+};
+
+/**
+ * Execution stage that collects metrics during vector search pipeline execution.
+ *
+ * On each getNext() call, updates the operation metrics with the current timestamp
+ * and algorithm name, then passes through documents from the source stage unchanged.
+ * The metrics are stored on the OperationContext and can be serialized for logging
+ * and diagnostics.
+ */
+class MetricsExecAggStage : public sdk::ExecAggStageTransform {
+public:
+    static constexpr std::string kCounterField = "counter";
+
+    explicit MetricsExecAggStage(const std::string& algorithm)
+        : sdk::ExecAggStageTransform(kMetricsStageName), _algorithm(algorithm) {}
+
+    mongo::extension::ExtensionGetNextResult getNext(
+        const sdk::QueryExecutionContextHandle& execCtx,
+        MongoExtensionExecAggStage* execStage,
+        ::MongoExtensionGetNextRequestType requestType) override {
+        // Get metrics from the execution context (stored on OperationContext).
+        auto metrics = execCtx.getMetrics(execStage);
+
+        auto now = Date_t::now();
+        BSONObjBuilder updateBuilder;
+        updateBuilder.append("start", now);
+        updateBuilder.append("algorithm", _algorithm);
+
+        auto bson = updateBuilder.obj();
+        auto updateBuf = mongo::extension::objAsByteView(bson);
+        metrics.update(updateBuf);
+
+        return _getSource().getNext(execCtx.get());
+    }
+
+    void open() override {}
+
+    void reopen() override {}
+
+    void close() override {}
+
+    /**
+     * Create metrics instance for this stage.
+     * The instance will be stored on the OperationContext and accessed via execCtx.getMetrics().
+     */
+    std::unique_ptr<sdk::OperationMetricsBase> createMetrics() const override {
+        return std::make_unique<OperationMetricsImpl>();
+    }
+
+private:
+    std::string _algorithm;
+};
+
+class MetricsLogicalStage : public sdk::LogicalAggStage {
+public:
+    MetricsLogicalStage(const std::string& algorithm) : _algorithm(algorithm) {};
+
+    BSONObj serialize() const override {
+        return BSON(kMetricsStageName << BSONObj());
+    }
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSON(kMetricsStageName << BSONObj());
+    }
+
+    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
+        return std::make_unique<MetricsExecAggStage>(_algorithm);
+    }
+
+private:
+    std::string _algorithm;
+};
+
+class MetricsAstNode : public sdk::AggStageAstNode {
+public:
+    MetricsAstNode(const std::string& algorithm)
+        : sdk::AggStageAstNode(kMetricsStageName), _algorithm(algorithm) {}
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<MetricsLogicalStage>(_algorithm);
+    }
+
+private:
+    std::string _algorithm;
+};
+
+/**
+ * Parse node for the $vectorSearchMetrics stage that expands during desugaring.
+ *
+ * This node expands to a single MetricsAstNode. It is inserted into the pipeline
+ * during expansion of $nativeVectorSearch to track metrics for the vector search
+ * operation. The algorithm parameter is passed through from the parent stage.
+ */
+class MetricsParseNode : public sdk::AggStageParseNode {
+public:
+    MetricsParseNode(const std::string& algorithm)
+        : sdk::AggStageParseNode(kMetricsStageName), _algorithm(algorithm) {}
+
+    size_t getExpandedSize() const override {
+        return 1;
+    }
+
+    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
+        std::vector<mongo::extension::VariantNodeHandle> expanded;
+        expanded.reserve(getExpandedSize());
+        expanded.emplace_back(
+            new sdk::ExtensionAggStageAstNode(std::make_unique<MetricsAstNode>(_algorithm)));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
+private:
+    std::string _algorithm;
+};
+
+/**
+ * Even though users don't use $vectorSearchMetrics, we must register stage descriptor for the
+ * sharded case, where the mongos serializes the pipeline and sends it to the shards.
+ */
+class MetricsStageDescriptor : public sdk::AggStageDescriptor {
+public:
+    static inline const std::string kStageName = "$vectorSearchMetrics";
+
+    MetricsStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
+
+    std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
+        sdk::validateStageDefinition(stageBson, kStageName);
+        const auto raw = stageBson[kMetricsStageName].Obj();
+        const auto algorithm = raw.hasField("metric") ? raw["metric"].checkAndGetStringData() : "";
+        return std::make_unique<MetricsParseNode>(std::string(algorithm));
+    }
+};
 
 class NativeVectorSearchParseNode : public sdk::AggStageParseNode {
 public:
@@ -71,10 +239,10 @@ public:
 
     /**
      * Return the number of expanded pipeline stages this node produces:
-     * $match? + $setMetadata + $sort + $limit
+     * $match? + $setMetadata + $sort + $limit + 1 metric stage
      */
     size_t getExpandedSize() const override {
-        return (_filter.isEmpty() ? 0 : 1) + 3;
+        return (_filter.isEmpty() ? 0 : 1) + 4;
     }
 
     /**
@@ -92,6 +260,9 @@ public:
         out.reserve(getExpandedSize());
 
         auto* host = sdk::HostServicesHandle::getHostServices();
+
+        auto metrics = std::make_unique<MetricsAstNode>(_metric);
+        out.emplace_back(new sdk::ExtensionAggStageAstNode(std::move(metrics)));
 
         if (!_filter.isEmpty()) {
             out.emplace_back(host->createHostAggStageParseNode(_buildMatch()));
@@ -213,6 +384,8 @@ public:
         sdk::validateStageDefinition(stageBson, kStageName);
         const auto raw = stageBson[kStageName].Obj();
 
+        sdk::sdk_log("Parsing a native vector search extension stage", 11407600);
+
         // Check presence and type of required fields.
         sdk_uassert(10956503,
                     "$nativeVectorSearch requires 'path' string",
@@ -282,6 +455,7 @@ public:
 class NativeVectorSearchExtension : public sdk::Extension {
 public:
     void initialize(const sdk::HostPortalHandle& portal) override {
+        _registerStage<MetricsStageDescriptor>(portal);
         _registerStage<NativeVectorSearchStageDescriptor>(portal);
     }
 };

@@ -53,6 +53,7 @@ protected:
     static inline const std::string kNativeVectorSearchStageName = "$nativeVectorSearch";
     static inline const std::string kNativeVectorSearchLibExtensionPath =
         "libnative_vector_search_mongo_extension.so";
+    static inline const std::string kMetricsStageName = "$vectorSearchMetrics";
 
     void setUp() override {
         ASSERT_DOES_NOT_THROW(
@@ -60,6 +61,7 @@ protected:
     }
 
     void tearDown() override {
+        host::DocumentSourceExtension::unregisterParser_forTest(kMetricsStageName);
         host::DocumentSourceExtension::unregisterParser_forTest(kNativeVectorSearchStageName);
         ExtensionLoader::unload_forTest("nativeVectorSearch");
     }
@@ -181,6 +183,7 @@ TEST_F(LoadNativeVectorSearchTest, LiteParsedExpandsWithFilter) {
     expectLiteParsedNames(nss,
                           spec,
                           {
+                              kMetricsStageName,
                               DocumentSourceMatch::kStageName,
                               DocumentSourceSetMetadata::kStageName,
                               DocumentSourceSort::kStageName,
@@ -193,6 +196,7 @@ TEST_F(LoadNativeVectorSearchTest, LiteParsedExpandsWithoutFilter) {
     expectLiteParsedNames(nss,
                           spec,
                           {
+                              kMetricsStageName,
                               DocumentSourceSetMetadata::kStageName,
                               DocumentSourceSort::kStageName,
                               DocumentSourceLimit::kStageName,
@@ -202,9 +206,24 @@ TEST_F(LoadNativeVectorSearchTest, LiteParsedExpandsWithoutFilter) {
 TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithFilter) {
     auto spec = makeNativeVectorSearchSpec(/*filter*/ true);
     auto stages = desugarAndSerialize(expCtx, spec);
+    ASSERT_EQ(stages.size(), 5U);
+
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
+    expectStageEq(stages, 1, R"JSON({ $match: { x: 1 } })JSON");
+    expectStageEq(stages, 2, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityCosine: {
+        vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
+        score: false } } } }
+        )JSON");
+    expectStageEq(stages, 3, kSortJson);
+    expectStageEq(stages, 4, kLimitJson);
+}
+
+TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithoutFilter) {
+    auto spec = makeNativeVectorSearchSpec(/*filter*/ false);  // default = "cosine"
+    auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
-    expectStageEq(stages, 0, R"JSON({ $match: { x: 1 } })JSON");
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
     expectStageEq(stages, 1, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityCosine: {
         vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
         score: false } } } }
@@ -213,84 +232,76 @@ TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithFilter) {
     expectStageEq(stages, 3, kLimitJson);
 }
 
-TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithoutFilter) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ false);  // default = "cosine"
-    auto stages = desugarAndSerialize(expCtx, spec);
-    ASSERT_EQ(stages.size(), 3U);
-
-    expectStageEq(stages, 0, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityCosine: {
-        vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
-        score: false } } } }
-        )JSON");
-    expectStageEq(stages, 1, kSortJson);
-    expectStageEq(stages, 2, kLimitJson);
-}
-
 TEST_F(LoadNativeVectorSearchTest, CosineNormalizedSerializesAsExpected) {
     auto spec = makeNativeVectorSearchSpec(/*filter*/ false, "cosine", /*normalize*/ true);
     auto stages = desugarAndSerialize(expCtx, spec);
-    ASSERT_EQ(stages.size(), 3U);
-    expectStageEq(stages, 0, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityCosine: {
+    ASSERT_EQ(stages.size(), 4U);
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
+    expectStageEq(stages, 1, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityCosine: {
       vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
       score: true } } } })JSON");
-    expectStageEq(stages, 1, kSortJson);
-    expectStageEq(stages, 2, kLimitJson);
+    expectStageEq(stages, 2, kSortJson);
+    expectStageEq(stages, 3, kLimitJson);
 }
 
 TEST_F(LoadNativeVectorSearchTest, DotProductNoNormalizeSerializesAsExpected) {
     auto spec = makeNativeVectorSearchSpec(/*filter*/ false, /*metric*/ "dotProduct");
     auto stages = desugarAndSerialize(expCtx, spec);
-    ASSERT_EQ(stages.size(), 3U);
+    ASSERT_EQ(stages.size(), 4U);
 
-    expectStageEq(stages, 0, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityDotProduct: {
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
+    expectStageEq(stages, 1, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityDotProduct: {
         vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
         score: false } } } }
         )JSON");
-    expectStageEq(stages, 1, kSortJson);
-    expectStageEq(stages, 2, kLimitJson);
+    expectStageEq(stages, 2, kSortJson);
+    expectStageEq(stages, 3, kLimitJson);
 }
 
 TEST_F(LoadNativeVectorSearchTest, DotProductNormalizedSerializesAsExpected) {
     auto spec = makeNativeVectorSearchSpec(false, "dotProduct", /*normalize*/ true);
     auto stages = desugarAndSerialize(expCtx, spec);
-    ASSERT_EQ(stages.size(), 3U);
+    ASSERT_EQ(stages.size(), 4U);
 
-    expectStageEq(stages, 0, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityDotProduct: {
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
+    expectStageEq(stages, 1, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityDotProduct: {
       vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
       score: true } } } })JSON");
-    expectStageEq(stages, 1, kSortJson);
-    expectStageEq(stages, 2, kLimitJson);
+    expectStageEq(stages, 2, kSortJson);
+    expectStageEq(stages, 3, kLimitJson);
 }
 
 TEST_F(LoadNativeVectorSearchTest, NativeVectorSearchEuclideanNoNormalizeUsesMultiplyNegation) {
     auto spec =
         makeNativeVectorSearchSpec(/*filter*/ false, /*metric*/ "euclidean", /*normalize*/ false);
     auto stages = desugarAndSerialize(expCtx, spec);
-    ASSERT_EQ(stages.size(), 3U);
+    ASSERT_EQ(stages.size(), 4U);
 
-    expectStageEq(stages, 0, R"JSON({ $setMetadata: { vectorSearchScore: { $multiply: [
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
+    expectStageEq(stages, 1, R"JSON({ $setMetadata: { vectorSearchScore: { $multiply: [
         { $const: -1 },
         { $similarityEuclidean: {
             vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
             score: false } }
         ] } } }
         )JSON");
-    expectStageEq(stages, 1, kSortJson);
-    expectStageEq(stages, 2, kLimitJson);
+    expectStageEq(stages, 2, kSortJson);
+    expectStageEq(stages, 3, kLimitJson);
 }
 
 TEST_F(LoadNativeVectorSearchTest, NativeVectorSearchEuclideanNormalizedSerializesAsExpected) {
     auto spec =
         makeNativeVectorSearchSpec(/*filter*/ false, /*metric*/ "euclidean", /*normalize*/ true);
     auto stages = desugarAndSerialize(expCtx, spec);
-    ASSERT_EQ(stages.size(), 3U);
+    ASSERT_EQ(stages.size(), 4U);
 
-    expectStageEq(stages, 0, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityEuclidean: {
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
+    expectStageEq(stages, 1, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityEuclidean: {
         vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
         score: true } } } }
         )JSON");
-    expectStageEq(stages, 1, kSortJson);
-    expectStageEq(stages, 2, kLimitJson);
+    expectStageEq(stages, 2, kSortJson);
+    expectStageEq(stages, 3, kLimitJson);
 }
 
 TEST_F(LoadNativeVectorSearchTest, NumCandidatesDoesNotAffectExpansionOrSerialization) {
