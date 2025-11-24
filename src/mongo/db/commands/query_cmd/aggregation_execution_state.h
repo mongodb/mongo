@@ -374,14 +374,14 @@ private:
 class ResolvedViewAggExState : public AggExState {
 public:
     ResolvedViewAggExState(AggExState&& baseState,
-                           std::unique_ptr<AggCatalogState>& catalog,
+                           const AggCatalogState& catalog,
                            const ViewDefinition& view);
 
     /**
      * Returns a new ResolvedViewAggExState object after performing a collation compatibility check.
      */
     static StatusWith<std::unique_ptr<ResolvedViewAggExState>> create(
-        AggExState&& aggExState, std::unique_ptr<AggCatalogState>& aggCatalogState);
+        std::unique_ptr<AggExState> aggExState, const AggCatalogState& aggCatalogState);
 
     bool isView() const override {
         return true;

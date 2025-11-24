@@ -595,11 +595,11 @@ std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState() {
 }
 
 ResolvedViewAggExState::ResolvedViewAggExState(AggExState&& baseState,
-                                               std::unique_ptr<AggCatalogState>& aggCatalogStage,
+                                               const AggCatalogState& aggCatalogStage,
                                                const ViewDefinition& view)
     : AggExState(std::move(baseState)),
       _originalAggReqDerivatives(std::move(_aggReqDerivatives)),
-      _resolvedView(uassertStatusOK(aggCatalogStage->resolveView(
+      _resolvedView(uassertStatusOK(aggCatalogStage.resolveView(
           _opCtx,
           _originalAggReqDerivatives->request.getNamespace(),
           view.timeseries() ? _originalAggReqDerivatives->request.getCollation() : boost::none))),
@@ -621,18 +621,18 @@ ResolvedViewAggExState::ResolvedViewAggExState(AggExState&& baseState,
 }
 
 StatusWith<std::unique_ptr<ResolvedViewAggExState>> ResolvedViewAggExState::create(
-    AggExState&& aggExState, std::unique_ptr<AggCatalogState>& aggCatalogState) {
-    invariant(aggCatalogState->lockAcquired());
+    std::unique_ptr<AggExState> aggExState, const AggCatalogState& aggCatalogState) {
+    invariant(aggCatalogState.lockAcquired());
 
     // Resolve the request's collation and check that the default collation of 'view' is compatible
     // with the operation's collation. The collation resolution and check are both skipped if the
     // request did not specify a collation.
-    tassert(10240800, "Expected a view", aggCatalogState->getMainCollectionOrView().isView());
+    tassert(10240800, "Expected a view", aggCatalogState.getMainCollectionOrView().isView());
     const auto& viewDefinition =
-        aggCatalogState->getMainCollectionOrView().getView().getViewDefinition();
+        aggCatalogState.getMainCollectionOrView().getView().getViewDefinition();
 
-    if (!aggExState.getRequest().getCollation().get_value_or(BSONObj()).isEmpty()) {
-        auto [collatorToUse, collatorToUseMatchesDefault] = aggCatalogState->resolveCollator();
+    if (!aggExState->getRequest().getCollation().get_value_or(BSONObj()).isEmpty()) {
+        auto [collatorToUse, collatorToUseMatchesDefault] = aggCatalogState.resolveCollator();
         if (!CollatorInterface::collatorsMatch(viewDefinition.defaultCollator(),
                                                collatorToUse.get()) &&
             !viewDefinition.timeseries()) {
@@ -644,7 +644,7 @@ StatusWith<std::unique_ptr<ResolvedViewAggExState>> ResolvedViewAggExState::crea
     // Create the ResolvedViewAggExState object which will resolve the view upon
     // initialization.
     return std::make_unique<ResolvedViewAggExState>(
-        std::move(aggExState), aggCatalogState, viewDefinition);
+        std::move(*aggExState), aggCatalogState, viewDefinition);
 }
 
 std::unique_ptr<Pipeline> ResolvedViewAggExState::applyViewToPipeline(
