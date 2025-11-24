@@ -51,14 +51,14 @@ const runTest = function (failover, commit) {
         rst.stepUp(primary);
         rst.waitForState(primary, ReplSetTest.State.PRIMARY);
         rst.awaitSecondaryNodes(null, [secondary]);
-        // This is needed after restarting the node because the 'lastCommitted' is not set until
-        // receiving heartbeats. We need to wait for the 'lastCommitted' OpTime to be past the
-        // 'prepareTimestamp' before committing the prepared transaction.
-        PrepareHelpers.awaitMajorityCommitted(rst, prepareTimestamp);
     }
 
     const newPrimary = rst.getPrimary();
     assert.eq(failover ? secondary : primary, newPrimary, "Wrong primary");
+    // The prepare entry must be majority committed on the new primary before we commit the
+    // prepared transaction, so we wait for the 'lastCommitted' OpTime to encompass the
+    // 'prepareTimestamp'.
+    PrepareHelpers.awaitMajorityCommitted(rst, prepareTimestamp);
 
     if (commit) {
         // Commit the prepared transaction on the new primary.
