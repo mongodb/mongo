@@ -99,10 +99,6 @@ class LintRunner:
             "src/mongo/db/modules/enterprise/src/streams/util/tests/concurrent_memory_aggregator_test.cpp",
             # TODO(SERVER-101375): Remove the exemptions below once resolved.
             "src/mongo/platform/decimal128_dummy.cpp",
-            # TODO(SERVER-112684): Remove the exemptions below once resolved.
-            "src/mongo/util/processinfo_emscripten.cpp",
-            "src/mongo/util/processinfo_macOS.cpp",
-            "src/mongo/util/processinfo_solaris.cpp",
         }
 
         exempted_subpaths = [
