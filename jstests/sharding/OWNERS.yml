@@ -139,3 +139,6 @@ filters:
   - "availability_canaries_under_transitions.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "index_commands_shard_targeting.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
