@@ -102,6 +102,6 @@ executor:
         defaultClientMaxRetryAttempts: 16
         defaultClientBaseBackoffMillis: 10
         defaultClientMaxBackoffMillis: 1000
-        failpoint.failRateLimiting:
+        failpoint.failIngressRequestRateLimiting:
           mode:
             activationProbability: 0.25
