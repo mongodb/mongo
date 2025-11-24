@@ -36,6 +36,25 @@
 
 namespace mongo::stage_builder {
 
+template <typename T>
+sbe::value::Path toPath(const T& fullPath) {
+    sbe::value::Path ret;
+
+    FieldPath fieldPath{fullPath};
+    for (size_t i = 0; i < fieldPath.getPathLength() - 1; ++i) {
+        ret.emplace_back(sbe::value::Get{.field = std::string(fieldPath.getFieldName(i))});
+        ret.emplace_back(sbe::value::Traverse{});
+    }
+    // Omit the Traverse for the last path component.
+    if (fieldPath.getPathLength() != 0) {
+        ret.emplace_back(sbe::value::Get{
+            .field = std::string(fieldPath.getFieldName(fieldPath.getPathLength() - 1))});
+    }
+    ret.emplace_back(sbe::value::Id{});
+
+    return ret;
+}
+
 boost::optional<PlanStageReqs> makeExtractFieldPathsPlanStageReqs(
     StageBuilderState& state,
     const std::vector<const Expression*>& expressions,
@@ -53,6 +72,17 @@ boost::optional<PlanStageReqs> makeExtractFieldPathsPlanStageReqs(
                     "Child stage outputs rejected for ExtractFieldPathsStage",
                     "reason"_attr = "has block output");
         return boost::none;
+    }
+    for (auto& p : childStageOutputs.getSlotNameToIdMap()) {
+        const PlanStageSlots::UnownedSlotName& slotName = p.first;
+        if (slotName.first != PlanStageSlots::kField) {
+            continue;
+        }
+        auto path = toPath(slotName.second);
+        // Only read from toplevel fields.
+        if (path.size() != 2) {
+            return boost::none;
+        }
     }
     bool ok = true;
     PlanStageReqs extractFieldPathsReqs;
@@ -124,25 +154,6 @@ boost::optional<PlanStageReqs> makeExtractFieldPathsPlanStageReqs(
     }
 
     return boost::make_optional(extractFieldPathsReqs);
-}
-
-template <typename T>
-sbe::value::Path toPath(const T& fullPath) {
-    sbe::value::Path ret;
-
-    FieldPath fieldPath{fullPath};
-    for (size_t i = 0; i < fieldPath.getPathLength() - 1; ++i) {
-        ret.emplace_back(sbe::value::Get{.field = std::string(fieldPath.getFieldName(i))});
-        ret.emplace_back(sbe::value::Traverse{});
-    }
-    // Omit the Traverse for the last path component.
-    if (fieldPath.getPathLength() != 0) {
-        ret.emplace_back(sbe::value::Get{
-            .field = std::string(fieldPath.getFieldName(fieldPath.getPathLength() - 1))});
-    }
-    ret.emplace_back(sbe::value::Id{});
-
-    return ret;
 }
 
 std::pair<SbStage, PlanStageSlots> buildExtractFieldPaths(SbStage stage,
