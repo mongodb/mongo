@@ -126,7 +126,6 @@ TEST_F(ScanStageTest, scanStage) {
                                                     nullptr /* yieldPolicy */,
                                                     kEmptyPlanNodeId,
                                                     ScanCallbacks{},
-                                                    false /* useRandomCursor */,
                                                     false /* participateInTrialRunTracking */,
                                                     false /* includeScanStartRecordId */,
                                                     false /* includeScanEndRecordId */);

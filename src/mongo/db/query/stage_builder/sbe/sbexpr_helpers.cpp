@@ -495,7 +495,6 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(
                                                 _state.yieldPolicy,
                                                 _nodeId,
                                                 std::move(scanCallbacks),
-                                                false /* useRandomCursor */,
                                                 true /* participateInTrialRunTracking */,
                                                 scanBounds.includeScanStartRecordId,
                                                 scanBounds.includeScanEndRecordId);

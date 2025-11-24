@@ -66,6 +66,7 @@
 
 namespace mongo {
 namespace sbe {
+
 using ScanOpenCallback = void (*)(OperationContext*, const CollectionPtr&);
 
 struct ScanCallbacks {
@@ -81,26 +82,26 @@ struct ScanCallbacks {
     ScanOpenCallback scanOpenCallback = nullptr;
 };
 
+template <typename Derived>
+class ScanStageBaseImpl;
+
 /**
- * Contains static state info that can be shared across all cloned copies of a ScanStage.
+ * Contains static state info that can be shared across all cloned copies of a ScanStageBase.
  */
-class ScanStageState {
+class ScanStageBaseState {
 public:
-    ScanStageState(UUID inCollUuid,
-                   DatabaseName dbName,
-                   boost::optional<value::SlotId> inRecordSlot,
-                   boost::optional<value::SlotId> inRecordIdSlot,
-                   boost::optional<value::SlotId> inSnapshotIdSlot,
-                   boost::optional<value::SlotId> inIndexIdentSlot,
-                   boost::optional<value::SlotId> inIndexKeySlot,
-                   boost::optional<value::SlotId> inIndexKeyPatternSlot,
-                   std::vector<std::string> inScanFieldNames,
-                   value::SlotVector inScanFieldSlots,
-                   boost::optional<value::SlotId> inMinRecordIdSlot,
-                   boost::optional<value::SlotId> inMaxRecordIdSlot,
-                   bool inForward,
-                   ScanCallbacks inScanCallbacks,
-                   bool inUseRandomCursor)
+    ScanStageBaseState(UUID inCollUuid,
+                       DatabaseName dbName,
+                       boost::optional<value::SlotId> inRecordSlot,
+                       boost::optional<value::SlotId> inRecordIdSlot,
+                       boost::optional<value::SlotId> inSnapshotIdSlot,
+                       boost::optional<value::SlotId> inIndexIdentSlot,
+                       boost::optional<value::SlotId> inIndexKeySlot,
+                       boost::optional<value::SlotId> inIndexKeyPatternSlot,
+                       std::vector<std::string> inScanFieldNames,
+                       value::SlotVector inScanFieldSlots,
+                       ScanCallbacks inScanCallbacks,
+                       bool forward)
         : collUuid(inCollUuid),
           dbName(dbName),
           recordSlot(inRecordSlot),
@@ -111,11 +112,8 @@ public:
           indexKeyPatternSlot(inIndexKeyPatternSlot),
           scanFieldNames(inScanFieldNames),
           scanFieldSlots(inScanFieldSlots),
-          minRecordIdSlot(inMinRecordIdSlot),
-          maxRecordIdSlot(inMaxRecordIdSlot),
-          forward(inForward),
           scanCallbacks(inScanCallbacks),
-          useRandomCursor(inUseRandomCursor) {
+          forward(forward) {
         tassert(11094712,
                 "Expecting number of scan fields to match the number of scan slots",
                 scanFieldNames.size() == scanFieldSlots.size());
@@ -140,17 +138,11 @@ public:
     const StringListSet scanFieldNames;
     const value::SlotVector scanFieldSlots;
 
-    const boost::optional<value::SlotId> minRecordIdSlot;
-    const boost::optional<value::SlotId> maxRecordIdSlot;
+    const ScanCallbacks scanCallbacks;
 
     // Tells if this is a forward (as opposed to reverse) scan.
     const bool forward;
-
-    const ScanCallbacks scanCallbacks;
-
-    // Used to return a random sample of the collection.
-    const bool useRandomCursor;
-};  // class ScanStageState
+};  // class ScanStageBaseState
 
 /**
  * Retrieves documents from the collection with the given 'collUuid' using the storage API.
@@ -172,84 +164,92 @@ public:
  *       indexKeyPatternSlot? minRecordIdSlot? maxRecordIdSlot? [slot1 = fieldName1, ...
  *       slot_n = fieldName_n] collUuid forward
  */
-class ScanStage final : public PlanStage {
+class ScanStageBase : public PlanStage {
 public:
+    void getStatsShared(BSONObjBuilder& bob) const;
+    const SpecificStats* getSpecificStats() const final;
+    size_t estimateCompileTimeSize() const final;
+
+protected:
     /**
      * Regular constructor. Initializes static '_state' managed by a shared_ptr.
+     * Should only be able to be called by ScanStageBaseImpl.
      */
-    ScanStage(UUID collUuid,
-              DatabaseName dbName,
-              boost::optional<value::SlotId> recordSlot,
-              boost::optional<value::SlotId> recordIdSlot,
-              boost::optional<value::SlotId> snapshotIdSlot,
-              boost::optional<value::SlotId> indexIdentSlot,
-              boost::optional<value::SlotId> indexKeySlot,
-              boost::optional<value::SlotId> indexKeyPatternSlot,
-              std::vector<std::string> scanFieldNames,
-              value::SlotVector scanFieldSlots,
-              boost::optional<value::SlotId> minRecordIdSlot,
-              boost::optional<value::SlotId> maxRecordIdSlot,
-              bool forward,
-              PlanYieldPolicy* yieldPolicy,
-              PlanNodeId nodeId,
-              ScanCallbacks scanCallbacks,
-              // Optional arguments:
-              bool useRandomCursor = false,
-              bool participateInTrialRunTracking = true,
-              bool includeScanStartRecordId = true,
-              bool includeScanEndRecordId = true);
-
+    ScanStageBase(UUID collUuid,
+                  DatabaseName dbName,
+                  boost::optional<value::SlotId> recordSlot,
+                  boost::optional<value::SlotId> recordIdSlot,
+                  boost::optional<value::SlotId> snapshotIdSlot,
+                  boost::optional<value::SlotId> indexIdentSlot,
+                  boost::optional<value::SlotId> indexKeySlot,
+                  boost::optional<value::SlotId> indexKeyPatternSlot,
+                  std::vector<std::string> scanFieldNames,
+                  value::SlotVector scanFieldSlots,
+                  PlanYieldPolicy* yieldPolicy,
+                  PlanNodeId nodeId,
+                  ScanCallbacks scanCallbacks,
+                  bool forward,
+                  // Optional arguments:
+                  bool participateInTrialRunTracking = true);
 
     /**
      * Constructor for clone(). Copies '_state' shared_ptr.
      */
-    ScanStage(const std::shared_ptr<ScanStageState>& state,
-              PlanYieldPolicy* yieldPolicy,
-              PlanNodeId nodeId,
-              bool participateInTrialRunTracking,
-              bool includeScanStartRecordId,
-              bool includeScanEndRecordId);
+    ScanStageBase(std::shared_ptr<ScanStageBaseState> state,
+                  PlanYieldPolicy* yieldPolicy,
+                  PlanNodeId nodeId,
+                  bool participateInTrialRunTracking);
 
-    std::unique_ptr<PlanStage> clone() const final;
-
-    void prepare(CompileCtx& ctx) final;
     value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final;
-    void open(bool reOpen) final;
-    PlanState getNext() final;
-    void close() final;
-
-    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
-    const SpecificStats* getSpecificStats() const final;
-    std::vector<DebugPrinter::Block> debugPrint() const final;
-    size_t estimateCompileTimeSize() const final;
-
-protected:
-    void doSaveState() override;
-    void doRestoreState() override;
-    void doDetachFromOperationContext() override;
-    void doAttachToOperationContext(OperationContext* opCtx) override;
+    void closeShared();
+    void debugPrintShared(std::vector<DebugPrinter::Block>& ret) const;
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override;
+    // Shared logic for getNext()
+    inline void handleInterruptAndSlotAccess() {
+        // We are about to call next() on a storage cursor so do not bother saving our internal
+        // state in case it yields as the state will be completely overwritten after the next()
+        // call.
+        disableSlotAccess();
 
-private:
-    // Returns the primary cursor or the random cursor depending on whether _useRandomCursor is set.
-    RecordCursor* getActiveCursor() const;
+        // This call to checkForInterrupt() may result in a call to save() or restore() on the
+        // entire PlanStage tree if a yield occurs.
+        checkForInterruptAndYield(_opCtx);
+    };
+
+    // Shared logic for getNext()
+    inline void handleEOF(boost::optional<Record>& nextRecord) {
+        if (_state->recordIdSlot) {
+            auto [tag, val] = sbe::value::makeCopyRecordId(RecordId());
+            _recordIdAccessor.reset(true, tag, val);
+        }
+    };
+
+    // Shared logic for getNext()
+    // Helper to reset record ID if a `recordIdSlot` is present and to track end bounds.
+    inline void resetRecordId(boost::optional<Record>& nextRecord) {
+        if (_state->recordSlot) {
+            _recordAccessor.reset(false,
+                                  value::TypeTags::bsonObject,
+                                  value::bitcastFrom<const char*>(nextRecord->data.data()));
+        }
+    };
+
+    MONGO_COMPILER_ALWAYS_INLINE
+    value::OwnedValueAccessor* getFieldAccessor(StringData name) {
+        if (size_t pos = _state->scanFieldNames.findPos(name); pos != StringListSet::npos) {
+            return &_scanFieldAccessors[pos];
+        }
+        return nullptr;
+    }
 
     /**
-     * Resets the state data members for starting the scan in the 'reOpen' case, i.e. skipping state
-     * that would be correct after a prior open() call that was NOT followed by a close() call. This
-     * is also called by the initial open() to set the same subset of state for the first time to
-     * avoid duplicating this code.
+     * This contains logic shared between ScanStage
+     * RandomScanStage.
      */
-    void scanResetState(bool reOpen);
-
-    // Only for a clustered collection scan, this sets '_minRecordId' to the lower scan bound.
-    void setMinRecordId();
-
-    // Only for a clustered collection scan, this sets '_maxRecordId' to the upper scan bound.
-    void setMaxRecordId();
+    void prepareShared(CompileCtx& ctx);
 
     // Contains unchanging state that will be shared across clones instead of copied.
-    const std::shared_ptr<ScanStageState> _state;
+    const std::shared_ptr<ScanStageBaseState> _state;
 
     // Holds the current record.
     value::OwnedValueAccessor _recordAccessor;
@@ -270,36 +270,9 @@ private:
     absl::InlinedVector<value::OwnedValueAccessor, 4> _scanFieldAccessors;
     value::SlotAccessorMap _scanFieldAccessorsMap;
 
-    // Only for clustered collection scans, holds the minimum record ID of the scan, if applicable.
-    value::SlotAccessor* _minRecordIdAccessor{nullptr};
-    RecordId _minRecordId;
-
-    // Only for clustered collection scans, holds the maximum record ID of the scan, if applicable.
-    value::SlotAccessor* _maxRecordIdAccessor{nullptr};
-    RecordId _maxRecordId;
-
-    // Only for clustered collection scans: must ScanStage::getNext() include the starting bound?
-    bool _includeScanStartRecordId = true;
-
-    // Only for clustered collection scans: must ScanStage::getNext() include the ending bound?
-    bool _includeScanEndRecordId = true;
-
-    // Only for clustered collection scans: does the scan have an end bound?
-    bool _hasScanEndRecordId = false;
-
-    // Only for clustered collection scans: have we crossed the scan end bound if there is one?
-    bool _havePassedScanEndRecordId = false;
-
     CollectionRef _coll;
 
     bool _open{false};
-    std::unique_ptr<SeekableRecordCursor> _cursor;
-
-    // TODO: SERVER-62647. Consider removing random cursor when no longer needed.
-    std::unique_ptr<RecordCursor> _randomCursor;
-
-    // Tells whether this is the first getNext() call of the scan or after restarting.
-    bool _firstGetNext{false};
 
     ScanStats _specificStats;
 
@@ -310,6 +283,141 @@ private:
     // saves/restores this is used to check that the storage cursor has not changed position.
     std::vector<char> _lastReturned;
 #endif
+};  // class ScanStageBase
+
+template <typename Derived>
+class ScanStageBaseImpl : public ScanStageBase {
+
+public:
+    /**
+     * Regular constructor. Initializes static '_state' managed by a shared_ptr.
+     */
+    ScanStageBaseImpl(UUID collUuid,
+                      DatabaseName dbName,
+                      boost::optional<value::SlotId> recordSlot,
+                      boost::optional<value::SlotId> recordIdSlot,
+                      boost::optional<value::SlotId> snapshotIdSlot,
+                      boost::optional<value::SlotId> indexIdentSlot,
+                      boost::optional<value::SlotId> indexKeySlot,
+                      boost::optional<value::SlotId> indexKeyPatternSlot,
+                      std::vector<std::string> scanFieldNames,
+                      value::SlotVector scanFieldSlots,
+                      PlanYieldPolicy* yieldPolicy,
+                      PlanNodeId nodeId,
+                      ScanCallbacks scanCallbacks,
+                      bool forward,
+                      // Optional arguments:
+                      bool participateInTrialRunTracking = true);
+
+    /**
+     * Constructor for clone(). Copies '_state' shared_ptr.
+     */
+    ScanStageBaseImpl(std::shared_ptr<ScanStageBaseState> state,
+                      PlanYieldPolicy* yieldPolicy,
+                      PlanNodeId nodeId,
+                      bool participateInTrialRunTracking);
+    void open(bool reOpen) final;
+
+protected:
+    void doSaveState() override;
+    void doRestoreState() override;
+    void doDetachFromOperationContext() override;
+    void doAttachToOperationContext(OperationContext* opCtx) override;
+
+private:
+    /**
+     * Required self() functions for CRTP
+     */
+    inline constexpr Derived* self() noexcept {
+        return static_cast<Derived*>(this);
+    }
+    inline constexpr const Derived* self() const noexcept {
+        return static_cast<const Derived*>(this);
+    }
+};
+
+class ScanStage final : public ScanStageBaseImpl<ScanStage> {
+    friend class ScanStageBaseImpl<ScanStage>;
+
+public:
+    ScanStage(UUID collUuid,
+              DatabaseName dbName,
+              boost::optional<value::SlotId> recordSlot,
+              boost::optional<value::SlotId> recordIdSlot,
+              boost::optional<value::SlotId> snapshotIdSlot,
+              boost::optional<value::SlotId> indexIdentSlot,
+              boost::optional<value::SlotId> indexKeySlot,
+              boost::optional<value::SlotId> indexKeyPatternSlot,
+              std::vector<std::string> scanFieldNames,
+              value::SlotVector scanFieldSlots,
+              boost::optional<value::SlotId> minRecordIdSlot,
+              boost::optional<value::SlotId> maxRecordIdSlot,
+              bool forward,
+              PlanYieldPolicy* yieldPolicy,
+              PlanNodeId nodeId,
+              ScanCallbacks scanCallbacks,
+              // Optional arguments:
+              bool participateInTrialRunTracking = true,
+              bool includeScanStartRecordId = true,
+              bool includeScanEndRecordId = true);
+
+
+    /**
+     * Constructor for clone(). Copies '_state' shared_ptr.
+     */
+    ScanStage(std::shared_ptr<ScanStageBaseState> state,
+              PlanYieldPolicy* yieldPolicy,
+              PlanNodeId nodeId,
+              boost::optional<value::SlotId> minRecordIdSlot,
+              boost::optional<value::SlotId> maxRecordIdSlot,
+              bool participateInTrialRunTracking,
+              bool includeScanStartRecordId,
+              bool includeScanEndRecordId);
+
+    std::unique_ptr<PlanStage> clone() const final;
+    PlanState getNext() final;
+    void prepare(CompileCtx& ctx) final;
+    void close() final;
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
+    std::vector<DebugPrinter::Block> debugPrint() const final;
+
+private:
+    inline RecordCursor* getActiveCursor() const {
+        return _cursor.get();
+    }
+    void scanResetState(bool reOpen);
+
+    // Only for a clustered collection scan, this sets '_minRecordId' to the lower scan bound.
+    void setMinRecordId();
+
+    // Only for a clustered collection scan, this sets '_maxRecordId' to the upper scan bound.
+    void setMaxRecordId();
+
+    std::unique_ptr<SeekableRecordCursor> _cursor;
+    // Only for clustered collection scans: must ScanStageBase::getNext() include the starting
+    // bound?
+    bool _includeScanStartRecordId = true;
+
+    // Only for clustered collection scans: must ScanStageBase::getNext() include the ending bound?
+    bool _includeScanEndRecordId = true;
+
+    // Only for clustered collection scans: does the scan have an end bound?
+    bool _hasScanEndRecordId = false;
+
+    // Only for clustered collection scans: have we crossed the scan end bound if there is one?
+    bool _havePassedScanEndRecordId = false;
+
+    // Only for clustered collection scans, holds the minimum record ID of the scan, if applicable.
+    boost::optional<value::SlotId> _maxRecordIdSlot;
+    value::SlotAccessor* _minRecordIdAccessor{nullptr};
+    RecordId _minRecordId;
+
+    // Only for clustered collection scans, holds the maximum record ID of the scan, if applicable.
+    boost::optional<value::SlotId> _minRecordIdSlot;
+    value::SlotAccessor* _maxRecordIdAccessor{nullptr};
+    RecordId _maxRecordId;
+    // Only care about whether first call of getNext() if clustered scan because we need to seek
+    bool _firstGetNext{false};
 };  // class ScanStage
 }  // namespace sbe
 }  // namespace mongo

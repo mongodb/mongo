@@ -38,6 +38,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/stages/random_scan.h"
+#include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
@@ -63,82 +65,55 @@ namespace sbe {
 /**
  * Regular constructor. Initializes static '_state' managed by a shared_ptr.
  */
-ScanStage::ScanStage(UUID collUuid,
-                     DatabaseName dbName,
-                     boost::optional<value::SlotId> recordSlot,
-                     boost::optional<value::SlotId> recordIdSlot,
-                     boost::optional<value::SlotId> snapshotIdSlot,
-                     boost::optional<value::SlotId> indexIdentSlot,
-                     boost::optional<value::SlotId> indexKeySlot,
-                     boost::optional<value::SlotId> indexKeyPatternSlot,
-                     std::vector<std::string> scanFieldNames,
-                     value::SlotVector scanFieldSlots,
-                     boost::optional<value::SlotId> minRecordIdSlot,
-                     boost::optional<value::SlotId> maxRecordIdSlot,
-                     bool forward,
-                     PlanYieldPolicy* yieldPolicy,
-                     PlanNodeId nodeId,
-                     ScanCallbacks scanCallbacks,
-                     // Optional arguments:
-                     bool useRandomCursor,
-                     bool participateInTrialRunTracking,
-                     bool includeScanStartRecordId,
-                     bool includeScanEndRecordId)
+ScanStageBase::ScanStageBase(UUID collUuid,
+                             DatabaseName dbName,
+                             boost::optional<value::SlotId> recordSlot,
+                             boost::optional<value::SlotId> recordIdSlot,
+                             boost::optional<value::SlotId> snapshotIdSlot,
+                             boost::optional<value::SlotId> indexIdentSlot,
+                             boost::optional<value::SlotId> indexKeySlot,
+                             boost::optional<value::SlotId> indexKeyPatternSlot,
+                             std::vector<std::string> scanFieldNames,
+                             value::SlotVector scanFieldSlots,
+                             PlanYieldPolicy* yieldPolicy,
+                             PlanNodeId nodeId,
+                             ScanCallbacks scanCallbacks,
+                             bool forward,
+                             // Optional arguments:
+                             bool participateInTrialRunTracking)
     : PlanStage("scan"_sd,
                 yieldPolicy,
                 nodeId,
                 participateInTrialRunTracking,
                 TrialRunTrackingType::TrackReads),
-      _state(std::make_shared<ScanStageState>(collUuid,
-                                              dbName,
-                                              recordSlot,
-                                              recordIdSlot,
-                                              snapshotIdSlot,
-                                              indexIdentSlot,
-                                              indexKeySlot,
-                                              indexKeyPatternSlot,
-                                              scanFieldNames,
-                                              scanFieldSlots,
-                                              minRecordIdSlot,
-                                              maxRecordIdSlot,
-                                              forward,
-                                              scanCallbacks,
-                                              useRandomCursor)),
-      _includeScanStartRecordId(includeScanStartRecordId),
-      _includeScanEndRecordId(includeScanEndRecordId) {
-    tassert(11094715,
-            "Cannot use a random cursor if we are requesting a reverse scan",
-            !useRandomCursor || forward);
-}  // ScanStage regular constructor
+      _state(std::make_shared<ScanStageBaseState>(collUuid,
+                                                  dbName,
+                                                  recordSlot,
+                                                  recordIdSlot,
+                                                  snapshotIdSlot,
+                                                  indexIdentSlot,
+                                                  indexKeySlot,
+                                                  indexKeyPatternSlot,
+                                                  scanFieldNames,
+                                                  scanFieldSlots,
+                                                  scanCallbacks,
+                                                  forward)) {}  // ScanStageBase regular constructor
 
 /**
  * Constructor for clone(). Copies '_state' shared_ptr.
  */
-ScanStage::ScanStage(const std::shared_ptr<ScanStageState>& state,
-                     PlanYieldPolicy* yieldPolicy,
-                     PlanNodeId nodeId,
-                     bool participateInTrialRunTracking,
-                     bool includeScanStartRecordId,
-                     bool includeScanEndRecordId)
+ScanStageBase::ScanStageBase(std::shared_ptr<ScanStageBaseState> state,
+                             PlanYieldPolicy* yieldPolicy,
+                             PlanNodeId nodeId,
+                             bool participateInTrialRunTracking)
     : PlanStage("scan"_sd,
                 yieldPolicy,
                 nodeId,
                 participateInTrialRunTracking,
                 TrialRunTrackingType::TrackReads),
-      _state(state),
-      _includeScanStartRecordId(includeScanStartRecordId),
-      _includeScanEndRecordId(includeScanEndRecordId) {}  // ScanStage constructor for clone()
+      _state(std::move(state)) {}  // ScanStageBase constructor for clone()
 
-std::unique_ptr<PlanStage> ScanStage::clone() const {
-    return std::make_unique<ScanStage>(_state,
-                                       _yieldPolicy,
-                                       _commonStats.nodeId,
-                                       participateInTrialRunTracking(),
-                                       _includeScanStartRecordId,
-                                       _includeScanEndRecordId);
-}
-
-void ScanStage::prepare(CompileCtx& ctx) {
+void ScanStageBase::prepareShared(CompileCtx& ctx) {
     const size_t numScanFields = _state->getNumScanFields();
     _scanFieldAccessors.resize(numScanFields);
     for (size_t idx = 0; idx < numScanFields; ++idx) {
@@ -149,14 +124,6 @@ void ScanStage::prepare(CompileCtx& ctx) {
         uassert(4822815,
                 str::stream() << "duplicate field: " << _state->scanFieldSlots[idx],
                 insertedRename);
-    }
-
-    if (_state->minRecordIdSlot) {
-        _minRecordIdAccessor = ctx.getAccessor(*(_state->minRecordIdSlot));
-    }
-
-    if (_state->maxRecordIdSlot) {
-        _maxRecordIdAccessor = ctx.getAccessor(*(_state->maxRecordIdSlot));
     }
 
     if (_state->snapshotIdSlot) {
@@ -179,7 +146,7 @@ void ScanStage::prepare(CompileCtx& ctx) {
     _coll.acquireCollection(_opCtx, _state->dbName, _state->collUuid);
 }
 
-value::SlotAccessor* ScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
+value::SlotAccessor* ScanStageBase::getAccessor(CompileCtx& ctx, value::SlotId slot) {
     if (_state->recordSlot && *(_state->recordSlot) == slot) {
         return &_recordAccessor;
     }
@@ -195,7 +162,91 @@ value::SlotAccessor* ScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot)
     return ctx.getAccessor(slot);
 }
 
-void ScanStage::doSaveState() {
+void ScanStageBase::doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
+    _coll.setCollAcquisition(mca.getCollectionAcquisitionFromUuid(_state->collUuid));
+}
+
+void ScanStageBase::getStatsShared(BSONObjBuilder& bob) const {
+    bob.appendNumber("numReads", static_cast<long long>(_specificStats.numReads));
+    if (_state->recordSlot) {
+        bob.appendNumber("recordSlot", static_cast<long long>(*(_state->recordSlot)));
+    }
+    if (_state->recordIdSlot) {
+        bob.appendNumber("recordIdSlot", static_cast<long long>(*(_state->recordIdSlot)));
+    }
+    if (_state->snapshotIdSlot) {
+        bob.appendNumber("snapshotIdSlot", static_cast<long long>(*(_state->snapshotIdSlot)));
+    }
+    if (_state->indexIdentSlot) {
+        bob.appendNumber("indexIdentSlot", static_cast<long long>(*(_state->indexIdentSlot)));
+    }
+    if (_state->indexKeySlot) {
+        bob.appendNumber("indexKeySlot", static_cast<long long>(*(_state->indexKeySlot)));
+    }
+    if (_state->indexKeyPatternSlot) {
+        bob.appendNumber("indexKeyPatternSlot",
+                         static_cast<long long>(*(_state->indexKeyPatternSlot)));
+    }
+    bob.append("scanFieldNames", _state->scanFieldNames.getUnderlyingVector());
+    bob.append("scanFieldSlots", _state->scanFieldSlots.begin(), _state->scanFieldSlots.end());
+}
+
+void ScanStageBase::debugPrintShared(std::vector<DebugPrinter::Block>& ret) const {
+    if (_state->recordSlot) {
+        DebugPrinter::addIdentifier(ret, _state->recordSlot.value());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_state->recordIdSlot) {
+        DebugPrinter::addIdentifier(ret, _state->recordIdSlot.value());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_state->snapshotIdSlot) {
+        DebugPrinter::addIdentifier(ret, _state->snapshotIdSlot.value());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_state->indexIdentSlot) {
+        DebugPrinter::addIdentifier(ret, _state->indexIdentSlot.value());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_state->indexKeySlot) {
+        DebugPrinter::addIdentifier(ret, _state->indexKeySlot.value());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_state->indexKeyPatternSlot) {
+        DebugPrinter::addIdentifier(ret, _state->indexKeyPatternSlot.value());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    ret.emplace_back(DebugPrinter::Block("[`"));
+    for (size_t idx = 0; idx < _state->scanFieldNames.size(); ++idx) {
+        if (idx) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
+
+        DebugPrinter::addIdentifier(ret, _state->scanFieldSlots[idx]);
+        ret.emplace_back("=");
+        DebugPrinter::addIdentifier(ret, _state->scanFieldNames[idx]);
+    }
+    ret.emplace_back(DebugPrinter::Block("`]"));
+
+    ret.emplace_back("@\"`");
+    DebugPrinter::addIdentifier(ret, _state->collUuid.toString());
+    ret.emplace_back("`\"");
+}
+
+template <typename Derived>
+void ScanStageBaseImpl<Derived>::doSaveState() {
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     if (slotsAccessible()) {
         if (_state->recordSlot &&
@@ -231,7 +282,7 @@ void ScanStage::doSaveState() {
     }
 #endif
 
-    if (auto cursor = getActiveCursor(); cursor != nullptr) {
+    if (auto cursor = self()->getActiveCursor(); cursor != nullptr) {
         cursor->save();
     }
 
@@ -239,7 +290,8 @@ void ScanStage::doSaveState() {
     _coll.reset();
 }
 
-void ScanStage::doRestoreState() {
+template <typename Derived>
+void ScanStageBaseImpl<Derived>::doRestoreState() {
     invariant(_opCtx);
 
     if (!_coll.isAcquisition()) {
@@ -250,7 +302,7 @@ void ScanStage::doRestoreState() {
         _coll.restoreCollection(_opCtx, _state->dbName, _state->collUuid);
     }
 
-    if (auto cursor = getActiveCursor(); cursor != nullptr) {
+    if (auto cursor = self()->getActiveCursor(); cursor != nullptr) {
         const auto tolerateCappedCursorRepositioning = false;
         const bool couldRestore = cursor->restore(*shard_role_details::getRecoveryUnit(_opCtx),
                                                   tolerateCappedCursorRepositioning);
@@ -278,20 +330,36 @@ void ScanStage::doRestoreState() {
 #endif
 }
 
-void ScanStage::doDetachFromOperationContext() {
-    if (auto cursor = getActiveCursor()) {
+template <typename Derived>
+void ScanStageBaseImpl<Derived>::doDetachFromOperationContext() {
+    if (auto cursor = self()->getActiveCursor()) {
         cursor->detachFromOperationContext();
     }
 }
 
-void ScanStage::doAttachToOperationContext(OperationContext* opCtx) {
-    if (auto cursor = getActiveCursor()) {
+template <typename Derived>
+void ScanStageBaseImpl<Derived>::doAttachToOperationContext(OperationContext* opCtx) {
+    if (auto cursor = self()->getActiveCursor()) {
         cursor->reattachToOperationContext(opCtx);
     }
 }
 
-RecordCursor* ScanStage::getActiveCursor() const {
-    return _state->useRandomCursor ? _randomCursor.get() : _cursor.get();
+void ScanStage::scanResetState(bool reOpen) {
+    // Reuse existing cursor if possible in the reOpen case (i.e. when we will do a seek).
+    if (!reOpen || (_state->forward ? !_minRecordIdAccessor : !_maxRecordIdAccessor)) {
+        _cursor = _coll.getPtr()->getCursor(_opCtx, _state->forward);
+    }
+
+    if (_minRecordIdAccessor) {
+        setMinRecordId();
+    }
+    if (_maxRecordIdAccessor) {
+        setMaxRecordId();
+    }
+
+    _firstGetNext = true;
+    _hasScanEndRecordId = _state->forward ? _maxRecordIdAccessor : _minRecordIdAccessor;
+    _havePassedScanEndRecordId = false;
 }
 
 void ScanStage::setMinRecordId() {
@@ -314,29 +382,8 @@ void ScanStage::setMaxRecordId() {
     _maxRecordId = *value::getRecordIdView(val);
 }
 
-void ScanStage::scanResetState(bool reOpen) {
-    if (!_state->useRandomCursor) {
-        // Reuse existing cursor if possible in the reOpen case (i.e. when we will do a seek).
-        if (!reOpen || (_state->forward ? !_minRecordIdAccessor : !_maxRecordIdAccessor)) {
-            _cursor = _coll.getPtr()->getCursor(_opCtx, _state->forward);
-        }
-        if (_minRecordIdAccessor) {
-            setMinRecordId();
-        }
-        if (_maxRecordIdAccessor) {
-            setMaxRecordId();
-        }
-    } else {
-        _randomCursor = _coll.getPtr()->getRecordStore()->getRandomCursor(
-            _opCtx, *shard_role_details::getRecoveryUnit(_opCtx));
-    }
-
-    _firstGetNext = true;
-    _hasScanEndRecordId = _state->forward ? _maxRecordIdAccessor : _minRecordIdAccessor;
-    _havePassedScanEndRecordId = false;
-}
-
-void ScanStage::open(bool reOpen) {
+template <typename Derived>
+void ScanStageBaseImpl<Derived>::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 
     _commonStats.opens++;
@@ -345,33 +392,139 @@ void ScanStage::open(bool reOpen) {
 
     // Fast-path for handling the case where 'reOpen' is true.
     if (MONGO_likely(reOpen)) {
-        dassert(_open && _coll && getActiveCursor());
-        scanResetState(reOpen);
+        dassert(_open && _coll && self()->getActiveCursor());
+        self()->scanResetState(reOpen);
         return;
     }
 
     // If we reach here, 'reOpen' is false. That means this stage is either being opened for the
     // first time ever, or this stage is being opened for the first time after calling close().
-    tassert(5071004, "first open to ScanStage but reOpen=true", !reOpen && !_open);
-    tassert(5071005, "ScanStage is not open but has a cursor", !getActiveCursor());
+    tassert(5071004, "first open to ScanStageBase but reOpen=true", !reOpen && !_open);
+    tassert(5071005, "ScanStageBase is not open but has a cursor", !self()->getActiveCursor());
     if (!_coll.isAcquisition()) {
         // We need to re-acquire '_coll' in this case and make some validity checks (the collection
         // has not been dropped, renamed, etc).
         _coll.restoreCollection(_opCtx, _state->dbName, _state->collUuid);
 
-        tassert(5959701, "restoreCollection() unexpectedly returned null in ScanStage", _coll);
+        tassert(5959701, "restoreCollection() unexpectedly returned null in ScanStageBase", _coll);
     }
 
     if (_state->scanCallbacks.scanOpenCallback) {
         _state->scanCallbacks.scanOpenCallback(_opCtx, _coll.getPtr());
     }
 
-    scanResetState(reOpen);
+    self()->scanResetState(reOpen);
     _open = true;
 }
 
-void ScanStage::doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
-    _coll.setCollAcquisition(mca.getCollectionAcquisitionFromUuid(_state->collUuid));
+template <typename Derived>
+ScanStageBaseImpl<Derived>::ScanStageBaseImpl(UUID collUuid,
+                                              DatabaseName dbName,
+                                              boost::optional<value::SlotId> recordSlot,
+                                              boost::optional<value::SlotId> recordIdSlot,
+                                              boost::optional<value::SlotId> snapshotIdSlot,
+                                              boost::optional<value::SlotId> indexIdentSlot,
+                                              boost::optional<value::SlotId> indexKeySlot,
+                                              boost::optional<value::SlotId> indexKeyPatternSlot,
+                                              std::vector<std::string> scanFieldNames,
+                                              value::SlotVector scanFieldSlots,
+                                              PlanYieldPolicy* yieldPolicy,
+                                              PlanNodeId nodeId,
+                                              ScanCallbacks scanCallbacks,
+                                              bool forward,
+                                              // Optional arguments:
+                                              bool participateInTrialRunTracking)
+    : ScanStageBase(collUuid,
+                    dbName,
+                    recordSlot,
+                    recordIdSlot,
+                    snapshotIdSlot,
+                    indexIdentSlot,
+                    indexKeySlot,
+                    indexKeyPatternSlot,
+                    scanFieldNames,
+                    scanFieldSlots,
+                    yieldPolicy,
+                    nodeId,
+                    scanCallbacks,
+                    forward,
+                    // Optional arguments:
+                    participateInTrialRunTracking){};
+
+
+template <typename Derived>
+ScanStageBaseImpl<Derived>::ScanStageBaseImpl(std::shared_ptr<ScanStageBaseState> state,
+                                              PlanYieldPolicy* yieldPolicy,
+                                              PlanNodeId nodeId,
+                                              bool participateInTrialRunTracking)
+    : ScanStageBase(std::move(state), yieldPolicy, nodeId, participateInTrialRunTracking){};
+
+ScanStage::ScanStage(UUID collUuid,
+                     DatabaseName dbName,
+                     boost::optional<value::SlotId> recordSlot,
+                     boost::optional<value::SlotId> recordIdSlot,
+                     boost::optional<value::SlotId> snapshotIdSlot,
+                     boost::optional<value::SlotId> indexIdentSlot,
+                     boost::optional<value::SlotId> indexKeySlot,
+                     boost::optional<value::SlotId> indexKeyPatternSlot,
+                     std::vector<std::string> scanFieldNames,
+                     value::SlotVector scanFieldSlots,
+                     boost::optional<value::SlotId> minRecordIdSlot,
+                     boost::optional<value::SlotId> maxRecordIdSlot,
+                     bool forward,
+                     PlanYieldPolicy* yieldPolicy,
+                     PlanNodeId nodeId,
+                     ScanCallbacks scanCallbacks,
+                     // Optional arguments:
+                     bool participateInTrialRunTracking,
+                     bool includeScanStartRecordId,
+                     bool includeScanEndRecordId)
+    : ScanStageBaseImpl(collUuid,
+                        dbName,
+                        recordSlot,
+                        recordIdSlot,
+                        snapshotIdSlot,
+                        indexIdentSlot,
+                        indexKeySlot,
+                        indexKeyPatternSlot,
+                        scanFieldNames,
+                        scanFieldSlots,
+                        yieldPolicy,
+                        nodeId,
+                        scanCallbacks,
+                        forward,
+                        participateInTrialRunTracking),
+      _includeScanStartRecordId(includeScanStartRecordId),
+      _includeScanEndRecordId(includeScanEndRecordId),
+      _maxRecordIdSlot(maxRecordIdSlot),
+      _minRecordIdSlot(minRecordIdSlot) {}
+
+/**
+ * Constructor for clone(). Copies '_state' shared_ptr.
+ */
+ScanStage::ScanStage(std::shared_ptr<ScanStageBaseState> state,
+                     PlanYieldPolicy* yieldPolicy,
+                     PlanNodeId nodeId,
+                     boost::optional<value::SlotId> minRecordIdSlot,
+                     boost::optional<value::SlotId> maxRecordIdSlot,
+                     bool participateInTrialRunTracking,
+                     bool includeScanStartRecordId,
+                     bool includeScanEndRecordId)
+    : ScanStageBaseImpl(std::move(state), yieldPolicy, nodeId, participateInTrialRunTracking),
+      _includeScanStartRecordId(includeScanStartRecordId),
+      _includeScanEndRecordId(includeScanEndRecordId),
+      _maxRecordIdSlot(maxRecordIdSlot),
+      _minRecordIdSlot(minRecordIdSlot) {}  // ScanStageBaseImpl constructor for clone()
+
+std::unique_ptr<PlanStage> ScanStage::clone() const {
+    return std::make_unique<ScanStage>(_state,
+                                       _yieldPolicy,
+                                       _commonStats.nodeId,
+                                       _minRecordIdSlot,
+                                       _maxRecordIdSlot,
+                                       participateInTrialRunTracking(),
+                                       _includeScanStartRecordId,
+                                       _includeScanEndRecordId);
 }
 
 PlanState ScanStage::getNext() {
@@ -386,13 +539,7 @@ PlanState ScanStage::getNext() {
         return trackPlanState(PlanState::IS_EOF);
     }
 
-    // We are about to call next() on a storage cursor so do not bother saving our internal state in
-    // case it yields as the state will be completely overwritten after the next() call.
-    disableSlotAccess();
-
-    // This call to checkForInterrupt() may result in a call to save() or restore() on the entire
-    // PlanStage tree if a yield occurs.
-    checkForInterruptAndYield(_opCtx);
+    handleInterruptAndSlotAccess();
 
     // Optimized so the most common case has as short a codepath as possible.
     // '_minRecordIdAccessor' and/or '_maxRecordIdAccessor' mean we are doing a bounded scan on
@@ -404,40 +551,31 @@ PlanState ScanStage::getNext() {
     //   always inclusive, so the logic is unchanged, but the end bound is always exclusive, so
     //   we use '_includeScanEndRecordId' to indicate this for scan termination.
     boost::optional<Record> nextRecord;
-    if (!_state->useRandomCursor) {
-        if (!_firstGetNext) {
-            nextRecord = _cursor->next();
-        } else {
-            _firstGetNext = false;
-            if (_minRecordIdAccessor && _state->forward) {
-                // The range may be exclusive of the start record.
-                // Find the first record equal to _minRecordId
-                // or, if exclusive, the first record "after" it.
-                nextRecord = _cursor->seek(_minRecordId,
-                                           _includeScanStartRecordId
-                                               ? SeekableRecordCursor::BoundInclusion::kInclude
-                                               : SeekableRecordCursor::BoundInclusion::kExclude);
-            } else if (_maxRecordIdAccessor && !_state->forward) {
-                nextRecord = _cursor->seek(_maxRecordId,
-                                           _includeScanStartRecordId
-                                               ? SeekableRecordCursor::BoundInclusion::kInclude
-                                               : SeekableRecordCursor::BoundInclusion::kExclude);
-            } else {
-                nextRecord = _cursor->next();
-            }
-        }
+    if (!_firstGetNext) {
+        nextRecord = _cursor->next();
     } else {
-        nextRecord = _randomCursor->next();
-        // Performance optimization: random cursors don't care about '_firstGetNext' so we do not
-        // need to set it to false here.
+        _firstGetNext = false;
+        if (_minRecordIdAccessor && _state->forward) {
+            // The range may be exclusive of the start record.
+            // Find the first record equal to _minRecordId
+            // or, if exclusive, the first record "after" it.
+            nextRecord = _cursor->seek(_minRecordId,
+                                       _includeScanStartRecordId
+                                           ? SeekableRecordCursor::BoundInclusion::kInclude
+                                           : SeekableRecordCursor::BoundInclusion::kExclude);
+        } else if (_maxRecordIdAccessor && !_state->forward) {
+            nextRecord = _cursor->seek(_maxRecordId,
+                                       _includeScanStartRecordId
+                                           ? SeekableRecordCursor::BoundInclusion::kInclude
+                                           : SeekableRecordCursor::BoundInclusion::kExclude);
+        } else {
+            nextRecord = _cursor->next();
+        }
     }
 
     if (!nextRecord) {
         // Indicate that the last recordId seen is null once EOF is hit.
-        if (_state->recordIdSlot) {
-            auto [tag, val] = sbe::value::makeCopyRecordId(RecordId());
-            _recordIdAccessor.reset(true, tag, val);
-        }
+        handleEOF(nextRecord);
         return trackPlanState(PlanState::IS_EOF);
     }
 
@@ -486,15 +624,30 @@ PlanState ScanStage::getNext() {
     return trackPlanState(PlanState::ADVANCED);
 }
 
-void ScanStage::close() {
+void ScanStageBase::closeShared() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
     _indexCatalogEntryMap.clear();
-    _cursor.reset();
-    _randomCursor.reset();
     _coll.reset();
     _open = false;
+}
+
+void ScanStage::close() {
+    closeShared();
+    _cursor.reset();
+}
+
+void ScanStage::prepare(CompileCtx& ctx) {
+    prepareShared(ctx);
+
+    if (_minRecordIdSlot) {
+        _minRecordIdAccessor = ctx.getAccessor(*(_minRecordIdSlot));
+    }
+
+    if (_maxRecordIdSlot) {
+        _maxRecordIdAccessor = ctx.getAccessor(*(_maxRecordIdSlot));
+    }
 }
 
 std::unique_ptr<PlanStageStats> ScanStage::getStats(bool includeDebugInfo) const {
@@ -503,121 +656,42 @@ std::unique_ptr<PlanStageStats> ScanStage::getStats(bool includeDebugInfo) const
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
-        bob.appendNumber("numReads", static_cast<long long>(_specificStats.numReads));
-        if (_state->recordSlot) {
-            bob.appendNumber("recordSlot", static_cast<long long>(*(_state->recordSlot)));
+        getStatsShared(bob);
+        if (_minRecordIdSlot) {
+            bob.appendNumber("minRecordIdSlot", static_cast<long long>(*(_minRecordIdSlot)));
         }
-        if (_state->recordIdSlot) {
-            bob.appendNumber("recordIdSlot", static_cast<long long>(*(_state->recordIdSlot)));
+        if (_maxRecordIdSlot) {
+            bob.appendNumber("maxRecordIdSlot", static_cast<long long>(*(_maxRecordIdSlot)));
         }
-        if (_state->minRecordIdSlot) {
-            bob.appendNumber("minRecordIdSlot", static_cast<long long>(*(_state->minRecordIdSlot)));
-        }
-        if (_state->maxRecordIdSlot) {
-            bob.appendNumber("maxRecordIdSlot", static_cast<long long>(*(_state->maxRecordIdSlot)));
-        }
-        if (_state->snapshotIdSlot) {
-            bob.appendNumber("snapshotIdSlot", static_cast<long long>(*(_state->snapshotIdSlot)));
-        }
-        if (_state->indexIdentSlot) {
-            bob.appendNumber("indexIdentSlot", static_cast<long long>(*(_state->indexIdentSlot)));
-        }
-        if (_state->indexKeySlot) {
-            bob.appendNumber("indexKeySlot", static_cast<long long>(*(_state->indexKeySlot)));
-        }
-        if (_state->indexKeyPatternSlot) {
-            bob.appendNumber("indexKeyPatternSlot",
-                             static_cast<long long>(*(_state->indexKeyPatternSlot)));
-        }
-
-        bob.append("scanFieldNames", _state->scanFieldNames.getUnderlyingVector());
-        bob.append("scanFieldSlots", _state->scanFieldSlots.begin(), _state->scanFieldSlots.end());
         ret->debugInfo = bob.obj();
     }
     return ret;
 }
 
-const SpecificStats* ScanStage::getSpecificStats() const {
-    return &_specificStats;
-}
-
 std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
     std::vector<DebugPrinter::Block> ret = PlanStage::debugPrint();
-
-    if (_state->recordSlot) {
-        DebugPrinter::addIdentifier(ret, _state->recordSlot.value());
+    if (_minRecordIdSlot) {
+        DebugPrinter::addIdentifier(ret, _minRecordIdSlot.value());
     } else {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
 
-    if (_state->recordIdSlot) {
-        DebugPrinter::addIdentifier(ret, _state->recordIdSlot.value());
+    if (_maxRecordIdSlot) {
+        DebugPrinter::addIdentifier(ret, _maxRecordIdSlot.value());
     } else {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
-
-    if (_state->snapshotIdSlot) {
-        DebugPrinter::addIdentifier(ret, _state->snapshotIdSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
-    }
-
-    if (_state->indexIdentSlot) {
-        DebugPrinter::addIdentifier(ret, _state->indexIdentSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
-    }
-
-    if (_state->indexKeySlot) {
-        DebugPrinter::addIdentifier(ret, _state->indexKeySlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
-    }
-
-    if (_state->indexKeyPatternSlot) {
-        DebugPrinter::addIdentifier(ret, _state->indexKeyPatternSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
-    }
-
-    if (_state->minRecordIdSlot) {
-        DebugPrinter::addIdentifier(ret, _state->minRecordIdSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
-    }
-
-    if (_state->maxRecordIdSlot) {
-        DebugPrinter::addIdentifier(ret, _state->maxRecordIdSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
-    }
-
-    if (_state->useRandomCursor) {
-        DebugPrinter::addKeyword(ret, "random");
-    }
-
-    ret.emplace_back(DebugPrinter::Block("[`"));
-    for (size_t idx = 0; idx < _state->scanFieldNames.size(); ++idx) {
-        if (idx) {
-            ret.emplace_back(DebugPrinter::Block("`,"));
-        }
-
-        DebugPrinter::addIdentifier(ret, _state->scanFieldSlots[idx]);
-        ret.emplace_back("=");
-        DebugPrinter::addIdentifier(ret, _state->scanFieldNames[idx]);
-    }
-    ret.emplace_back(DebugPrinter::Block("`]"));
-
-    ret.emplace_back("@\"`");
-    DebugPrinter::addIdentifier(ret, _state->collUuid.toString());
-    ret.emplace_back("`\"");
-
+    debugPrintShared(ret);
     ret.emplace_back(_state->forward ? "true" : "false");
 
     return ret;
 }
 
-size_t ScanStage::estimateCompileTimeSize() const {
+const SpecificStats* ScanStageBase::getSpecificStats() const {
+    return &_specificStats;
+}
+
+size_t ScanStageBase::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
     size += size_estimator::estimate(_state->scanFieldNames.getUnderlyingVector());
     size += size_estimator::estimate(_state->scanFieldNames.getUnderlyingMap());
@@ -627,3 +701,6 @@ size_t ScanStage::estimateCompileTimeSize() const {
 }
 }  // namespace sbe
 }  // namespace mongo
+
+template class mongo::sbe::ScanStageBaseImpl<mongo::sbe::ScanStage>;
+template class mongo::sbe::ScanStageBaseImpl<mongo::sbe::RandomScanStage>;

@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/project.h"
+#include "mongo/db/exec/sbe/stages/random_scan.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/index/btree_key_generator.h"
@@ -158,6 +159,21 @@ std::unique_ptr<sbe::PlanStage> makeScanStage(const CollectionPtr& collection,
     sbe::value::SlotVector scanFieldSlots;
     std::vector<std::string> scanFieldNames;
     sbe::ScanCallbacks callbacks{};
+    if (useRandomCursor) {
+        return sbe::makeS<sbe::RandomScanStage>(collection->uuid(),
+                                                collection->ns().dbName(),
+                                                recordSlot,
+                                                recordIdSlot,
+                                                boost::none /* snapshotIdSlot */,
+                                                boost::none /* indexIdentSlot */,
+                                                boost::none /* indexKeySlot */,
+                                                boost::none /* keyPatternSlot */,
+                                                scanFieldNames,
+                                                scanFieldSlots,
+                                                sbeYieldPolicy,
+                                                0 /* nodeId */,
+                                                callbacks);
+    }
     return sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                       collection->ns().dbName(),
                                       recordSlot,
@@ -173,8 +189,7 @@ std::unique_ptr<sbe::PlanStage> makeScanStage(const CollectionPtr& collection,
                                       true /* forward */,
                                       sbeYieldPolicy,
                                       0 /* nodeId */,
-                                      callbacks,
-                                      useRandomCursor);
+                                      callbacks);
 }
 
 /**
