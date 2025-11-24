@@ -3,7 +3,6 @@
 load(
     "//bazel/toolchains/cc:mongo_errors.bzl",
     "BAZELISK_CHECK_ERROR_MESSAGE",
-    "DETECT_ODR_VIOLATIONS_ERROR_MESSAGE",
     "LIBCXX_ERROR_MESSAGE",
     "REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE",
     "SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE",
@@ -189,13 +188,6 @@ UNDEFINED_SANITIZER_LINKFLAGS = select({
     "//conditions:default": [],
 })
 
-DETECT_ODR_VIOLATIONS_LINKFLAGS = select({
-    "//bazel/config:detect_odr_violations_required_settings": [
-        "-Wl,--detect-odr-violations",
-    ],
-    "//bazel/config:detect_odr_violations_disabled": [],
-}, no_match_error = DETECT_ODR_VIOLATIONS_ERROR_MESSAGE)
-
 # TODO(SERVER-101099): Remove this once builds are containerized and system libraries inside the containers
 # no longer contain debug symbols.
 #
@@ -358,7 +350,6 @@ MONGO_LINUX_CC_LINKFLAGS = (
     FUZZER_SANITIZER_LINKFLAGS +
     UNDEFINED_SANITIZER_LINKFLAGS +
     THREAD_SANITIZER_LINKFLAGS +
-    DETECT_ODR_VIOLATIONS_LINKFLAGS +
     BIND_AT_LOAD_LINKFLAGS +
     ANY_SANITIZER_AVAILABLE_LINKFLAGS +
     ANY_SANITIZER_GCC_LINKFLAGS +

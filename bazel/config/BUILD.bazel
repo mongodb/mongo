@@ -19,7 +19,6 @@ load(
     "dbg",
     "dbg_level",
     "debug_symbols",
-    "detect_odr_violations",
     "dev_stacktrace",
     "disable_streams",
     "disable_warnings_as_errors",
@@ -1897,38 +1896,6 @@ selects.config_setting_group(
         ":skip_archive_enabled",
         ":not_windows",
         ":linkstatic_enabled",
-    ],
-)
-
-# --------------------------------------
-# detect-odr-violations options
-# --------------------------------------
-
-detect_odr_violations(
-    name = "detect_odr_violations",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "detect_odr_violations_enabled",
-    flag_values = {
-        "//bazel/config:detect_odr_violations": "True",
-    },
-)
-
-config_setting(
-    name = "detect_odr_violations_disabled",
-    flag_values = {
-        "//bazel/config:detect_odr_violations": "False",
-    },
-)
-
-selects.config_setting_group(
-    name = "detect_odr_violations_required_settings",
-    match_all = [
-        ":opt_off",
-        ":detect_odr_violations_enabled",
-        ":linker_gold",
     ],
 )
 

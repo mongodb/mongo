@@ -407,20 +407,6 @@ simple_build_id = rule(
 )
 
 # =========
-# detect_odr_violations
-# =========
-
-detect_odr_violations_provider = provider(
-    doc = """Have the linker try to detect ODR violations, if supported""",
-    fields = ["enabled"],
-)
-
-detect_odr_violations = rule(
-    implementation = lambda ctx: detect_odr_violations_provider(enabled = ctx.build_setting_value),
-    build_setting = config.bool(flag = True),
-)
-
-# =========
 # build_enterprise_module
 # =========
 

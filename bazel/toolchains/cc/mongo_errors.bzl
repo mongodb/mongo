@@ -48,13 +48,6 @@ Error:
       --opt=on [OR] --opt=debug
 """
 
-DETECT_ODR_VIOLATIONS_ERROR_MESSAGE = """
-Error:
-    detect_odr_violations requires these configurations:
-        --opt=off
-        --linker=gold
-"""
-
 BAZELISK_CHECK_ERROR_MESSAGE = """
 Error:
   This repository must be built through bazelisk, please uninstall your current bazel
