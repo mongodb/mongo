@@ -750,19 +750,6 @@ public:
 
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kStart) {
             {
-                // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
-                if (role && role->has(ClusterRole::ConfigServer) &&
-                    feature_flags::gSessionsCollectionCoordinatorOnConfigServer
-                        .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
-                                                                      actualVersion)) {
-                    // Checks that the config server exists as sharded and throws CannotUpgrade
-                    // otherwise. We do this before setting the FCV to kUpgrading so that we don't
-                    // trap the user in a transitional phase and before entering the FCV change
-                    // region because this may create config.system.sessions and we don't want to
-                    // hold the FCV lock for a long time.
-                    _validateSessionsCollectionSharded(opCtx);
-                }
-
                 if (role && role->has(ClusterRole::ConfigServer) &&
                     requestedVersion > actualVersion) {
                     _fixConfigShardsTopologyTime(opCtx);
@@ -836,7 +823,7 @@ public:
                 // SetClusterParameterCoordinator instances active when downgrading.
                 if (role && role->has(ClusterRole::ConfigServer) &&
                     requestedVersion < actualVersion) {
-                    uassert(ErrorCodes::CannotDowngrade,
+                    uassert(ErrorCodes::ConflictingOperationInProgress,
                             "Cannot downgrade while cluster server parameters are being set",
                             (ConfigsvrCoordinatorService::getService(opCtx)
                                  ->areAllCoordinatorsOfTypeFinished(
@@ -851,19 +838,6 @@ public:
                     // Drain drop database coordinators and remove possible garbage from
                     // config.dropPendingDBs.
                     handleDropPendingDBsGarbage(opCtx);
-                }
-
-                // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
-                if (role && role->has(ClusterRole::ConfigServer) &&
-                    feature_flags::gSessionsCollectionCoordinatorOnConfigServer
-                        .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
-                                                                      actualVersion)) {
-                    // Checks that the config server exists as sharded and throws CannotUpgrade
-                    // otherwise. We do this before setting the FCV to kUpgrading so that we don't
-                    // trap the user in a transitional phase and after entering the FCV change
-                    // region to ensure we don't transition to/from being a config shard during the
-                    // checks.
-                    _validateSessionsCollectionSharded(opCtx);
                 }
 
                 // We pass boost::none as the setIsCleaningServerMetadata argument in order to
@@ -1385,36 +1359,6 @@ private:
     // This helper function is for any actions that should be done before taking the global lock in
     // S mode.
     void _prepareToDowngradeActions(OperationContext* opCtx, const FCV requestedVersion) {
-        if (!feature_flags::gFeatureFlagEnableReplicasetTransitionToCSRS.isEnabledOnVersion(
-                requestedVersion)) {
-            BSONObj shardIdentityBSON;
-            if ([&] {
-                    auto coll = acquireCollection(
-                        opCtx,
-                        CollectionAcquisitionRequest(
-                            NamespaceString::kServerConfigurationNamespace,
-                            PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
-                            repl::ReadConcernArgs::get(opCtx),
-                            AcquisitionPrerequisites::kRead),
-                        LockMode::MODE_IS);
-                    return Helpers::findOne(
-                        opCtx, coll, BSON("_id" << ShardIdentityType::IdName), shardIdentityBSON);
-                }()) {
-                auto shardIdentity = uassertStatusOK(
-                    ShardIdentityType::fromShardIdentityDocument(shardIdentityBSON));
-                if (shardIdentity.getDeferShardingInitialization().has_value()) {
-                    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-                        uasserted(ErrorCodes::CannotDowngrade,
-                                  "Downgrading FCV is prohibited during promotion to sharded "
-                                  "cluster. Please finish the promotion before proceeding.");
-                    }
-                    uasserted(ErrorCodes::CannotDowngrade,
-                              "Downgrading FCV is prohibited during promotion to sharded cluster. "
-                              "Please remove the shard identity document before proceeding.");
-                }
-            }
-        }
-
         auto role = ShardingState::get(opCtx)->pollClusterRole();
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
@@ -1560,6 +1504,36 @@ private:
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
                 catalog::forEachCollectionFromDb(
                     opCtx, dbName, MODE_IS, checkForStringSearchQueryType);
+            }
+        }
+
+        if (feature_flags::gFeatureFlagEnableReplicasetTransitionToCSRS
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            BSONObj shardIdentityBSON;
+            if ([&] {
+                    auto coll = acquireCollection(
+                        opCtx,
+                        CollectionAcquisitionRequest(
+                            NamespaceString::kServerConfigurationNamespace,
+                            PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                            repl::ReadConcernArgs::get(opCtx),
+                            AcquisitionPrerequisites::kRead),
+                        LockMode::MODE_IS);
+                    return Helpers::findOne(
+                        opCtx, coll, BSON("_id" << ShardIdentityType::IdName), shardIdentityBSON);
+                }()) {
+                auto shardIdentity = uassertStatusOK(
+                    ShardIdentityType::fromShardIdentityDocument(shardIdentityBSON));
+                if (shardIdentity.getDeferShardingInitialization().has_value()) {
+                    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+                        uasserted(ErrorCodes::CannotDowngrade,
+                                  "Downgrading FCV is prohibited during promotion to sharded "
+                                  "cluster. Please finish the promotion before proceeding.");
+                    }
+                    uasserted(ErrorCodes::CannotDowngrade,
+                              "Downgrading FCV is prohibited during promotion to sharded cluster. "
+                              "Please remove the shard identity document before proceeding.");
+                }
             }
         }
     }
@@ -1901,61 +1875,6 @@ private:
         LOGV2(10216201,
               "Update of 'config.shards' entries succeeded",
               "updateResponse"_attr = result.toBSON());
-    }
-
-    void _validateSessionsCollectionSharded(OperationContext* opCtx) {
-        const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-
-        // If there are no shards in the cluster the collection cannot be sharded.
-        if (allShardIds.empty()) {
-            return;
-        }
-
-        auto cm = uassertStatusOK(
-            RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(
-                opCtx, NamespaceString::kLogicalSessionsNamespace));
-
-        if (!cm.isSharded()) {
-            auto status = LogicalSessionCache::get(opCtx)->refreshNow(opCtx);
-            uassert(
-                ErrorCodes::CannotUpgrade,
-                str::stream() << "Collection "
-                              << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
-                              << " must be created as sharded before upgrading. If the collection "
-                                 "exists as unsharded, please contact support for assistance.",
-                status.isOK());
-        }
-    }
-
-    void _validateSessionsCollectionOutsideConfigServer(OperationContext* opCtx) {
-        const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-
-        // If there are no shards in the cluster the collection cannot be sharded.
-        if (allShardIds.empty()) {
-            return;
-        }
-
-        auto cm = uassertStatusOK(
-            RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(
-                opCtx, NamespaceString::kLogicalSessionsNamespace));
-
-        // If we are on a dedicated config server, make sure that there is not a chunk on the
-        // config server. This is prevented by SERVER-97338, but prior to its fixing this could
-        // be possible.
-        bool amIAConfigShard = std::find(allShardIds.begin(),
-                                         allShardIds.end(),
-                                         ShardingState::get(opCtx)->shardId()) != allShardIds.end();
-        if (!amIAConfigShard) {
-            std::set<ShardId> shardsOwningChunks;
-            cm.getAllShardIds(&shardsOwningChunks);
-            uassert(ErrorCodes::CannotUpgrade,
-                    str::stream()
-                        << "Collection "
-                        << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
-                        << " has a range located on the config server. Please move this range to "
-                           "any other shard using the `moveRange` command before upgrading.",
-                    !shardsOwningChunks.contains(ShardingState::get(opCtx)->shardId()));
-        }
     }
 
     void _createConfigSessionsCollectionLocally(OperationContext* opCtx) {

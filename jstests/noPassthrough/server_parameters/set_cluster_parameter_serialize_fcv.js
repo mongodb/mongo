@@ -158,7 +158,7 @@ function runShardedTest(fixture) {
     fixture.asAdmin(({admin}) =>
         assert.commandFailedWithCode(
             admin.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
-            ErrorCodes.CannotDowngrade,
+            ErrorCodes.ConflictingOperationInProgress,
         ),
     );
 
