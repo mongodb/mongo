@@ -351,6 +351,7 @@ buildvariants:
             variant: *amazon_linux2023_arm64_static_compile_variant_name
       - name: multiversion_gen
       - name: .multiversion_sanity_check
+      - name: clustered_collection_passthrough_gen
       - name: concurrency_gen
       - name: concurrency_replication_gen
       - name: concurrency_sharded_replication_gen
