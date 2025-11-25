@@ -40,6 +40,9 @@ static constexpr char kInterleavedStartControlByte = (char)0xF1;
 static constexpr char kInterleavedStartArrayRootControlByte = (char)0xF2;
 static constexpr uint8_t kInvalidScaleIndex = 0xFF;
 static constexpr uint8_t kInvalidControlByte = 0xFE;
+static constexpr uint8_t kMaxNumSimple8bPerControl = 16;
+static constexpr std::array<uint8_t, Simple8bTypeUtil::kMemoryAsInteger + 1>
+    kControlByteForScaleIndex = {0x90, 0xA0, 0xB0, 0xC0, 0xD0, 0x80};
 
 inline bool isUncompressedLiteralControlByte(uint8_t control) {
     return (control & 0xE0) == 0 || control == (uint8_t)stdx::to_underlying(BSONType::minKey) ||

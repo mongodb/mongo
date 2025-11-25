@@ -18,6 +18,7 @@ mongo_cc_library(
         "simple8b_type_util.cpp",
     ],
     hdrs = [
+        "binary_reopen.h",
         "bsoncolumn.h",
         "bsoncolumn.inl",
         "bsoncolumn_helpers.h",
@@ -114,6 +115,20 @@ mongo_cc_unit_test(
         ":bsoncolumn_fuzzer_util",
         ":bsoncolumn_test_util",
         "//src/mongo/util:safe_num",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "binary_reopen_test",
+    srcs = [
+        "binary_reopen_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_seventh_group",
+        "server-bsoncolumn",
+    ],
+    deps = [
+        ":column",
     ],
 )
 

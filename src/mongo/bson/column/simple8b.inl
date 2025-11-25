@@ -103,11 +103,19 @@ struct SimpleDecoder {
     }
 
     // Returns value of last slot. 'kMissing' is returned for missing.
-    static int64_t last(uint64_t encoded) {
+    static int64_t lastDecoded(uint64_t encoded) {
         encoded >>= (bits * (iters - 1));
         if (encoded == mask)
             return kMissing;
         return Simple8bTypeUtil::decodeInt64(encoded);
+    }
+
+    // Returns value of last slot. 'kMissing' is returned for missing.
+    static uint64_t lastEncoded(uint64_t encoded) {
+        encoded >>= (bits * (iters - 1));
+        if (encoded == mask)
+            return kMissing;
+        return encoded;
     }
 };
 
@@ -212,13 +220,22 @@ struct TableDecoder {
     }
 
     // Returns value of last slot. 'kMissing' is returned for missing.
-    int64_t last(uint64_t encoded) const {
+    int64_t lastDecoded(uint64_t encoded) const {
         encoded >>= (bits * (iters - 1));
         const auto& entry = table[encoded];
         if (!entry.num) {
             return kMissing;
         }
         return entry.decoded;
+    }
+
+    uint64_t lastEncoded(uint64_t encoded) const {
+        encoded >>= (bits * (iters - 1));
+        const auto& entry = table[encoded];
+        if (!entry.num) {
+            return kMissing;
+        }
+        return encoded;
     }
 };
 
@@ -510,7 +527,7 @@ struct ExtendedDecoder {
 
     // Returns value of last slot. 'kMissing' is returned for missing.
     template <typename T>
-    T last(uint64_t encoded) const {
+    T lastDecoded(uint64_t encoded) const {
         encoded >>= (bits * (iters - 1));
         if ((encoded & mask) == mask)
             return kMissing;
@@ -524,6 +541,24 @@ struct ExtendedDecoder {
         }
 
         return Simple8bTypeUtil::decodeInt(value << numZeroes);
+    }
+
+    // Returns value of last slot. 'kMissing' is returned for missing.
+    template <typename T>
+    T lastEncoded(uint64_t encoded) const {
+        encoded >>= (bits * (iters - 1));
+        if ((encoded & mask) == mask)
+            return kMissing;
+
+        uint64_t count = encoded & countMask;
+        T value = (encoded >> countBits) & valueMask;
+        auto numZeroes = count * countScale;
+        // UBSAN will complain if shift values are greater than bit length
+        if constexpr (std::is_same<T, uint64_t>::value) {
+            numZeroes %= 64;
+        }
+
+        return value << numZeroes;
     }
 };
 
@@ -672,55 +707,57 @@ T decodeLastSlotIgnoreSkip(uint64_t encoded) {
         case 15:
             break;
         default:
+            uasserted(10065906, "Bad selector");
             break;
     }
     return 0;
 }
 
 template <typename T>
-T decodeLastSlot(uint64_t encoded) {
+T lastDecoded(uint64_t encoded) {
     auto selector = encoded & simple8b_internal::kBaseSelectorMask;
     encoded >>= 4;
     switch (selector) {
         case 1:
+            // Encoded and decoded value is the same for the 1 bit case
             return decoder1.last(encoded);
         case 2:
-            return decoder2.last(encoded);
+            return decoder2.lastDecoded(encoded);
         case 3:
-            return decoder3.last(encoded);
+            return decoder3.lastDecoded(encoded);
         case 4:
-            return decoder4.last(encoded);
+            return decoder4.lastDecoded(encoded);
         case 5:
-            return decoder5.last(encoded);
+            return decoder5.lastDecoded(encoded);
         case 6:
-            return decoder6.last(encoded);
+            return decoder6.lastDecoded(encoded);
         case 7: {
 
             auto extended = encoded & simple8b_internal::kBaseSelectorMask;
             encoded >>= 4;
             switch (extended) {
                 case 0:
-                    return decoder7.last(encoded);
+                    return decoder7.lastDecoded(encoded);
                 case 1:
-                    return decoderExtended7_1.last<T>(encoded);
+                    return decoderExtended7_1.lastDecoded<T>(encoded);
                 case 2:
-                    return decoderExtended7_2.last<T>(encoded);
+                    return decoderExtended7_2.lastDecoded<T>(encoded);
                 case 3:
-                    return decoderExtended7_3.last<T>(encoded);
+                    return decoderExtended7_3.lastDecoded<T>(encoded);
                 case 4:
-                    return decoderExtended7_4.last<T>(encoded);
+                    return decoderExtended7_4.lastDecoded<T>(encoded);
                 case 5:
-                    return decoderExtended7_5.last<T>(encoded);
+                    return decoderExtended7_5.lastDecoded<T>(encoded);
                 case 6:
-                    return decoderExtended7_6.last<T>(encoded);
+                    return decoderExtended7_6.lastDecoded<T>(encoded);
                 case 7:
-                    return decoderExtended7_7.last<T>(encoded);
+                    return decoderExtended7_7.lastDecoded<T>(encoded);
                 case 8:
-                    return decoderExtended7_8.last<T>(encoded);
+                    return decoderExtended7_8.lastDecoded<T>(encoded);
                 case 9:
-                    return decoderExtended7_9.last<T>(encoded);
+                    return decoderExtended7_9.lastDecoded<T>(encoded);
                 default:
-                    invariant(false);  // invalid encoding
+                    uasserted(10065900, "Bad extended selector");
                     break;
             }
             break;
@@ -730,54 +767,163 @@ T decodeLastSlot(uint64_t encoded) {
             encoded >>= 4;
             switch (extended) {
                 case 0:
-                    return decoder8.last(encoded);
+                    return decoder8.lastDecoded(encoded);
                 case 1:
-                    return decoderExtended8_1.last<T>(encoded);
+                    return decoderExtended8_1.lastDecoded<T>(encoded);
                 case 2:
-                    return decoderExtended8_2.last<T>(encoded);
+                    return decoderExtended8_2.lastDecoded<T>(encoded);
                 case 3:
-                    return decoderExtended8_3.last<T>(encoded);
+                    return decoderExtended8_3.lastDecoded<T>(encoded);
                 case 4:
-                    return decoderExtended8_4.last<T>(encoded);
+                    return decoderExtended8_4.lastDecoded<T>(encoded);
                 case 5:
-                    return decoderExtended8_5.last<T>(encoded);
+                    return decoderExtended8_5.lastDecoded<T>(encoded);
                 case 6:
-                    return decoderExtended8_6.last<T>(encoded);
+                    return decoderExtended8_6.lastDecoded<T>(encoded);
                 case 7:
-                    return decoderExtended8_7.last<T>(encoded);
+                    return decoderExtended8_7.lastDecoded<T>(encoded);
                 case 8:
-                    return decoderExtended8_8.last<T>(encoded);
+                    return decoderExtended8_8.lastDecoded<T>(encoded);
                 case 9:
-                    return decoderExtended8_9.last<T>(encoded);
+                    return decoderExtended8_9.lastDecoded<T>(encoded);
                 case 10:
-                    return decoderExtended8_10.last<T>(encoded);
+                    return decoderExtended8_10.lastDecoded<T>(encoded);
                 case 11:
-                    return decoderExtended8_11.last<T>(encoded);
+                    return decoderExtended8_11.lastDecoded<T>(encoded);
                 case 12:
-                    return decoderExtended8_12.last<T>(encoded);
+                    return decoderExtended8_12.lastDecoded<T>(encoded);
                 case 13:
-                    return decoderExtended8_13.last<T>(encoded);
+                    return decoderExtended8_13.lastDecoded<T>(encoded);
                 default:
-                    invariant(false);  // invalid encoding
+                    uasserted(10065901, "Bad extended selector");
                     break;
             }
             break;
         }
         case 9:
-            return decoder10.last(encoded);
+            return decoder10.lastDecoded(encoded);
         case 10:
-            return decoder12.last(encoded);
+            return decoder12.lastDecoded(encoded);
         case 11:
-            return decoder15.last(encoded);
+            return decoder15.lastDecoded(encoded);
         case 12:
-            return decoder20.last(encoded);
+            return decoder20.lastDecoded(encoded);
         case 13:
-            return decoder30.last(encoded);
+            return decoder30.lastDecoded(encoded);
         case 14:
-            return decoder60.last(encoded);
+            return decoder60.lastDecoded(encoded);
         case 15:
             break;
         default:
+            uasserted(10065905, "Bad selector");
+            break;
+    }
+    return 0;
+}
+
+template <typename T>
+T lastEncoded(uint64_t encoded) {
+    auto selector = encoded & simple8b_internal::kBaseSelectorMask;
+    encoded >>= 4;
+    switch (selector) {
+        case 1:
+            // Encoded and decoded value is the same for the 1 bit case
+            return decoder1.last(encoded);
+        case 2:
+            return decoder2.lastEncoded(encoded);
+        case 3:
+            return decoder3.lastEncoded(encoded);
+        case 4:
+            return decoder4.lastEncoded(encoded);
+        case 5:
+            return decoder5.lastEncoded(encoded);
+        case 6:
+            return decoder6.lastEncoded(encoded);
+        case 7: {
+
+            auto extended = encoded & simple8b_internal::kBaseSelectorMask;
+            encoded >>= 4;
+            switch (extended) {
+                case 0:
+                    return decoder7.lastEncoded(encoded);
+                case 1:
+                    return decoderExtended7_1.lastEncoded<T>(encoded);
+                case 2:
+                    return decoderExtended7_2.lastEncoded<T>(encoded);
+                case 3:
+                    return decoderExtended7_3.lastEncoded<T>(encoded);
+                case 4:
+                    return decoderExtended7_4.lastEncoded<T>(encoded);
+                case 5:
+                    return decoderExtended7_5.lastEncoded<T>(encoded);
+                case 6:
+                    return decoderExtended7_6.lastEncoded<T>(encoded);
+                case 7:
+                    return decoderExtended7_7.lastEncoded<T>(encoded);
+                case 8:
+                    return decoderExtended7_8.lastEncoded<T>(encoded);
+                case 9:
+                    return decoderExtended7_9.lastEncoded<T>(encoded);
+                default:
+                    uasserted(10065902, "Bad extended selector");
+                    break;
+            }
+            break;
+        }
+        case 8: {
+            auto extended = encoded & simple8b_internal::kBaseSelectorMask;
+            encoded >>= 4;
+            switch (extended) {
+                case 0:
+                    return decoder8.lastEncoded(encoded);
+                case 1:
+                    return decoderExtended8_1.lastEncoded<T>(encoded);
+                case 2:
+                    return decoderExtended8_2.lastEncoded<T>(encoded);
+                case 3:
+                    return decoderExtended8_3.lastEncoded<T>(encoded);
+                case 4:
+                    return decoderExtended8_4.lastEncoded<T>(encoded);
+                case 5:
+                    return decoderExtended8_5.lastEncoded<T>(encoded);
+                case 6:
+                    return decoderExtended8_6.lastEncoded<T>(encoded);
+                case 7:
+                    return decoderExtended8_7.lastEncoded<T>(encoded);
+                case 8:
+                    return decoderExtended8_8.lastEncoded<T>(encoded);
+                case 9:
+                    return decoderExtended8_9.lastEncoded<T>(encoded);
+                case 10:
+                    return decoderExtended8_10.lastEncoded<T>(encoded);
+                case 11:
+                    return decoderExtended8_11.lastEncoded<T>(encoded);
+                case 12:
+                    return decoderExtended8_12.lastEncoded<T>(encoded);
+                case 13:
+                    return decoderExtended8_13.lastEncoded<T>(encoded);
+                default:
+                    uasserted(10065903, "Bad extended selector");
+                    break;
+            }
+            break;
+        }
+        case 9:
+            return decoder10.lastEncoded(encoded);
+        case 10:
+            return decoder12.lastEncoded(encoded);
+        case 11:
+            return decoder15.lastEncoded(encoded);
+        case 12:
+            return decoder20.lastEncoded(encoded);
+        case 13:
+            return decoder30.lastEncoded(encoded);
+        case 14:
+            return decoder60.lastEncoded(encoded);
+        case 15:
+            break;
+        default:
+            uasserted(10065904, "Bad selector");
             break;
     }
     return 0;
@@ -925,7 +1071,7 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 inline size_t decodeAndVisit(uint64_t encoded
             return decoder60.visitAll<T>(encoded, visit, visitZero, visitMissing);
             break;
         case simple8b_internal::kRleSelector: {
-            const T lastValue = decodeLastSlot<T>(*prevNonRLE);
+            const T lastValue = lastDecoded<T>(*prevNonRLE);
             size_t count = ((encoded & 0xf) + 1) * simple8b_internal::kRleMultiplier;
             if (lastValue == kMissing) {
                 for (size_t i = 0; i < count; ++i) {
@@ -1168,7 +1314,7 @@ T decodeAndPrefixSum(uint64_t encoded, T& prefix, uint64_t* prevNonRLE) {
         case 14:
             return decoder60.prefixSum<T>(encoded, prefix);
         case simple8b_internal::kRleSelector: {
-            T last = decodeLastSlot<T>(*prevNonRLE);
+            T last = lastDecoded<T>(*prevNonRLE);
             if (last == kMissing)
                 return 0;
 
@@ -1227,6 +1373,29 @@ inline size_t count(const char* buffer, size_t size) {
         buffer += sizeof(uint64_t);
     }
     return numElements;
+}
+
+template <typename T>
+boost::optional<T> last(const char* buffer, size_t size, uint64_t& prevNonRLE) {
+    invariant(size % 8 == 0);
+    const char* end = buffer + size;
+    while (buffer != end) {
+        uint64_t encoded = ConstDataView(buffer).read<LittleEndian<uint64_t>>();
+        auto selector = encoded & simple8b_internal::kBaseSelectorMask;
+        if (selector != simple8b_internal::kRleSelector) {
+            prevNonRLE = encoded;
+        }
+
+        buffer += sizeof(uint64_t);
+    }
+
+    if constexpr (std::is_same_v<T, uint64_t> || std::is_same_v<T, uint128_t>) {
+        T encoded = lastEncoded<T>(prevNonRLE);
+        return encoded == kMissing ? boost::optional<T>{} : boost::optional<T>{encoded};
+    } else {
+        T decoded = lastDecoded<T>(prevNonRLE);
+        return decoded == kMissing ? boost::optional<T>{} : boost::optional<T>{decoded};
+    }
 }
 
 template <typename T>

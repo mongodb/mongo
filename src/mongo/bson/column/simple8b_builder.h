@@ -71,6 +71,7 @@ public:
     // Callback to handle writing of finalized Simple-8b blocks. Machine Endian byte order, the
     // value need to be converted to Little Endian before persisting.
     explicit Simple8bBuilder(Allocator = {});
+    Simple8bBuilder(boost::optional<T> val, int64_t num, Allocator = {});
     ~Simple8bBuilder();
 
     Simple8bBuilder(const Simple8bBuilder&) = default;
@@ -78,6 +79,20 @@ public:
 
     Simple8bBuilder& operator=(const Simple8bBuilder&) = default;
     Simple8bBuilder& operator=(Simple8bBuilder&&) = default;
+
+    /**
+     * Returns the allocator used by this Simple8bBuilder.
+     */
+    Allocator allocator() const {
+        // There is a bug in the version of MSVC we are using that fails to perform this cast when
+        // the allocator is std::allocator<void>. It is a stateless allocator so we just return a
+        // new instance as a workaround.
+        if constexpr (std::is_same_v<Allocator, std::allocator<void>>) {
+            return Allocator{};
+        } else {
+            return _pendingValues.get_allocator();
+        }
+    }
 
     /**
      * Appends a multiple missing value to Simple8b.  Should be called before any other values are
@@ -174,17 +189,6 @@ public:
      * Checks to see if RLE is possible and/or ongoing
      */
     bool rlePossible() const;
-
-    /**
-     * Forcibly set last value so future append/skip calls may use this to construct RLE. This
-     * should not be called in normal operation.
-     */
-    void setLastForRLE(boost::optional<T> val);
-
-    /**
-     * Reset RLE state on the last value, if needed. This should not be called in normal operation.
-     */
-    void resetLastForRLEIfNeeded();
 
     /**
      * Initialize RLE state from another builder
@@ -500,6 +504,20 @@ template <typename T, class Allocator>
 Simple8bBuilder<T, Allocator>::Simple8bBuilder(Allocator allocator) : _pendingValues(allocator) {}
 
 template <typename T, class Allocator>
+Simple8bBuilder<T, Allocator>::Simple8bBuilder(boost::optional<T> val,
+                                               int64_t num,
+                                               Allocator allocator)
+    : _rleCount(num), _lastValueInPrevWord(val), _pendingValues(allocator) {
+    if (val) {
+        auto pendingValue = _calculatePendingValue(*val);
+        invariant(pendingValue);
+        invariant(_doesIntegerFitInCurrentWord(*pendingValue));
+    }
+    _lastValidExtensionType = 0;
+    isSelectorPossible.fill(true);
+}
+
+template <typename T, class Allocator>
 Simple8bBuilder<T, Allocator>::~Simple8bBuilder() = default;
 
 template <typename T, class Allocator>
@@ -581,23 +599,6 @@ void Simple8bBuilder<T, Allocator>::flush(F&& writeFn) {
         // There are no more words in _pendingValues and RLE is possible.
         // However the _rleCount is 0 because we have not read any of the values in the next word.
         _rleCount = 0;
-    }
-}
-
-template <typename T, class Allocator>
-void Simple8bBuilder<T, Allocator>::setLastForRLE(boost::optional<T> val) {
-    _lastValueInPrevWord = val;
-    if (val) {
-        auto pendingValue = _calculatePendingValue(*val);
-        invariant(pendingValue);
-        invariant(_doesIntegerFitInCurrentWord(*pendingValue));
-    }
-}
-
-template <typename T, class Allocator>
-void Simple8bBuilder<T, Allocator>::resetLastForRLEIfNeeded() {
-    if (!rlePossible()) {
-        _lastValueInPrevWord = 0;
     }
 }
 

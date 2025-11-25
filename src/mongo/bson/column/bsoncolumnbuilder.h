@@ -269,9 +269,6 @@ struct EncodingState {
                                    F controlBlockWriter,
                                    const Allocator&);
     void _initializeFromPrevious(const Allocator&);
-    template <class F>
-    ptrdiff_t _incrementSimple8bCount(allocator_aware::BufBuilder<Allocator>& buffer,
-                                      F controlBlockWriter);
 
     // Encoders for 64bit and 128bit types.
     std::variant<Encoder64, Encoder128> _encoder;
@@ -521,7 +518,7 @@ private:
         int lastBufLength = 0;
         // Finalized state of last control byte written out by the previous intermediate() call.
         uint8_t lastControl;
-        uint8_t lastControlOffset = 0;
+        uint16_t lastControlOffset = 0;
     };
 
     // Internal helper to perform reopen/initialization of this class from a BSONColumn binary.

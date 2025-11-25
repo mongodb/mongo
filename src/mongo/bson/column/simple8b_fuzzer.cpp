@@ -31,6 +31,7 @@
 #include "mongo/bson/column/simple8b.h"
 #include "mongo/bson/column/simple8b_type_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/int128.h"
 #include "mongo/util/hex.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -38,6 +39,11 @@
 static constexpr int128_t add(int128_t lhs, int128_t rhs) {
     return static_cast<int128_t>(static_cast<uint128_t>(lhs) + static_cast<uint128_t>(rhs));
 }
+
+struct LastResult {
+    boost::optional<uint128_t> encoded;
+    boost::optional<int128_t> decoded;
+};
 
 extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     using namespace mongo;
@@ -65,11 +71,40 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
             }
         }();
 
+        auto oldLast = [&]() -> boost::optional<LastResult> {
+            try {
+                boost::optional<uint128_t> last = uint128_t{0};
+                Simple8b<uint128_t> s8b(Data, bufferSize);
+                for (auto&& val : s8b) {
+                    last = val;
+                }
+                if (last) {
+                    return LastResult{last, Simple8bTypeUtil::decodeInt(*last)};
+                } else {
+                    return LastResult{boost::optional<uint128_t>(boost::none),
+                                      boost::optional<int128_t>(boost::none)};
+                }
+
+            } catch (const DBException&) {
+                return boost::none;
+            }
+        }();
+
         auto sum = [&]() -> boost::optional<int128_t> {
             try {
-                uint64_t prev =
-                    0xE;  // Previous value 0, this is one simple8b value containing a zero.
+                uint64_t prev = simple8b::kSingleZero;
                 return simple8b::sum<int128_t>(Data, bufferSize, prev);
+            } catch (const DBException&) {
+                return boost::none;
+            }
+        }();
+
+        auto last = [&]() -> boost::optional<LastResult> {
+            try {
+                uint64_t prev1 = simple8b::kSingleZero;
+                uint64_t prev2 = simple8b::kSingleZero;
+                return LastResult{simple8b::last<uint128_t>(Data, bufferSize, prev1),
+                                  simple8b::last<int128_t>(Data, bufferSize, prev2)};
             } catch (const DBException&) {
                 return boost::none;
             }
@@ -91,6 +126,11 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         // (as they'd lead to crashes), while using edge cases leading to interesting control flow
         // paths in both implementations.
         invariant(sum == oldSum);
+        // simple8b::last is not required to decode everything so an invalid binary might not throw.
+        if (last && oldLast) {
+            invariant(last->encoded == oldLast->encoded);
+            invariant(last->decoded == oldLast->decoded);
+        }
     }
 
 
