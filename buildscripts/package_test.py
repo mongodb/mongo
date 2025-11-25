@@ -697,14 +697,16 @@ if args.command == "branch":
             logging.error("Could not find mongosh package for %s and %s", arch, test_os)
             sys.exit(1)
 
-        tests.append(
-            Test(
-                os_name=test_os,
-                edition=args.edition,
-                version=args.server_version,
-                packages_urls=urls,
+        # Skip testing the actual deb/rpm packages on Atlas since it only relies on the tarball
+        if args.edition != "atlas":
+            tests.append(
+                Test(
+                    os_name=test_os,
+                    edition=args.edition,
+                    version=args.server_version,
+                    packages_urls=urls,
+                )
             )
-        )
 
         validate_top_level_directory("mongo-binaries.tgz")
 
@@ -858,9 +860,11 @@ if args.command == "release":
             logging.error("Could not find mongosh package for %s and %s", arch, test_os)
             sys.exit(1)
 
-        tests.append(
-            Test(os_name=test_os, packages_urls=urls, edition=edition, version=server_version)
-        )
+        # Skip testing the actual deb/rpm packages on Atlas since it only relies on the tarball
+        if args.edition != "atlas":
+            tests.append(
+                Test(os_name=test_os, packages_urls=urls, edition=edition, version=server_version)
+            )
 
 for i in range(5):
     try:
