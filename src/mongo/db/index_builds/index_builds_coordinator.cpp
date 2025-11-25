@@ -167,7 +167,7 @@ public:
     AtomicWord<int> processConstraintsViolatonTableOnCommit{0};
     AtomicWord<int> commit{0};
     // The duration of the last committed index build.
-    AtomicWord<int> lastCommittedMillis{0};
+    AtomicWord<int64_t> lastCommittedMillis{0};
 };
 
 auto& indexBuildsSSS = *ServerStatusSectionBuilder<IndexBuildsSSS>("indexBuilds").forShard();
