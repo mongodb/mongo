@@ -3,15 +3,11 @@
  * the target range on the recipient shard. This prevents mixing legitimate
  * documents (incoming via migration) with invalid ones (incorrectly present
  * due to historical reasons like direct connections or range deleter bugs).
- * @tags: [
- *   # TODO SERVER-112060 re-enable this test in viewless timeseries suites
- *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
- * ]
-
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 st.stopBalancer();
@@ -356,38 +352,42 @@ assert.commandWorked(admin.runCommand({enableSharding: "test", primaryShard: st.
     // Insert a document directly on shard1 that should belong to the first chunk (owned by shard0).
     jsTest.log.info("Creating spurious time series document by inserting directly on shard1 " + tsCollDDLOps.getName());
 
-    const shard1TsBucketsColl = st.shard1.getDB("test").getCollection(tsCollDDLOps.getName());
+    const shard1DB = st.shard1.getDB("test");
+    const shard1TsColl = shard1DB.getCollection(tsColl.getName());
 
     // Create a proper bucket document that would map to sensor_025 (which should be in first chunk)
     const spuriousTimestamp = new Date(baseTime.getTime() + 3000);
     assert.commandWorked(
-        shard1TsBucketsColl.insert({
-            _id: ObjectId(),
-            meta: "sensor_025", // This corresponds to sensor_id metaField
-            control: {
-                version: 1,
-                min: {
-                    timestamp: spuriousTimestamp,
-                    temperature: 20.0,
+        getTimeseriesCollForRawOps(shard1DB, shard1TsColl).insert(
+            {
+                _id: ObjectId(),
+                meta: "sensor_025", // This corresponds to sensor_id metaField
+                control: {
+                    version: 1,
+                    min: {
+                        timestamp: spuriousTimestamp,
+                        temperature: 20.0,
+                    },
+                    max: {
+                        timestamp: spuriousTimestamp,
+                        temperature: 20.0,
+                    },
+                    closed: false,
                 },
-                max: {
-                    timestamp: spuriousTimestamp,
-                    temperature: 20.0,
+                data: {
+                    timestamp: {"0": spuriousTimestamp},
+                    temperature: {"0": 20.0},
+                    data: {"0": "spurious_ts_document"},
                 },
-                closed: false,
             },
-            data: {
-                timestamp: {"0": spuriousTimestamp},
-                temperature: {"0": 20.0},
-                data: {"0": "spurious_ts_document"},
-            },
-        }),
+            getRawOperationSpec(shard1DB),
+        ),
     );
 
     // Verify the spurious document exists on shard1.
     assert.eq(
         1,
-        shard1TsBucketsColl.find({meta: "sensor_025"}).count(),
+        getTimeseriesCollForRawOps(shard1DB, shard1TsColl).find({meta: "sensor_025"}).rawData().count(),
         "Spurious time series document should exist on shard1",
     );
 
@@ -419,10 +419,12 @@ assert.commandWorked(admin.runCommand({enableSharding: "test", primaryShard: st.
 
     // Clean up the spurious document and verify migration works.
     jsTest.log.info("Cleaning up spurious time series document and retrying migration...");
-    assert.commandWorked(shard1TsBucketsColl.remove({meta: "sensor_025"}));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(shard1DB, shard1TsColl).remove({meta: "sensor_025"}, getRawOperationSpec(shard1DB)),
+    );
     assert.eq(
         0,
-        shard1TsBucketsColl.find({meta: "sensor_025"}).count(),
+        getTimeseriesCollForRawOps(shard1DB, shard1TsColl).find({meta: "sensor_025"}).rawData().count(),
         "Spurious time series document should be removed",
     );
 
