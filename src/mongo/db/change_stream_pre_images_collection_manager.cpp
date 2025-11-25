@@ -170,6 +170,7 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
     ServiceContext::UniqueOperationContext opCtx;
     try {
         opCtx = client->makeOperationContext();
+        // TODO SERVER-114033: Use replicated truncates for change stream pre-images.
         size_t numberOfRemovals = _deleteExpiredPreImagesWithTruncate(opCtx.get());
 
         if (numberOfRemovals > 0) {

@@ -34,7 +34,9 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/client.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
@@ -77,6 +79,15 @@ void ChangeStreamExpiredPreImagesRemoverService::onConsistentDataAvailable(Opera
     // 'isRollback: false' signals data is consistent on initial startup. If the pre-image removal
     // job is to run, it should do so once data is consistent on startup.
     if (isRollback) {
+        return;
+    }
+
+    // TODO SERVER-114033: Remove this early return once we can use replicated truncates on change
+    // stream pre-images. We can use the shouldReplicateRangeTruncates() utility to determine
+    // whether to use the new replicated truncates API.
+    if (rss::ReplicatedStorageService::get(opCtx)
+            .getPersistenceProvider()
+            .shouldUseReplicatedTruncates()) {
         return;
     }
 
