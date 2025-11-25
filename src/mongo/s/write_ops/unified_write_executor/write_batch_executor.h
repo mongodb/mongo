@@ -162,6 +162,11 @@ struct EmptyBatchResponse {};
 
 struct SimpleWriteBatchResponse {
     std::vector<std::pair<ShardId, ShardResponse>> shardResponses;
+    bool isRetryableWriteWithId = false;
+
+    static SimpleWriteBatchResponse makeEmpty(bool isRetryableWriteWithId) {
+        return SimpleWriteBatchResponse{{}, isRetryableWriteWithId};
+    }
 };
 
 class NoRetryWriteBatchResponse : public BasicResponse {

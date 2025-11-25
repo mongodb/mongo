@@ -642,7 +642,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         routingCtx.onRequestSentForNss(nss);
     }
 
-    SimpleWriteBatchResponse resp;
+    auto resp = SimpleWriteBatchResponse::makeEmpty(batch.isRetryableWriteWithId);
     bool stopParsingResponses = false;
 
     while (!stopParsingResponses && !sender.done()) {

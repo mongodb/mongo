@@ -39,6 +39,8 @@
 namespace mongo {
 namespace unified_write_executor {
 
+bool analysisTypeSupportsGrouping(AnalysisType type);
+
 struct EmptyBatch {
     std::vector<WriteOp> getWriteOps() const {
         return std::vector<WriteOp>{};
@@ -54,9 +56,8 @@ struct EmptyBatch {
 };
 
 struct SimpleWriteBatch {
-    // Given that a write command can target multiple collections,
-    // we store one shard version per namespace to support batching ops which target the same shard,
-    // but target different namespaces.
+    // Given that a write command can target multiple collections, we store one shard version per
+    // namespace to support batching ops which target different namespaces on the same shard.
     struct ShardRequest {
         std::map<NamespaceString, ShardEndpoint> versionByNss;
         std::set<NamespaceString> nssIsViewfulTimeseries;
@@ -66,6 +67,12 @@ struct SimpleWriteBatch {
     };
 
     std::map<ShardId, ShardRequest> requestByShardId;
+
+    bool isRetryableWriteWithId = false;
+
+    static SimpleWriteBatch makeEmpty(bool isRetryableWriteWithId) {
+        return SimpleWriteBatch{{}, isRetryableWriteWithId};
+    }
 
     std::vector<WriteOp> getWriteOps() const {
         std::vector<WriteOp> result;

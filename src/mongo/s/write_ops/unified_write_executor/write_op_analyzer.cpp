@@ -65,10 +65,7 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     // TODO SERVER-103782 Don't use CRITargeter.
     auto nss = op.getNss();
     CollectionRoutingInfoTargeter targeter(nss, routingCtx);
-
-    // TODO SERVER-103781 Add support for kPartialKeyWithId.
     // TODO SERVER-103146 Add kChangesOwnership.
-    // TODO SERVER-103781 Add support for "WriteWithoutShardKeyWithId" writes.
     NSTargeter::TargetingResult tr;
     switch (op.getType()) {
         case WriteType::kInsert: {
@@ -118,7 +115,13 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     auto targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
         opCtx, targeter.getNS(), op.getItemRef().getOpType(), tr.endpoints);
 
-    if (tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId) {
+    if (tr.isNonTargetedRetryableWriteWithId) {
+        recordTargetingStats(opCtx, targeter, tr, op);
+        return Analysis{AnalysisType::kRetryableWriteWithId,
+                        std::move(tr.endpoints),
+                        isViewfulTimeseries,
+                        std::move(targetedSampleId)};
+    } else if (tr.useTwoPhaseWriteProtocol) {
         recordTargetingStats(opCtx, targeter, tr, op);
         return Analysis{AnalysisType::kTwoPhaseWrite,
                         std::move(tr.endpoints),

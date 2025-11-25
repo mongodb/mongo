@@ -49,6 +49,7 @@ enum AnalysisType {
     kSingleShard,
     kMultiShard,
     kTwoPhaseWrite,
+    kRetryableWriteWithId,
     kInternalTransaction,
     kMultiWriteBlockingMigrations,
 };

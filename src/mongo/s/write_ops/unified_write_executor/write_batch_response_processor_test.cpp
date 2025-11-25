@@ -68,6 +68,7 @@ public:
     const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test", "coll");
     const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("test", "coll2");
     const NamespaceString nss3 = NamespaceString::createNamespaceString_forTest("test", "coll3");
+    const NamespaceString cursorNss = NamespaceString::makeBulkWriteNSS(boost::none);
     const HostAndPort host1 = HostAndPort("host1", 0);
     const HostAndPort host2 = HostAndPort("host2", 0);
     const ShardId shard1Name = ShardId("shard1");
@@ -685,6 +686,90 @@ TEST_F(WriteBatchResponseProcessorTest, MixedStalenessErrorsAndOk) {
     ASSERT_EQ(result.opsToRetry[0].getNss(), nss1);
     ASSERT_EQ(result.opsToRetry[1].getId(), op2.getId());
     ASSERT_EQ(result.opsToRetry[1].getNss(), nss1);
+
+    // Assert that 2 OK items were processed.
+    ASSERT_EQ(processor.getNumOkItemsProcessed(), 2);
+
+    // Assert that no errors were recorded.
+    ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
+}
+
+TEST_F(WriteBatchResponseProcessorTest, RetryableWriteWithIdMixedStalenessErrorsAndOk) {
+    auto request = BulkWriteCommandRequest(
+        {BulkWriteUpdateOp(0, BSON("_id" << 1), BSON("$set" << BSON("y" << 1))),
+         BulkWriteUpdateOp(0, BSON("_id" << -1), BSON("$set" << BSON("y" << 1))),
+         BulkWriteUpdateOp(1, BSON("_id" << 1), BSON("$set" << BSON("y" << 1))),
+         BulkWriteUpdateOp(1, BSON("_id" << -1), BSON("$set" << BSON("y" << 1)))},
+        {NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
+
+    request.setOrdered(false);
+
+    const bool isRetryableWriteWithId = true;
+
+    WriteOp op1(request, 0);
+    WriteOp op2(request, 1);
+    WriteOp op3(request, 2);
+    WriteOp op4(request, 3);
+
+    Status badValueStatus(ErrorCodes::BadValue, "Bad Value");
+    Status staleCollStatus1(
+        StaleConfigInfo(nss1, *shard1Endpoint.shardVersion, newShardVersion, shard1Name), "");
+    Status staleCollStatus2(
+        StaleConfigInfo(nss2, *shard2Endpoint.shardVersion, newShardVersion, shard2Name), "");
+
+    auto reply = makeReply();
+    reply.setNErrors(2);
+    reply.setCursor(BulkWriteCommandResponseCursor(0,
+                                                   {BulkWriteReplyItem{0, Status::OK()},
+                                                    BulkWriteReplyItem{1, staleCollStatus1},
+                                                    BulkWriteReplyItem{2, Status::OK()},
+                                                    BulkWriteReplyItem{3, badValueStatus}},
+                                                   cursorNss));
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    auto reply2 = makeReply();
+    reply2.setNErrors(2);
+    reply2.setCursor(BulkWriteCommandResponseCursor(0,
+                                                    {BulkWriteReplyItem{0, Status::OK()},
+                                                     BulkWriteReplyItem{1, Status::OK()},
+                                                     BulkWriteReplyItem{2, staleCollStatus2},
+                                                     BulkWriteReplyItem{3, badValueStatus}},
+                                                    cursorNss));
+    RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+    auto result = processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{{{shard1Name, ShardResponse::make(rcr1, {op1, op2, op3, op4})},
+                                  {shard2Name, ShardResponse::make(rcr2, {op1, op2, op3, op4})}},
+                                 isRetryableWriteWithId});
+
+    ASSERT_EQ(routingCtx.errors.size(), 2);
+    ASSERT_EQ(routingCtx.errors[0].code(), ErrorCodes::StaleConfig);
+    ASSERT_EQ(routingCtx.errors[0].extraInfo<StaleConfigInfo>()->getNss(), nss1);
+    ASSERT_EQ(routingCtx.errors[1].code(), ErrorCodes::StaleConfig);
+    ASSERT_EQ(routingCtx.errors[1].extraInfo<StaleConfigInfo>()->getNss(), nss2);
+    ASSERT_EQ(result.collsToCreate.size(), 0);
+
+    // Assert that all ops were returned for retry (regardless of whether they succeeded or not).
+    ASSERT_EQ(result.opsToRetry.size(), 4);
+    ASSERT_EQ(result.opsToRetry[0].getId(), op1.getId());
+    ASSERT_EQ(result.opsToRetry[0].getNss(), nss1);
+    ASSERT_EQ(result.opsToRetry[1].getId(), op2.getId());
+    ASSERT_EQ(result.opsToRetry[1].getNss(), nss1);
+    ASSERT_EQ(result.opsToRetry[2].getId(), op3.getId());
+    ASSERT_EQ(result.opsToRetry[2].getNss(), nss2);
+    ASSERT_EQ(result.opsToRetry[3].getId(), op4.getId());
+    ASSERT_EQ(result.opsToRetry[3].getNss(), nss2);
+
+    // Assert that no OK items were processed.
+    ASSERT_EQ(processor.getNumOkItemsProcessed(), 0);
+
+    // Assert that no errors were recorded.
+    ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
 }
 
 TEST_F(WriteBatchResponseProcessorTest, RetryShardsCannotRefreshDueToLocksHeldError) {

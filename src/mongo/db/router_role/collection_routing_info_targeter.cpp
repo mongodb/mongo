@@ -558,7 +558,7 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
     // TODO SPM-3673: Implement a similar approach for non-retryable or sessionless multi:false
     // non-upsert updates with an "_id" equality that involve multiple shards.
     result.isNonTargetedRetryableWriteWithId =
-        multipleEndpoints && isExactId && !isUpsert && isRetryableWrite(opCtx);
+        multipleEndpoints && isExactId && !isUpsert && !isFindAndModify && isRetryableWrite(opCtx);
 
     // Increment query counters as appropriate.
     if (!multipleEndpoints) {

@@ -34,10 +34,12 @@
 #include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
 #include "mongo/db/router_role/collection_uuid_mismatch.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/s/commands/query_cmd/populate_cursor.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
+#include "mongo/s/write_ops/write_op.h"
 #include "mongo/s/write_ops/write_op_helper.h"
 #include "mongo/util/assert_util.h"
 
@@ -52,10 +54,24 @@ using Unexecuted = WriteBatchResponseProcessor::Unexecuted;
 using SucceededWithoutItem = WriteBatchResponseProcessor::SucceededWithoutItem;
 using FindAndModifyReplyItem = WriteBatchResponseProcessor::FindAndModifyReplyItem;
 using GroupItemsResult = WriteBatchResponseProcessor::GroupItemsResult;
+using ItemsByOpMap = WriteBatchResponseProcessor::ItemsByOpMap;
 using ShardResult = WriteBatchResponseProcessor::ShardResult;
 
 namespace {
-ErrorCodes::Error getErrorCodeForItem(const ItemVariant& itemVar) {
+// This function returns the Status for a given ItemVariant ('itemVar'). If 'itemVar' is Unexecuted,
+// this function will return an OK status.
+Status getItemStatus(const ItemVariant& itemVar) {
+    return visit(
+        OverloadedVisitor([&](const Unexecuted&) { return Status::OK(); },
+                          [&](const SucceededWithoutItem&) { return Status::OK(); },
+                          [&](const BulkWriteReplyItem& item) { return item.getStatus(); },
+                          [&](const FindAndModifyReplyItem& item) { return item.getStatus(); }),
+        itemVar);
+}
+
+// This function returns the error code for a given ItemVariant ('itemVar'). If 'itemVar' is
+// Unexecuted, this function will return ErrorCodes::OK.
+ErrorCodes::Error getErrorCode(const ItemVariant& itemVar) {
     return visit(OverloadedVisitor(
                      [&](const Unexecuted&) { return ErrorCodes::OK; },
                      [&](const SucceededWithoutItem&) { return ErrorCodes::OK; },
@@ -64,8 +80,13 @@ ErrorCodes::Error getErrorCodeForItem(const ItemVariant& itemVar) {
                  itemVar);
 }
 
+// Like getErrorCode(), but takes a 'std::pair<ShardId,ItemVariant>' as its input.
 ErrorCodes::Error getErrorCodeForShardItemPair(const std::pair<ShardId, ItemVariant>& p) {
-    return getErrorCodeForItem(p.second);
+    return getErrorCode(p.second);
+}
+
+bool isRetryableError(const ItemVariant& itemVar) {
+    return write_op_helpers::isRetryErrCode(getErrorCode(itemVar));
 }
 
 template <typename ResultT>
@@ -85,6 +106,46 @@ void handleTransientTxnError(OperationContext* opCtx,
                                            << "Encountered error from "
                                            << (target ? target->toString() : "<unknown>")
                                            << " during a transaction"));
+    }
+}
+
+std::shared_ptr<const CannotImplicitlyCreateCollectionInfo> getCannotImplicitlyCreateCollectionInfo(
+    const Status& status) {
+    if (status == ErrorCodes::CannotImplicitlyCreateCollection) {
+        auto info = status.extraInfo<CannotImplicitlyCreateCollectionInfo>();
+        tassert(11182204, "Expected to find CannotImplicitlyCreateCollectionInfo", info != nullptr);
+
+        return info;
+    }
+
+    return {};
+}
+
+std::shared_ptr<const CollectionUUIDMismatchInfo> getCollectionUUIDMismatchInfo(
+    const Status& status) {
+    if (status == ErrorCodes::CollectionUUIDMismatch) {
+        auto info = status.extraInfo<CollectionUUIDMismatchInfo>();
+        tassert(11273500, "Expected to find CollectionUUIDMismatchInfo", info != nullptr);
+
+        return info;
+    }
+
+    return {};
+}
+
+// Helper function that prints the contents of 'opsToRetry' to the log if appropriate.
+void logOpsToRetry(const std::vector<WriteOp>& opsToRetry) {
+    if (opsToRetry.empty() &&
+        shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(4))) {
+        std::stringstream opsStream;
+        size_t numOpsInStream = 0;
+
+        for (const auto& op : opsToRetry) {
+            opsStream << (numOpsInStream++ > 0 ? ", " : "") << op.getId();
+        }
+
+        LOGV2_DEBUG(
+            10411404, 4, "re-enqueuing ops that didn't complete", "ops"_attr = opsStream.str());
     }
 }
 }  // namespace
@@ -119,7 +180,47 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
 
     // Organize the items from the shard responses by op, and check if any of the items is an
     // unrecoverable error.
-    auto [itemsByOp, unrecoverable] = groupItemsByOp(opCtx, shardResults);
+    auto [itemsByOp, unrecoverable, hasRetryableError] = groupItemsByOp(opCtx, shardResults);
+
+    // For "RetryableWriteWithId" simple write batches, a different retry strategy is used. If the
+    // batch has any retryable errors (and 'inTransaction' and 'unrecoverable' are false), then all
+    // of the ops in the batch are retried regardless of what their execution status was.
+    //
+    // This is the key difference between "RetryableWriteWithId" simple write batches and regular
+    // simple write batch.
+    if (response.isRetryableWriteWithId && hasRetryableError && !inTransaction && !unrecoverable) {
+        std::set<WriteOp> toRetry;
+        CollectionsToCreate collsToCreate;
+
+        // For each 'op', queue 'op' for retry and also increment counters as appropriate.
+        for (auto& [op, items] : itemsByOp) {
+            for (const auto& [shardId, itemVar] : items) {
+                if (isRetryableError(itemVar)) {
+                    // If 'itemVar' has a Status that is a retryable error, we pass that in when
+                    // calling queueOpForRetry().
+                    queueOpForRetry(op, getItemStatus(itemVar), toRetry, collsToCreate);
+                } else {
+                    // Otherwise, call queueOpForRetry() without a Stauts.
+                    queueOpForRetry(op, toRetry);
+                }
+            }
+
+            if (op.getType() == kUpdate) {
+                getQueryCounters(opCtx).updateOneWithoutShardKeyWithIdRetryCount.increment(1);
+            } else if (op.getType() == kDelete) {
+                getQueryCounters(opCtx).deleteOneWithoutShardKeyWithIdRetryCount.increment(1);
+            }
+        }
+
+        ProcessorResult result;
+        result.opsToRetry.insert(result.opsToRetry.end(), toRetry.begin(), toRetry.end());
+        result.collsToCreate = std::move(collsToCreate);
+
+        // Print the contents of 'opsToRetry' to the log if appropriate.
+        logOpsToRetry(result.opsToRetry);
+
+        return result;
+    }
 
     // Update the counters (excluding _nErrors), update the list of retried stmtIds, and process
     // the write concern error (if any).
@@ -154,7 +255,7 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
                     // If 'shouldRetryOnUnexecutedOrRetryableError' is true, then queue 'op' to
                     // be retried.
                     if (shouldRetryOnUnexecutedOrRetryableError) {
-                        queueOpForRetry(op, /*status*/ boost::none, toRetry, collsToCreate);
+                        queueOpForRetry(op, toRetry);
                     }
                     return true;
                 },
@@ -221,19 +322,17 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
     result.collsToCreate = std::move(collsToCreate);
     result.successfulShardSet = std::move(successfulShardSet);
 
-    if (!result.opsToRetry.empty()) {
-        // Print the contents of 'opsToRetry' to the log.
-        if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(4))) {
-            std::stringstream opsStream;
-            size_t numOpsInStream = 0;
-            for (const auto& op : result.opsToRetry) {
-                opsStream << (numOpsInStream++ > 0 ? ", " : "") << op.getId();
-            }
-
-            LOGV2_DEBUG(
-                10411404, 4, "re-enqueuing ops that didn't complete", "ops"_attr = opsStream.str());
+    // For "RetryableWriteWithId" batches, if the "hangAfterCompletingWriteWithoutShardKeyWithId"
+    // failpoint is set, call pauseWhileSet().
+    if (response.isRetryableWriteWithId) {
+        auto& fp = getHangAfterCompletingWriteWithoutShardKeyWithIdFailPoint();
+        if (MONGO_unlikely(fp.shouldFail())) {
+            fp.pauseWhileSet();
         }
     }
+
+    // Print the contents of 'opsToRetry' to the log if appropriate.
+    logOpsToRetry(result.opsToRetry);
 
     return result;
 }
@@ -344,15 +443,17 @@ void WriteBatchResponseProcessor::noteRetryableError(OperationContext* opCtx,
 }
 
 void WriteBatchResponseProcessor::queueOpForRetry(const WriteOp& op,
-                                                  boost::optional<const Status&> status,
+                                                  std::set<WriteOp>& toRetry) const {
+    toRetry.emplace(op);
+}
+
+void WriteBatchResponseProcessor::queueOpForRetry(const WriteOp& op,
+                                                  const Status& status,
                                                   std::set<WriteOp>& toRetry,
                                                   CollectionsToCreate& collsToCreate) const {
     toRetry.emplace(op);
 
-    if (status && *status == ErrorCodes::CannotImplicitlyCreateCollection) {
-        auto info = status->extraInfo<CannotImplicitlyCreateCollectionInfo>();
-        tassert(11182204, "Expected to find CannotImplicitlyCreateCollectionInfo", info != nullptr);
-
+    if (auto info = getCannotImplicitlyCreateCollectionInfo(status)) {
         auto nss = info->getNss();
         collsToCreate.emplace(std::move(nss), std::move(info));
     }
@@ -533,19 +634,21 @@ GroupItemsResult WriteBatchResponseProcessor::groupItemsByOp(
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     auto isUnrecoverable = [&](const ItemVariant& itemVar) {
-        const auto code = getErrorCodeForItem(itemVar);
+        const auto code = getErrorCode(itemVar);
         return (code != ErrorCodes::OK &&
                 (inTransaction || (ordered && !write_op_helpers::isRetryErrCode(code))));
     };
 
     // Organize the items from the shard responses by op, and check if any of the items is an
     // unrecoverable error.
-    std::map<WriteOp, std::vector<std::pair<ShardId, ItemVariant>>> itemsByOp;
+    ItemsByOpMap itemsByOp;
     bool unrecoverable = false;
+    bool hasRetryableError = false;
 
     for (const auto& [shardId, shardResult] : shardResults) {
         for (auto& [op, itemVar] : shardResult.items) {
             unrecoverable |= isUnrecoverable(itemVar);
+            hasRetryableError |= isRetryableError(itemVar);
 
             auto it = itemsByOp.find(op);
             if (it != itemsByOp.end()) {
@@ -558,7 +661,7 @@ GroupItemsResult WriteBatchResponseProcessor::groupItemsByOp(
         }
     }
 
-    return GroupItemsResult{std::move(itemsByOp), unrecoverable};
+    return GroupItemsResult{std::move(itemsByOp), unrecoverable, hasRetryableError};
 }
 
 void WriteBatchResponseProcessor::processCountersAndRetriedStmtIds(
@@ -588,7 +691,8 @@ void WriteBatchResponseProcessor::retrieveBulkWriteReplyItems(OperationContext* 
     tassert(11182209, "Expected BulkWriteCommandReply", result.bulkWriteReply.has_value());
     const BulkWriteCommandReply& parsedReply = *result.bulkWriteReply;
 
-    const bool orderedOrInTxn = _cmdRef.getOrdered() || TransactionRouter::get(opCtx);
+    const bool ordered = _cmdRef.getOrdered();
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     // Put all the reply items into a vector and then validate the reply items. Note that if the
     // BulkWriteCommandReply object contains a non-zero cursor ID, exhaustCursorForReplyItems()
@@ -607,7 +711,7 @@ void WriteBatchResponseProcessor::retrieveBulkWriteReplyItems(OperationContext* 
 
     std::vector<WriteOp> opsAfterFinalRetryableError;
     const bool logOpsAfterFinalRetryableError =
-        shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(4));
+        !inTransaction && shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(4));
 
     for (size_t shardOpId = 0; shardOpId < ops.size(); ++shardOpId) {
         const auto& op = ops[shardOpId];
@@ -631,10 +735,10 @@ void WriteBatchResponseProcessor::retrieveBulkWriteReplyItems(OperationContext* 
                     noteRetryableError(opCtx, routingCtx, status);
                 }
 
-                // If 'item' is an error and 'orderedOrInTxn' is true, -OR- if 'item' is a
-                // retryable error and it's the last reply item, then for remaining ops without
+                // If 'item' is an error and 'ordered || inTransaction' is true, -OR- if 'item' is
+                // a retryable error and it's the last reply item, then for remaining ops without
                 // reply items we will assume the ops did not execute.
-                if (orderedOrInTxn || (isRetryableErr && itemIndex >= items.size())) {
+                if (ordered || inTransaction || (isRetryableErr && itemIndex >= items.size())) {
                     finalErrorForBatch = status;
                     finalErrorForBatchIsRetryable = isRetryableErr;
                 }
@@ -722,18 +826,6 @@ void WriteBatchResponseProcessor::validateBulkWriteReplyItems(
 }
 
 namespace {
-std::shared_ptr<const CollectionUUIDMismatchInfo> getCollectionUUIDMismatchInfo(
-    const Status& status) {
-    if (status == ErrorCodes::CollectionUUIDMismatch) {
-        auto info = status.extraInfo<CollectionUUIDMismatchInfo>();
-        tassert(11273500, "Expected to find CollectionUUIDMismatchInfo", info != nullptr);
-
-        return info;
-    }
-
-    return {};
-}
-
 BulkWriteReplyItem getFirstError(const std::vector<BulkWriteReplyItem>& items) {
     tassert(11182216, "Expected vector to contain at least one item", !items.empty());
 

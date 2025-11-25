@@ -100,6 +100,8 @@ inline bool writeTypeSupportsGrouping(WriteType t) {
     return t == WriteType::Ordinary || t == WriteType::WithoutShardKeyWithId;
 }
 
+FailPoint& getHangAfterCompletingWriteWithoutShardKeyWithIdFailPoint();
+
 /**
  * State of a write in-progress (to a single shard) which is one part of a larger write
  * operation.

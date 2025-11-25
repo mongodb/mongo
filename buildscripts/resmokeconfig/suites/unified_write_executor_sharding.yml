@@ -6,60 +6,67 @@ test_kind: js_test
 
 selector:
   roots:
-    - jstests/sharding/internal_txns/**/*.js
-    - jstests/sharding/txn*.js
-    - jstests/noPassthrough/txns_retryable_writes_sessions/**/*.js
-    - jstests/noPassthrough/query/out_merge/**/*.js
-    - jstests/sharding/query/out_merge/**/*.js
-
     # Sharding tests.
-    - jstests/sharding/query/bulk_write_basic.js
     - jstests/sharding/analyze_shard_key/list_sampled_queries.js
+    - jstests/sharding/analyze_shard_key/read_and_write_distribution.js
     - jstests/sharding/analyze_shard_key/sample_rates_bulk_write_multi_namespaces.js
     # - jstests/sharding/applyOps_multiple_namespaces.js
+    - jstests/sharding/batched_writes_with_id_without_shard_key_basic.js
+    - jstests/sharding/batched_writes_with_id_without_shard_key_stale_config.js
     - jstests/sharding/chunk_migration_with_bulk_write.js
     # - jstests/sharding/database_versioning_all_commands.js
+    - jstests/sharding/deleteOne_with_id_without_shard_key_basic.js
+    - jstests/sharding/deleteOne_with_id_without_shard_key_stale_config.js
+    - jstests/sharding/internal_txns/**/*.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_sharded.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_sharded_addl_crud_ops.js
-    - jstests/sharding/timeseries/**/*.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_timeseries.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_unsharded.js
+    - jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
+    - jstests/sharding/migration_blocking_operation/mongos_calls_shardsvr_coordinate_multi_update_command.js
+    - jstests/sharding/migration_blocking_operation/pause_during_multi_updates_cluster_parameter_requires_feature_flag.js
     - jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
-    # TODO: SERVER-103781 try enabling when write without shard key with id supported.
-    # - jstests/sharding/retryable_update_one_by_id_chunk_migration.js
+    - jstests/sharding/query/bulk_write_basic.js
     - jstests/sharding/query/bulk_write_size_limit.js
+    - jstests/sharding/query/collation/*.js
+    - jstests/sharding/query/find_and_modify/*.js
     - jstests/sharding/query/let_rand.js
+    - jstests/sharding/query/out_merge/**/*.js
     # - jstests/sharding/query/update/update_shard_key_bulk_write.js
     # - jstests/sharding/query/update_delete_many_metrics.js
     # - jstests/sharding/read_write_concern_defaults_application.js
-    - jstests/sharding/updateOne_without_shard_key/deleteOne_without_shard_key_basic.js
-    - jstests/sharding/updateOne_without_shard_key/dropping_collection_during_clusterQueryWithoutShardKey_errors.js
-    - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_basic.js
-    - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_sort.js
-    - jstests/sharding/updateOne_without_shard_key/errors.js
-    - jstests/sharding/updateOne_without_shard_key/find_and_modify_without_shard_key_sort.js
-    - jstests/sharding/analyze_shard_key/read_and_write_distribution.js
-    - jstests/noPassthrough/crud/bulk_write_max_replies_size_mongos.js
-    - jstests/noPassthrough/crud/bulk_write_metrics.js
-    - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
-    - jstests/sharding/retryable_writes.js
-    - jstests/sharding/retryable_writes_nested_shard_key.js
+    - jstests/sharding/retryable_update_one_by_id_chunk_migration.js
     - jstests/sharding/retryable_upsert_single_write_shard.js
     - jstests/sharding/retryable_write_error_labels.js
-    - jstests/sharding/query/find_and_modify/*.js
-    - jstests/sharding/query/collation/*.js
+    - jstests/sharding/retryable_writes.js
+    - jstests/sharding/retryable_writes_nested_shard_key.js
+    - jstests/sharding/server_status_crud_metrics_write_without_shard_key_with_id.js
+    - jstests/sharding/swallow_unnecessary_uuid_mismatch_error.js
+    - jstests/sharding/timeseries/**/*.js
+    - jstests/sharding/txn*.js
+    - jstests/sharding/updateOne_with_id_without_shard_key_basic.js
+    - jstests/sharding/updateOne_with_id_without_shard_key_stale_config.js
+    - jstests/sharding/updateOne_without_shard_key/deleteOne_without_shard_key_basic.js
+    - jstests/sharding/updateOne_without_shard_key/dropping_collection_during_clusterQueryWithoutShardKey_errors.js
+    - jstests/sharding/updateOne_without_shard_key/errors.js
+    - jstests/sharding/updateOne_without_shard_key/find_and_modify_without_shard_key_sort.js
+    - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_basic.js
+    - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_sort.js
+    - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
 
     # No passthrough tests.
-    - jstests/noPassthrough/timeseries/**/*.js
-    # - jstests/noPassthrough/crud/bulk_write_currentop.js
+    - jstests/noPassthrough/crud/bulk_write_currentop.js
+    - jstests/noPassthrough/crud/bulk_write_max_replies_size_mongos.js
     - jstests/noPassthrough/crud/bulk_write_metrics.js
     - jstests/noPassthrough/crud/bulk_write_metrics_single_shard.js
-    - jstests/noPassthrough/crud/bulk_write_currentop.js
-    - jstests/noPassthrough/query/current_op/currentop_query.js
-
     # - jstests/noPassthrough/query/command_diagnostics_sharded.js
+    - jstests/noPassthrough/query/current_op/currentop_query.js
+    - jstests/noPassthrough/query/out_merge/**/*.js
     # - jstests/noPassthrough/query/profile/profile_planning_time_stats.js
     # - jstests/noPassthrough/server_parameters/cluster_commands_require_cluster_node.js
+    - jstests/noPassthrough/timeseries/**/*.js
+    - jstests/noPassthrough/txns_retryable_writes_sessions/**/*.js
+
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_bulkwrite_metrics.js
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_log_omit.js
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_log_omit_bulk_write.js
@@ -67,12 +74,6 @@ selector:
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_update_shard_key.js
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_write_concern_errors_unsharded.js
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle_tassert_log_omit.js
-
-    - jstests/sharding/migration_blocking_operation/mongos_calls_shardsvr_coordinate_multi_update_command.js
-    - jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
-    - jstests/sharding/migration_blocking_operation/pause_during_multi_updates_cluster_parameter_requires_feature_flag.js
-
-    - jstests/sharding/swallow_unnecessary_uuid_mismatch_error.js
 
   exclude_files:
     # TODO SERVER-114138: Handle concurrent collection drops with $merge in UWE.

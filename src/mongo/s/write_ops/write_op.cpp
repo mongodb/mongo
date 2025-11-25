@@ -58,10 +58,14 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
-namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterCompletingWriteWithoutShardKeyWithId);
 
+FailPoint& getHangAfterCompletingWriteWithoutShardKeyWithIdFailPoint() {
+    return hangAfterCompletingWriteWithoutShardKeyWithId;
+}
+
+namespace {
 // Aggregate a bunch of errors for a single op together
 write_ops::WriteError combineOpErrors(const std::vector<ChildWriteOp const*>& errOps) {
     auto getStatusCode = [](ChildWriteOp const* item) {

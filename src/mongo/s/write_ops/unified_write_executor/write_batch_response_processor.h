@@ -106,8 +106,13 @@ public:
 
     using CollectionsToCreate = ProcessorResult::CollectionsToCreate;
 
-    using GroupItemsResult =
-        std::pair<std::map<WriteOp, std::vector<std::pair<ShardId, ItemVariant>>>, bool>;
+    using ItemsByOpMap = std::map<WriteOp, std::vector<std::pair<ShardId, ItemVariant>>>;
+
+    struct GroupItemsResult {
+        ItemsByOpMap itemsByOp;
+        bool unrecoverable = false;
+        bool hasRetryableError = false;
+    };
 
     struct ShardResult {
         boost::optional<BulkWriteCommandReply> bulkWriteReply;
@@ -264,11 +269,16 @@ private:
                             const Status& status);
 
     /**
-     * Helper method that adds 'op' to 'toRetry' and also copies CannotImplicityCreateCollection
-     * errors into 'collsToCreate'.
+     * Helper method that adds 'op' to 'toRetry'.
+     */
+    void queueOpForRetry(const WriteOp& op, std::set<WriteOp>& toRetry) const;
+
+    /**
+     * Helper method that adds 'op' to 'toRetry', and extracts CannotImplicityCreateCollectionInfo
+     * from 'status' (if it exists) and stores it into 'collsToCreate'.
      */
     void queueOpForRetry(const WriteOp& op,
-                         boost::optional<const Status&> status,
+                         const Status& status,
                          std::set<WriteOp>& toRetry,
                          CollectionsToCreate& collsToCreate) const;
 
@@ -279,7 +289,8 @@ private:
 
     /**
      * This method scans the items from 'shardResults' and groups the items together by op. This
-     * method also checks if 'shardResults' contains an unrecoverable error.
+     * method also returns a flag indicating if 'shardResults' contains a retryable error, and
+     * another flag indicating if an error occurred that is "unrecoverable".
      */
     GroupItemsResult groupItemsByOp(
         OperationContext* opCtx, std::vector<std::pair<ShardId, ShardResult>>& shardResults) const;

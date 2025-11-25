@@ -39,11 +39,9 @@
 namespace mongo {
 namespace unified_write_executor {
 
-namespace {
-bool analysisTypeSupportsGrouping(AnalysisType writeType) {
-    return writeType == kSingleShard || writeType == kMultiShard;
+bool analysisTypeSupportsGrouping(AnalysisType type) {
+    return type == kSingleShard || type == kMultiShard || type == kRetryableWriteWithId;
 }
-}  // namespace
 
 template <bool Ordered>
 class SimpleBatchBuilderBase {
@@ -80,16 +78,25 @@ public:
      */
     bool isCompatibleWithBatch(NamespaceString nss, Analysis& analysis) const {
         const auto& endpoints = analysis.shardsAffected;
-        // If the op's type is not compatible with SimpleBatch, return false.
-        if (!analysisTypeSupportsGrouping(analysis.type)) {
+        const AnalysisType& analysisType = analysis.type;
+        const bool opIsRetryableWriteWithId = analysisType == kRetryableWriteWithId;
+
+        // If op's analysis type doesn't support grouping, return false.
+        if (!analysisTypeSupportsGrouping(analysisType)) {
             return false;
         }
+
+        // If op isn't compatible with the current batch's type, return false.
+        if (_batch && (opIsRetryableWriteWithId != _batch->isRetryableWriteWithId)) {
+            return false;
+        }
+
         // Verify that there is at least one endpoint. Also, if this op is kSingleShard, verify
         // that there's exactly one endpoint.
         tassert(10896511, "Expected at least one affected shard", !endpoints.empty());
         tassert(10896512,
-                "Single shard write type should only target a single shard",
-                analysis.type != kSingleShard || endpoints.size() == 1);
+                "Single shard op should only target a single shard",
+                analysisType != kSingleShard || endpoints.size() == 1);
         // If the current batch is empty, return true.
         if (!_batch || _batch->requestByShardId.empty()) {
             return true;
@@ -98,7 +105,7 @@ public:
         // current batch targets multiple shards, or the op and the current batch target different
         // shards, then return false.
         if (Ordered &&
-            (analysis.type != kSingleShard || _batch->requestByShardId.size() > 1 ||
+            (endpoints.size() > 1 || _batch->requestByShardId.size() > 1 ||
              endpoints.front().shardName != _batch->requestByShardId.begin()->first)) {
             return false;
         }
@@ -136,17 +143,23 @@ public:
     }
 
     /**
-     * Adds 'writeOp' to the current batch. This method will fail with a tassert if writeOp's type
-     * is not compatible with SimpleWriteBatch.
+     * Adds 'writeOp' to the current batch. This method will fail with a tassert if the op's
+     * analysis type is not compatible with the current batch.
      */
     void addOp(WriteOp& writeOp, Analysis& analysis) {
+        const AnalysisType& analysisType = analysis.type;
+        const bool opIsRetryableWriteWithId = analysisType == kRetryableWriteWithId;
         tassert(10896513,
-                "Expected op to be compatible with SimpleWriteBatch",
-                analysisTypeSupportsGrouping(analysis.type));
+                "Expected op's analysis type to support grouping",
+                analysisTypeSupportsGrouping(analysisType));
 
         if (!_batch) {
-            _batch.emplace();
+            _batch = SimpleWriteBatch::makeEmpty(opIsRetryableWriteWithId);
         }
+
+        tassert(10378100,
+                "Expected op's type to be compatible with batch",
+                opIsRetryableWriteWithId == _batch->isRetryableWriteWithId);
 
         for (const auto& shard : analysis.shardsAffected) {
             auto nss = writeOp.getNss();
@@ -212,6 +225,10 @@ protected:
      */
     bool wasShardAlreadyTargetedWithDifferentShardVersion(NamespaceString nss,
                                                           Analysis& analysis) const {
+        if (!_batch) {
+            return false;
+        }
+
         for (const auto& shard : analysis.shardsAffected) {
             auto it = _batch->requestByShardId.find(shard.shardName);
             if (it != _batch->requestByShardId.end()) {
@@ -241,12 +258,14 @@ protected:
 
 class OrderedSimpleBatchBuilder : public SimpleBatchBuilderBase<true> {
 public:
-    using SimpleBatchBuilderBase::SimpleBatchBuilderBase;
+    using BaseT = SimpleBatchBuilderBase<true>;
+    using BaseT::BaseT;
 };
 
 class UnorderedSimpleBatchBuilder : public SimpleBatchBuilderBase<false> {
 public:
-    using SimpleBatchBuilderBase::SimpleBatchBuilderBase;
+    using BaseT = SimpleBatchBuilderBase<false>;
+    using BaseT::BaseT;
 };
 
 void WriteOpBatcher::markBatchReprocess(WriteBatch batch) {
@@ -365,14 +384,14 @@ BatcherResult OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
                             *writeOp, std::move(sampleId), analysis.isViewfulTimeseries}},
                         std::move(opsWithErrors)};
             }
-            // If the first WriteOp is kMultiShard, then add the op to a SimpleBatch and then break
-            // and return the batch.
-            if (analysis.type == kMultiShard) {
+            // If the first WriteOp is kMultiShard or kRetryableWriteWithId, then start a new
+            // SimpleWriteBatch, add the op to the batch, and break and return the batch.
+            if (analysis.type != kSingleShard) {
                 builder.addOp(*writeOp, analysis);
                 break;
             }
-            // If the op is kSingleShard, then add the op to a SimpleBatch and keep looping to see
-            // if more ops can be added to the batch.
+            // If the op is kSingleShard, then start a new SimpleWriteBatch and add the op to the
+            // batch, and keep looping to see if more ops can be added to the batch.
             builder.addOp(*writeOp, analysis);
         }
     }
@@ -505,8 +524,9 @@ BatcherResult UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
                             writeOp, std::move(sampleId), analysis.isViewfulTimeseries}},
                         std::move(opsWithErrors)};
             }
-            // If the op is kSingleShard or kMultiShard, then add the op to a SimpleBatch and keep
-            // looping to see if more ops can be added to the batch.
+            // If the op is kSingleShard or kMultiShard or kRetryableWriteWithId, then start a new
+            // SimpleWriteBatch and add the op to the batch, and keep looping to see if more ops can
+            // be added to the batch.
             builder.addOp(writeOp, analysis);
         }
     }

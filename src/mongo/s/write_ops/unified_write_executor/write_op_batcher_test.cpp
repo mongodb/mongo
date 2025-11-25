@@ -434,9 +434,11 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherBatchesQuaruntineOp
         {0, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries}},
         {1, Analysis{kTwoPhaseWrite, {nss0Shard0}, nss0IsViewfulTimeseries}},
         {2, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries}},
-        {3, Analysis{kInternalTransaction, {nss0Shard0}}},
+        {3, Analysis{kInternalTransaction, {nss0Shard0}, nss0IsViewfulTimeseries}},
         {4, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries}},
-        {5, Analysis{kMultiWriteBlockingMigrations, {nss0Shard0, nss0Shard1}}},
+        {5,
+         Analysis{
+             kMultiWriteBlockingMigrations, {nss0Shard0, nss0Shard1}, nss0IsViewfulTimeseries}},
     });
 
     auto routingCtx = RoutingContext::createSynthetic({});
@@ -925,9 +927,11 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherBatchesQuarunti
         {3, Analysis{kTwoPhaseWrite, {nss0Shard0, nss0Shard1}, nss0IsViewfulTimeseries}},
         {4, Analysis{kTwoPhaseWrite, {nss0Shard0, nss0Shard1}, nss0IsViewfulTimeseries}},
         {5, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries}},
-        {6, Analysis{kInternalTransaction, {nss0Shard0}}},
+        {6, Analysis{kInternalTransaction, {nss0Shard0}, nss0IsViewfulTimeseries}},
         {7, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries}},
-        {8, Analysis{kMultiWriteBlockingMigrations, {nss0Shard0, nss0Shard1}}},
+        {8,
+         Analysis{
+             kMultiWriteBlockingMigrations, {nss0Shard0, nss0Shard1}, nss0IsViewfulTimeseries}},
     });
 
     auto routingCtx = RoutingContext::createSynthetic({});
