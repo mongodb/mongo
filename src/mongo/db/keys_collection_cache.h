@@ -35,6 +35,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <string>

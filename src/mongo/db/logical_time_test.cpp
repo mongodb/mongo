@@ -39,6 +39,7 @@
 #include "mongo/db/time_proof_service.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 

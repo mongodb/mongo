@@ -37,6 +37,7 @@ structs:
         description: >-
             Contains the fields shared by key documents stored in admin.system.keys and
             config.external_validation_keys.
+        mod_visibility: needs_replacement
         strict: true
         fields:
             purpose:
@@ -52,6 +53,7 @@ structs:
     keysCollectionDocument:
         description: >-
             Represents a key document stored in admin.system.keys.
+        mod_visibility: needs_replacement
         strict: true
         inline_chained_structs: true
         chained_structs:
@@ -66,6 +68,7 @@ structs:
     externalKeysCollectionDocument:
         description: >-
             Represents a key document stored in config.external_validation_keys.
+        mod_visibility: needs_replacement
         strict: true
         inline_chained_structs: true
         chained_structs:

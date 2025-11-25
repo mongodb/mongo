@@ -34,6 +34,7 @@
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 
@@ -47,7 +48,7 @@ namespace mongo {
  * and contains the logic to generate this key. As a performance optimization to avoid expensive
  * signature generation the class also holds the cache.
  */
-class TimeProofService {
+class MONGO_MOD_NEEDS_REPLACEMENT TimeProofService {
 public:
     // This type must be synchronized with the library that generates SHA1 or other proof.
     using TimeProof = SHA1Block;
@@ -58,22 +59,22 @@ public:
     /**
      * Generates a pseudorandom key to be used for HMAC authentication.
      */
-    static Key generateRandomKey();
+    MONGO_MOD_NEEDS_REPLACEMENT static Key generateRandomKey();
 
     /**
      * Returns the proof matching the time argument.
      */
-    TimeProof getProof(LogicalTime time, const Key& key);
+    MONGO_MOD_PRIVATE TimeProof getProof(LogicalTime time, const Key& key);
 
     /**
      * Verifies that the proof matches the time argument.
      */
-    Status checkProof(LogicalTime time, const TimeProof& proof, const Key& key);
+    MONGO_MOD_PRIVATE Status checkProof(LogicalTime time, const TimeProof& proof, const Key& key);
 
     /**
      * Resets the cache.
      */
-    void resetCache();
+    MONGO_MOD_PRIVATE void resetCache();
 
 private:
     /**

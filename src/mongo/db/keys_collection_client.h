@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/keys_collection_document_gen.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
@@ -41,7 +42,7 @@ class BSONObj;
 class LogicalTime;
 class OperationContext;
 
-class KeysCollectionClient {
+class MONGO_MOD_NEEDS_REPLACEMENT KeysCollectionClient {
 public:
     virtual ~KeysCollectionClient() = default;
 
@@ -50,7 +51,7 @@ public:
      * clusters that this node is in) that match the given purpose and have an expiresAt value
      * greater than newerThanThis. Uses readConcern level majority if possible.
      */
-    virtual StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
+    MONGO_MOD_PRIVATE virtual StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
         StringData purpose,
         const LogicalTime& newerThanThis,
@@ -60,19 +61,19 @@ public:
      * Returns all external keys (validation-only keys copied from other clusters) that match the
      * given purpose.
      */
-    virtual StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
-        OperationContext* opCtx, StringData purpose) = 0;
+    MONGO_MOD_PRIVATE virtual StatusWith<std::vector<ExternalKeysCollectionDocument>>
+    getAllExternalKeys(OperationContext* opCtx, StringData purpose) = 0;
 
     /**
      * Directly inserts a key document to the storage
      */
-    virtual Status insertNewKey(OperationContext* opCtx, const BSONObj& doc) = 0;
+    MONGO_MOD_PRIVATE virtual Status insertNewKey(OperationContext* opCtx, const BSONObj& doc) = 0;
 
     /**
      * Returns true if the client can only read with local read concern, which means keys read by a
      * refresh may be rolled back.
      */
-    virtual bool mustUseLocalReads() const = 0;
+    MONGO_MOD_PRIVATE virtual bool mustUseLocalReads() const = 0;
 };
 
 }  // namespace mongo

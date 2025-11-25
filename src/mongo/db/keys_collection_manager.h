@@ -43,6 +43,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>
@@ -74,7 +75,8 @@ Milliseconds howMuchSleepNeedFor(const LogicalTime& currentTime,
  * HMAC computation. It maintains an internal background thread that is used to periodically
  * refresh the local key cache against the keys collection stored on the config servers.
  */
-class KeysCollectionManager {
+// TODO This class should be parent_private ideally
+class MONGO_MOD_NEEDS_REPLACEMENT KeysCollectionManager {
 public:
     static const unsigned kReadConcernMajorityNotAvailableYetMaxTries;
     static const Milliseconds kRefreshIntervalIfErrored;

@@ -44,6 +44,7 @@
 #include "mongo/db/rs_local_client.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -57,7 +58,7 @@ class OperationContext;
 class LogicalTime;
 class BSONObj;
 
-class KeysCollectionClientDirect : public KeysCollectionClient {
+class MONGO_MOD_NEEDS_REPLACEMENT KeysCollectionClientDirect : public KeysCollectionClient {
 public:
     KeysCollectionClientDirect(bool mustUseLocalReads);
 
@@ -65,7 +66,7 @@ public:
      * Returns internal keys for the given purpose and have an expiresAt value greater than
      * newerThanThis. Uses readConcern level majority if possible.
      */
-    StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
+    MONGO_MOD_PRIVATE StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
         StringData purpose,
         const LogicalTime& newerThanThis,
@@ -74,19 +75,19 @@ public:
     /**
      * Returns all external (i.e. validation-only) keys for the given purpose.
      */
-    StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
+    MONGO_MOD_PRIVATE StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
         OperationContext* opCtx, StringData purpose) override;
 
     /**
      * Directly inserts a key document to the storage
      */
-    Status insertNewKey(OperationContext* opCtx, const BSONObj& doc) override;
+    MONGO_MOD_PRIVATE Status insertNewKey(OperationContext* opCtx, const BSONObj& doc) override;
 
     /**
      * Returns true if getNewKeys always uses readConcern level:local, so the documents returned can
      * be rolled back.
      */
-    bool mustUseLocalReads() const final {
+    MONGO_MOD_PRIVATE bool mustUseLocalReads() const final {
         return _mustUseLocalReads;
     }
 

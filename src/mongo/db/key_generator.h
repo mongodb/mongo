@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

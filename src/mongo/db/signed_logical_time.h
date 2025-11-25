@@ -31,6 +31,7 @@
 
 #include "mongo/db/logical_time.h"
 #include "mongo/db/time_proof_service.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <utility>
@@ -44,7 +45,8 @@ namespace mongo {
  * The SignedLogicalTime class is a pair of value i.e. time and a signature i.e. _proof
  * The class is immutable and is used to hold the cryptographically protected LogicalTime.
  */
-class SignedLogicalTime {
+// TODO This class should be parent_private ideally
+class MONGO_MOD_NEEDS_REPLACEMENT SignedLogicalTime {
 public:
     using TimeProof = TimeProofService::TimeProof;
 

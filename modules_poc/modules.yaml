@@ -93,6 +93,7 @@ core.service:
     - src/mongo/db/commands/test_deprecation_command.cpp
     - src/mongo/db/s/forwardable_operation_metadata*
     - src/mongo/embedded
+    - src/mongo/db/logical_time.*
 
 # stuff that is part of a *specific* mongo server (eg mongos, mongod)
 core.servers:
@@ -490,15 +491,16 @@ field_level_encryption.crypt_shared:
   files:
     - src/mongo/db/modules/enterprise/src/fle/lib
 
-causal_consistency:
+catalog_and_routing.topology.causal_consistency:
   meta:
     slack: server-sharding
     jira: Cluster Scalability
   files:
     - src/mongo/db/keys_collection*
     - src/mongo/db/key_generator*
-    - src/mongo/db/*logical_time*
+    - src/mongo/db/logical_time_*
     - src/mongo/db/time_proof_service*
+    - src/mongo/db/signed_logical_time*
 
 data_movement:
   meta:

@@ -35,6 +35,7 @@ server_parameters:
             Specifies the number of seconds for which an HMAC signing key is valid before
             rotating to the next one. This parameter is intended primarily to facilitate
             authentication testing.
+        mod_visibility: needs_replacement
         set_at: [startup]
         cpp_vartype: int
         cpp_varname: KeysRotationIntervalSec

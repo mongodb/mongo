@@ -37,6 +37,7 @@
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -51,7 +52,7 @@ class KeysCollectionManager;
  * This is responsible for signing cluster times that can be used to sent to other servers and
  * verifying signatures of signed cluster times.
  */
-class LogicalTimeValidator {
+class MONGO_MOD_NEEDS_REPLACEMENT LogicalTimeValidator {
 public:
     // Decorate ServiceContext with LogicalTimeValidator instance.
     static std::shared_ptr<LogicalTimeValidator> get(ServiceContext* service);
