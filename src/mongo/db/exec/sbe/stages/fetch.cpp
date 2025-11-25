@@ -268,6 +268,7 @@ PlanState FetchStage::getNext() {
                 seekTag == value::TypeTags::RecordId);
 
         _seekRid = *value::getRecordIdView(seekVal);
+        tassert(11430201, "Cursor must not be null", _cursor);
         record = _cursor->seekExact(_seekRid);
         if (!record) {
             if (_state->scanCallbacks.indexKeyCorruptionCheckCallback) {
