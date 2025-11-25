@@ -5628,6 +5628,7 @@ ReadPreference ReplicationCoordinatorImpl::_getSyncSourceReadPreference(WithLock
     // Always allow chaining while in catchup and drain mode.
     auto memberState = _getMemberState_inlock();
     ReadPreference readPreference = ReadPreference::Nearest;
+    const auto& config = _rsConfig.unsafePeek();
 
     bool parsedSyncSourceFromInitialSync = false;
     // Handle special case of initial sync source read preference.
@@ -5643,7 +5644,7 @@ ReadPreference ReplicationCoordinatorImpl::_getSyncSourceReadPreference(WithLock
             } catch (const DBException& e) {
                 fassertFailedWithStatus(3873100, e.toStatus());
             }
-        } else if (_rsConfig.unsafePeek().getMemberAt(_selfIndex).getNumVotes() > 0) {
+        } else if (config.getMemberAt(_selfIndex).getNumVotes() > 0) {
             // Voting nodes prefer to sync from the primary.  A voting node that is initial syncing
             // may have acknowledged writes which are part of the set's write majority; if it then
             // resyncs from a node which does not have those writes, and (before it replicates them
@@ -5653,12 +5654,28 @@ ReadPreference ReplicationCoordinatorImpl::_getSyncSourceReadPreference(WithLock
             readPreference = ReadPreference::PrimaryPreferred;
         }
     }
-    if (!parsedSyncSourceFromInitialSync && !memberState.primary() &&
-        !_rsConfig.unsafePeek().isChainingAllowed() &&
-        !enableOverrideClusterChainingSetting.load()) {
-        // If we are not the primary and chaining is disabled in the config (without overrides), we
-        // should only be syncing from the primary.
-        readPreference = ReadPreference::PrimaryOnly;
+
+    // Prevent chaining if chaining is not allowed.
+    if (parsedSyncSourceFromInitialSync || config.isChainingAllowed() ||
+        enableOverrideClusterChainingSetting.load()) {
+        // No update to read preference necessary.
+
+    } else if (!memberState.primary()) {
+        // SERVER-105416: If we are the only electable node, then we need to be able to sync from
+        // secondaries.
+        // Otherwise, if we are not the primary and chaining is disabled in the config (without
+        // overrides), we should only sync from the primary.
+        const bool isElectable =
+            !memberState.removed() && config.getMemberAt(_selfIndex).isElectable();
+        const bool isOnlyElectableNode = isElectable &&
+            std::count_if(config.membersBegin(), config.membersEnd(), [](const auto& m) -> bool {
+                return m.isElectable();
+            }) == 1;
+        if (isOnlyElectableNode) {
+            // Allow syncing from secondaries regardless of whether chaining is allowed.
+        } else {
+            readPreference = ReadPreference::PrimaryOnly;
+        }
     }
     return readPreference;
 }
