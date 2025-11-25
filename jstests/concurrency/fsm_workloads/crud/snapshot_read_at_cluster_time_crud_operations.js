@@ -42,20 +42,14 @@ export const $config = (function () {
             } else {
                 // The killOp() function below may cause Interrupted or CursorNotFound here, or the
                 // end of the test may cause ShutdownInProgress.
-                doSnapshotGetMoreAtClusterTime(
-                    db,
-                    collName,
-                    this,
-                    [...interruptedQueryErrors, ErrorCodes.ShutdownInProgress],
-                    (res) => {
-                        let expectedDocs = [...Array(this.batchSize).keys()].map((i) => ({
-                            _id: i + this.numDocScanned,
-                            x: 1,
-                        }));
-                        assert.eq(res.cursor.nextBatch, expectedDocs, () => tojson(res));
-                        this.numDocScanned = this.numDocScanned + this.batchSize;
-                    },
-                );
+                doSnapshotGetMoreAtClusterTime(db, collName, this, interruptedQueryErrors, (res) => {
+                    let expectedDocs = [...Array(this.batchSize).keys()].map((i) => ({
+                        _id: i + this.numDocScanned,
+                        x: 1,
+                    }));
+                    assert.eq(res.cursor.nextBatch, expectedDocs, () => tojson(res));
+                    this.numDocScanned = this.numDocScanned + this.batchSize;
+                });
             }
         },
 

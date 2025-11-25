@@ -195,7 +195,8 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         return (
             res &&
             (res.code == ErrorCodes.LinearizableReadConcernError ||
-                (TestData.runningWithShardStepdowns && interruptedQueryErrors.includes(res.code)))
+                ((TestData.runningWithShardStepdowns || TestData.killShards) &&
+                    interruptedQueryErrors.includes(res.code)))
         );
     };
 

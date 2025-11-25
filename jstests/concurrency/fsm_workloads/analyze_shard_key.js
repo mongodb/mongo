@@ -1120,7 +1120,9 @@ export const $config = extendWorkload(kBaseConfig, function ($config, $super) {
         // the filtering metadata which would be used for the cursor. Interrupts such as
         // stepdowns can cause a getMore command get fail as a result of the cursor being killed.
         this.expectedAggregateInterruptErrors =
-            cluster.isSharded() && TestData.runningWithShardStepdowns ? interruptedQueryErrors : [];
+            cluster.isSharded() && (TestData.runningWithShardStepdowns || TestData.killShards)
+                ? interruptedQueryErrors
+                : [];
 
         this.generateShardKeyOptions(cluster);
         this.generateDocumentOptions(cluster);

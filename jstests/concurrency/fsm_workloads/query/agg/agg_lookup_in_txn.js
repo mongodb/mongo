@@ -57,10 +57,10 @@ export const $config = (function () {
 
                     arr = cursor.toArray();
                 } catch (e) {
-                    // When running with stepdowns or with balancer, we expect to sometimes see
+                    // When running with stepdowns, balancer or shards killed, we expect to sometimes see
                     // the query killed.
                     const isExpectedError =
-                        (TestData.runningWithShardStepdowns || TestData.runningWithBalancer) &&
+                        (TestData.runningWithShardStepdowns || TestData.runningWithBalancer || TestData.killShards) &&
                         interruptedQueryErrors.includes(e.code);
                     if (!isExpectedError) {
                         throw e;

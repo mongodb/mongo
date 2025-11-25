@@ -23,7 +23,7 @@ export const $config = (function () {
 
     const states = {
         snapshotScan: function snapshotScan(db, collName) {
-            const readErrorCodes = [...interruptedQueryErrors, ErrorCodes.ShutdownInProgress];
+            const readErrorCodes = interruptedQueryErrors;
             if (!this.cursorId || this.cursorId == 0) {
                 doSnapshotFindAtClusterTime(db, collName, this, readErrorCodes, {a: 1});
             } else {

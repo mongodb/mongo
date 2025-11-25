@@ -6,9 +6,20 @@
  * Workloads that issue queries requiring multiple batches or sharded execution plans should detect
  * these errors and ensure that they do not get reported as test failures.
  */
-export var interruptedQueryErrors = [
-    ErrorCodes.CursorNotFound,
-    ErrorCodes.CursorKilled,
-    ErrorCodes.Interrupted,
-    ErrorCodes.QueryPlanKilled,
-];
+export const interruptedQueryErrors = (() => {
+    let errors = [
+        ErrorCodes.CursorNotFound,
+        ErrorCodes.CursorKilled,
+        ErrorCodes.Interrupted,
+        ErrorCodes.QueryPlanKilled,
+    ];
+
+    // Test suites that kill shards may run into these additional errors that can occur during
+    // instance shutdown.
+    if (TestData.killShards) {
+        errors.push(ErrorCodes.InterruptedAtShutdown);
+        errors.push(ErrorCodes.CallbackCanceled);
+        errors.push(ErrorCodes.ShutdownInProgress);
+    }
+    return errors;
+})();
