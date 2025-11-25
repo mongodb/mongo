@@ -29,44 +29,56 @@
 
 #pragma once
 
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
 namespace mongo {
 /**
- * An "OutOfLineExecutor" that actually runs on the same thread of execution
- * This executor is not thread-safe, and accessing it by multiple threads is prohibited.
- * Multi-threaded accesses to instances of "InlineQueuedCountingExecutor" result in undefined
- * behavior.
+ * An "OutOfLineExecutor" that actually runs on the same thread of execution. This executor is
+ * thread-safe, but not scalable: at most one thread will execute tasks at a time, and it may be the
+ * thread that added the task.
+ *
+ * This is meant to simplify testing when it is important to have an executor that can handle tasks
+ * being added as a result of the execution of other tasks, but multiple threads are not actually
+ * needed.
  */
 class MONGO_MOD_USE_REPLACEMENT(other OutOfLineExecutors) InlineQueuedCountingExecutor
     : public OutOfLineExecutor {
 public:
     void schedule(Task task) override {
-        // Add the task to our queue
-        taskQueue.emplace_back(std::move(task));
-
-        // Make sure that we are not invocing a Task while invocing a Task. Some OutOfLineExecutors
-        // do recursively dispatch Tasks, however, they also carefully monitor stack depth. For the
-        // purposes of testing, let's serialize our Tasks. One Task runs at a time.
-        if (std::exchange(inSchedule, true)) {
-            return;
+        {
+            stdx::lock_guard lock(_mutex);
+            // Add the task to our queue
+            _taskQueue.emplace_back(std::move(task));
+            // Make sure that we are not invoking a Task while invoking a Task. Some
+            // OutOfLineExecutors do recursively dispatch Tasks, however, they also carefully
+            // monitor stack depth. For the purposes of testing, let's serialize our Tasks. One Task
+            // runs at a time.
+            if (std::exchange(_inSchedule, true)) {
+                return;
+            }
         }
 
-        ON_BLOCK_EXIT([this] {
-            // Admit we're not working on the queue anymore
-            inSchedule = false;
-        });
-
         // Clear out our queue
-        while (!taskQueue.empty()) {
-            auto task = std::move(taskQueue.front());
-
-            // Relaxed to avoid adding synchronization where there otherwise wouldn't be. That would
-            // cause a false negative from TSAN.
+        while (true) {
+            Task task_to_run;
+            {
+                stdx::lock_guard lock(_mutex);
+                if (_taskQueue.empty()) {
+                    _inSchedule = false;
+                    break;
+                }
+                task_to_run = std::move(_taskQueue.front());
+                _taskQueue.pop_front();
+            }
+            // Relaxed to avoid adding synchronization where there otherwise wouldn't be. That
+            // would cause a false negative from TSAN.
             tasksRun.fetch_add(1, std::memory_order_relaxed);
-            task(Status::OK());
-            taskQueue.pop_front();
+            // Allow more to be added while we run the current task. Note: we want to destroy the
+            // current task before checking for more in case the current task's destructor adds more
+            // tasks.
+            task_to_run(Status::OK());
         }
     }
 
@@ -74,10 +86,12 @@ public:
         return std::make_shared<InlineQueuedCountingExecutor>();
     }
 
-    bool inSchedule;
-
-    std::deque<Task> taskQueue;
     std::atomic<uint32_t> tasksRun{0};  // NOLINT
+private:
+    stdx::mutex _mutex;
+    // Whether or not a task is currently being run.
+    bool _inSchedule = false;
+    std::deque<Task> _taskQueue;
 };
 
 class InlineRecursiveCountingExecutor final : public OutOfLineExecutor {
