@@ -73,28 +73,24 @@ public:
         std::filesystem::remove_all(dirname);
     }
 
-    auto createRecordingFile() {
+    PacketWriter createRecordingFile() {
         auto filename = std::filesystem::path(dirname);
         filename /= std::to_string(fileCounter++);
         filename += ".bin";
-        auto os = std::ofstream(filename.string(), std::ios_base::binary | std::ios_base::out);
-        invariant(os.is_open());
-        return os;
+        auto out = PacketWriter();
+        out.open(filename.string());
+        invariant(out.is_open());
+        return out;
     }
 
-    void appendToRecording(std::ofstream& os, TrafficRecordingPacket packet) {
+    void appendToRecording(PacketWriter& pw, TrafficRecordingPacket packet) {
         // Store the packet in-memory, for validation.
         writtenPackets.push_back(packet);
-
-        DataBuilder db;
-        appendPacketHeader(db, packet);
-        // Write out the serialised packet.
-        os.write(db.getCursor().data(), db.size());
-        os.write(packet.message.buf(), packet.message.size());
+        pw.writePacket(packet);
     }
 
-    void appendTestPacket(std::ofstream& os) {
-        appendToRecording(os,
+    void appendTestPacket(PacketWriter& pw) {
+        appendToRecording(pw,
                           {.id = 1,
                            .session = "test-session",
                            .offset = tsm.ticksTo<Microseconds>(tsm.getTicks()),

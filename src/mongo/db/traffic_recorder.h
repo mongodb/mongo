@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/data_builder.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/traffic_recorder/utils/task_scheduler.h"
@@ -50,6 +51,7 @@
 #include <queue>
 #include <string>
 
+#include <boost/filesystem/fstream.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 
@@ -72,8 +74,38 @@ struct TrafficRecordingPacket {
 };
 
 class DataBuilder;
-void appendPacketHeader(DataBuilder& builder, const TrafficRecordingPacket& packet);
 
+class PacketWriter {
+public:
+    PacketWriter(uint64_t maxFileSize = 0) : maxFileSize(maxFileSize) {}
+    void open(boost::filesystem::path path);
+
+    void close();
+
+    bool is_open() const;
+
+    absl::crc32c_t getChecksum() const;
+
+    uint64_t getCurrentFileSize() const;
+
+    bool writePacket(const TrafficRecordingPacket& packet);
+
+    operator bool() const {
+        return bool(out);
+    }
+
+private:
+    static void serializeHeaderForPacket(DataBuilder& db, const TrafficRecordingPacket& packet);
+    void write(const char* data, size_t len);
+
+    uint64_t currentFileBytesWritten = 0;
+
+    DataBuilder db;
+    boost::filesystem::ofstream out;
+    absl::crc32c_t checksum{0};
+
+    uint64_t maxFileSize = 0;
+};
 
 /**
  * A service context level global which captures packet capture through the transport layer if it is

@@ -34,17 +34,13 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_type_terminated.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/util/stop_token.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/traffic_recorder.h"
 #include "mongo/db/traffic_recorder_gen.h"
@@ -54,7 +50,6 @@
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
@@ -65,15 +60,13 @@
 #include "mongo/util/uuid.h"
 
 #include <chrono>
-#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <exception>
 #include <filesystem>
-#include <limits>
+#include <ios>
 #include <memory>
-#include <queue>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -105,8 +98,55 @@ static std::vector<std::pair<transport::SessionId, std::string>> getActiveSessio
     return openSessions;
 }
 
-void appendPacketHeader(DataBuilder& db, const TrafficRecordingPacket& packet) {
+void PacketWriter::open(boost::filesystem::path path) {
+    out.open(path, std::ios_base::binary | std::ios_base::trunc | std::ios_base::out);
+    out.exceptions(std::ios_base::failbit | std::ofstream::badbit | std::ofstream::eofbit);
+}
+
+void PacketWriter::close() {
+    if (out.is_open()) {
+        out.close();
+        checksum = absl::crc32c_t(0);
+        currentFileBytesWritten = 0;
+    }
+}
+
+bool PacketWriter::is_open() const {
+    return out.is_open();
+}
+
+absl::crc32c_t PacketWriter::getChecksum() const {
+    return checksum;
+}
+
+uint64_t PacketWriter::getCurrentFileSize() const {
+    return currentFileBytesWritten;
+}
+
+bool PacketWriter::writePacket(const TrafficRecordingPacket& packet) {
     db.clear();
+    // Serialise header into in-memory buffer.
+    serializeHeaderForPacket(db, packet);
+    Message toWrite = packet.message;
+
+    const auto size = db.size() + toWrite.size();
+
+    if (currentFileBytesWritten != 0 && maxFileSize != 0 &&
+        currentFileBytesWritten + size > maxFileSize) {
+        // Try to limit files to the requested size, but if a single packet exceeds the
+        // limit by itself allow the file to grow beyond the limit.
+        return false;
+    }
+
+    currentFileBytesWritten += size;
+
+    // Write out the data to disk.
+    write(db.getCursor().data(), db.size());
+    write(toWrite.buf(), toWrite.size());
+    return true;
+}
+
+void PacketWriter::serializeHeaderForPacket(DataBuilder& db, const TrafficRecordingPacket& packet) {
     Message toWrite = packet.message;
 
     uassertStatusOK(db.writeAndAdvance<LittleEndian<uint32_t>>(0));
@@ -120,6 +160,13 @@ void appendPacketHeader(DataBuilder& db, const TrafficRecordingPacket& packet) {
     auto fullSize = db.size() + packet.message.size();
     db.getCursor().write<LittleEndian<uint32_t>>(fullSize);
 }
+
+
+void PacketWriter::write(const char* data, size_t len) {
+    out.write(data, len);
+    absl::ExtendCrc32c(checksum, {data, len});
+}
+
 
 TrafficRecorder::RecordingID generateID() {
     return UUID::gen().toString();
@@ -179,19 +226,23 @@ void TrafficRecorder::Recording::start() {
         boost::filesystem::ofstream checksumOut(checksumFile,
                                                 std::ios_base::app | std::ios_base::out);
 
-        // The calculator calculates the checksum of each recording for integrity check.
-        absl::crc32c_t checksum{0};
-        auto writeChecksum = [&checksumOut, &checksum](const std::string& recordingFile) {
-            fmt::print(checksumOut, "{}\t{:x}\n", recordingFile, static_cast<uint32_t>(checksum));
-            checksum = absl::crc32c_t{0};
+        boost::filesystem::path recordingFile;
+        PacketWriter writer(_maxLogSize);
+
+        auto writeChecksum = [&] {
+            fmt::print(checksumOut,
+                       "{}\t{:x}\n",
+                       recordingFile.string(),
+                       static_cast<uint32_t>(writer.getChecksum()));
         };
 
         // This function guarantees to open a new recording file. Force the thread to sleep for
         // a very short period of time if a file with the same name exists and then create a new
         // file. This case is rare and only happens when the 'maxFileSize' is too small. The
         // same recording file could be opened twice within 1 millisecond.
-        auto openNewRecordingFile = [this](boost::filesystem::path& recordingFile,
-                                           boost::filesystem::ofstream& out) {
+        auto openNewRecordingFile = [&] {
+            writeChecksum();
+            writer.close();
             recordingFile = boost::filesystem::absolute(_path);
             recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
             recordingFile += ".bin";
@@ -201,14 +252,11 @@ void TrafficRecorder::Recording::start() {
                 recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
                 recordingFile += ".bin";
             }
-            out.open(recordingFile,
-                     std::ios_base::binary | std::ios_base::trunc | std::ios_base::out);
+            writer.open(recordingFile);
         };
-        boost::filesystem::path recordingFile;
-        boost::filesystem::ofstream out;
+
         try {
-            DataBuilder db;
-            openNewRecordingFile(recordingFile, out);
+            openNewRecordingFile();
 
             while (true) {
                 std::deque<TrafficRecordingPacket> storage;
@@ -216,50 +264,30 @@ void TrafficRecorder::Recording::start() {
 
                 std::tie(storage, bytes) = consumer.popManyUpTo(MaxMessageSizeBytes);
 
-                // if this fired... somehow we got a message bigger than a message
+                // If pop returned nothing, the next message is beyond MaxMessageSizeBytes
+                // which should not be possible.
                 invariant(bytes);
 
                 for (const auto& packet : storage) {
-                    appendPacketHeader(db, packet);
-                    Message toWrite = packet.message;
-
-                    auto size = db.size() + toWrite.size();
-
-                    bool maxSizeExceeded = false;
+                    if (!writer.writePacket(packet)) {
+                        openNewRecordingFile();
+                        uassert(10670200,
+                                "Failed to write packet in new file",
+                                writer.writePacket(packet));
+                    }
 
                     {
                         stdx::lock_guard<stdx::mutex> lk(_mutex);
-                        _written += size;
-                        maxSizeExceeded = _written >= _maxLogSize;
+                        // Track written bytes for stats.
+                        _written = writer.getCurrentFileSize();
                     }
-
-                    if (maxSizeExceeded) {
-                        writeChecksum(recordingFile.string());
-                        out.close();
-                        // The current recording file hits the maximum file size, open a new
-                        // recording file.
-                        openNewRecordingFile(recordingFile, out);
-                        // We assume that the size of one packet message is greater than the max
-                        // file size. It's intentional to not assert if
-                        // 'size' >= '_maxLogSize' for testing purposes.
-                        {
-                            stdx::lock_guard<stdx::mutex> lk(_mutex);
-                            _written = size;
-                        }
-                    }
-
-                    out.write(db.getCursor().data(), db.size());
-                    absl::ExtendCrc32c(checksum, {db.getCursor().data(), db.size()});
-                    out.write(toWrite.buf(), toWrite.size());
-                    absl::ExtendCrc32c(checksum,
-                                       {toWrite.buf(), static_cast<size_t>(toWrite.size())});
                 }
             }
         } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueConsumed>&) {
             // Close naturally
-            writeChecksum(recordingFile.string());
+            writeChecksum();
         } catch (...) {
-            writeChecksum(recordingFile.string());
+            writeChecksum();
             auto status = exceptionToStatus();
 
             stdx::lock_guard<stdx::mutex> lk(_mutex);
