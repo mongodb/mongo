@@ -668,10 +668,30 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "get engflow creds"
+      - command: github.generate_token
+        params:
+          owner: ${github_org}
+          repo: ${github_repo}
+          expansion_name: github_token_temp
+      - command: subprocess.exec
+        params:
+          binary: "bash"
+          args:
+            - "-c"
+            - |
+              echo "github_token: ${github_token_temp}" >> github_expansions.yml
+      - command: expansions.update
+        params:
+          file: github_expansions.yml
+      - func: "f_expansions_write"
       - func: "bazel run"
         vars:
           target: >-
             //:codeowners -- --check --expansions-file ../expansions.yml
+      - func: "bazel run"
+        vars:
+          target: >-
+            @bazel_rules_mongo//codeowners:check_github_codeowner_errors -- --expansions-file ../expansions.yml
 
   - name: bazel_run_lint
     tags:

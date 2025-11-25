@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bazel_rules_mongo"
-version = "0.1.13"
+version = "0.1.14"
 description = "Bazel rule we use to ship common code between bazel repos"
 authors = ["Trevor Guidry <trevor.guidry@mongodb.com>"]
 readme = "README.md"
@@ -10,6 +10,8 @@ python = "^3.10"
 pyyaml = "^6.0.2"
 retry = "^0.9.2"
 gitpython = "^3.1.44"
+requests = "^2.32.5"
+structlog = "^25.5.0"
 
 
 [build-system]

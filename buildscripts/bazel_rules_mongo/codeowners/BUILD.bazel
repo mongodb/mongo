@@ -88,3 +88,25 @@ config_setting(
         "codeowners_have_banned_codeowners": "True",
     },
 )
+
+py_binary(
+    name = "check_github_codeowner_errors",
+    srcs = [
+        "check_github_codeowner_errors.py",
+    ],
+    data = [],
+    env = {},
+    main = "check_github_codeowner_errors.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "requests",
+        ),
+        dependency(
+            "structlog",
+        ),
+        dependency(
+            "pyyaml",
+        ),
+    ],
+)
