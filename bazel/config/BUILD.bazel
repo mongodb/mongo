@@ -3001,7 +3001,7 @@ string_flag(
 
 bool_flag(
     name = "build_atlas",
-    build_setting_default = False,
+    build_setting_default = True,
 )
 
 config_setting(

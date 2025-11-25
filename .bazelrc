@@ -353,6 +353,8 @@ common:opt_profiled --enable_platform_specific_config=true
 common:evg --config=opt
 common:evg --fission=no
 common:evg --evg=True
+# TODO(SERVER-114370): Remove once atlas module is enabled in CI by default
+common:evg --//bazel/config:build_atlas=False
 common:evg --//bazel/config:opt=auto
 common:evg --//bazel/config:separate_debug=True
 common:evg --enable_platform_specific_config=true
@@ -501,7 +503,6 @@ common --remote_upload_local_results=False
 # Settings specific for clang-tidy
 --config=clang-tidy
 common:clang-tidy --config=dbg
-common:clang-tidy --build_atlas
 common:clang-tidy --remote_download_outputs=all
 common:clang-tidy --build_tag_filters=-third_party,-mongo-tidy-tests,-third_party_debug,-mongo-tidy-tests_debug
 common:clang-tidy --//bazel/config:compiler_type=clang
@@ -512,7 +513,6 @@ common:clang-tidy --jobs=300
 
 --config=mod-scanner
 common:mod-scanner --config=dbg
-common:mod-scanner --build_atlas
 common:mod-scanner --build_tag_filters=-third_party,-mongo-tidy-tests,-third_party_debug,-mongo-tidy-tests_debug
 common:mod-scanner --//bazel/config:compiler_type=clang
 common:mod-scanner --//bazel/config:mongo_toolchain_version=v5
