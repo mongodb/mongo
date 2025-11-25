@@ -82,13 +82,29 @@ public:
         _initTxnRouterIfNeeded(opCtx);
 
         while (true) {
-            auto cdb = _getRoutingInfo(opCtx);
+            auto cdb = _createDbIfRequestedAndGetRoutingInfo(opCtx);
             try {
                 return callbackFn(opCtx, cdb);
             } catch (const DBException& ex) {
                 _onException(opCtx, &retryInfo, ex.toStatus());
             }
         }
+    }
+
+    /**
+     * Enables implicit database creation when an operation is routed through this DBPrimaryRouter
+     * instance.
+     * Handles concurrent database drops: if the command throws a NamespaceNotFound error because
+     * the database was concurrently dropped, the database will be recreated and the operation will
+     * be automatically retried.
+     * If a suggestedPrimaryId is specified, the database will be created on the given shard only
+     * if the database doesn't exist yet. If the database is already created, the suggestedPrimaryId
+     * parameter will be ignored.
+     */
+    void createDbImplicitlyOnRoute(
+        const boost::optional<ShardId>& suggestedPrimaryId = boost::none) {
+        _createDbImplicitly = true;
+        _suggestedPrimaryId = suggestedPrimaryId;
     }
 
     static void appendDDLRoutingTokenToCommand(const DatabaseType& dbt, BSONObjBuilder* builder);
@@ -99,9 +115,13 @@ public:
 
 private:
     CachedDatabaseInfo _getRoutingInfo(OperationContext* opCtx) const;
+    CachedDatabaseInfo _createDbIfRequestedAndGetRoutingInfo(OperationContext* opCtx) const;
     void _onException(OperationContext* opCtx, RoutingRetryInfo* retryInfo, Status s);
 
     DatabaseName _dbName;
+
+    bool _createDbImplicitly{false};
+    boost::optional<ShardId> _suggestedPrimaryId;
 };
 
 /**
@@ -136,7 +156,7 @@ public:
     template <typename F>
     auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
         return _routeImpl(opCtx, comment, [&] {
-            auto cri = _getRoutingInfo(opCtx, _targetedNamespaces.front());
+            auto cri = _createDbIfRequestedAndGetRoutingInfo(opCtx);
             return callbackFn(opCtx, cri);
         });
     }
@@ -144,16 +164,23 @@ public:
     template <typename F>
     auto routeWithRoutingContext(OperationContext* opCtx, StringData comment, F&& callbackFn) {
         return _routeImpl(opCtx, comment, [&] {
-            // When in a multi-document transaction, allow getting routing info from the
-            // CatalogCache even though locks may be held. The CatalogCache will throw
-            // CannotRefreshDueToLocksHeld if the entry is not already cached.
-            const auto allowLocks = opCtx->inMultiDocumentTransaction() &&
-                shard_role_details::getLocker(opCtx)->isLocked();
-
-            RoutingContext routingCtx(opCtx, _targetedNamespaces, allowLocks);
+            RoutingContext routingCtx = _createDbIfRequestedAndGetRoutingContext(opCtx);
             return routing_context_utils::runAndValidate(
                 routingCtx, [&](RoutingContext& ctx) { return callbackFn(opCtx, ctx); });
         });
+    }
+
+    /**
+     * Enables implicit database creation when an operation is routed through this CollectionRouter
+     * instance.
+     * Handles concurrent database drops: if the command throws a NamespaceNotFound error because
+     * the database was concurrently dropped, the database will be recreated and the operation will
+     * be automatically retried.
+     */
+    void createDbImplicitlyOnRoute(
+        const boost::optional<ShardId>& suggestedPrimaryId = boost::none) {
+        _createDbImplicitly = true;
+        _suggestedPrimaryId = suggestedPrimaryId;
     }
 
 private:
@@ -170,6 +197,14 @@ private:
             }
         }
     }
+
+    RoutingContext _getRoutingContext(OperationContext* opCtx);
+
+    RoutingContext _createDbIfRequestedAndGetRoutingContext(OperationContext* opCtx);
+    CollectionRoutingInfo _createDbIfRequestedAndGetRoutingInfo(OperationContext* opCtx);
+
+    bool _createDbImplicitly{false};
+    boost::optional<ShardId> _suggestedPrimaryId;
 };
 
 class MONGO_MOD_PUBLIC MultiCollectionRouter final : public CollectionRouterCommon {

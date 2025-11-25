@@ -31,6 +31,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/ddl/cluster_ddl.h"
+#include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
@@ -51,6 +53,10 @@
 namespace mongo {
 namespace sharding {
 namespace router {
+
+namespace {
+constexpr size_t kMaxDatabaseCreationAttempts = 3;
+}
 
 RouterBase::RouterBase(CatalogCache* catalogCache) : _catalogCache(catalogCache) {}
 
@@ -91,6 +97,32 @@ void DBPrimaryRouter::appendCRUDUnshardedRoutingTokenToCommand(const ShardId& sh
 
 CachedDatabaseInfo DBPrimaryRouter::_getRoutingInfo(OperationContext* opCtx) const {
     return uassertStatusOK(_catalogCache->getDatabase(opCtx, _dbName));
+}
+
+CachedDatabaseInfo DBPrimaryRouter::_createDbIfRequestedAndGetRoutingInfo(
+    OperationContext* opCtx) const {
+
+    if (_createDbImplicitly) {
+        size_t attempts = 0;
+        while (attempts < kMaxDatabaseCreationAttempts) {
+            try {
+                if (attempts > 0) {
+                    cluster::createDatabase(opCtx, _dbName, _suggestedPrimaryId);
+                }
+                return _getRoutingInfo(opCtx);
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                ++attempts;
+                LOGV2_INFO(11398601,
+                           "Failed initialization of routing info because the database has been "
+                           "concurrently dropped",
+                           logAttrs(_dbName),
+                           "attemptNumber"_attr = attempts,
+                           "maxAttempts"_attr = kMaxDatabaseCreationAttempts);
+            }
+        }
+    }
+
+    return _getRoutingInfo(opCtx);
 }
 
 void DBPrimaryRouter::_onException(OperationContext* opCtx, RoutingRetryInfo* retryInfo, Status s) {
@@ -272,6 +304,67 @@ CollectionRoutingInfo CollectionRouterCommon::_getRoutingInfo(OperationContext* 
             opCtx, nss, maybeAtClusterTime->asTimestamp(), allowLocks));
     }
     return uassertStatusOK(_catalogCache->getCollectionRoutingInfo(opCtx, nss, allowLocks));
+}
+
+RoutingContext CollectionRouter::_getRoutingContext(OperationContext* opCtx) {
+    // When in a multi-document transaction, allow getting routing info from the CatalogCache even
+    // though locks may be held. The CatalogCache will throw CannotRefreshDueToLocksHeld if the
+    // entry is not already cached.
+    const auto allowLocks =
+        opCtx->inMultiDocumentTransaction() && shard_role_details::getLocker(opCtx)->isLocked();
+    return RoutingContext(opCtx, _targetedNamespaces, allowLocks);
+}
+
+RoutingContext CollectionRouter::_createDbIfRequestedAndGetRoutingContext(OperationContext* opCtx) {
+    const NamespaceString& nss = _targetedNamespaces.front();
+
+    if (_createDbImplicitly) {
+        size_t attempts = 0;
+        while (attempts < kMaxDatabaseCreationAttempts) {
+            try {
+                if (attempts > 0) {
+                    cluster::createDatabase(opCtx, nss.dbName(), _suggestedPrimaryId);
+                }
+                return _getRoutingContext(opCtx);
+
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                ++attempts;
+                LOGV2_INFO(11398602,
+                           "Failed initialization of routing info because the database has been "
+                           "concurrently dropped",
+                           logAttrs(nss.dbName()),
+                           "attemptNumber"_attr = attempts,
+                           "maxAttempts"_attr = kMaxDatabaseCreationAttempts);
+            }
+        }
+    }
+    return _getRoutingContext(opCtx);
+}
+
+CollectionRoutingInfo CollectionRouter::_createDbIfRequestedAndGetRoutingInfo(
+    OperationContext* opCtx) {
+    const NamespaceString& nss = _targetedNamespaces.front();
+
+    if (_createDbImplicitly) {
+        size_t attempts = 0;
+        while (attempts < kMaxDatabaseCreationAttempts) {
+            try {
+                if (attempts > 0) {
+                    cluster::createDatabase(opCtx, nss.dbName(), _suggestedPrimaryId);
+                }
+                return _getRoutingInfo(opCtx, nss);
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                ++attempts;
+                LOGV2_INFO(11398603,
+                           "Failed initialization of routing info because the database has been "
+                           "concurrently dropped",
+                           logAttrs(nss.dbName()),
+                           "attemptNumber"_attr = attempts,
+                           "maxAttempts"_attr = kMaxDatabaseCreationAttempts);
+            }
+        }
+    }
+    return _getRoutingInfo(opCtx, nss);
 }
 
 void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(const ShardId& shardId,

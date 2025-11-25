@@ -1390,6 +1390,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthrough/replication/**/*initial_sync* @10gen/server-initial-sync @svc-auto-approve-bot
 /jstests/noPassthrough/replication/**/*replication_recovery* @10gen/server-recovery @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/noPassthrough/routing/OWNERS.yml
+/jstests/noPassthrough/routing/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/noPassthrough/rs_endpoint/OWNERS.yml
 /jstests/noPassthrough/rs_endpoint/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
 

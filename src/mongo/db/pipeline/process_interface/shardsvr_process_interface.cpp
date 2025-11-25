@@ -432,12 +432,11 @@ void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCt
                                                           const DatabaseName& dbName,
                                                           const BSONObj& cmdObj,
                                                           boost::optional<ShardId> dataShard) {
-    cluster::createDatabase(opCtx, dbName, dataShard);
-
     // TODO (SERVER-77915): Remove the FCV check and keep only the 'else' branch
     if (!feature_flags::g80CollectionCreationPath.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
+        router.createDbImplicitlyOnRoute(dataShard);
         router.route(opCtx,
                      "ShardServerProcessInterface::_createCollectionCommon",
                      [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
@@ -483,6 +482,7 @@ void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCt
 
         shardsvrCollCommand.setShardsvrCreateCollectionRequest(request);
         sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
+        router.createDbImplicitlyOnRoute(dataShard);
         router.route(opCtx,
                      "ShardServerProcessInterface::_createCollectionCommon",
                      [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {

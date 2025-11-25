@@ -1037,6 +1037,21 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     sharding::router::CollectionRouter router(opCtx->getServiceContext(), namespaces.executionNss);
 
+    bool isExplain = verbosity.has_value();
+    if (isExplain) {
+        // Implicitly create the database for explain commands since, right now, there is no way
+        // to respond properly when the database doesn't exist.
+        // Before, the database was implicitly created by the CollectionRoutingInfoTargeter class,
+        // (for context, it's a legacy class to store the routing information), now that we are
+        // using the RoutingContext instead, we still need to create a database until SERVER-108882
+        // gets addressed.
+        // TODO (SERVER-108882) Stop creating the db once explain can be executed when th db
+        // doesn't exist.
+        router.createDbImplicitlyOnRoute();
+    }
+
+    // We'll use routerBodyStarted to distinguish whether an error was thrown before or after the
+    // body function was executed.
     bool routerBodyStarted = false;
     auto bodyFn = [&](OperationContext* opCtx, RoutingContext& routingCtx) {
         routerBodyStarted = true;
@@ -1053,33 +1068,16 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         return Status::OK();
     };
 
-    const size_t kMaxDatabaseCreationAttempts = 3;
-    size_t attempts = 1;
-    Status status{Status::OK()};
-    bool isExplain = verbosity.has_value();
-    while (true) {
-        if (isExplain) {
-            // Implicitly create the database for explain commands since, right now, there is no way
-            // to respond properly when the database doesn't exist. Before the database was
-            // implicitly created by CollectionRoutingInfoTargeter, now that we are not using this
-            // class anymore still need to create a database.
-            // TODO (SERVER-108882) Stop creating the db once explain can be executed when th db
-            // doesn't exist.
-            cluster::createDatabase(opCtx, namespaces.executionNss.dbName());
-        }
+    // Route the command and capture the returned status.
+    Status status = std::invoke([&]() -> Status {
         try {
-            status = router.routeWithRoutingContext(opCtx, comment, bodyFn);
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-            if (isExplain && ++attempts < kMaxDatabaseCreationAttempts) {
-                continue;
-            }
-            status = ex.toStatus();
+            return router.routeWithRoutingContext(opCtx, comment, bodyFn);
         } catch (const DBException& ex) {
-            status = ex.toStatus();
+            return ex.toStatus();
         }
-        break;
-    }
+    });
 
+    // Error handling for exceptions raised prior to executing the runAggregation operation.
     if (!status.isOK() && !routerBodyStarted) {
         uassert(CollectionUUIDMismatchInfo(request.getDbName(),
                                            *request.getCollectionUUID(),

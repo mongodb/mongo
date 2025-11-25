@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
@@ -69,7 +70,19 @@ public:
         RouterCatalogCacheTestFixture::tearDown();
     }
 
-    void mockConfigServerQueries(NamespaceString _nss, OID epoch, Timestamp timestamp) {
+    void setupReadConcernAtClusterTime(Timestamp clusterTime) {
+        repl::ReadConcernArgs readConcernArgs;
+        ASSERT_OK(readConcernArgs.initialize(
+            BSON("find" << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                        << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                                << clusterTime << repl::ReadConcernArgs::kLevelFieldName
+                                << "snapshot"))));
+        repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
+    }
+
+    void mockConfigServerQueriesForCollRefresh(const NamespaceString& nss,
+                                               OID epoch,
+                                               Timestamp timestamp) {
         // Mock the expected config server queries.
         ChunkVersion version({epoch, timestamp}, {2, 0});
         ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
@@ -86,7 +99,30 @@ public:
         version.incMinor();
 
         expectCollectionAndChunksAggregation(
-            _nss, epoch, timestamp, uuid, shardKeyPattern, {chunk1, chunk2});
+            nss, epoch, timestamp, uuid, shardKeyPattern, {chunk1, chunk2});
+    }
+
+    void mockConfigServerQueriesForDbRefresh(const DatabaseName& dbName,
+                                             const DatabaseVersion& dbVersion) {
+        expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
+            DatabaseType db(dbName, {"0"}, dbVersion);
+            return std::vector<BSONObj>{db.toBSON()};
+        }());
+    }
+
+    void expectCreateDatabase(const DatabaseName& dbName,
+                              const DatabaseVersion& dbVersionToReturn) {
+        static constexpr auto kCmdName = "_configsvrCreateDatabase"_sd;
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ(kConfigHostAndPort, request.target);
+            ASSERT_TRUE(request.cmdObj.hasField(kCmdName))
+                << "Expected command '" << kCmdName << "', but got: " << request.toString();
+            ASSERT_EQ(dbName.toString_forTest(), request.cmdObj.getStringField(kCmdName));
+
+            ConfigsvrCreateDatabaseResponse response;
+            response.setDatabaseVersion(dbVersionToReturn);
+            return response.toBSON();
+        });
     }
 
     void setupCatalogCacheWithHistory() {
@@ -192,15 +228,6 @@ public:
         repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
     }
 
-    void setupReadConcernAtClusterTime(Timestamp clusterTime) {
-        repl::ReadConcernArgs readConcernArgs;
-        ASSERT_OK(readConcernArgs.initialize(
-            BSON("find" << "test" << repl::ReadConcernArgs::kReadConcernFieldName
-                        << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
-                                << clusterTime << repl::ReadConcernArgs::kLevelFieldName
-                                << "snapshot"))));
-        repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
-    }
 
 private:
     boost::optional<RouterOperationContextSession> _routerOpCtxSession;
@@ -291,6 +318,43 @@ TEST_F(RouterRoleTestTxn, DBPrimaryRouterSetsPlacementConflictTimeIfSubRouter) {
         });
 }
 
+TEST_F(RouterRoleTest, DBPrimaryRouterHappyPath) {
+    int tries = 0;
+
+    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
+    router.route(operationContext(),
+                 "test",
+                 [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) { tries++; });
+
+    ASSERT_EQ(tries, 1);
+}
+
+TEST_F(RouterRoleTest, DBPrimaryRouterRetriesAfterStaleDb) {
+    int tries = 0;
+
+    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
+    auto future = launchAsync([&] {
+        router.route(
+            operationContext(),
+            "test",
+            [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+                tries++;
+                if (tries == 1) {
+                    uasserted(StaleDbRoutingVersion(_nss.dbName(),
+                                                    DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
+                                                    DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
+                              "staleDbVersion");
+                }
+            });
+    });
+
+    mockConfigServerQueriesForDbRefresh(_nss.dbName(),
+                                        DatabaseVersion(UUID::gen(), Timestamp(3, 0)));
+
+    future.default_timed_get();
+    ASSERT_EQ(tries, 2);
+}
+
 TEST_F(RouterRoleTest, DBPrimaryRouterExceedsMaxRetryAttempts) {
     int maxTestRetries = 10;
 
@@ -307,11 +371,14 @@ TEST_F(RouterRoleTest, DBPrimaryRouterExceedsMaxRetryAttempts) {
                          tries++;
                          uasserted(
                              StaleDbRoutingVersion(_nss.dbName(),
-                                                   DatabaseVersion(UUID::gen(), Timestamp(0, 0)),
-                                                   DatabaseVersion(UUID::gen(), Timestamp(0, 0))),
+                                                   DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
+                                                   DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
                              "staleDbVersion");
                      });
     });
+
+    mockConfigServerQueriesForDbRefresh(_nss.dbName(),
+                                        DatabaseVersion(UUID::gen(), Timestamp(3, 0)));
 
     ASSERT_THROWS_CODE_AND_WHAT(
         future.default_timed_get(),
@@ -319,6 +386,85 @@ TEST_F(RouterRoleTest, DBPrimaryRouterExceedsMaxRetryAttempts) {
         ErrorCodes::StaleDbVersion,
         "Exceeded maximum number of 10 retries attempting 'test' :: caused by :: staleDbVersion");
     ASSERT_EQ(tries, maxTestRetries + 1);
+}
+
+TEST_F(RouterRoleTest, DBPrimaryRouterImplicitlyCreatesDbWhenSpecified) {
+    int tries = 0;
+
+    // 1. Route asynchronously a dummy operation with 'createDbImplicitly' set to true.
+    // The first attempt will fail with a StaleDbVersion to force a db refresh.
+    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
+    router.createDbImplicitlyOnRoute();
+    auto future = launchAsync([&] {
+        router.route(
+            operationContext(),
+            "test",
+            [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+                tries++;
+                if (tries == 1) {
+                    uasserted(StaleDbRoutingVersion(_nss.dbName(),
+                                                    DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
+                                                    DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
+                              "staleDbVersion");
+                }
+            });
+    });
+
+    // 2. Mock a db drop by return an empty database to force an implicit db creation (need to
+    // return it twice because for missing databases, the CatalogClient tries twice)
+    expectFindSendBSONObjVector(kConfigHostAndPort, {});
+    expectFindSendBSONObjVector(kConfigHostAndPort, {});
+
+    // 3. Mock a db drop again since the createDatabase isn't attempted until the second
+    // router-role-loop iteration.
+    expectFindSendBSONObjVector(kConfigHostAndPort, {});
+    expectFindSendBSONObjVector(kConfigHostAndPort, {});
+
+    // 4. Expect a call to _configsvrCreateDatabase.
+    expectCreateDatabase(_nss.dbName(), DatabaseVersion(UUID::gen(), Timestamp(3, 0)));
+
+    // 5. Mock the refresh that runs after the db creation.
+    mockConfigServerQueriesForDbRefresh(_nss.dbName(),
+                                        DatabaseVersion(UUID::gen(), Timestamp(3, 0)));
+
+    future.default_timed_get();
+    ASSERT_EQ(tries, 2);
+}
+
+TEST_F(RouterRoleTest, DBPrimaryRouterDoesntImplicitlyCreateDbByDefault) {
+    int tries = 0;
+
+    // 1. Route asynchronously a dummy operation with 'createDbImplicitly' set to true.
+    // The first attempt will fail with a StaleDbVersion to force a db refresh.
+    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
+    auto future = launchAsync([&] {
+        router.route(
+            operationContext(),
+            "test",
+            [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+                tries++;
+                if (tries == 1) {
+                    uasserted(StaleDbRoutingVersion(_nss.dbName(),
+                                                    DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
+                                                    DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
+                              "staleDbVersion");
+                }
+            });
+    });
+
+    // 2. Mock a db drop by return an empty database to force an implicit db creation (need to
+    // return it twice because for missing databases, the CatalogClient tries twice)
+    expectFindSendBSONObjVector(kConfigHostAndPort, {});
+    expectFindSendBSONObjVector(kConfigHostAndPort, {});
+
+    // 3. Expect a NamespaceNotFound error since the database doesn't exist and the implicit db
+    // creation is disabled.
+    ASSERT_THROWS_CODE_AND_WHAT(future.default_timed_get(),
+                                DBException,
+                                ErrorCodes::NamespaceNotFound,
+                                str::stream() << "database " << _nss.dbName().toStringForErrorMsg()
+                                              << " not found");
+    ASSERT_EQ(tries, 1);
 }
 
 TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryForSubRouter) {
@@ -347,7 +493,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryForSubRouter) {
     ASSERT_EQ(tries, 1);
 }
 
-TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryOnStaleConfigForNonSubRouter) {
+TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryOnStaleConfigInTxnForNonSubRouter) {
     const OID epoch{OID::gen()};
     const Timestamp timestamp{1, 0};
 
@@ -413,7 +559,7 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigWithoutTxn) {
                          }
                      });
     });
-    mockConfigServerQueries(_nss, epoch, timestamp);
+    mockConfigServerQueriesForCollRefresh(_nss, epoch, timestamp);
     future.default_timed_get();
 
     ASSERT_EQ(tries, 2);
@@ -467,7 +613,7 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleEpochWithoutTxn) {
                 }
             });
     });
-    mockConfigServerQueries(_nss, epoch, timestamp);
+    mockConfigServerQueriesForCollRefresh(_nss, epoch, timestamp);
     future.default_timed_get();
     ASSERT_EQ(tries, 2);
 
@@ -486,7 +632,7 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleEpochWithoutTxn) {
                           }
                       });
     });
-    mockConfigServerQueries(_nss, OID::gen(), Timestamp{2, 0});
+    mockConfigServerQueriesForCollRefresh(_nss, OID::gen(), Timestamp{2, 0});
     future2.default_timed_get();
     ASSERT_EQ(tries, 2);
 
@@ -617,7 +763,7 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextRetryOnStaleConfigWitho
                 }
             });
     });
-    mockConfigServerQueries(_nss, epoch, timestamp);
+    mockConfigServerQueriesForCollRefresh(_nss, epoch, timestamp);
     future.default_timed_get();
 
     ASSERT_EQ(tries, 2);
@@ -681,7 +827,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterWithRoutingContextAtTransactionCluster
         testAtTimestamp(Timestamp(1, 0), 2, "0"), DBException, ErrorCodes::StaleChunkHistory);
 }
 
-TEST_F(RouterRoleTestTxn, CollectionRouterWithRoutingContextAtReadConcernClusterTime) {
+TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextAtReadConcernClusterTime) {
     setupCatalogCacheWithHistory();
 
     // Test routing behavior at different timestamps to verify that catalog cache history works
@@ -803,8 +949,8 @@ TEST_F(RouterRoleTest, MultiCollectionRouterRetryOnStaleConfig) {
                          }
                      });
     });
-    mockConfigServerQueries(nss2, epoch, timestamp);
-    mockConfigServerQueries(_nss, epoch, timestamp);
+    mockConfigServerQueriesForCollRefresh(nss2, epoch, timestamp);
+    mockConfigServerQueriesForCollRefresh(_nss, epoch, timestamp);
     future.default_timed_get();
 
     ASSERT_EQ(tries, 2);
@@ -839,7 +985,7 @@ TEST_F(RouterRoleTest,
                           "StaleConfig error");
             });
     });
-    mockConfigServerQueries(nss2, epoch, timestamp);
+    mockConfigServerQueriesForCollRefresh(nss2, epoch, timestamp);
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::StaleConfig);
 
     ASSERT_EQ(tries, 1);
@@ -950,7 +1096,7 @@ TEST_F(RouterRoleTestTxn, RoutingContextRoutingTablesAreImmutable) {
             // Schedule a refresh with a new placement version.
             auto future = scheduleRoutingInfoForcedRefresh(_nss);
 
-            mockConfigServerQueries(_nss, versionA.epoch(), versionA.getTimestamp());
+            mockConfigServerQueriesForCollRefresh(_nss, versionA.epoch(), versionA.getTimestamp());
 
             const auto criB = *future.default_timed_get();
             const auto versionB = criB.getCollectionVersion().placementVersion();
@@ -1013,7 +1159,7 @@ TEST_F(RouterRoleTest, CollectionRouterExceedsMaxRetryAttempts) {
         Timestamp timestamp{startTime, 0};
         startTime++;
 
-        mockConfigServerQueries(_nss, epoch, timestamp);
+        mockConfigServerQueriesForCollRefresh(_nss, epoch, timestamp);
     }
 
     ASSERT_THROWS_CODE_AND_WHAT(future.default_timed_get(),
@@ -1024,7 +1170,7 @@ TEST_F(RouterRoleTest, CollectionRouterExceedsMaxRetryAttempts) {
     ASSERT_EQ(tries, maxTestRetries + 1);
 }
 
-TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryOnShardNotFound) {
+TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryOnShardNotFoundInTxn) {
     sharding::router::CollectionRouter router(getServiceContext(), _nss);
     ASSERT(TransactionRouter::get(operationContext()));
 
@@ -1070,7 +1216,7 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnShardNotFound) {
         DatabaseType db(_nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp(1, 0)));
         return std::vector<BSONObj>{db.toBSON()};
     }());
-    mockConfigServerQueries(_nss, epoch, timestamp);
+    mockConfigServerQueriesForCollRefresh(_nss, epoch, timestamp);
     future.default_timed_get();
 
     ASSERT_EQ(tries, 2);
@@ -1112,7 +1258,7 @@ TEST_F(RouterRoleTestTxn, CatalogCacheGetRoutingInfoAtTransactionClusterTime) {
         testAtTimestamp(Timestamp(1, 0), 2, "0"), DBException, ErrorCodes::StaleChunkHistory);
 }
 
-TEST_F(RouterRoleTestTxn, CatalogCacheGetRoutingInfoAtReadConcernClusterTime) {
+TEST_F(RouterRoleTest, CatalogCacheGetRoutingInfoAtReadConcernClusterTime) {
     setupCatalogCacheWithHistory();
 
     // Test routing behavior at different timestamps to verify that catalog cache history works
@@ -1186,7 +1332,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterGetRoutingInfoAtTransactionClusterTime
         testAtTimestamp(Timestamp(1, 0), 2, "0"), DBException, ErrorCodes::StaleChunkHistory);
 }
 
-TEST_F(RouterRoleTestTxn, CollectionRouterGetRoutingInfoAtReadConcernClusterTime) {
+TEST_F(RouterRoleTest, CollectionRouterGetRoutingInfoAtReadConcernClusterTime) {
     setupCatalogCacheWithHistory();
 
     // Test routing behavior at different timestamps to verify that catalog cache history works
@@ -1249,10 +1395,92 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigTimeseriesBucket) {
                          }
                      });
     });
-    mockConfigServerQueries(bucketNss, epoch, timestamp);
+    mockConfigServerQueriesForCollRefresh(bucketNss, epoch, timestamp);
     future.default_timed_get();
 
     ASSERT_EQ(tries, 2);
 }
+
+TEST_F(RouterRoleTest, CollectionRouterDoesntImplicitlyCreateDbByDefault) {
+    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+
+    // 1. Route asynchronously a dummy operation.
+    // The first attempt will fail with a StaleDbVersion to force a db refresh.
+    int tries = 0;
+    auto future = launchAsync([&] {
+        router.route(
+            operationContext(),
+            "test",
+            [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+                tries++;
+                if (tries == 1) {
+                    uasserted(StaleDbRoutingVersion(_nss.dbName(),
+                                                    DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
+                                                    DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
+                              "staleDbVersion");
+                }
+            });
+    });
+
+    // 2. Mock a db drop as well by returning an empty database to force an implicit db creation
+    // (need to return it twice because for missing databases, the CatalogClient tries twice)
+    expectFindSendBSONObjVector(kConfigHostAndPort, {});
+    expectFindSendBSONObjVector(kConfigHostAndPort, {});
+
+    // 3. Expect a NamespaceNotFound error since the database doesn't exist and the implicit db
+    // creation is disabled.
+    ASSERT_THROWS_CODE_AND_WHAT(future.default_timed_get(),
+                                DBException,
+                                ErrorCodes::NamespaceNotFound,
+                                str::stream() << "database " << _nss.dbName().toStringForErrorMsg()
+                                              << " not found");
+    ASSERT_EQ(tries, 1);
+}
+
+TEST_F(RouterRoleTest, CollectionRouterImplicitlyCreatesDbWhenSpecified) {
+    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    router.createDbImplicitlyOnRoute();
+
+    // 1. Route asynchronously a dummy operation with 'createDbImplicitly' set to true.
+    // The first attempt will fail with a StaleDbVersion to force a db refresh.
+    int tries = 0;
+    auto future = launchAsync([&] {
+        router.route(
+            operationContext(),
+            "test",
+            [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+                tries++;
+                if (tries == 1) {
+                    uasserted(StaleDbRoutingVersion(_nss.dbName(),
+                                                    DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
+                                                    DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
+                              "staleDbVersion");
+                }
+            });
+    });
+
+    // 2. Mock a db drop as well by returning an empty database to force an implicit db creation
+    // (need to return it twice because for missing databases, the CatalogClient tries twice)
+    expectFindSendBSONObjVector(kConfigHostAndPort, {});
+    expectFindSendBSONObjVector(kConfigHostAndPort, {});
+
+    // 3. Mock a db drop again since the createDatabase isn't attempted until the second
+    // router-role-loop iteration.
+    expectFindSendBSONObjVector(kConfigHostAndPort, {});
+    expectFindSendBSONObjVector(kConfigHostAndPort, {});
+
+    // 4. Expect a call to _configsvrCreateDatabase.
+    expectCreateDatabase(_nss.dbName(), DatabaseVersion(UUID::gen(), Timestamp(3, 0)));
+
+    // 5. Mock the refresh that runs after the db creation.
+    mockConfigServerQueriesForDbRefresh(_nss.dbName(),
+                                        DatabaseVersion(UUID::gen(), Timestamp(3, 0)));
+    mockConfigServerQueriesForCollRefresh(_nss, OID::gen(), Timestamp{1, 0});
+
+    future.default_timed_get();
+
+    ASSERT_EQ(tries, 2);
+}
+
 }  // namespace
 }  // namespace mongo

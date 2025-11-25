@@ -506,6 +506,12 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
     }
 
     sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
+
+    // Implicitly create the db if it doesn't exist. There is no way right now to return an
+    // explain on a sharded cluster if the database doesn't exist.
+    // TODO (SERVER-108882) Stop creating the db once explain can be executed when th db
+    // doesn't exist.
+    router.createDbImplicitlyOnRoute();
     return router.routeWithRoutingContext(
         opCtx,
         "explain write"_sd,
@@ -609,99 +615,76 @@ void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
     auto bodyBuilder = result->getBodyBuilder();
     const auto originalRequestBSON = req ? req->toBSON() : requestObj;
 
-    const size_t kMaxDatabaseCreationAttempts = 3;
-    size_t attempts = 1;
-    while (true) {
-        try {
-            // Implicitly create the db if it doesn't exist. There is no way right now to return an
-            // explain on a sharded cluster if the database doesn't exist.
-            // TODO (SERVER-108882) Stop creating the db once explain can be executed when th db
-            // doesn't exist.
-            cluster::createDatabase(opCtx, originalNss.dbName());
-
-            // If we aren't running an explain for updateOne or deleteOne without shard key,
-            // continue and run the original explain path.
-            if (runExplainWithoutShardKey(
-                    opCtx, batchedRequest, originalNss, verbosity, &bodyBuilder)) {
-                return;
-            }
-
-            sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
-            router.routeWithRoutingContext(
-                opCtx,
-                "explain write"_sd,
-                [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
-                    auto translatedReqBSON = originalRequestBSON;
-                    auto translatedNss = originalNss;
-                    const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
-
-                    auto& unusedRoutingCtx = translateNssForRawDataAccordingToRoutingInfo(
-                        opCtx,
-                        originalNss,
-                        targeter,
-                        originalRoutingCtx,
-                        [&](const NamespaceString& bucketsNss) {
-                            translatedNss = bucketsNss;
-                            switch (batchedRequest.getBatchType()) {
-                                case BatchedCommandRequest::BatchType_Insert:
-                                    translatedReqBSON = rewriteCommandForRawDataOperation<
-                                        write_ops::InsertCommandRequest>(originalRequestBSON,
-                                                                         translatedNss.coll());
-                                    break;
-                                case BatchedCommandRequest::BatchType_Update:
-                                    translatedReqBSON = rewriteCommandForRawDataOperation<
-                                        write_ops::UpdateCommandRequest>(originalRequestBSON,
-                                                                         translatedNss.coll());
-                                    break;
-                                case BatchedCommandRequest::BatchType_Delete:
-                                    translatedReqBSON = rewriteCommandForRawDataOperation<
-                                        write_ops::DeleteCommandRequest>(originalRequestBSON,
-                                                                         translatedNss.coll());
-                                    break;
-                            }
-                        });
-                    unusedRoutingCtx.skipValidation();
-
-                    const auto explainCmd =
-                        ClusterExplain::wrapAsExplain(translatedReqBSON, verbosity);
-
-                    // We will time how long it takes to run the commands on the shards.
-                    Timer timer;
-
-                    // Target the command to the shards based on the singleton batch item.
-                    BatchItemRef targetingBatchItem(requestPtr, 0);
-                    std::vector<AsyncRequestsSender::Response> shardResponses;
-                    commandOpWrite(opCtx,
-                                   translatedNss,
-                                   explainCmd,
-                                   std::move(targetingBatchItem),
-                                   targeter,
-                                   &shardResponses);
-                    uassertStatusOK(ClusterExplain::buildExplainResult(
-                        makeBlankExpressionContext(opCtx, translatedNss),
-                        shardResponses,
-                        ClusterExplain::kWriteOnShards,
-                        timer.millis(),
-                        originalRequestBSON,
-                        &bodyBuilder));
-                });
-            break;
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            LOGV2_INFO(10370602,
-                       "Failed initialization of routing info because the database has been "
-                       "concurrently dropped",
-                       logAttrs(originalNss.dbName()),
-                       "attemptNumber"_attr = attempts,
-                       "maxAttempts"_attr = kMaxDatabaseCreationAttempts);
-
-            if (++attempts >= kMaxDatabaseCreationAttempts) {
-                // The maximum number of attempts has been reached, so the procedure fails as it
-                // could be a logical error. At this point, it is unlikely that the error is caused
-                // by concurrent drop database operations.
-                throw;
-            }
-        }
+    // If we aren't running an explain for updateOne or deleteOne without shard key,
+    // continue and run the original explain path.
+    if (runExplainWithoutShardKey(opCtx, batchedRequest, originalNss, verbosity, &bodyBuilder)) {
+        return;
     }
+
+    sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
+
+    // Implicitly create the db if it doesn't exist. There is no way right now to return an
+    // explain on a sharded cluster if the database doesn't exist.
+    // TODO (SERVER-108882) Stop creating the db once explain can be executed when th db
+    // doesn't exist.
+    router.createDbImplicitlyOnRoute();
+    router.routeWithRoutingContext(
+        opCtx,
+        "explain write"_sd,
+        [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
+            auto translatedReqBSON = originalRequestBSON;
+            auto translatedNss = originalNss;
+            const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
+
+            auto& unusedRoutingCtx = translateNssForRawDataAccordingToRoutingInfo(
+                opCtx,
+                originalNss,
+                targeter,
+                originalRoutingCtx,
+                [&](const NamespaceString& bucketsNss) {
+                    translatedNss = bucketsNss;
+                    switch (batchedRequest.getBatchType()) {
+                        case BatchedCommandRequest::BatchType_Insert:
+                            translatedReqBSON =
+                                rewriteCommandForRawDataOperation<write_ops::InsertCommandRequest>(
+                                    originalRequestBSON, translatedNss.coll());
+                            break;
+                        case BatchedCommandRequest::BatchType_Update:
+                            translatedReqBSON =
+                                rewriteCommandForRawDataOperation<write_ops::UpdateCommandRequest>(
+                                    originalRequestBSON, translatedNss.coll());
+                            break;
+                        case BatchedCommandRequest::BatchType_Delete:
+                            translatedReqBSON =
+                                rewriteCommandForRawDataOperation<write_ops::DeleteCommandRequest>(
+                                    originalRequestBSON, translatedNss.coll());
+                            break;
+                    }
+                });
+            unusedRoutingCtx.skipValidation();
+
+            const auto explainCmd = ClusterExplain::wrapAsExplain(translatedReqBSON, verbosity);
+
+            // We will time how long it takes to run the commands on the shards.
+            Timer timer;
+
+            // Target the command to the shards based on the singleton batch item.
+            BatchItemRef targetingBatchItem(requestPtr, 0);
+            std::vector<AsyncRequestsSender::Response> shardResponses;
+            commandOpWrite(opCtx,
+                           translatedNss,
+                           explainCmd,
+                           std::move(targetingBatchItem),
+                           targeter,
+                           &shardResponses);
+            uassertStatusOK(
+                ClusterExplain::buildExplainResult(makeBlankExpressionContext(opCtx, translatedNss),
+                                                   shardResponses,
+                                                   ClusterExplain::kWriteOnShards,
+                                                   timer.millis(),
+                                                   originalRequestBSON,
+                                                   &bodyBuilder));
+        });
 }
 
 bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,

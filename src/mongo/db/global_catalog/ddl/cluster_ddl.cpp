@@ -176,8 +176,6 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
               "Hanging createCollection due to failpoint 'hangCreateUnshardedCollection' finished");
     }
 
-    const auto dbInfo = createDatabase(opCtx, nss.dbName());
-
     // The config.system.session collection can only exist as sharded and it's essential for the
     // correct cluster functionality. To prevent potential issues, the operation must always be
     // performed as a sharded creation with internal defaults. Ignore potentially different
@@ -268,6 +266,14 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
 
     // TODO (SERVER-100309): remove againstFirstShard option once 9.0 becomes last LTS.
     if (againstFirstShard) {
+        tassert(
+            113986,
+            "createCollection can only run against the first shard for `config.system.sessions` "
+            "collection.",
+            nss == NamespaceString::kLogicalSessionsNamespace);
+
+        const auto dbInfo =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
         const auto cmdResponse =
             executeCommandAgainstFirstShard(opCtx,
                                             nss.dbName(),
@@ -282,6 +288,7 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
 
     } else {
         sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+        router.createDbImplicitlyOnRoute();
         router.route(
             opCtx,
             "createCollection"_sd,

@@ -118,8 +118,6 @@
 namespace mongo {
 namespace {
 
-constexpr size_t kMaxDatabaseCreationAttempts = 3u;
-
 using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
@@ -1018,35 +1016,15 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         }
     };
 
-    while (true) {
-        size_t attempts = 1u;
-        try {
-            // Technically, findAndModify should only be creating database if upsert is true, but
-            // this would require that the parsing be pulled into this function.
-            cluster::createDatabase(opCtx, originalNss.dbName());
+    sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
 
-            sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
-            router.routeWithRoutingContext(opCtx, getName(), findAndModifyBody);
-            return true;
+    // Technically, findAndModify should only be creating database if upsert is true, but
+    // this would require that the parsing be pulled into this function.
+    // TODO (SERVER-114203) - Implicitly create a database only when upsert is true.
+    router.createDbImplicitlyOnRoute();
+    router.routeWithRoutingContext(opCtx, getName(), findAndModifyBody);
 
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            LOGV2_INFO(8584300,
-                       "Failed initialization of routing info because the database has been "
-                       "concurrently dropped",
-                       logAttrs(originalNss.dbName()),
-                       "attemptNumber"_attr = attempts,
-                       "maxAttempts"_attr = kMaxDatabaseCreationAttempts);
-
-            if (attempts++ >= kMaxDatabaseCreationAttempts) {
-                // The maximum number of attempts has been reached, so the procedure fails as it
-                // could be a logical error. At this point, it is unlikely that the error is
-                // caused by concurrent drop database operations.
-                throw;
-            }
-        }
-    }
-
-    MONGO_UNREACHABLE;
+    return true;
 }
 
 bool FindAndModifyCmd::getCrudProcessedFromCmd(const BSONObj& cmdObj) {
