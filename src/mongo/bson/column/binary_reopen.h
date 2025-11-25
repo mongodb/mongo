@@ -356,6 +356,9 @@ template <typename T>
 const OverflowPoint<T>& OverflowState<T>::detect(const ControlBlockContainer& controls) {
     using namespace bsoncolumn::internal;
 
+    // This function must be called with at least one control block
+    invariant(!controls.empty());
+
     // Setup reverse iteration.
     auto begin = controls.rbegin();
     auto it = begin;
