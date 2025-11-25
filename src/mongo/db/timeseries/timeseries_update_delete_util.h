@@ -169,4 +169,11 @@ requires IsRequestableOnTimeseriesView<T> std::pair<bool, NamespaceString> isTim
 
     return {false, nss};
 }
+
+/**
+ * Returns a basic match expression checking against closed buckets for meta-only updates/deletes
+ */
+std::unique_ptr<MatchExpression> addClosedBucketExclusionExpr(
+    std::unique_ptr<MatchExpression> base);
+
 }  // namespace mongo::timeseries

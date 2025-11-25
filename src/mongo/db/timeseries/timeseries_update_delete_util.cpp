@@ -370,4 +370,9 @@ TimeseriesWritesQueryExprs getMatchExprsForWrites(
                 closedBucketFilter->clone(), std::move(metaOnlyExpr), std::move(bucketMetricExpr)),
             ._residualExpr = std::move(residualExpr)};
 }
+
+std::unique_ptr<MatchExpression> addClosedBucketExclusionExpr(
+    std::unique_ptr<MatchExpression> base) {
+    return andCombineMatchExpressions(closedBucketFilter->clone(), std::move(base));
+}
 }  // namespace mongo::timeseries
