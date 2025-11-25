@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import List, Optional
 
 import yaml
@@ -9,6 +10,11 @@ from pydantic import BaseModel
 class ThresholdConfig(BaseModel):
     count: int
     grace_period_days: int
+
+
+class ThresholdOverride(BaseModel):
+    hot: int
+    cold: int
 
 
 class IssueThresholds(BaseModel):
@@ -48,6 +54,7 @@ class NotificationsConfig(BaseModel):
 class TeamConfig(BaseModel):
     name: str
     slack_tags: Optional[List[str]]
+    thresholds: Optional[ThresholdOverride]
 
 
 class GroupConfig(BaseModel):
@@ -114,3 +121,19 @@ class CodeLockdownConfig(BaseModel):
                 return team.slack_tags or []
 
         return []
+
+    def get_team_thresholds(self, team_name: str, defaults: IssueThresholds) -> IssueThresholds:
+        """
+        Get team thresholds (or defaults if none set)
+        """
+
+        for team in self.teams:
+            if team.name == team_name and team.thresholds:
+                thresholds = deepcopy(defaults)
+                if team.thresholds.hot is not None:
+                    thresholds.hot.count = team.thresholds.hot
+                if team.thresholds.cold is not None:
+                    thresholds.cold.count = team.thresholds.cold
+                return thresholds
+
+        return defaults

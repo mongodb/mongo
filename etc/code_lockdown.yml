@@ -111,6 +111,10 @@ groups:
       - "Replication"
       - "Storage Execution"
       - "Storage Engines"
+      - "Storage Engines - Server Integration"
+      - "Storage Engines - Foundations"
+      - "Storage Engines - Transactions"
+      - "Storage Engines - Persistence"
       - "Storage Layer Services"
     slack_tags:
       - "<@U032DKCUWQ4>" # mick.graham@mongodb.com - VP
@@ -195,6 +199,38 @@ teams:
     slack_tags:
       - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
       - "<!subteam^S05UGLCB76U>" # @leads-storage-engines - Leads
+      - "<!subteam^S08DQ4QBP6K>" # @storage-engines-wiredtiger-primary - Triager
+    thresholds: # triage should route these elsewhere quickly
+      hot: 2
+      cold: 2
+  - name: "Storage Engines - Server Integration"
+    slack_tags:
+      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@U09EG3B1MR6>" # nick.beckenham@mongodb.com - Lead
+    thresholds: # Reduced Quotas for Storage Engines
+      hot: 3
+      cold: 5
+  - name: "Storage Engines - Foundations"
+    slack_tags:
+      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@U094DFQ4JGL>" # radoslav.kardum@mongodb.com - Lead
+    thresholds: # Reduced Quotas for Storage Engines
+      hot: 3
+      cold: 5
+  - name: "Storage Engines - Transactions"
+    slack_tags:
+      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@UKGR8F9C7>" # haribabu.kommi@mongodb.com - Lead
+    thresholds: # Reduced Quotas for Storage Engines
+      hot: 3
+      cold: 5
+  - name: "Storage Engines - Persistence"
+    slack_tags:
+      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@U01JK626XEY>" # etienne.petrel@mongodb.com - Lead
+    thresholds: # Reduced Quotas for Storage Engines
+      hot: 3
+      cold: 5
   - name: "Storage Layer Services"
     slack_tags:
       - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
