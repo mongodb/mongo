@@ -995,7 +995,7 @@ palm_handle_discard(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_
 
     /* Create an empty record as a tombstone. */
     if ((tombstone = calloc(1, sizeof(WT_ITEM))) == NULL)
-        return (errno);
+        PALM_KV_ERR(palm, session, errno);
 
     PALM_KV_ERR(palm, session,
       palm_kv_put_page(&context, palm_handle->table_id, page_id, lsn, is_delta,
@@ -1073,7 +1073,6 @@ palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
     }
 
     palm_init_context(palm, &context);
-    context_valid = true;
 
     /* Check or initialize the encryption field. */
     PALM_KV_RET(palm, session,
@@ -1081,6 +1080,7 @@ palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
         put_args->base_lsn, &encryption));
 
     PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
+    context_valid = true;
     ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_LSN, &lsn);
     if (ret == MDB_NOTFOUND) {
         lsn = 1;

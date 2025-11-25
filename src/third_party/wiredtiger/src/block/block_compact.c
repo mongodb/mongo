@@ -17,10 +17,14 @@ static void __block_dump_file_stat(WT_SESSION_IMPL *, WT_BLOCK *, bool);
 int
 __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-    if (block->compact_session_id != WT_SESSION_ID_INVALID)
+    if (block->compact_session_id != WT_SESSION_ID_INVALID) {
+        bool is_bg_compact =
+          (block->compact_session_id == S2C(session)->background_compact.session->id);
+
         WT_RET_MSG(session, EBUSY,
-          "Compaction already happening on data handle %s by session %" PRIu32, block->name,
-          session->id);
+          "%s compaction already happening on data handle %s by session %" PRIu32,
+          is_bg_compact ? "Background" : "Foreground", block->name, block->compact_session_id);
+    }
 
     /* Switch to first-fit allocation. */
     __wti_block_configure_first_fit(block, true);

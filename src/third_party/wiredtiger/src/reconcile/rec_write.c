@@ -3032,6 +3032,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
     WT_REF_STATE previous_ref_state;
     WT_TIME_AGGREGATE stop_ta, *stop_tap, ta;
     uint32_t i;
+    bool disagg_page_free_required;
+    bool disagg_page_is_valid;
 
     btree = S2BT(session);
     bm = btree->bm;
@@ -3040,6 +3042,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
     mod = page->modify;
     WT_TIME_AGGREGATE_INIT(&ta);
     previous_ref_state = 0;
+    disagg_page_is_valid = false;
+    disagg_page_free_required = false;
 
     /*
      * If using the history store table eviction path and we found updates that weren't globally
@@ -3052,6 +3056,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
         session->reconcile_timeline.hs_wrapup_finish = __wt_clock(session);
         WT_RET(ret);
     }
+
+    /* As an initial condition, the page must have a valid page_id. */
+    if (page->disagg_info != NULL &&
+      page->disagg_info->block_meta.page_id != WT_BLOCK_INVALID_PAGE_ID)
+        disagg_page_is_valid = true;
 
     /*
      * Wrap up overflow tracking. If we are about to create a checkpoint, the system must be
@@ -3090,10 +3099,18 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
             break;
         }
 
-        WT_RET(__wt_ref_block_free(session, ref,
-          page->disagg_info != NULL &&
-            page->disagg_info->block_meta.page_id != WT_BLOCK_INVALID_PAGE_ID &&
-            r->multi_next != 1));
+        /*
+         * Free the disaggregated block if reconciliation results in zero pages, multiple pages, or
+         * a single empty page.
+         */
+        if (disagg_page_is_valid)
+            /*
+             * r->multi == NULL implies r->multi_next == 0; thus it is safe to access block_meta
+             * directly.
+             */
+            disagg_page_free_required =
+              (r->multi_next != 1 || r->multi->block_meta->page_id == WT_BLOCK_INVALID_PAGE_ID);
+        WT_RET(__wt_ref_block_free(session, ref, disagg_page_free_required));
         break;
     case WT_PM_REC_EMPTY: /* Page deleted */
         break;
@@ -3115,6 +3132,17 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
              * We have skipped writing a delta in the first reconciliation after the page is read
              * from disk.
              */
+            /*
+             * Free the disaggregated block if reconciliation results in zero pages, multiple pages,
+             * or a single empty page.
+             */
+            if (disagg_page_is_valid)
+                /*
+                 * r->multi == NULL implies r->multi_next == 0; thus it is safe to access block_meta
+                 * directly.
+                 */
+                disagg_page_free_required =
+                  (r->multi_next != 1 || r->multi->block_meta->page_id == WT_BLOCK_INVALID_PAGE_ID);
             if (mod->mod_replace.block_cookie == NULL) {
                 WT_ASSERT(session, WT_DELTA_ENABLED_FOR_PAGE(session, page->type));
                 /*
@@ -3122,19 +3150,32 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
                  * Free the block address otherwise if it is available.
                  */
                 if (ref->addr != NULL) {
-                    if (!F_ISSET(r, WT_REC_EMPTY_DELTA))
-                        WT_RET(__wt_ref_block_free(session, ref,
-                          page->disagg_info != NULL &&
-                            page->disagg_info->block_meta.page_id != WT_BLOCK_INVALID_PAGE_ID &&
-                            r->multi_next != 1));
+                    if (page->disagg_info == NULL)
+                        WT_RET(__wt_ref_block_free(session, ref, true));
+                    /*
+                     * r->multi_next may be 0; check it to avoid block_meta is NULL.
+                     * WT_PM_REC_REPLACE only indicates previous reconciliation generated one page.
+                     */
+                    else if (r->multi_next > 0 &&
+                      r->multi->block_meta->page_id == WT_BLOCK_INVALID_PAGE_ID)
+                        /*
+                         * If we write an empty page for update restore eviction, we need to free
+                         * the page id.
+                         */
+                        WT_RET(__wt_ref_block_free(session, ref, true));
+                    else if (!F_ISSET(r, WT_REC_EMPTY_DELTA))
+                        /* Only free a disagg page if it's not an empty delta. */
+                        WT_RET(__wt_ref_block_free(session, ref, disagg_page_free_required));
                 }
             } else {
+                /*
+                 * Free the disaggregated block if reconciliation results in zero pages, multiple
+                 * pages, or a single empty page.
+                 */
                 if (page->disagg_info == NULL)
                     WT_RET(__wt_btree_block_free(
                       session, mod->mod_replace.block_cookie, mod->mod_replace.block_cookie_size));
-                /* Free disagg block only if it is not a block replacement. */
-                else if (page->disagg_info->block_meta.page_id != WT_BLOCK_INVALID_PAGE_ID &&
-                  r->multi_next != 1) {
+                else if (disagg_page_free_required) {
                     WT_RET(__wt_btree_block_free(
                       session, mod->mod_replace.block_cookie, mod->mod_replace.block_cookie_size));
                     page->disagg_info->block_meta.page_id = WT_BLOCK_INVALID_PAGE_ID;
