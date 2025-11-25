@@ -309,6 +309,62 @@ StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
     return {matches};
 }
 
+Status applyExtractionConversionsToDocument(const BSONObj& ref,
+                                            BSONObjBuilder& builder,
+                                            size_t recursion) {
+    if (recursion > kMaxRecursion) {
+        return {ErrorCodes::BadValue, "Recursion limit reached."};
+    }
+
+    BSONObjIterator iterator(ref);
+    while (iterator.more()) {
+        BSONElement currentElement = iterator.next();
+
+        switch (currentElement.type()) {
+            case BSONType::numberDouble: {
+                double value = currentElement.numberDouble();
+                if (std::isnan(value)) {
+                    builder.append(currentElement.fieldName(), 0);
+                } else if (value >= BSONElement::kLongLongMaxPlusOneAsDouble) {
+                    builder.append(currentElement.fieldName(),
+                                   std::numeric_limits<long long>::max());
+                } else if (value < std::numeric_limits<long long>::min()) {
+                    builder.append(currentElement.fieldName(),
+                                   std::numeric_limits<long long>::min());
+                } else {
+                    builder.append(currentElement.fieldName(), value);
+                }
+            } break;
+
+            case BSONType::object: {
+                BSONObjBuilder sub(builder.subobjStart(currentElement.fieldName()));
+                auto s =
+                    applyExtractionConversionsToDocument(currentElement.Obj(), sub, recursion + 1);
+                if (!s.isOK()) {
+                    return s;
+                }
+                break;
+            }
+
+            case BSONType::array: {
+                BSONObjBuilder sub(builder.subarrayStart(currentElement.fieldName()));
+                auto s =
+                    applyExtractionConversionsToDocument(currentElement.Obj(), sub, recursion + 1);
+                if (!s.isOK()) {
+                    return s;
+                }
+                break;
+            }
+
+            default:
+                builder.append(currentElement);
+                break;
+        }
+    }
+
+    return Status::OK();
+}
+
 }  // namespace
 
 bool isFTDCType(BSONType type) {
@@ -333,6 +389,16 @@ StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
                                             const BSONObj& currentDoc,
                                             std::vector<std::uint64_t>* metrics) {
     return extractMetricsFromDocument(referenceDoc, currentDoc, metrics, true, 0);
+}
+
+StatusWith<BSONObj> applyExtractionConversionsToDocument(const BSONObj& ref) {
+    BSONObjBuilder b;
+    Status s = applyExtractionConversionsToDocument(ref, b, 0);
+    if (!s.isOK()) {
+        return StatusWith<BSONObj>(s);
+    }
+
+    return b.obj();
 }
 
 namespace {

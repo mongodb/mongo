@@ -147,6 +147,20 @@ StatusWith<BSONObj> constructDocumentFromMetrics(const BSONObj& ref,
                                                  const std::vector<std::uint64_t>& metrics);
 
 /**
+ * Apply the conversions specified in the FTDC extraction specifications to the given reference
+ * document.
+ *
+ * Current conversions are:
+ *  - For Doubles:
+ *    - NaN -> 0
+ *    - less than MIN_INT64 -> MIN_INT64
+ *    - greater than MAX_INT64 -> MAX_INT64
+ *
+ * See: src/mongo/db/ftdc/README.md#extraction
+ */
+StatusWith<BSONObj> applyExtractionConversionsToDocument(const BSONObj& ref);
+
+/**
  * Create BSON metadata document for storage. The passed in document is embedded as the doc
  * field in the example above. For the _id field, the specified date is used.
  *

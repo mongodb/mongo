@@ -123,6 +123,12 @@ FTDCCompressor::addSample(const BSONObj& sample, Date_t date) {
 StatusWith<std::tuple<ConstDataRange, Date_t>> FTDCCompressor::getCompressedSamples() {
     _uncompressedChunkBuffer.setlen(0);
 
+    auto swConvertedDoc = FTDCBSONUtil::applyExtractionConversionsToDocument(_referenceDoc);
+    if (!swConvertedDoc.isOK()) {
+        return swConvertedDoc.getStatus();
+    }
+    _referenceDoc = swConvertedDoc.getValue();
+
     // Append reference document - BSON Object
     _uncompressedChunkBuffer.appendBuf(_referenceDoc.objdata(), _referenceDoc.objsize());
 
@@ -133,20 +139,21 @@ StatusWith<std::tuple<ConstDataRange, Date_t>> FTDCCompressor::getCompressedSamp
     _uncompressedChunkBuffer.appendNum(static_cast<std::uint32_t>(_deltaCount));
 
     if (_metricsCount != 0 && _deltaCount != 0) {
-        // On average, we do not need all 10 bytes for every sample, worst case, we grow the buffer
+        // On average, we do not need all 10 bytes for every sample, worst case, we grow the
+        // buffer
         DataBuilder db(_metricsCount * _deltaCount * VarInt::kMaxSizeBytes64 / 2);
 
         std::uint32_t zeroesCount = 0;
 
-        // For each set of samples for a particular metric,
-        // we think of it is simple array of 64-bit integers we try to compress into a byte array.
-        // This is done in three steps for each metric
+        // For each set of samples for a particular metric, we think of it is simple array of 64-bit
+        // integers we try to compress into a byte array. This is done in three steps for each
+        // metric:
         // 1. Delta Compression
         //   - i.e., we store the difference between pairs of samples, not their absolute values
         //   - this is done in addSamples
         // 2. Run Length Encoding of zeros
         //   - We find consecutive sets of zeros and represent them as a tuple of (0, count - 1).
-        //   - Each memeber is stored as VarInt packed integer
+        //   - Each member is stored as VarInt packed integer
         // 3. Finally, for non-zero members, we store these as VarInt packed
         //
         // These byte arrays are added to a buffer which is then concatenated with other chunks and
@@ -182,8 +189,7 @@ StatusWith<std::tuple<ConstDataRange, Date_t>> FTDCCompressor::getCompressedSamp
             }
 
             // If we are on the last metric, and the previous loop ended in a zero, write out the
-            // RLE
-            // pair of zero information.
+            // RLE pair of zero information.
             if ((i == (_metricsCount - 1)) && zeroesCount) {
                 auto s1 = db.writeAndAdvance(VarInt(0));
                 if (!s1.isOK()) {
