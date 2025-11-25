@@ -142,11 +142,10 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromBsons(
             rec.newDoc();
         }
 
-        walkObj<BlockProjectionPositionInfoRecorder>(&_root,
-                                                     TypeTags::bsonObject,
-                                                     bitcastFrom<const char*>(obj.objdata()),
-                                                     obj.objdata(),
-                                                     visitElementExtractorCallback);
+        walkBsonObj<BlockProjectionPositionInfoRecorder>(&_root,
+                                                         bitcastFrom<const char*>(obj.objdata()),
+                                                         obj.objdata(),
+                                                         visitElementExtractorCallback);
 
         for (auto& rec : _filterPositionInfoRecorders) {
             rec.endDoc();
@@ -221,11 +220,10 @@ std::vector<const char*> extractValuePointersFromBson(BSONObj& obj,
             }
         };
 
-    walkObj<BlockProjectionPositionInfoRecorder>(extractor.getRoot(),
-                                                 TypeTags::bsonObject,
-                                                 bitcastFrom<const char*>(obj.objdata()),
-                                                 obj.objdata(),
-                                                 recordValuePointer);
+    walkBsonObj<BlockProjectionPositionInfoRecorder>(extractor.getRoot(),
+                                                     bitcastFrom<const char*>(obj.objdata()),
+                                                     obj.objdata(),
+                                                     recordValuePointer);
     return bsonPointers;
 }
 }  // namespace mongo::sbe::value

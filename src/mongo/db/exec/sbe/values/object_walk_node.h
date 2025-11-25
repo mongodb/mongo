@@ -257,27 +257,42 @@ void walkField(ObjectWalkNode<ProjectionRecorder>* node,
 
 template <class ProjectionRecorder, class Cb>
 requires std::invocable<Cb&, ObjectWalkNode<ProjectionRecorder>*, TypeTags, Value, const char*>
-void walkObj(ObjectWalkNode<ProjectionRecorder>* node,
-             value::TypeTags inputTag,
-             value::Value inputVal,
-             const char* bsonPtr,
-             const Cb& cb) {
+void walkBsonObj(ObjectWalkNode<ProjectionRecorder>* node,
+                 value::Value inputVal,
+                 const char* bsonPtr,
+                 const Cb& cb) {
     size_t numChildrenWalked = 0;
-    auto callback = [&](StringData currFieldName,
-                        value::TypeTags tag,
-                        value::Value val,
-                        const char* cur) -> bool {
-        if (numChildrenWalked >= node->getChildren.size()) {
-            // Early exit because we've walked every child for this node.
-            return true;
-        }
-        if (auto it = node->getChildren.find(currFieldName); it != node->getChildren.end()) {
-            walkField<ProjectionRecorder, Cb>(it->second.get(), tag, val, cur, cb);
+    auto bson = value::getRawPointerView(inputVal);
+    const auto end = bson::bsonEnd(bson);
+
+    // Skip document length.
+    const char* be = bson + 4;
+    while (numChildrenWalked < node->getChildren.size() && be != end - 1) {
+        auto fieldName = bson::fieldNameAndLength(be);
+        if (auto it = node->getChildren.find(fieldName); it != node->getChildren.end()) {
+            auto [eltTag, eltVal] = bson::convertFrom<true>(be, end, fieldName.size());
+            walkField<ProjectionRecorder>(it->second.get(), eltTag, eltVal, be, cb);
             numChildrenWalked++;
         }
-        return false;
-    };
-    value::objectForEach(inputTag, inputVal, callback);
+        be = bson::advance(be, fieldName.size());
+    }
+}
+
+template <class ProjectionRecorder, class Cb>
+void walkObject(ObjectWalkNode<ProjectionRecorder>* node, value::Value inputVal, const Cb& cb) {
+    size_t numChildrenWalked = 0;
+    auto obj = getObjectView(inputVal);
+
+    size_t i = 0;
+    while (numChildrenWalked < node->getChildren.size() && i < obj->size()) {
+        if (auto it = node->getChildren.find(obj->field(i)); it != node->getChildren.end()) {
+            auto [eltTag, eltVal] = obj->getAt(i);
+            walkField<ProjectionRecorder>(
+                it->second.get(), eltTag, eltVal, nullptr /*bsonPtr*/, cb);
+            numChildrenWalked++;
+        }
+        i++;
+    }
 }
 
 template <class ProjectionRecorder, class Cb>
@@ -287,13 +302,12 @@ void walkField(ObjectWalkNode<ProjectionRecorder>* node,
                Value eltVal,
                const char* bsonPtr,
                const Cb& cb) {
-    if (value::isObject(eltTag)) {
-        walkObj<ProjectionRecorder, Cb>(node, eltTag, eltVal, bsonPtr, cb);
-        if (node->traverseChild) {
-            walkField<ProjectionRecorder, Cb>(
-                node->traverseChild.get(), eltTag, eltVal, bsonPtr, cb);
-        }
-    } else if (value::isArray(eltTag)) {
+    if (value::TypeTags::bsonObject == eltTag) {
+        walkBsonObj<ProjectionRecorder, Cb>(node, eltVal, bsonPtr, cb);
+    } else if (value::TypeTags::Object == eltTag) {
+        walkObject<ProjectionRecorder, Cb>(node, eltVal, cb);
+    }
+    if (value::isArray(eltTag)) {
         if (node->traverseChild) {
             // The projection traversal semantics are "special" in that the leaf must know
             // when there is an array higher up in the tree.
@@ -322,7 +336,7 @@ void walkField(ObjectWalkNode<ProjectionRecorder>* node,
             }
         }
     } else if (node->traverseChild) {
-        // We didn't see an array, so we apply the node below the traverse to this scalar.
+        // We didn't see an array, so we apply the node below the traverse.
         walkField<ProjectionRecorder>(node->traverseChild.get(), eltTag, eltVal, bsonPtr, cb);
     }
     // Some callbacks use the raw bson pointer, not just the tag and value.

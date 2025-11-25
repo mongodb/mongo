@@ -132,8 +132,15 @@ PlanState ExtractFieldPathsStage::getNext() {
     if (_root->inputAccessor) {
         // Should only be used for unit tests.
         auto [inputTag, inputVal] = _root->inputAccessor->getViewOfValue();
-        value::walkObj<value::ScalarProjectionPositionInfoRecorder>(
-            _root.get(), inputTag, inputVal, value::bitcastTo<const char*>(inputVal), walk);
+
+        if (value::TypeTags::bsonObject == inputTag) {
+            value::walkBsonObj<value::ScalarProjectionPositionInfoRecorder>(
+                _root.get(), inputVal, value::bitcastTo<const char*>(inputVal), walk);
+        } else if (value::TypeTags::Object == inputTag) {
+            value::walkObject<value::ScalarProjectionPositionInfoRecorder>(
+                _root.get(), inputVal, walk);
+        }
+
     } else {
         // Important this is only for toplevel fields. For nested fields, we would need knowledge of
         // arrayness. We would also need to check for input accessors during the tree traversal.
