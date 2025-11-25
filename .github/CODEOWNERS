@@ -356,6 +356,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /docs/**/poetry_execution.md @10gen/devprod-correctness @svc-auto-approve-bot
 /docs/**/server_parameters.md @10gen/server-programmability @svc-auto-approve-bot
 
+# The following patterns are parsed from ./docs/branching/OWNERS.yml
+/docs/branching/**/* @10gen/server-release @svc-auto-approve-bot
+
 # The following patterns are parsed from ./docs/evergreen-testing/OWNERS.yml
 /docs/evergreen-testing/ @10gen/devprod-correctness @svc-auto-approve-bot
 
