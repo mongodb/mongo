@@ -2252,12 +2252,6 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
         ASSERT(client.runCommand(nss.dbName(), createIndexesCmdObj, result)) << result;
     }
 
-    auto collAcq = acquireCollection(
-        _opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
-        MODE_X);
-    ;
-
     NamespaceString renamedNss = NamespaceString::createNamespaceString_forTest(
         "unittestsRename.timestampMultiIndexBuildsDuringRename");
     create(renamedNss);
