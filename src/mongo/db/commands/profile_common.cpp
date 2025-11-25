@@ -69,10 +69,9 @@ Status ProfileCmdBase::checkAuthForOperation(OperationContext* opCtx,
         ProfileCmdRequest::parse(cmdObj, IDLParserContext("profile", vts, dbName.tenantId(), sc));
     const auto profilingLevel = request.getCommandParameter();
 
-    if (profilingLevel < 0 && !request.getSlowms() && !request.getSlowinprogms() &&
-        !request.getSampleRate()) {
-        // If the user just wants to view the current values of 'slowms' and 'sampleRate', they
-        // only need read rights on system.profile, even if they can't change the profiling level.
+    if (profilingLevel < 0 && cmdObj.nFields() == 1) {
+        // If the user just wants to view the current profiling settings, they only need read rights
+        // on system.profile, even if they can't change the profiling level.
         if (authzSession->isAuthorizedForActionsOnResource(
                 ResourcePattern::forExactNamespace(
                     NamespaceStringUtil::deserialize(dbName, "system.profile")),
