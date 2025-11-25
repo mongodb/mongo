@@ -78,6 +78,74 @@ def find_files(file_name: str, path: str) -> List[str]:
     return glob.glob(f"{path}/**/{file_name}", recursive=True)
 
 
+def filter_core_dumps(
+    core_files: List[str],
+    boring_core_dump_pids: set,
+    max_core_dumps: int,
+    logger: logging.Logger,
+) -> List[str]:
+    """
+    Filter core dump files by removing boring PIDs and applying a maximum cap.
+
+    :param core_files: List of core dump file paths
+    :param boring_core_dump_pids: Set of PIDs to filter out (can be None or empty)
+    :param max_core_dumps: Maximum number of core dumps to process
+    :param logger: Logger for output
+    :return: Filtered list of core dump file paths
+    """
+    if boring_core_dump_pids is None:
+        boring_core_dump_pids = set()
+
+    original_count = len(core_files)
+
+    # Only filter if we have boring PIDs to filter out (empty set is falsy)
+    if boring_core_dump_pids:
+        logger.info(
+            f"Found {original_count} total core dumps. Filtering out boring PIDs: {boring_core_dump_pids}"
+        )
+        interesting_core_dumps = []
+        boring_core_dump_names = []
+        for core_file in core_files:
+            basename = os.path.basename(core_file)
+            # Expected format: dump_<binary>.<pid>.core or dump_<binary>-<version>.<pid>.core
+            parts = basename.split(".")
+            if len(parts) >= 3 and parts[-2].isdigit():
+                pid = parts[-2]
+                if pid in boring_core_dump_pids:
+                    boring_core_dump_names.append(basename)
+                else:
+                    interesting_core_dumps.append(core_file)
+            else:
+                # If we can't parse the PID, assume it's interesting to be safe
+                logger.warning(
+                    f"Could not parse PID from core file name: {basename}, treating as interesting"
+                )
+                interesting_core_dumps.append(core_file)
+
+        core_files = interesting_core_dumps
+        logger.info(
+            f"Filtered out {len(boring_core_dump_names)} boring core dumps. {len(core_files)} interesting core dumps remain."
+        )
+        if boring_core_dump_names:
+            logger.info(
+                f"Skipped boring core dumps: {boring_core_dump_names[:10]}{'...' if len(boring_core_dump_names) > 10 else ''}"
+            )
+    else:
+        logger.info(
+            f"Found {original_count} total core dumps. No boring PIDs list provided, analyzing all core dumps."
+        )
+
+    # Apply cap to limit maximum number of core dumps analyzed
+    if len(core_files) > max_core_dumps:
+        logger.warning(
+            f"Found {len(core_files)} core dumps, which exceeds the maximum of {max_core_dumps}. "
+            f"Only the first {max_core_dumps} core dumps will be analyzed."
+        )
+        core_files = core_files[:max_core_dumps]
+
+    return core_files
+
+
 class Dumper(metaclass=ABCMeta):
     """
     Abstract base class for OS-specific dumpers.
@@ -295,11 +363,28 @@ class WindowsDumper(Dumper):
 
             self._root_logger.info("Done analyzing %s process with PID %d", pinfo.name, pid)
 
-    def analyze_cores(self, core_file_dir: str, install_dir: str, analysis_dir: str):
+    def analyze_cores(
+        self,
+        core_file_dir: str,
+        install_dir: str,
+        analysis_dir: str,
+        boring_core_dump_pids: set = None,
+        max_core_dumps: int = 50,
+    ):
         install_dir = os.path.abspath(install_dir)
         core_files = find_files(f"*.{self.get_dump_ext()}", core_file_dir)
         if not core_files:
             raise RuntimeError(f"No core dumps found in {core_file_dir}")
+
+        # Filter and cap core dumps
+        core_files = filter_core_dumps(
+            core_files, boring_core_dump_pids, max_core_dumps, self._root_logger
+        )
+
+        if not core_files:
+            self._root_logger.warning("No interesting core dumps to analyze after filtering.")
+            return
+
         for filename in core_files:
             file_path = os.path.abspath(filename)
             try:
@@ -325,7 +410,7 @@ class WindowsDumper(Dumper):
         logger.info("analyzing %s", filename)
 
         if not binary_files:
-            logger.warn("Binary %s not found, cannot process %s", binary_name, filename)
+            logger.warning("Binary %s not found, cannot process %s", binary_name, filename)
             return
 
         if len(binary_files) > 1:
@@ -654,6 +739,8 @@ class GDBDumper(Dumper):
         analysis_dir: str,
         multiversion_dir: str,
         gdb_index_cache: str,
+        boring_core_dump_pids: set = None,
+        max_core_dumps: int = 50,
     ) -> Report:
         core_files = find_files(f"*.{self.get_dump_ext()}", core_file_dir)
         analyze_cores_span = get_default_current_span()
@@ -663,6 +750,17 @@ class GDBDumper(Dumper):
                 "analyze_cores_error", f"No core dumps found in {core_file_dir}"
             )
             raise RuntimeError(f"No core dumps found in {core_file_dir}")
+
+        original_count = len(core_files)
+
+        # Filter and cap core dumps
+        core_files = filter_core_dumps(
+            core_files, boring_core_dump_pids, max_core_dumps, self._root_logger
+        )
+
+        if not core_files:
+            self._root_logger.warning("No interesting core dumps to analyze after filtering.")
+            return Report({"failures": 0, "results": []})
 
         tmp_dir = os.path.join(analysis_dir, "tmp")
         os.makedirs(tmp_dir, exist_ok=True)
@@ -724,7 +822,14 @@ class GDBDumper(Dumper):
             report["results"].append(result)
             self._root_logger.info("Analysis of %s ended with status %s", basename, status)
         analyze_cores_span.set_attributes(
-            {"failures": report["failures"], "core_dump_count": len(core_files)}
+            {
+                "failures": report["failures"],
+                "core_dump_count": len(core_files),
+                "original_core_dump_count": original_count,
+                "boring_core_dumps_filtered": original_count - len(core_files)
+                if boring_core_dump_pids
+                else 0,
+            }
         )
         shutil.rmtree(tmp_dir)
         return report
@@ -758,7 +863,7 @@ class GDBDumper(Dumper):
 
         if not binary_files:
             # This can sometimes happen because coredumps can appear from non-mongo processes
-            logger.warn("Binary %s not found, cannot process %s", binary_name, basename)
+            logger.warning("Binary %s not found, cannot process %s", binary_name, basename)
             return 0, "skip"
 
         if len(binary_files) > 1:

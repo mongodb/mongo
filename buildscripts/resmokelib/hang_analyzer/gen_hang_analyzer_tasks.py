@@ -86,6 +86,7 @@ def get_core_analyzer_commands(
     core_analyzer_results_url: str,
     gdb_index_cache: str,
     has_interesting_core_dumps: bool,
+    boring_core_dump_pids: set,
 ) -> List[FunctionCall]:
     """Return setup commands."""
     return [
@@ -109,6 +110,7 @@ def get_core_analyzer_commands(
                     f"--task-id={task_id}",
                     f"--execution={execution}",
                     f"--gdb-index-cache={gdb_index_cache}",
+                    f"--boring-core-dump-pids={','.join(boring_core_dump_pids)}",
                     "--generate-report",
                     "--otel-extra-data",
                     f"has_interesting_core_dumps={str(has_interesting_core_dumps).lower()}",
@@ -233,10 +235,21 @@ def generate(
 
     should_activate = should_activate_core_analysis_task(task_info)
 
+    # Get boring core dump PIDs to pass to the analyzer
+    boring_core_dump_pids = set()
+    if os.path.exists(BORING_CORE_DUMP_PIDS_FILE):
+        with open(BORING_CORE_DUMP_PIDS_FILE, "r") as file:
+            boring_core_dump_pids = set(file.read().split())
+
     # Make the evergreen variant that will be generated
     build_variant = BuildVariant(name=build_variant_name)
     commands = get_core_analyzer_commands(
-        task_id, execution, core_analyzer_results_url, gdb_index_cache, should_activate
+        task_id,
+        execution,
+        core_analyzer_results_url,
+        gdb_index_cache,
+        should_activate,
+        boring_core_dump_pids,
     )
 
     deps = {TaskDependency("archive_dist_test_debug", compile_variant)}

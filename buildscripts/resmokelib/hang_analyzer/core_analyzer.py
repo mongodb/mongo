@@ -23,6 +23,12 @@ class CoreAnalyzer(Subcommand):
         self.task_id = options["failed_task_id"]
         self.execution = options["execution"]
         self.gdb_index_cache = options["gdb_index_cache"]
+        # Parse boring core dump PIDs from comma-separated string
+        boring_pids_str = options["boring_core_dump_pids"]
+        if boring_pids_str:
+            self.boring_core_dump_pids = set(pid for pid in boring_pids_str.split(",") if pid)
+        else:
+            self.boring_core_dump_pids = set()
         self.root_logger = self.setup_logging(logger)
         self.extra_otel_options = {}
         for option in options["otel_extra_data"]:
@@ -82,7 +88,12 @@ class CoreAnalyzer(Subcommand):
 
         analysis_dir = os.path.join(base_dir, "analysis")
         report = dumpers.dbg.analyze_cores(
-            core_dump_dir, install_dir, analysis_dir, multiversion_dir, self.gdb_index_cache
+            core_dump_dir,
+            install_dir,
+            analysis_dir,
+            multiversion_dir,
+            self.gdb_index_cache,
+            self.boring_core_dump_pids,
         )
 
         if self.options["generate_report"]:
@@ -204,6 +215,14 @@ class CoreAnalyzerPlugin(PluginInterface):
             action="append",
             default=[],
             help="Add any data input here to otel trace, format: key=val",
+        )
+
+        parser.add_argument(
+            "--boring-core-dump-pids",
+            action="store",
+            type=str,
+            default="",
+            help="Comma-separated list of PIDs for boring core dumps that should be skipped during analysis.",
         )
 
         configure_resmoke.add_otel_args(parser)
