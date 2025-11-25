@@ -24,9 +24,9 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_options_servers",
-        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/query/query_stats",
-        "//src/mongo/db/storage:recovery_unit_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:recovery_unit_base",
         "//src/mongo/util:log_and_backoff",
     ],
 )
@@ -46,12 +46,12 @@ mongo_cc_library(
     deps = [
         ":flow_control_ticketholder",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/admission:execution_admission_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/admission:execution_admission_context",
         "//src/mongo/db/admission:ticketing_system",
         "//src/mongo/db/storage/key_string",
-        "//src/mongo/util:background_job",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/concurrency:ticketholder",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:background_job",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/concurrency:ticketholder",
     ],
 )
 

@@ -16,7 +16,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:service_context",
-        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:storage_options",
     ],
 )
 
@@ -41,8 +41,8 @@ mongo_cc_library(
         "repl_settings.cpp",
     ],
     deps = [
-        ":repl_server_parameters",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        ":repl_server_parameters",
+        "//src/mongo/db:server_base",
     ],
 )
 
@@ -70,7 +70,7 @@ mongo_cc_library(
         "storage_interface.cpp",
     ],
     deps = [
-        ":optime",  # TODO(SERVER-93876): Remove.
+        ":optime",
         "//src/mongo/db:service_context",
     ],
 )
@@ -114,12 +114,12 @@ mongo_cc_library(
         "oplog_entry_serialization.cpp",
     ],
     deps = [
-        ":optime",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:multitenancy",  # TODO(SERVER-93876): Remove.
+        ":optime",
+        "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/auth:security_token_auth",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/auth:security_token_auth",
+        "//src/mongo/db/exec/document_value",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
     ],
 )
@@ -169,7 +169,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
         "//src/mongo/db/auth",
         "//src/mongo/util/concurrency:thread_pool",
     ],
@@ -211,7 +211,7 @@ mongo_cc_library(
     deps = [
         ":oplog_entry",
         "//src/mongo:base",
-        "//src/mongo/db/session:logical_session_id",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/session:logical_session_id",
         "//src/mongo/idl:idl_parser",
     ],
 )
@@ -248,9 +248,9 @@ mongo_cc_library(
         "read_concern_args_decoration.cpp",
     ],
     deps = [
-        ":optime",  # TODO(SERVER-93876): Remove.
+        ":optime",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
     ],
 )
 
@@ -274,15 +274,15 @@ mongo_cc_library(
         "replication_coordinator_noop.cpp",
     ],
     deps = [
-        ":optime",  # TODO(SERVER-93876): Remove.
+        ":optime",
         ":repl_server_parameters",
         ":repl_settings",
-        ":replication_process",  # TODO(SERVER-93876): Remove.
-        ":split_prepare_session_manager",  # TODO(SERVER-93876): Remove.
+        ":replication_process",
+        ":split_prepare_session_manager",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/util/net:network",
     ],
 )
 
@@ -301,7 +301,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/client:read_preference",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
     ],
 )
 
@@ -314,8 +314,8 @@ mongo_cc_library(
     deps = [
         ":oplog_entry",
         ":repl_coordinator_interface",
-        ":repl_server_parameters",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        ":repl_server_parameters",
+        "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
     ],
 )
@@ -344,18 +344,18 @@ mongo_cc_library(
     ],
     deps = [
         ":optime",
-        ":read_concern_args",  # TODO(SERVER-93876): Remove.
+        ":read_concern_args",
         ":repl_server_parameters",
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/client:connection_string",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db:common",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/repl/hello:hello_response",
         "//src/mongo/db/repl/split_horizon",
         "//src/mongo/rpc:command_status",
-        "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/util/net:network",
     ],
 )
 
@@ -377,10 +377,10 @@ mongo_cc_library(
     deps = [
         ":replica_set_messages",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/executor:remote_command",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/executor:remote_command",
         "//src/mongo/executor:task_executor_interface",
-        "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/rpc:command_status",
     ],
 )
 
@@ -391,13 +391,13 @@ mongo_cc_library(
     ],
     deps = [
         ":oplog_entry",
-        ":optime",  # TODO(SERVER-93876): Remove.
-        ":read_concern_args",  # TODO(SERVER-93876): Remove.
+        ":optime",
+        ":read_concern_args",
         "//src/mongo/client:fetcher",
         "//src/mongo/db:server_base",
-        "//src/mongo/executor:task_executor_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/rpc:metadata",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/rpc:metadata",
+        "//src/mongo/util/net:network",
     ],
 )
 
@@ -539,7 +539,7 @@ mongo_cc_library(
     srcs = ["roll_back_local_operations.cpp"],
     deps = [
         ":oplog_entry",
-        ":optime",  # TODO(SERVER-93876): Remove.
+        ":optime",
         "//src/mongo:base",
         "//src/mongo/db/storage:remove_saver",
     ],
@@ -576,9 +576,9 @@ mongo_cc_library(
         "replication_process.cpp",
     ],
     deps = [
-        ":optime",  # TODO(SERVER-93876): Remove.
-        ":rollback_idl",  # TODO(SERVER-93876): Remove.
-        ":storage_interface",  # TODO(SERVER-93876): Remove.
+        ":optime",
+        ":rollback_idl",
+        ":storage_interface",
         "//src/mongo/db:service_context",
     ],
 )
@@ -600,8 +600,8 @@ mongo_cc_library(
         "split_prepare_session_manager.cpp",
     ],
     deps = [
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/session:logical_session_id",  #  TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
+        "//src/mongo/db/session:logical_session_id",
         "//src/mongo/db/session:logical_session_id_helpers",
     ],
 )
@@ -612,9 +612,9 @@ mongo_cc_library(
         "abstract_async_component.cpp",
     ],
     deps = [
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
         "//src/mongo/executor:task_executor_interface",
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",
     ],
 )
 
@@ -624,7 +624,7 @@ mongo_cc_library(
         "delayable_timeout_callback.cpp",
     ],
     deps = [
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
         "//src/mongo/executor:task_executor_interface",
     ],
 )

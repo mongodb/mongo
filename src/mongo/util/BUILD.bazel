@@ -76,7 +76,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:service_context",
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",
     ],
 )
 
@@ -296,10 +296,10 @@ mongo_cc_library(
         "periodic_runner_impl.cpp",
     ],
     deps = [
-        ":periodic_runner",  # TODO(SERVER-93876): Remove.
+        ":periodic_runner",
         "//src/mongo:base",
         "//src/mongo/db:service_context",
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",
     ],
 )
 
@@ -310,8 +310,8 @@ mongo_cc_library(
     ],
     deps = [
         ":periodic_runner_impl",
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
     ],
 )
 

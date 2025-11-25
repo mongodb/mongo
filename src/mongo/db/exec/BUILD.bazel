@@ -19,11 +19,11 @@ mongo_cc_library(
         ":working_set",
         "//src/mongo/db/pipeline/spilling:spilling_stats",
         "//src/mongo/db/query:spill_util",
-        "//src/mongo/db/query/compiler/logical_model/sort_pattern",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/sorter:sorter_base",
-        "//src/mongo/db/sorter:sorter_stats",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/storage:encryption_hooks",
-        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:storage_options",
         "//src/third_party/snappy",
     ],
 )
@@ -50,7 +50,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/bson/dotted_path:dotted_path_support",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
         "//src/mongo/db/exec/document_value",
     ],
 )
@@ -259,8 +259,6 @@ mongo_cc_fuzzer_test(
     ],
     deps = [
         ":convert_utils",
-        # TODO(SERVER-93876): Remove. Once the dependency on query_knobs is removed
-        # from field_path, we will no longer transitively depend on this.
         "//src/mongo/transport:transport_layer_common",
     ],
 )

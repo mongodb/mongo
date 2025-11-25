@@ -26,7 +26,7 @@ mongo_cc_library(
     ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [

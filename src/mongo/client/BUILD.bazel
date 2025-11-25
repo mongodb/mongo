@@ -21,7 +21,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/util:dns_query",
         "//src/mongo/util/net:network",
-        "//src/mongo/util/options_parser",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/options_parser",
     ],
 )
 
@@ -96,19 +96,19 @@ mongo_cc_library(
     }],
     deps = [
         ":connection_string",
-        "//src/mongo/base:secure_allocator",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/base:secure_allocator",
+        "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db:server_base",
         "//src/mongo/db/auth:sasl_mechanism_protocol",
         "//src/mongo/db/commands/server_status:server_status_core",
-        "//src/mongo/executor:remote_command",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/executor:remote_command",
         "//src/mongo/rpc:command_status",
-        "//src/mongo/rpc:metadata",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/shell:program_runner",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/rpc:metadata",
+        "//src/mongo/shell:program_runner",
         "//src/mongo/util:icu",
         "//src/mongo/util:md5",
-        "//src/mongo/util/net:http_client",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/net:http_client",
+        "//src/mongo/util/net:network",
         "//src/mongo/util/options_parser",
     ] + select({
         "//bazel/config:ssl_enabled": [
@@ -124,13 +124,13 @@ mongo_cc_library(
         "authenticate.cpp",
     ],
     deps = [
-        ":connection_string",  # TODO(SERVER-93876): Remove.
-        ":internal_auth",  # TODO(SERVER-93876): Remove.
+        ":connection_string",
+        ":internal_auth",
         ":native_sasl_client",
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/executor:remote_command",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth",
+        "//src/mongo/executor:remote_command",
     ],
 )
 
@@ -141,17 +141,17 @@ mongo_cc_library(
     ],
     deps = [
         ":authentication",
-        "//src/mongo/db:connection_health_metrics_parameter",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:wire_version",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:connection_health_metrics_parameter",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/stats:counters",
         "//src/mongo/executor:egress_connection_closer_manager",
         "//src/mongo/rpc",
-        "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:ssl_manager",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/util/net:ssl_manager",
     ],
 )
 
@@ -201,16 +201,16 @@ mongo_cc_library(
     ],
     deps = [
         ":authentication",
-        ":connection_string",  # TODO(SERVER-93876): Remove.
-        ":read_preference",  # TODO(SERVER-93876): Remove.
+        ":connection_string",
+        ":read_preference",
         "//src/mongo/db:dbmessage",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:wire_version",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:wire_version",
         "//src/mongo/db/pipeline:aggregation_request_helper",
-        "//src/mongo/db/query:command_request_response",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/query:query_request",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/rpc",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/rpc",
+        "//src/mongo/rpc:command_status",
         "//src/mongo/util/net:ssl_manager",
     ],
 )
@@ -258,23 +258,23 @@ mongo_cc_library(
     ],
     deps = [
         ":clientdriver_minimal",
-        ":read_preference",  # TODO(SERVER-93876): Remove.
+        ":read_preference",
         ":replica_set_monitor_server_parameters",
         "//src/mongo/client/sdam",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/executor:connection_pool_stats",
         "//src/mongo/executor:network_interface",
         "//src/mongo/executor:network_interface_factory",
         "//src/mongo/executor:network_interface_thread_pool",
         "//src/mongo/executor:thread_pool_task_executor",
-        "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/transport:transport_layer_manager",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:background_job",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:md5",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:background_job",
+        "//src/mongo/util:md5",
+        "//src/mongo/util/net:network",
         "//src/mongo/util/net:ssl_manager",
     ] + select({
         "//bazel/config:build_grpc_enabled": [
@@ -373,7 +373,7 @@ mongo_cc_library(
     ],
     deps = [
         ":retry_strategy",
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
         "//src/mongo/executor:task_executor_interface",
     ],
 )
@@ -388,7 +388,7 @@ mongo_cc_library(
         ":retry_strategy",
         "//src/mongo/db:server_base",
         "//src/mongo/db/query/client_cursor",
-        "//src/mongo/executor:task_executor_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/executor:task_executor_interface",
         "//src/mongo/rpc:command_status",
     ],
 )

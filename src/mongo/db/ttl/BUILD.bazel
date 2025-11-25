@@ -15,7 +15,7 @@ mongo_cc_library(
         "ttl_collection_cache.cpp",
     ],
     deps = [
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
         "//src/mongo/db:service_context",
     ],
 )

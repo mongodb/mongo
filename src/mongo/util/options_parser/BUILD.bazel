@@ -49,10 +49,10 @@ mongo_cc_library(
         "//src/mongo/crypto:sha_block",
         "//src/mongo/util/net:http_client",
         "//src/mongo/util/net:network",
-        "//src/third_party/boost:boost_filesystem",  # TODO(SERVER-93876): Remove.
-        "//src/third_party/boost:boost_iostreams",  # TODO(SERVER-93876): Remove.
-        "//src/third_party/boost:boost_log",  # TODO(SERVER-93876): Remove.
-        "//src/third_party/boost:boost_program_options",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_filesystem",
+        "//src/third_party/boost:boost_iostreams",
+        "//src/third_party/boost:boost_log",
+        "//src/third_party/boost:boost_program_options",
         "//src/third_party/yaml-cpp:yaml",
     ],
 )

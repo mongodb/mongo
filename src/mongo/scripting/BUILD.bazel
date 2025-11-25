@@ -36,11 +36,11 @@ mongo_cc_library(
         ":deadline_monitor_gen",
     ],
     deps = [
-        ":bson_template_evaluator",  # TODO(SERVER-93876): Remove.
+        ":bson_template_evaluator",
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/db:server_base",
         "//src/mongo/shell:mongojs",
-        "//src/mongo/util:md5",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:md5",
     ],
 )
 

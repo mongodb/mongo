@@ -17,7 +17,7 @@ mongo_cc_library(
         "telemetry_context_holder.cpp",
     ],
     deps = [
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
     ],
 )
 

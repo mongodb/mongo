@@ -17,8 +17,8 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:server_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_options",
+        "//src/mongo/db/query:query_knobs",
     ],
 )
 
@@ -29,7 +29,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:common",
-        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/exec/document_value",
     ],
 )
 
@@ -128,18 +128,18 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/search:plan_sharded_search_gen",
     ],
     deps = [
-        ":docs_needed_bounds",  # TODO(SERVER-93876): Remove.
+        ":docs_needed_bounds",
         ":runtime_constants_idl",
-        ":value_idl",  # TODO(SERVER-93876): Remove.
+        ":value_idl",
         "//src/mongo:base",
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db/auth:security_token_auth",
-        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/query/query_shape",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/query/query_shape",
         "//src/mongo/db/query/query_stats:query_stats_parse",
         "//src/mongo/db/shard_role/shard_catalog:local_oplog_info",
         "//src/mongo/db/storage/key_string",
-        "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/idl:idl_parser",
         "//src/mongo/s:common_s",
         "//src/mongo/util:pcre_util",
@@ -183,7 +183,7 @@ mongo_cc_library(
         "value_gen",
     ],
     deps = [
-        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/exec/document_value",
         "//src/mongo/idl:idl_parser",
     ],
 )
@@ -244,14 +244,14 @@ mongo_cc_library(
     deps = [
         ":document_sources_idl",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/auth:security_token",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth:security_token",
+        "//src/mongo/db/exec/document_value",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:common_query_enums_and_helpers",
-        "//src/mongo/db/query:query_request",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/query/query_settings",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/db/query/query_settings",
+        "//src/mongo/db/repl:read_concern_args",
+        "//src/mongo/db/storage:storage_options",
     ],
 )
 
@@ -349,7 +349,7 @@ mongo_cc_library(
         "granularity_rounder_preferred_numbers.cpp",
     ],
     deps = [
-        ":field_path",  # TODO(SERVER-93876): Remove.
+        ":field_path",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/exec/document_value",
     ],
@@ -615,8 +615,8 @@ mongo_cc_library(
     ],
     deps = [
         ":aggregation_request_helper",
-        "//src/mongo/db/query:common_query_enums_and_helpers",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:common_query_enums_and_helpers",
+        "//src/mongo/db/stats:counters",
     ],
 )
 

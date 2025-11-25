@@ -20,10 +20,10 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/client:clientdriver_minimal",
-        "//src/mongo/db/session:logical_session_id",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/session:logical_session_id",
         "//src/mongo/scripting:bson_template_evaluator",
         "//src/mongo/util:pcre_util",
-        "//src/mongo/util:pcre_wrapper",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:pcre_wrapper",
     ],
 )
 
@@ -113,7 +113,7 @@ mongo_cc_library(
     deps = [
         ":kms_idl",
         "//src/mongo:base",
-        "//src/mongo/base:secure_allocator",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/base:secure_allocator",
         "//src/mongo/crypto:aead_encryption",
         "//src/mongo/db/commands:test_commands_enabled",
     ],
@@ -131,23 +131,23 @@ mongo_cc_library(
     ],
     deps = [
         ":benchrun",
-        ":program_runner",  # TODO(SERVER-93876): Remove.
+        ":program_runner",
         ":shell_options_storage",
-        "//src/mongo/base:environment_buffer",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/base:environment_buffer",
         "//src/mongo/bson/column",
         "//src/mongo/client:clientdriver_network",
-        "//src/mongo/db:mongohasher",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:mongohasher",
         "//src/mongo/db:traffic_reader",
-        "//src/mongo/db/auth:security_token_auth",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth:security_token_auth",
         "//src/mongo/db/query/collation:collator_icu",
         "//src/mongo/db/query/virtual_collection",
         "//src/mongo/replay:mongor_lib",
         "//src/mongo/scripting",
-        "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/transport:message_compressor",
         "//src/mongo/transport/named_pipe",
         "//src/mongo/unittest:golden_test_base",
         "//src/mongo/util:buildinfo",
-        "//src/mongo/util:icu",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:icu",
         "//src/mongo/util:password",
         "//src/mongo/util:signal_handlers",
     ],
@@ -163,7 +163,7 @@ mongo_cc_library(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
-        ":kms",  # TODO(SERVER-93876): Remove.
+        ":kms",
         ":shell_utils",
     ],
 )
@@ -188,11 +188,11 @@ mongo_cc_library(
     deps = [
         ":kms",
         "//src/mongo/client:clientdriver_minimal",
-        "//src/mongo/crypto:aead_encryption",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/crypto:aead_encryption",
         "//src/mongo/crypto:encrypted_field_config",
         "//src/mongo/crypto:fle_crypto",
         "//src/mongo/crypto:fle_fields",
-        "//src/mongo/crypto:symmetric_crypto",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/crypto:symmetric_crypto",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/query/compiler/parsers/matcher/schema:json_schema_parser",
         "//src/mongo/scripting",

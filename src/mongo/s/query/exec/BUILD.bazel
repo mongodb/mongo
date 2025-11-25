@@ -50,18 +50,18 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/client:retry_strategy",
-        "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:commands",
+        "//src/mongo/db/auth",
         "//src/mongo/db/auth:auth_checks",
-        "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/memory_tracking",
         "//src/mongo/db/query:command_request_response",
-        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query/client_cursor:generic_cursor",
         "//src/mongo/db/session:kill_sessions",
-        "//src/mongo/db/session:logical_session_cache",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/session:logical_session_id",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/session:logical_session_cache",
+        "//src/mongo/db/session:logical_session_id",
+        "//src/mongo/util/concurrency:spin_lock",
     ],
 )
 

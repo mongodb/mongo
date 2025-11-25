@@ -29,9 +29,9 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db/pipeline:aggregation_request_helper",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/pipeline:aggregation_request_helper",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
-        "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/timeseries:timeseries_options",
     ],
 )
 

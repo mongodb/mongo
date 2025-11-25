@@ -35,8 +35,8 @@ mongo_cc_library(
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db:server_base",
         "//src/mongo/db/query:index_hint",
-        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/query/query_shape:query_shape_hash",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query/query_shape:query_shape_hash",
     ],
 )
 
@@ -76,20 +76,20 @@ mongo_cc_library(
         ":query_settings",
         "//src/mongo/client:remote_command_targeter",
         "//src/mongo/crypto:fle_fields",
-        "//src/mongo/crypto:sha256_block",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/crypto:sha256_block",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/pipeline/process_interface:common_process_interface",
         "//src/mongo/db/query:command_shapes",
-        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query/query_shape",
         "//src/mongo/db/shard_role/lock_manager",
-        "//src/mongo/db/shard_role/lock_manager:exception_util",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/shard_role/lock_manager:exception_util",
         "//src/mongo/db/shard_role/shard_catalog:index_key_validate",
         "//src/mongo/executor:async_rpc",
-        "//src/mongo/idl:cluster_server_parameter",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/idl:cluster_server_parameter",
     ],
 )
 

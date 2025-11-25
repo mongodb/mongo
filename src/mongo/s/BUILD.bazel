@@ -176,20 +176,20 @@ mongo_cc_library(
         "//src/mongo/db/topology:shard_registry.cpp",
     ],
     deps = [
-        ":common_s",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/client:clientdriver_network",  # TODO(SERVER-93876): Remove.
+        ":common_s",
+        "//src/mongo/client:clientdriver_network",
         "//src/mongo/db:logical_time_metadata_hook",
         "//src/mongo/db:read_write_concern_defaults",
         "//src/mongo/db:server_base",
         "//src/mongo/db/exec:scoped_timer",
-        "//src/mongo/db/repl:replica_set_messages",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/shard_role/lock_manager",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/update:update_common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:replica_set_messages",
+        "//src/mongo/db/shard_role/lock_manager",
+        "//src/mongo/db/update:update_common",
         "//src/mongo/executor:task_executor_pool",
         "//src/mongo/s/client:shard_interface",
         "//src/mongo/s/query/exec:cluster_cursor_manager",
-        "//src/mongo/util:caching",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:caching",
+        "//src/mongo/util/concurrency:spin_lock",
         "//src/mongo/util/concurrency:thread_pool",
     ],
 )
@@ -227,8 +227,8 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
-        "//src/mongo/db/pipeline:runtime_constants_idl",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/pipeline:runtime_constants_idl",
+        "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:repl_settings",
     ],
@@ -360,33 +360,31 @@ mongo_cc_library(
         "//src/mongo/s/resharding:type_collection_fields_gen",
     ],
     deps = [
-        "//src/mongo/client:connection_string",
-        "//src/mongo/db/commands:create_command",
-        "//src/mongo/db/topology/user_write_block:set_user_write_block_mode_idl",
-        "//src/mongo/db/matcher:path",
-        "//src/mongo/db:coll_mod_command_idl",
-        "//src/mongo/db:index_commands_idl",
-        "//src/mongo/db:metadata_consistency_types_idl",
-        "//src/mongo/db:mongohasher",
-        "//src/mongo/rpc:command_status",
-        "//src/mongo/db:server_feature_flags",
-        "//src/mongo/db/s:remove_shard_exception",
         ":add_shard_idl",
         ":analyze_shard_key_common",
         ":sharding_helpers",
-        "//src/mongo/executor:scoped_task_executor",
-
-        # TODO(SERVER-93876): Remove.
+        "//src/mongo/client:connection_string",
         "//src/mongo/client:read_preference",
+        "//src/mongo/db:coll_mod_command_idl",
+        "//src/mongo/db:common",
+        "//src/mongo/db:index_commands_idl",
+        "//src/mongo/db:metadata_consistency_types_idl",
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/auth:authprivilege",
-        "//src/mongo/db/shard_role/shard_catalog:collection_options",
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_cmds_idl",
+        "//src/mongo/db/commands:create_command",
+        "//src/mongo/db/matcher:path",
         "//src/mongo/db/query/query_shape",
+        "//src/mongo/db/s:remove_shard_exception",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
         "//src/mongo/db/storage/key_string",
         "//src/mongo/db/timeseries:timeseries_options",
-        "//src/mongo/db:common",
-        "//src/mongo/db:server_base",
+        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_cmds_idl",
+        "//src/mongo/db/topology/user_write_block:set_user_write_block_mode_idl",
         "//src/mongo/executor:async_rpc_error_info",
+        "//src/mongo/executor:scoped_task_executor",
+        "//src/mongo/rpc:command_status",
         "//src/mongo/util:caching",
     ],
 )
@@ -398,11 +396,11 @@ mongo_cc_library(
         "//src/mongo/db/topology:mongos_topology_coordinator.cpp",
     ],
     deps = [
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:common",
         "//src/mongo/db:server_base",
         "//src/mongo/rpc:metadata",
-        "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/transport:transport_layer_common",
     ],
 )
 

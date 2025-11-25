@@ -29,7 +29,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/bson/dotted_path:dotted_path_support",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",

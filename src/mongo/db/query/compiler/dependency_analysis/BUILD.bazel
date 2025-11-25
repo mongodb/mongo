@@ -15,7 +15,7 @@ mongo_cc_library(
         "dependencies.cpp",
     ],
     deps = [
-        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/exec/document_value",
         "//src/mongo/db/pipeline:field_path",
     ],
 )

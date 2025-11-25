@@ -17,7 +17,7 @@ mongo_cc_library(
     ],
     deps = [
         ":logical_session_cache",
-        ":logical_session_id",  # TODO(SERVER-93876): Remove.
+        ":logical_session_id",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
     ],
@@ -61,9 +61,9 @@ mongo_cc_library(
         ":logical_session_cache_stats_gen",
     ],
     deps = [
-        ":logical_session_id",  # TODO(SERVER-93876): Remove.
+        ":logical_session_id",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
     ],
 )
 
@@ -101,7 +101,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:user",
         "//src/mongo/rpc:client_metadata",
         "//src/mongo/rpc:metadata_impersonated_user",
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",
     ],
 )
 
@@ -141,12 +141,12 @@ mongo_cc_library(
     ],
     deps = [
         ":kill_sessions",
-        ":logical_session_id",  # TODO(SERVER-93876): Remove.
-        ":logical_session_id_helpers",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:internal_transactions_feature_flag",  # TODO(SERVER-93876): Remove.
+        ":logical_session_id",
+        ":logical_session_id_helpers",
+        "//src/mongo/db:internal_transactions_feature_flag",
         "//src/mongo/db:service_context",
         "//src/mongo/db/shard_role/lock_manager",
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",
     ],
 )
 
@@ -162,12 +162,12 @@ mongo_cc_library(
         "sessions_collection.cpp",
     ],
     deps = [
-        ":logical_session_id",  # TODO(SERVER-93876): Remove.
-        ":logical_session_id_helpers",  # TODO(SERVER-93876): Remove.
+        ":logical_session_id",
+        ":logical_session_id_helpers",
         ":sessions_server_parameters_idl",
         "//src/mongo/client:clientdriver_minimal",
-        "//src/mongo/db:coll_mod_command_idl",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:index_commands_idl",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:coll_mod_command_idl",
+        "//src/mongo/db:index_commands_idl",
         "//src/mongo/db:server_base",
         "//src/mongo/rpc:command_status",
     ],

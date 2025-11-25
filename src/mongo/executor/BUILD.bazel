@@ -16,13 +16,13 @@ mongo_cc_library(
         "remote_command_response.cpp",
     ],
     deps = [
-        "//src/mongo/db:api_parameters",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/auth:security_token_auth",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/otel/traces:telemetry_context_serialization",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/otel/traces:tracing_enablement",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/rpc:metadata",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/s:mongos_server_parameters",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:api_parameters",
+        "//src/mongo/db/auth:security_token_auth",
+        "//src/mongo/otel/traces:telemetry_context_serialization",
+        "//src/mongo/otel/traces:tracing_enablement",
+        "//src/mongo/rpc:metadata",
+        "//src/mongo/s:mongos_server_parameters",
+        "//src/mongo/util/net:network",
     ],
 )
 
@@ -33,7 +33,7 @@ mongo_cc_library(
     ],
     deps = [
         ":remote_command",
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
     ],
 )
 
@@ -44,10 +44,10 @@ mongo_cc_library(
     ],
     deps = [
         ":remote_command",
-        ":task_executor_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        ":task_executor_interface",
+        "//src/mongo:base",
         "//src/mongo/client:retry_strategy",
-        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/net:network",
     ],
 )
 
@@ -67,7 +67,7 @@ mongo_cc_library(
         "network_interface.cpp",
     ],
     deps = [
-        ":task_executor_interface",  # TODO(SERVER-93876): Remove.
+        ":task_executor_interface",
     ],
 )
 
@@ -77,9 +77,9 @@ mongo_cc_library(
         "thread_pool_task_executor.cpp",
     ],
     deps = [
-        ":network_interface",  # TODO(SERVER-93876): Remove.
+        ":network_interface",
         ":task_executor_interface",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
         "//src/mongo/util:future_util",
     ],
 )
@@ -89,7 +89,7 @@ mongo_cc_library(
     srcs = ["inline_executor.cpp"],
     deps = [
         ":task_executor_interface",
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
     ],
 )
 
@@ -99,7 +99,7 @@ mongo_cc_library(
         "pinned_connection_task_executor_registry.cpp",
     ],
     deps = [
-        ":task_executor_interface",  # TODO(SERVER-93876): Remove.
+        ":task_executor_interface",
     ],
 )
 
@@ -110,7 +110,7 @@ mongo_cc_library(
     ],
     deps = [
         "scoped_task_executor",
-        "task_executor_interface",  # TODO(SERVER-93876): Remove.
+        "task_executor_interface",
         "//src/mongo/client:async_client",
     ],
 )
@@ -121,9 +121,9 @@ mongo_cc_library(
         "pinned_connection_task_executor_factory.cpp",
     ],
     deps = [
-        ":network_interface",  # TODO(SERVER-93876): Remove.
+        ":network_interface",
         ":pinned_connection_task_executor",
-        ":task_executor_interface",  # TODO(SERVER-93876): Remove.
+        ":task_executor_interface",
         ":thread_pool_task_executor",
     ],
 )
@@ -164,10 +164,10 @@ mongo_cc_library(
         ":async_client_factory",
         ":network_interface",
         "//src/mongo/client:async_client",
-        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/auth",
-        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/transport:transport_layer",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/transport:transport_layer",
         "//src/mongo/transport:transport_layer_manager",
     ],
 )
@@ -183,8 +183,8 @@ mongo_cc_library(
         ":egress_networking_parameters",
         "//src/mongo/client:async_client",
         "//src/mongo/db/auth",
-        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/transport:transport_layer",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/transport:transport_layer",
     ],
 )
 
@@ -195,10 +195,10 @@ mongo_cc_library(
     ],
     deps = [
         ":async_client_factory",
-        ":connection_pool_executor",  # TODO(SERVER-93876): Remove.
+        ":connection_pool_executor",
         ":connection_pool_tl",
-        ":egress_connection_closer_manager",  # TODO(SERVER-93876): Remove.
-        ":network_interface",  # TODO(SERVER-93876): Remove.
+        ":egress_connection_closer_manager",
+        ":network_interface",
         ":network_interface_tl",
     ] + select({
         "//bazel/config:build_grpc_enabled": ["//src/mongo/transport/grpc:grpc_async_client_factory"],
@@ -223,7 +223,7 @@ mongo_cc_library(
         ":pinned_connection_task_executor_registry",
         ":task_executor_interface",
         "//src/mongo/db/query:command_request_response",
-        "//src/mongo/db/query:plan_yield_policy",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:plan_yield_policy",
     ],
 )
 
@@ -236,7 +236,7 @@ mongo_cc_library(
     deps = [
         ":task_executor_interface",
         "//src/mongo/db:server_base",
-        "//src/mongo/util:processinfo",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:processinfo",
     ],
 )
 
@@ -322,11 +322,11 @@ mongo_cc_library(
         ":async_client_factory",
         ":connection_pool_stats",
         ":egress_connection_closer_manager",
-        ":remote_command",  # TODO(SERVER-93876): Remove.
+        ":remote_command",
         "//src/mongo/client:backoff_with_jitter",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/util/net:network",
     ],
 )
 

@@ -228,7 +228,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:read_write_concern_defaults",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
     ],
 )
 
@@ -282,11 +282,11 @@ mongo_cc_library(
     deps = [
         "//src/mongo/crypto:encrypted_field_config",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:server_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_options",
         "//src/mongo/db/auth:authprivilege",
-        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
-        "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/timeseries:timeseries_options",
     ],
 )
 

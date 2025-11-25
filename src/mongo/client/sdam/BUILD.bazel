@@ -28,13 +28,13 @@ mongo_cc_library(
         ":sdam_configuration_parameters_gen",
     ],
     deps = [
-        "//src/mongo/client:read_preference",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/client:read_preference",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:wire_version",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/repl:optime",
         "//src/mongo/executor:task_executor_interface",
         "//src/mongo/rpc:metadata",
-        "//src/mongo/util:clock_sources",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:clock_sources",
     ],
 )
 

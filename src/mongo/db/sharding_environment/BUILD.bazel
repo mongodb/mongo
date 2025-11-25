@@ -75,7 +75,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/s:common_s",
         "//src/mongo/util:processinfo",
     ],

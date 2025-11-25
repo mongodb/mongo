@@ -16,12 +16,12 @@ mongo_cc_library(
         "op_msg.cpp",
     ],
     deps = [
-        "//src/mongo/bson:bson_validate",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson:bson_validate",
         "//src/mongo/bson/dotted_path:dotted_path_support",
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:wire_version",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:wire_version",
         "//src/mongo/db/auth:security_token_auth",
     ] + select({
         "//bazel/config:use_wiredtiger_enabled": [
@@ -49,10 +49,10 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
-        "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:processinfo",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/net:network",
     ],
 )
 
@@ -67,19 +67,19 @@ mongo_cc_library(
     ],
     deps = [
         ":client_metadata",
-        ":message",  # TODO(SERVER-93876): Remove.
+        ":message",
         ":metadata_impersonated_user",
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/client:read_preference",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:multitenancy",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/client:read_preference",
+        "//src/mongo/db:multitenancy",
         "//src/mongo/db:raw_data_operation",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:signed_logical_time",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:signed_logical_time",
         "//src/mongo/db:vector_clock",
         "//src/mongo/db:write_block_bypass",
-        "//src/mongo/db/auth:security_token",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth:security_token",
+        "//src/mongo/db/repl:optime",
+        "//src/mongo/util/concurrency:spin_lock",
     ],
 )
 
@@ -103,13 +103,13 @@ mongo_cc_library(
     deps = [
         ":message",
         ":metadata",
-        ":rewrite_state_change_errors",  # TODO(SERVER-93876): Remove.
+        ":rewrite_state_change_errors",
         "//src/mongo/db:dbmessage",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/s:common_s",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/s:common_s",
+        "//src/mongo/util/net:network",
     ],
 )
 
@@ -125,10 +125,10 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-83990): Remove.
-        "//src/mongo/db:server_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_options",
+        "//src/mongo/db:service_context",
         "//src/mongo/db/auth",
     ],
 )
@@ -153,11 +153,11 @@ mongo_cc_library(
         "rewrite_state_change_errors_server_parameter_gen",
     ],
     deps = [
-        ":message",  # TODO(SERVER-93876): Remove.
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
+        ":message",
+        "//src/mongo:base",
+        "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
         "//src/mongo/db/exec/mutable_bson",
         "//src/mongo/util:pcre_wrapper",
     ],

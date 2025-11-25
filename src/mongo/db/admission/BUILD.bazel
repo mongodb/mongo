@@ -51,10 +51,10 @@ mongo_cc_library(
     deps = [
         ":ingress_admission_context",
         ":rate_limiter",
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:service_context",
         "//src/mongo/util/concurrency:ticketholder",
     ],
 )
@@ -84,10 +84,10 @@ mongo_cc_library(
     deps = [
         ":ingress_admission_control",
         ":ingress_request_rate_limiter",
-        ":ticketing_system",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
+        ":ticketing_system",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/transport:transport_layer_common",
     ],
 )
@@ -159,7 +159,7 @@ mongo_cc_library(
     deps = [
         ":flow_control_parameters",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/shard_role/lock_manager:flow_control_ticketholder",
         "//src/mongo/util:background_job",

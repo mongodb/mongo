@@ -30,7 +30,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
-        "//src/mongo/db/query/query_shape",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_shape",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/util:processinfo",
     ],
@@ -40,7 +40,7 @@ mongo_cc_library(
     name = "timeseries_extended_range",
     srcs = ["timeseries_extended_range.cpp"],
     deps = [
-        ":timeseries_options",  # TODO(SERVER-93876): Remove.
+        ":timeseries_options",
         "//src/mongo:base",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog",
     ],
@@ -106,17 +106,17 @@ mongo_cc_library(
     ],
     deps = [
         ":bucket_compression",
-        ":timeseries_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/bson/column",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:coll_mod_command_idl",  # TODO(SERVER-93876): Remove.
+        ":timeseries_options",
+        "//src/mongo/bson/column",
+        "//src/mongo/db:coll_mod_command_idl",
         "//src/mongo/db:expression_context_builder",
-        "//src/mongo/db:index_commands_idl",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:index_commands_idl",
         "//src/mongo/db:server_base",
         "//src/mongo/db/exec:bucket_unpacker",
-        "//src/mongo/db/query:bucket_predicate_generator",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/query/write_ops:write_ops_parsers",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:bucket_predicate_generator",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog",
-        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:storage_options",
     ],
 )
 

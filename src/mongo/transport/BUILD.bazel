@@ -22,12 +22,12 @@ mongo_cc_library(
     deps = [
         ":cidr_range_list_parameter",
         "//src/mongo:base",
-        "//src/mongo/db:connection_health_metrics_parameter",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:connection_health_metrics_parameter",
         "//src/mongo/db:service_context",
-        "//src/mongo/db:wire_version",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:wire_version",
         "//src/mongo/db/admission:rate_limiter",
         "//src/mongo/util:future_util",
-        "//src/mongo/util/net:ssl_manager",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/net:ssl_manager",
     ],
 )
 
@@ -92,24 +92,24 @@ mongo_cc_library(
         "//conditions:default": [],
     }],
     deps = [
-        ":service_executor",  # TODO(SERVER-93876): Remove.
+        ":service_executor",
         ":session_manager",
         ":session_util",
-        ":transport_layer_common",  # TODO(SERVER-93876): Remove.
+        ":transport_layer_common",
         "//src/mongo/base:system_error",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:server_options",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/ftdc:rolling_stats",
-        "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/s:common_s",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/s:common_s",
         "//src/mongo/util:executor_stats",
         "//src/mongo/util:processinfo",
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:ssl_manager",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/options_parser",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/net:ssl_manager",
+        "//src/mongo/util/options_parser",
         "//src/third_party/asio",
     ],
 )
@@ -125,10 +125,10 @@ mongo_cc_library(
     deps = [
         ":transport_layer_common",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:processinfo",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/concurrency:thread_pool",  # TODO(SERVER-93876): Remove.
-        "//src/third_party/asio",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util/concurrency:thread_pool",
+        "//src/third_party/asio",
     ],
 )
 
@@ -152,7 +152,7 @@ mongo_cc_library(
         "//src/mongo/rpc:message",
         "//src/mongo/util/options_parser",
         "//src/third_party/snappy",
-        "//src/third_party/zlib",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/zlib",
         "//src/third_party/zstandard:zstd",
     ],
 )

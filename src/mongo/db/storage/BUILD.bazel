@@ -16,7 +16,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
     ],
 )
 
@@ -34,8 +34,8 @@ mongo_cc_library(
         "record_store_base.cpp",
     ],
     deps = [
-        ":storage_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        ":storage_options",
+        "//src/mongo/db:service_context",
     ],
 )
 
@@ -46,7 +46,7 @@ mongo_cc_library(
     ],
     deps = [
         ":encryption_hooks",
-        ":storage_options",  # TODO(SERVER-93876): Remove.
+        ":storage_options",
         "//src/mongo/db:server_base",
     ],
 )
@@ -60,9 +60,9 @@ mongo_cc_library(
         ":storage_options",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
-        "//src/mongo/db/admission:execution_admission_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/admission:execution_admission_context",
         "//src/mongo/util:background_job",
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",
     ],
 )
 
@@ -110,7 +110,7 @@ mongo_cc_library(
     ],
     deps = [
         ":storage_file_util",
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
         "//src/mongo/db:service_context",
     ],
 )
@@ -205,8 +205,8 @@ mongo_cc_library(
         "storage_init.cpp",
     ],
     deps = [
-        ":backup_cursor_hooks",  # TODO(SERVER-93876): Remove.
-        ":storage_options",  # TODO(SERVER-93876): Remove.
+        ":backup_cursor_hooks",
+        ":storage_options",
         "//src/mongo/db/commands/server_status:server_status_core",
     ],
 )
@@ -215,7 +215,7 @@ mongo_cc_library(
     name = "disk_space_util",
     srcs = ["disk_space_util.cpp"],
     deps = [
-        ":storage_options",  # TODO(SERVER-93876): Remove.
+        ":storage_options",
         "//src/mongo:base",
     ],
 )
@@ -227,9 +227,9 @@ mongo_cc_library(
     ],
     deps = [
         ":disk_space_util",
-        ":storage_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        ":storage_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
         "//src/mongo/db/commands/server_status:server_status_core",
     ],
 )
@@ -242,9 +242,9 @@ mongo_cc_library(
     deps = [
         ":storage_options",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
         "//src/mongo/util:background_job",
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",
     ],
 )
 
@@ -257,10 +257,10 @@ mongo_cc_library(
     deps = [
         ":checkpointer",
         ":journal_flusher",
-        ":storage_options",  # TODO(SERVER-93876): Remove.
+        ":storage_options",
         "//src/mongo:base",
         "//src/mongo/db:service_context",
-        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/storage:oplog_truncation",
     ],
 )
@@ -436,7 +436,7 @@ mongo_cc_library(
         "prepare_conflict_tracker.cpp",
     ],
     deps = [
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
         "//src/mongo/db/commands/server_status:server_status_core",
     ],
 )

@@ -54,7 +54,6 @@ mongo_cc_library(
         "collection_options_validation.cpp",
     ],
     deps = [
-        # TODO(SERVER-93876): Technically only requires `//src/mongo/db:common`.
         "//src/mongo/crypto:encrypted_field_config",
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
@@ -73,12 +72,12 @@ mongo_cc_library(
         "//src/mongo/db/repl:local_oplog_info.cpp",
     ],
     deps = [
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
         "//src/mongo/db:vector_clock_mutable",
         "//src/mongo/db/admission:flow_control",
         "//src/mongo/db/repl:oplog_visibility_manager",
         "//src/mongo/db/repl:optime",
-        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/storage:oplog_truncate_markers",
         "//src/mongo/db/storage:record_store_base",
@@ -129,14 +128,14 @@ mongo_cc_library(
         ":durable_catalog_entry_metadata",
         "//src/mongo/db:audit",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:shard_role_api_stor_ex",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api_stor_ex",
         "//src/mongo/db/collection_crud",
-        "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/collation:collator_factory_interface",
+        "//src/mongo/db/query/query_stats",
         "//src/mongo/db/storage:mdb_catalog",
-        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/views",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/views",
     ],
 )
 

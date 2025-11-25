@@ -17,13 +17,13 @@ mongo_cc_library(
         "s2_common.cpp",
     ],
     deps = [
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/geo:geometry",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/geo:geometry",
         "//src/mongo/db/geo:geoparser",
-        "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage/key_string",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/collation:collator_interface",
+        "//src/mongo/db/storage/key_string",
         "//src/third_party/s2",
     ],
 )
@@ -61,44 +61,44 @@ mongo_cc_library(
     deps = [
         ":expression_params",
         ":multikey_paths",
-        "//src/mongo/bson/dotted_path:dotted_path_support",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/db:mongohasher",
-        "//src/mongo/db:multi_key_path_tracker",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:query_expressions",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:multi_key_path_tracker",
+        "//src/mongo/db:query_expressions",
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:shard_role_api",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/collection_crud:container_write",
         "//src/mongo/db/exec:projection_executor",
         "//src/mongo/db/exec:working_set",
         "//src/mongo/db/fts:base_fts",
-        "//src/mongo/db/geo:geoparser",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/geo:geoparser",
         "//src/mongo/db/index:preallocated_container_pool",
         "//src/mongo/db/index_builds:index_build_interceptor",
         "//src/mongo/db/index_builds:resumable_index_builds_idl",
         "//src/mongo/db/pipeline:document_path_support",
         "//src/mongo/db/query:spill_util",
-        "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
-        "//src/mongo/db/query/compiler/logical_model/sort_pattern",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/shard_role/lock_manager",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/compiler/logical_model/sort_pattern",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog",
         "//src/mongo/db/sorter:sorter_base",
-        "//src/mongo/db/sorter:sorter_stats",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:encryption_hooks",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/sorter:sorter_stats",
+        "//src/mongo/db/storage:encryption_hooks",
         "//src/mongo/db/storage:index_entry_comparison",
         "//src/mongo/db/storage:record_store_base",
-        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:write_unit_of_work",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage/key_string",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage:write_unit_of_work",
+        "//src/mongo/db/storage/key_string",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
-        "//src/mongo/util:progress_meter",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
-        "//src/third_party/s2",  # TODO(SERVER-93876): Remove.
-        "//src/third_party/snappy",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:progress_meter",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/third_party/s2",
+        "//src/third_party/snappy",
     ],
 )
 

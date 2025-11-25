@@ -59,10 +59,10 @@ mongo_cc_library(
         "v2_log_builder.cpp",
     ],
     deps = [
-        ":pattern_cmp",  # TODO(SERVER-93876): Remove.
+        ":pattern_cmp",
         ":update_document_diff",
         "//src/mongo:base",
-        "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:common",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/exec/mutable_bson",
         "//src/mongo/db/query/compiler/parsers/matcher:matcher_parser",

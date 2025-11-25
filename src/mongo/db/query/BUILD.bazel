@@ -429,11 +429,11 @@ mongo_cc_library(
         ":hint_parser",
         "//src/mongo/crypto:fle_fields",
         "//src/mongo/db/auth:authprivilege",
-        "//src/mongo/db/auth:security_token_auth",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/pipeline:runtime_constants_idl",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth:security_token_auth",
+        "//src/mongo/db/pipeline:runtime_constants_idl",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
         "//src/mongo/db/query/query_settings",
-        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:repl_coordinator_interface",
     ],
 )
 

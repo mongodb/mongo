@@ -60,8 +60,8 @@ mongo_cc_library(
         ":collection_statistics_interface",
         ":stats_histograms",
         "//src/mongo/db:dbdirectclient",
-        "//src/mongo/util:caching",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/concurrency:thread_pool",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:caching",
+        "//src/mongo/util/concurrency:thread_pool",
     ],
 )
 

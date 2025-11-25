@@ -26,7 +26,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/exec/document_value",
-        "//src/mongo/db/pipeline:field_path",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/pipeline:field_path",
     ],
 )
 
@@ -39,9 +39,9 @@ mongo_cc_library(
     deps = [
         ":query_shape_common",
         "//src/mongo:base",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/pipeline:field_path",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/pipeline:field_path",
     ],
 )
 

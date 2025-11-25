@@ -16,7 +16,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db:query_expressions",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:query_expressions",
         "//src/mongo/db/query/compiler/dependency_analysis",
     ],
 )

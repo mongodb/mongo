@@ -17,7 +17,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
         "//src/mongo/db/query/query_stats",
     ],
 )
@@ -29,9 +29,9 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db:shared_request_handling",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:shared_request_handling",
         "//src/mongo/db:validate_api_parameters",
-        "//src/mongo/rpc:client_metadata",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/rpc:client_metadata",
     ],
 )
 
@@ -59,7 +59,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands/server_status:server_status_core",
-        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:read_concern_args",
     ],
 )
 
@@ -80,10 +80,10 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/client:read_preference",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/repl:repl_settings",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:repl_settings",
     ],
 )
 

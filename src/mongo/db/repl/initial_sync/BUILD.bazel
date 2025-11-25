@@ -24,9 +24,9 @@ mongo_cc_library(
         "database_cloner_gen",
     ],
     deps = [
-        "//src/mongo/db:multitenancy",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
     ],
 )

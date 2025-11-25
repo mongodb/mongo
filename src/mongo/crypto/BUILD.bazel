@@ -17,7 +17,7 @@ mongo_cc_library(
     deps = [
         ":fle_fields",
         ":sha_block",
-        ":symmetric_crypto",  # TODO(SERVER-93876): Remove.
+        ":symmetric_crypto",
     ],
 )
 
@@ -41,8 +41,8 @@ mongo_cc_library(
         "fle_numeric.cpp",
     ],
     deps = [
-        "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:common",
+        "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/pipeline:value_idl",
     ],
@@ -57,7 +57,7 @@ mongo_cc_library(
     deps = [
         ":encrypted_field_config",
         ":fle_tokens",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
     ],
 )
 
@@ -94,26 +94,25 @@ mongo_cc_library(
         "MLIB_USER",
     ],
     deps = [
-        # TODO(SERVER-93876): Remove many of these.
+        ":aead_encryption",
+        ":encrypted_field_config",
+        ":fle_fields",
+        ":fle_tokens",
+        ":mongocryptutil",
+        ":sha_block",
         "//src/mongo/base:secure_allocator",
         "//src/mongo/bson/util:bson_extract",
-        "//src/mongo/db/commands/server_status:server_status_core",
-        "//src/mongo/db/exec/document_value",
-        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:wire_version",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/idl:cluster_server_parameter",
         "//src/mongo/shell:kms_idl",
         "//src/mongo/util:testing_options",
         "//src/third_party/libmongocrypt:mongocrypt",
-        ":aead_encryption",
-        ":encrypted_field_config",
-        ":fle_tokens",
-        ":fle_fields",
-        ":mongocryptutil",
-        ":sha_block",
     ],
 )
 

@@ -29,7 +29,7 @@ mongo_cc_library(
         "ssl_options.cpp",
     ],
     deps = [
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
         "//src/mongo/util/options_parser",
     ],
 )
@@ -41,7 +41,7 @@ mongo_cc_library(
     ],
     deps = [
         ":ssl_options",
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
     ],
 )
 
@@ -58,13 +58,13 @@ mongo_cc_library(
     }],
     deps = select({
         "//bazel/config:ssl_enabled": [
-            ":ssl_options",  # TODO(SERVER-93876): Remove.
-            "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+            ":ssl_options",
+            "//src/mongo:base",
             "//src/mongo/client:authentication",
-            "//src/mongo/db/auth:cluster_auth_mode",  # TODO(SERVER-93876): Remove.
+            "//src/mongo/db/auth:cluster_auth_mode",
         ],
         "//conditions:default": [
-            "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+            "//src/mongo:base",
         ],
     }),
 )
@@ -122,8 +122,8 @@ mongo_cc_library(
     ],
     deps = [
         ":ssl_options",
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/options_parser",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
+        "//src/mongo/util/options_parser",
     ],
 )
 
@@ -143,10 +143,10 @@ mongo_cc_library(
     ],
     deps = [
         ":ssl_options",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
         "//src/mongo/db/auth:auth_options",
         "//src/mongo/db/auth:cluster_auth_mode",
-        "//src/mongo/util/options_parser",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/options_parser",
     ],
 )
 

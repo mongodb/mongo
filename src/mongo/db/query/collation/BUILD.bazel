@@ -27,7 +27,7 @@ mongo_cc_library(
     ],
     deps = [
         ":collator_interface",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
     ],
 )
 
@@ -37,7 +37,7 @@ mongo_cc_library(
         "collator_factory_interface.cpp",
     ],
     deps = [
-        ":collator_interface",  # TODO(SERVER-93876): Remove.
+        ":collator_interface",
         "//src/mongo/db:service_context",
     ],
 )
@@ -48,7 +48,7 @@ mongo_cc_library(
         "collator_factory_mock.cpp",
     ],
     deps = [
-        ":collator_factory_interface",  # TODO(SERVER-93876): Remove.
+        ":collator_factory_interface",
         ":collator_interface_mock",
     ],
 )
@@ -61,10 +61,10 @@ mongo_cc_library(
     ],
     deps = [
         ":collator_factory_interface",
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:icu_init",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:server_base",
+        "//src/mongo/util:icu_init",
         "//src/third_party/icu4c-57.1/source:icu_i18n",
     ],
 )

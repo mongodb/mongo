@@ -79,13 +79,13 @@ mongo_cc_library(
         ":search_query_view_spec_gen",
     ],
     deps = [
-        ":mongot_options",  # TODO(SERVER-93876): Remove.
+        ":mongot_options",
         ":search_task_executors",
         "//src/mongo/db/pipeline:docs_needed_bounds",
-        "//src/mongo/db/query:common_query_enums_and_helpers",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/query:plan_yield_policy",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:common_query_enums_and_helpers",
+        "//src/mongo/db/query:plan_yield_policy",
         "//src/mongo/executor:task_executor_cursor",
-        "//src/mongo/idl:cluster_server_parameter",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/idl:cluster_server_parameter",
     ],
 )
 
@@ -115,7 +115,7 @@ mongo_cc_library(
         "//src/mongo/executor:pinned_connection_task_executor_registry",
         "//src/mongo/executor:task_executor_interface",
         "//src/mongo/executor:thread_pool_task_executor",
-        "//src/mongo/util/concurrency:thread_pool",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:thread_pool",
     ],
 )
 
@@ -125,9 +125,9 @@ mongo_cc_library(
         "search_index_process_interface.cpp",
     ],
     deps = [
-        "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:commands",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
         "//src/mongo/db/views:resolved_view",
     ],
 )

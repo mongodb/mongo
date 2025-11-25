@@ -121,7 +121,7 @@ mongo_cc_library(
         "//src/mongo/otel",
         "//src/mongo/otel/traces:telemetry_context_serialization",
         "//src/mongo/rpc:metadata_impersonated_user",
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",
     ],
 )
 
