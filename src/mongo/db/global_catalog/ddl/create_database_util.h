@@ -32,6 +32,7 @@
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 

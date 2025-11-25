@@ -31,6 +31,7 @@
 
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_external_state.h"
 #include "mongo/db/global_catalog/ddl/sharding_test_helpers.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

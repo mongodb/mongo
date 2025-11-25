@@ -33,6 +33,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

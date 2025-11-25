@@ -32,6 +32,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/shard_role/shard_catalog/validate_db_metadata_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

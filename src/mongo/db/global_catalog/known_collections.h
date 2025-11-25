@@ -29,6 +29,7 @@
 
 #pragma once
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

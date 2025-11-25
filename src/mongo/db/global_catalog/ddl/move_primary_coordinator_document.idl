@@ -29,6 +29,7 @@
 # This file defines the format of movePrimary coordinator persisted documents.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

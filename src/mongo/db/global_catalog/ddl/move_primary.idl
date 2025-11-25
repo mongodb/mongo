@@ -29,6 +29,7 @@
 # movePrimary IDL File
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

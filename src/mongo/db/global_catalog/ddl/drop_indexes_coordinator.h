@@ -32,6 +32,7 @@
 #include "mongo/db/global_catalog/ddl/drop_indexes_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 

@@ -34,6 +34,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_cmds_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

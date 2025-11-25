@@ -31,6 +31,7 @@
 
 #include "mongo/db/global_catalog/ddl/initialize_placement_history_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

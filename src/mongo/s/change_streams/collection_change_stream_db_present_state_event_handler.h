@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/s/change_streams/change_stream_db_present_state_event_handler.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 class CollectionChangeStreamShardTargeterDbPresentStateEventHandler

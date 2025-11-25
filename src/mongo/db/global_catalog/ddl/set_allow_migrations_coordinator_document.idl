@@ -30,6 +30,7 @@
 # shard coordinator to guarantee resilience in the event of stepdowns while creating collections.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

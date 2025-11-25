@@ -37,6 +37,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/global_catalog/type_chunk_range.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>

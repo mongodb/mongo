@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <cstdint>
 
 namespace mongo::logical_sessions {

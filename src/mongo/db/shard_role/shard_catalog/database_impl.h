@@ -42,6 +42,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/shard_catalog/virtual_collection_options.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

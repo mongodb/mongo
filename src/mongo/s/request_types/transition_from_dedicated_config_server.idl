@@ -29,6 +29,7 @@
 # transitionFromDedicatedConfigServer IDL file
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

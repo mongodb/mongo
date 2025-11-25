@@ -30,6 +30,7 @@
 # shard for a drop collection operation.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/global_catalog/type_collection.h"

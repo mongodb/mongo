@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/processinfo.h"
 
 #include <fmt/core.h>

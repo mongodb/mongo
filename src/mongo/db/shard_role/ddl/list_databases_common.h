@@ -45,6 +45,7 @@
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

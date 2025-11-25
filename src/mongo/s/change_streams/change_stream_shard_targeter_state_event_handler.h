@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/change_stream_shard_targeter.h"
 #include "mongo/db/pipeline/historical_placement_fetcher.h"
 #include "mongo/s/change_streams/control_events.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

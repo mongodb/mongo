@@ -34,6 +34,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 class CreateDatabaseCoordinator final

@@ -29,6 +29,7 @@
 # This file defines the format of drop database coordinator persisted documents.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/global_catalog/type_collection.h"

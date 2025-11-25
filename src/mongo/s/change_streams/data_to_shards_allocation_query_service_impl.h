@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/data_to_shards_allocation_query_service.h"
 #include "mongo/db/pipeline/historical_placement_fetcher.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

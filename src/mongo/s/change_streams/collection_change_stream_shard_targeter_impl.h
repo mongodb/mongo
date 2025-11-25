@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/historical_placement_fetcher.h"
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler.h"
 #include "mongo/s/change_streams/control_events.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 

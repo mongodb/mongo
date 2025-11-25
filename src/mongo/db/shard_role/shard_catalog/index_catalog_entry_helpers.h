@@ -32,6 +32,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/update_index_data.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::index_catalog_helpers {
 

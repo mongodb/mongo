@@ -30,6 +30,7 @@
 # shard coordinator to serialize with other DDL operations.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

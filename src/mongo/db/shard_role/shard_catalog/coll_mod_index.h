@@ -37,6 +37,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 #include <set>

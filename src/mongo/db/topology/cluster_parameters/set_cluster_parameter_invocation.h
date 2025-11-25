@@ -41,6 +41,7 @@
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>

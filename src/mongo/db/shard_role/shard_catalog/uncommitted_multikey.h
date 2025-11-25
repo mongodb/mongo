@@ -32,6 +32,7 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog_entry_metadata.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>

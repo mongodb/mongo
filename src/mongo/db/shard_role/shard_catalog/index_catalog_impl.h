@@ -48,6 +48,7 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/update/document_diff_calculator.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <functional>

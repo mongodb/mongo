@@ -33,6 +33,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/change_stream_reader_context.h"
 #include "mongo/db/pipeline/change_stream_shard_targeter.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 

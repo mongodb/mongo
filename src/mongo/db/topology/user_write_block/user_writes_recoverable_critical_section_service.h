@@ -34,6 +34,7 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/user_write_block/user_writes_block_reason_gen.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

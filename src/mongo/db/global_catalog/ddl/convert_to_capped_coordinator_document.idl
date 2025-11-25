@@ -29,6 +29,7 @@
 # This file defines the format of fields/documents used by the convert to capped coordinator
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

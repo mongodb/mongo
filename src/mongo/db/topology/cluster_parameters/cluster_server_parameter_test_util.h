@@ -50,6 +50,7 @@
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_test_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

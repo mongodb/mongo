@@ -34,6 +34,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/util/immutable/unordered_map.h"
 #include "mongo/util/immutable/unordered_set.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <vector>

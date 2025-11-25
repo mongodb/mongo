@@ -30,6 +30,7 @@
 # config.shard.xxx collections.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

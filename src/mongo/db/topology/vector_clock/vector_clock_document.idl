@@ -29,6 +29,7 @@
 # This file defines the format of the vector clock document stored under config.system.version.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

@@ -34,6 +34,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/modules.h"
 
 #include <set>
 

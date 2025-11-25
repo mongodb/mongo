@@ -43,6 +43,7 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

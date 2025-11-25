@@ -32,6 +32,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

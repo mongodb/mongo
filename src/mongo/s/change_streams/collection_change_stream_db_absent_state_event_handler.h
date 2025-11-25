@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/s/change_streams/change_stream_db_absent_state_event_handler.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

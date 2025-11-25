@@ -34,6 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/remove_shard_draining_progress_gen.h"
+#include "mongo/util/modules.h"
 
 
 namespace mongo {

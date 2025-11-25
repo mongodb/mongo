@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::catalog_stats {
 

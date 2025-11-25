@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/historical_placement_fetcher.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

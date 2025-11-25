@@ -31,6 +31,7 @@
 
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

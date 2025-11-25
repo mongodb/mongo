@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status_with.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

@@ -43,6 +43,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>
