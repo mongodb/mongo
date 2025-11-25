@@ -175,6 +175,7 @@ void UnionWithStage::prepareSubPipeline(const std::vector<BSONObj>& serializedPi
     // parent query ExpressionContext.
     const boost::intrusive_ptr<ExpressionContext>& pipelineCtx =
         _sharedState->_pipeline->getContext();
+    pipelineCtx->initializeReferencedSystemVariables();
     pipelineCtx->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
 
     logPipeline(104243, "$unionWith before pipeline prep: ", *_sharedState->_pipeline);
