@@ -46,9 +46,40 @@ namespace {
 // Empty vector used by LiteParsedDocumentSources which do not have a sub pipeline.
 inline static std::vector<LiteParsedPipeline> kNoSubPipeline = {};
 
-StringMap<LiteParsedDocumentSource::LiteParserInfo> parserMap;
+StringMap<LiteParsedDocumentSource::LiteParserRegistration> parserMap;
 
 }  // namespace
+
+const LiteParsedDocumentSource::LiteParserInfo&
+LiteParsedDocumentSource::LiteParserRegistration::getParser() const {
+    // If there's no feature flag toggle, or the feature flag toggle exists and the feature is
+    // enabled in this context, use the primary parser. Otherwise, use the fallback parser.
+    if (_primaryParserFeatureFlag == nullptr || _primaryParserFeatureFlag->checkEnabled()) {
+        return _primaryParser;
+    } else {
+        return _fallbackParser;
+    }
+}
+
+void LiteParsedDocumentSource::LiteParserRegistration::setPrimaryParser(LiteParserInfo&& lpi) {
+    _primaryParser = std::move(lpi);
+    _primaryIsSet = true;
+}
+
+void LiteParsedDocumentSource::LiteParserRegistration::setFallbackParser(
+    LiteParserInfo&& lpi, IncrementalRolloutFeatureFlag* ff) {
+    _fallbackParser = std::move(lpi);
+    _primaryParserFeatureFlag = ff;
+    _fallbackIsSet = true;
+}
+
+bool LiteParsedDocumentSource::LiteParserRegistration::isPrimarySet() const {
+    return _primaryIsSet;
+}
+
+bool LiteParsedDocumentSource::LiteParserRegistration::isFallbackSet() const {
+    return _fallbackIsSet;
+}
 
 void LiteParsedDocumentSource::registerParser(const std::string& name,
                                               Parser parser,
@@ -62,7 +93,46 @@ void LiteParsedDocumentSource::registerParser(const std::string& name,
         aggStageCounters.addMetric(name);
     }
 
-    parserMap[name] = {parser, allowedWithApiStrict, allowedWithClientType};
+    // Retrieve an existing or create a new registration.
+    auto& registration = parserMap[name];
+    registration.setPrimaryParser({parser, allowedWithApiStrict, allowedWithClientType});
+}
+
+void LiteParsedDocumentSource::registerFallbackParser(const std::string& name,
+                                                      Parser parser,
+                                                      FeatureFlag* parserFeatureFlag,
+                                                      AllowedWithApiStrict allowedWithApiStrict,
+                                                      AllowedWithClientType allowedWithClientType) {
+    if (parserMap.contains(name)) {
+        const auto& registration = parserMap.at(name);
+
+        // We require that the fallback parser is always registered prior to the primary parser.
+        // At extension load time, it’s then explicit which stages are permitted to be overridden
+        // and which cannot.
+        tassert(11395100,
+                "A stage's fallback parser must be registered before the primary parser",
+                registration.isFallbackSet() || !registration.isPrimarySet());
+
+        // Silently skip registration if a fallback parser has already been registered. The first
+        // fallback parser registration gets priority.
+        return;
+    }
+
+    // Initialize a counter for this document source to track how many times it is used.
+    aggStageCounters.addMetric(name);
+
+    // Create a new registration and save the parser as the fallback parser.
+    auto& registration = parserMap[name];
+
+    // TODO SERVER-114028 Remove the following dynamic cast and tassert when fallback parsing
+    // supports all feature flags.
+    auto* ifrFeatureFlag = dynamic_cast<IncrementalRolloutFeatureFlag*>(parserFeatureFlag);
+    tassert(11395101,
+            "Fallback parsing only supports IncrementalRolloutFeatureFlags.",
+            ifrFeatureFlag != nullptr);
+
+    registration.setFallbackParser({parser, allowedWithApiStrict, allowedWithClientType},
+                                   ifrFeatureFlag);
 }
 
 void LiteParsedDocumentSource::unregisterParser_forTest(const std::string& name) {
@@ -77,23 +147,23 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
     BSONElement specElem = spec.firstElement();
 
     auto stageName = specElem.fieldNameStringData();
-    auto it = parserMap.find(stageName);
+    const auto it = parserMap.find(stageName);
 
     uassert(40324,
             str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
             it != parserMap.end());
 
-    return it->second.parser(nss, specElem, options);
+    return it->second.getParser().parser(nss, specElem, options);
 }
 
 const LiteParsedDocumentSource::LiteParserInfo& LiteParsedDocumentSource::getInfo(
     const std::string& stageName) {
-    auto it = parserMap.find(stageName);
+    const auto it = parserMap.find(stageName);
     uassert(5407200,
             str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
             it != parserMap.end());
 
-    return it->second;
+    return it->second.getParser();
 }
 
 const std::vector<LiteParsedPipeline>& LiteParsedDocumentSource::getSubPipelines() const {

@@ -95,6 +95,44 @@ public:
         AllowedWithClientType allowedWithClientType;
     };
 
+    /*
+     * A LiteParserRegistration encapsulates the set of all parsers that can be used to parse a
+     * stage into a LiteParsedDocumentSource, controlled by the value of a feature flag.
+     */
+    class LiteParserRegistration {
+    public:
+        const LiteParserInfo& getParser() const;
+
+        void setPrimaryParser(LiteParserInfo&& lpi);
+
+        // TODO SERVER-114028 Update when fallback parsing supports all feature flags.
+        void setFallbackParser(LiteParserInfo&& lpi, IncrementalRolloutFeatureFlag* ff);
+
+        bool isPrimarySet() const;
+
+        bool isFallbackSet() const;
+
+    private:
+        // The preferred method of parsing this LiteParsedDocumentSource. If the feature flag is
+        // enabled, the primary parser will be used to parse the stage.
+        LiteParserInfo _primaryParser;
+
+        // The fallback method of parsing this LiteParsedDocumentSource. If the feature flag is
+        // disabled, the fallback parser will be used to parse the stage.
+        LiteParserInfo _fallbackParser;
+
+        // When enabled, signals to use the primary parser; when disabled, signals to use the
+        // fallback parser.
+        // TODO SERVER-114028 Generalize this to be FeatureFlag*.
+        IncrementalRolloutFeatureFlag* _primaryParserFeatureFlag = nullptr;
+
+        // Whether or not the primary parser has been registered or not.
+        bool _primaryIsSet = false;
+
+        // Whether or not the fallback parser has been registered or not.
+        bool _fallbackIsSet = false;
+    };
+
     /**
      * Constructs a LiteParsedDocumentSource from the user-supplied BSON.
      *
@@ -119,6 +157,12 @@ public:
                                Parser parser,
                                AllowedWithApiStrict allowedWithApiStrict,
                                AllowedWithClientType allowedWithClientType);
+
+    static void registerFallbackParser(const std::string& name,
+                                       Parser parser,
+                                       FeatureFlag* parserFeatureFlag,
+                                       AllowedWithApiStrict allowedWithApiStrict,
+                                       AllowedWithClientType allowedWithClientType);
 
     /**
      * Function that will be used as an alternate parser for a document source that has been
@@ -347,6 +391,8 @@ private:
      * only meant to be used in the context of unit tests. This is because the parserMap is not
      * thread safe, so modifying it at runtime is unsafe.
      */
+    friend class LiteParserRegistrationTest;
+    friend class LiteParsedDocumentSourceParseTest;
     static void unregisterParser_forTest(const std::string& name);
 
     std::string _parseTimeName;
