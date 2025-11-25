@@ -309,7 +309,7 @@
 				"id": "runTargets",
 				"command": "shellCommand.execute",
 				"args": {
-					"command": "buildscripts/vscode_launch_targets.sh 2> /dev/null",
+					"command": "buildscripts/vscode_launch_targets.sh",
 					"cwd": "${workspaceFolder}",
 					"taskId": "runTargets",
 					"rememberPrevious": true,

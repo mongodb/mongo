@@ -1,6 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Directory where you want the log to end up (VS Code is already setting cwd)
+ROOT_DIR=$(pwd)
+
+tmp_log=$(mktemp)
+
+cleanup() {
+    status=$?
+    if [[ -s "$tmp_log" ]]; then
+        mv "$tmp_log" "$ROOT_DIR/.vscode_launch_targets.log"
+    else
+        rm -f "$tmp_log"
+        rm -f "$ROOT_DIR/.vscode_launch_targets.log"
+    fi
+    exit $status
+}
+trap cleanup EXIT
+
+# Save original stderr on fd 3
+exec 3>&2
+# Send stderr through tee: write to tmp_log and still to real stderr (fd 3)
+exec 2> >(tee "$tmp_log" >&3)
+
 # 1) what we want to query
 QUERY=${1:-"attr(tags, \"mongo_binary\", //...) union attr(tags, \"mongo_unittest\", //...)"}
 
