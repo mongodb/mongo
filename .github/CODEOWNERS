@@ -1896,6 +1896,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/admission/OWNERS.yml
 /src/mongo/db/admission/**/* @10gen/server-workload-resilience @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/admission/execution_control/OWNERS.yml
+/src/mongo/db/admission/execution_control/ @10gen/server-workload-resilience @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/auth/OWNERS.yml
 /src/mongo/db/auth/**/* @10gen/server-security @svc-auto-approve-bot
 

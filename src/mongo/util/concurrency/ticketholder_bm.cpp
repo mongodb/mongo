@@ -29,7 +29,7 @@
 
 #include <benchmark/benchmark.h>
 // IWYU pragma: no_include "cxxabi.h"
-#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"

@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/admission/throughput_probing.h"
+#include "mongo/db/admission/execution_control/throughput_probing.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/admission/throughput_probing_gen.h"
+#include "mongo/db/admission/execution_control/throughput_probing_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

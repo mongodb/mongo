@@ -29,9 +29,9 @@
 
 #include "mongo/tools/workload_simulation/throughput_probing/throughput_probing_simulator.h"
 
-#include "mongo/db/admission/execution_control_parameters_gen.h"
-#include "mongo/db/admission/throughput_probing.h"
-#include "mongo/db/admission/throughput_probing_gen.h"
+#include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
+#include "mongo/db/admission/execution_control/throughput_probing.h"
+#include "mongo/db/admission/execution_control/throughput_probing_gen.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

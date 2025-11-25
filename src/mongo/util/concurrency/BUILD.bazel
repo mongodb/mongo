@@ -70,8 +70,8 @@ mongo_cc_library(
     deps = [
         ":admission_context",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/admission:execution_admission_context",
         "//src/mongo/db/admission:ingress_admission_control",
+        "//src/mongo/db/admission/execution_control:execution_admission_context",
     ],
 )
 
@@ -134,7 +134,7 @@ mongo_cc_benchmark(
     deps = [
         ":ticketholder",
         "//src/mongo/db:service_context_non_d",
-        "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/db/admission/execution_control:execution_admission_context",
         "//src/mongo/db/shard_role/lock_manager",
     ],
 )

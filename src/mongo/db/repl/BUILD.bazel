@@ -898,7 +898,7 @@ mongo_cc_library(
         "//src/mongo/db:change_stream_pre_image_util",
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role_api_stor_ex",
-        "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/db/admission/execution_control:execution_admission_context",
         "//src/mongo/db/auth:authorization_manager_global",
         "//src/mongo/db/pipeline:change_stream_preimage",
         "//src/mongo/executor:task_executor_interface",

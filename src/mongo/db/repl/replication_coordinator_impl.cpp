@@ -49,7 +49,7 @@
 #include "mongo/client/fetcher.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/read_preference_gen.h"
-#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"

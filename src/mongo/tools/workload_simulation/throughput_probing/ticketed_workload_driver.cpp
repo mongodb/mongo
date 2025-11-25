@@ -30,7 +30,7 @@
 #include "mongo/tools/workload_simulation/throughput_probing/ticketed_workload_driver.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 

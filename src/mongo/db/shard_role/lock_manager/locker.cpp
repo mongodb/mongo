@@ -30,7 +30,7 @@
 #include "mongo/db/shard_role/lock_manager/locker.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/admission/ticketing_system.h"
+#include "mongo/db/admission/execution_control/ticketing_system.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/lock_manager/dump_lock_manager.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager.h"

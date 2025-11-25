@@ -31,8 +31,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/admission/execution_admission_context.h"
-#include "mongo/db/admission/execution_control_parameters_gen.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/curop.h"

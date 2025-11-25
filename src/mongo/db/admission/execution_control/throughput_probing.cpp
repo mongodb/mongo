@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/admission/throughput_probing.h"
+#include "mongo/db/admission/execution_control/throughput_probing.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/admission/execution_admission_context.h"
-#include "mongo/db/admission/throughput_probing_gen.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/throughput_probing_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/lock_manager/dump_lock_manager.h"
 #include "mongo/logv2/log.h"

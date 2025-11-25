@@ -29,7 +29,7 @@
 
 #include "mongo/db/repl/oplog_writer_impl.h"
 
-#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/repl/initial_sync/initial_syncer.h"

@@ -29,7 +29,7 @@
 #include "mongo/db/periodic_runner_cache_pressure_rollback.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/admission/execution_control_parameters_gen.h"
+#include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"

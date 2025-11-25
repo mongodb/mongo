@@ -44,7 +44,7 @@
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/admission/execution_control_init.h"
+#include "mongo/db/admission/execution_control/execution_control_init.h"
 #include "mongo/db/admission/flow_control.h"
 #include "mongo/db/admission/flow_control_parameters_gen.h"
 #include "mongo/db/audit.h"

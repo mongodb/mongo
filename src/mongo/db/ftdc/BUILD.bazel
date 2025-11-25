@@ -64,7 +64,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role_api",
-        "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/db/admission/execution_control:execution_admission_context",
         "//src/mongo/util:varint",
         "//src/mongo/util/concurrency:spin_lock",
         "//src/third_party/zlib",

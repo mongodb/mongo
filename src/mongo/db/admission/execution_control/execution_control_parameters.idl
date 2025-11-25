@@ -29,7 +29,7 @@
 global:
     cpp_namespace: "mongo::admission::execution_control"
     cpp_includes:
-        - "mongo/db/admission/ticketing_system.h"
+        - "mongo/db/admission/execution_control/ticketing_system.h"
 
 enums:
     ExecutionControlConcurrencyAdjustmentAlgorithm:

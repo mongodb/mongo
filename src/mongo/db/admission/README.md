@@ -2,8 +2,8 @@
 
 There are 2 separate ticketing mechanisms placed in front of the global lock acquisition. Both aim to limit the number of concurrent operations from overwhelming the system. Before an operation can acquire the global lock, it must acquire a ticket from one, or both, of the ticketing mechanisms. When both ticket mechanisms are necessary, the acquisition order is as follows:
 
-1. [Flow Control](./README_execution_control.md) - Required only for global lock requests in MODE_IX
-2. [Execution Control](./README_flow_control.md) - Required for all global lock requests
+1. [Flow Control](./README_flow_control.md) - Required only for global lock requests in MODE_IX
+2. [Execution Control](execution_control/README.md) - Required for all global lock requests
 
 ## Admission Priority
 

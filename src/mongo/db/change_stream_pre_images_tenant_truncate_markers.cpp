@@ -28,7 +28,7 @@
  */
 #include "mongo/db/change_stream_pre_images_tenant_truncate_markers.h"
 
-#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
 #include "mongo/db/collection_crud/collection_write_path.h"

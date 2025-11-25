@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/flow_control_ticketholder.h"
 #include "mongo/db/namespace_string.h"

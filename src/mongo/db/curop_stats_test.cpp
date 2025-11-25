@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context_options_gen.h"
