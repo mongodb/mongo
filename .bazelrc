@@ -588,8 +588,8 @@ try-import %workspace%/.bazelrc.evergreen
 # local default dev settings
 try-import %workspace%/.bazelrc.common_bes
 
-# local default dev settings
-try-import %workspace%/.bazelrc.mongo_variables
+# Settings unconditionally written by the wrapper hook
+try-import %workspace%/.bazelrc.wrapper_hook
 
 # local git version info
 try-import %workspace%/.bazelrc.git

@@ -299,6 +299,7 @@ buildozer
 .bazelrc.mongo_version
 .bazelrc.compiledb
 .bazelrc.sync
+.bazelrc.wrapper_hook
 .compiledb
 .bazelrc.xcode
 .bazelrc.bazelisk

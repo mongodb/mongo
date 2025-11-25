@@ -200,7 +200,6 @@ fi
 # find existing python installs
 cur_dir=$(basename $REPO_ROOT)
 python=""
-standard_python_loc="$(readlink "$REPO_ROOT/bazel-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_${os}_${ARCH}/dist/bin/python3"
 if [ -d $REPO_ROOT/bazel-$cur_dir ]; then
   python="$(readlink "$REPO_ROOT/bazel-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_${os}_${ARCH}/dist/bin/python3"
 else

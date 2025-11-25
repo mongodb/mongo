@@ -12,10 +12,10 @@ py_library(
         "install_modules.py",
         "lint.py",
         "plus_interface.py",
-        "set_mongo_variables.py",
         "wrapper_debug.py",
         "wrapper_hook.py",
         "wrapper_util.py",
+        "write_wrapper_hook_bazelrc.py",
     ],
     visibility = ["//visibility:public"],
 )

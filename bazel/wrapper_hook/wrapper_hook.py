@@ -92,7 +92,7 @@ def main():
     # from bazel.wrapper_hook.git_age_check import check as git_age_check
     from bazel.wrapper_hook.lint import LinterFail
     from bazel.wrapper_hook.plus_interface import check_bazel_command_type, test_runner_interface
-    from bazel.wrapper_hook.set_mongo_variables import write_mongo_variables_bazelrc
+    from bazel.wrapper_hook.write_wrapper_hook_bazelrc import write_wrapper_hook_bazelrc
 
     th_all_header, hdr_state_all_header = spawn_all_headers_thread(REPO_ROOT)
 
@@ -137,7 +137,7 @@ def main():
 
         engflow_auth(args)
         write_workstation_bazelrc(args)
-        write_mongo_variables_bazelrc(args)
+        write_wrapper_hook_bazelrc(args)
         # Disable git age check for now, to avoid issues wth merge commits
         # git_age_check()
         check_resource()

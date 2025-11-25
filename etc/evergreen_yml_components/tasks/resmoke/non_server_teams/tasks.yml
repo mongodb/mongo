@@ -486,7 +486,6 @@ tasks:
           suite: //buildscripts/resmokeconfig:core
           compiling_for_test: true
           bazel_args: >-
-            --workspace_status_command="bazel/resmoke/workspace_status.sh"
             --test_sharding_strategy=forced=16
             --test_arg=--testTimeout=960
             --test_timeout=1500
@@ -507,8 +506,6 @@ tasks:
           jstestfuzz_vars: --jsTestsDir ../jstests
           suite: //buildscripts/resmokeconfig:jstestfuzz
           npm_command: jstestfuzz
-          bazel_args: >-
-            --workspace_status_command="bazel/resmoke/workspace_status.sh"
 
   # Experimental task running the multiversion sanity check bazel targets. To be removed with SERVER-103537.
   - <<: *gen_task_template
@@ -522,9 +519,6 @@ tasks:
       ]
     commands:
       - func: "generate resmoke tasks"
-        vars:
-          bazel_args: >-
-            --workspace_status_command="bazel/resmoke/workspace_status.sh"
       - func: "initialize multiversion tasks"
         vars:
           //buildscripts/resmokeconfig:bazel_multiversion_sanity_check_last_continuous_new_new_old: last_continuous

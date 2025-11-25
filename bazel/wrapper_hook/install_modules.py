@@ -111,7 +111,7 @@ def install_modules(bazel, args):
         with open(lockfile_hash_file, "w") as f:
             f.write(current_hash)
 
-    deps = ["retry", "gitpython", "requests", "timeout-decorator", "boto3"]
+    deps = ["retry", "gitpython", "requests", "timeout-decorator", "boto3", "pyyaml", "pymongo"]
     deps_installed = []
     deps_needed = search_for_modules(
         deps, deps_installed, lockfile_changed=old_hash != current_hash
@@ -139,6 +139,7 @@ def install_modules(bazel, args):
                 "--remote_download_all",
                 "--bes_backend=",
                 "--bes_results_url=",
+                "--workspace_status_command=",
             ]
         )
         if proc.returncode != 0:
