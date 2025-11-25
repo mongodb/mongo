@@ -65,7 +65,8 @@ bool isNonVerboseWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
 
 WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
                                          WriteCommandRef cmdRef,
-                                         BSONObj originalCommand) {
+                                         BSONObj originalCommand,
+                                         boost::optional<OID> targetEpoch) {
 
     tassert(11123700, "OperationContext must not be null", opCtx);
 
@@ -86,14 +87,16 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
 
     WriteBatchExecutor executor(cmdRef, originalCommand);
     WriteBatchResponseProcessor processor(cmdRef, stats, isNonVerbose, originalCommand);
-    WriteBatchScheduler scheduler(cmdRef, *batcher, executor, processor);
+    WriteBatchScheduler scheduler(cmdRef, *batcher, executor, processor, targetEpoch);
 
     scheduler.run(opCtx);
     stats.updateMetrics(opCtx);
     return processor.generateClientResponse(opCtx);
 }
 
-BatchedCommandResponse write(OperationContext* opCtx, const BatchedCommandRequest& request) {
+BatchedCommandResponse write(OperationContext* opCtx,
+                             const BatchedCommandRequest& request,
+                             boost::optional<OID> targetEpoch) {
     if (request.hasEncryptionInformation()) {
         BatchedCommandResponse response;
         FLEBatchResult result = processFLEBatch(opCtx, request, &response);
@@ -104,7 +107,8 @@ BatchedCommandResponse write(OperationContext* opCtx, const BatchedCommandReques
         // case.
     }
 
-    return std::get<BatchedCommandResponse>(executeWriteCommand(opCtx, WriteCommandRef{request}));
+    return std::get<BatchedCommandResponse>(
+        executeWriteCommand(opCtx, WriteCommandRef{request}, BSONObj(), targetEpoch));
 }
 
 BulkWriteCommandReply bulkWrite(OperationContext* opCtx,

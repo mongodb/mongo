@@ -75,10 +75,6 @@ selector:
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_write_concern_errors_unsharded.js
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle_tassert_log_omit.js
 
-  exclude_files:
-    # TODO SERVER-114138: Handle concurrent collection drops with $merge in UWE.
-    - jstests/sharding/query/out_merge/merge_stale_on_fields.js
-
 executor:
   archive:
     hooks:

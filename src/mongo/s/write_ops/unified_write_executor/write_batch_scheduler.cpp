@@ -171,8 +171,35 @@ StatusWith<std::unique_ptr<RoutingContext>> WriteBatchScheduler::initRoutingCont
             const auto allowLocks = opCtx->inMultiDocumentTransaction() &&
                 shard_role_details::getLocker(opCtx)->isLocked();
 
-            return std::make_unique<RoutingContext>(
+
+            // We should only be passing the target epoch if we're targeting one namespace. In
+            // general, a target epoch is only passed for $merge commands to detect concurrent
+            // collection drops between rounds of inserting documents.
+            tassert(11413801, "Expected at least one nss to be targeted", nssList.size() > 0);
+            tassert(11413800,
+                    "Expected only one namespace when target epoch is specified",
+                    !_targetEpoch || nssList.size() == 1);
+            const auto firstNss = nssList.front();
+
+            auto routingCtx = std::make_unique<RoutingContext>(
                 opCtx, std::move(nssList), allowLocks, true /* checkTimeseriesBucketsNss */);
+
+            // Throws a StaleEpoch exception if the collection has been dropped and recreated or has
+            // an epoch that doesn't match that target epoch specified.
+            if (_targetEpoch) {
+                const auto& cri = routingCtx->getCollectionRoutingInfo(firstNss);
+                const auto& cm = cri.getChunkManager();
+
+                uassert(StaleEpochInfo(firstNss, ShardVersion{}, ShardVersion{}),
+                        "Collection has been dropped",
+                        cm.hasRoutingTable());
+                uassert(StaleEpochInfo(firstNss, ShardVersion{}, ShardVersion{}),
+                        "Collection epoch has changed",
+                        cm.getVersion().epoch() == _targetEpoch);
+            }
+
+            return std::move(routingCtx);
+
         } catch (const DBException& ex) {
             // For NamespaceNotFound errors, we will retry a couple of times before returning
             // the error to the caller. For all other types of errors, we return the error to

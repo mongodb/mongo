@@ -46,12 +46,14 @@ public:
     WriteBatchScheduler(WriteCommandRef cmdRef,
                         WriteOpBatcher& batcher,
                         WriteBatchExecutor& executor,
-                        WriteBatchResponseProcessor& processor)
+                        WriteBatchResponseProcessor& processor,
+                        boost::optional<OID> targetEpoch)
         : _cmdRef(std::move(cmdRef)),
           _nssSet(_cmdRef.getNssSet()),
           _batcher(batcher),
           _executor(executor),
-          _processor(processor) {}
+          _processor(processor),
+          _targetEpoch(targetEpoch) {}
 
     void run(OperationContext* opCtx);
 
@@ -114,6 +116,7 @@ protected:
     WriteOpBatcher& _batcher;
     WriteBatchExecutor& _executor;
     WriteBatchResponseProcessor& _processor;
+    boost::optional<OID> _targetEpoch;
 };
 
 }  // namespace unified_write_executor

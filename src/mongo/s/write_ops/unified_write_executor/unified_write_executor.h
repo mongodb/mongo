@@ -51,12 +51,15 @@ using WriteCommandResponse =
  */
 WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
                                          WriteCommandRef cmdRef,
-                                         BSONObj originalCommand = BSONObj());
+                                         BSONObj originalCommand = BSONObj(),
+                                         boost::optional<OID> targetEpoch = boost::none);
 
 /**
  * Helper function for executing insert/update/delete commands.
  */
-BatchedCommandResponse write(OperationContext* opCtx, const BatchedCommandRequest& request);
+BatchedCommandResponse write(OperationContext* opCtx,
+                             const BatchedCommandRequest& request,
+                             boost::optional<OID> targetEpoch = boost::none);
 
 /**
  * Helper function for executing bulk commands.

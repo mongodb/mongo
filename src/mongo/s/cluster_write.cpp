@@ -81,7 +81,7 @@ void write(OperationContext* opCtx,
 
     // TODO SERVER-104145: Enable insert/update/delete commands from internal clients.
     if (unified_write_executor::isEnabled(opCtx)) {
-        *response = unified_write_executor::write(opCtx, request);
+        *response = unified_write_executor::write(opCtx, request, targetEpoch);
         // SERVER-109104 This can be removed once we delete BatchWriteExec.
         stats->markIgnore();
     } else {
