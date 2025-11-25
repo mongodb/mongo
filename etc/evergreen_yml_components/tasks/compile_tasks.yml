@@ -138,24 +138,6 @@ tasks:
           target: >-
             //src/mongo/platform:visibility1_test
 
-  - name: bazel_archive_and_run_dist_test
-    tags: ["assigned_to_jira_team_devprod_build", "bazel_check", "auxiliary"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    exec_timeout_secs: 32400 # 9 hours
-    commands:
-      - func: "bazel compile"
-        vars:
-          targets: archive-dist-test
-          bazel_args: --config=opt --separate_debug=True
-      - func: "run tests"
-        vars:
-          suite: core
-          install_dir: bazel-bin/install/bin
-          resmoke_jobs_max: 4 # No cap on number of jobs.
-          exec_timeout_secs: 32400 # 9 hours
-
   - name: hydrate_bazel_profile_fastbuild
     tags:
       [
@@ -1395,7 +1377,6 @@ task_groups:
     name: run_bazel_TG
     tasks:
       - run_bazel_program
-      - bazel_archive_and_run_dist_test
 
   # We want to run these sequentially to put less load on the cluster
   - <<: *compile_task_group_template
@@ -1419,16 +1400,6 @@ task_groups:
     max_hosts: -1
     tasks:
       - build_source_graph_index
-
-  - <<: *compile_bazel_task_group_template
-    name: compile_bazel_windows_TG
-    tasks:
-      - run_bazel_program_windows
-
-  - <<: *compile_bazel_task_group_template
-    name: compile_bazel_macos_TG
-    tasks:
-      - compile_dist_test_quick
 
   - <<: *compile_task_group_template
     name: compile_upload_benchmarks_TG

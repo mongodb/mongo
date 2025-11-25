@@ -5,19 +5,6 @@
 # and LTS release (v7.0, v6.0 etc.) branch projects
 
 buildvariants:
-  - name: &ubuntu2204-x86-64-bazel-compile ubuntu2204-x86-64-bazel-compile
-    display_name: "Ubuntu 22.04 x86_64 Enterprise Bazel Compile"
-    tags: ["bazel_check"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-    run_on:
-      - ubuntu2204-large
-    stepback: false
-    expansions:
-      compile_variant: *ubuntu2204-x86-64-bazel-compile
-    tasks:
-      - name: compile_bazel_TG
-      - name: run_bazel_TG
-
   - name: &workstation_bazel_cache_hydration_arm64 workstation_bazel_cache_hydration_arm64
     display_name: "~ Workstation Bazel Cache Hydration arm64"
     tags: ["bazel_cache_hydration"]

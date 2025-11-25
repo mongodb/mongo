@@ -91,21 +91,6 @@ buildvariants:
 
   # Note that this task is currently optional;
   # This will eventually become suggested, then required.
-  - name: &amazon-linux-2023-arm64-bazel-compile amazon-linux-2023-arm64-bazel-compile
-    display_name: "Amazon Linux 2023.3 Enterprise arm64 Bazel Compile"
-    tags: ["bazel_check"]
-    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
-    run_on:
-      - amazon2023.3-arm64-m8g-4xlarge
-    stepback: false
-    expansions:
-      compile_variant: *amazon-linux-2023-arm64-bazel-compile
-    tasks:
-      - name: compile_bazel_TG
-      - name: run_bazel_TG
-
-  # Note that this task is currently optional;
-  # This will eventually become suggested, then required.
   - name: &rhel81-ppc64le-bazel-compile rhel81-ppc64le-bazel-compile
     display_name: "RHEL 8.1 PPC64LE Bazel Compile"
     tags: ["bazel_check"]
