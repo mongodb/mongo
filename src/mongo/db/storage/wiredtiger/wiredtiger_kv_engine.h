@@ -62,6 +62,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -919,6 +920,7 @@ private:
 /**
  * Generates config string for wiredtiger_open() from the given config options.
  */
+MONGO_MOD_USE_REPLACEMENT(jstest)
 std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerConfig& wtConfig,
                                        StringData extensionsConfig,
                                        StringData providerConfig);
@@ -927,6 +929,7 @@ std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerC
  * Returns a WiredTigerKVEngineBase::WiredTigerConfig populated with config values provided at
  * startup.
  */
+MONGO_MOD_USE_REPLACEMENT(jstest)
 WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
     const rss::PersistenceProvider&);
 

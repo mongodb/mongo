@@ -31,6 +31,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -206,6 +207,7 @@ private:
  * Returns a WiredTigerKVEngineBase::WiredTigerConfig populated with config values provided at
  * startup for the Spill WiredTiger Engine.
  */
+MONGO_MOD_USE_REPLACEMENT(jstest)
 WiredTigerKVEngineBase::WiredTigerConfig getSpillWiredTigerConfigFromStartupOptions();
 
 }  // namespace mongo
