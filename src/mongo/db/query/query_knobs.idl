@@ -1297,6 +1297,32 @@ server_parameters:
         default: false
         redact: false
 
+    internalQueryGlobalProfilingLockDeadlineMs:
+        description: >-
+            A number of milliseconds to wait for a lock acquisition to perform writes to the
+            system.profile collection.
+        set_at: [startup, runtime]
+        cpp_varname: internalQueryGlobalProfilingLockDeadlineMs
+        cpp_vartype: AtomicWord<int>
+        default: 1
+        redact: false
+        validator:
+            gte: 0
+
+    internalProfilingMaxAbandonedWritesPerSecondPerDb:
+        description: >-
+            If there are at least this many lock timeouts when trying to profile, we will skip all
+            future profiling for a given database. Lasts until profiling is manually re-enabled. The
+            value can be zero, in which case even a single lock timeout will disable profiling for
+            the db.
+        set_at: [startup, runtime]
+        cpp_varname: internalProfilingMaxAbandonedWritesPerSecondPerDb
+        cpp_vartype: AtomicWord<int>
+        default: 1000
+        redact: false
+        validator:
+            gte: 0
+
     internalQueryAggMulticastTimeoutMS:
         description: "Timeout in MS for requests to shard servers when aggregations are sent to all shard servers"
         set_at: [startup]

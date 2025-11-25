@@ -46,6 +46,15 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "throughput_gauge",
+    srcs = [
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
     name = "stop_token",
     srcs = [
     ],
@@ -104,6 +113,7 @@ mongo_cc_unit_test(
         "jparse_util_test.cpp",
         "memory_util_test.cpp",
         "string_util_test.cpp",
+        "throughput_gauge_test.cpp",
         "validate_id_test.cpp",
     ],
     tags = [
@@ -112,6 +122,8 @@ mongo_cc_unit_test(
     deps = [
         ":jparse_util",
         ":query_util_bitset",
+        ":throughput_gauge",
         "//src/mongo/db:query_exec",
+        "//src/mongo/util:clock_source_mock",
     ],
 )
