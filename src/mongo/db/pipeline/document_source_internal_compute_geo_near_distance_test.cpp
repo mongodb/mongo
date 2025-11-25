@@ -35,6 +35,7 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -175,6 +176,69 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, RedactsCorrectly) {
             }
         })",
         redact(*geoDist, true));
+}
+
+void assertRepresentativeShapeIsStable(auto expCtx,
+                                       BSONObj inputStage,
+                                       BSONObj expectedRepresentativeStage) {
+    auto parsedStage =
+        DocumentSourceInternalGeoNearDistance::createFromBson(inputStage.firstElement(), expCtx);
+    std::vector<Value> serialization;
+    auto opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    parsedStage->serializeToArray(serialization, opts);
+
+    auto serializedStage = serialization[0].getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(serializedStage, expectedRepresentativeStage);
+
+    auto roundTripped = DocumentSourceInternalGeoNearDistance::createFromBson(
+        serializedStage.firstElement(), expCtx);
+
+    std::vector<Value> newSerialization;
+    roundTripped->serializeToArray(newSerialization, opts);
+    ASSERT_EQ(newSerialization.size(), 1UL);
+    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
+TEST_F(DocumentSourceInternalGeoNearDistanceTest, RoundtripSerializationPoint) {
+    assertRepresentativeShapeIsStable(getExpCtx(),
+                                      fromjson(R"(
+        { $_internalComputeGeoNearDistance: {
+            near: {
+                type: "Point",
+                coordinates: [10, 11]
+            },
+            key: "loc",
+            distanceMultiplier: 5,
+            distanceField: "dist"
+        }})"),
+                                      fromjson(R"(
+        { $_internalComputeGeoNearDistance: {
+            near: {
+                type: "Point",
+                coordinates: [1, 1]
+            },
+            key: "loc",
+            distanceField: "dist",
+            distanceMultiplier: 1
+        }})"));
+}
+
+TEST_F(DocumentSourceInternalGeoNearDistanceTest, RoundtripSerializationCoordinate) {
+    assertRepresentativeShapeIsStable(getExpCtx(),
+                                      fromjson(R"(
+        { $_internalComputeGeoNearDistance: {
+            near: [10, 11],
+            key: "loc",
+            distanceMultiplier: 5,
+            distanceField: "dist"
+        }})"),
+                                      fromjson(R"(
+        { $_internalComputeGeoNearDistance: {
+            near: [1, 1],
+            key: "loc",
+            distanceField: "dist",
+            distanceMultiplier: 1
+        }})"));
 }
 
 }  // namespace

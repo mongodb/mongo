@@ -122,10 +122,20 @@ DocumentSourceInternalGeoNearDistance::DocumentSourceInternalGeoNearDistance(
       _distanceField(std::move(distanceField)),
       _distanceMultiplier(distanceMultiplier) {}
 
+Value getNearFieldRepresentativeValue(BSONType coordinateType) {
+    if (isNumericBSONType(coordinateType)) {
+        return Value({Value(1), Value(1)});
+    } else {
+        return Value(BSON("type" << "Point" << "coordinates" << BSON_ARRAY(1 << 1)));
+    }
+}
+
 Value DocumentSourceInternalGeoNearDistance::serialize(const SerializationOptions& opts) const {
     MutableDocument out;
+
     out.setField(DocumentSourceInternalGeoNearDistance::kNearFieldName,
-                 opts.serializeLiteral(_coords));
+                 opts.serializeLiteral(
+                     _coords, getNearFieldRepresentativeValue(_coords.firstElementType())));
     out.setField(DocumentSourceInternalGeoNearDistance::kKeyFieldName,
                  Value(opts.serializeFieldPathFromString(_key)));
     out.setField(DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName,

@@ -9,8 +9,6 @@
  *   requires_timeseries,
  *   requires_getmore,
  *   requires_fcv_83,
- *   # TODO SERVER-113572 remove this tag once '$_internalComputeGeoNearDistance' is fixed.
- *   known_query_shape_computation_problem,
  *   # TODO SERVER-109838: Remove 'incompatible_with_extensions' tag.
  *   incompatible_with_extensions
  * ]
