@@ -215,6 +215,14 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::make(
         addUniquePort(uniquePorts, *maintenancePort, "maintenance"_sd);
     }
 
+    // Check ingress GRPC
+#ifdef MONGO_CONFIG_GRPC
+    if (shouldGRPCIngressBeEnabled()) {
+        addUniquePort(uniquePorts, serverGlobalParams.grpcPort, "grpc"_sd);
+    }
+#endif
+
+    // Check egress GRPC
     bool useEgressGRPC = false;
     if (isUseGrpc) {
 #ifdef MONGO_CONFIG_GRPC
