@@ -152,7 +152,6 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
                         isViewfulTimeseries,
                         std::move(targetedSampleId)};
     } else {
-        recordTargetingStats(opCtx, targeter, tr, op);
         // For updates/upserts/deletes running outside of a transaction that need to target more
         // than one endpoint, all shards are targeted -AND- 'shardVersion' is set to IGNORED on all
         // endpoints. The exception to this is when 'onlyTargetDataOwningShardsForMultiWrites' is
@@ -171,6 +170,8 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
             targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
                 opCtx, targeter.getNS(), op.getItemRef().getOpType(), tr.endpoints);
         }
+
+        recordTargetingStats(opCtx, targeter, tr, op);
 
         return Analysis{AnalysisType::kMultiShard,
                         std::move(tr.endpoints),

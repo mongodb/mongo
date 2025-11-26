@@ -26,6 +26,7 @@ selector:
     - jstests/sharding/migration_blocking_operation/mongos_calls_shardsvr_coordinate_multi_update_command.js
     - jstests/sharding/migration_blocking_operation/pause_during_multi_updates_cluster_parameter_requires_feature_flag.js
     - jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
+    - jstests/sharding/num_hosts_targeted_metrics.js
     - jstests/sharding/query/bulk_write_basic.js
     - jstests/sharding/query/bulk_write_size_limit.js
     - jstests/sharding/query/collation/*.js

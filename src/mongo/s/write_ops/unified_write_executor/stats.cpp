@@ -72,7 +72,8 @@ void Stats::updateMetrics(OperationContext* opCtx) {
         for (const auto& [writeType, shards] : targetingStats.targetedShardsByWriteType) {
             const int perWriteNShards = shards.size();
 
-            // TODO add one to 'nShards' if updated shard key
+            // TODO SERVER-104122: add one to 'nShards' if updated shard key. This information is
+            // returned from WCOS handling, see batch_write_exec.cpp
             NumHostsTargetedMetrics::QueryType metricsWriteType;
             switch (writeType) {
                 case WriteType::kInsert:
