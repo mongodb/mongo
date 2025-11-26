@@ -308,6 +308,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./buildscripts/tests/OWNERS.yml
 /buildscripts/tests/ @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/tests/test_evergreen_task_timeout.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/tests/test_generate_sbom.py @10gen/code-review-team-ssdlc @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/tests/burn_in_tests_end2end/OWNERS.yml
 /buildscripts/tests/burn_in_tests_end2end/ @10gen/devprod-correctness @svc-auto-approve-bot

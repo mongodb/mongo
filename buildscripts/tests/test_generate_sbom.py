@@ -1,13 +1,19 @@
+#!/usr/bin/env python3
+"""
+Tests for buildscripts/sbom/*.py
+"""
+
 import json
 import logging
 import os
 import sys
 import unittest
 
-sys.path.append(".")
+sys.path.append("buildscripts/sbom")
 
-from buildscripts.sbom.config import get_semver_from_release_version, is_valid_purl, regex_semver
+from buildscripts.sbom.config import get_semver_from_release_version, regex_semver
 from buildscripts.sbom.endorctl_utils import EndorCtl
+from buildscripts.sbom.generate_sbom import is_valid_purl
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
