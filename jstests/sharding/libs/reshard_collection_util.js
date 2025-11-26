@@ -227,6 +227,11 @@ export class ReshardCollectionCmdTest {
         });
     }
 
+    // Suites that run stepdowns can cause commands to fail due to retryable errors, so in those cases we should retry the command.
+    isStepdownRetryableError(error) {
+        return TestData.runningWithShardStepdowns && error.code === ErrorCodes.FailedToSatisfyReadPreference;
+    }
+
     assertReshardCollOkWithPreset(commandObj, presetReshardedChunks) {
         if (!this._skipCollectionSetup) {
             const oldShardKey = {oldKey: 1};
@@ -247,7 +252,17 @@ export class ReshardCollectionCmdTest {
         commandObj._presetReshardedChunks = presetReshardedChunks;
         const tempReshardingCollName = this._constructTemporaryReshardingCollName(this._dbName, this._collName);
 
-        assert.commandWorked(this._mongos.adminCommand(commandObj));
+        assert.soon(() => {
+            try {
+                assert.commandWorked(this._mongos.adminCommand(commandObj));
+                return true;
+            } catch (e) {
+                if (this.isStepdownRetryableError(e)) {
+                    return false;
+                }
+                throw e;
+            }
+        });
 
         this._verifyShardKey(commandObj.key);
 
@@ -302,7 +317,19 @@ export class ReshardCollectionCmdTest {
         const tempReshardingCollName = this._constructTemporaryReshardingCollName(this._dbName, this._collName);
 
         const startTime = Date.now();
-        assert.commandWorked(this._mongos.adminCommand(commandObj));
+
+        assert.soon(() => {
+            try {
+                assert.commandWorked(this._mongos.adminCommand(commandObj));
+                return true;
+            } catch (e) {
+                if (this.isStepdownRetryableError(e)) {
+                    return false;
+                }
+                throw e;
+            }
+        });
+
         const endTime = Date.now();
         this._reshardDuration = (endTime - startTime) / 1000;
 
@@ -334,7 +361,17 @@ export class ReshardCollectionCmdTest {
         // Do not drop the collection if this._skipCollectionSetup is true because the caller owns
         // the setup/teardown of the collection.
         if (!this._skipCollectionSetup) {
-            this._mongos.getDB(this._dbName)[this._collName].drop();
+            assert.soon(() => {
+                try {
+                    this._mongos.getDB(this._dbName)[this._collName].drop();
+                    return true;
+                } catch (e) {
+                    if (this.isStepdownRetryableError(e)) {
+                        return false;
+                    }
+                    throw e;
+                }
+            });
         }
 
         this._verifyAllShardingCollectionsRemoved(tempReshardingCollName);

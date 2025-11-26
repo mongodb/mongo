@@ -2,10 +2,10 @@
  * Basic tests for reshardCollection.
  * @tags: [
  *  uses_atclustertime,
- *  # Stepdown test coverage is already provided by the resharding FSM suites.
- *  does_not_support_stepdowns,
  *  # This test performs explicit calls to shardCollection
  *  assumes_unsharded_collection,
+ *  # TODO(SERVER-114426) Remove incompatible_aubsan tag
+ *  incompatible_aubsan
  * ]
  */
 
@@ -20,7 +20,6 @@ const collName = jsTestName();
 const dbName = db.getName();
 const ns = dbName + "." + collName;
 const mongos = db.getMongo();
-
 const numInitialDocs = 500;
 
 const reshardCmdTest = new ReshardCollectionCmdTest({
@@ -100,7 +99,8 @@ assert.commandFailedWithCode(
         zones: [{zone: nonExistingZoneName, min: {newKey: 5}, max: {newKey: 10}}],
         numInitialChunks: 2,
     }),
-    ErrorCodes.ZoneNotFound,
+    // TODO SERVER-103461 Remove ErrorCodes.CannotCreateChunkDistribution when 9.0 becomes last LTS.
+    [ErrorCodes.ZoneNotFound, ErrorCodes.CannotCreateChunkDistribution],
 );
 
 jsTest.log("Fail if zone provided is invalid for storage.");
@@ -159,7 +159,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation) {
 }
 
 // TODO SERVER-103461 Remove version check when 9.0 becomes last LTS.
-const binVersion = assert.commandWorked(
+let binVersion = assert.commandWorked(
     db.adminCommand({
         serverStatus: 1,
     }),
@@ -296,19 +296,67 @@ reshardCmdTest.assertReshardCollOk(
     3,
 );
 
-jsTestLog("Succeed if hashed shard key without hashed prefix and numInitialChunks is respected.");
-reshardCmdTest.assertReshardCollOk({reshardCollection: ns, key: {oldKey: 1, newKey: "hashed"}, numInitialChunks: 5}, 5);
+// TODO SERVER-103461 Remove version check when 9.0 becomes last LTS.
+binVersion = assert.commandWorked(
+    db.adminCommand({
+        serverStatus: 1,
+    }),
+).version;
+if (MongoRunner.compareBinVersions(binVersion, "8.2") >= 0) {
+    jsTestLog("Succeed if hashed shard key without hashed prefix and numInitialChunks is respected.");
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {oldKey: 1, newKey: "hashed"}, numInitialChunks: 5},
+        5,
+    );
 
-jsTest.log("Succeed reshard to hashed shard key with one chunk per shard.");
-assert.commandWorked(db.adminCommand({shardCollection: ns, key: {a: "hashed"}}));
-assert.commandWorked(
-    db.getCollection(collName).insert(Array.from({length: 10000}, () => ({a: new ObjectId(), b: new ObjectId()}))),
-);
-assert.commandWorked(db.adminCommand({reshardCollection: ns, key: {b: "hashed"}}));
+    jsTest.log("Succeed reshard to hashed shard key with one chunk per shard.");
+    assert.commandWorked(db.adminCommand({shardCollection: ns, key: {a: "hashed"}}));
+    assert.soon(() => {
+        try {
+            db.getCollection(collName).insert(
+                Array.from({length: 10000}, () => ({a: new ObjectId(), b: new ObjectId()})),
+            );
+            return true;
+        } catch (e) {
+            if (reshardCmdTest.isStepdownRetryableError(e)) {
+                return false;
+            }
+            throw e;
+        }
+    });
 
-let configDB = db.getSiblingDB("config");
-shardNames.forEach((shardName) => {
-    let chunks = findChunksUtil.findChunksByNs(configDB, ns, {shard: shardName});
-    assert.eq(chunks.itcount(), 1);
-});
-db.getCollection(collName).drop();
+    assert.commandWorked(db.adminCommand({reshardCollection: ns, key: {b: "hashed"}}));
+
+    let configDB = db.getSiblingDB("config");
+    shardNames.forEach((shardName) => {
+        let chunks = findChunksUtil.findChunksByNs(configDB, ns, {shard: shardName});
+        assert.eq(chunks.itcount(), 1);
+    });
+    db.getCollection(collName).drop();
+
+    jsTest.log("Succeed if 'demoMode' parameter is set to true.");
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1, demoMode: true},
+        1,
+    );
+}
+
+const featureFlagRelaxedMode = FeatureFlagUtil.isPresentAndEnabled(db, "RelaxedMode");
+if (featureFlagRelaxedMode) {
+    jsTest.log("Succeed if 'relaxed' parameter is set to true.");
+
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {newKey: 1}, relaxed: true, numInitialChunks: 1},
+        1,
+    );
+}
+
+const featureFlagReshardingVerification = FeatureFlagUtil.isPresentAndEnabled(db, "ReshardingVerification");
+if (featureFlagReshardingVerification) {
+    jsTest.log("Succeed if 'performVerification' parameter is set to true.");
+
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {newKey: 1}, performVerification: true, numInitialChunks: 1},
+        1,
+    );
+}

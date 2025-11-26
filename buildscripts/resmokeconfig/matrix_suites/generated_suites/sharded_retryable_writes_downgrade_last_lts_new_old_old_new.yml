@@ -31,6 +31,7 @@ executor:
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true
           overrideRetryAttempts: 3
+          runningWithShardStepdowns: true
           sessionOptions:
             readConcern:
               level: majority
@@ -117,10 +118,6 @@ selector:
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_standalone_mongod
-    - assumes_no_implicit_collection_creation_after_drop
-    - assumes_no_implicit_index_creation
-    - assumes_unsharded_collection
-    - cannot_create_unique_index_when_using_hashed_shard_key
     - assumes_read_concern_local
     - requires_getmore
     - requires_non_retryable_writes

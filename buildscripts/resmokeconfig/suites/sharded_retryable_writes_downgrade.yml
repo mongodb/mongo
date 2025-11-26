@@ -70,11 +70,6 @@ selector:
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_standalone_mongod
-    # Tests tagged with the following will fail because they assume collections are not sharded.
-    - assumes_no_implicit_collection_creation_after_drop
-    - assumes_no_implicit_index_creation
-    - assumes_unsharded_collection
-    - cannot_create_unique_index_when_using_hashed_shard_key
     # Tests tagged with the following will fail because commands like `explain` does not support majority read concern
     - assumes_read_concern_local
     ##
@@ -168,6 +163,7 @@ executor:
             readPreference:
               mode: "primary"
             retryWrites: true
+          runningWithShardStepdowns: true
       # We specify nodb so the shell used by each test will attempt to connect after loading the
       # retry logic in auto_retry_on_network_error.js.
       nodb: ""
