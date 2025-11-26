@@ -42,6 +42,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <vector>
