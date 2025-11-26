@@ -107,8 +107,8 @@ void invalidateRangePreservers(OperationContext* opCtx, const RangeDeletionTask&
 
     if (preMigrationShardVersion && preMigrationShardVersion.get() != ChunkVersion::IGNORED()) {
         auto scopedScr = CollectionShardingRuntime::acquireExclusive(opCtx, rdt.getNss());
-        scopedScr->invalidateRangePreserversOlderThanShardVersion(opCtx,
-                                                                  preMigrationShardVersion.get());
+        scopedScr->invalidateRangePreserversOlderThanShardVersion(
+            opCtx, preMigrationShardVersion.get(), rdt.getCollectionUuid());
     }
 }
 

@@ -467,10 +467,11 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanShardVer
     // the chunk and collection share the same shard ID ("0") to generate comparable chunk versions.
     // This setup is required to correctly test invalidateRangePreserversOlderThanShardVersion,
     // which compares shard placement versions for invalidation.
+    auto collectionUUID = UUID::gen();
     ShardId metadataShardId("0");
     auto metadataInThePast =
-        makeShardedMetadata(opCtx, UUID::gen(), metadataShardId, metadataShardId);
-    auto metadata = makeShardedMetadata(opCtx, UUID::gen(), metadataShardId, metadataShardId);
+        makeShardedMetadata(opCtx, collectionUUID, metadataShardId, metadataShardId);
+    auto metadata = makeShardedMetadata(opCtx, collectionUUID, metadataShardId, metadataShardId);
     csr.setFilteringMetadata(opCtx, metadata);
     const auto optCurrMetadata = csr.getCurrentMetadataIfKnown();
     ASSERT_TRUE(optCurrMetadata);
@@ -483,23 +484,31 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanShardVer
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
     // Test that the trackers will not be invalidated with version ChunkVersion::IGNORED()
-    csr.invalidateRangePreserversOlderThanShardVersion(opCtx, ChunkVersion::IGNORED());
+    csr.invalidateRangePreserversOlderThanShardVersion(
+        opCtx, ChunkVersion::IGNORED(), collectionUUID);
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
     // Test that the trackers will not be invalidated with version which is older
     csr.invalidateRangePreserversOlderThanShardVersion(
-        opCtx, metadataInThePast.getShardPlacementVersion());
+        opCtx, metadataInThePast.getShardPlacementVersion(), collectionUUID);
+    ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
+
+    // Test that the trackers will not be invalidated when collection UUID does not match
+    csr.invalidateRangePreserversOlderThanShardVersion(
+        opCtx, metadata.getShardPlacementVersion(), UUID::gen());
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
     // Test that the trackers will be invalidated with current version
-    csr.invalidateRangePreserversOlderThanShardVersion(opCtx, metadata.getShardPlacementVersion());
+    csr.invalidateRangePreserversOlderThanShardVersion(
+        opCtx, metadata.getShardPlacementVersion(), collectionUUID);
     ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
 }
 
 TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanUnshardedVersion) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    auto collectionUUID = UUID::gen();
     OperationContext* opCtx = operationContext();
-    auto metadata = makeShardedMetadata(opCtx);
+    auto metadata = makeShardedMetadata(opCtx, collectionUUID);
     csr.setFilteringMetadata(opCtx, metadata);
 
     auto ownershipFilter = csr.getOwnershipFilter(
@@ -512,12 +521,14 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanUnsharde
     // case ownershipFilter::shardPlacementVersion = UNTRACKED. Currently it's not possible to test
     // as in this case metadataManager is not created for unsharded collection. When it will be
     // changed it will be possible to test against a current version.
-    csr.invalidateRangePreserversOlderThanShardVersion(opCtx, ChunkVersion::UNTRACKED());
+    csr.invalidateRangePreserversOlderThanShardVersion(
+        opCtx, ChunkVersion::UNTRACKED(), collectionUUID);
     ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
 }
 
 TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversUntrackedCollection) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    auto collectionUUID = UUID::gen();
     OperationContext* opCtx = operationContext();
     csr.setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
 
@@ -528,12 +539,13 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversUntrackedCollecti
 
     // Promote the collection to a sharded collection since it only make sense to invalidat range
     // preservers on sharded collections.
-    const auto metadata = makeShardedMetadata(opCtx);
+    const auto metadata = makeShardedMetadata(opCtx, collectionUUID);
     csr.setFilteringMetadata(opCtx, metadata);
 
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
-    csr.invalidateRangePreserversOlderThanShardVersion(opCtx, metadata.getShardPlacementVersion());
+    csr.invalidateRangePreserversOlderThanShardVersion(
+        opCtx, metadata.getShardPlacementVersion(), collectionUUID);
     ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
 }
 

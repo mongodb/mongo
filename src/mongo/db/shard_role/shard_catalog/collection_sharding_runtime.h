@@ -275,9 +275,12 @@ public:
      * of an incoming RangeDeletion for a specified shard version. It invalidates all metadata
      * trackers when shardVersion is lower than or equal to the given version. This method ensures
      * that metadata operation is performed in a thread-safe manner.
+     * The invalidation will be skipped if the provided collectionUUID doesn't match the UUID of the
+     * metadataManager.
      */
     void invalidateRangePreserversOlderThanShardVersion(OperationContext* opCtx,
-                                                        const ChunkVersion& shardVersion);
+                                                        const ChunkVersion& shardVersion,
+                                                        const UUID& collectionUUID);
 
 private:
     friend class CollectionShardingRuntimeTest;

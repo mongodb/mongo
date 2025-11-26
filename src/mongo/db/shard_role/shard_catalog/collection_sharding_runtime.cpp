@@ -193,12 +193,24 @@ CollectionShardingRuntime::acquireExclusive(OperationContext* opCtx, const Names
 }
 
 void CollectionShardingRuntime::invalidateRangePreserversOlderThanShardVersion(
-    OperationContext* opCtx, const ChunkVersion& shardVersion) {
+    OperationContext* opCtx, const ChunkVersion& shardVersion, const UUID& collectionUUID) {
     if (shardVersion == ChunkVersion::IGNORED()) {
         return;
     }
     stdx::lock_guard lk(_metadataManagerLock);
     if (_metadataManager) {
+        const auto metadataUuid = _metadataManager->getCollectionUuid();
+        if (metadataUuid && collectionUUID != metadataUuid.get()) {
+            LOGV2_WARNING(
+                11366700,
+                "Collection UUID mismatch detected during a range preserver invalidation: "
+                "The metadata manager UUID does not match the UUID of the range deletion task. "
+                "Skipping invalidation",
+                "metadataUUID"_attr = metadataUuid.get(),
+                "expectedUUID"_attr = collectionUUID,
+                "shardVersion"_attr = shardVersion);
+            return;
+        }
         _metadataManager->invalidateRangePreserversOlderThanShardVersion(opCtx, shardVersion);
     }
 }
