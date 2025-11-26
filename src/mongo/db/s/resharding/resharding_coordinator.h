@@ -42,6 +42,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
+#include <shared_mutex>
 #include <vector>
 
 namespace mongo {
@@ -72,15 +73,8 @@ public:
      * Returns whether the any token has been canceled.
      */
     bool isCanceled() {
+        std::shared_lock rLock(_abortMutex);  // NOLINT
         return _stepdownToken.isCanceled() || _abortToken.isCanceled();
-    }
-
-    /**
-     * Returns whether the abort token has been canceled, indicating that the resharding operation
-     * was explicitly aborted by an external user.
-     */
-    bool isAborted() {
-        return !_stepdownToken.isCanceled() && _abortToken.isCanceled();
     }
 
     /**
@@ -92,12 +86,10 @@ public:
     }
 
     /**
-     * Cancels the source created by this class, in order to indicate to holders of the abortToken
-     * that the resharding operation has been aborted.
+     * Cancels the source for the abort token and sets the abort reason to indicate that the
+     * resharding operation has been aborted.
      */
-    void abort() {
-        _abortSource.cancel();
-    }
+    void abort(Status reason);
 
     void cancelCommitMonitor() {
         _commitMonitorCancellationSource.cancel();
@@ -106,6 +98,8 @@ public:
     void cancelQuiescePeriod() {
         _quiesceCancellationSource.cancel();
     }
+
+    boost::optional<Status> getAbortReason() const;
 
     const CancellationToken& getStepdownToken() {
         return _stepdownToken;
@@ -128,12 +122,15 @@ private:
     // underlying replica set node is stepping down or shutting down.
     CancellationToken _stepdownToken;
 
+    mutable std::shared_mutex _abortMutex;  // NOLINT
     // The source created by inheriting from the stepdown token.
     CancellationSource _abortSource;
-
     // The token to wait on in cases where a user wants to wait on either a resharding operation
-    // being aborted or the replica set node stepping/shutting down.
+    // being aborted explicitly by the user or implicitly by the coordinator itself after hitting
+    // an error, or the replica set node stepping/shutting down.
     CancellationToken _abortToken;
+    // The abort reason if reshadring operation has been aborted.
+    boost::optional<Status> _abortReason;
 
     // The source created by inheriting from the abort token.
     // Provides the means to cancel the commit monitor (e.g., due to receiving the commit command).
@@ -147,6 +144,11 @@ private:
 class ReshardingCoordinator final
     : public repl::PrimaryOnlyService::TypedInstance<ReshardingCoordinator> {
 public:
+    struct AbortRequest {
+        Status reason;
+        resharding::AbortType type;
+    };
+
     explicit ReshardingCoordinator(
         ReshardingCoordinatorService* coordinatorService,
         const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -161,9 +163,10 @@ public:
 
     /**
      * Attempts to cancel the underlying resharding operation using the abort token.
-     * If 'skipQuiescePeriod' is set, will also skip the quiesce period used to allow retries.
+     * If the request specifies 'skipQuiescePeriod', will also skip the quiesce period used to
+     * allow retries.
      */
-    void abort(bool skipQuiescePeriod = false);
+    void abort(AbortRequest abortRequest);
 
     /*
      * Sets _coordinatorDoc equal to the supplied doc.
@@ -306,6 +309,19 @@ private:
      */
     ExecutorFuture<void> _quiesce(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                                   Status status);
+
+    /**
+     * To be called upon stepup after initializing the CancellationTokenHolder.
+     * - If the coordinator is in the "aborting", cancels the source for the abort token and sets
+     *   the abort reason based on the reason in the state doc.
+     * - Else if coordinator is in the "quiesced" state, cancels the source for the abort token
+     *   and sets the abort reason to a placeholder quiesce abort reason.
+     * - Else if the is an abort request, cancels the source for the abort token and sets the abort
+     *   reason based on the request.
+     * - Otherwise, does nothing.
+     */
+    void _abortIfCoordinatorInAbortingOrQuiescingOrRequested(
+        const boost::optional<AbortRequest>& abortRequest);
 
     /**
      * Does the following writes:
@@ -556,6 +572,12 @@ private:
     const ShardId& _getChangeStreamNotifierShardId() const;
 
     /**
+     * If the resharding operation has been aborted, override the given status with the abort
+     * reason.
+     */
+    Status _getEffectiveStatus(Status status) const;
+
+    /**
      * Creates a new span with the resharding UUID set as an attribute.
      */
     otel::traces::Span _startSpan(std::shared_ptr<otel::TelemetryContext> telemetryCtx,
@@ -602,10 +624,9 @@ private:
     mutable stdx::mutex _fulfillmentMutex;
 
     /**
-     * Must be locked while the _abortCalled is being set to true.
+     * Must be locked while the _abortRequest is being set.
      */
-    mutable stdx::mutex _abortCalledMutex;
-
+    mutable stdx::mutex _abortRequestMutex;
 
     /**
      * Coordinator does not enter the critical section until this is fulfilled.
@@ -633,11 +654,7 @@ private:
 
     // Used to catch the case when an abort() is called but the cancellation source (_ctHolder) has
     // not been initialized.
-    enum AbortType {
-        kNoAbort = 0,
-        kAbortWithQuiesce,
-        kAbortSkipQuiesce
-    } _abortCalled{AbortType::kNoAbort};
+    boost::optional<AbortRequest> _abortRequest;
 
     // If we recovered a completed resharding coordinator (quiesced) on failover, the
     // resharding status when it actually ran.

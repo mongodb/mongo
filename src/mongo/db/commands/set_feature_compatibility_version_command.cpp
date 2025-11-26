@@ -84,6 +84,7 @@
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
@@ -170,7 +171,11 @@ void abortAllReshardCollection(OperationContext* opCtx) {
     auto reshardingCoordinatorService = checked_cast<ReshardingCoordinatorService*>(
         repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
             ->lookupServiceByName(ReshardingCoordinatorService::kServiceName));
-    reshardingCoordinatorService->abortAllReshardCollection(opCtx);
+    // Skip the quiesce period to avoid blocking the FCV change. Please note that a resharding
+    // operation only has a quiesce period if its resharding UUID was provided by the user which is
+    // used for retryability.
+    reshardingCoordinatorService->abortAllReshardCollection(
+        opCtx, {resharding::kFCVChangeAbortReason, resharding::AbortType::kAbortSkipQuiesce});
 
     PersistentTaskStore<ReshardingCoordinatorDocument> store(
         NamespaceString::kConfigReshardingOperationsNamespace);

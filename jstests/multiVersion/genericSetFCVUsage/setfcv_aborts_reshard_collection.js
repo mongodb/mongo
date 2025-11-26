@@ -119,7 +119,10 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
         },
         {
             expectedErrorCode: [
+                // Starting in 8.3, ReshardCollectionAborted is reserved for user abort and
+                // ReshardCollectionInterruptedDueToFCVChange is used for setFCV abort.
                 ErrorCodes.ReshardCollectionAborted,
+                ErrorCodes.ReshardCollectionInterruptedDueToFCVChange,
                 ErrorCodes.Interrupted,
                 // The query feature used in resharding can be disallowed after FCV downgrade,
                 // resulting in an InvalidOptions error.
@@ -164,7 +167,10 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
         {
             expectedErrorCode: [
                 ErrorCodes.CommandNotSupported,
+                // Starting in 8.3, ReshardCollectionAborted is reserved for user abort and
+                // ReshardCollectionInterruptedDueToFCVChange is used for setFCV abort.
                 ErrorCodes.ReshardCollectionAborted,
+                ErrorCodes.ReshardCollectionInterruptedDueToFCVChange,
                 ErrorCodes.Interrupted,
                 // setFCV will abort index build and resharding. Since resharding can also be
                 // building index, it is possible that the index build gets aborted first and

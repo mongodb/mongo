@@ -47,8 +47,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         ErrorCodes.Interrupted,
         // In older versions there is no moveCollection.
         ErrorCodes.CommandNotSupported,
-        // On FCV a moveCollection could be aborted.
+        // On FCV a moveCollection could be aborted. Starting in 8.3, ReshardCollectionAborted is
+        // reserved for user abort and ReshardCollectionInterruptedDueToFCVChange is used for
+        // setFCV abort.
         ErrorCodes.ReshardCollectionAborted,
+        ErrorCodes.ReshardCollectionInterruptedDueToFCVChange,
     ];
     // Failures that are accepted for the createCollection command
     $config.data.kAcceptedCreateErrors = [

@@ -157,7 +157,8 @@ public:
             auto machine =
                 assertGetReshardingMachine(opCtx, reshardingUUID, request().getProvenance());
             auto future = machine->getCompletionFuture();
-            machine->abort();
+            machine->abort(
+                {resharding::kUserAbortReason, resharding::AbortType::kAbortWithQuiesce});
 
             auto completionStatus = future.getNoThrow(opCtx);
 

@@ -80,6 +80,17 @@
 namespace mongo {
 namespace resharding {
 
+inline const Status kUserAbortReason{ErrorCodes::ReshardCollectionAborted,
+                                     "resharding aborted by user"};
+MONGO_MOD_PUBLIC inline const Status kFCVChangeAbortReason{
+    ErrorCodes::ReshardCollectionInterruptedDueToFCVChange, "resharding aborted due to FCV change"};
+inline const Status kCriticalTimeoutAbortReason{ErrorCodes::ReshardingCriticalSectionTimeout,
+                                                "resharding critical section timed out"};
+inline const Status kQuiesceAbortReason{ErrorCodes::ReshardCollectionQuiescing,
+                                        "resharding operation completed and is in quiesce"};
+
+enum MONGO_MOD_PUBLIC AbortType { kAbortWithQuiesce, kAbortSkipQuiesce };
+
 MONGO_MOD_NEEDS_REPLACEMENT constexpr auto kReshardFinalOpLogType = "reshardFinalOp"_sd;
 constexpr auto kReshardProgressMarkOpLogType = "reshardProgressMark"_sd;
 static const auto kReshardErrorMaxBytes = 2000;

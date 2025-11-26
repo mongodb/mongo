@@ -243,7 +243,7 @@ void ReshardingCoordinatorCleaner::_doClean(OperationContext* opCtx,
 }
 
 void ReshardingCoordinatorCleaner::_abortMachine(ReshardingCoordinator& machine) {
-    machine.abort();
+    machine.abort({resharding::kUserAbortReason, resharding::AbortType::kAbortWithQuiesce});
 }
 
 void ReshardingCoordinatorCleaner::_cleanOnParticipantShards(

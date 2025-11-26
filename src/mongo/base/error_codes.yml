@@ -986,6 +986,10 @@ error_codes:
       categories: [Interruption, SystemOverloadedError],
     }
 
+  - {code: 474, name: ReshardCollectionQuiescing}
+  - {code: 475, name: ReshardCollectionInterruptedDueToFCVChange}
+  - {code: 476, name: ReshardCollectionMissingAbortReason}
+
   # Error codes 4000-8999 are reserved.
 
   # Non-sequential error codes for compatibility only)

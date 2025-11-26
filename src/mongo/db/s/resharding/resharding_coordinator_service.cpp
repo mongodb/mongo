@@ -148,14 +148,15 @@ ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
         .on(**executor, CancellationToken::uncancelable());
 }
 
-void ReshardingCoordinatorService::abortAllReshardCollection(OperationContext* opCtx) {
+void ReshardingCoordinatorService::abortAllReshardCollection(
+    OperationContext* opCtx, ReshardingCoordinator::AbortRequest abortRequest) {
     std::vector<SharedSemiFuture<void>> reshardingCoordinatorFutures;
 
     for (auto& instance : getAllInstances(opCtx)) {
         auto reshardingCoordinator = checked_pointer_cast<ReshardingCoordinator>(instance);
         reshardingCoordinatorFutures.push_back(
             reshardingCoordinator->getQuiescePeriodFinishedFuture());
-        reshardingCoordinator->abort(true /* skip quiesce period */);
+        reshardingCoordinator->abort(abortRequest);
     }
 
     for (auto&& future : reshardingCoordinatorFutures) {

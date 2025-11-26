@@ -54,6 +54,7 @@
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
@@ -119,6 +120,31 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseBeforeTellingRecipientsToClone);
 }  // namespace resharding_coordinator_detail
 
 #ifdef RESHARDING_COORDINATOR_PART_0
+
+void CoordinatorCancellationTokenHolder::abort(Status reason) {
+    stdx::unique_lock wLock(_abortMutex);
+    if (_abortReason) {
+        if (_abortReason != reason) {
+            LOGV2_WARNING(11400501,
+                          "ReshardingCoordinator aborted multiple times with different "
+                          "reasons. Keeping the original reason.",
+                          "originalReason"_attr = _abortReason->toString(),
+                          "newReason"_attr = reason.toString());
+        }
+        tassert(11400503,
+                "Found an abort reason but the abort token has not been canceled",
+                _abortSource.token().isCanceled());
+        return;
+    }
+    _abortReason.emplace(reason);
+    _abortSource.cancel();
+}
+
+boost::optional<Status> CoordinatorCancellationTokenHolder::getAbortReason() const {
+    std::shared_lock rLock(_abortMutex);
+    return _abortReason;
+}
+
 ReshardingCoordinator::ReshardingCoordinator(
     ReshardingCoordinatorService* coordinatorService,
     const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -221,6 +247,16 @@ void markCompleted(const Status& status, ReshardingMetrics* metrics) {
 }  // namespace resharding_coordinator_detail
 
 #ifdef RESHARDING_COORDINATOR_PART_1
+
+Status ReshardingCoordinator::_getEffectiveStatus(Status status) const {
+    if (auto abortReason = _ctHolder->getAbortReason()) {
+        // The resharding operation has been aborted, so override the given status with a resharding
+        // abort error.
+        return *abortReason;
+    }
+    return status;
+}
+
 ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarted(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kPreparingToDonate) {
@@ -312,15 +348,7 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
                 return ExecutorFuture<void>(**executor, status);
             }
 
-            if (_ctHolder->isAborted()) {
-                // If the abort cancellation token was triggered, implying that a user ran the abort
-                // command, override status with a resharding abort error.
-                //
-                // Note for debugging purposes: Ensure the original error status is recorded in the
-                // logs before replacing it.
-                status = {ErrorCodes::ReshardCollectionAborted, "aborted"};
-            }
-
+            status = _getEffectiveStatus(status);
             auto nss = _coordinatorDoc.getSourceNss();
 
             // If we have an original resharding status due to a failover occurring, we want to
@@ -445,12 +473,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                 return ExecutorFuture<ReshardingCoordinatorDocument>(**executor, status);
             }
 
-            if (_ctHolder->isAborted()) {
-                // If the abort cancellation token was triggered, implying that a user ran the abort
-                // command, override status with a resharding abort error.
-                status = {ErrorCodes::ReshardCollectionAborted, "aborted"};
-            }
-
+            status = _getEffectiveStatus(status);
             auto nss = _coordinatorDoc.getSourceNss();
             LOGV2(4956902,
                   "Resharding failed",
@@ -608,18 +631,13 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
 
     auto span = _startSpan(telemetryCtx, "ReshardingCoordinator::run", true);
 
-    auto abortCalled = [&] {
-        stdx::lock_guard<stdx::mutex> lk(_abortCalledMutex);
+    auto abortRequest = [&] {
+        stdx::lock_guard<stdx::mutex> lk(_abortRequestMutex);
         _ctHolder = std::make_unique<CoordinatorCancellationTokenHolder>(stepdownToken);
-        return _abortCalled;
+        return _abortRequest;
     }();
 
-    if (abortCalled) {
-        if (abortCalled == AbortType::kAbortSkipQuiesce) {
-            _ctHolder->cancelQuiescePeriod();
-        }
-        _ctHolder->abort();
-    }
+    _abortIfCoordinatorInAbortingOrQuiescingOrRequested(abortRequest);
 
     _markKilledExecutor->startup();
     _cancelableOpCtxFactory.emplace(_ctHolder->getAbortToken(), _markKilledExecutor);
@@ -879,19 +897,17 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorAndParticipants(
         .then([status] { return status; });
 }
 
-void ReshardingCoordinator::abort(bool skipQuiescePeriod) {
+void ReshardingCoordinator::abort(ReshardingCoordinator::AbortRequest abortRequest) {
     auto ctHolderInitialized = [&] {
-        stdx::lock_guard<stdx::mutex> lk(_abortCalledMutex);
-        skipQuiescePeriod = skipQuiescePeriod || _abortCalled == AbortType::kAbortSkipQuiesce;
-        _abortCalled =
-            skipQuiescePeriod ? AbortType::kAbortSkipQuiesce : AbortType::kAbortWithQuiesce;
+        stdx::lock_guard<stdx::mutex> lk(_abortRequestMutex);
+        _abortRequest.emplace(abortRequest);
         return !(_ctHolder == nullptr);
     }();
 
     if (ctHolderInitialized) {
-        if (skipQuiescePeriod)
+        if (abortRequest.type == resharding::AbortType::kAbortSkipQuiesce)
             _ctHolder->cancelQuiescePeriod();
-        _ctHolder->abort();
+        _ctHolder->abort(abortRequest.reason);
     }
 }
 
@@ -992,27 +1008,43 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
         .until<StatusWith<bool>>([](const StatusWith<bool>& status) { return status.isOK(); })
         .on(**executor, _ctHolder->getAbortToken())
         .onError(([this, executor](StatusWith<bool> status) {
-            if (_ctHolder->isAborted()) {
-                // If the abort cancellation token was triggered, implying that a user ran the
-                // abort command, override status with a resharding abort error.
-                //
-                // Note for debugging purposes: Ensure the original error status is recorded in
-                // the logs before replacing it.
-                status = {ErrorCodes::ReshardCollectionAborted, "aborted"};
-            }
-            return status;
+            return ExecutorFuture<bool>(**executor, _getEffectiveStatus(status.getStatus()));
         }));
+}
+
+void ReshardingCoordinator::_abortIfCoordinatorInAbortingOrQuiescingOrRequested(
+    const boost::optional<AbortRequest>& abortRequest) {
+    if (_coordinatorDoc.getState() == CoordinatorStateEnum::kAborting) {
+        auto abortReason = [&] {
+            if (_coordinatorDoc.getAbortReason()) {
+                return resharding::getStatusFromAbortReason(_coordinatorDoc);
+            }
+            auto msg = "The coordinator is in the 'aborting' state but there is no abort reason";
+            if (TestingProctor::instance().isEnabled()) {
+                tasserted(11400502, str::stream() << msg << ": " << _coordinatorDoc.toBSON());
+            }
+            return Status(ErrorCodes::ReshardCollectionMissingAbortReason, msg);
+        }();
+        _ctHolder->abort(abortReason);
+    } else if (_coordinatorDoc.getState() == CoordinatorStateEnum::kQuiesced) {
+        _ctHolder->abort(resharding::kQuiesceAbortReason);
+        tassert(11400504,
+                str::stream() << "Expected resharding to have committed or aborted since it is in "
+                              << CoordinatorState_serializer(_coordinatorDoc.getState())
+                              << " state",
+                _originalReshardingStatus.has_value());
+    } else if (abortRequest) {
+        if (abortRequest->type == resharding::AbortType::kAbortSkipQuiesce) {
+            _ctHolder->cancelQuiescePeriod();
+        }
+        _ctHolder->abort(abortRequest->reason);
+    }
 }
 
 void ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kUnused) {
         if (!_coordinatorDocWrittenPromise.getFuture().isReady()) {
             _coordinatorDocWrittenPromise.emplaceValue();
-        }
-
-        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kAborting ||
-            _coordinatorDoc.getState() == CoordinatorStateEnum::kQuiesced) {
-            _ctHolder->abort();
         }
     } else {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
@@ -1576,6 +1608,7 @@ void ReshardingCoordinator::_setCriticalSectionTimeoutCallback(
                 return;
             }
             _reshardingCoordinatorObserver->onCriticalSectionTimeout();
+            _ctHolder->abort(resharding::kCriticalTimeoutAbortReason);
         });
 
     auto scheduleTimeoutStatus = swCbHandle.getStatus();
@@ -1937,7 +1970,7 @@ void ReshardingCoordinator::_tellAllRecipientsToRefresh(
         _coordinatorDoc.getReshardingUUID(),
         _coordinatorDoc.getRecipientShards(),
         **executor,
-        _ctHolder->getStepdownToken());
+        _ctHolder->getAbortToken());
 }
 
 void ReshardingCoordinator::_tellAllDonorsToRefresh(
@@ -1949,7 +1982,7 @@ void ReshardingCoordinator::_tellAllDonorsToRefresh(
                                                                 _coordinatorDoc.getReshardingUUID(),
                                                                 _coordinatorDoc.getDonorShards(),
                                                                 **executor,
-                                                                _ctHolder->getStepdownToken());
+                                                                _ctHolder->getAbortToken());
 }
 
 void ReshardingCoordinator::_tellAllDonorsToStartChangeStreamsMonitor(

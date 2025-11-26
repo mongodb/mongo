@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/resharding/resharding_coordinator.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -84,7 +85,8 @@ public:
      *
      * This call skips quiesce periods for all aborted coordinators.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT void abortAllReshardCollection(OperationContext* opCtx);
+    MONGO_MOD_NEEDS_REPLACEMENT void abortAllReshardCollection(
+        OperationContext* opCtx, ReshardingCoordinator::AbortRequest abortRequest);
 
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
