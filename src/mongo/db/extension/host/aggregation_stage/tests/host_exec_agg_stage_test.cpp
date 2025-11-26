@@ -86,16 +86,17 @@ TEST_F(ExecAggStageTest, GetNextResult) {
 
     auto hostGetNextResult = handle.getNext(_execCtx.get());
     ASSERT_EQ(extension::GetNextCode::kPauseExecution, hostGetNextResult.code);
-    ASSERT_EQ(boost::none, hostGetNextResult.res);
+    ASSERT_EQ(boost::none, hostGetNextResult.resultDocument);
 
     hostGetNextResult = handle.getNext(_execCtx.get());
     ASSERT_EQ(extension::GetNextCode::kAdvanced, hostGetNextResult.code);
-    ASSERT_BSONOBJ_EQ(BSON("a" << 1), hostGetNextResult.res.get());
+    ASSERT_TRUE(hostGetNextResult.resultDocument.has_value());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 1), hostGetNextResult.resultDocument->getUnownedBSONObj());
 
     // Note that the match clause is "a": 1 so the documents where "a": 2 will be passed over.
     hostGetNextResult = handle.getNext(_execCtx.get());
     ASSERT_EQ(extension::GetNextCode::kEOF, hostGetNextResult.code);
-    ASSERT_EQ(boost::none, hostGetNextResult.res);
+    ASSERT_EQ(boost::none, hostGetNextResult.resultDocument);
 
     // Confirm the ownership of the result was correctly passed to the caller. To do that, create a
     // dummy host_connector::HostExecAggStageAdapter so the initial underlying
@@ -110,7 +111,7 @@ TEST_F(ExecAggStageTest, GetNextResult) {
     handle = ExecAggStageHandle{duplicateHostExecAggStage};
 
     ASSERT_EQ(extension::GetNextCode::kEOF, hostGetNextResult.code);
-    ASSERT_EQ(boost::none, hostGetNextResult.res);
+    ASSERT_EQ(boost::none, hostGetNextResult.resultDocument);
 }
 
 TEST_F(ExecAggStageTest, GetNextResultEdgeCaseEof) {
@@ -133,7 +134,7 @@ TEST_F(ExecAggStageTest, GetNextResultEdgeCaseEof) {
 
     auto hostGetNextResult = handle.getNext(_execCtx.get());
     ASSERT_EQ(extension::GetNextCode::kEOF, hostGetNextResult.code);
-    ASSERT_EQ(boost::none, hostGetNextResult.res);
+    ASSERT_EQ(boost::none, hostGetNextResult.resultDocument);
 }
 
 using ExecAggStageTestDeathTest = ExecAggStageTest;
@@ -219,6 +220,17 @@ TEST_F(ExecAggStageTest, DeletedCopyAndMoveConstructors) {
                   "HostExecAggStageAdapter should not be copy assignable");
     static_assert(!std::is_move_assignable_v<host_connector::HostExecAggStageAdapter>,
                   "HostExecAggStageAdapter should not be move assignable");
+}
+
+TEST(HostExecAggStageTest, ValidateCachedGetNextResultRequestDocument) {
+    auto bsonResult = BSON("meow" << "santiago");
+    exec::agg::GetNextResult hostResult{Document{bsonResult}};
+    host_connector::CachedGetNextResult cachedResult(std::move(hostResult));
+    ::MongoExtensionGetNextResult extensionGetNext =
+        createDefaultExtensionGetNext(::MongoExtensionGetNextRequestType::kDocumentOnly);
+    cachedResult.getAsExtensionNextResult(extensionGetNext);
+    ASSERT_EQ(kByteView, extensionGetNext.resultDocument.type);
+    ASSERT_BSONOBJ_EQ(bsonResult, bsonObjFromByteView(extensionGetNext.resultDocument.bytes.view));
 }
 
 }  // namespace

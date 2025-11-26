@@ -49,18 +49,10 @@ public:
 
     mongo::extension::ExtensionGetNextResult getNext(
         const sdk::QueryExecutionContextHandle& execCtx,
-        ::MongoExtensionExecAggStage* execStage,
-        ::MongoExtensionGetNextRequestType requestType) override {
+        ::MongoExtensionExecAggStage* execStage) override {
         // TODO SERVER-113905: once we support metadata, we should only support returning both
         // document and metadata.
-        auto input = _getSource().getNext(execCtx.get());
-        if (input.code == extension::GetNextCode::kPauseExecution) {
-            return extension::ExtensionGetNextResult::pauseExecution();
-        }
-        if (input.code == extension::GetNextCode::kEOF) {
-            return extension::ExtensionGetNextResult::eof();
-        }
-        return extension::ExtensionGetNextResult::advanced(input.res.get());
+        return _getSource().getNext(execCtx.get());
     }
 
     void open() override {}

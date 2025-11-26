@@ -30,40 +30,10 @@
 
 #include "mongo/db/extension/host_connector/handle/host_operation_metrics_handle.h"
 #include "mongo/db/extension/shared/get_next_result.h"
-#include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::extension {
-
-/**
- * Takes a MongoExtensionGetNextResult C struct and sets the code and result field of the
- * ExtensionGetNextResult C++ struct accordingly. If the MongoExtensionGetNextResult struct has an
- * invalid code, asserts in that case.
- */
-static ExtensionGetNextResult convertCRepresentationToGetNextResult(
-    ::MongoExtensionGetNextResult* const apiResult) {
-    switch (apiResult->code) {
-        case ::MongoExtensionGetNextResultCode::kAdvanced: {
-            // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an
-            // owned BSONObj to return to the host
-            ExtensionByteBufHandle ownedBuf{apiResult->result};
-            BSONObj objResult = bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
-            return ExtensionGetNextResult{.code = GetNextCode::kAdvanced,
-                                          .res = boost::make_optional(objResult)};
-        }
-        case ::MongoExtensionGetNextResultCode::kPauseExecution:
-            return ExtensionGetNextResult{.code = GetNextCode::kPauseExecution, .res = boost::none};
-        case ::MongoExtensionGetNextResultCode::kEOF: {
-            return ExtensionGetNextResult{.code = GetNextCode::kEOF, .res = boost::none};
-        }
-        default:
-            tasserted(10956803,
-                      str::stream()
-                          << "Invalid MongoExtensionGetNextResultCode: " << apiResult->code);
-    }
-}
-
 /**
  * ExecAggStageHandle is a wrapper around a MongoExtensionExecAggStage.
  */

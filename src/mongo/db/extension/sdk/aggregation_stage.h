@@ -464,10 +464,8 @@ public:
     virtual ~ExecAggStageBase() = default;
     // TODO SERVER-113905: once we support metadata, we should only support returning both
     // document and metadata.
-    virtual ExtensionGetNextResult getNext(
-        const QueryExecutionContextHandle& execCtx,
-        ::MongoExtensionExecAggStage* execStage,
-        ::MongoExtensionGetNextRequestType requestType = kDocumentOnly) = 0;
+    virtual ExtensionGetNextResult getNext(const QueryExecutionContextHandle& execCtx,
+                                           ::MongoExtensionExecAggStage* execStage) = 0;
 
     std::string_view getName() const {
         return _name;
@@ -535,57 +533,6 @@ private:
 };
 
 /**
- * Takes a MongoExtensionGetNextResult C struct and ExtensionGetNextResult C++ struct and sets the
- * code and result field of the MongoExtensionGetNextResult C struct accordingly. Asserts if the
- * ExtensionGetNextResult C++ struct doesn't have a value for the result when it's expected or does
- * have a value for a result when it's not expected.
- */
-static void convertExtensionGetNextResultToCRepresentation(
-    ::MongoExtensionGetNextResult* const apiResult, const ExtensionGetNextResult& extensionResult) {
-    switch (extensionResult.code) {
-        case GetNextCode::kAdvanced: {
-            sdk_tassert(
-                10956801,
-                "If the ExtensionGetNextResult code is kAdvanced, then ExtensionGetNextResult "
-                "should have a result to return.",
-                extensionResult.res.has_value());
-            apiResult->code = ::MongoExtensionGetNextResultCode::kAdvanced;
-            apiResult->result = new VecByteBuf(extensionResult.res.get());
-            break;
-        }
-        case GetNextCode::kPauseExecution: {
-            sdk_tassert(10956802,
-                        (str::stream()
-                         << "If the ExtensionGetNextResult code is kPauseExecution, then "
-                            "there are currently no results to return so "
-                            "ExtensionGetNextResult shouldn't have a result. In this case, "
-                            "the following result was returned: "
-                         << extensionResult.res.get()),
-                        !(extensionResult.res.has_value()));
-            apiResult->code = ::MongoExtensionGetNextResultCode::kPauseExecution;
-            apiResult->result = nullptr;
-            break;
-        }
-        case GetNextCode::kEOF: {
-            sdk_tassert(10956805,
-                        (str::stream()
-                         << "If the ExtensionGetNextResult code is kEOF, then there are no "
-                            "results to return so ExtensionGetNextResult shouldn't have a "
-                            "result. In this case, the following result was returned: "
-                         << extensionResult.res.get()),
-                        !(extensionResult.res.has_value()));
-            apiResult->code = ::MongoExtensionGetNextResultCode::kEOF;
-            apiResult->result = nullptr;
-            break;
-        }
-        default:
-            sdk_tasserted(10956804,
-                          (str::stream() << "Invalid GetNextCode: "
-                                         << static_cast<const int>(extensionResult.code)));
-    }
-}
-
-/**
  * ExecAggStage is a boundary object representation of a
  * ::MongoExtensionExecAggStage. It is meant to abstract away the C++ implementation
  * by the extension and provides the interface at the API boundary which will be called upon by the
@@ -627,16 +574,15 @@ private:
                                                ::MongoExtensionQueryExecutionContext* execCtxPtr,
                                                ::MongoExtensionGetNextResult* apiResult) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
+            sdk_tassert(11357806, "The api result should be non-null", apiResult != nullptr);
             apiResult->code = ::MongoExtensionGetNextResultCode::kPauseExecution;
-            apiResult->result = nullptr;
+            apiResult->resultDocument = createEmptyByteContainer();
 
-            QueryExecutionContextHandle execCtx(execCtxPtr);
+            QueryExecutionContextHandle execCtx{execCtxPtr};
 
             auto& impl = static_cast<ExtensionExecAggStage*>(execAggStage)->getImpl();
-
-            // Allocate a buffer on the heap. Ownership is transferred to the caller.
-            ExtensionGetNextResult extensionResult = impl.getNext(execCtx, execAggStage);
-            convertExtensionGetNextResultToCRepresentation(apiResult, extensionResult);
+            auto extensionResult = impl.getNext(execCtx, execAggStage);
+            extensionResult.toApiResult(*apiResult);
         });
     };
 

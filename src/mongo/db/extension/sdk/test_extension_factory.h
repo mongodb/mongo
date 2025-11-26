@@ -43,16 +43,8 @@ public:
 
     mongo::extension::ExtensionGetNextResult getNext(
         const mongo::extension::sdk::QueryExecutionContextHandle& execCtx,
-        ::MongoExtensionExecAggStage* execStage,
-        ::MongoExtensionGetNextRequestType requestType) override {
-        auto input = _getSource().getNext(execCtx.get());
-        if (input.code == ::mongo::extension::GetNextCode::kPauseExecution) {
-            return ::mongo::extension::ExtensionGetNextResult::pauseExecution();
-        }
-        if (input.code == ::mongo::extension::GetNextCode::kEOF) {
-            return ::mongo::extension::ExtensionGetNextResult::eof();
-        }
-        return ::mongo::extension::ExtensionGetNextResult::advanced(input.res.get());
+        ::MongoExtensionExecAggStage* execStage) override {
+        return _getSource().getNext(execCtx.get());
     }
 
     void open() override {}

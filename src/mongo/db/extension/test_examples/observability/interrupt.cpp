@@ -58,8 +58,7 @@ public:
 
     mongo::extension::ExtensionGetNextResult getNext(
         const sdk::QueryExecutionContextHandle& execCtx,
-        MongoExtensionExecAggStage* execStage,
-        ::MongoExtensionGetNextRequestType requestType) override {
+        MongoExtensionExecAggStage* execStage) override {
         // Call checkForInterrupt to check if the operation has been interrupted.
         // If the checkForInterruptFail failpoint is active, this will mark the
         // operation as killed and cause checkForInterrupt to return a killed code.
@@ -81,14 +80,15 @@ public:
             return mongo::extension::ExtensionGetNextResult::ExtensionGetNextResult::eof();
         }
 
-        auto doc = input.res.get();
+        auto doc = input.resultDocument->getUnownedBSONObj();
         if (doc.hasField(kIdField) && doc[kIdField].numberInt() == _uassertOn) {
             sdk_uasserted(11213400, "$interruptTest triggered uassert");
         }
 
         // If we get here, the operation was not interrupted. Pass the source document through
         // unchanged.
-        return mongo::extension::ExtensionGetNextResult::advanced(doc);
+        return mongo::extension::ExtensionGetNextResult::advanced(
+            mongo::extension::ExtensionBSONObj::makeAsByteBuf(doc));
     }
 
     void open() override {}

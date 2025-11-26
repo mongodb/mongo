@@ -846,8 +846,7 @@ public:
     ResourceTrackingExecAggStage(std::string_view stageName) : ExecAggStageSource(stageName) {}
 
     ExtensionGetNextResult getNext(const QueryExecutionContextHandle& execCtx,
-                                   MongoExtensionExecAggStage* execAggStage,
-                                   MongoExtensionGetNextRequestType requestType) override {
+                                   MongoExtensionExecAggStage* execAggStage) override {
         // TODO SERVER-113905: once we support metadata, we should only support returning both
         // document and metadata.
         return extension::ExtensionGetNextResult::eof();
@@ -891,27 +890,30 @@ TEST_F(AggStageTest, ValidExecAggStageVTableGetNextSucceeds) {
 
     auto getNext = handle.getNext(_execCtx.get());
     ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
-    ASSERT_BSONOBJ_EQ(BSON("meow" << "adithi"), getNext.res.get());
+    ASSERT_BSONOBJ_EQ(BSON("meow" << "adithi"), getNext.resultDocument->getUnownedBSONObj());
 
     getNext = handle.getNext(_execCtx.get());
     ASSERT_EQUALS(extension::GetNextCode::kPauseExecution, getNext.code);
-    ASSERT_EQ(boost::none, getNext.res);
+    ASSERT_EQ(boost::none, getNext.resultDocument);
 
     getNext = handle.getNext(_execCtx.get());
     ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
-    ASSERT_BSONOBJ_EQ(BSON("meow" << "cedric"), getNext.res.get());
+    ASSERT_BSONOBJ_EQ(BSON("meow" << "cedric"), getNext.resultDocument->getUnownedBSONObj());
 
     getNext = handle.getNext(_execCtx.get());
     ASSERT_EQUALS(extension::GetNextCode::kEOF, getNext.code);
-    ASSERT_EQ(boost::none, getNext.res);
+    ASSERT_EQ(boost::none, getNext.resultDocument);
 };
 
 TEST_F(AggStageTest, ValidateStructStateAfterConvertingStructToGetNextResult) {
-    ::MongoExtensionGetNextResult result = {
-        .code = static_cast<::MongoExtensionGetNextResultCode>(10), .result = nullptr};
+    ::MongoExtensionGetNextResult result = {.code =
+                                                static_cast<::MongoExtensionGetNextResultCode>(10),
+                                            .resultDocument = createEmptyByteContainer(),
+                                            .requestType = kDocumentOnly};
     ASSERT_THROWS_WITH_CHECK(
         [&] {
-            [[maybe_unused]] auto converted = convertCRepresentationToGetNextResult(&result);
+            [[maybe_unused]] auto converted =
+                extension::ExtensionGetNextResult::makeFromApiResult(result);
         }(),
         AssertionException,
         [](const AssertionException& ex) {
@@ -921,7 +923,9 @@ TEST_F(AggStageTest, ValidateStructStateAfterConvertingStructToGetNextResult) {
             assertionCount.tripwire.subtractAndFetch(1);
         });
     ASSERT_EQ(static_cast<::MongoExtensionGetNextResultCode>(10), result.code);
-    ASSERT_EQ(nullptr, result.result);
+    ASSERT_EQ(::MongoExtensionByteContainerType::kByteView, result.resultDocument.type);
+    ASSERT_EQ(nullptr, result.resultDocument.bytes.view.data);
+    ASSERT_EQ(0, result.resultDocument.bytes.view.len);
 }
 
 class GetMetricsExtensionOperationMetrics : public OperationMetricsBase {
@@ -947,8 +951,7 @@ public:
 
     extension::ExtensionGetNextResult getNext(
         const extension::sdk::QueryExecutionContextHandle& execCtx,
-        MongoExtensionExecAggStage* execAggStage,
-        MongoExtensionGetNextRequestType requestType) override {
+        MongoExtensionExecAggStage* execAggStage) override {
         // TODO SERVER-113905: once we support metadata, we should only support returning both
         // document and metadata.
         auto metrics = execCtx.getMetrics(execAggStage);
@@ -957,7 +960,8 @@ public:
         auto metricsBson = metrics.serialize();
         auto counterVal = metricsBson["counter"].Int();
         if (counterVal == 1) {
-            return extension::ExtensionGetNextResult::advanced(BSON("hi" << "finley"));
+            return extension::ExtensionGetNextResult::advanced(
+                ExtensionBSONObj::makeAsByteBuf(BSON("hi" << "finley")));
         } else if (counterVal == 2) {
             return extension::ExtensionGetNextResult::eof();
         }
@@ -978,7 +982,7 @@ public:
     static inline std::unique_ptr<ExecAggStageBase> make() {
         return std::make_unique<GetMetricsExtensionExecAggStage>("$getMetrics");
     }
-};  // namespace
+};
 
 TEST(AggregationStageTest, GetMetricsExtensionExecAggStageSucceeds) {
     QueryTestServiceContext testCtx;
@@ -1029,25 +1033,25 @@ TEST_F(AggStageTest, TestValidExecAggStageFromCompiledLogicalAggStage) {
     {
         auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
-        ASSERT_BSONOBJ_EQ(BSON("meow" << "adithi"), getNext.res.get());
+        ASSERT_BSONOBJ_EQ(BSON("meow" << "adithi"), getNext.resultDocument->getUnownedBSONObj());
     }
 
     {
         auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kPauseExecution, getNext.code);
-        ASSERT_EQ(boost::none, getNext.res);
+        ASSERT_EQ(boost::none, getNext.resultDocument);
     }
 
     {
         auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
-        ASSERT_BSONOBJ_EQ(BSON("meow" << "cedric"), getNext.res.get());
+        ASSERT_BSONOBJ_EQ(BSON("meow" << "cedric"), getNext.resultDocument->getUnownedBSONObj());
     }
 
     {
         auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kEOF, getNext.code);
-        ASSERT_EQ(boost::none, getNext.res);
+        ASSERT_EQ(boost::none, getNext.resultDocument);
     }
 }
 
@@ -1069,19 +1073,22 @@ TEST_F(AggStageTest, TestValidExecAggStageFromCompiledSourceLogicalAggStage) {
     {
         auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
-        ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "apples" << "red"), getNext.res.get());
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "apples" << "red"),
+                          getNext.resultDocument->getUnownedBSONObj());
     }
 
     {
         auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
-        ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "oranges" << 5), getNext.res.get());
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "oranges" << 5),
+                          getNext.resultDocument->getUnownedBSONObj());
     }
 
     {
         auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
-        ASSERT_BSONOBJ_EQ(BSON("_id" << 3 << "bananas" << false), getNext.res.get());
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 3 << "bananas" << false),
+                          getNext.resultDocument->getUnownedBSONObj());
     }
 
     {
@@ -1089,19 +1096,20 @@ TEST_F(AggStageTest, TestValidExecAggStageFromCompiledSourceLogicalAggStage) {
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
         ASSERT_BSONOBJ_EQ(
             BSON("_id" << 4 << "tropical fruits" << BSON_ARRAY("rambutan" << "durian" << "lychee")),
-            getNext.res.get());
+            getNext.resultDocument->getUnownedBSONObj());
     }
 
     {
         auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
-        ASSERT_BSONOBJ_EQ(BSON("_id" << 5 << "pie" << 3.14159), getNext.res.get());
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 5 << "pie" << 3.14159),
+                          getNext.resultDocument->getUnownedBSONObj());
     }
 
     {
         auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kEOF, getNext.code);
-        ASSERT_EQ(boost::none, getNext.res);
+        ASSERT_EQ(boost::none, getNext.resultDocument);
     }
 }
 

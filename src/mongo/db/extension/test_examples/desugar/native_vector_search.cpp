@@ -98,8 +98,7 @@ public:
 
     mongo::extension::ExtensionGetNextResult getNext(
         const sdk::QueryExecutionContextHandle& execCtx,
-        MongoExtensionExecAggStage* execStage,
-        ::MongoExtensionGetNextRequestType requestType) override {
+        MongoExtensionExecAggStage* execStage) override {
         // Get metrics from the execution context (stored on OperationContext).
         auto metrics = execCtx.getMetrics(execStage);
 

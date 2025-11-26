@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
@@ -50,9 +51,11 @@ public:
     void setSource(Stage* source) override;
 
 private:
-    extension::ExecAggStageHandle _execAggStageHandle;
-    extension::ExecAggStageHandle _sourceAggStageHandle;
     GetNextResult doGetNext() final;
+
+    extension::ExecAggStageHandle _execAggStageHandle{nullptr};
+    extension::ExecAggStageHandle _sourceAggStageHandle{nullptr};
+    extension::ExtensionGetNextResult _lastGetNextResult;
 };
 }  // namespace agg
 }  // namespace exec

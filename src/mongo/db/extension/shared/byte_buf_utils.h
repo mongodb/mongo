@@ -70,4 +70,8 @@ inline MongoExtensionByteView stringDataAsByteView(mongo::StringData sd) noexcep
     return MongoExtensionByteView{reinterpret_cast<const uint8_t*>(sd.data()),
                                   static_cast<size_t>(sd.size())};
 }
+
+inline ::MongoExtensionByteContainer createEmptyByteContainer() {
+    return {MongoExtensionByteContainerType::kByteView, MongoExtensionByteView{nullptr, 0}};
+};
 }  // namespace mongo::extension

@@ -94,13 +94,13 @@ GetNextResult ExtensionStage::doGetNext() {
         std::make_unique<host::QueryExecutionContext>(pExpCtx.get());
     host_connector::QueryExecutionContextAdapter ctxAdapter(std::move(wrappedCtx));
     tassert(11357601, "_execAggStageHandle is invalid", _execAggStageHandle.isValid());
-    auto result = _execAggStageHandle.getNext(&ctxAdapter);
-    switch (result.code) {
+    _lastGetNextResult = _execAggStageHandle.getNext(&ctxAdapter);
+    switch (_lastGetNextResult.code) {
         case GetNextCode::kAdvanced: {
             tassert(11357602,
                     "No result BSONObj returned even though the result is in the advanced state.",
-                    result.res.has_value());
-            return GetNextResult(Document{result.res.get()});
+                    _lastGetNextResult.resultDocument.has_value());
+            return GetNextResult(Document{_lastGetNextResult.resultDocument->getUnownedBSONObj()});
         }
         case GetNextCode::kPauseExecution:
             return GetNextResult::makePauseExecution();
@@ -109,7 +109,7 @@ GetNextResult ExtensionStage::doGetNext() {
         default:
             tasserted(11357603,
                       str::stream()
-                          << "Invalid GetNextCode: " << static_cast<const int>(result.code));
+                          << "Invalid GetNextCode: " << static_cast<int>(_lastGetNextResult.code));
     }
 }
 }  // namespace exec::agg

@@ -648,6 +648,25 @@ typedef enum MongoExtensionGetNextResultCode : uint8_t {
     kPauseExecution = 2,
 } MongoExtensionGetNextResultCode;
 
+typedef enum MongoExtensionByteContainerType : uint8_t {
+    kByteView = 0,
+    kByteBuf = 1,
+} MongoExtensionByteContainerType;
+
+/**
+ * MongoExtensionByteContainer is an abstraction to represent a serialized ByteBuf or ByteView.
+ * Depending on the type enum specified, this struct will contain either a ByteBuf with ownership
+ * being transferred to the caller, or a ByteView which the callee guarantees to remain valid for a
+ * specified duration.
+ */
+typedef struct MongoExtensionByteContainer {
+    MongoExtensionByteContainerType type;
+    union {
+        MongoExtensionByteView view;
+        MongoExtensionByteBuf* buf;
+    } bytes;
+} MongoExtensionByteContainer;
+
 /**
  * MongoExtensionGetNextRequestType is an enum used to instruct an ExecAggStage on how to fetch the
  * next results via getNext().
@@ -666,7 +685,8 @@ typedef enum MongoExtensionGetNextRequestType : uint8_t {
  */
 typedef struct MongoExtensionGetNextResult {
     MongoExtensionGetNextResultCode code;
-    MongoExtensionByteBuf* result;
+    MongoExtensionByteContainer resultDocument;
+    MongoExtensionGetNextRequestType requestType;
 } MongoExtensionGetNextResult;
 
 /**
@@ -688,12 +708,21 @@ typedef struct MongoExtensionExecAggStageVTable {
 
     /**
      * Pulls the next result from the stage executor.
+     *
      * On success:
-     *    - Updates the provided MongoExtensionGetNextResult with a result code
-     *      indicating whether or not a document has been returned by the function.
-     *    - If the result code indicates a document is available, populates
-     *      MongoExtensionGetNextResult's ByteBuf pointer with the resulting document as
-     *      a byte buffer. Ownership of the buffer is transferred to the Host.
+     *  - Updates the provided MongoExtensionGetNextResult with a result code
+     *    indicating whether or not a document has been returned.
+     *  - If a document is available, return the MongoExtensionByteContainer document as one of the
+     * following:
+     *       * a MongoExtensionByteBuf (kByteBuf)
+     *       * a MongoExtensionByteView (kByteView)
+     *
+     * Ownership / lifetime:
+     *  - For kByteBuf: ownership of the buffer is transferred to the caller (ex: host).
+     *  - For kByteView: the callee (ex: extension) retains ownership of the underlying memory
+     *    and MUST keep it valid and unchanged until the next call to get_next()
+     *    on this execAggStage or until destroy() is called. The caller must treat
+     *    the view as read-only and must not free it.
      */
     MongoExtensionStatus* (*get_next)(MongoExtensionExecAggStage* execAggStage,
                                       MongoExtensionQueryExecutionContext* execCtxPtr,

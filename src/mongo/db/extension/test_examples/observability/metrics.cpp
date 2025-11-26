@@ -79,8 +79,7 @@ public:
 
     mongo::extension::ExtensionGetNextResult getNext(
         const mongo::extension::sdk::QueryExecutionContextHandle& execCtx,
-        ::MongoExtensionExecAggStage* execStage,
-        ::MongoExtensionGetNextRequestType requestType) override {
+        ::MongoExtensionExecAggStage* execStage) override {
         // Get metrics from the execution context (stored on OperationContext).
         auto metrics = execCtx.getMetrics(execStage);
 
@@ -92,14 +91,15 @@ public:
             return mongo::extension::ExtensionGetNextResult::eof();
         }
 
-        auto doc = input.res.get();
+        auto doc = input.resultDocument->getUnownedBSONObj();
         if (doc.hasField(kCounterField)) {
             int64_t counterDelta = doc[kCounterField].numberInt();
             metrics.update(MongoExtensionByteView{reinterpret_cast<const uint8_t*>(&counterDelta),
                                                   sizeof(int64_t)});
         }
 
-        return mongo::extension::ExtensionGetNextResult::advanced(doc);
+        return mongo::extension::ExtensionGetNextResult::advanced(
+            mongo::extension::ExtensionBSONObj::makeAsByteBuf(doc));
     }
 
     void open() override {}

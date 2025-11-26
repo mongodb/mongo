@@ -41,39 +41,38 @@ namespace mongo::extension::host_connector {
     ::MongoExtensionGetNextResult* apiResult) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         apiResult->code = ::MongoExtensionGetNextResultCode::kPauseExecution;
-        apiResult->result = nullptr;
+        apiResult->resultDocument = createEmptyByteContainer();
 
-        auto& impl = static_cast<HostExecAggStageAdapter*>(execAggStage)->getImpl();
+        auto& aggStageAdapter = *static_cast<HostExecAggStageAdapter*>(execAggStage);
 
-        using GetNextResult = exec::agg::GetNextResult;
-        using ReturnStatus = GetNextResult::ReturnStatus;
-        GetNextResult hostResult = impl.getNext();
-        ReturnStatus hostStatusCode = hostResult.getStatus();
+        // Keep the last getNextResult stable.
+        aggStageAdapter._lastGetNextResult =
+            CachedGetNextResult(aggStageAdapter.getImpl().getNext());
+        const auto hostStatusCode = aggStageAdapter._lastGetNextResult.getStatus();
         // Shouldn't need to validate that the hostResult has a valid Document when the status
         // is kAdvanced because the exec agg stage's implementation on the server should take
         // care of that validation.
         switch (hostStatusCode) {
+            using ReturnStatus = exec::agg::GetNextResult::ReturnStatus;
             case ReturnStatus::kAdvanced: {
                 apiResult->code = ::MongoExtensionGetNextResultCode::kAdvanced;
-                // Allocate a buffer on the heap. Ownership is transferred to the caller.
-                apiResult->result = new VecByteBuf(hostResult.getDocument().toBson());
+                aggStageAdapter._lastGetNextResult.getAsExtensionNextResult(*apiResult);
                 break;
             }
             case ReturnStatus::kPauseExecution: {
                 apiResult->code = ::MongoExtensionGetNextResultCode::kPauseExecution;
-                apiResult->result = nullptr;
                 break;
             }
             case ReturnStatus::kEOF: {
                 apiResult->code = ::MongoExtensionGetNextResultCode::kEOF;
-                apiResult->result = nullptr;
                 break;
             }
             default: {
                 tasserted(11019500,
                           str::stream()
                               << "Cannot forward a GetNextResult with the following ReturnStatus: "
-                              << static_cast<const int>(hostStatusCode));
+                              << static_cast<int>(hostStatusCode));
+                break;
             }
         }
     });
@@ -84,6 +83,28 @@ namespace mongo::extension::host_connector {
     auto sv = static_cast<const HostExecAggStageAdapter*>(execAggStage)->getImpl().getName();
     StringData sd{sv.data(), sv.length()};
     return stringDataAsByteView(sd);
+}
+
+void CachedGetNextResult::getAsExtensionNextResult(::MongoExtensionGetNextResult& outputResult) {
+    switch (outputResult.requestType) {
+        case kDocumentOnly: {
+            // TODO SERVER-113905, once we support metadata, we should only support returning both
+            // document and metadata.
+
+            // First, we must obtain the BSONObj for the document.
+            // Whether the resultDocument BSON is owned or not owned, it does not matter, since we
+            // will keep it stable for the lifetime of this cached result.
+            if (!_resultDocument) {
+                _resultDocument = _getNextResult.getDocument().toBson();
+            }
+            // Populate the output result as a view on the cached result BSON.
+            outputResult.resultDocument.type = MongoExtensionByteContainerType::kByteView;
+            outputResult.resultDocument.bytes.view = objAsByteView(*_resultDocument);
+        } break;
+        default:
+            MONGO_UNREACHABLE_TASSERT(11357800);
+            break;
+    }
 }
 
 };  // namespace mongo::extension::host_connector

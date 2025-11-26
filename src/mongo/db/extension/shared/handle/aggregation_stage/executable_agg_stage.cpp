@@ -41,11 +41,11 @@ ExtensionGetNextResult _internalGetNext(const MongoExtensionExecAggStageVTable& 
                                         MongoExtensionExecAggStage* stage,
                                         MongoExtensionQueryExecutionContext* execCtxPtr,
                                         ::MongoExtensionGetNextRequestType requestType) {
-    ::MongoExtensionGetNextResult result{};
+    ::MongoExtensionGetNextResult result = createDefaultExtensionGetNext(requestType);
     invokeCAndConvertStatusToException(
         [&]() { return vtable.get_next(stage, execCtxPtr, &result); });
 
-    return convertCRepresentationToGetNextResult(&result);
+    return ExtensionGetNextResult::makeFromApiResult(result);
 }
 
 std::string_view _internalGetName(const MongoExtensionExecAggStageVTable& vtable,

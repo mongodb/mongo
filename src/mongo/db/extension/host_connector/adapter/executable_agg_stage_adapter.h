@@ -38,6 +38,48 @@
 namespace mongo::extension::host_connector {
 
 /**
+ * CachedGetNextResult is a helper class used to cache Host exec::agg::GetNextResult documents.
+ * When converting a Host exec::agg::GetNextResult to the boundary type
+ * ::MongoExtensionGetNextResult, we want to avoid having to make unnecessary copies of the result
+ * BSON document. For this reason, the key function getAsExtensionNextResult only provides the BSON
+ * result as a view on the original document.
+ * Any populated ::MongoExtensionGetNextResult via the key function must not outlive the
+ * CachedGetNextResult instance from which it was obtained. This is guaranteed by
+ * HostExecAggStageAdapter when servicing calls to getNext(), where HostExecAggStageAdapter
+ * guarantees to keep the previous CachedGetNextResult valid until the subsequent GetNext() call.
+ */
+class CachedGetNextResult {
+public:
+    explicit CachedGetNextResult() {}
+    explicit CachedGetNextResult(exec::agg::GetNextResult&& hostResult)
+        : _getNextResult(std::move(hostResult)) {}
+
+    CachedGetNextResult(const CachedGetNextResult&) = delete;
+    CachedGetNextResult& operator=(const CachedGetNextResult&) = delete;
+    CachedGetNextResult(CachedGetNextResult&&) = default;
+    CachedGetNextResult& operator=(CachedGetNextResult&&) = default;
+    /**
+     * Expresses a CachedGetNextResult as the boundary type ::MongoExtensionGetNextResult.
+     * Callers of this function must guarantee to keep this CachedGetNextResult instance valid
+     * for as long as the output value is needed. This is required, because this conversion function
+     * only provides the BSON result as a view on the original document.
+     * This was done intentionally to avoid making unnecessary copies of owned BSON.
+     * This function is typically used by HostExecAggStage when servicing calls to getNext(), where
+     * HostExecAggStageAdapter guarantees to keep the previous CachedGetNextResult valid until the
+     * subsequent GetNext() call.
+     */
+    void getAsExtensionNextResult(::MongoExtensionGetNextResult& outputResult);
+
+    exec::agg::GetNextResult::ReturnStatus getStatus() const {
+        return _getNextResult.getStatus();
+    }
+
+private:
+    exec::agg::GetNextResult _getNextResult{exec::agg::GetNextResult::makeEOF()};
+    boost::optional<BSONObj> _resultDocument{boost::none};
+};
+
+/**
  * Boundary object representation of a ::MongoExtensionExecAggStage.
  *
  * This class abstracts the C++ implementation of the extension and provides the interface at the
@@ -168,5 +210,7 @@ private:
                                                                .close = &_hostClose};
 
     std::unique_ptr<host::ExecAggStage> _execAggStage;
+    CachedGetNextResult _lastGetNextResult;
 };
+
 };  // namespace mongo::extension::host_connector

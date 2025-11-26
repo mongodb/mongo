@@ -66,9 +66,8 @@ public:
     TransformExecAggStage() : sdk::ExecAggStageTransform(kTransformName) {}
 
     ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
-                                   ::MongoExtensionExecAggStage* execStage,
-                                   ::MongoExtensionGetNextRequestType requestType) override {
-        return _getSource().getNext(execCtx.get(), requestType);
+                                   ::MongoExtensionExecAggStage* execStage) override {
+        return _getSource().getNext(execCtx.get());
     }
 
     void open() override {}
@@ -172,12 +171,14 @@ public:
     FruitsAsDocumentsExecAggStage() : sdk::ExecAggStageSource(kSourceName) {}
 
     ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
-                                   ::MongoExtensionExecAggStage* execStage,
-                                   ::MongoExtensionGetNextRequestType requestType) override {
+                                   ::MongoExtensionExecAggStage* execStage) override {
         if (_currentIndex >= _documents.size()) {
             return ExtensionGetNextResult::eof();
         }
-        return ExtensionGetNextResult::advanced(_documents[_currentIndex++]);
+        // Note, here we can create the result as a byte view, since this stage guarantees to keep
+        // the results valid.
+        return ExtensionGetNextResult::advanced(
+            ExtensionBSONObj::makeAsByteView(_documents[_currentIndex++]));
     }
 
     // Allow this to be public for visibility in unit tests.
@@ -290,8 +291,7 @@ public:
     // exec::agg::SingleDocumentTransformationStage::doGetNext(), more specifically, the $addFields
     // behavior.
     ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
-                                   MongoExtensionExecAggStage* execStage,
-                                   ::MongoExtensionGetNextRequestType requestType) override {
+                                   MongoExtensionExecAggStage* execStag) override {
         auto input = _getSource().getNext(execCtx.get());
         if (input.code == GetNextCode::kPauseExecution) {
             return ExtensionGetNextResult::pauseExecution();
@@ -302,11 +302,14 @@ public:
         if (_currentIndex >= _documents.size()) {
             return ExtensionGetNextResult::eof();
         }
+        // If we got here, we must have a document!
+        sdk_tassert(11357802, "Failed to get an input document!", input.resultDocument.has_value());
         BSONObjBuilder bob;
-        bob.append("existingDoc", input.res.get());
+        bob.append("existingDoc", input.resultDocument->getUnownedBSONObj());
         // Transform the returned input document by adding a new field.
         bob.append("addedFields", _documents[_currentIndex++]);
-        return ExtensionGetNextResult::advanced(bob.obj());
+        // We need to return the result as a ByteBuf, since we are returning a temporary.
+        return ExtensionGetNextResult::advanced(ExtensionBSONObj::makeAsByteBuf(bob.done()));
     }
 
     void open() override {}
@@ -409,10 +412,8 @@ class ValidExtensionExecAggStage : public extension::sdk::ExecAggStageSource {
 public:
     ValidExtensionExecAggStage() : sdk::ExecAggStageSource("$validExtension") {}
 
-    extension::ExtensionGetNextResult getNext(
-        const sdk::QueryExecutionContextHandle& execCtx,
-        ::MongoExtensionExecAggStage* execStage,
-        ::MongoExtensionGetNextRequestType requestType) override {
+    extension::ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
+                                              ::MongoExtensionExecAggStage* execStage) override {
         // TODO SERVER-113905: once we support metadata, we should only support returning both
         // document and metadata.
         if (_results.empty()) {
@@ -426,7 +427,10 @@ public:
             _results.pop_front();
             return extension::ExtensionGetNextResult::pauseExecution();
         } else {
-            auto result = extension::ExtensionGetNextResult::advanced(_results.front());
+            // We need to return the result as a ByteBuf, since we are popping results off our
+            // results deque.
+            auto result = extension::ExtensionGetNextResult::advanced(
+                ExtensionBSONObj::makeAsByteBuf(_results.front()));
             _results.pop_front();
             return result;
         }
