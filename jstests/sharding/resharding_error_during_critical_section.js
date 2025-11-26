@@ -5,6 +5,7 @@
  * @tags: [
  *   requires_fcv_83,
  *   featureFlagReshardingVerification,
+ *   featureFlagReshardingSkipCloningAndApplyingIfApplicable,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -129,6 +130,11 @@ const cmdsToBlock = [
     },
     {
         cmdName: "_shardsvrReshardingDonorFetchFinalCollectionStats",
+        // No skipping.
+        numSkips: 0,
+    },
+    {
+        cmdName: "_shardsvrReshardRecipientCriticalSectionStarted",
         // No skipping.
         numSkips: 0,
     },

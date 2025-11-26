@@ -434,7 +434,16 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                                telemetryCtx,
                                "ReshardingCoordinator::tellAllParticipantsReshardingReadyToCommit");
                            _tellAllDonorsToRefresh(executor);
-                           _tellAllRecipientsToRefresh(executor);
+                           // TODO (SERVER-92437) Avoid ignoring FCV for feature flag check once
+                           // resharding starts storing what FCV it was started with.
+                           if (resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
+                                   .isEnabled(kVersionContextIgnored_UNSAFE,
+                                              serverGlobalParams.featureCompatibility
+                                                  .acquireFCVSnapshot())) {
+                               _tellAllRecipientsCriticalSectionStarted(executor);
+                           } else {
+                               _tellAllRecipientsToRefresh(executor);
+                           }
                        }
                    })
                    .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
@@ -1882,6 +1891,18 @@ void ReshardingCoordinator::_sendCommandToAllDonors(
         opCtx.get(), opts, {donorShardIds.begin(), donorShardIds.end()});
 }
 
+template <typename CommandType>
+void ReshardingCoordinator::_sendCommandToAllRecipients(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts) {
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto recipientShardIds =
+        resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
+
+    resharding::sendCommandToShards(
+        opCtx.get(), opts, {recipientShardIds.begin(), recipientShardIds.end()});
+}
+
 void ReshardingCoordinator::_sendRecipientCloneCmdToShards(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -2001,6 +2022,18 @@ void ReshardingCoordinator::_tellAllDonorsToStartChangeStreamsMonitor(
         **executor, _ctHolder->getStepdownToken(), cmd);
     opts->cmd.setDbName(DatabaseName::kAdmin);
     _sendCommandToAllDonors(executor, opts);
+}
+
+void ReshardingCoordinator::_tellAllRecipientsCriticalSectionStarted(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    ShardsvrReshardRecipientCriticalSectionStarted cmd(_coordinatorDoc.getReshardingUUID());
+    generic_argument_util::setMajorityWriteConcern(cmd, &resharding::kMajorityWriteConcern);
+
+    auto opts = std::make_shared<
+        async_rpc::AsyncRPCOptions<ShardsvrReshardRecipientCriticalSectionStarted>>(
+        **executor, _ctHolder->getAbortToken(), cmd);
+    opts->cmd.setDbName(DatabaseName::kAdmin);
+    _sendCommandToAllRecipients(executor, opts);
 }
 
 namespace {

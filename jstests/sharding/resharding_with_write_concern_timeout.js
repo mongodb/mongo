@@ -94,14 +94,6 @@ function testWriteConcernBasic(st) {
     const moveThreadForTest = new Thread(runMoveCollection, st.s.host, ns, st.shard2.shardName);
     moveThreadForTest.start();
 
-    // TODO Remove the find command when SERVER-109322 is done.
-    // The find command triggers a catalog cache refresh which could throw a WriteConcernTimeout.
-    // Using assert.soon so that find eventually works.
-    assert.soon(() => {
-        const res = testDB.runCommand({find: collName, filter: {}});
-        return res.ok === 1;
-    });
-
     blockingWriteFailPoint.wait();
     assert.commandWorked(testColl.insert([{x: -3}, {x: 3}]));
     blockingWriteFailPoint.off();

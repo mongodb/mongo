@@ -537,6 +537,12 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
+     * Sends '_shardsvrReshardRecipientCriticalSectionStarted' to all recipient shards.
+     */
+    void _tellAllRecipientsCriticalSectionStarted(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
      * Sends '_shardsvrCommitReshardCollection' to all participant shards.
      */
     void _tellAllParticipantsToCommit(

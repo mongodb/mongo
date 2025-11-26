@@ -91,6 +91,12 @@ last-continuous:
       ticket: SERVER-112267
     - test_file: jstests/sharding/resharding_error_during_critical_section.js
       ticket: SERVER-114005
+    - test_file: jstests/sharding/move_collection_stale_mongos.js
+      ticket: SERVER-109322
+    - test_file: jstests/sharding/unshard_collection_stale_mongos.js
+      ticket: SERVER-109322
+    - test_file: jstests/sharding/reshard_collection_with_zones_stale_mongos.js
+      ticket: SERVER-109322
   suites: null
 last-lts:
   all:
@@ -684,4 +690,10 @@ last-lts:
       ticket: SERVER-113887
     - test_file: jstests/sharding/resharding_error_during_critical_section.js
       ticket: SERVER-114005
+    - test_file: jstests/sharding/move_collection_stale_mongos.js
+      ticket: SERVER-109322
+    - test_file: jstests/sharding/unshard_collection_stale_mongos.js
+      ticket: SERVER-109322
+    - test_file: jstests/sharding/reshard_collection_with_zones_stale_mongos.js
+      ticket: SERVER-109322
   suites: null
