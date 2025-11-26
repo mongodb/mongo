@@ -252,12 +252,17 @@ runBasicJoinTest([
     {$unwind: "$z"},
 ]);
 
+// TODO: SERVER-113230 Restore this example to use conflicting target paths
+//   {$lookup: {from: foreignColl3.getName(), as: "x.y", localField: "x.c", foreignField: "c"}},
+//   {$unwind: "$x.y"},
+//   {$lookup: {from: foreignColl2.getName(), as: "x.y.z", localField: "x.y.d", foreignField: "d"}},
+//   {$unwind: "$x.y.z"},
 section("Basic example with 3 joins & subsequent join referencing nested paths");
 runBasicJoinTest([
     {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
     {$unwind: "$x"},
-    {$lookup: {from: foreignColl3.getName(), as: "x.y", localField: "x.c", foreignField: "c"}},
-    {$unwind: "$x.y"},
-    {$lookup: {from: foreignColl2.getName(), as: "x.y.z", localField: "x.y.d", foreignField: "d"}},
-    {$unwind: "$x.y.z"},
+    {$lookup: {from: foreignColl3.getName(), as: "w.y", localField: "x.c", foreignField: "c"}},
+    {$unwind: "$w.y"},
+    {$lookup: {from: foreignColl2.getName(), as: "k.y.z", localField: "w.y.d", foreignField: "d"}},
+    {$unwind: "$k.y.z"},
 ]);

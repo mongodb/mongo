@@ -229,10 +229,10 @@ Execution Engine: sbe
 					}
 				],
 				"joinPredicates" : [
-					"b = b"
+					"a = a"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "y",
+				"leftEmbeddingField" : "x",
+				"rightEmbeddingField" : "none",
 				"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 			},
 			{
@@ -244,11 +244,11 @@ Execution Engine: sbe
 			}
 		],
 		"joinPredicates" : [
-			"a = a"
+			"b = b"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "x",
+		"rightEmbeddingField" : "y",
 		"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 	}
 }
@@ -317,10 +317,10 @@ Execution Engine: sbe
 					}
 				],
 				"joinPredicates" : [
-					"b = b"
+					"a = a"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "y",
+				"leftEmbeddingField" : "x",
+				"rightEmbeddingField" : "none",
 				"stage" : "HASH_JOIN_EMBEDDING"
 			},
 			{
@@ -332,11 +332,11 @@ Execution Engine: sbe
 			}
 		],
 		"joinPredicates" : [
-			"a = a"
+			"b = b"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "x",
+		"rightEmbeddingField" : "y",
 		"stage" : "HASH_JOIN_EMBEDDING"
 	}
 }
@@ -405,10 +405,10 @@ Execution Engine: sbe
 					}
 				],
 				"joinPredicates" : [
-					"a = a"
+					"b = b"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x",
+				"leftEmbeddingField" : "y",
+				"rightEmbeddingField" : "none",
 				"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 			},
 			{
@@ -420,11 +420,11 @@ Execution Engine: sbe
 			}
 		],
 		"joinPredicates" : [
-			"b = b"
+			"a = a"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "y",
+		"rightEmbeddingField" : "x",
 		"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 	}
 }
@@ -493,10 +493,10 @@ Execution Engine: sbe
 					}
 				],
 				"joinPredicates" : [
-					"a = a"
+					"b = b"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x",
+				"leftEmbeddingField" : "y",
+				"rightEmbeddingField" : "none",
 				"stage" : "HASH_JOIN_EMBEDDING"
 			},
 			{
@@ -508,11 +508,11 @@ Execution Engine: sbe
 			}
 		],
 		"joinPredicates" : [
-			"b = b"
+			"a = a"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "y",
+		"rightEmbeddingField" : "x",
 		"stage" : "HASH_JOIN_EMBEDDING"
 	}
 }
@@ -789,6 +789,13 @@ Execution Engine: sbe
 						{
 							"inputStages" : [
 								{
+									"direction" : "forward",
+									"filter" : {
+										
+									},
+									"stage" : "COLLSCAN"
+								},
+								{
 									"inputStage" : {
 										"direction" : "forward",
 										"filter" : {
@@ -802,20 +809,13 @@ Execution Engine: sbe
 										"a" : true,
 										"b" : true
 									}
-								},
-								{
-									"direction" : "forward",
-									"filter" : {
-										
-									},
-									"stage" : "COLLSCAN"
 								}
 							],
 							"joinPredicates" : [
-								"b = b"
+								"a = a"
 							],
-							"leftEmbeddingField" : "none",
-							"rightEmbeddingField" : "y",
+							"leftEmbeddingField" : "x",
+							"rightEmbeddingField" : "none",
 							"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 						},
 						{
@@ -827,11 +827,11 @@ Execution Engine: sbe
 						}
 					],
 					"joinPredicates" : [
-						"a = a"
+						"b = b"
 					],
 					"leftEmbeddingField" : "none",
 					"planNodeId" : 6,
-					"rightEmbeddingField" : "x",
+					"rightEmbeddingField" : "y",
 					"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 				}
 			}
@@ -907,6 +907,13 @@ Execution Engine: sbe
 						{
 							"inputStages" : [
 								{
+									"direction" : "forward",
+									"filter" : {
+										
+									},
+									"stage" : "COLLSCAN"
+								},
+								{
 									"inputStage" : {
 										"direction" : "forward",
 										"filter" : {
@@ -920,20 +927,13 @@ Execution Engine: sbe
 										"a" : true,
 										"b" : true
 									}
-								},
-								{
-									"direction" : "forward",
-									"filter" : {
-										
-									},
-									"stage" : "COLLSCAN"
 								}
 							],
 							"joinPredicates" : [
-								"b = b"
+								"a = a"
 							],
-							"leftEmbeddingField" : "none",
-							"rightEmbeddingField" : "y",
+							"leftEmbeddingField" : "x",
+							"rightEmbeddingField" : "none",
 							"stage" : "HASH_JOIN_EMBEDDING"
 						},
 						{
@@ -945,11 +945,11 @@ Execution Engine: sbe
 						}
 					],
 					"joinPredicates" : [
-						"a = a"
+						"b = b"
 					],
 					"leftEmbeddingField" : "none",
 					"planNodeId" : 6,
-					"rightEmbeddingField" : "x",
+					"rightEmbeddingField" : "y",
 					"stage" : "HASH_JOIN_EMBEDDING"
 				}
 			}
@@ -1025,6 +1025,13 @@ Execution Engine: sbe
 						{
 							"inputStages" : [
 								{
+									"direction" : "forward",
+									"filter" : {
+										
+									},
+									"stage" : "COLLSCAN"
+								},
+								{
 									"inputStage" : {
 										"direction" : "forward",
 										"filter" : {
@@ -1038,20 +1045,13 @@ Execution Engine: sbe
 										"a" : true,
 										"b" : true
 									}
-								},
-								{
-									"direction" : "forward",
-									"filter" : {
-										
-									},
-									"stage" : "COLLSCAN"
 								}
 							],
 							"joinPredicates" : [
-								"a = a"
+								"b = b"
 							],
-							"leftEmbeddingField" : "none",
-							"rightEmbeddingField" : "x",
+							"leftEmbeddingField" : "y",
+							"rightEmbeddingField" : "none",
 							"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 						},
 						{
@@ -1063,11 +1063,11 @@ Execution Engine: sbe
 						}
 					],
 					"joinPredicates" : [
-						"b = b"
+						"a = a"
 					],
 					"leftEmbeddingField" : "none",
 					"planNodeId" : 6,
-					"rightEmbeddingField" : "y",
+					"rightEmbeddingField" : "x",
 					"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 				}
 			}
@@ -1143,6 +1143,13 @@ Execution Engine: sbe
 						{
 							"inputStages" : [
 								{
+									"direction" : "forward",
+									"filter" : {
+										
+									},
+									"stage" : "COLLSCAN"
+								},
+								{
 									"inputStage" : {
 										"direction" : "forward",
 										"filter" : {
@@ -1156,20 +1163,13 @@ Execution Engine: sbe
 										"a" : true,
 										"b" : true
 									}
-								},
-								{
-									"direction" : "forward",
-									"filter" : {
-										
-									},
-									"stage" : "COLLSCAN"
 								}
 							],
 							"joinPredicates" : [
-								"a = a"
+								"b = b"
 							],
-							"leftEmbeddingField" : "none",
-							"rightEmbeddingField" : "x",
+							"leftEmbeddingField" : "y",
+							"rightEmbeddingField" : "none",
 							"stage" : "HASH_JOIN_EMBEDDING"
 						},
 						{
@@ -1181,11 +1181,11 @@ Execution Engine: sbe
 						}
 					],
 					"joinPredicates" : [
-						"b = b"
+						"a = a"
 					],
 					"leftEmbeddingField" : "none",
 					"planNodeId" : 6,
-					"rightEmbeddingField" : "y",
+					"rightEmbeddingField" : "x",
 					"stage" : "HASH_JOIN_EMBEDDING"
 				}
 			}
@@ -4559,8 +4559,8 @@ Execution Engine: sbe
 				"joinPredicates" : [
 					"a = a"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x",
+				"leftEmbeddingField" : "x",
+				"rightEmbeddingField" : "none",
 				"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 			},
 			{
@@ -4645,8 +4645,8 @@ Execution Engine: sbe
 				"joinPredicates" : [
 					"a = a"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x",
+				"leftEmbeddingField" : "x",
+				"rightEmbeddingField" : "none",
 				"stage" : "HASH_JOIN_EMBEDDING"
 			},
 			{
@@ -4729,9 +4729,9 @@ Execution Engine: sbe
 					}
 				],
 				"joinPredicates" : [
-					"a = a"
+					"c = c"
 				],
-				"leftEmbeddingField" : "none",
+				"leftEmbeddingField" : "z",
 				"rightEmbeddingField" : "x",
 				"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 			},
@@ -4744,11 +4744,11 @@ Execution Engine: sbe
 			}
 		],
 		"joinPredicates" : [
-			"x.c = c"
+			"x.a = a"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "z",
+		"rightEmbeddingField" : "none",
 		"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 	}
 }
@@ -4815,9 +4815,9 @@ Execution Engine: sbe
 					}
 				],
 				"joinPredicates" : [
-					"a = a"
+					"c = c"
 				],
-				"leftEmbeddingField" : "none",
+				"leftEmbeddingField" : "z",
 				"rightEmbeddingField" : "x",
 				"stage" : "HASH_JOIN_EMBEDDING"
 			},
@@ -4830,11 +4830,11 @@ Execution Engine: sbe
 			}
 		],
 		"joinPredicates" : [
-			"x.c = c"
+			"x.a = a"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "z",
+		"rightEmbeddingField" : "none",
 		"stage" : "HASH_JOIN_EMBEDDING"
 	}
 }
@@ -5134,10 +5134,10 @@ Execution Engine: sbe
 							}
 						],
 						"joinPredicates" : [
-							"b = b"
+							"a = a"
 						],
 						"leftEmbeddingField" : "none",
-						"rightEmbeddingField" : "y",
+						"rightEmbeddingField" : "x",
 						"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 					},
 					{
@@ -5149,10 +5149,10 @@ Execution Engine: sbe
 					}
 				],
 				"joinPredicates" : [
-					"a = a"
+					"x.c = c"
 				],
 				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x",
+				"rightEmbeddingField" : "z",
 				"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 			},
 			{
@@ -5164,11 +5164,11 @@ Execution Engine: sbe
 			}
 		],
 		"joinPredicates" : [
-			"x.c = c"
+			"b = b"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 7,
-		"rightEmbeddingField" : "z",
+		"rightEmbeddingField" : "y",
 		"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 	}
 }
@@ -5250,10 +5250,10 @@ Execution Engine: sbe
 							}
 						],
 						"joinPredicates" : [
-							"b = b"
+							"a = a"
 						],
 						"leftEmbeddingField" : "none",
-						"rightEmbeddingField" : "y",
+						"rightEmbeddingField" : "x",
 						"stage" : "HASH_JOIN_EMBEDDING"
 					},
 					{
@@ -5265,10 +5265,10 @@ Execution Engine: sbe
 					}
 				],
 				"joinPredicates" : [
-					"a = a"
+					"x.c = c"
 				],
 				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x",
+				"rightEmbeddingField" : "z",
 				"stage" : "HASH_JOIN_EMBEDDING"
 			},
 			{
@@ -5280,11 +5280,11 @@ Execution Engine: sbe
 			}
 		],
 		"joinPredicates" : [
-			"x.c = c"
+			"b = b"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 7,
-		"rightEmbeddingField" : "z",
+		"rightEmbeddingField" : "y",
 		"stage" : "HASH_JOIN_EMBEDDING"
 	}
 }
@@ -5366,10 +5366,10 @@ Execution Engine: sbe
 							}
 						],
 						"joinPredicates" : [
-							"a = a"
+							"c = c"
 						],
-						"leftEmbeddingField" : "none",
-						"rightEmbeddingField" : "x",
+						"leftEmbeddingField" : "x",
+						"rightEmbeddingField" : "z",
 						"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 					},
 					{
@@ -5381,10 +5381,10 @@ Execution Engine: sbe
 					}
 				],
 				"joinPredicates" : [
-					"x.c = c"
+					"x.a = a"
 				],
 				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "z",
+				"rightEmbeddingField" : "none",
 				"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 			},
 			{
@@ -5482,10 +5482,10 @@ Execution Engine: sbe
 							}
 						],
 						"joinPredicates" : [
-							"a = a"
+							"c = c"
 						],
-						"leftEmbeddingField" : "none",
-						"rightEmbeddingField" : "x",
+						"leftEmbeddingField" : "x",
+						"rightEmbeddingField" : "z",
 						"stage" : "HASH_JOIN_EMBEDDING"
 					},
 					{
@@ -5497,10 +5497,10 @@ Execution Engine: sbe
 					}
 				],
 				"joinPredicates" : [
-					"x.c = c"
+					"x.a = a"
 				],
 				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "z",
+				"rightEmbeddingField" : "none",
 				"stage" : "HASH_JOIN_EMBEDDING"
 			},
 			{
@@ -5541,36 +5541,36 @@ Execution Engine: sbe
 	{
 		"$lookup" : {
 			"from" : "basic_joins_md_foreign3",
-			"as" : "x.y",
+			"as" : "w.y",
 			"localField" : "x.c",
 			"foreignField" : "c"
 		}
 	},
 	{
-		"$unwind" : "$x.y"
+		"$unwind" : "$w.y"
 	},
 	{
 		"$lookup" : {
 			"from" : "basic_joins_md_foreign2",
-			"as" : "x.y.z",
-			"localField" : "x.y.d",
+			"as" : "k.y.z",
+			"localField" : "w.y.d",
 			"foreignField" : "d"
 		}
 	},
 	{
-		"$unwind" : "$x.y.z"
+		"$unwind" : "$k.y.z"
 	}
 ]
 ```
 ### Results
 ```json
-{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2,  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2,  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "k" : {  "y" : {  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } },  "w" : {  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } },  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
 ```
 ### Summarized explain
 Execution Engine: classic
 ```json
 {
-	"queryShapeHash" : "4545A5343C4F418AA879D5C8E031D6B637DFEE78E362FFC2EE47775E87790625",
+	"queryShapeHash" : "9226A4FAA10C8790B27D9B5B865D46D0C58179A837F014E6289A34A6EBE76420",
 	"stages" : [
 		{
 			"$cursor" : {
@@ -5595,7 +5595,7 @@ Execution Engine: classic
 		},
 		{
 			"$lookup" : {
-				"as" : "x.y",
+				"as" : "w.y",
 				"foreignField" : "c",
 				"from" : "basic_joins_md_foreign3",
 				"localField" : "x.c",
@@ -5606,10 +5606,10 @@ Execution Engine: classic
 		},
 		{
 			"$lookup" : {
-				"as" : "x.y.z",
+				"as" : "k.y.z",
 				"foreignField" : "d",
 				"from" : "basic_joins_md_foreign2",
-				"localField" : "x.y.d",
+				"localField" : "w.y.d",
 				"unwinding" : {
 					"preserveNullAndEmptyArrays" : false
 				}
@@ -5637,36 +5637,36 @@ Execution Engine: classic
 	{
 		"$lookup" : {
 			"from" : "basic_joins_md_foreign3",
-			"as" : "x.y",
+			"as" : "w.y",
 			"localField" : "x.c",
 			"foreignField" : "c"
 		}
 	},
 	{
-		"$unwind" : "$x.y"
+		"$unwind" : "$w.y"
 	},
 	{
 		"$lookup" : {
 			"from" : "basic_joins_md_foreign2",
-			"as" : "x.y.z",
-			"localField" : "x.y.d",
+			"as" : "k.y.z",
+			"localField" : "w.y.d",
 			"foreignField" : "d"
 		}
 	},
 	{
-		"$unwind" : "$x.y.z"
+		"$unwind" : "$k.y.z"
 	}
 ]
 ```
 ### Results
 ```json
-{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2,  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2,  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "k" : {  "y" : {  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } },  "w" : {  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } },  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
 ```
 ### Summarized explain
 Execution Engine: sbe
 ```json
 {
-	"queryShapeHash" : "4545A5343C4F418AA879D5C8E031D6B637DFEE78E362FFC2EE47775E87790625",
+	"queryShapeHash" : "9226A4FAA10C8790B27D9B5B865D46D0C58179A837F014E6289A34A6EBE76420",
 	"rejectedPlans" : [ ],
 	"winningPlan" : {
 		"inputStages" : [
@@ -5708,7 +5708,7 @@ Execution Engine: sbe
 					"x.c = c"
 				],
 				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x.y",
+				"rightEmbeddingField" : "w.y",
 				"stage" : "HASH_JOIN_EMBEDDING"
 			},
 			{
@@ -5720,11 +5720,11 @@ Execution Engine: sbe
 			}
 		],
 		"joinPredicates" : [
-			"x.y.d = d"
+			"w.y.d = d"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 7,
-		"rightEmbeddingField" : "x.y.z",
+		"rightEmbeddingField" : "k.y.z",
 		"stage" : "HASH_JOIN_EMBEDDING"
 	}
 }
@@ -5748,36 +5748,36 @@ Execution Engine: sbe
 	{
 		"$lookup" : {
 			"from" : "basic_joins_md_foreign3",
-			"as" : "x.y",
+			"as" : "w.y",
 			"localField" : "x.c",
 			"foreignField" : "c"
 		}
 	},
 	{
-		"$unwind" : "$x.y"
+		"$unwind" : "$w.y"
 	},
 	{
 		"$lookup" : {
 			"from" : "basic_joins_md_foreign2",
-			"as" : "x.y.z",
-			"localField" : "x.y.d",
+			"as" : "k.y.z",
+			"localField" : "w.y.d",
 			"foreignField" : "d"
 		}
 	},
 	{
-		"$unwind" : "$x.y.z"
+		"$unwind" : "$k.y.z"
 	}
 ]
 ```
 ### Results
 ```json
-{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2,  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2,  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "k" : {  "y" : {  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } },  "w" : {  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } },  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
 ```
 ### Summarized explain
 Execution Engine: sbe
 ```json
 {
-	"queryShapeHash" : "4545A5343C4F418AA879D5C8E031D6B637DFEE78E362FFC2EE47775E87790625",
+	"queryShapeHash" : "9226A4FAA10C8790B27D9B5B865D46D0C58179A837F014E6289A34A6EBE76420",
 	"rejectedPlans" : [ ],
 	"winningPlan" : {
 		"inputStages" : [
@@ -5819,7 +5819,7 @@ Execution Engine: sbe
 					"x.c = c"
 				],
 				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x.y",
+				"rightEmbeddingField" : "w.y",
 				"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 			},
 			{
@@ -5831,11 +5831,11 @@ Execution Engine: sbe
 			}
 		],
 		"joinPredicates" : [
-			"x.y.d = d"
+			"w.y.d = d"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 7,
-		"rightEmbeddingField" : "x.y.z",
+		"rightEmbeddingField" : "k.y.z",
 		"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 	}
 }
@@ -5859,36 +5859,36 @@ Execution Engine: sbe
 	{
 		"$lookup" : {
 			"from" : "basic_joins_md_foreign3",
-			"as" : "x.y",
+			"as" : "w.y",
 			"localField" : "x.c",
 			"foreignField" : "c"
 		}
 	},
 	{
-		"$unwind" : "$x.y"
+		"$unwind" : "$w.y"
 	},
 	{
 		"$lookup" : {
 			"from" : "basic_joins_md_foreign2",
-			"as" : "x.y.z",
-			"localField" : "x.y.d",
+			"as" : "k.y.z",
+			"localField" : "w.y.d",
 			"foreignField" : "d"
 		}
 	},
 	{
-		"$unwind" : "$x.y.z"
+		"$unwind" : "$k.y.z"
 	}
 ]
 ```
 ### Results
 ```json
-{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2,  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2,  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "k" : {  "y" : {  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } },  "w" : {  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } },  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
 ```
 ### Summarized explain
 Execution Engine: sbe
 ```json
 {
-	"queryShapeHash" : "4545A5343C4F418AA879D5C8E031D6B637DFEE78E362FFC2EE47775E87790625",
+	"queryShapeHash" : "9226A4FAA10C8790B27D9B5B865D46D0C58179A837F014E6289A34A6EBE76420",
 	"rejectedPlans" : [ ],
 	"winningPlan" : {
 		"inputStages" : [
@@ -5930,7 +5930,7 @@ Execution Engine: sbe
 					"x.c = c"
 				],
 				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x.y",
+				"rightEmbeddingField" : "w.y",
 				"stage" : "HASH_JOIN_EMBEDDING"
 			},
 			{
@@ -5942,11 +5942,11 @@ Execution Engine: sbe
 			}
 		],
 		"joinPredicates" : [
-			"x.y.d = d"
+			"w.y.d = d"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 7,
-		"rightEmbeddingField" : "x.y.z",
+		"rightEmbeddingField" : "k.y.z",
 		"stage" : "HASH_JOIN_EMBEDDING"
 	}
 }
@@ -5970,36 +5970,36 @@ Execution Engine: sbe
 	{
 		"$lookup" : {
 			"from" : "basic_joins_md_foreign3",
-			"as" : "x.y",
+			"as" : "w.y",
 			"localField" : "x.c",
 			"foreignField" : "c"
 		}
 	},
 	{
-		"$unwind" : "$x.y"
+		"$unwind" : "$w.y"
 	},
 	{
 		"$lookup" : {
 			"from" : "basic_joins_md_foreign2",
-			"as" : "x.y.z",
-			"localField" : "x.y.d",
+			"as" : "k.y.z",
+			"localField" : "w.y.d",
 			"foreignField" : "d"
 		}
 	},
 	{
-		"$unwind" : "$x.y.z"
+		"$unwind" : "$k.y.z"
 	}
 ]
 ```
 ### Results
 ```json
-{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2,  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2,  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "k" : {  "y" : {  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } },  "w" : {  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } },  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
 ```
 ### Summarized explain
 Execution Engine: sbe
 ```json
 {
-	"queryShapeHash" : "4545A5343C4F418AA879D5C8E031D6B637DFEE78E362FFC2EE47775E87790625",
+	"queryShapeHash" : "9226A4FAA10C8790B27D9B5B865D46D0C58179A837F014E6289A34A6EBE76420",
 	"rejectedPlans" : [ ],
 	"winningPlan" : {
 		"inputStages" : [
@@ -6023,10 +6023,10 @@ Execution Engine: sbe
 							}
 						],
 						"joinPredicates" : [
-							"a = a"
+							"c = c"
 						],
-						"leftEmbeddingField" : "none",
-						"rightEmbeddingField" : "x",
+						"leftEmbeddingField" : "x",
+						"rightEmbeddingField" : "w.y",
 						"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 					},
 					{
@@ -6038,10 +6038,10 @@ Execution Engine: sbe
 					}
 				],
 				"joinPredicates" : [
-					"x.c = c"
+					"w.y.d = d"
 				],
 				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x.y",
+				"rightEmbeddingField" : "k.y.z",
 				"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 			},
 			{
@@ -6053,11 +6053,11 @@ Execution Engine: sbe
 			}
 		],
 		"joinPredicates" : [
-			"x.y.d = d"
+			"x.a = a"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 7,
-		"rightEmbeddingField" : "x.y.z",
+		"rightEmbeddingField" : "none",
 		"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 	}
 }
@@ -6081,36 +6081,36 @@ Execution Engine: sbe
 	{
 		"$lookup" : {
 			"from" : "basic_joins_md_foreign3",
-			"as" : "x.y",
+			"as" : "w.y",
 			"localField" : "x.c",
 			"foreignField" : "c"
 		}
 	},
 	{
-		"$unwind" : "$x.y"
+		"$unwind" : "$w.y"
 	},
 	{
 		"$lookup" : {
 			"from" : "basic_joins_md_foreign2",
-			"as" : "x.y.z",
-			"localField" : "x.y.d",
+			"as" : "k.y.z",
+			"localField" : "w.y.d",
 			"foreignField" : "d"
 		}
 	},
 	{
-		"$unwind" : "$x.y.z"
+		"$unwind" : "$k.y.z"
 	}
 ]
 ```
 ### Results
 ```json
-{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2,  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2,  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "k" : {  "y" : {  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } },  "w" : {  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } },  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
 ```
 ### Summarized explain
 Execution Engine: sbe
 ```json
 {
-	"queryShapeHash" : "4545A5343C4F418AA879D5C8E031D6B637DFEE78E362FFC2EE47775E87790625",
+	"queryShapeHash" : "9226A4FAA10C8790B27D9B5B865D46D0C58179A837F014E6289A34A6EBE76420",
 	"rejectedPlans" : [ ],
 	"winningPlan" : {
 		"inputStages" : [
@@ -6134,10 +6134,10 @@ Execution Engine: sbe
 							}
 						],
 						"joinPredicates" : [
-							"a = a"
+							"c = c"
 						],
-						"leftEmbeddingField" : "none",
-						"rightEmbeddingField" : "x",
+						"leftEmbeddingField" : "x",
+						"rightEmbeddingField" : "w.y",
 						"stage" : "HASH_JOIN_EMBEDDING"
 					},
 					{
@@ -6149,10 +6149,10 @@ Execution Engine: sbe
 					}
 				],
 				"joinPredicates" : [
-					"x.c = c"
+					"w.y.d = d"
 				],
 				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x.y",
+				"rightEmbeddingField" : "k.y.z",
 				"stage" : "HASH_JOIN_EMBEDDING"
 			},
 			{
@@ -6164,11 +6164,11 @@ Execution Engine: sbe
 			}
 		],
 		"joinPredicates" : [
-			"x.y.d = d"
+			"x.a = a"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 7,
-		"rightEmbeddingField" : "x.y.z",
+		"rightEmbeddingField" : "none",
 		"stage" : "HASH_JOIN_EMBEDDING"
 	}
 }

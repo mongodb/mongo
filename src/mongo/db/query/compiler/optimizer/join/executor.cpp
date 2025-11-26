@@ -164,7 +164,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                                  model.resolvedPaths,
                                                  mca,
                                                  qkc.getRandomJoinOrderSeed(),
-                                                 qkc.getRandomJoinReorderDefaultToHashJoin());
+                                                 qkc.getRandomJoinReorderDefaultToHashJoin(),
+                                                 true);
             break;
         default:
             MONGO_UNREACHABLE_TASSERT(11336911);

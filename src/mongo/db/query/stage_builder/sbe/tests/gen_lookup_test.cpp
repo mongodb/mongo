@@ -227,6 +227,28 @@ public:
         stage->close();
     }
 
+    CompiledTree compileAndRun(MultipleCollectionAccessor& colls,
+                               std::unique_ptr<QuerySolutionNode> node) {
+        auto solution = makeQuerySolution(std::move(node));
+
+        // Convert logical solution into the physical SBE plan.
+        auto [resultSlots, stage, data, _] =
+            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
+
+        if (enableDebugOutput) {
+            std::cout << std::endl << DebugPrinter{true}.print(stage->debugPrint()) << std::endl;
+        }
+
+        // Prepare the SBE tree for execution.
+        auto ctx = makeCompileCtx();
+        prepareTree(ctx.get(), stage.get());
+
+        auto resultSlot = *data.staticData->resultSlot;
+        SlotAccessor* resultSlotAccessor = stage->getAccessor(*ctx, resultSlot);
+
+        return CompiledTree{std::move(stage), std::move(data), std::move(ctx), resultSlotAccessor};
+    }
+
 protected:
     const NamespaceString _foreignNss =
         NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
@@ -326,24 +348,7 @@ private:
                                                          strategy,
                                                          boost::none /* idxEntry */,
                                                          true /* shouldProduceBson */);
-        auto solution = makeQuerySolution(std::move(lookupNode));
-
-        // Convert logical solution into the physical SBE plan.
-        auto [resultSlots, stage, data, _] =
-            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
-
-        if (enableDebugOutput) {
-            std::cout << std::endl << DebugPrinter{true}.print(stage->debugPrint()) << std::endl;
-        }
-
-        // Prepare the SBE tree for execution.
-        auto ctx = makeCompileCtx();
-        prepareTree(ctx.get(), stage.get());
-
-        auto resultSlot = *data.staticData->resultSlot;
-        SlotAccessor* resultSlotAccessor = stage->getAccessor(*ctx, resultSlot);
-
-        return CompiledTree{std::move(stage), std::move(data), std::move(ctx), resultSlotAccessor};
+        return compileAndRun(colls, std::move(lookupNode));
     }
 };
 
@@ -361,6 +366,37 @@ public:
                                                   std::move(rightField),
                                                   std::move(leftEmbeddingFieldArg),
                                                   std::move(rightEmbeddingFieldArg));
+            },
+            expected);
+    }
+
+    void assertReturnedDocuments(FieldPath leftField,
+                                 FieldPath centerField,
+                                 FieldPath rightField,
+                                 boost::optional<FieldPath> leftEmbeddingFieldArg,
+                                 boost::optional<FieldPath> centerEmbeddingFieldArg,
+                                 boost::optional<FieldPath> rightEmbeddingFieldArg,
+                                 const std::vector<BSONObj>& expected) {
+        executeTestWithPlanCallbackAndExpectedResults(
+            [&](MultipleCollectionAccessor& colls) {
+                return buildNestedLoopJoinSbeTreeStar(colls,
+                                                      leftField,
+                                                      centerField,
+                                                      rightField,
+                                                      leftEmbeddingFieldArg,
+                                                      centerEmbeddingFieldArg,
+                                                      rightEmbeddingFieldArg);
+            },
+            expected);
+        executeTestWithPlanCallbackAndExpectedResults(
+            [&](MultipleCollectionAccessor& colls) {
+                return buildNestedLoopJoinSbeTreeChain(colls,
+                                                       std::move(leftField),
+                                                       std::move(centerField),
+                                                       std::move(rightField),
+                                                       std::move(leftEmbeddingFieldArg),
+                                                       std::move(centerEmbeddingFieldArg),
+                                                       std::move(rightEmbeddingFieldArg));
             },
             expected);
     }
@@ -385,24 +421,93 @@ private:
                                                            .rightField = std::move(rightField)}},
             std::move(leftEmbeddingFieldArg),
             std::move(rightEmbeddingFieldArg));
-        auto solution = makeQuerySolution(std::move(nestedLoopJoinEmbeddingNode));
 
-        // Convert logical solution into the physical SBE plan.
-        auto [resultSlots, stage, data, _] =
-            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
+        return compileAndRun(colls, std::move(nestedLoopJoinEmbeddingNode));
+    }
 
-        if (enableDebugOutput) {
-            std::cout << std::endl << DebugPrinter{true}.print(stage->debugPrint()) << std::endl;
-        }
+    CompiledTree buildNestedLoopJoinSbeTreeStar(MultipleCollectionAccessor& colls,
+                                                FieldPath leftField,
+                                                FieldPath centerField,
+                                                FieldPath rightField,
+                                                boost::optional<FieldPath> leftEmbeddingFieldArg,
+                                                boost::optional<FieldPath> centerEmbeddingFieldArg,
+                                                boost::optional<FieldPath> rightEmbeddingFieldArg) {
+        // Create a three-way join with (left == center && left == right)
+        auto outerScanNode = std::make_unique<CollectionScanNode>();
+        outerScanNode->nss = _nss;
 
-        // Prepare the SBE tree for execution.
-        auto ctx = makeCompileCtx();
-        prepareTree(ctx.get(), stage.get());
+        auto innerScanNode = std::make_unique<CollectionScanNode>();
+        innerScanNode->nss = _foreignNss;
 
-        auto resultSlot = *data.staticData->resultSlot;
-        SlotAccessor* resultSlotAccessor = stage->getAccessor(*ctx, resultSlot);
+        auto nestedLoopJoinEmbeddingNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
+            std::move(outerScanNode),
+            std::move(innerScanNode),
+            std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                           .leftField = leftField,
+                                                           .rightField = std::move(centerField)}},
+            leftEmbeddingFieldArg,
+            std::move(centerEmbeddingFieldArg));
 
-        return CompiledTree{std::move(stage), std::move(data), std::move(ctx), resultSlotAccessor};
+        auto innerScanNode2 = std::make_unique<CollectionScanNode>();
+        innerScanNode2->nss = _foreignNss;
+
+        // The left field must be prepended with the embedding used for that table.
+        nestedLoopJoinEmbeddingNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
+            std::move(nestedLoopJoinEmbeddingNode),
+            std::move(innerScanNode2),
+            std::vector<QSNJoinPredicate>{
+                QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                 .leftField = leftEmbeddingFieldArg.has_value()
+                                     ? leftEmbeddingFieldArg->concat(leftField)
+                                     : leftField,
+                                 .rightField = std::move(rightField)}},
+            boost::none,
+            std::move(rightEmbeddingFieldArg));
+
+        return compileAndRun(colls, std::move(nestedLoopJoinEmbeddingNode));
+    }
+
+    CompiledTree buildNestedLoopJoinSbeTreeChain(
+        MultipleCollectionAccessor& colls,
+        FieldPath leftField,
+        FieldPath centerField,
+        FieldPath rightField,
+        boost::optional<FieldPath> leftEmbeddingFieldArg,
+        boost::optional<FieldPath> centerEmbeddingFieldArg,
+        boost::optional<FieldPath> rightEmbeddingFieldArg) {
+        // Create a three-way join with (left == center && denter == right)
+        auto outerScanNode = std::make_unique<CollectionScanNode>();
+        outerScanNode->nss = _nss;
+
+        auto innerScanNode = std::make_unique<CollectionScanNode>();
+        innerScanNode->nss = _foreignNss;
+
+        auto nestedLoopJoinEmbeddingNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
+            std::move(outerScanNode),
+            std::move(innerScanNode),
+            std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                           .leftField = std::move(leftField),
+                                                           .rightField = centerField}},
+            std::move(leftEmbeddingFieldArg),
+            centerEmbeddingFieldArg);
+
+        auto innerScanNode2 = std::make_unique<CollectionScanNode>();
+        innerScanNode2->nss = _foreignNss;
+
+        // The left field must be prepended with the embedding used for that table.
+        nestedLoopJoinEmbeddingNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
+            std::move(nestedLoopJoinEmbeddingNode),
+            std::move(innerScanNode2),
+            std::vector<QSNJoinPredicate>{
+                QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                 .leftField = centerEmbeddingFieldArg.has_value()
+                                     ? centerEmbeddingFieldArg->concat(centerField)
+                                     : centerField,
+                                 .rightField = std::move(rightField)}},
+            boost::none,
+            std::move(rightEmbeddingFieldArg));
+
+        return compileAndRun(colls, std::move(nestedLoopJoinEmbeddingNode));
     }
 };
 
@@ -420,6 +525,37 @@ public:
                                             std::move(rightField),
                                             std::move(leftEmbeddingFieldArg),
                                             std::move(rightEmbeddingFieldArg));
+            },
+            expected);
+    }
+
+    void assertReturnedDocuments(FieldPath leftField,
+                                 FieldPath centerField,
+                                 FieldPath rightField,
+                                 boost::optional<FieldPath> leftEmbeddingFieldArg,
+                                 boost::optional<FieldPath> centerEmbeddingFieldArg,
+                                 boost::optional<FieldPath> rightEmbeddingFieldArg,
+                                 const std::vector<BSONObj>& expected) {
+        executeTestWithPlanCallbackAndExpectedResultsUnordered(
+            [&](MultipleCollectionAccessor& colls) {
+                return buildHashJoinSbeTreeStar(colls,
+                                                leftField,
+                                                centerField,
+                                                rightField,
+                                                leftEmbeddingFieldArg,
+                                                centerEmbeddingFieldArg,
+                                                rightEmbeddingFieldArg);
+            },
+            expected);
+        executeTestWithPlanCallbackAndExpectedResultsUnordered(
+            [&](MultipleCollectionAccessor& colls) {
+                return buildHashJoinSbeTreeChain(colls,
+                                                 std::move(leftField),
+                                                 std::move(centerField),
+                                                 std::move(rightField),
+                                                 std::move(leftEmbeddingFieldArg),
+                                                 std::move(centerEmbeddingFieldArg),
+                                                 std::move(rightEmbeddingFieldArg));
             },
             expected);
     }
@@ -444,24 +580,92 @@ private:
                                                            .rightField = std::move(rightField)}},
             std::move(leftEmbeddingFieldArg),
             std::move(rightEmbeddingFieldArg));
-        auto solution = makeQuerySolution(std::move(hashJoinEmbeddingNode));
 
-        // Convert logical solution into the physical SBE plan.
-        auto [resultSlots, stage, data, _] =
-            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
+        return compileAndRun(colls, std::move(hashJoinEmbeddingNode));
+    }
 
-        if (enableDebugOutput) {
-            std::cout << std::endl << DebugPrinter{true}.print(stage->debugPrint()) << std::endl;
-        }
+    CompiledTree buildHashJoinSbeTreeStar(MultipleCollectionAccessor& colls,
+                                          FieldPath leftField,
+                                          FieldPath centerField,
+                                          FieldPath rightField,
+                                          boost::optional<FieldPath> leftEmbeddingFieldArg,
+                                          boost::optional<FieldPath> centerEmbeddingFieldArg,
+                                          boost::optional<FieldPath> rightEmbeddingFieldArg) {
+        // Create a three-way join with (left == center && left == right)
+        auto outerScanNode = std::make_unique<CollectionScanNode>();
+        outerScanNode->nss = _nss;
 
-        // Prepare the SBE tree for execution.
-        auto ctx = makeCompileCtx();
-        prepareTree(ctx.get(), stage.get());
+        auto innerScanNode = std::make_unique<CollectionScanNode>();
+        innerScanNode->nss = _foreignNss;
 
-        auto resultSlot = *data.staticData->resultSlot;
-        SlotAccessor* resultSlotAccessor = stage->getAccessor(*ctx, resultSlot);
+        auto hashJoinEmbeddingNode = std::make_unique<HashJoinEmbeddingNode>(
+            std::move(outerScanNode),
+            std::move(innerScanNode),
+            std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                           .leftField = leftField,
+                                                           .rightField = std::move(centerField)}},
+            leftEmbeddingFieldArg,
+            std::move(centerEmbeddingFieldArg));
 
-        return CompiledTree{std::move(stage), std::move(data), std::move(ctx), resultSlotAccessor};
+        auto innerScanNode2 = std::make_unique<CollectionScanNode>();
+        innerScanNode2->nss = _foreignNss;
+
+        // The left field must be prepended with the embedding used for that table.
+        hashJoinEmbeddingNode = std::make_unique<HashJoinEmbeddingNode>(
+            std::move(hashJoinEmbeddingNode),
+            std::move(innerScanNode2),
+            std::vector<QSNJoinPredicate>{
+                QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                 .leftField = leftEmbeddingFieldArg.has_value()
+                                     ? leftEmbeddingFieldArg->concat(leftField)
+                                     : leftField,
+                                 .rightField = std::move(rightField)}},
+            boost::none,
+            std::move(rightEmbeddingFieldArg));
+
+        return compileAndRun(colls, std::move(hashJoinEmbeddingNode));
+    }
+
+    CompiledTree buildHashJoinSbeTreeChain(MultipleCollectionAccessor& colls,
+                                           FieldPath leftField,
+                                           FieldPath centerField,
+                                           FieldPath rightField,
+                                           boost::optional<FieldPath> leftEmbeddingFieldArg,
+                                           boost::optional<FieldPath> centerEmbeddingFieldArg,
+                                           boost::optional<FieldPath> rightEmbeddingFieldArg) {
+        // Create a three-way join with (left == center && center == right)
+        auto outerScanNode = std::make_unique<CollectionScanNode>();
+        outerScanNode->nss = _nss;
+
+        auto innerScanNode = std::make_unique<CollectionScanNode>();
+        innerScanNode->nss = _foreignNss;
+
+        auto hashJoinEmbeddingNode = std::make_unique<HashJoinEmbeddingNode>(
+            std::move(outerScanNode),
+            std::move(innerScanNode),
+            std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                           .leftField = std::move(leftField),
+                                                           .rightField = centerField}},
+            std::move(leftEmbeddingFieldArg),
+            centerEmbeddingFieldArg);
+
+        auto innerScanNode2 = std::make_unique<CollectionScanNode>();
+        innerScanNode2->nss = _foreignNss;
+
+        // The left field must be prepended with the embedding used for that table.
+        hashJoinEmbeddingNode = std::make_unique<HashJoinEmbeddingNode>(
+            std::move(hashJoinEmbeddingNode),
+            std::move(innerScanNode2),
+            std::vector<QSNJoinPredicate>{
+                QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                 .leftField = centerEmbeddingFieldArg.has_value()
+                                     ? centerEmbeddingFieldArg->concat(centerField)
+                                     : centerField,
+                                 .rightField = std::move(rightField)}},
+            boost::none,
+            std::move(rightEmbeddingFieldArg));
+
+        return compileAndRun(colls, std::move(hashJoinEmbeddingNode));
     }
 };
 
@@ -1020,6 +1224,116 @@ TEST_F(NestedLoopJoinStageBuilderTest, JoinWithSinglePredicate) {
                             expected);
 }
 
+TEST_F(NestedLoopJoinStageBuilderTest, JoinThreeTablesWithSinglePredicate) {
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, lkey: 1}"),
+        fromjson("{_id: 1, lkey: -1}"),
+        fromjson("{_id: 2, lkey: 3}"),
+        fromjson("{_id: 3, no_lkey: -2}"),
+        fromjson("{_id: 4, lkey: null}"),
+        fromjson("{_id: 5, lkey: undefined}"),
+    };
+
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, fkey: 0, fkey1: 0}"),
+        fromjson("{_id: 1, fkey: 1, fkey1: 1}"),
+        fromjson("{_id: 2, fkey: 2, fkey1: 2}"),
+        fromjson("{_id: 3, fkey: 3, fkey1: 3}"),
+        fromjson("{_id: 4, no_fkey: -3}"),
+        fromjson("{_id: 5, fkey: null, fkey1: null}"),
+        fromjson("{_id: 6, fkey: undefined, fkey1: undefined}"),
+    };
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 0, lkey: 1, embedding1: {_id: 1, fkey: 1, fkey1: 1}, embedding: {_id: 1, "
+                 "fkey: 1, fkey1: 1}}"),
+        fromjson("{_id: 2, lkey: 3, embedding1: {_id: 3, fkey: 3, fkey1: 3}, embedding: {_id: 3, "
+                 "fkey: 3, fkey1: 3}}"),
+        fromjson("{_id: 3, no_lkey: -2, embedding1: {_id: 4, no_fkey: -3}, embedding: {_id: 4, "
+                 "no_fkey: -3}}"),
+        fromjson("{_id: 3, no_lkey: -2, embedding1: {_id: 5, fkey: null, fkey1: null}, embedding: "
+                 "{_id: 4, no_fkey: -3}}"),
+        fromjson("{_id: 3, no_lkey: -2, embedding1: {_id: 4, no_fkey: -3}, embedding: {_id: 5, "
+                 "fkey: null, fkey1: null}}"),
+        fromjson("{_id: 3, no_lkey: -2, embedding1: {_id: 5, fkey: null, fkey1: null}, embedding: "
+                 "{_id: 5, fkey: null, fkey1: null}}"),
+        fromjson("{_id: 4, lkey: null, embedding1: {_id: 4, no_fkey: -3}, embedding: {_id: 4, "
+                 "no_fkey: -3}}"),
+        fromjson("{_id: 4, lkey: null, embedding1: {_id: 5, fkey: null, fkey1: null}, embedding: "
+                 "{_id: 4, no_fkey: -3}}"),
+        fromjson("{_id: 4, lkey: null, embedding1: {_id: 4, no_fkey: -3}, embedding: {_id: 5, "
+                 "fkey: null, fkey1: null}}"),
+        fromjson("{_id: 4, lkey: null, embedding1: {_id: 5, fkey: null, fkey1: null}, embedding: "
+                 "{_id: 5, fkey: null, fkey1: null}}"),
+        fromjson("{_id: 5, lkey: undefined, embedding1: {_id: 6, fkey: undefined, fkey1: "
+                 "undefined}, embedding: {_id: 6, fkey: undefined, fkey1: undefined}}"),
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertReturnedDocuments(FieldPath("lkey"),
+                            FieldPath("fkey"),
+                            FieldPath("fkey1"),
+                            {},
+                            boost::make_optional<FieldPath>("embedding"),
+                            boost::make_optional<FieldPath>("embedding1"),
+                            expected);
+}
+
+TEST_F(NestedLoopJoinStageBuilderTest, JoinThreeTablesWithSinglePredicateBaseIsLast) {
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, lkey: 1}"),
+        fromjson("{_id: 1, lkey: -1}"),
+        fromjson("{_id: 2, lkey: 3}"),
+        fromjson("{_id: 3, no_lkey: -2}"),
+        fromjson("{_id: 4, lkey: null}"),
+        fromjson("{_id: 5, lkey: undefined}"),
+    };
+
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, fkey: 0, fkey1: 0}"),
+        fromjson("{_id: 1, fkey: 1, fkey1: 1}"),
+        fromjson("{_id: 2, fkey: 2, fkey1: 2}"),
+        fromjson("{_id: 3, fkey: 3, fkey1: 3}"),
+        fromjson("{_id: 4, no_fkey: -3}"),
+        fromjson("{_id: 5, fkey: null, fkey1: null}"),
+        fromjson("{_id: 6, fkey: undefined, fkey1: undefined}"),
+    };
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 1, fkey: 1, fkey1: 1, embedding: {_id: 0, lkey: 1}, embedding1: {_id: 1, "
+                 "fkey: 1, fkey1: 1}}"),
+        fromjson("{_id: 3, fkey: 3, fkey1: 3, embedding: {_id: 2, lkey: 3}, embedding1: {_id: 3, "
+                 "fkey: 3, fkey1: 3}}"),
+        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 3, no_lkey: -2}, embedding1: {_id: 4, "
+                 "no_fkey: -3}}"),
+        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 3, no_lkey: -2}, embedding1: "
+                 "{_id: 4, no_fkey: -3}}"),
+        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 3, no_lkey: -2}, embedding1: {_id: 5, "
+                 "fkey: null, fkey1: null}}"),
+        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 3, no_lkey: -2}, embedding1: "
+                 "{_id: 5, fkey: null, fkey1: null}}"),
+        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 4, lkey: null}, embedding1: {_id: 4, "
+                 "no_fkey: -3}}"),
+        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 4, lkey: null}, embedding1: "
+                 "{_id: 4, no_fkey: -3}}"),
+        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 4, lkey: null}, embedding1: {_id: 5, "
+                 "fkey: null, fkey1: null}}"),
+        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 4, lkey: null}, embedding1: "
+                 "{_id: 5, fkey: null, fkey1: null}}"),
+        fromjson("{_id: 6, fkey: undefined, fkey1: undefined, embedding: {_id: 5, lkey: "
+                 "undefined}, embedding1: {_id: 6, fkey: undefined, fkey1: undefined}}"),
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertReturnedDocuments(FieldPath("lkey"),
+                            FieldPath("fkey"),
+                            FieldPath("fkey1"),
+                            boost::make_optional<FieldPath>("embedding"),
+                            boost::make_optional<FieldPath>("embedding1"),
+                            {},
+                            expected);
+}
+
 TEST_F(NestedLoopJoinStageBuilderTest, JoinWithSinglePredicateEmbeddingLeftInRight) {
     const std::vector<BSONObj> ldocs = {
         fromjson("{_id: 0, lkey: 1}"),
@@ -1187,6 +1501,128 @@ TEST_F(NestedLoopJoinStageBuilderTest, JoinWithArrayPredicate) {
                             FieldPath("fkey"),
                             {},
                             boost::make_optional<FieldPath>("embedding"),
+                            expected);
+}
+
+TEST_F(HashJoinStageBuilderTest, JoinThreeTablesWithSinglePredicate) {
+    // Creates a join ((A hj B) hj B') to represent a query
+    //
+    //  db.A.aggregate([
+    //     {$lookup: {from: B as:embedding localField:lkey foreignField:fkey}},
+    //     {$lookup: {from: B' as:embedding1 localField:lkey foreignField:fkey1}},
+    //  ])
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, lkey: 1}"),
+        fromjson("{_id: 1, lkey: -1}"),
+        fromjson("{_id: 2, lkey: 3}"),
+        fromjson("{_id: 3, no_lkey: -2}"),
+        fromjson("{_id: 4, lkey: null}"),
+        fromjson("{_id: 5, lkey: undefined}"),
+    };
+
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, fkey: 0, fkey1: 0}"),
+        fromjson("{_id: 1, fkey: 1, fkey1: 1}"),
+        fromjson("{_id: 2, fkey: 2, fkey1: 2}"),
+        fromjson("{_id: 3, fkey: 3, fkey1: 3}"),
+        fromjson("{_id: 4, no_fkey: -3}"),
+        fromjson("{_id: 5, fkey: null, fkey1: null}"),
+        fromjson("{_id: 6, fkey: undefined, fkey1: undefined}"),
+    };
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 0, lkey: 1, embedding1: {_id: 1, fkey: 1, fkey1: 1}, embedding: {_id: 1, "
+                 "fkey: 1, fkey1: 1}}"),
+        fromjson("{_id: 2, lkey: 3, embedding1: {_id: 3, fkey: 3, fkey1: 3}, embedding: {_id: 3, "
+                 "fkey: 3, fkey1: 3}}"),
+        fromjson("{_id: 3, no_lkey: -2, embedding1: {_id: 4, no_fkey: -3}, embedding: {_id: 4, "
+                 "no_fkey: -3}}"),
+        fromjson("{_id: 3, no_lkey: -2, embedding1: {_id: 5, fkey: null, fkey1: null}, embedding: "
+                 "{_id: 4, no_fkey: -3}}"),
+        fromjson("{_id: 3, no_lkey: -2, embedding1: {_id: 4, no_fkey: -3}, embedding: {_id: 5, "
+                 "fkey: null, fkey1: null}}"),
+        fromjson("{_id: 3, no_lkey: -2, embedding1: {_id: 5, fkey: null, fkey1: null}, embedding: "
+                 "{_id: 5, fkey: null, fkey1: null}}"),
+        fromjson("{_id: 4, lkey: null, embedding1: {_id: 4, no_fkey: -3}, embedding: {_id: 4, "
+                 "no_fkey: -3}}"),
+        fromjson("{_id: 4, lkey: null, embedding1: {_id: 5, fkey: null, fkey1: null}, embedding: "
+                 "{_id: 4, no_fkey: -3}}"),
+        fromjson("{_id: 4, lkey: null, embedding1: {_id: 4, no_fkey: -3}, embedding: {_id: 5, "
+                 "fkey: null, fkey1: null}}"),
+        fromjson("{_id: 4, lkey: null, embedding1: {_id: 5, fkey: null, fkey1: null}, embedding: "
+                 "{_id: 5, fkey: null, fkey1: null}}"),
+        fromjson("{_id: 5, lkey: undefined, embedding1: {_id: 6, fkey: undefined, fkey1: "
+                 "undefined}, embedding: {_id: 6, fkey: undefined, fkey1: undefined}}"),
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertReturnedDocuments(FieldPath("lkey"),
+                            FieldPath("fkey"),
+                            FieldPath("fkey1"),
+                            {},
+                            boost::make_optional<FieldPath>("embedding"),
+                            boost::make_optional<FieldPath>("embedding1"),
+                            expected);
+}
+
+TEST_F(HashJoinStageBuilderTest, JoinThreeTablesWithSinglePredicateBaseIsLast) {
+    // Creates a join ((A hj B) hj B') to represent a query
+    //
+    //  db.B'.aggregate([
+    //     {$lookup: {from: A as:embedding localField:fkey1 foreignField:lkey}},
+    //     {$lookup: {from: B as:embedding1 localField:fkey1 foreignField:fkey}},
+    //  ])
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, lkey: 1}"),
+        fromjson("{_id: 1, lkey: -1}"),
+        fromjson("{_id: 2, lkey: 3}"),
+        fromjson("{_id: 3, no_lkey: -2}"),
+        fromjson("{_id: 4, lkey: null}"),
+        fromjson("{_id: 5, lkey: undefined}"),
+    };
+
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, fkey: 0, fkey1: 0}"),
+        fromjson("{_id: 1, fkey: 1, fkey1: 1}"),
+        fromjson("{_id: 2, fkey: 2, fkey1: 2}"),
+        fromjson("{_id: 3, fkey: 3, fkey1: 3}"),
+        fromjson("{_id: 4, no_fkey: -3}"),
+        fromjson("{_id: 5, fkey: null, fkey1: null}"),
+        fromjson("{_id: 6, fkey: undefined, fkey1: undefined}"),
+    };
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 1, fkey: 1, fkey1: 1, embedding: {_id: 0, lkey: 1}, embedding1: {_id: 1, "
+                 "fkey: 1, fkey1: 1}}"),
+        fromjson("{_id: 3, fkey: 3, fkey1: 3, embedding: {_id: 2, lkey: 3}, embedding1: {_id: 3, "
+                 "fkey: 3, fkey1: 3}}"),
+        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 3, no_lkey: -2}, embedding1: {_id: 4, "
+                 "no_fkey: -3}}"),
+        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 3, no_lkey: -2}, embedding1: {_id: 5, "
+                 "fkey: null, fkey1: null}}"),
+        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 3, no_lkey: -2}, embedding1: "
+                 "{_id: 4, no_fkey: -3}}"),
+        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 3, no_lkey: -2}, embedding1: "
+                 "{_id: 5, fkey: null, fkey1: null}}"),
+        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 4, lkey: null}, embedding1: {_id: 4, "
+                 "no_fkey: -3}}"),
+        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 4, lkey: null}, embedding1: {_id: 5, "
+                 "fkey: null, fkey1: null}}"),
+        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 4, lkey: null}, embedding1: "
+                 "{_id: 4, no_fkey: -3}}"),
+        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 4, lkey: null}, embedding1: "
+                 "{_id: 5, fkey: null, fkey1: null}}"),
+        fromjson("{_id: 6, fkey: undefined, fkey1: undefined, embedding: {_id: 5, lkey: "
+                 "undefined}, embedding1: {_id: 6, fkey: undefined, fkey1: undefined}}"),
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertReturnedDocuments(FieldPath("lkey"),
+                            FieldPath("fkey"),
+                            FieldPath("fkey1"),
+                            boost::make_optional<FieldPath>("embedding"),
+                            boost::make_optional<FieldPath>("embedding1"),
+                            {},
                             expected);
 }
 

@@ -650,6 +650,42 @@ void QsnAnalysis::analyzeQsNode(const QuerySolutionNode* qsNode, QsnInfo& qsnInf
             qsnInfo.setPostimageAllowedFields(childQsnInfo.postimageAllowedFields);
             return;
         }
+        case STAGE_HASH_JOIN_EMBEDDING_NODE:
+        case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE:
+        case STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE: {
+            auto join = static_cast<const BinaryJoinEmbeddingNode*>(qsNode);
+            // Use the postimage allowed set and postimage present set from each qsNode's child that
+            // has no embedding, then compute the union with the fields coming from the embedding of
+            // the other.
+            FieldSet fieldSet;
+            FieldEffects::CreatedFieldVectorType createdFieldVec;
+
+            auto processChild = [this, &fieldSet, &createdFieldVec](
+                                    const std::unique_ptr<QuerySolutionNode>& node,
+                                    const boost::optional<FieldPath>& outPath) {
+                if (!outPath) {
+                    const QsnInfo& info = getQsnInfo(node);
+                    fieldSet.setUnion(*info.postimageAllowedFields);
+                    if (info.effects) {
+                        auto existingFields = info.effects->getCreatedFieldVector();
+                        createdFieldVec.insert(
+                            createdFieldVec.end(), existingFields.begin(), existingFields.end());
+                    }
+                } else {
+                    createdFieldVec.emplace_back(outPath->fullPath(), FieldEffect::kSet);
+                }
+            };
+            processChild(qsNode->children[0], join->leftEmbeddingField);
+            processChild(qsNode->children[1], join->rightEmbeddingField);
+
+            auto effectsOverPreimage =
+                FieldEffects(fieldSet, FieldSet::makeEmptySet(), createdFieldVec);
+
+            qsnInfo.setPostimageAllowedFields(effectsOverPreimage.getAllowedFields());
+            qsnInfo.effects = effectsOverPreimage;
+            return;
+        }
+
         case STAGE_OR:
         case STAGE_SORT_MERGE: {
             // qsNode's postimage allowed set is equal to the union of all of its children's

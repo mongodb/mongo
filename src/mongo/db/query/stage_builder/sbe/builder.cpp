@@ -408,7 +408,7 @@ std::pair<SbStage, PlanStageSlots> PlanStageSlots::makeMergedPlanStageSlots(
     tassert(8146604, "Expected 'trees' to be non-empty", !trees.empty());
 
     if (reqs.hasResultInfo()) {
-        // Merge the childeren's result infos.
+        // Merge the children's result infos.
         mergeResultInfos(state, nodeId, reqs, trees, postimageAllowedFieldSets);
     }
 
@@ -5166,10 +5166,10 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::build(const QuerySolut
         if (!outputs.hasResultObj()) {
             for (const auto& f : missingFields) {
                 tassert(6023424,
-                        str::stream()
-                            << "Expected build() for " << nodeStageTypeToString(root)
-                            << " to either satisfy all kField reqs, provide a materialized "
-                            << "result object, or provide a compatible result base object",
+                        str::stream() << "Expected build() for " << nodeStageTypeToString(root)
+                                      << " to satisfy the kField reqs for '" << f
+                                      << "' by providing a materialized result object or a "
+                                         "compatible result base object",
                         reqs.hasResultInfo() && reqs.getResultInfoTrackedFieldSet().count(f) &&
                             outputs.hasResultInfo() &&
                             outputs.getResultInfoChanges().get(f) == FieldEffect::kKeep);

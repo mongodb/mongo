@@ -728,7 +728,10 @@ boost::optional<UnfetchedIxscans> getUnfetchedIxscans(const QuerySolutionNode* r
             case STAGE_SORT_SIMPLE:
             case STAGE_SORT_DEFAULT:
             case STAGE_OR:
-            case STAGE_SORT_MERGE: {
+            case STAGE_SORT_MERGE:
+            case STAGE_HASH_JOIN_EMBEDDING_NODE:
+            case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE:
+            case STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE: {
                 visitNextChild();
                 break;
             }

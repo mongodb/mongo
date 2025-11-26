@@ -99,7 +99,7 @@ enum class FieldEffect : int { kKeep, kDrop, kModify, kSet, kAdd, kGeneric };
  * (a single projection or multiple projections combined together) has on the set of all possible
  * top-level field names.
  *
- * Conceptully, a FieldEffects object can be thought of as a field name/FieldEffect map plus
+ * Conceptually, a FieldEffects object can be thought of as a field name/FieldEffect map plus
  * a "default" FieldEffect to be applied to all fields that are not present in the map.
  *
  * The six possible effects modeled by this class are: Keep, Drop, Modify, Set, Add, and Generic.
