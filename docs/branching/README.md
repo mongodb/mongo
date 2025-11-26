@@ -176,11 +176,6 @@ bazel run lint format
 
 Run linters and formatters and fix anything that couldn't be autofixed.
 
-#### Disable Coverity scans on release branch
-
-Since Coverity scans will automatically run on the new \*-staging branch, we can disable Coverity scanning on the release branch itself.
-Create `ENABLE_COVERITY_ANALYSIS` variable in the Evegreen project settings for the release branch and set the value `false`
-
 ## 3. Test changes
 
 In case working branch was created from `master` branch, rebase it on a new `vX.Y` branch and fix file conflicts if any.

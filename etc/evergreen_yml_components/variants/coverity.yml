@@ -3,7 +3,6 @@ buildvariants:
     display_name: Coverity Analysis
     # Don't run Coverity analysis as part of patch builds
     patchable: false
-    activate: {ENABLE_COVERITY_ANALYSIS!|true}
     allow_for_git_tag: false
     # Run at 4 am UTC everyday
     cron: "30 4 * * *"
