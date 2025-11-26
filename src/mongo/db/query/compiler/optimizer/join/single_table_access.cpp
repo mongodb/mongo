@@ -82,10 +82,24 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
         const auto& node = graph.getNode(i);
         auto& nss = node.accessPath->nss();
 
+        // Re-construct MultipleCollectionAccessor so that this collection is treated as the "main"
+        // collection during query planning (and CE).
+        auto singleAcq = [&nss, &collections]() -> CollectionOrViewAcquisition {
+            if (nss == collections.getMainCollectionPtrOrAcquisition().nss()) {
+                return collections.getMainCollectionPtrOrAcquisition();
+            }
+
+            const auto& secondaries = collections.getSecondaryCollectionAcquisitions();
+            auto it = secondaries.find(nss);
+            tassert(11434000, "Namespace not found in collections", it != secondaries.end());
+            return it->second;
+        }();
+        MultipleCollectionAccessor singleMca{singleAcq};
+
         QueryPlannerParams params(QueryPlannerParams::ArgsForSingleCollectionQuery{
             .opCtx = opCtx,
             .canonicalQuery = *node.accessPath,
-            .collections = collections,
+            .collections = singleMca,
             .planRankerMode = QueryPlanRankerModeEnum::kSamplingCE,
         });
 

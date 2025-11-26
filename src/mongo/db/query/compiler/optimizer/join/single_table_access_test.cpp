@@ -33,6 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::join_ordering {
@@ -57,22 +58,23 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
     auto nss2 = NamespaceString::createNamespaceString_forTest("test", "coll2");
 
     std::vector<BSONObj> docs;
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 10; ++i) {
         docs.push_back(BSON("_id" << i << "a" << 1 << "b" << i));
     }
-
     ce::createCollAndInsertDocuments(opCtx, nss1, docs);
+
+    // coll2 is 10x larger than coll1.
+    for (int i = 10; i < 100; ++i) {
+        docs.push_back(BSON("_id" << i << "a" << 1 << "b" << i));
+    }
     ce::createCollAndInsertDocuments(opCtx, nss2, docs);
 
     {
         auto mca = multipleCollectionAccessor(opCtx, {nss1, nss2});
         auto nss1UUID = mca.lookupCollection(nss1)->uuid();
-        auto nss2UUID = mca.lookupCollection(nss2)->uuid();
 
         createIndex(nss1UUID, fromjson("{a: 1}"), "a_1");
         createIndex(nss1UUID, fromjson("{b: 1}"), "b_1");
-        createIndex(nss2UUID, fromjson("{a: 1}"), "a_1");
-        createIndex(nss2UUID, fromjson("{b: 1}"), "b_1");
     }
 
     // Get new MultiCollectionAccessor after all DDLs are done.
@@ -83,17 +85,23 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
     estimators[nss2] = samplingEstimator(mca, nss2);
 
     auto filter1 = fromjson("{a: 1, b: 1}");
-    auto filter2 = fromjson("{a: 1, b: 1}");
+    auto filter2 = fromjson("{a: 1}");
 
     // Mock a JoinGraph for testing purposes.
     JoinGraph graph;
     graph.addNode(nss1, makeCanonicalQuery(nss1, filter1), boost::none);
-    graph.addNode(nss2, makeCanonicalQuery(nss2, filter2), boost::none);
+    auto node2 = graph.addNode(nss2, makeCanonicalQuery(nss2, filter2), boost::none);
+    ASSERT(node2);
     auto swRes = singleTableAccessPlans(opCtx, mca, graph, estimators);
     ASSERT_OK(swRes);
 
     auto& res = swRes.getValue();
     ASSERT_EQ(2, res.solns.size());
+
+    // There are no indexes on nss2, so the chosen access path must use a collection scan.
+    auto soln2 = res.solns.at(graph.accessPathAt(*node2)).get();
+    ASSERT(soln2);
+    ASSERT_EQ(soln2->getFirstNodeByType(STAGE_COLLSCAN).second, 1);
 
     for (auto&& [_, soln] : res.solns) {
         assertQuerySolutionHasEstimate(soln->root(), res.estimate);
