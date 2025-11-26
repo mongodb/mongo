@@ -7,6 +7,7 @@
  */
 import {section, subSection} from "jstests/libs/pretty_md.js";
 import {outputAggregationPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -120,30 +121,108 @@ runBasicJoinTest([
     {$sortByCount: "$y.b"},
 ]);
 
-// TODO SERVER-111910: Enable $lookup stages with sub-pipelines for join-opt, and add access-path selection tests.
-// runBasicJoinTest([
-//     {
-//         $lookup: {
-//             from: foreignColl1.getName(),
-//             as: "x",
-//             localField: "a",
-//             foreignField: "a",
-//             pipeline: [{$match: {d: {$lt: 3}}}, {$project: {_id: 0, a: 1}}],
-//         },
-//     },
-//     {$unwind: "$x"},
-//     {
-//         $lookup: {
-//             from: foreignColl2.getName(),
-//             as: "y",
-//             localField: "b",
-//             foreignField: "b",
-//             pipeline: [{$project: {_id: 0, b: 1}}],
-//         },
-//     },
-//     {$unwind: "$y"},
-//     {$sortByCount: "$x.a"},
-// ]);
+if (!checkSbeFullFeatureFlagEnabled(db)) {
+    // TODO SERVER-114457: re-enable for featureFlagSbeFull once $match constants are correctly extracted
+    section("Example with two joins, suffix, and sub-pipeline with un-correlated $match");
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$match: {d: {$lt: 3}}}],
+            },
+        },
+        {$unwind: "$x"},
+        {
+            $lookup: {
+                from: foreignColl2.getName(),
+                as: "y",
+                localField: "b",
+                foreignField: "b",
+                pipeline: [{$match: {b: {$gt: "aaa"}}}],
+            },
+        },
+        {$unwind: "$y"},
+        {$sortByCount: "$x.a"},
+    ]);
+
+    section("Example with two joins and sub-pipeline with un-correlated $match");
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$match: {d: {$lt: 3}}}],
+            },
+        },
+        {$unwind: "$x"},
+        {
+            $lookup: {
+                from: foreignColl2.getName(),
+                as: "y",
+                localField: "b",
+                foreignField: "b",
+                pipeline: [{$match: {b: {$gt: "aaa"}}}],
+            },
+        },
+        {$unwind: "$y"},
+    ]);
+
+    section("Example with two joins, suffix, and sub-pipeline with un-correlated $match and $match prefix");
+    runBasicJoinTest([
+        {$match: {a: {$gt: 1}}},
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$match: {d: {$lt: 3}}}],
+            },
+        },
+        {$unwind: "$x"},
+        {
+            $lookup: {
+                from: foreignColl2.getName(),
+                as: "y",
+                localField: "b",
+                foreignField: "b",
+                pipeline: [{$match: {b: {$gt: "aaa"}}}],
+            },
+        },
+        {$unwind: "$y"},
+        {$sortByCount: "$x.a"},
+    ]);
+
+    section("Example with two joins and sub-pipeline with un-correlated $match and $match prefix");
+    runBasicJoinTest([
+        {$match: {a: {$gt: 1}}},
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$match: {d: {$lt: 3}}}],
+            },
+        },
+        {$unwind: "$x"},
+        {
+            $lookup: {
+                from: foreignColl2.getName(),
+                as: "y",
+                localField: "b",
+                foreignField: "b",
+                pipeline: [{$match: {b: {$gt: "aaa"}}}],
+            },
+        },
+        {$unwind: "$y"},
+    ]);
+}
 
 const foreignColl3 = db[jsTestName() + "_foreign3"];
 foreignColl3.drop();

@@ -1237,7 +1237,16 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     auto swResForJoin = join_ordering::getJoinReorderedExecutor(
         aggCatalogState->getCollections(), *pipeline, aggExState.getOpCtx(), expCtx);
     if (swResForJoin.isOK()) {
-        auto resForJoin = std::move(swResForJoin.getValue());
+        /**
+         * We are careful to keep the AggJoinModel alive for the entirety of this function scope.
+         * We've created several CanonicalQueries, which in turn may own memory to the backing BSON
+         * of some MatchExpression filters. Several places in code may try to access this BSON, so
+         * we need to make sure it doesn't get deleted.
+         *
+         * TODO SERVER-114272: We keep our QSN tree alive in the SBE executor; however, filters in
+         * that QSN tree may be unowned, so accessing them may lead to use-after-free.
+         */
+        auto& resForJoin = swResForJoin.getValue();
         auto attachExecutorCallback =
             [](const MultipleCollectionAccessor& collections,
                std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
