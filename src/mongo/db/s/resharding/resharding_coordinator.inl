@@ -1043,10 +1043,12 @@ void ReshardingCoordinator::_abortIfCoordinatorInAbortingOrQuiescingOrRequested(
                               << " state",
                 _originalReshardingStatus.has_value());
     } else if (abortRequest) {
-        if (abortRequest->type == resharding::AbortType::kAbortSkipQuiesce) {
-            _ctHolder->cancelQuiescePeriod();
-        }
         _ctHolder->abort(abortRequest->reason);
+    }
+    // If there has been an abort request and it specifies skip quiescing, cancel the quiescing
+    // regardless of whether the resharding operation has been committed or aborted with quiescing.
+    if (abortRequest && abortRequest->type == resharding::AbortType::kAbortSkipQuiesce) {
+        _ctHolder->cancelQuiescePeriod();
     }
 }
 

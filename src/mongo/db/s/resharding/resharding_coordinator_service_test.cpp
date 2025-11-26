@@ -75,6 +75,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
@@ -91,6 +92,8 @@
 
 namespace mongo {
 namespace {
+
+constexpr Milliseconds kOneDayMillis{24 * 3600 * 1000};
 
 using CoordinatorStateTransitionController =
     resharding_service_test_helpers::StateTransitionController<CoordinatorStateEnum>;
@@ -1065,7 +1068,13 @@ public:
             transitionFunctions, nullptr /* stateTransitionsGuard */, states, reshardingOptions);
     }
 
-    void runReshardingAbortBeforeAfterFailoverWithoutQuiescing(CoordinatorStateEnum state) {
+    void runReshardingAbortWithoutQuiescingBeforeFailover(
+        CoordinatorStateEnum state, resharding::AbortType abortTypeAfterFailover) {
+        // Set a large quiesce period to test that there is no quiescing both before and after
+        // failover, regardless of the abort type after failover.
+        RAIIServerParameterControllerForTest quiescePeriodMillis{
+            "reshardingCoordinatorQuiescePeriodMillis", kOneDayMillis.count()};
+
         // Set the failpoint to pause the coordinator before it removes the state doc. Otherwise,
         // the doc would get removed as soon as the resharding operation aborts since there is
         // no quiescing.
@@ -1123,7 +1132,7 @@ public:
 
         // Try to abort again with user abort as the reason.
         auto abortReason1 = resharding::kUserAbortReason;
-        coordinator->abort({abortReason1, resharding::AbortType::kAbortSkipQuiesce});
+        coordinator->abort({abortReason1, abortTypeAfterFailover});
 
         // Unset the failpoint to allow the coordinator to initialize the cancellation token holder
         // and start recovering the resharding operation.
@@ -1134,9 +1143,18 @@ public:
 
         // Wait for completion and verify the original abort reason is still used.
         ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), abortReason0);
+        // There should be no quiescing regardless of the abort type after failover, i.e. the wait
+        // should finish immediately.
+        coordinator->getQuiescePeriodFinishedFuture().wait();
     }
 
-    void runReshardingAbortBeforeAfterFailoverWithQuiescing(CoordinatorStateEnum state) {
+    void runReshardingAbortWithQuiescingBeforeFailover(
+        CoordinatorStateEnum state, resharding::AbortType abortTypeAfterFailover) {
+        // Set a large quiesce period to test that there is quiescing before failover and no
+        // quiescing after failover if the abort type after failover specifies skip quiescing.
+        RAIIServerParameterControllerForTest quiescePeriodMillis{
+            "reshardingCoordinatorQuiescePeriodMillis", kOneDayMillis.count()};
+
         auto opCtx = operationContext();
 
         auto reshardingOptions = makeDefaultReshardingOptions();
@@ -1202,11 +1220,18 @@ public:
 
         // Try to abort again with user abort as the reason.
         auto abortReason1 = resharding::kUserAbortReason;
-        coordinator->abort({abortReason1, resharding::AbortType::kAbortSkipQuiesce});
+        coordinator->abort({abortReason1, abortTypeAfterFailover});
         pauseBeforeCTHolderInitialization->setMode(FailPoint::off, 0);
 
         // Wait for completion and verify the original abort reason is still used.
         ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), abortReason0);
+        // If the abort requests after failover specifies skip quiescing, there should be
+        // no quiescing.
+        if (abortTypeAfterFailover == resharding::AbortType::kAbortSkipQuiesce) {
+            coordinator->getQuiescePeriodFinishedFuture().wait();
+        } else {
+            ASSERT(!coordinator->getQuiescePeriodFinishedFuture().isReady());
+        }
     }
 
     repl::PrimaryOnlyService* _service = nullptr;
@@ -2322,42 +2347,99 @@ TEST_F(ReshardingCoordinatorServiceFailGetDocumentsDelta,
 }
 
 TEST_F(ReshardingCoordinatorServiceTest,
-       AbortWithDifferentReasonAfterStepUpWithoutQuiescing_PreparingToDonate) {
-    runReshardingAbortBeforeAfterFailoverWithoutQuiescing(CoordinatorStateEnum::kPreparingToDonate);
+       AbortWithoutQuiescingBeforeFailover_AbortWithQuiescingAfterFailover_PreparingToDonate) {
+    runReshardingAbortWithoutQuiescingBeforeFailover(CoordinatorStateEnum::kPreparingToDonate,
+                                                     resharding::AbortType::kAbortWithQuiesce);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest,
-       AbortWithDifferentReasonAfterStepUpWithQuiescing_PreparingToDonate) {
-    runReshardingAbortBeforeAfterFailoverWithQuiescing(CoordinatorStateEnum::kPreparingToDonate);
+       AbortWithoutQuiescingBeforeFailover_AbortWithoutQuiescingAfterFailover_PreparingToDonate) {
+    runReshardingAbortWithoutQuiescingBeforeFailover(CoordinatorStateEnum::kPreparingToDonate,
+                                                     resharding::AbortType::kAbortSkipQuiesce);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest,
-       AbortWithDifferentReasonAfterStepUpWithoutQuiescing_Cloning) {
-    runReshardingAbortBeforeAfterFailoverWithoutQuiescing(CoordinatorStateEnum::kCloning);
-}
-
-TEST_F(ReshardingCoordinatorServiceTest, AbortWithDifferentReasonAfterStepUpWithQuiescing_Cloning) {
-    runReshardingAbortBeforeAfterFailoverWithQuiescing(CoordinatorStateEnum::kCloning);
+       AbortWithQuiescingBeforeFailover_AbortWithQuiescingAfterFailover_PreparingToDonate) {
+    runReshardingAbortWithQuiescingBeforeFailover(CoordinatorStateEnum::kPreparingToDonate,
+                                                  resharding::AbortType::kAbortWithQuiesce);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest,
-       AbortWithDifferentReasonAfterStepUpWithoutQuiescing_Applying) {
-    runReshardingAbortBeforeAfterFailoverWithoutQuiescing(CoordinatorStateEnum::kApplying);
+       AbortWithQuiescingBeforeFailover_AbortWithoutQuiescingAfterFailover_PreparingToDonate) {
+    runReshardingAbortWithQuiescingBeforeFailover(CoordinatorStateEnum::kPreparingToDonate,
+                                                  resharding::AbortType::kAbortSkipQuiesce);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest,
-       AbortWithDifferentReasonAfterStepUpWithQuiescing_Applying) {
-    runReshardingAbortBeforeAfterFailoverWithQuiescing(CoordinatorStateEnum::kApplying);
+       AbortWithoutQuiescingBeforeFailover_AbortWithQuiescingAfterFailover_Cloning) {
+    runReshardingAbortWithoutQuiescingBeforeFailover(CoordinatorStateEnum::kCloning,
+                                                     resharding::AbortType::kAbortWithQuiesce);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest,
-       AbortWithDifferentReasonAfterStepUpWithoutQuiescing_BlockingWrites) {
-    runReshardingAbortBeforeAfterFailoverWithoutQuiescing(CoordinatorStateEnum::kBlockingWrites);
+       AbortWithoutQuiescingBeforeFailover_AbortWithoutQuiescingAfterFailover_Cloning) {
+    runReshardingAbortWithoutQuiescingBeforeFailover(CoordinatorStateEnum::kCloning,
+                                                     resharding::AbortType::kAbortSkipQuiesce);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest,
-       AbortWithDifferentReasonAfterStepUpWithQuiescing_BlockingWrites) {
-    runReshardingAbortBeforeAfterFailoverWithQuiescing(CoordinatorStateEnum::kBlockingWrites);
+       AbortWithQuiescingBeforeFailover_AbortWithQuiescingAfterFailover_Cloning) {
+    runReshardingAbortWithQuiescingBeforeFailover(CoordinatorStateEnum::kCloning,
+                                                  resharding::AbortType::kAbortWithQuiesce);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest,
+       AbortWithQuiescingBeforeFailover_AbortWithoutQuiescingAfterFailover_Cloning) {
+    runReshardingAbortWithQuiescingBeforeFailover(CoordinatorStateEnum::kCloning,
+                                                  resharding::AbortType::kAbortSkipQuiesce);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest,
+       AbortWithoutQuiescingBeforeFailover_AbortWithQuiescingAfterFailover_Applying) {
+    runReshardingAbortWithoutQuiescingBeforeFailover(CoordinatorStateEnum::kApplying,
+                                                     resharding::AbortType::kAbortWithQuiesce);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest,
+       AbortWithoutQuiescingBeforeFailover_AbortWithoutQuiescingAfterFailover_Applying) {
+    runReshardingAbortWithoutQuiescingBeforeFailover(CoordinatorStateEnum::kApplying,
+                                                     resharding::AbortType::kAbortSkipQuiesce);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest,
+       AbortWithQuiescingBeforeFailover_AbortWithQuiescingAfterFailover_Applying) {
+    runReshardingAbortWithQuiescingBeforeFailover(CoordinatorStateEnum::kApplying,
+                                                  resharding::AbortType::kAbortWithQuiesce);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest,
+       AbortWithQuiescingBeforeFailover_AbortWithoutQuiescingAfterFailover_Applying) {
+    runReshardingAbortWithQuiescingBeforeFailover(CoordinatorStateEnum::kApplying,
+                                                  resharding::AbortType::kAbortSkipQuiesce);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest,
+       AbortWithoutQuiescingBeforeFailover_AbortWithQuiescingAfterFailover_BlockingWrites) {
+    runReshardingAbortWithoutQuiescingBeforeFailover(CoordinatorStateEnum::kBlockingWrites,
+                                                     resharding::AbortType::kAbortWithQuiesce);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest,
+       AbortWithoutQuiescingBeforeFailover_AbortWithoutQuiescingAfterFailover_BlockingWrites) {
+    runReshardingAbortWithoutQuiescingBeforeFailover(CoordinatorStateEnum::kBlockingWrites,
+                                                     resharding::AbortType::kAbortSkipQuiesce);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest,
+       AbortWithQuiescingBeforeFailover_AbortWithQuiescingAfterFailover_BlockingWrites) {
+    runReshardingAbortWithQuiescingBeforeFailover(CoordinatorStateEnum::kBlockingWrites,
+                                                  resharding::AbortType::kAbortWithQuiesce);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest,
+       AbortWithQuiescingBeforeFailover_AbortWithoutQuiescingAfterFailover_BlockingWrites) {
+    runReshardingAbortWithQuiescingBeforeFailover(CoordinatorStateEnum::kBlockingWrites,
+                                                  resharding::AbortType::kAbortSkipQuiesce);
 }
 
 }  // namespace
