@@ -29,7 +29,7 @@ if (isSlowBuild(db)) {
 }
 
 const is83orAbove = (() => {
-    const {version} = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    const {version} = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}).featureCompatibilityVersion;
     return MongoRunner.compareBinVersions(version, "8.3") >= 0;
 })();
 const numRuns = 50;
