@@ -34,6 +34,7 @@
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/s/range_deletion_recovery_tracker.h"
 #include "mongo/db/s/range_deletion_task_tracker.h"
 #include "mongo/db/s/ready_range_deletions_processor.h"
 #include "mongo/db/service_context.h"
@@ -77,6 +78,9 @@ public:
     static RangeDeleterService* get(OperationContext* opCtx);
 
 private:
+    RangeDeletionRecoveryTracker _recoveryState;
+    std::unique_ptr<RangeDeletionRecoveryTracker::ActiveTerm> _activeTerm;
+
     // Keeping track of per-collection registered range deletion tasks.
     RangeDeletionTaskTracker _rangeDeletionTasks;
 
@@ -110,6 +114,9 @@ private:
     stdx::mutex _mutex_DO_NOT_USE_DIRECTLY;
 
 public:
+    void registerRecoveryJob(long long term);
+    void notifyRecoveryJobComplete(long long term);
+
     /*
      * Register a task on the range deleter service.
      * Returns a future that will be marked ready once the range deletion will be completed.
@@ -156,6 +163,7 @@ public:
     void onStartup(OperationContext* opCtx) override;
     void onSetCurrentConfig(OperationContext* opCtx) override {}
     void onRollbackBegin() override {}
+    void onStepUpBegin(OperationContext* opCtx, long long term) override;
     void onStepUpComplete(OperationContext* opCtx, long long term) override;
     void onStepDown() override;
     void onShutdown() override;
@@ -187,8 +195,8 @@ private:
      */
     void _joinAndResetState();
 
-    /* Asynchronously register range deletions on the service. To be called on on step-up */
-    void _recoverRangeDeletionsOnStepUp(OperationContext* opCtx);
+    /* Asynchronously register range deletions on the service. To be called on on step-up. */
+    void _launchRangeDeletionRecoveryTask(OperationContext* opCtx, long long term);
 
     /* Called by shutdown/stepdown hooks to interrupt the service */
     void _stopService();
@@ -197,7 +205,6 @@ private:
     void onConsistentDataAvailable(OperationContext* opCtx,
                                    bool isMajority,
                                    bool isRollback) final {}
-    void onStepUpBegin(OperationContext* opCtx, long long term) final {};
     void onBecomeArbiter() final {}
 };
 

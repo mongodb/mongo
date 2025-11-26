@@ -48,6 +48,8 @@ public:
                                  std::shared_ptr<executor::TaskExecutor> executor);
     ~ReadyRangeDeletionsProcessor();
 
+    void beginProcessing();
+
     /*
      * Interrupt ongoing range deletions
      */
@@ -59,10 +61,16 @@ public:
     void emplaceRangeDeletion(const RangeDeletionTask& rdt);
 
 private:
+    enum State { kInitializing, kRunning, kStopped };
+
     /*
      * Return true if this processor have been shutted down
      */
     bool _stopRequested() const;
+
+    void _transitionState(WithLock, State newState);
+    bool _validateStateTransition(State oldState, State newState) const;
+    bool _isStateTransitionValid(State oldState, State newState) const;
 
     /*
      * Remove a range deletion from the head of the queue. Supposed to be called only once a
@@ -79,8 +87,7 @@ private:
 
     mutable stdx::mutex _mutex;
 
-    enum State { kRunning, kStopped };
-    State _state{kRunning};
+    State _state{kInitializing};
 
     /*
      * Condition variable notified when:
@@ -95,6 +102,8 @@ private:
 
     /* Pointer to the (one and only) operation context used by the thread */
     ServiceContext::UniqueOperationContext _threadOpCtxHolder;
+
+    SharedPromise<void> _beginProcessingSignal;
 
     /* Thread consuming the range deletions queue */
     stdx::thread _thread;

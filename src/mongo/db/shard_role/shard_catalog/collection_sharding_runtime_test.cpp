@@ -664,6 +664,7 @@ public:
 
         auto opCtx = operationContext();
         RangeDeleterService::get(opCtx)->onStartup(opCtx);
+        RangeDeleterService::get(opCtx)->onStepUpBegin(opCtx, 0L);
         RangeDeleterService::get(opCtx)->onStepUpComplete(opCtx, 0L);
         RangeDeleterService::get(opCtx)->getRangeDeleterServiceInitializationFuture().get(opCtx);
     }

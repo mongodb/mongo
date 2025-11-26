@@ -78,7 +78,12 @@ BSONObj getShardKeyPattern(OperationContext* opCtx,
 ReadyRangeDeletionsProcessor::ReadyRangeDeletionsProcessor(
     OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor)
     : _service(opCtx->getServiceContext()),
-      _thread([this] { _runRangeDeletions(); }),
+      _thread([this] {
+          if (!_beginProcessingSignal.getFuture().getNoThrow().isOK()) {
+              return;
+          }
+          _runRangeDeletions();
+      }),
       _executor(executor) {}
 
 ReadyRangeDeletionsProcessor::~ReadyRangeDeletionsProcessor() {
@@ -89,12 +94,23 @@ ReadyRangeDeletionsProcessor::~ReadyRangeDeletionsProcessor() {
               "Thread operation context is still alive after joining main thread");
 }
 
+void ReadyRangeDeletionsProcessor::beginProcessing() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (!_beginProcessingSignal.getFuture().isReady()) {
+        _beginProcessingSignal.emplaceValue();
+    }
+}
+
 void ReadyRangeDeletionsProcessor::shutdown() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (_state == kStopped)
         return;
+    _transitionState(lock, kStopped);
 
-    _state = kStopped;
+    if (!_beginProcessingSignal.getFuture().isReady()) {
+        _beginProcessingSignal.setError(Status{ErrorCodes::InterruptedAtShutdown,
+                                               "ReadyRangeDeletionsProcessor is shutting down"});
+    }
 
     if (_threadOpCtxHolder) {
         stdx::lock_guard<Client> scopedClientLock(*_threadOpCtxHolder->getClient());
@@ -107,9 +123,46 @@ bool ReadyRangeDeletionsProcessor::_stopRequested() const {
     return _state == kStopped;
 }
 
+void ReadyRangeDeletionsProcessor::_transitionState(WithLock, State newState) {
+    if (_state == newState) {
+        return;
+    }
+    if (!_validateStateTransition(_state, newState)) {
+        return;
+    }
+    LOGV2(11420000,
+          "ReadyRangeDeletionsProcessor transitioned state",
+          "oldState"_attr = _state,
+          "newState"_attr = newState);
+    _state = newState;
+}
+
+bool ReadyRangeDeletionsProcessor::_validateStateTransition(State oldState, State newState) const {
+    try {
+        tassert(11420001,
+                "Invalid state transition requested in ReadyRangeDeletionsProcessor",
+                _isStateTransitionValid(oldState, newState));
+        return true;
+    } catch (const AssertionException&) {
+        return false;
+    }
+}
+
+bool ReadyRangeDeletionsProcessor::_isStateTransitionValid(State oldState, State newState) const {
+    switch (oldState) {
+        case kInitializing:
+            return newState == kRunning || newState == kStopped;
+        case kRunning:
+            return newState == kStopped;
+        case kStopped:
+            return false;
+    }
+    MONGO_UNREACHABLE;
+}
+
 void ReadyRangeDeletionsProcessor::emplaceRangeDeletion(const RangeDeletionTask& rdt) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    if (_state != kRunning) {
+    if (_state == kStopped) {
         return;
     }
     _queue.push(rdt);
@@ -128,9 +181,10 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
 
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        if (_state != kRunning) {
+        if (_state != kInitializing) {
             return;
         }
+        _transitionState(lock, kRunning);
         _threadOpCtxHolder = cc().makeOperationContext();
     }
 

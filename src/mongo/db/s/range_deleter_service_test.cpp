@@ -69,6 +69,16 @@
 
 namespace mongo {
 
+namespace {
+constexpr auto kStartingTerm = 0L;
+
+void simulateStepup(OperationContext* opCtx, long long term) {
+    RangeDeleterService::get(opCtx)->onStepUpBegin(opCtx, term);
+    RangeDeleterService::get(opCtx)->onStepUpComplete(opCtx, term);
+    RangeDeleterService::get(opCtx)->getRangeDeleterServiceInitializationFuture().get(opCtx);
+}
+}  // namespace
+
 /**
  *  RangeDeleterServiceTest implementation
  */
@@ -77,9 +87,7 @@ void RangeDeleterServiceTest::setUp() {
     WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
     opCtx = operationContext();
     RangeDeleterService::get(opCtx)->onStartup(opCtx);
-    RangeDeleterService::get(opCtx)->onStepUpComplete(opCtx, 0L);
-    RangeDeleterService::get(opCtx)->getRangeDeleterServiceInitializationFuture().get(opCtx);
-
+    simulateStepup(opCtx, kStartingTerm);
     createTestCollection(opCtx, nsCollA);
     createTestCollection(opCtx, nsCollB);
 
@@ -688,8 +696,7 @@ TEST_F(RangeDeleterServiceTest, RescheduleRangeDeletionTasksOnStepUp) {
     }
 
     // Trigger step-up
-    rds->onStepUpComplete(opCtx, 0L);
-    rds->getRangeDeleterServiceInitializationFuture().get(opCtx);
+    simulateStepup(opCtx, kStartingTerm + 1);
 
     // Check that all non-pending tasks are being rescheduled
     ASSERT_EQ(nNonPending + nNonPendingAndProcessing,
@@ -938,6 +945,19 @@ TEST_F(RangeDeleterServiceTest, ProcessingFlagIsSetWhenRangeDeletionExecutionSta
     // Complete the range deletion execution
     completionFuture.get(opCtx);
     ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+}
+
+TEST_F(RangeDeleterServiceTest, InitializationFutureWaitsForRecovery) {
+    auto rds = RangeDeleterService::get(opCtx);
+    rds->onStepDown();
+    const auto term = kStartingTerm + 1;
+    rds->onStepUpBegin(opCtx, term);
+    rds->registerRecoveryJob(term);
+    rds->onStepUpComplete(opCtx, term);
+    auto future = rds->getRangeDeleterServiceInitializationFuture();
+    ASSERT(!future.isReady());
+    rds->notifyRecoveryJobComplete(term);
+    ASSERT_OK(future.getNoThrow(opCtx));
 }
 
 }  // namespace mongo

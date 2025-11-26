@@ -39,6 +39,19 @@
 namespace mongo {
 
 using Outcome = RangeDeletionRecoveryTracker::Outcome;
+using Term = RangeDeletionRecoveryTracker::Term;
+using ActiveTerm = RangeDeletionRecoveryTracker::ActiveTerm;
+
+ActiveTerm::ActiveTerm(RangeDeletionRecoveryTracker* parent, Term term)
+    : _parent{parent}, _term{term} {}
+
+ActiveTerm::~ActiveTerm() {
+    _parent->notifyEndOfTerm(_term);
+}
+
+std::unique_ptr<ActiveTerm> RangeDeletionRecoveryTracker::notifyStartOfTerm(Term term) {
+    return std::make_unique<ActiveTerm>(this, term);
+}
 
 RangeDeletionRecoveryTracker::RangeDeletionRecoveryTracker() {
     ObservableMutexRegistry::get().add("RangeDeletionRecoveryTracker::_mutex", _mutex);

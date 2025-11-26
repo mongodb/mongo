@@ -47,11 +47,23 @@ public:
                       // request was made.
     };
 
+    class ActiveTerm {
+    public:
+        ActiveTerm(RangeDeletionRecoveryTracker* parent, Term term);
+        ActiveTerm(ActiveTerm&) = delete;
+        ActiveTerm(ActiveTerm&&) = delete;
+        ~ActiveTerm();
+
+    private:
+        RangeDeletionRecoveryTracker* _parent;
+        Term _term;
+    };
+
     RangeDeletionRecoveryTracker();
 
+    [[nodiscard]] std::unique_ptr<ActiveTerm> notifyStartOfTerm(Term term);
     void registerRecoveryJob(Term term);
     void notifyRecoveryJobComplete(Term term);
-    void notifyEndOfTerm(Term term);
     SharedSemiFuture<Outcome> getRecoveryFuture(Term term);
     size_t getTrackedTermsCount() const;
 
@@ -69,6 +81,7 @@ private:
     TermState* getStateForTerm(WithLock, Term term);
     bool isTermTooOld(WithLock, Term term);
     bool isRemainingJobCountValid(const boost::optional<int8_t>& count);
+    void notifyEndOfTerm(Term term);
     void cleanUpOldTerms(WithLock);
     void ensurePromiseSet(SharedPromise<Outcome>& promise, Outcome outcome);
 };

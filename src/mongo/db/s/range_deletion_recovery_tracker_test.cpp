@@ -34,6 +34,12 @@
 
 namespace mongo {
 
+void endTerm(RangeDeletionRecoveryTracker& tracker, RangeDeletionRecoveryTracker::Term term) {
+    // notifyStartOfTerm returns an RAII type that ends the term on destruction, so we immediately
+    // discard it to end the term.
+    auto discard = tracker.notifyStartOfTerm(term);
+}
+
 TEST(RangeDeletionRecoveryTracker, RecoveryFutureCompletesWhenAllJobsComplete) {
     const auto term = 0;
     RangeDeletionRecoveryTracker tracker;
@@ -58,9 +64,9 @@ TEST(RangeDeletionRecoveryTracker, TrackedTermsCount) {
     ASSERT_EQ(tracker.getTrackedTermsCount(), 2);
     tracker.registerRecoveryJob(2);
     ASSERT_EQ(tracker.getTrackedTermsCount(), 3);
-    tracker.notifyEndOfTerm(1);
+    endTerm(tracker, 1);
     ASSERT_EQ(tracker.getTrackedTermsCount(), 1);
-    tracker.notifyEndOfTerm(2);
+    endTerm(tracker, 2);
     ASSERT_EQ(tracker.getTrackedTermsCount(), 0);
 }
 
@@ -70,7 +76,7 @@ TEST(RangeDeletionRecoveryTracker, RecoveryFutureCompletesAtEndOfTerm) {
     tracker.registerRecoveryJob(term);
     auto future = tracker.getRecoveryFuture(term);
     ASSERT_FALSE(future.isReady());
-    tracker.notifyEndOfTerm(term);
+    endTerm(tracker, term);
     ASSERT_TRUE(future.isReady());
     auto outcome = future.get();
     ASSERT_EQ(outcome, RangeDeletionRecoveryTracker::Outcome::kIncomplete);
@@ -82,7 +88,7 @@ TEST(RangeDeletionRecoveryTracker, EndingTermCompletesOlderTermsToo) {
     tracker.registerRecoveryJob(term);
     auto future = tracker.getRecoveryFuture(term);
     ASSERT_FALSE(future.isReady());
-    tracker.notifyEndOfTerm(term);
+    endTerm(tracker, term);
     ASSERT_TRUE(future.isReady());
     auto outcome = future.get();
     ASSERT_EQ(outcome, RangeDeletionRecoveryTracker::Outcome::kIncomplete);
@@ -91,7 +97,7 @@ TEST(RangeDeletionRecoveryTracker, EndingTermCompletesOlderTermsToo) {
 TEST(RangeDeletionRecoveryTracker, AddJobForCompletedTermDoesNothing) {
     auto term = 0;
     RangeDeletionRecoveryTracker tracker;
-    tracker.notifyEndOfTerm(term);
+    endTerm(tracker, term);
     tracker.registerRecoveryJob(term);
     ASSERT_EQ(tracker.getTrackedTermsCount(), 0);
 }
@@ -106,7 +112,7 @@ DEATH_TEST(RangeDeletionRecoveryTracker,
 TEST(RangeDeletionRecoveryTracker, NotifyJobForCompletedTermDoesNothing) {
     auto term = 0;
     RangeDeletionRecoveryTracker tracker;
-    tracker.notifyEndOfTerm(term);
+    endTerm(tracker, term);
     tracker.notifyRecoveryJobComplete(term);
     ASSERT_EQ(tracker.getTrackedTermsCount(), 0);
 }
@@ -114,7 +120,7 @@ TEST(RangeDeletionRecoveryTracker, NotifyJobForCompletedTermDoesNothing) {
 TEST(RangeDeletionRecoveryTracker, RecoveryFutureForEndedTermIsComplete) {
     auto term = 0;
     RangeDeletionRecoveryTracker tracker;
-    tracker.notifyEndOfTerm(term);
+    endTerm(tracker, term);
     auto future = tracker.getRecoveryFuture(term);
     ASSERT_TRUE(future.isReady());
     ASSERT_EQ(future.get(), RangeDeletionRecoveryTracker::Outcome::kUnknown);
@@ -126,7 +132,7 @@ TEST(RangeDeletionRecoveryTracker, EndTermAfterAllJobsComplete) {
     tracker.registerRecoveryJob(term);
     auto future = tracker.getRecoveryFuture(term);
     tracker.notifyRecoveryJobComplete(term);
-    tracker.notifyEndOfTerm(term);
+    endTerm(tracker, term);
     ASSERT_TRUE(future.isReady());
     ASSERT_EQ(future.get(), RangeDeletionRecoveryTracker::Outcome::kComplete);
 }
