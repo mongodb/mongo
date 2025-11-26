@@ -68,30 +68,37 @@ def swap_default_config(args, command, config_mode, compiledb_target, clang_tidy
     if os.path.exists(f"{REPO_ROOT}/.bazelrc.local"):
         return config_mode
 
-    if config_mode is None:
-        if os.path.exists(WRAPPER_CONFIG_MODE_FILE):
-            # Reset to fastbuild if it's been more than 2 days since the file was written,
-            # since we don't want users to stay locked on dbg/opt if they forgot to change it back.
-            two_days_since_last_command = (
-                os.path.getmtime(WRAPPER_CONFIG_MODE_FILE) < time.time() - 60 * 60 * 24 * 2
-            )
-            invalidating_invocation = command == "build" and not compiledb_target and not clang_tidy
-            if two_days_since_last_command or invalidating_invocation:
-                os.remove(WRAPPER_CONFIG_MODE_FILE)
-            else:
-                with open(WRAPPER_CONFIG_MODE_FILE, "r", encoding="utf-8") as f:
-                    config_mode = f.read().strip()
-                    args.insert(3, f"--config={config_mode}")
-                    green = "\033[0;32m"
-                    no_color = "\033[0m"
-                    print("=====")
-                    print(
-                        f"{green}INFO:{no_color} No config mode specified, using last specified config option: --config={config_mode}"
-                    )
-                    print("=====")
-    else:
-        with open(WRAPPER_CONFIG_MODE_FILE, "w", encoding="utf-8") as f:
-            f.write(config_mode)
+    try:
+        if config_mode is None:
+            if os.path.exists(WRAPPER_CONFIG_MODE_FILE):
+                # Reset to fastbuild if it's been more than 2 days since the file was written,
+                # since we don't want users to stay locked on dbg/opt if they forgot to change it back
+                two_days_since_last_command = (
+                    os.path.getmtime(WRAPPER_CONFIG_MODE_FILE) < time.time() - 60 * 60 * 24 * 2
+                )
+                invalidating_invocation = (
+                    command == "build" and not compiledb_target and not clang_tidy
+                )
+                if two_days_since_last_command or invalidating_invocation:
+                    os.remove(WRAPPER_CONFIG_MODE_FILE)
+                else:
+                    with open(WRAPPER_CONFIG_MODE_FILE, "r", encoding="utf-8") as f:
+                        config_mode = f.read().strip()
+                        args.insert(3, f"--config={config_mode}")
+                        green = "\033[0;32m"
+                        no_color = "\033[0m"
+                        print("=====")
+                        print(
+                            f"{green}INFO:{no_color} No config mode specified, using last specified config option: --config={config_mode}"
+                        )
+                        print("=====")
+        else:
+            if not os.path.exists(os.path.dirname(WRAPPER_CONFIG_MODE_FILE)):
+                os.makedirs(os.path.dirname(WRAPPER_CONFIG_MODE_FILE))
+            with open(WRAPPER_CONFIG_MODE_FILE, "w", encoding="utf-8") as f:
+                f.write(config_mode)
+    except Exception as _:
+        print(f"Failed to read/write config mode file at {WRAPPER_CONFIG_MODE_FILE}")
     return config_mode
 
 
