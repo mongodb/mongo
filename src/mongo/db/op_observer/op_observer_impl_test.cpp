@@ -3489,7 +3489,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     }
 }
 
-// Verifies that a WriteUnitOfWork with groupOplogEntries=kGroupForTransaction constisting of an
+// Verifies that a WriteUnitOfWork with groupOplogEntries=kGroupForTransaction consisting of an
 // insert, an update and a delete replicates as a single applyOps.
 TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
     // Setup.
@@ -3853,8 +3853,8 @@ TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
     WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
 
-    // Attempt to delete more documents than allowed in a single applyOps batch because it
-    // the generated entry exceeds the limit of 16MB for an applyOps entry.
+    // Attempt to delete more documents than allowed in a single applyOps batch because the
+    // generated entry exceeds the limit of 16MB for an applyOps entry.
     int approximateDifferenceBetweenBSONObjMaxUserAndInternalSize = 2000;
     for (int docId = 0; docId < BatchedWriteOutputsTest::maxDeleteOpsInBatch +
              approximateDifferenceBetweenBSONObjMaxUserAndInternalSize + 1;
