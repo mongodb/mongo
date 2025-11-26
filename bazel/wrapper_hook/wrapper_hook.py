@@ -118,6 +118,7 @@ def main():
     autogenerate_targets(sys.argv, sys.argv[1])
 
     enterprise = True
+    atlas = True
     if check_bazel_command_type(sys.argv[1:]) not in ["clean", "shutdown", "version", None]:
         args = sys.argv
         enterprise_mod = REPO_ROOT / "src" / "mongo" / "db" / "modules" / "enterprise"
@@ -130,6 +131,7 @@ def main():
 
         atlas_mod = REPO_ROOT / "src" / "mongo" / "db" / "modules" / "atlas"
         if not atlas_mod.exists():
+            atlas = False
             args += ["--//bazel/config:build_atlas=False"]
 
         if any(arg.startswith("--include_mongot") for arg in args):
@@ -145,9 +147,10 @@ def main():
         try:
             args = run_with_terminal_output(
                 test_runner_interface,
-                sys.argv[1:],
+                args[1:],
                 autocomplete_query=os.environ.get("MONGO_AUTOCOMPLETE_QUERY") == "1",
                 enterprise=enterprise,
+                atlas=atlas,
             )
         except LinterFail:
             # Linter fails preempt bazel run.

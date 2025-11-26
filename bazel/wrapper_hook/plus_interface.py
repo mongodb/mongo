@@ -103,7 +103,7 @@ def swap_default_config(args, command, config_mode, compiledb_target, clang_tidy
 
 
 def test_runner_interface(
-    args, autocomplete_query, get_buildozer_output=get_buildozer_output, enterprise=True
+    args, autocomplete_query, get_buildozer_output=get_buildozer_output, enterprise=True, atlas=True
 ):
     start = time.time()
 
@@ -160,7 +160,7 @@ def test_runner_interface(
     )
 
     if compiledb_target:
-        generate_compiledb(args[0], persistent_compdb, enterprise)
+        generate_compiledb(args[0], persistent_compdb, enterprise, atlas)
 
     if lint_target:
         for lint_arg in lint_targets:

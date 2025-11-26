@@ -44,7 +44,7 @@ def run_pty_command(cmd):
     return stdout
 
 
-def generate_compiledb(bazel_bin, persistent_compdb, enterprise):
+def generate_compiledb(bazel_bin, persistent_compdb, enterprise, atlas):
     # compiledb ignores command line args so just make a version rc file in anycase
     write_wrapper_hook_bazelrc([])
     if persistent_compdb:
@@ -67,6 +67,9 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise):
 
     if not enterprise:
         compiledb_config.append("--build_enterprise=False")
+
+    if not atlas:
+        compiledb_config.append("--build_atlas=False")
 
     query_cmd = (
         [bazel_bin]
