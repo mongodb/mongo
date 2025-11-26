@@ -199,8 +199,10 @@ TEST(RuleBasedRewriterTest, ApplyMultipleRulesDifferentPriorities) {
 TEST(RuleBasedRewriterTest, EnqueueAdditionalRulesFromRule) {
     std::vector<std::string> strings = {{"hello"}, {"world"}};
 
+    const std::vector<Rule<TestRewriteContext>> kUpperCaseHello{
+        {"UPPERCASE_HELLO", isHello, upperCaseTransform, 1.5}};
     auto enqueueUpperCaseHello = [&](TestRewriteContext& ctx) {
-        ctx.addRules({{"UPPERCASE_HELLO", isHello, upperCaseTransform, 1.5}});
+        ctx.addRules(kUpperCaseHello);
         return false;
     };
 
@@ -222,15 +224,16 @@ TEST(RuleBasedRewriterTest, EnqueueAdditionalRulesFromRule) {
 TEST(RuleBasedRewriterTest, EnqueueHighestPriorityRule) {
     std::vector<std::string> strings = {{"hello"}, {"world"}};
 
+    const std::vector<Rule<TestRewriteContext>> kTurnAnyIntoEmpty{{"TURN_ANY_INTO_EMPTY_STRING",
+                                                                   alwaysTrue,
+                                                                   [](TestRewriteContext& ctx) {
+                                                                       ctx.current() = "";
+                                                                       return false;
+                                                                   },
+                                                                   100}};
     auto enqueueHighestPriorityRule = [&](TestRewriteContext& ctx) {
         ctx.current() = "not hello";
-        ctx.addRules({{"TURN_ANY_INTO_EMPTY_STRING",
-                       alwaysTrue,
-                       [](TestRewriteContext& ctx) {
-                           ctx.current() = "";
-                           return false;
-                       },
-                       100}});
+        ctx.addRules(kTurnAnyIntoEmpty);
         return false;
     };
 
@@ -280,6 +283,8 @@ TEST(RuleBasedRewriterTest, RunRulesThatHaveSpecificTags) {
 DEATH_TEST(RuleBasedRewriterTestDeathTest, EnqueueRuleFromRuleThenRequeue, "11010015") {
     std::vector<std::string> strings = {{"1", "2", "3"}};
 
+    const std::vector<Rule<TestRewriteContext>> kShouldNeverRun{
+        {"SHOULD_NOT_RUN", alwaysTrue, shouldNeverRun, 100}};
     RewriteEngine<TestRewriteContext> engine{{
         strings,
         {
@@ -287,7 +292,7 @@ DEATH_TEST(RuleBasedRewriterTestDeathTest, EnqueueRuleFromRuleThenRequeue, "1101
              alwaysTrue,
              [&](TestRewriteContext& ctx) {
                  // This rule should never fire because rules should be cleared when we requeue.
-                 ctx.addRules({{"SHOULD_NOT_RUN", alwaysTrue, shouldNeverRun, 100}});
+                 ctx.addRules(kShouldNeverRun);
                  return true;
              },
              1},

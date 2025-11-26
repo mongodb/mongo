@@ -57,15 +57,6 @@ void PipelineRewriteContext::advance() {
     _itr = std::next(_itr);
 }
 
-void PipelineRewriteContext::enqueueRules() {
-    auto& ds = current();
-    registration_detail::RuleRegisteringVisitorCtx visitorCtx{*this};
-    auto queueTransforms = _registry.getConstVisitorFunc<true /*AllowMissing*/>(visitorCtx, ds);
-    // Invoke the function pointer returned from the registry. May be a noop for stages with no
-    // optimizations registered.
-    queueTransforms(&visitorCtx, ds);
-}
-
 std::string PipelineRewriteContext::debugString() const {
     str::stream ss;
     ss << "Container (current position " << std::distance(_container.begin(), _itr) << "):\n";
@@ -136,19 +127,56 @@ bool Transforms::partialPushdown(PipelineRewriteContext& ctx,
     return true;
 }
 
-namespace registration_detail {
 namespace {
-const auto getRegisteredRuleNames = ServiceContext::declareDecoration<std::set<std::string>>();
+/**
+ * Manages a mapping between DocumentSources and rewrite rules that are applicable to them.
+ */
+class PipelineRewriteRuleRegistry {
+public:
+    void registerRules(std::type_index key, std::vector<PipelineRewriteRule> rules) {
+        for (auto&& rule : rules) {
+            tassert(11010016,
+                    str::stream() << "Duplicate rule name \"" << rule.name << '\"',
+                    _registeredRuleNames.insert(rule.name).second);
+
+            _rules[key].push_back(std::move(rule));
+        }
+    }
+
+    const std::vector<PipelineRewriteRule>& getRules(const DocumentSource& ds) const {
+        auto it = _rules.find(std::type_index{typeid(ds)});
+        return it == _rules.end() ? _kEmptyRules : it->second;
+    }
+
+private:
+    std::set<std::string> _registeredRuleNames;
+    stdx::unordered_map<std::type_index, std::vector<PipelineRewriteRule>> _rules;
+
+    // To return an empty result by reference when no rules have been registered.
+    constexpr static const std::vector<PipelineRewriteRule> _kEmptyRules = {};
+};
+
+const auto getPipelineRewriteRuleRegistry =
+    ServiceContext::declareDecoration<PipelineRewriteRuleRegistry>();
+}  // namespace
+
+void PipelineRewriteContext::enqueueRules() {
+    auto& ds = current();
+    auto& registry = getPipelineRewriteRuleRegistry(&_serviceCtx);
+    addRules(registry.getRules(ds));
 }
 
-void enforceUniqueRuleNames(ServiceContext* service,
-                            std::vector<Rule<PipelineRewriteContext>> rules) {
-    auto& registeredRuleNames = getRegisteredRuleNames(service);
-    for (auto&& rule : rules) {
-        tassert(11010016,
-                str::stream() << "Duplicate rule name \"" << rule.name << '\"',
-                registeredRuleNames.insert(rule.name).second);
-    }
+namespace registration_detail {
+void registerRules(ServiceContext* serviceCtx,
+                   std::type_index key,
+                   std::vector<Rule<PipelineRewriteContext>> rules) {
+    auto& registry = getPipelineRewriteRuleRegistry(serviceCtx);
+    registry.registerRules(key, std::move(rules));
+}
+
+void clearRulesForTest(ServiceContext* serviceCtx) {
+    auto& registry = getPipelineRewriteRuleRegistry(serviceCtx);
+    registry = {};
 }
 }  // namespace registration_detail
 

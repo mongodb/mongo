@@ -31,7 +31,6 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
 #include "mongo/db/query/compiler/rewrites/rule_based_rewriter.h"
 #include "mongo/util/modules.h"
 
@@ -47,18 +46,12 @@ namespace mongo::rule_based_rewrites::pipeline {
  *                OPTIMIZE_RULE(DocumentSourceMatch),
  *                {"SOME_OTHER_RULE", precondition, transform, 1.0});
  */
-#define REGISTER_RULES(DS, ...)                                                                    \
-    const ServiceContext::ConstructorActionRegisterer documentSourcePrereqsRegisterer_##DS {       \
-        "PipelineOptimizationContext" #DS, [](ServiceContext* service) {                           \
-            namespace rbr = rule_based_rewrites::pipeline;                                         \
-            rbr::registration_detail::enforceUniqueRuleNames(service, {__VA_ARGS__});              \
-            auto& registry = getDocumentSourceVisitorRegistry(service);                            \
-            registry.registerVisitorFunc<rbr::registration_detail::RuleRegisteringVisitorCtx, DS>( \
-                [](DocumentSourceVisitorContextBase* ctx, const DocumentSource&) {                 \
-                    static_cast<rbr::registration_detail::RuleRegisteringVisitorCtx*>(ctx)         \
-                        ->addRules({__VA_ARGS__});                                                 \
-                });                                                                                \
-        }                                                                                          \
+#define REGISTER_RULES(DS, ...)                                                              \
+    const ServiceContext::ConstructorActionRegisterer documentSourcePrereqsRegisterer_##DS { \
+        "PipelineOptimizationContext" #DS, [](ServiceContext* serviceCtx) {                  \
+            namespace rbr = rule_based_rewrites::pipeline;                                   \
+            rbr::registration_detail::registerRules<DS>(serviceCtx, {__VA_ARGS__});          \
+        }                                                                                    \
     }
 
 /**
@@ -113,16 +106,14 @@ public:
                            DocumentSourceContainer& container,
                            boost::optional<DocumentSourceContainer::iterator> startingPos = {})
         : PipelineRewriteContext(
-              getDocumentSourceVisitorRegistry(expCtx.getOperationContext()->getServiceContext()),
-              container,
-              startingPos) {}
+              *expCtx.getOperationContext()->getServiceContext(), container, startingPos) {}
 
-    PipelineRewriteContext(const DocumentSourceVisitorRegistry& registry,
+    PipelineRewriteContext(const ServiceContext& serviceCtx,
                            DocumentSourceContainer& container,
                            boost::optional<DocumentSourceContainer::iterator> startingPos = {})
         : _container(container),
           _itr(startingPos.value_or(_container.begin())),
-          _registry(registry) {}
+          _serviceCtx(serviceCtx) {}
 
     bool hasMore() const final {
         return _itr != _container.end();
@@ -177,7 +168,7 @@ private:
     DocumentSourceContainer& _container;
     DocumentSourceContainer::iterator _itr;
 
-    const DocumentSourceVisitorRegistry& _registry;
+    const ServiceContext& _serviceCtx;
 
     friend struct Transforms;
 };
@@ -268,25 +259,17 @@ inline bool alwaysTrue(PipelineRewriteContext&) {
 }
 
 namespace registration_detail {
-/**
- * Helper for queueing rules using the document source visitor registry.
- */
-class RuleRegisteringVisitorCtx : public DocumentSourceVisitorContextBase {
-public:
-    RuleRegisteringVisitorCtx(PipelineRewriteContext& ctx) : _ctx(ctx) {}
 
-    void addRules(std::vector<Rule<PipelineRewriteContext>> rules) {
-        _ctx.addRules(std::move(rules));
-    }
+void registerRules(ServiceContext* serviceCtx,
+                   std::type_index key,
+                   std::vector<Rule<PipelineRewriteContext>> rules);
 
-private:
-    PipelineRewriteContext& _ctx;
-};
+template <std::derived_from<DocumentSource> DS>
+void registerRules(ServiceContext* serviceCtx, std::vector<Rule<PipelineRewriteContext>> rules) {
+    registerRules(serviceCtx, typeid(DS), std::move(rules));
+}
 
-/**
- * Enforces that pipeline rewrite rule names registered under the same service context are unique.
- */
-void enforceUniqueRuleNames(ServiceContext* service,
-                            std::vector<Rule<PipelineRewriteContext>> rules);
+void clearRulesForTest(ServiceContext* serviceCtx);
+
 }  // namespace registration_detail
 }  // namespace mongo::rule_based_rewrites::pipeline

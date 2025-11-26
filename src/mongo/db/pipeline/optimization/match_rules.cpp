@@ -144,7 +144,7 @@ bool canPushMatchBefore(PipelineRewriteContext& ctx,
         // Always move the $match stage ahead of internal change stream stages appearing in the
         // router (mongoS) pipeline, because they do not access or modify any paths in the input
         // document.
-        ctx.addRules({kPushMatchBeforeChangeStreams});
+        ctx.addRule(kPushMatchBeforeChangeStreams);
         return false;
     }
 

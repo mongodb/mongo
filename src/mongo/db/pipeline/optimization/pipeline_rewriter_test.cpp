@@ -39,22 +39,17 @@
 namespace mongo::rule_based_rewrites::pipeline {
 namespace {
 
-using PipelineRewriteEngineTest = AggregationContextFixture;
+class PipelineRewriteEngineTest : public AggregationContextFixture {
+public:
+    PipelineRewriteEngineTest() {
+        registration_detail::clearRulesForTest(getServiceContext());
+    }
+};
 
-// Need a different registry for the made up rules we register in this test.
-const auto getDocumentSourceVisitorRegistryForTest =
-    ServiceContext::declareDecoration<DocumentSourceVisitorRegistry>();
-
-#define REGISTER_TEST_RULES(DS, ...)                                                             \
-    {                                                                                            \
-        auto* service = getExpCtx()->getOperationContext()->getServiceContext();                 \
-        registration_detail::enforceUniqueRuleNames(service, {__VA_ARGS__});                     \
-        getDocumentSourceVisitorRegistryForTest(service)                                         \
-            .registerVisitorFunc<registration_detail::RuleRegisteringVisitorCtx, DS>(            \
-                [](DocumentSourceVisitorContextBase* ctx, const DocumentSource&) {               \
-                    static_cast<registration_detail::RuleRegisteringVisitorCtx*>(ctx)->addRules( \
-                        {__VA_ARGS__});                                                          \
-                });                                                                              \
+#define REGISTER_TEST_RULES(DS, ...)                                             \
+    {                                                                            \
+        auto* service = getExpCtx()->getOperationContext()->getServiceContext(); \
+        registration_detail::registerRules<DS>(service, {__VA_ARGS__});          \
     }
 
 void runTest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -69,9 +64,7 @@ void runTest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     };
 
     auto pipeline = makePipeline(input);
-    PipelineRewriteEngine engine({getDocumentSourceVisitorRegistryForTest(
-                                      expCtx->getOperationContext()->getServiceContext()),
-                                  pipeline->getSources()},
+    PipelineRewriteEngine engine({*pipeline},
                                  static_cast<size_t>(internalQueryMaxPipelineRewrites.load()));
 
     engine.applyRules();
@@ -254,9 +247,12 @@ TEST_F(PipelineRewriteEngineTest, PushStageToBack) {
 }
 
 TEST_F(PipelineRewriteEngineTest, EnqueueAdditionalRulesFromPrecondition) {
+    static const std::vector<PipelineRewriteRule> kSwapWithNext{
+        {"SWAP_WITH_NEXT", alwaysTrue, Transforms::swapStageWithNext, 2.0}};
+
     static auto swapIfFirstStage = [](PipelineRewriteContext& ctx) {
         if (ctx.atFirstStage()) {
-            ctx.addRules({{"SWAP_WITH_NEXT", alwaysTrue, Transforms::swapStageWithNext, 2.0}});
+            ctx.addRules(kSwapWithNext);
             return true;
         }
         return false;
@@ -286,8 +282,11 @@ TEST_F(PipelineRewriteEngineTest, EnqueueAdditionalRulesFromTransform) {
         return ctx.atFirstStage();
     };
 
+    static const std::vector<PipelineRewriteRule> kSwapWithNext{
+        {"SWAP_WITH_NEXT", alwaysTrue, Transforms::swapStageWithNext, 2.0}};
+
     static auto insertLimitThenSwap = [](PipelineRewriteContext& ctx) {
-        ctx.addRules({{"SWAP_WITH_NEXT", alwaysTrue, Transforms::swapStageWithNext, 2.0}});
+        ctx.addRules(kSwapWithNext);
 
         auto limitStage = DocumentSourceLimit::create(ctx.current().getExpCtx(), 10);
         Transforms::insertAfter(ctx, *limitStage);

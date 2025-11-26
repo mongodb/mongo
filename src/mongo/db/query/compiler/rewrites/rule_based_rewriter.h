@@ -81,15 +81,6 @@ struct Rule {
 };
 
 template <typename Context>
-std::partial_ordering operator<=>(const Rule<Context>& lhs, const Rule<Context>& rhs) {
-    if (auto cmp = lhs.priority <=> rhs.priority; cmp != 0) {
-        return cmp;
-    }
-    // Compare names to break tie. Rule names are assumed to be unique.
-    return lhs.name <=> rhs.name;
-}
-
-template <typename Context>
 class RewriteEngine;
 
 /**
@@ -123,9 +114,14 @@ public:
     /**
      * Enqueues given rules to be applied to the current element.
      */
-    void addRules(std::vector<Rule<SubClass>> rules) {
+    void addRules(const std::vector<Rule<SubClass>>& rules) {
+        for (auto&& rule : rules) {
+            addRule(rule);
+        }
+    }
+    void addRule(const Rule<SubClass>& rule) {
         tassert(11010014, "Engine not initialized", _engine);
-        _engine->addRules(std::move(rules));
+        _engine->addRule(rule);
     }
 
     /**
@@ -151,7 +147,7 @@ private:
 namespace rule_detail {
 // Whether this rule has been assigned least one of the given tags.
 template <typename Context>
-constexpr bool hasTag(Rule<Context> rule, TagSet tags) {
+constexpr bool hasTag(const Rule<Context>& rule, TagSet tags) {
     if (tags == 0) {
         // Empty tag set denotes that we want to run all rules.
         return true;
@@ -173,15 +169,9 @@ public:
         _context.setEngine(*this);
     }
 
-    void addRule(Rule<Context> rule) {
+    void addRule(const Rule<Context>& rule) {
         if (rule_detail::hasTag(rule, _tagsToRun)) {
-            _rules.emplace(std::move(rule));
-        }
-    }
-
-    void addRules(std::vector<Rule<Context>> rules) {
-        for (auto&& rule : rules) {
-            addRule(std::move(rule));
+            _rules.emplace(&rule);
         }
     }
 
@@ -200,6 +190,7 @@ public:
             switch (nextAction) {
                 case NextAction::Requeue:
                     // Requeue rules that apply to the current element without advancing.
+                    clearRules();
                     break;
                 case NextAction::Advance:
                     // Did not update position. Advance to the next element.
@@ -212,6 +203,15 @@ public:
     }
 
 private:
+    struct HighestPriorityFirst {
+        bool operator()(const Rule<Context>* a, const Rule<Context>* b) const {
+            return a->priority < b->priority;
+        }
+    };
+    using RuleQueue = std::priority_queue<const Rule<Context>*,
+                                          std::vector<const Rule<Context>*>,
+                                          HighestPriorityFirst>;
+
     enum class NextAction {
         Requeue,
         Advance,
@@ -231,7 +231,7 @@ private:
                 return NextAction::Bail;
             }
 
-            const auto rule = std::move(_rules.top());
+            const auto& rule = *_rules.top();
             _rules.pop();
             const size_t rulesBefore = _rules.size();
 
@@ -255,9 +255,7 @@ private:
                 tassert(11010015,
                         "Should not add new rules from a rule that requires requeueing",
                         rulesBefore == _rules.size());
-
                 // Discard remaining rules and requeue because we changed position.
-                clearRules();
                 return NextAction::Requeue;
             }
         }
@@ -270,7 +268,7 @@ private:
     }
 
     Context _context;
-    std::priority_queue<Rule<Context>> _rules;
+    RuleQueue _rules;
     // Only rules with at least one of these tags will be applied.
     TagSet _tagsToRun{0};
 
