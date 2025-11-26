@@ -49,6 +49,7 @@
 #include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 
 #include <vector>
@@ -70,8 +71,8 @@ namespace aggregation_request_helper {
 /**
  * Helpers to serialize/deserialize AggregateCommandRequest.
  */
-static constexpr StringData kBatchSizeField = "batchSize"_sd;
-static constexpr long long kDefaultBatchSize = 101;
+MONGO_MOD_PUBLIC static constexpr StringData kBatchSizeField = "batchSize"_sd;
+MONGO_MOD_PUBLIC static constexpr long long kDefaultBatchSize = 101;
 
 /**
  * Create a new instance of AggregateCommandRequest by parsing the raw command object. Throws an
@@ -85,13 +86,13 @@ static constexpr long long kDefaultBatchSize = 101;
  * Callers must provide the validated tenancy scope (if any) to ensure that any namespaces
  * deserialized from the aggregation request properly account for the tenant ID.
  */
-AggregateCommandRequest parseFromBSON(
-    const BSONObj& cmdObj,
-    const boost::optional<auth::ValidatedTenancyScope>& vts,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-    const SerializationContext& serializationContext = SerializationContext());
+MONGO_MOD_PUBLIC AggregateCommandRequest
+parseFromBSON(const BSONObj& cmdObj,
+              const boost::optional<auth::ValidatedTenancyScope>& vts,
+              boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+              const SerializationContext& serializationContext = SerializationContext());
 
-StatusWith<AggregateCommandRequest> parseFromBSONForTests(
+MONGO_MOD_PUBLIC StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     const BSONObj& cmdObj,
     const boost::optional<auth::ValidatedTenancyScope>& vts = boost::none,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none);
@@ -183,7 +184,8 @@ static StatusWith<std::vector<BSONObj>> attemptToParsePipelineFromBSON(
 /**
  * A throwing version of the above.
  */
-static std::vector<BSONObj> parsePipelineFromBSON(const BSONElement& pipelineElem) {
+MONGO_MOD_PUBLIC static std::vector<BSONObj> parsePipelineFromBSON(
+    const BSONElement& pipelineElem) {
     return uassertStatusOK(attemptToParsePipelineFromBSON(pipelineElem));
 }
 

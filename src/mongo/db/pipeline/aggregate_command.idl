@@ -32,6 +32,7 @@ global:
         - "mongo/db/pipeline/aggregation_request_helper.h"
         - "mongo/db/query/count_request.h"
         - "mongo/db/query/explain_options.h"
+    mod_visibility: public
 
 imports:
     - "mongo/crypto/fle_field_schema.idl"

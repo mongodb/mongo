@@ -44,6 +44,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <functional>
@@ -55,7 +56,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_UNFORTUNATELY_OPEN mongo {
 
 class LiteParsedPipeline;
 
@@ -76,7 +77,7 @@ struct LiteParserOptions {
  * make certain DocumentSource properties available before full parsing (e.g., getting the involved
  * foreign collections).
  */
-class LiteParsedDocumentSource {
+class MONGO_MOD_UNFORTUNATELY_OPEN LiteParsedDocumentSource {
 public:
     /*
      * This is the type of parser you should register using REGISTER_DOCUMENT_SOURCE. It need not
@@ -519,4 +520,4 @@ protected:
     boost::optional<NamespaceString> _foreignNss;
     std::vector<LiteParsedPipeline> _pipelines;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_UNFORTUNATELY_OPEN mongo

@@ -37,6 +37,7 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/version_context.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 
@@ -48,7 +49,7 @@ namespace mongo {
  * the resolved namespaces to be provided on construction and does not allow them to be subsequently
  * mutated.
  */
-class ExpressionContextForTest : public ExpressionContext {
+class MONGO_MOD_NEEDS_REPLACEMENT ExpressionContextForTest : public ExpressionContext {
 public:
     static constexpr TimeZoneDatabase* kNullTimeZoneDatabase = nullptr;
 

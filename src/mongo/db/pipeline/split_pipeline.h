@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace sharded_agg_helpers {
@@ -39,7 +40,7 @@ namespace sharded_agg_helpers {
  * will execute in parallel on each shard, and 'mergePipeline' will execute on the merge host -
  * either one of the shards or a mongos.
  */
-class SplitPipeline {
+class MONGO_MOD_PUBLIC SplitPipeline {
 public:
     /**
      * Split the given Pipeline into a Pipeline for each shard, and a Pipeline that combines the

@@ -34,6 +34,7 @@ global:
         - "mongo/db/namespace_string.h"
         - "mongo/db/pipeline/document_source_merge_spec.h"
         - "mongo/db/versioning_protocol/chunk_version.h"
+    mod_visibility: public
 
 imports:
     - "mongo/db/pipeline/document_source_merge_modes.idl"

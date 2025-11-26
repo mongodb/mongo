@@ -49,6 +49,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/query/exec/owned_remote_cursor.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -72,7 +73,7 @@ struct ShardedExchangePolicy {
     std::vector<ShardId> consumerShards;
 };
 
-struct DispatchShardPipelineResults {
+struct MONGO_MOD_PUBLIC DispatchShardPipelineResults {
     // Contains a value when the second half of the pipeline was requested to run on a specific
     // shard.
     boost::optional<ShardId> mergeShardId;
@@ -112,7 +113,7 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
  * Used to indicate if a pipeline contains any data source requiring extra handling for targeting
  * shards.
  */
-enum class PipelineDataSource {
+enum class MONGO_MOD_PUBLIC PipelineDataSource {
     kNormal,
     kChangeStream,          // Indicates a pipeline has a $changeStream stage.
     kGeneratesOwnDataOnce,  // Indicates the shards part needs to be executed on a single node.
@@ -141,20 +142,20 @@ enum class PipelineDataSource {
  * The caller of this function must handle any stale shard version error error thrown by
  * `dispatchShardPipeline`.
  */
-DispatchShardPipelineResults dispatchShardPipeline(
-    RoutingContext& routingCtx,
-    Document serializedCommand,
-    PipelineDataSource pipelineDataSource,
-    bool eligibleForSampling,
-    std::unique_ptr<Pipeline> pipeline,
-    boost::optional<ExplainOptions::Verbosity> explain,
-    const NamespaceString& targetedNss,
-    bool requestQueryStatsFromRemotes = false,
-    ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
-    boost::optional<BSONObj> readConcern = boost::none,
-    AsyncRequestsSender::ShardHostMap designatedHostsMap = {},
-    stdx::unordered_map<ShardId, BSONObj> resumeTokenMap = {},
-    std::set<ShardId> shardsToSkip = {});
+MONGO_MOD_PUBLIC DispatchShardPipelineResults
+dispatchShardPipeline(RoutingContext& routingCtx,
+                      Document serializedCommand,
+                      PipelineDataSource pipelineDataSource,
+                      bool eligibleForSampling,
+                      std::unique_ptr<Pipeline> pipeline,
+                      boost::optional<ExplainOptions::Verbosity> explain,
+                      const NamespaceString& targetedNss,
+                      bool requestQueryStatsFromRemotes = false,
+                      ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+                      boost::optional<BSONObj> readConcern = boost::none,
+                      AsyncRequestsSender::ShardHostMap designatedHostsMap = {},
+                      stdx::unordered_map<ShardId, BSONObj> resumeTokenMap = {},
+                      std::set<ShardId> shardsToSkip = {});
 
 BSONObj createPassthroughCommandForShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -294,7 +295,7 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursors(
  *
  * Note that the specified AggregateCommandRequest must not be for an explain command.
  */
-std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
+MONGO_MOD_PUBLIC std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     AggregateCommandRequest request,
     ShardId shardId,

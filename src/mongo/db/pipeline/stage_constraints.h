@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <numeric>
 
@@ -41,7 +42,7 @@ namespace mongo {
  * A struct describing various constraints about where this stage can run, where it must be in
  * the pipeline, what resources it may require, etc.
  */
-struct StageConstraints {
+struct MONGO_MOD_PUBLIC StageConstraints {
     /**
      * A StreamType defines whether this stage is streaming (can produce output based solely on
      * the current input document) or blocking (must examine subsequent documents before

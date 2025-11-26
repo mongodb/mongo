@@ -61,6 +61,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
@@ -110,7 +111,7 @@ enum class MergeType {
 
 std::ostream& operator<<(std::ostream& os, SbeCompatibility sbeCompat);
 
-struct ResolvedNamespace {
+struct MONGO_MOD_PUBLIC ResolvedNamespace {
     ResolvedNamespace() = default;
     ResolvedNamespace(NamespaceString ns,
                       std::vector<BSONObj> pipeline,
@@ -127,11 +128,12 @@ struct ResolvedNamespace {
     // LiteParsedPipeline object when it's already being stored here.
 };
 
-using ResolvedNamespaceMap = absl::flat_hash_map<NamespaceString, ResolvedNamespace>;
+using ResolvedNamespaceMap MONGO_MOD_PUBLIC =
+    absl::flat_hash_map<NamespaceString, ResolvedNamespace>;
 
-enum class ExpressionContextCollationMatchesDefault { kYes, kNo };
+enum class MONGO_MOD_PUBLIC ExpressionContextCollationMatchesDefault { kYes, kNo };
 
-class ExpressionContext : public RefCountable {
+class MONGO_MOD_PUBLIC ExpressionContext : public RefCountable {
 public:
     /**
      * An RAII type that will temporarily change the ExpressionContext's collator. Resets the
@@ -764,7 +766,8 @@ public:
 
     // Should only be used to test parsing with the flag. Otherwise, this flag should only be set
     // when creating a new ExpressionContext.
-    bool setAllowGenericForeignDbLookup_forTest(bool allowGenericForeignDbLookup) {
+    MONGO_MOD_NEEDS_REPLACEMENT bool setAllowGenericForeignDbLookup_forTest(
+        bool allowGenericForeignDbLookup) {
         return _params.allowGenericForeignDbLookup = allowGenericForeignDbLookup;
     }
 

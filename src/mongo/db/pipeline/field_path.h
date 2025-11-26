@@ -35,6 +35,7 @@
 #include "mongo/db/exec/document_value/document_internal.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <compare>
 #include <cstddef>
@@ -43,7 +44,7 @@
 #include <utility>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Utility class which represents a field path with nested paths separated by dots.
@@ -233,4 +234,4 @@ template <typename H>
 H AbslHashValue(H h, const FieldPath& fieldPath) {
     return H::combine(std::move(h), fieldPath.fullPath());
 }
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

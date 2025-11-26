@@ -43,6 +43,7 @@
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <functional>
@@ -55,7 +56,7 @@ namespace mongo {
  * A semi-parsed version of a Pipeline, parsed just enough to determine information like what
  * foreign collections are involved.
  */
-class LiteParsedPipeline {
+class MONGO_MOD_PUBLIC LiteParsedPipeline {
 public:
     /**
      * Constructs a LiteParsedPipeline from the raw BSON stages given in 'request'.

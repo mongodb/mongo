@@ -65,6 +65,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/safe_num.h"
 #include "mongo/util/str.h"
@@ -197,7 +198,7 @@ enum class ExpressionDisabledReason {
                                       featureFlag,                     \
                                       getTestCommandsEnabled())
 
-class Expression : public RefCountable {
+class MONGO_MOD_PUBLIC Expression : public RefCountable {
 public:
     using Parser = std::function<boost::intrusive_ptr<Expression>(
         ExpressionContext* const, BSONElement, const VariablesParseState&)>;
@@ -457,7 +458,7 @@ private:
 /**
  * A constant expression. Repeated calls to evaluate() will always return the same thing.
  */
-class ExpressionConstant final : public Expression {
+class MONGO_MOD_NEEDS_REPLACEMENT ExpressionConstant final : public Expression {
 public:
     ExpressionConstant(ExpressionContext* expCtx, const Value& value);
 
@@ -898,7 +899,7 @@ public:
     }
 };
 
-class ExpressionAdd final : public ExpressionVariadic<ExpressionAdd> {
+class MONGO_MOD_NEEDS_REPLACEMENT ExpressionAdd final : public ExpressionVariadic<ExpressionAdd> {
 public:
     explicit ExpressionAdd(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionAdd>(expCtx) {}
@@ -1358,7 +1359,8 @@ public:
 };
 
 
-class ExpressionCond final : public ExpressionFixedArity<ExpressionCond, 3> {
+class MONGO_MOD_NEEDS_REPLACEMENT ExpressionCond final
+    : public ExpressionFixedArity<ExpressionCond, 3> {
 public:
     explicit ExpressionCond(ExpressionContext* const expCtx) : Base(expCtx) {}
 
@@ -1972,7 +1974,7 @@ public:
 };
 
 
-class ExpressionFieldPath : public Expression {
+class MONGO_MOD_NEEDS_REPLACEMENT ExpressionFieldPath : public Expression {
 public:
     /**
      * Checks whether this field path is exactly "$$ROOT".
@@ -4301,7 +4303,7 @@ private:
 };
 
 
-class ExpressionSwitch final : public Expression {
+class MONGO_MOD_NEEDS_REPLACEMENT ExpressionSwitch final : public Expression {
 public:
     using ExpressionPair =
         std::pair<boost::intrusive_ptr<Expression>&, boost::intrusive_ptr<Expression>&>;

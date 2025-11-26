@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_merge_modes_gen.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 
 #include <string>
@@ -44,7 +45,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 class BSONObjBuilder;
 class BSONElement;
 
@@ -86,4 +87,4 @@ void mergeWhenMatchedSerializeToBSON(const MergeWhenMatchedPolicy& policy,
                                      StringData fieldName,
                                      BSONObjBuilder* bob);
 MergeWhenMatchedPolicy mergeWhenMatchedParseFromBSON(const BSONElement& elem);
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

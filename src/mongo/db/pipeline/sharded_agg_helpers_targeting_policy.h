@@ -29,8 +29,10 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 namespace mongo {
-enum class ShardTargetingPolicy {
+enum class MONGO_MOD_PUBLIC ShardTargetingPolicy {
     kNotAllowed,
     kAllowed,
     kForceTargetingWithSimpleCollation,
