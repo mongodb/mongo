@@ -38,6 +38,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/stage_params.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -225,6 +226,12 @@ public:
     virtual void assertPermittedInAPIVersion(const APIParameters&) const {
         // By default there are no custom checks needed. The 'AllowedWithApiStrict' flag should take
         // care of most cases.
+    }
+
+    virtual std::unique_ptr<StageParams> getStageParams() const {
+        // The base class of StageParams should never be called.
+        // TODO SERVER-114306 Make this a pure virtual function.
+        MONGO_UNIMPLEMENTED_TASSERT(11429300);
     }
 
     /**

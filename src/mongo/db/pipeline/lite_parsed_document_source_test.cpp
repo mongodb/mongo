@@ -29,16 +29,14 @@
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/stage_params.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -240,6 +238,59 @@ DEATH_TEST_F(LiteParsedDocumentSourceParseTest, IFRFlagIsRequired, "11395101") {
 
     BinaryCompatibleFeatureFlag mockFlag(false);
     registerFallbackParser(&mockFlag);
+}
+
+/**
+ * A dummy test stage parameters class used for testing. It just allocates an ID.
+ */
+class TestStageParams : public DefaultStageParams {
+public:
+    TestStageParams(BSONElement element) : DefaultStageParams(element) {}
+    static const Id& id;
+    Id getId() const override {
+        return id;
+    }
+};
+ALLOCATE_STAGE_PARAMS_ID(testStage, TestStageParams::id);
+
+/**
+ * A dummy LiteParsedDocumentSource that implements just enough functionality to return custom
+ * derived StageParams.
+ */
+class TestLiteParsed final : public LiteParsedDocumentSource {
+public:
+    TestLiteParsed(const BSONElement& originalBson) : LiteParsedDocumentSource(originalBson) {}
+
+    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+        return stdx::unordered_set<NamespaceString>();
+    }
+
+    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
+        return {};
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<TestStageParams>(_originalBson);
+    }
+};
+
+/**
+ * Verifies that LiteParsedDocumentSource can return StageParams via getStageParams().
+ *
+ * This test ensures that:
+ *   1. getStageParams() returns a valid StageParams object
+ *   2. The returned object is of the correct derived type (TestStageParams in this case)
+ *   3. The StageParams has a properly allocated, non-zero ID
+ *
+ * This validates the integration between LiteParsedDocumentSource and the StageParams
+ * type system.
+ */
+TEST(StageParams, CanGetStageParamsFromLiteParsed) {
+    BSONObj spec = BSON("$testStage" << BSONObj());
+    auto lp = TestLiteParsed(spec.firstElement());
+    auto baseParams = lp.getStageParams();
+    ASSERT_TRUE(dynamic_cast<TestStageParams*>(baseParams.get()) != nullptr);
+    ASSERT_NE(baseParams->getId(), 0);
 }
 
 }  // namespace mongo

@@ -608,6 +608,16 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "stage_params",
+    srcs = [
+        "stage_params.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
     name = "lite_parsed_document_source",
     srcs = [
         "lite_parsed_document_source.cpp",
@@ -615,6 +625,7 @@ mongo_cc_library(
     ],
     deps = [
         ":aggregation_request_helper",
+        ":stage_params",
         "//src/mongo/db/query:common_query_enums_and_helpers",
         "//src/mongo/db/stats:counters",
     ],
@@ -1277,6 +1288,7 @@ mongo_cc_unit_test(
         ":granularity_rounder",
         ":pipeline",
         ":sharded_agg_helpers",
+        ":stage_params",
         "//src/mongo:base",
         "//src/mongo/db:change_stream_options",
         "//src/mongo/db:change_stream_options_manager",
