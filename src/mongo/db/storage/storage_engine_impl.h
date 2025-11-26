@@ -241,6 +241,10 @@ public:
 
     void closeMDBCatalog(OperationContext* opCtx) final;
 
+    bool isMDBCatalogOpen() const final {
+        return _catalog != nullptr;
+    }
+
     TimestampMonitor* getTimestampMonitor() const override {
         return _timestampMonitor.get();
     }

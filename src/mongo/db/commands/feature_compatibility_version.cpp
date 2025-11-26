@@ -612,6 +612,13 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
     invariant(shard_role_details::getLocker(opCtx)->isW());
     auto featureCompatibilityVersion = findFeatureCompatibilityVersionDocument(opCtx);
     if (!featureCompatibilityVersion.isOK()) {
+        const auto& status = featureCompatibilityVersion.getStatus();
+        // NamespaceNotFound is expected on a new cluster, and NoSuchKey is expected if the
+        // featureCompatibilityVersion document is not found and --repair is used.
+        if (status.code() != ErrorCodes::NamespaceNotFound &&
+            status.code() != ErrorCodes::NoSuchKey) {
+            LOGV2_FATAL(11379202, "FCV initialization failed", "status"_attr = status);
+        }
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext(
             "startup"_sd);
         return;
@@ -684,7 +691,8 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
     if (!fcvDocument.isOK() && nonLocalDatabases) {
         LOGV2_FATAL_NOTRACE(40652,
                             "Unable to start up mongod due to missing featureCompatibilityVersion "
-                            "document. Please run with --repair to restore the document.");
+                            "document. Please run with --repair to restore the document.",
+                            "status"_attr = fcvDocument.getStatus());
     }
 
     // If we are part of a replica set and are started up with no data files, we do not set the

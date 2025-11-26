@@ -61,7 +61,8 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
  * Runs startup recovery after system startup.
  */
 void runStartupRecovery(OperationContext* opCtx,
-                        StorageEngine::LastShutdownState lastShutdownState);
+                        StorageEngine::LastShutdownState lastShutdownState,
+                        bool afterDataReady = false);
 
 /**
  * Ensures data on the change stream collections is consistent on startup. Only after unclean

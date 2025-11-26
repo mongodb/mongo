@@ -151,8 +151,14 @@ public:
     }
 };
 
+bool isCatalogOpen(OperationContext* opCtx) {
+    invariant(shard_role_details::getLocker(opCtx)->isW());
+    return opCtx->getServiceContext()->getStorageEngine()->isMDBCatalogOpen();
+}
+
 PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     invariant(shard_role_details::getLocker(opCtx)->isW());
+    invariant(isCatalogOpen(opCtx));
 
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgress();
 
@@ -227,6 +233,7 @@ void openCatalog(OperationContext* opCtx,
                  const PreviousCatalogState& previousCatalogState,
                  Timestamp stableTimestamp) {
     invariant(shard_role_details::getLocker(opCtx)->isW());
+    invariant(!isCatalogOpen(opCtx));
 
     // Load the catalog in the storage engine.
     LOGV2(20273, "openCatalog: loading storage engine catalog");

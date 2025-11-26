@@ -168,6 +168,9 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
 
 void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
                                        LastShutdownState lastShutdownState) {
+    dassert(!_catalog);
+    dassert(!_catalogRecordStore);
+
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     bool catalogExists = _engine->hasIdent(ru, ident::kMdbCatalog);
     if (_options.forRepair && catalogExists) {
@@ -409,6 +412,9 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
 
 void StorageEngineImpl::closeMDBCatalog(OperationContext* opCtx) {
     dassert(shard_role_details::getLocker(opCtx)->isLocked());
+    dassert(_catalog);
+    dassert(_catalogRecordStore);
+
     if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOGV2_FOR_RECOVERY(4615632, kCatalogLogLevel.toInt(), "closeMDBCatalog:");
         _dumpCatalog(opCtx);

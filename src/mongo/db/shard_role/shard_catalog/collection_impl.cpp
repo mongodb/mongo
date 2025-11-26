@@ -322,6 +322,8 @@ SharedCollectionDecorations* CollectionImpl::getSharedDecorations() const {
 }
 
 void CollectionImpl::init(OperationContext* opCtx) {
+    LOGV2_DEBUG(11379204, 1, "Initializing collection", logAttrs(ns()));
+
     const auto& collectionOptions = _metadata->options;
 
     _initShared(opCtx, collectionOptions);

@@ -53,6 +53,9 @@ public:
     }
     void loadMDBCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final {}
     void closeMDBCatalog(OperationContext* opCtx) final {}
+    bool isMDBCatalogOpen() const final {
+        return true;
+    }
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) final {}
     Status beginBackup() final {
         return Status(ErrorCodes::CommandNotSupported,

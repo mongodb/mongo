@@ -150,6 +150,13 @@ StorageEngine::LastShutdownState startUpStorageEngine(OperationContext* opCtx,
                                                       BSONObjBuilder* startupTimeElapsedBuilder);
 
 /**
+ * Initializes catalog (storage engine's MDB and CollectionCatalog). To be used in scenarios where
+ * catalog initialization needs to be deferred after storage engine startup (via
+ * startUpStorageEngine).
+ */
+void startUpCollectionCatalogDeferred(OperationContext* opCtx);
+
+/**
  * Starts up storage engine and initializes the collection catalog.
  */
 StorageEngine::LastShutdownState startUpStorageEngineAndCollectionCatalog(

@@ -790,9 +790,10 @@ void offlineValidate(OperationContext* opCtx) {
 void startupRecovery(OperationContext* opCtx,
                      StorageEngine* storageEngine,
                      StorageEngine::LastShutdownState lastShutdownState,
-                     BSONObjBuilder* startupTimeElapsedBuilder = nullptr) {
+                     BSONObjBuilder* startupTimeElapsedBuilder = nullptr,
+                     bool afterDataReady = false) {
     auto& rss = rss::ReplicatedStorageService::get(opCtx);
-    if (rss.getPersistenceProvider().shouldDelayDataAccessDuringStartup()) {
+    if (rss.getPersistenceProvider().shouldDelayDataAccessDuringStartup() && !afterDataReady) {
         LOGV2(10985327,
               "Skip startupRecovery; it will be handled later when WT loads the "
               "checkpoint");
@@ -893,7 +894,8 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
  * In no case will it create an FCV document nor run repair or read-only recovery.
  */
 void runStartupRecovery(OperationContext* opCtx,
-                        StorageEngine::LastShutdownState lastShutdownState) {
+                        StorageEngine::LastShutdownState lastShutdownState,
+                        bool afterDataReady) {
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     Lock::GlobalWrite lk(opCtx);
 
@@ -902,7 +904,7 @@ void runStartupRecovery(OperationContext* opCtx,
     const bool usingReplication =
         repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
     invariant(usingReplication);
-    startupRecovery(opCtx, storageEngine, lastShutdownState);
+    startupRecovery(opCtx, storageEngine, lastShutdownState, nullptr, afterDataReady);
 }
 
 void recoverChangeStreamCollections(OperationContext* opCtx,

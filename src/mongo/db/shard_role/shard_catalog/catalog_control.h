@@ -47,6 +47,11 @@ struct PreviousCatalogState {
 };
 
 /**
+ * Checks if the catalog is open.
+ */
+bool isCatalogOpen(OperationContext* opCtx);
+
+/**
  * Closes the catalog, destroying all associated in-memory data structures for all databases. After
  * a call to this function, it is illegal to access the catalog before calling openCatalog().
  *

@@ -715,7 +715,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         ClusterServerParameterInitializer::synchronizeAllParametersFromDisk(startupOpCtx.get());
     }
 
-    FeatureCompatibilityVersion::afterStartupActions(startupOpCtx.get());
+    // FCV initialization is delayed on persistence providers where data access is not immediately
+    // available. As such, post startup actions will be performed elsewhere.
+    if (!rss.getPersistenceProvider().shouldDelayDataAccessDuringStartup()) {
+        FeatureCompatibilityVersion::afterStartupActions(startupOpCtx.get());
+    }
 
     if (gFlowControlEnabled.load()) {
         LOGV2(20536, "Flow Control is enabled on this deployment");

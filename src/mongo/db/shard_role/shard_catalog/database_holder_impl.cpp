@@ -126,6 +126,9 @@ std::vector<DatabaseName> DatabaseHolderImpl::getNames() {
 Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
                                      const DatabaseName& dbName,
                                      bool* justCreated) {
+
+    LOGV2_DEBUG(11379203, 2, "DatabaseHolder opening db", "name"_attr = dbName);
+
     uassert(6198701,
             "invalid db name: " + dbName.toStringForErrorMsg(),
             DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Allow));

@@ -980,6 +980,8 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
 
     ASSERT(!collectionExists(opCtx.get(), collNs));
 
+    _storageEngine->closeMDBCatalog(opCtx.get());
+
     // When in a repair context, loadMDBCatalog() recreates catalog entries for orphaned idents.
     _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
     catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
@@ -1017,6 +1019,7 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     // orphaned idents.
     {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
+        _storageEngine->closeMDBCatalog(opCtx.get());
         _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
         catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
     }

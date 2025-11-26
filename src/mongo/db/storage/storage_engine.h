@@ -255,6 +255,7 @@ public:
      */
     virtual void loadMDBCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) = 0;
     virtual void closeMDBCatalog(OperationContext* opCtx) = 0;
+    virtual bool isMDBCatalogOpen() const = 0;
 
     /**
      * Checkpoints the data to disk.
