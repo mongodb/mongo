@@ -130,14 +130,20 @@ NodeSet JoinGraph::getNeighbors(NodeId nodeIndex) const {
     return neighbors;
 }
 
-NodeId JoinGraph::addNode(NamespaceString collectionName,
-                          std::unique_ptr<CanonicalQuery> cq,
-                          boost::optional<FieldPath> embedPath) {
+boost::optional<NodeId> JoinGraph::addNode(NamespaceString collectionName,
+                                           std::unique_ptr<CanonicalQuery> cq,
+                                           boost::optional<FieldPath> embedPath) {
+    if (numNodes() >= kMaxNodesInJoin) {
+        return boost::none;
+    }
+
     _nodes.emplace_back(std::move(collectionName), std::move(cq), std::move(embedPath));
     return static_cast<NodeId>(_nodes.size()) - 1;
 }
 
-EdgeId JoinGraph::addEdge(NodeSet left, NodeSet right, JoinEdge::PredicateList predicates) {
+boost::optional<EdgeId> JoinGraph::addEdge(NodeSet left,
+                                           NodeSet right,
+                                           JoinEdge::PredicateList predicates) {
     // Self-edges are not permitted; when joining a collection to itself, we should use a different
     // node for each instance of the collection.
     if (const auto common = (left & right); common.any()) {
@@ -159,10 +165,10 @@ EdgeId JoinGraph::addEdge(NodeSet left, NodeSet right, JoinEdge::PredicateList p
     return makeEdge(left, right, std::move(predicates));
 }
 
-EdgeId JoinGraph::addSimpleEqualityEdge(NodeId leftNode,
-                                        NodeId rightNode,
-                                        PathId leftPathId,
-                                        PathId rightPathId) {
+boost::optional<EdgeId> JoinGraph::addSimpleEqualityEdge(NodeId leftNode,
+                                                         NodeId rightNode,
+                                                         PathId leftPathId,
+                                                         PathId rightPathId) {
 
     NodeSet leftNodeSet{};
     leftNodeSet.set(leftNode);
@@ -200,7 +206,9 @@ BSONObj JoinGraph::toBSON() const {
     return result.obj();
 }
 
-EdgeId JoinGraph::makeEdge(NodeSet left, NodeSet right, JoinEdge::PredicateList predicates) {
+boost::optional<EdgeId> JoinGraph::makeEdge(NodeSet left,
+                                            NodeSet right,
+                                            JoinEdge::PredicateList predicates) {
     if (bitsetLess(right, left)) {
         swap(left, right);
         swapPredicateSides(predicates);

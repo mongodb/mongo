@@ -67,10 +67,10 @@ private:
 TEST_F(JoinGraphGoldenTest, buildGraph) {
     JoinGraph graph{};
 
-    auto a = graph.addNode(makeNSS("a"), makeCanonicalQuery(BSON("a" << 1)), boost::none);
-    auto b = graph.addNode(makeNSS("b"), makeCanonicalQuery(BSON("b" << 1)), FieldPath("b"));
-    auto c = graph.addNode(makeNSS("c"), makeCanonicalQuery(BSON("c" << 1)), FieldPath("c"));
-    auto d = graph.addNode(makeNSS("d"), nullptr, FieldPath("d"));
+    auto a = *graph.addNode(makeNSS("a"), makeCanonicalQuery(BSON("a" << 1)), boost::none);
+    auto b = *graph.addNode(makeNSS("b"), makeCanonicalQuery(BSON("b" << 1)), FieldPath("b"));
+    auto c = *graph.addNode(makeNSS("c"), makeCanonicalQuery(BSON("c" << 1)), FieldPath("c"));
+    auto d = *graph.addNode(makeNSS("d"), nullptr, FieldPath("d"));
 
     graph.addSimpleEqualityEdge(a, b, 0, 1);
     graph.addSimpleEqualityEdge(a, c, 2, 3);

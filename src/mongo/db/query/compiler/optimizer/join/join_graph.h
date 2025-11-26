@@ -38,11 +38,15 @@
 namespace mongo::join_ordering {
 /** The maximum number of nodes which can participate in one join.
  */
-constexpr uint32_t kMaxNodesInJoin = 64;
+constexpr size_t kMaxNodesInJoin = 64;
 
-/** NodeSet is a bitset representation of a subset of join nodes. It is used to efficiently track
- * which nodes are included in an intermediate join. This compact representation is highly effective
- * for the join reordering algorithm.
+/** The maximum number of edges in a Join Graph.
+ */
+constexpr size_t kMaxEdgesInJoin = std::numeric_limits<EdgeId>::max();
+
+/** NodeSet is a bitset representation of a subset of join nodes. It is used to efficiently
+ * track which nodes are included in an intermediate join. This compact representation is highly
+ * effective for the join reordering algorithm.
  */
 using NodeSet = std::bitset<kMaxNodesInJoin>;
 
@@ -128,16 +132,32 @@ public:
      */
     NodeSet getNeighbors(NodeId nodeIndex) const;
 
-    NodeId addNode(NamespaceString collectionName,
-                   std::unique_ptr<CanonicalQuery> cq,
-                   boost::optional<FieldPath> embedPath);
+    /**
+     * Adds a new node. Returns the id of the new node or boost::none if the maximum number of join
+     * nodes has been reached.
+     */
+    boost::optional<NodeId> addNode(NamespaceString collectionName,
+                                    std::unique_ptr<CanonicalQuery> cq,
+                                    boost::optional<FieldPath> embedPath);
 
-    EdgeId addEdge(NodeSet left, NodeSet right, JoinEdge::PredicateList predicates);
+    /**
+     * Adds a new edge or add predicates if the edge with the specified 'left' and 'right' exists.
+     * Returns the id of the edge or boost::none if the maximum number of join edges has been
+     * reached.
+     */
+    boost::optional<EdgeId> addEdge(NodeSet left,
+                                    NodeSet right,
+                                    JoinEdge::PredicateList predicates);
 
-    EdgeId addSimpleEqualityEdge(NodeId leftNode,
-                                 NodeId rightNode,
-                                 PathId leftPathId,
-                                 PathId rightPathId);
+    /**
+     * Adds a new edge or add predicates if the edge with the specified 'left' and 'right' exists.
+     * Returns the id of the edge or boost::none if the maximum number of join edges has been
+     * reached.
+     */
+    boost::optional<EdgeId> addSimpleEqualityEdge(NodeId leftNode,
+                                                  NodeId rightNode,
+                                                  PathId leftPathId,
+                                                  PathId rightPathId);
 
     /**
      * Returns EdgeId of the edge that connects u and v. This check is order-independent, meaning
@@ -199,7 +219,9 @@ private:
      * maintains the invariant that only a single edge exists between any two node sets containing
      * the conjunction of all predicates.
      */
-    EdgeId makeEdge(NodeSet left, NodeSet right, JoinEdge::PredicateList predicates);
+    boost::optional<EdgeId> makeEdge(NodeSet left,
+                                     NodeSet right,
+                                     JoinEdge::PredicateList predicates);
 
     std::vector<JoinNode> _nodes;
     std::vector<JoinEdge> _edges;

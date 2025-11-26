@@ -137,15 +137,20 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
     JoinGraph graph;
     auto baseNodeId =
         graph.addNode(expCtx->getNamespaceString(), std::move(swCQ.getValue()), boost::none);
+    if (!baseNodeId) {
+        return Status(ErrorCodes::BadValue, "Failed to create a node for base collection");
+    }
 
     auto prefix = createEmptyPipeline(suffix->getContext());
     std::vector<ResolvedPath> resolvedPaths;
-    PathResolver pathResolver{baseNodeId, resolvedPaths};
+    PathResolver pathResolver{*baseNodeId, resolvedPaths};
 
     // Go through the pipeline trying to find the maximal chain of join optimization eligible
     // $lookup+$unwinds pairs and turning them into CanonicalQueries. At the end only ineligible for
     // join optimization stages are left in the suffix.
-    while (!suffix->getSources().empty()) {
+    // If we already reach the maximum number of edges we bail out from building the graph and put
+    // the remaining stages into the suffix.
+    while (!suffix->getSources().empty() && graph.numNodes() < kMaxNodesInJoin) {
         auto* stage = suffix->getSources().front().get();
         if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(stage); lookup) {
             // TODO SERVER-111164: once we start adding edge from $expr we need to remove check for
@@ -168,7 +173,12 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
 
             auto foreignNodeId = graph.addNode(
                 lookup->getFromNs(), std::move(swCQ.getValue()), lookup->getAsField());
-            pathResolver.addNode(foreignNodeId, lookup->getAsField());
+
+            if (!foreignNodeId) {
+                return Status(ErrorCodes::BadValue, "Graph is too big: too many nodes");
+            }
+
+            pathResolver.addNode(*foreignNodeId, lookup->getAsField());
 
             if (lookup->hasLocalFieldForeignFieldJoin()) {
                 // The order of resolving the paths are important here: localPathId shouln't be
@@ -176,10 +186,14 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                 // collection's embedPath.
                 auto localPathId = pathResolver.resolve(*lookup->getLocalField());
                 auto foreignPathId =
-                    pathResolver.addPath(foreignNodeId, *lookup->getForeignField());
+                    pathResolver.addPath(*foreignNodeId, *lookup->getForeignField());
 
-                graph.addSimpleEqualityEdge(
-                    pathResolver[localPathId].nodeId, foreignNodeId, localPathId, foreignPathId);
+                auto edgeId = graph.addSimpleEqualityEdge(
+                    pathResolver[localPathId].nodeId, *foreignNodeId, localPathId, foreignPathId);
+                if (!edgeId) {
+                    // Cannot add an edge for existing nodes.
+                    return Status(ErrorCodes::BadValue, "Graph is too big: too many edges");
+                }
             }
 
             // TODO SERVER-111164: add edges from $expr's

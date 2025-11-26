@@ -37,8 +37,8 @@ namespace mongo::join_ordering {
 TEST(JoinGraphTests, AddNode) {
     JoinGraph graph{};
 
-    auto first = graph.addNode(makeNSS("first"), nullptr, boost::none);
-    auto second = graph.addNode(makeNSS("second"), nullptr, FieldPath("snd"));
+    auto first = *graph.addNode(makeNSS("first"), nullptr, boost::none);
+    auto second = *graph.addNode(makeNSS("second"), nullptr, FieldPath("snd"));
 
     ASSERT_EQ(graph.numNodes(), 2);
     ASSERT_EQ(graph.numEdges(), 0);
@@ -50,9 +50,9 @@ TEST(JoinGraphTests, AddNode) {
 TEST(JoinGraphTests, AddEdge) {
     JoinGraph graph{};
 
-    auto first = graph.addNode(makeNSS("first"), nullptr, boost::none);
-    auto second = graph.addNode(makeNSS("second"), nullptr, FieldPath("snd"));
-    auto third = graph.addNode(makeNSS("third"), nullptr, FieldPath("trd"));
+    auto first = *graph.addNode(makeNSS("first"), nullptr, boost::none);
+    auto second = *graph.addNode(makeNSS("second"), nullptr, FieldPath("snd"));
+    auto third = *graph.addNode(makeNSS("third"), nullptr, FieldPath("trd"));
 
 
     auto firstSecond = graph.addSimpleEqualityEdge(first, second, 0, 1);
@@ -62,10 +62,13 @@ TEST(JoinGraphTests, AddEdge) {
     ASSERT_EQ(graph.numNodes(), 3);
     ASSERT_EQ(graph.numEdges(), 2);
 
-    ASSERT_EQ(graph.getEdge(firstSecond).left, 1 << first);
-    ASSERT_EQ(graph.getEdge(firstSecond).right, 1 << second);
-    ASSERT_EQ(graph.getEdge(secondThird).left, 1 << second);
-    ASSERT_EQ(graph.getEdge(secondThird).right, 1 << third);
+    ASSERT_TRUE(firstSecond.has_value());
+    ASSERT_TRUE(secondThird.has_value());
+
+    ASSERT_EQ(graph.getEdge(*firstSecond).left, 1 << first);
+    ASSERT_EQ(graph.getEdge(*firstSecond).right, 1 << second);
+    ASSERT_EQ(graph.getEdge(*secondThird).left, 1 << second);
+    ASSERT_EQ(graph.getEdge(*secondThird).right, 1 << third);
 
     ASSERT_EQ(graph.findSimpleEdge(first, second), firstSecond);
     ASSERT_EQ(graph.findSimpleEdge(second, first), firstSecond);
@@ -80,8 +83,8 @@ DEATH_TEST(JoinGraphTestsDeathTest,
            "Self edges are not permitted") {
     JoinGraph graph{};
 
-    auto a = graph.addNode(makeNSS("a"), nullptr, boost::none);
-    graph.addNode(makeNSS("b"), nullptr, boost::none);
+    auto a = *graph.addNode(makeNSS("a"), nullptr, boost::none);
+    *graph.addNode(makeNSS("b"), nullptr, boost::none);
 
     // Try adding a self-edge (a) -- (a).
     graph.addSimpleEqualityEdge(a, a, 0, 1);
@@ -92,9 +95,9 @@ DEATH_TEST(JoinGraphTestsDeathTest,
            "Self edges are not permitted") {
     JoinGraph graph{};
 
-    auto a = graph.addNode(makeNSS("a"), nullptr, boost::none);
-    auto b = graph.addNode(makeNSS("b"), nullptr, boost::none);
-    auto c = graph.addNode(makeNSS("c"), nullptr, boost::none);
+    auto a = *graph.addNode(makeNSS("a"), nullptr, boost::none);
+    auto b = *graph.addNode(makeNSS("b"), nullptr, boost::none);
+    auto c = *graph.addNode(makeNSS("c"), nullptr, boost::none);
 
     // Try adding a complex self-edge (a,b) -- (b,c).
     graph.addEdge(makeNodeSetFromIds({a, b}), makeNodeSetFromIds({b, c}), {});
@@ -103,14 +106,14 @@ DEATH_TEST(JoinGraphTestsDeathTest,
 TEST(JoinGraphTests, getJoinEdges) {
     JoinGraph graph{};
 
-    auto a = graph.addNode(makeNSS("a"), nullptr, boost::none);
-    auto b = graph.addNode(makeNSS("b"), nullptr, FieldPath("b"));
-    auto c = graph.addNode(makeNSS("c"), nullptr, FieldPath("c"));
-    auto d = graph.addNode(makeNSS("d"), nullptr, FieldPath("d"));
+    auto a = *graph.addNode(makeNSS("a"), nullptr, boost::none);
+    auto b = *graph.addNode(makeNSS("b"), nullptr, FieldPath("b"));
+    auto c = *graph.addNode(makeNSS("c"), nullptr, FieldPath("c"));
+    auto d = *graph.addNode(makeNSS("d"), nullptr, FieldPath("d"));
 
-    auto ab = graph.addSimpleEqualityEdge(a, b, 0, 1);
-    auto ac = graph.addSimpleEqualityEdge(a, c, 2, 3);
-    auto cd = graph.addSimpleEqualityEdge(c, d, 4, 5);
+    auto ab = *graph.addSimpleEqualityEdge(a, b, 0, 1);
+    auto ac = *graph.addSimpleEqualityEdge(a, c, 2, 3);
+    auto cd = *graph.addSimpleEqualityEdge(c, d, 4, 5);
 
     ASSERT_EQ(graph.getJoinEdges(NodeSet{"0001"}, NodeSet{"0010"}), std::vector<EdgeId>{ab});
     ASSERT_EQ(graph.getJoinEdges(NodeSet{"0001"}, NodeSet{"0100"}), std::vector<EdgeId>{ac});
@@ -125,13 +128,13 @@ TEST(JoinGraphTests, getJoinEdges) {
 TEST(JoinGraph, MultiplePredicatesSameEdge) {
     JoinGraph graph{};
 
-    auto a = graph.addNode(makeNSS("a"), nullptr, boost::none);
-    auto b = graph.addNode(makeNSS("b"), nullptr, boost::none);
+    auto a = *graph.addNode(makeNSS("a"), nullptr, boost::none);
+    auto b = *graph.addNode(makeNSS("b"), nullptr, boost::none);
 
-    auto ab = graph.addSimpleEqualityEdge(a, b, 0, 1);
-    auto ab2 = graph.addSimpleEqualityEdge(a, b, 2, 3);
+    auto ab = *graph.addSimpleEqualityEdge(a, b, 0, 1);
+    auto ab2 = *graph.addSimpleEqualityEdge(a, b, 2, 3);
     // Opposite order of nodes
-    auto ab3 = graph.addSimpleEqualityEdge(b, a, 5, 4);
+    auto ab3 = *graph.addSimpleEqualityEdge(b, a, 5, 4);
 
     // Edge is deduplicated
     ASSERT_EQ(ab, ab2);
@@ -175,11 +178,11 @@ TEST(JoinGraph, MultiplePredicatesSameEdge) {
 TEST(JoinGraphTests, GetNeighborsSimpleEqualityEdges) {
     JoinGraph graph{};
 
-    auto a = graph.addNode(makeNSS("a"), nullptr, boost::none);
-    auto b = graph.addNode(makeNSS("b"), nullptr, boost::none);
-    auto c = graph.addNode(makeNSS("c"), nullptr, boost::none);
-    auto d = graph.addNode(makeNSS("d"), nullptr, boost::none);
-    auto e = graph.addNode(makeNSS("e"), nullptr, boost::none);
+    auto a = *graph.addNode(makeNSS("a"), nullptr, boost::none);
+    auto b = *graph.addNode(makeNSS("b"), nullptr, boost::none);
+    auto c = *graph.addNode(makeNSS("c"), nullptr, boost::none);
+    auto d = *graph.addNode(makeNSS("d"), nullptr, boost::none);
+    auto e = *graph.addNode(makeNSS("e"), nullptr, boost::none);
 
     // At this point, no edges.
     ASSERT_EQ(graph.getNeighbors(a), NodeSet{});
@@ -204,11 +207,11 @@ TEST(JoinGraphTests, GetNeighborsSimpleEqualityEdges) {
 TEST(JoinGraphTests, GetNeighborsComplexEdge) {
     JoinGraph graph{};
 
-    auto a = graph.addNode(makeNSS("a"), nullptr, boost::none);
-    auto b = graph.addNode(makeNSS("b"), nullptr, boost::none);
-    auto c = graph.addNode(makeNSS("c"), nullptr, boost::none);
-    auto d = graph.addNode(makeNSS("d"), nullptr, boost::none);
-    auto e = graph.addNode(makeNSS("e"), nullptr, boost::none);
+    auto a = *graph.addNode(makeNSS("a"), nullptr, boost::none);
+    auto b = *graph.addNode(makeNSS("b"), nullptr, boost::none);
+    auto c = *graph.addNode(makeNSS("c"), nullptr, boost::none);
+    auto d = *graph.addNode(makeNSS("d"), nullptr, boost::none);
+    auto e = *graph.addNode(makeNSS("e"), nullptr, boost::none);
 
     // Add a complex edge (a,b) <-> (c,d) which could represent, for example, the predicate (a.a=c.c
     // AND b.b=d.d). Also add simple edge d -- e.
@@ -232,9 +235,9 @@ TEST(JoinGraphTests, GetNeighborsComplexEdge) {
 TEST(JoinGraph, GetNeighborsMultiEdges) {
     JoinGraph graph{};
 
-    auto a = graph.addNode(makeNSS("a"), nullptr, boost::none);
-    auto b = graph.addNode(makeNSS("b"), nullptr, boost::none);
-    auto c = graph.addNode(makeNSS("c"), nullptr, boost::none);
+    auto a = *graph.addNode(makeNSS("a"), nullptr, boost::none);
+    auto b = *graph.addNode(makeNSS("b"), nullptr, boost::none);
+    auto c = *graph.addNode(makeNSS("c"), nullptr, boost::none);
 
     // Now add two edges between "a" and "b". These could in theory be simplified into a single
     // complex edge with multiple predicates, but this demonstrates that getNeighbors supports it.
@@ -250,10 +253,10 @@ TEST(JoinGraph, GetNeighborsMultiEdges) {
 TEST(JoinGraph, GetNeighborsCycle) {
     JoinGraph graph{};
 
-    auto a = graph.addNode(makeNSS("a"), nullptr, boost::none);
-    auto b = graph.addNode(makeNSS("b"), nullptr, boost::none);
-    auto c = graph.addNode(makeNSS("c"), nullptr, boost::none);
-    auto d = graph.addNode(makeNSS("d"), nullptr, boost::none);
+    auto a = *graph.addNode(makeNSS("a"), nullptr, boost::none);
+    auto b = *graph.addNode(makeNSS("b"), nullptr, boost::none);
+    auto c = *graph.addNode(makeNSS("c"), nullptr, boost::none);
+    auto d = *graph.addNode(makeNSS("d"), nullptr, boost::none);
 
     // Introduce a cycle involving all four nodes.
     graph.addEdge(makeNodeSetFromIds({a}), makeNodeSetFromIds({b}), {});

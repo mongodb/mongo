@@ -46,11 +46,11 @@ AdjacencyMatrix makeMatrix(std::vector<std::string_view> rows) {
 }
 
 NodeId addNode(JoinGraph& graph) {
-    return graph.addNode(makeNSS("test"), nullptr, boost::none);
+    return *graph.addNode(makeNSS("test"), nullptr, boost::none);
 }
 
 EdgeId addEdge(JoinGraph& graph, NodeId left, NodeId right) {
-    return graph.addSimpleEqualityEdge(left, right, 0, 0);
+    return *graph.addSimpleEqualityEdge(left, right, 0, 0);
 }
 }  // namespace
 
@@ -135,7 +135,7 @@ TEST(AdjacencyMatrixBuilderTest, OneToAllEdge) {
     right.set(node3);
     right.set(node4);
 
-    auto edge = graph.addEdge(left, right, {});
+    auto edge = *graph.addEdge(left, right, {});
     auto expectedMatrix = makeMatrix({
         "11110",
         "00001",
@@ -163,7 +163,7 @@ TEST(AdjacencyMatrixBuilderTest, DoubleEdges) {
     right.set(node1);
     right.set(node3);
 
-    const auto edge0213 = graph.addEdge(left, right, {});
+    const auto edge0213 = *graph.addEdge(left, right, {});
 
     left.reset();
     right.reset();
@@ -171,7 +171,7 @@ TEST(AdjacencyMatrixBuilderTest, DoubleEdges) {
     left.set(node4);
     right.set(node3);
     right.set(node5);
-    const auto edge2435 = graph.addEdge(left, right, {});
+    const auto edge2435 = *graph.addEdge(left, right, {});
 
     left.reset();
     right.reset();
@@ -179,7 +179,7 @@ TEST(AdjacencyMatrixBuilderTest, DoubleEdges) {
     left.set(node5);
     right.set(node0);
     right.set(node2);
-    const auto edge3502 = graph.addEdge(left, right, {});
+    const auto edge3502 = *graph.addEdge(left, right, {});
 
     // No edges case
     {

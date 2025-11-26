@@ -72,7 +72,7 @@ protected:
         solnsPerQuery.insert(std::move(p));
         idxMap.insert({nss, std::move(params.indexes)});
 
-        return graph.addNode(nss, std::move(cq), params.embedPath);
+        return *graph.addNode(nss, std::move(cq), params.embedPath);
     }
 
     void outputSolutions(std::ostream& out) {

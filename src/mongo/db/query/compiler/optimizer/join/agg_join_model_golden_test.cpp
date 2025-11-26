@@ -58,7 +58,7 @@ public:
         ctx.outStream() << std::endl;
     }
 
-    auto makePipeline(StringData query, std::vector<StringData> collNames) {
+    auto makePipeline(std::vector<BSONObj> bsonStages, std::vector<StringData> collNames) {
         stdx::unordered_set<NamespaceString> secondaryNamespaces;
         for (auto&& collName : collNames) {
             secondaryNamespaces.insert(
@@ -66,12 +66,17 @@ public:
         }
         auto expCtx = getExpCtx();
         expCtx->addResolvedNamespaces(secondaryNamespaces);
-
-        const auto bsonStages = pipelineFromJsonArray(query);
         auto pipeline = Pipeline::parse(bsonStages, expCtx);
         pipeline_optimization::optimizePipeline(*pipeline);
 
         return pipeline;
+    }
+
+    auto makePipeline(StringData query, std::vector<StringData> collNames) {
+
+
+        const auto bsonStages = pipelineFromJsonArray(query);
+        return makePipeline(std::move(bsonStages), std::move(collNames));
     }
 
 private:
@@ -116,5 +121,20 @@ TEST_F(AggJoinModelGoldenTest, longPrefix) {
         ])";
     auto pipeline = makePipeline(query, {"A", "B"});
     runVariation(std::move(pipeline), "longPrefix");
+}
+
+TEST_F(AggJoinModelGoldenTest, veryLargePipeline) {
+    std::vector<BSONObj> stages;
+    constexpr size_t numJoins = kMaxNodesInJoin + 3;
+    for (size_t i = 0; i != numJoins; ++i) {
+        std::string asField = str::stream() << "from" << i;
+        stages.emplace_back(
+            BSON("$lookup" << BSON("from" << "A" << "localField" << "a" << "foreignField" << "b"
+                                          << "as" << asField)));
+        stages.emplace_back(BSON("$unwind" << ("$" + asField)));
+    }
+
+    auto pipeline = makePipeline(std::move(stages), {"A"});
+    runVariation(std::move(pipeline), "veryLargePipeline");
 }
 }  // namespace mongo::join_ordering

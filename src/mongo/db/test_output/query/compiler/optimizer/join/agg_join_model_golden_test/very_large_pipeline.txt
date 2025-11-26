@@ -1,0 +1,3159 @@
+VARIATION veryLargePipeline
+input {
+    "pipeline": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from0",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from0"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from1",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from1"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from2",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from2"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from3",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from3"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from4",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from4"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from5",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from5"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from6",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from6"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from7",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from7"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from8",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from8"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from9",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from9"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from10",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from10"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from11",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from11"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from12",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from12"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from13",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from13"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from14",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from14"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from15",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from15"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from16",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from16"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from17",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from17"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from18",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from18"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from19",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from19"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from20",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from20"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from21",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from21"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from22",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from22"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from23",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from23"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from24",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from24"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from25",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from25"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from26",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from26"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from27",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from27"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from28",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from28"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from29",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from29"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from30",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from30"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from31",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from31"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from32",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from32"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from33",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from33"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from34",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from34"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from35",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from35"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from36",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from36"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from37",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from37"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from38",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from38"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from39",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from39"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from40",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from40"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from41",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from41"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from42",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from42"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from43",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from43"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from44",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from44"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from45",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from45"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from46",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from46"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from47",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from47"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from48",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from48"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from49",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from49"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from50",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from50"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from51",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from51"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from52",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from52"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from53",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from53"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from54",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from54"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from55",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from55"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from56",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from56"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from57",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from57"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from58",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from58"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from59",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from59"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from60",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from60"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from61",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from61"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from62",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from62"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from63",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from63"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from64",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from64"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from65",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from65"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from66",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from66"
+            }
+        }
+    ]
+}
+output: {
+    "graph": {
+        "nodes": [
+            {
+                "collectionName": "test.pipeline_test",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": ""
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from0"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from1"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from2"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from3"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from4"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from5"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from6"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from7"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from8"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from9"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from10"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from11"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from12"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from13"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from14"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from15"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from16"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from17"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from18"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from19"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from20"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from21"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from22"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from23"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from24"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from25"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from26"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from27"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from28"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from29"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from30"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from31"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from32"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from33"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from34"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from35"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from36"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from37"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from38"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from39"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from40"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from41"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from42"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from43"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from44"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from45"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from46"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from47"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from48"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from49"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from50"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from51"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from52"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from53"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from54"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from55"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from56"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from57"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from58"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from59"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from60"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from61"
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "from62"
+            }
+        ],
+        "edges": [
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"1"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000000000000010"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"2"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000000000000100"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"3"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000000000001000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"4"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000000000010000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"5"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000000000100000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"6"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000000001000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"7"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000000010000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"8"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000000100000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"9"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000001000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"10"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000010000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"11"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000100000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"12"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000001000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"13"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000010000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"14"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000100000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"15"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000001000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"16"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000010000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"17"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000100000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"18"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000001000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"19"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000010000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"20"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000100000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"21"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000001000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"22"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000010000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"23"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000100000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"24"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000001000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"25"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000010000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"26"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000100000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"27"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000001000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"28"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000010000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"29"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000100000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"30"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000001000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"31"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000010000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"32"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000100000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"33"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000001000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"34"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000010000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"35"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000100000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"36"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000001000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"37"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000010000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"38"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000100000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"39"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000001000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"40"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000010000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"41"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000100000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"42"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000001000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"43"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000010000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"44"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000100000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"45"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000001000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"46"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000010000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"47"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000100000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"48"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000001000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"49"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000010000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"50"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000100000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"51"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000001000000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"52"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000010000000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"53"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000100000000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"54"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000001000000000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"55"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000010000000000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"56"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000100000000000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"57"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000001000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"58"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000010000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"59"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000100000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"60"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0001000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"61"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0010000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"62"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0100000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"63"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "1000000000000000000000000000000000000000000000000000000000000000"
+            }
+        ]
+    },
+    "resolvedPaths": [
+        {
+            "nodeId": {"$numberInt":"0"},
+            "fieldName": "a"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"2"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"3"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"4"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"5"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"6"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"7"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"8"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"9"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"10"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"11"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"12"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"13"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"14"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"15"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"16"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"17"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"18"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"19"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"20"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"21"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"22"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"23"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"24"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"25"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"26"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"27"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"28"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"29"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"30"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"31"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"32"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"33"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"34"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"35"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"36"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"37"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"38"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"39"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"40"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"41"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"42"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"43"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"44"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"45"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"46"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"47"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"48"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"49"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"50"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"51"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"52"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"53"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"54"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"55"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"56"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"57"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"58"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"59"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"60"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"61"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"62"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"63"},
+            "fieldName": "b"
+        }
+    ],
+    "prefix": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from0",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from0"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from1",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from1"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from2",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from2"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from3",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from3"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from4",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from4"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from5",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from5"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from6",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from6"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from7",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from7"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from8",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from8"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from9",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from9"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from10",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from10"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from11",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from11"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from12",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from12"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from13",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from13"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from14",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from14"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from15",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from15"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from16",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from16"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from17",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from17"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from18",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from18"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from19",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from19"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from20",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from20"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from21",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from21"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from22",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from22"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from23",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from23"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from24",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from24"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from25",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from25"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from26",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from26"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from27",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from27"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from28",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from28"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from29",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from29"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from30",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from30"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from31",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from31"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from32",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from32"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from33",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from33"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from34",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from34"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from35",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from35"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from36",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from36"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from37",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from37"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from38",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from38"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from39",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from39"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from40",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from40"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from41",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from41"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from42",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from42"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from43",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from43"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from44",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from44"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from45",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from45"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from46",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from46"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from47",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from47"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from48",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from48"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from49",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from49"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from50",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from50"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from51",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from51"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from52",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from52"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from53",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from53"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from54",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from54"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from55",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from55"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from56",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from56"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from57",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from57"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from58",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from58"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from59",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from59"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from60",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from60"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from61",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from61"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from62",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from62"
+            }
+        }
+    ],
+    "suffix": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from63",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from63"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from64",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from64"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from65",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from65"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "from66",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$from66"
+            }
+        }
+    ]
+}
+

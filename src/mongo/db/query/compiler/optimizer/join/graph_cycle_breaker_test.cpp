@@ -47,11 +47,11 @@ public:
     }
 
     NodeId addNode(StringData collName) {
-        return graph.addNode(makeNSS(collName), nullptr, {});
+        return *graph.addNode(makeNSS(collName), nullptr, {});
     }
 
     EdgeId addEdge(NodeId u, NodeId v) {
-        return graph.addEdge(makeNodeSetFromId(u), makeNodeSetFromId(v), {});
+        return *graph.addEdge(makeNodeSetFromId(u), makeNodeSetFromId(v), {});
     }
 
     template <typename... EdgeIds>

@@ -97,7 +97,7 @@ public:
             auto cq = makeCanonicalQuery(nss, filterBSON);
             solnsPerQuery.insert(
                 {cq.get(), makeCollScanPlan(nss, cq->getPrimaryMatchExpression()->clone())});
-            graph.addNode(nss, std::move(cq), boost::none);
+            ASSERT_TRUE(graph.addNode(nss, std::move(cq), boost::none).has_value());
         }
     }
 
@@ -110,7 +110,7 @@ public:
             // Make the graph fully connected in order to ensure we generate as many plans as
             // possible.
             for (size_t j = 0; j < i; ++j) {
-                graph.addSimpleEqualityEdge((NodeId)j, (NodeId)i, 0, 1);
+                ASSERT_TRUE(graph.addSimpleEqualityEdge((NodeId)j, (NodeId)i, 0, 1).has_value());
             }
         }
 
@@ -323,8 +323,8 @@ TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollection) {
     auto bNss = NamespaceString::createNamespaceString_forTest("b");
     auto aCQ = makeCanonicalQuery(aNss);
     auto bCQ = makeCanonicalQuery(bNss);
-    auto aNodeId = graph.addNode(aNss, std::move(aCQ), boost::none);
-    auto bNodeId = graph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
+    auto aNodeId = *graph.addNode(aNss, std::move(aCQ), boost::none);
+    auto bNodeId = *graph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
 
     std::vector<ResolvedPath> paths;
     paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});
@@ -361,8 +361,8 @@ TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollectionEmbedPath) {
     auto bNss = NamespaceString::createNamespaceString_forTest("b");
     auto aCQ = makeCanonicalQuery(aNss);
     auto bCQ = makeCanonicalQuery(bNss);
-    auto aNodeId = graph.addNode(aNss, std::move(aCQ), boost::none);
-    auto bNodeId = graph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
+    auto aNodeId = *graph.addNode(aNss, std::move(aCQ), boost::none);
+    auto bNodeId = *graph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
 
     std::vector<ResolvedPath> paths;
     paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});
@@ -400,8 +400,8 @@ TEST_F(JoinPredicateEstimatorFixture, NDVCompoundJoinKey) {
     auto bNss = NamespaceString::createNamespaceString_forTest("b");
     auto aCQ = makeCanonicalQuery(aNss);
     auto bCQ = makeCanonicalQuery(bNss);
-    auto aNodeId = graph.addNode(aNss, std::move(aCQ), boost::none);
-    auto bNodeId = graph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
+    auto aNodeId = *graph.addNode(aNss, std::move(aCQ), boost::none);
+    auto bNodeId = *graph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
 
     std::vector<ResolvedPath> paths;
     paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});
