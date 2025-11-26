@@ -481,6 +481,7 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             // NOTE: this is done here, as opposed to at the beginning of the serialize() method
             // because serialize() is called when generating query shape, however, at that
             // moment no query settings are present in the parent context.
+            _sharedState->_pipeline->getContext()->initializeReferencedSystemVariables();
             _sharedState->_pipeline->getContext()->setQuerySettingsIfNotPresent(
                 getExpCtx()->getQuerySettings());
 
