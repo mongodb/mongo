@@ -195,8 +195,6 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
     auto timeOutSec = stdx::chrono::seconds(
         timeout_sec ? *timeout_sec : repl::fassertOnLockTimeoutForStepUpDown.load());
 
-    _waitForDrain(Intent::BlockingWrite,
-                  stdx::chrono::duration_cast<stdx::chrono::milliseconds>(timeOutSec));
     {
         stdx::unique_lock lock(_stateMutex);
         if (_interruptionCtx) {
@@ -248,6 +246,9 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
                 }
             }
         }
+
+        _waitForDrain(Intent::BlockingWrite,
+                      stdx::chrono::duration_cast<stdx::chrono::milliseconds>(timeOutSec));
 
         updateAndLogStateTransitionMetrics(interrupt, _totalOpsKilled);
         _totalOpsKilled = 0;
