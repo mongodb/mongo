@@ -139,6 +139,20 @@ public:
                                  PathId leftPathId,
                                  PathId rightPathId);
 
+    /**
+     * Returns EdgeId of the edge that connects u and v. This check is order-independent, meaning
+     * the returned edge might be (u, v) or (v, u).
+     */
+    boost::optional<EdgeId> findEdge(NodeSet u, NodeSet v) const;
+
+    boost::optional<EdgeId> findSimpleEdge(NodeId u, NodeId v) const {
+        NodeSet uns{};
+        uns.set(u);
+        NodeSet vns{};
+        vns.set(v);
+        return findEdge(uns, vns);
+    }
+
     const JoinNode& getNode(NodeId nodeId) const {
         if constexpr (kDebugBuild) {
             return _nodes.at(nodeId);
@@ -179,8 +193,19 @@ public:
     }
 
 private:
+    /**
+     * Creates a new edge with the specified 'left' and 'right' nodesets and 'predicates'. It's the
+     * only correct way to create edges and must not be called for an existing edge, since it
+     * maintains the invariant that only a single edge exists between any two node sets containing
+     * the conjunction of all predicates.
+     */
+    EdgeId makeEdge(NodeSet left, NodeSet right, JoinEdge::PredicateList predicates);
+
     std::vector<JoinNode> _nodes;
     std::vector<JoinEdge> _edges;
+    // Maps a pair of nodesets to the edge that connects them, The node sets are stored
+    // in a key in the way that the first node is smaller than the second one.
+    absl::flat_hash_map<std::pair<NodeSet, NodeSet>, EdgeId> _edgeMap;
 };
 
 }  // namespace mongo::join_ordering

@@ -66,6 +66,13 @@ TEST(JoinGraphTests, AddEdge) {
     ASSERT_EQ(graph.getEdge(firstSecond).right, 1 << second);
     ASSERT_EQ(graph.getEdge(secondThird).left, 1 << second);
     ASSERT_EQ(graph.getEdge(secondThird).right, 1 << third);
+
+    ASSERT_EQ(graph.findSimpleEdge(first, second), firstSecond);
+    ASSERT_EQ(graph.findSimpleEdge(second, first), firstSecond);
+    ASSERT_EQ(graph.findSimpleEdge(second, third), secondThird);
+    ASSERT_EQ(graph.findSimpleEdge(third, second), secondThird);
+    ASSERT_EQ(graph.findSimpleEdge(first, third), boost::none);
+    ASSERT_EQ(graph.findSimpleEdge(third, first), boost::none);
 }
 
 DEATH_TEST(JoinGraphTestsDeathTest,
