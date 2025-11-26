@@ -615,7 +615,7 @@ kv_workload_generator::run()
                 kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
                   _sequences.size(), kv_workload_sequence_type::checkpoint);
                 *p << operation::checkpoint();
-                _sequences.push_back(p);
+                _sequences.push_back(std::move(p));
 
                 has_checkpoint = true;
             }
@@ -628,7 +628,7 @@ kv_workload_generator::run()
                   _sequences.size(), kv_workload_sequence_type::checkpoint_crash);
                 uint64_t random_number = _random.next_uint64(1000);
                 *p << operation::checkpoint_crash(random_number);
-                _sequences.push_back(p);
+                _sequences.push_back(std::move(p));
 
                 if (!has_checkpoint)
                     has_stable_timestamp = false;
@@ -641,7 +641,7 @@ kv_workload_generator::run()
                 kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
                   _sequences.size(), kv_workload_sequence_type::crash);
                 *p << operation::crash();
-                _sequences.push_back(p);
+                _sequences.push_back(std::move(p));
 
                 if (!has_checkpoint)
                     has_stable_timestamp = false;
@@ -653,7 +653,7 @@ kv_workload_generator::run()
                 table_context_ptr table = choose_table(std::move(kv_workload_sequence_ptr()));
                 data_value key = generate_key(table, op_category::evict);
                 *p << operation::evict(table->id(), key);
-                _sequences.push_back(p);
+                _sequences.push_back(std::move(p));
             }
             probability_case(_spec.restart)
             {
@@ -663,7 +663,7 @@ kv_workload_generator::run()
                 kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
                   _sequences.size(), kv_workload_sequence_type::restart);
                 *p << operation::restart();
-                _sequences.push_back(p);
+                _sequences.push_back(std::move(p));
 
                 has_checkpoint = true; /* Shutdown takes a checkpoint. */
             }
@@ -672,21 +672,21 @@ kv_workload_generator::run()
                 kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
                   _sequences.size(), kv_workload_sequence_type::rollback_to_stable);
                 *p << operation::rollback_to_stable();
-                _sequences.push_back(p);
+                _sequences.push_back(std::move(p));
             }
             probability_case(_spec.set_oldest_timestamp)
             {
                 kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
                   _sequences.size(), kv_workload_sequence_type::set_oldest_timestamp);
                 *p << operation::set_oldest_timestamp(k_timestamp_none); /* Placeholder. */
-                _sequences.push_back(p);
+                _sequences.push_back(std::move(p));
             }
             probability_case(_spec.set_stable_timestamp)
             {
                 kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
                   _sequences.size(), kv_workload_sequence_type::set_stable_timestamp);
                 *p << operation::set_stable_timestamp(k_timestamp_none); /* Placeholder. */
-                _sequences.push_back(p);
+                _sequences.push_back(std::move(p));
 
                 has_stable_timestamp = true;
             }
@@ -701,7 +701,7 @@ kv_workload_generator::run()
         kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
           _sequences.size(), kv_workload_sequence_type::set_stable_timestamp);
         *p << operation::set_stable_timestamp(k_timestamp_none); /* Placeholder. */
-        _sequences.push_back(p);
+        _sequences.push_back(std::move(p));
         has_stable_timestamp = true;
     }
 

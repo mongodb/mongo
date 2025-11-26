@@ -2424,6 +2424,10 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 
     WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 
+    /* Skip running checkpoint for standby. */
+    if (__wt_conn_is_disagg(session) && !S2C(session)->layered_table_manager.leader)
+        goto done;
+
     /*
      * Checkpoints require a snapshot to write a transactionally consistent snapshot of the data.
      *
@@ -2445,6 +2449,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
     WT_TRET(__wt_session_release_resources(session));
 
 err:
+done:
     API_END_RET_NOTFOUND_MAP(session, ret);
 }
 

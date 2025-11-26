@@ -243,14 +243,3 @@ struct __wt_cell_unpack_delta_leaf_kv {
 #define WT_DELTA_LEAF_IS_DELETE 0x1u
     uint8_t flags;
 };
-
-/*
- * WT_REC_KV--
- *	An on-page key/value item we're building.
- */
-struct __wt_cell_kv {
-    WT_ITEM buf;  /* Data */
-    WT_CELL cell; /* Cell and cell's length */
-    size_t cell_len;
-    size_t len; /* Total length of cell + data */
-};
