@@ -908,6 +908,13 @@ public:
             OperationContext* opCtx,
             std::shared_ptr<const WouldChangeOwningShardInfo> wouldChangeOwningShardInfo);
 
+        /**
+         * Adds fields to the given session transaction record (i.e. config.transactions entry)
+         * necessary to recover from a precise checkpoint.
+         */
+        void addPreparedTransactionPreciseCheckpointRecoveryFields(
+            SessionTxnRecord& sessionTxnRecord) const;
+
     private:
         // Checks whether the given statementId for the specified transaction has already executed
         // in any external or internal sessions associated with this session (see the header comment

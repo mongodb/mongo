@@ -1891,7 +1891,9 @@ protected:
 
     void assertTxnRecord(TxnNumber txnNum,
                          repl::OpTime opTime,
-                         boost::optional<DurableTxnStateEnum> txnState) {
+                         boost::optional<DurableTxnStateEnum> txnState,
+                         boost::optional<Timestamp> prepareTs = boost::none,
+                         boost::optional<size_t> numAffectedNamespaces = boost::none) {
         DBDirectClient client(opCtx());
         FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
         findRequest.setFilter(BSON("_id" << session()->getSessionId().toBSON()));
@@ -1915,6 +1917,20 @@ protected:
             ASSERT_EQ(opTime, txnParticipant.getLastWriteOpTime());
         } else {
             ASSERT_EQ(txnRecord.getLastWriteOpTime(), txnParticipant.getLastWriteOpTime());
+        }
+
+        if (prepareTs) {
+            ASSERT(txnRecord.getPrepareTimestamp());
+            ASSERT_EQ(*txnRecord.getPrepareTimestamp(), *prepareTs);
+        } else {
+            ASSERT(!txnRecord.getPrepareTimestamp());
+        }
+
+        if (numAffectedNamespaces) {
+            ASSERT(txnRecord.getAffectedNamespaces());
+            ASSERT_EQ(txnRecord.getAffectedNamespaces()->size(), *numAffectedNamespaces);
+        } else {
+            ASSERT(!txnRecord.getAffectedNamespaces());
         }
     }
 
@@ -2288,6 +2304,30 @@ TEST_F(OpObserverTransactionTest, PreparingTransactionWritesToTransactionTable) 
               shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
     txnParticipant.stashTransactionResources(opCtx());
     assertTxnRecord(txnNum(), prepareOpTime, DurableTxnStateEnum::kPrepared);
+    txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
+}
+
+TEST_F(OpObserverTransactionTest,
+       PreparingTransactionWritesToTransactionTablePreciseCheckpointsFlagOn) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPreparedTransactionsPreciseCheckpoints", true);
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+
+    repl::OpTime prepareOpTime;
+    {
+        Lock::GlobalLock lk(opCtx(), MODE_IX);
+        WriteUnitOfWork wuow(opCtx());
+        auto reservedSlots = prepareTransaction();
+        prepareOpTime = reservedSlots.back();
+    }
+
+    ASSERT_EQ(prepareOpTime.getTimestamp(),
+              shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
+    txnParticipant.stashTransactionResources(opCtx());
+    assertTxnRecord(
+        txnNum(), prepareOpTime, DurableTxnStateEnum::kPrepared, prepareOpTime.getTimestamp(), 0);
     txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
 }
 

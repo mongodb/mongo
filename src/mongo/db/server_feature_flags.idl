@@ -216,6 +216,12 @@ feature_flags:
         cpp_varname: gFeatureFlagDedicatedPortForMaintenanceOperations
         default: false
         fcv_gated: false
+    featureFlagPreparedTransactionsPreciseCheckpoints:
+        description: "Enables logic necessary to recover prepared transactions with precise checkpoints"
+        cpp_varname: gFeatureFlagPreparedTransactionsPreciseCheckpoints
+        default: false
+        # TODO SERVER-113736 Set this to true and correctly gate any checks on FCV
+        fcv_gated: false
     featureFlagKillOpErrorCodeOverride:
         description: "Feature flag to enable specifying custom error codes when killing operations"
         cpp_varname: gFeatureFlagKillOpErrorCodeOverride

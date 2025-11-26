@@ -3775,6 +3775,17 @@ void TransactionParticipant::Participant::handleWouldChangeOwningShardError(
     }
 }
 
+void TransactionParticipant::Participant::addPreparedTransactionPreciseCheckpointRecoveryFields(
+    SessionTxnRecord& sessionTxnRecord) const {
+    const auto& affectedNamespacesSet = affectedNamespaces();
+    sessionTxnRecord.setAffectedNamespaces(boost::optional<std::vector<NamespaceString>>(
+        boost::in_place_init, affectedNamespacesSet.begin(), affectedNamespacesSet.end()));
+
+    auto prepareOpTime = getPrepareOpTime();
+    invariant(!prepareOpTime.isNull());
+    sessionTxnRecord.setPrepareTimestamp(prepareOpTime.getTimestamp());
+}
+
 void TransactionParticipant::Participant::_registerUpdateCacheOnCommit(
     OperationContext* opCtx,
     std::vector<StmtId> stmtIdsWritten,

@@ -7897,5 +7897,96 @@ TEST_F(TxnParticipantAndTxnRouterTest, CannotEagerReapSessionWithYieldedTxnRoute
     ASSERT_FALSE(doesExistInCatalog(retryableChildLsidReapable, sessionCatalog));
 }
 
+TEST_F(TxnParticipantTest, CanAddPreciseCheckpointFieldsForRecovery) {
+    //
+    // Set up namespaces and add operations that touch them to the transaction.
+    //
+    const std::vector<NamespaceString> kNamespaces = {
+        NamespaceString::createNamespaceString_forTest("TestDB1", "TestColl1"),
+        NamespaceString::createNamespaceString_forTest("TestDB1", "TestColl2"),
+        NamespaceString::createNamespaceString_forTest("TestDB2", "TestColl1")};
+
+    std::vector<UUID> uuids;
+    uuids.reserve(kNamespaces.size());
+
+    for (const auto& nss : kNamespaces) {
+        AutoGetDb autoDb(opCtx(), nss.dbName(), MODE_X);
+        auto db = autoDb.ensureDbExists(opCtx());
+        ASSERT_TRUE(db);
+
+        WriteUnitOfWork wuow(opCtx());
+        CollectionOptions options;
+        auto collection = db->createCollection(opCtx(), nss, options);
+        wuow.commit();
+        uuids.push_back(collection->uuid());
+    }
+
+    auto sessionCheckout = checkOutSession();
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT(txnParticipant.transactionIsOpen());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+    for (size_t collIndex = 0; collIndex < kNamespaces.size(); ++collIndex) {
+        auto operation = repl::DurableOplogEntry::makeInsertOperation(
+            kNamespaces[collIndex], uuids[collIndex], BSON("_id" << 0), BSON("_id" << 0));
+        txnParticipant.addTransactionOperation(opCtx(), operation);
+
+        // Add twice to verify we don't double count.
+        txnParticipant.addTransactionOperation(opCtx(), operation);
+    }
+    auto [timestamp, namespaces] = txnParticipant.prepareTransaction(opCtx(), {});
+
+    //
+    // Verify the correct fields are added.
+    //
+
+    SessionTxnRecord sessionTxnRecord;
+    txnParticipant.addPreparedTransactionPreciseCheckpointRecoveryFields(sessionTxnRecord);
+
+    ASSERT_EQ(sessionTxnRecord.getPrepareTimestamp(), timestamp);
+    ASSERT_EQ(sessionTxnRecord.getPrepareTimestamp(),
+              txnParticipant.getPrepareOpTime().getTimestamp());
+
+    auto addedAffectedNamespaces = sessionTxnRecord.getAffectedNamespaces();
+    ASSERT(addedAffectedNamespaces);
+    std::sort(addedAffectedNamespaces->begin(), addedAffectedNamespaces->end());
+    ASSERT_EQ(*addedAffectedNamespaces, kNamespaces);
+
+    std::vector<NamespaceString> namespacesVec;
+    std::move(namespaces.begin(), namespaces.end(), std::back_inserter(namespacesVec));
+    std::sort(namespacesVec.begin(), namespacesVec.end());
+    ASSERT_EQ(addedAffectedNamespaces, namespacesVec);
+}
+
+TEST_F(TxnParticipantTest, CanAddPreciseCheckpointFieldsForRecoveryNoNamespaces) {
+    //
+    // Prepare a transaction that touches no namespaces.
+    //
+    auto sessionCheckout = checkOutSession();
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT(txnParticipant.transactionIsOpen());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+    auto [timestamp, namespaces] = txnParticipant.prepareTransaction(opCtx(), {});
+
+    //
+    // Verify the correct fields are added.
+    //
+
+    SessionTxnRecord sessionTxnRecord;
+    txnParticipant.addPreparedTransactionPreciseCheckpointRecoveryFields(sessionTxnRecord);
+
+    ASSERT_EQ(sessionTxnRecord.getPrepareTimestamp(), timestamp);
+    ASSERT_EQ(sessionTxnRecord.getPrepareTimestamp(),
+              txnParticipant.getPrepareOpTime().getTimestamp());
+
+    auto addedAffectedNamespaces = sessionTxnRecord.getAffectedNamespaces();
+    ASSERT(addedAffectedNamespaces);
+    ASSERT_EQ(addedAffectedNamespaces->size(), 0);
+    ASSERT_EQ(namespaces.size(), 0);
+}
+
 }  // namespace
 }  // namespace mongo
