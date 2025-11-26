@@ -62,8 +62,6 @@ for (var i = 0; i < fcvValues.length; i++) {
 
     // Create database `createdBeforeUpgrading` under downgraded FCV
     assert.commandWorked(
-        mongos.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
-    assert.commandWorked(
         mongos.adminCommand({enableSharding: kBeforeUpgradingDbName, primaryShard: shard0}));
     assert.commandWorked(createdBeforeUpgradingDB.coll.insert({_id: 'foo'}));
 
