@@ -16,6 +16,7 @@
  */
 
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {assertExplainTargetsExpectedTimeseriesNamespace} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 export const $config = (function () {
     // This value must be 10. The tids of the threads are sequential, but don't necessarily start at
@@ -96,13 +97,11 @@ export const $config = (function () {
                 commandResult.command.rawData,
                 `Expected command to include rawData but got ${tojson(commandResult)}`,
             );
-            assert.eq(
-                commandResult.command[commandName],
-                coll.getName(),
-                `Expected command namespace to be ${tojson(coll.getName())} but got ${tojson(
-                    commandResult.command[commandName],
-                )}`,
-            );
+            assertExplainTargetsExpectedTimeseriesNamespace(db, coll, commandResult, commandName, {
+                // In balancer suites, `coll` may be tracked when the explain command was run,
+                // but then recreateCollection may drop the collection and re-create it as untracked.
+                mayConcurrentlyTrackOrUntrack: TestData.runningWithBalancer,
+            });
         },
 
         handleCollectionDrop: function (fn, opName) {
