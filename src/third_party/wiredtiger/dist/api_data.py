@@ -659,6 +659,14 @@ connection_runtime_config = [
             A page release encourages eviction of hot or large pages, which is more likely to
             succeed without a cursor keeping the page pinned.''',
             type='boolean'),
+        Config('disagg_address_cookie_upgrade', 'none', r'''
+            modify the disaggregated block manager to pretend that it is a newer version to test
+            upgrade/downgrade of address cookies.''',
+            choices=['none', 'compatible', 'incompatible'], undoc=True),
+        Config('disagg_address_cookie_optional_field', 'false', r'''
+            if true, modify the disaggregated block manager to pretend that it has an optional
+            field protected by a new flag.''',
+            type='boolean', undoc=True),
         Config('eviction', 'false', r'''
             if true, modify internal algorithms to change skew to force history store eviction
             to happen more aggressively. This includes but is not limited to not skewing newest,

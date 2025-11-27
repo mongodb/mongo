@@ -208,12 +208,12 @@ struct __wt_btree {
  * with a sync.
  */
 #define WT_BTREE_SYNCING(btree) \
-    (__wt_atomic_load_enum_relaxed(&(btree)->syncing) != WT_BTREE_SYNC_OFF)
+    (__wt_atomic_load_enum_acquire(&(btree)->syncing) != WT_BTREE_SYNC_OFF)
 #define WT_SESSION_BTREE_SYNC(session) \
-    (__wt_atomic_load_ptr_relaxed(&S2BT(session)->sync_session) == (session))
+    (__wt_atomic_load_ptr_acquire(&S2BT(session)->sync_session) == (session))
 #define WT_SESSION_BTREE_SYNC_SAFE(session, btree)                                \
-    (__wt_atomic_load_enum_relaxed(&(btree)->syncing) != WT_BTREE_SYNC_RUNNING || \
-      __wt_atomic_load_ptr_relaxed(&(btree)->sync_session) == (session))
+    (__wt_atomic_load_enum_acquire(&(btree)->syncing) != WT_BTREE_SYNC_RUNNING || \
+      __wt_atomic_load_ptr_acquire(&(btree)->sync_session) == (session))
 
     wt_shared uint64_t bytes_dirty_intl;    /* Bytes in dirty internal pages. */
     wt_shared uint64_t bytes_dirty_leaf;    /* Bytes in dirty leaf pages. */

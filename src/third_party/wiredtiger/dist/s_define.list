@@ -140,6 +140,7 @@ __WIREDTIGER_EXT_H_
 __WIREDTIGER_H_
 __WT_INTERNAL_H
 __wt_atomic_and_generic_relaxed
+__wt_atomic_load_enum_acquire
 __wt_atomic_load_generic_relaxed
 __wt_atomic_or_generic_relaxed
 __wt_atomic_store_generic_relaxed

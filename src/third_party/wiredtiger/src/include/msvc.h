@@ -226,7 +226,13 @@ __wt_atomic_store_double_relaxed(double *vp, double v)
 }
 
 #define __wt_atomic_load_enum_relaxed(vp) (*(vp))
+#define __wt_atomic_load_enum_acquire(vp) (WT_ACQUIRE_BARRIER(), *(vp))
 #define __wt_atomic_store_enum_relaxed(vp, v) (*(vp) = (v))
+#define __wt_atomic_store_enum_release(vp, v) \
+    do {                                      \
+        WT_RELEASE_BARRIER();                 \
+        *(vp) = (v);                          \
+    } while (0)
 
 #define __wt_atomic_load_ptr_relaxed(vp) (*(vp))
 #define __wt_atomic_store_ptr_relaxed(vp, v) (*(vp) = (v))

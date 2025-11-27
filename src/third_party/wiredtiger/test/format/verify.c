@@ -44,8 +44,7 @@ table_verify(TABLE *table, void *arg)
     testutil_assert(table != NULL);
 
     /*
-     * FIXME-WT-15619 and FIXME-WT-15618: We can run verify on layered tables when deltas are
-     * written as a full image.
+     * FIXME-WT-15619: We can run verify on layered tables when deltas are written as a full image.
      *
      * Remove this check once both tickets are resolved.
      */

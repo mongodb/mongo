@@ -243,10 +243,14 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
           __wt_atomic_load_enum_relaxed(&btree->syncing) == WT_BTREE_SYNC_OFF &&
             __wt_atomic_load_ptr_relaxed(&btree->sync_session) == NULL);
 
-        __wt_atomic_store_ptr_relaxed(&btree->sync_session, session);
-        __wt_atomic_store_enum_relaxed(&btree->syncing, WT_BTREE_SYNC_WAIT);
+        /*
+         * FIXME-WT-16110: Investigate what should be the correct memory ordering for these
+         * variables.
+         */
+        __wt_atomic_store_ptr_release(&btree->sync_session, session);
+        __wt_atomic_store_enum_release(&btree->syncing, WT_BTREE_SYNC_WAIT);
         __wt_gen_next_drain(session, WT_GEN_EVICT);
-        __wt_atomic_store_enum_relaxed(&btree->syncing, WT_BTREE_SYNC_RUNNING);
+        __wt_atomic_store_enum_release(&btree->syncing, WT_BTREE_SYNC_RUNNING);
 
         /*
          * Reset the number of obsolete time window pages to let the eviction threads and checkpoint
@@ -414,9 +418,24 @@ err:
     if (txn->isolation == WT_ISO_READ_COMMITTED && saved_pinned_id == WT_TXN_NONE)
         __wt_txn_release_snapshot(session);
 
-    /* Clear the checkpoint flag. */
-    __wt_atomic_store_enum_relaxed(&btree->syncing, WT_BTREE_SYNC_OFF);
-    __wt_atomic_store_ptr_relaxed(&btree->sync_session, NULL);
+    if (syncop == WT_SYNC_CHECKPOINT) {
+        /*
+         * Ensure the checkpoint generation is updated before clearing the sync flag. Otherwise,
+         * eviction could evict a page from the btree after the flag is cleared but before the
+         * checkpoint generation is updated. This would violate the constraints of disaggregated
+         * storage, as eviction would write a page that should not be part of the current
+         * checkpoint.
+         */
+        __wt_checkpoint_update_generation(session, btree);
+
+        /* Clear the checkpoint flag. */
+        /*
+         * FIXME-WT-16110: Investigate what should be the correct memory ordering for these
+         * variables.
+         */
+        __wt_atomic_store_enum_release(&btree->syncing, WT_BTREE_SYNC_OFF);
+        __wt_atomic_store_ptr_release(&btree->sync_session, NULL);
+    }
 
     __wt_spin_unlock(session, &btree->flush_lock);
 

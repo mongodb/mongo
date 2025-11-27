@@ -490,6 +490,7 @@ __wti_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
     WT_ERR(__wt_tiered_conn_config(session, cfg, true));
     WT_ERR(__wti_sweep_config(session, cfg));
     WT_ERR(__wti_timing_stress_config(session, cfg));
+    WT_ERR(__wti_disagg_debug_mode_config(session, cfg));
     WT_ERR(__wti_json_config(session, cfg, true));
     WT_ERR(__wt_verbose_config(session, cfg, true));
     WT_ERR(__wt_rollback_to_stable_reconfig(session, cfg));

@@ -543,6 +543,16 @@ extern const WT_NAME_FLAG __wt_stress_types[];
 #define WT_CONN_SESSIONS_GET(conn) ((conn)->session_array.__array)
 
 /*
+ * WT_CONN_DEBUG_DISAGG_ADDRESS_COOKIE_UPGRADE --
+ *     The debug mode for upgrade/downgrade of the disaggregated storage address cookies.
+ */
+typedef enum __wt_conn_debug_disagg_address_cookie_upgrade {
+    WT_CONN_DEBUG_DISAGG_ADDRESS_COOKIE_UPGRADE_NONE = 0,
+    WT_CONN_DEBUG_DISAGG_ADDRESS_COOKIE_UPGRADE_COMPATIBLE,
+    WT_CONN_DEBUG_DISAGG_ADDRESS_COOKIE_UPGRADE_INCOMPATIBLE
+} WT_CONN_DEBUG_DISAGG_ADDRESS_COOKIE_UPGRADE;
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
@@ -907,6 +917,10 @@ struct __wt_connection_impl {
     /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
     /* Categories of assertions that can be runtime enabled. */
     uint64_t extra_diagnostics_flags;
+
+    /* The debug mode for upgrade/downgrade of the disaggregated storage address cookies. */
+    WT_CONN_DEBUG_DISAGG_ADDRESS_COOKIE_UPGRADE debug_disagg_address_cookie_upgrade;
+    bool debug_disagg_address_cookie_optional_field;
 
     /* Verbose settings for our various categories. */
     WT_VERBOSE_LEVEL verbose[WT_VERB_NUM_CATEGORIES];

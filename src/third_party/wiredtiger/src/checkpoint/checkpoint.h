@@ -188,6 +188,7 @@ extern void __wt_checkpoint_snapshot_clear(WT_CKPT_SNAPSHOT *snapshot);
 extern void __wt_checkpoint_timer_stats(WT_SESSION_IMPL *session);
 extern void __wt_checkpoint_timer_stats_clear(WT_SESSION_IMPL *session);
 extern void __wt_checkpoint_tree_reconcile_update(WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta);
+extern void __wt_checkpoint_update_generation(WT_SESSION_IMPL *session, WT_BTREE *btree);
 extern void __wt_ckptlist_free(WT_SESSION_IMPL *session, WT_CKPT **ckptbasep);
 extern void __wt_ckptlist_saved_free(WT_SESSION_IMPL *session);
 

@@ -1357,7 +1357,7 @@ struct Pages : public Table<Pages> {
                  );)";
 
         /*
-         * Get the LSN of the first non-discarded full page below the given LSN.
+         * Get the LSN of the previous non-discarded full page for the given LSN.
          *
          * The query LSN may belong to a delta page. Therefore, we find the corresponding full page
          * LSN first. Then we look for the previous full page LSN. Assuming that given query LSN
@@ -1367,115 +1367,61 @@ struct Pages : public Table<Pages> {
          */
         stmt[GET_FULL_PAGE_LSN] =
           R"(WITH full_page AS (
-             SELECT MAX(p0.lsn) AS lsn
+             SELECT
+                 p0.backlink_lsn AS backlink_lsn
              FROM pages AS p0
              WHERE p0.table_id = ?1
                  AND p0.page_id = ?2
                  AND p0.lsn <= ?3
-                 AND p0.delta = 0
+                 AND (
+                     -- Full page, return itself
+                     (?4 = 0 AND p0.lsn = ?3)
+                     OR
+                     -- Delta page, return corresponding full page
+                     (?4 = 1 AND p0.lsn = ?5)
+                 )
              )
-             SELECT MAX(p1.lsn)
+             SELECT p1.lsn
              FROM
                  pages AS p1,
                  full_page AS fp
              WHERE p1.table_id = ?1
                  AND p1.page_id = ?2
-                 AND p1.lsn < fp.lsn
+                 AND p1.lsn = fp.backlink_lsn
                  AND p1.delta = 0
                  AND NOT EXISTS (
                      SELECT 1
                      FROM pages AS p2
                      WHERE p2.table_id = p1.table_id
                          AND p2.page_id = p1.page_id
-                         AND p2.lsn < fp.lsn
+                         AND p2.base_lsn = fp.backlink_lsn
                          AND p2.discarded = 1
                  );)";
 
         /*
-         * Retrieve information about entire delta chain
-         * stopping at the first full page. The chain may include discarded page.
+         * Retrieve information about entire delta chain stopping at the first full page.
          *
-         * This query uses a window function OVER to assign a group number
-         * to rows based on the 'delta' column. This is more performant
-         * than discovering full page in a separate query as it may only
-         * require a single scan over the data.
-         *
-         * The window function works as follows:
-         *
-         * First, the inner part:
-         *     CASE
-         *         WHEN delta = 0 THEN 1
-         *         ELSE 0
-         *     END
-         *
-         * This expression looks at each row one by one. For delta pages
-         * (where delta = 1), it produces a 0. For full pages (where
-         * delta = 0), it produces a 1.
-         *
-         * So, it's essentially a marker for the rows with full pages.
-         * We consider such rows as terminators.
-         *
-         * Next, the outer part:
-         *     SUM(...) OVER (ORDER BY lsn DESC) as page_group
-         *
-         * This expression takes the markers produced by the inner part
-         * and computes a running total (SUM) of these markers, ordered
-         * by LSN in descending order (from newest to oldest).
-         *
-         * This creates a cumulative count of how many "terminating" rows
-         * (delta = 0) have been seen so far.
-         *
-         * Example:
-         *
-         *   lsn | delta | inner CASE | page_group | explanation
-         *   ----+-------+------------+------------+------------
-         *   10  | 1     | 0          | 0          | Sum of (0)
-         *   9   | 1     | 0          | 0          | Sum of (0, 0)
-         *   8   | 1     | 0          | 0          | Sum of (0, 0, 0)
-         *   7   | 0     | 1          | 1          | Sum of (0, 0, 0, 1)
-         *   6   | 0     | 1          | 2          | Sum of (0, 0, 0, 1, 1)
-         *
-         * The entire chain of pages (lsn 10, 9, 8, 7) is returned, stopping
-         * at the first full page (lsn 7). The next full page (lsn 6) is
-         * not included because page_group becomes 2 and we explicitly check
-         * for that:
-         *     ...
-         *     WHERE page_group = 0
-         *         OR (page_group = 1 AND delta = 0)
-         *
-         * This condition ensures that we get all delta pages in the chain
-         * up to the first full page.
+         * The chain may include discarded page.
          */
         stmt[GET_PAGE_INFOS] =
-          R"(WITH chained_pages AS (
-             SELECT
-                 table_id,
-                 page_id,
-                 lsn,
-                 backlink_lsn,
-                 base_lsn,
-                 flags,
-                 delta,
-                 SUM(CASE
-                         WHEN delta = 0 THEN 1
-                         ELSE 0
-                     END) OVER (ORDER BY lsn DESC) as page_group
-             FROM pages
-             WHERE table_id = ?
-                 AND page_id = ?
-                 AND lsn <= ?
-                 AND timestamp_materialized_us <= ?
-             )
-             SELECT
+          R"(SELECT
                  table_id,
                  page_id,
                  lsn,
                  backlink_lsn,
                  base_lsn,
                  flags
-             FROM chained_pages
-             WHERE page_group = 0
-                 OR (page_group = 1 AND delta = 0)
+             FROM pages
+             WHERE table_id = ?1
+                 AND page_id = ?2
+                 AND lsn <= ?3
+                 AND (
+                    -- Full page, return only that specific page
+                    (?4 = 0 AND lsn = ?3)
+                    OR
+                    -- Delta page, return entire chain, including full page
+                    (?4 = 1 AND (lsn = ?5 OR base_lsn = ?5))
+                 )
              ORDER BY lsn DESC;)";
 
         /*
@@ -1651,8 +1597,15 @@ struct Pages : public Table<Pages> {
         }
 
         if (config.verify) {
+            const PageInfo start_page{.table_id = table_id,
+              .page_id = page_id,
+              .lsn = lsn,
+              .backlink_lsn = args->backlink_lsn,
+              .base_lsn = args->base_lsn,
+              .flags = args->flags,
+              .encryption = args->encryption};
             auto acc_r = request(AccessMode::READ);
-            verify_chain(acc_r.conn, table_id, page_id, lsn);
+            verify_chain(acc_r.conn, start_page);
         }
     }
 
@@ -1723,11 +1676,11 @@ struct Pages : public Table<Pages> {
             LOG_AND_THROW("Insufficient space in results_array: {}", *results_count);
         }
 
-        /* Verify full page, if configured */
-        const uint64_t prev_full_lsn =
-          config.verify ? get_prev_full_page_lsn(acc.conn, table_id, page_id, args->lsn) : 0;
         /* Always verify the delta chain when retrieving pages, even if config.verify=false. */
-        verify_chain(pages, prev_full_lsn);
+        if (!pages.empty()) {
+            const uint64_t prev_full_lsn = get_prev_full_page_lsn(acc.conn, pages.front());
+            verify_chain(pages, prev_full_lsn);
+        }
 
         /* Fill args from the first found page. (It will be the last in returned array.) */
         uint64_t save_lsn = args->lsn;
@@ -1805,12 +1758,17 @@ struct Pages : public Table<Pages> {
 
 private:
     uint64_t
-    get_prev_full_page_lsn(Connection &conn, uint64_t table_id, uint64_t page_id, uint64_t lsn)
+    get_prev_full_page_lsn(Connection &conn, const PageInfo &start_page)
     {
         Connection::StatementPtr stmt = conn.db_statement(Statement::GET_FULL_PAGE_LSN);
-        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 1, static_cast<sqlite3_int64>(table_id));
-        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 2, static_cast<sqlite3_int64>(page_id));
-        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 3, static_cast<sqlite3_int64>(lsn));
+        SQ_CHECK(
+          sqlite3_bind_int64, stmt.get(), 1, static_cast<sqlite3_int64>(start_page.table_id));
+        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 2, static_cast<sqlite3_int64>(start_page.page_id));
+        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 3, static_cast<sqlite3_int64>(start_page.lsn));
+        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 4,
+          static_cast<sqlite3_int64>(start_page.flags & WT_PAGE_LOG_DELTA ? 1 : 0));
+        SQ_CHECK(
+          sqlite3_bind_int64, stmt.get(), 5, static_cast<sqlite3_int64>(start_page.base_lsn));
 
         int ret = SQ_CHECK(sqlite3_step, stmt.get());
         if (ret == SQLITE_DONE) {
@@ -1904,14 +1862,17 @@ private:
     }
 
     void
-    get_infos(Connection &conn, uint64_t table_id, uint64_t page_id, uint64_t lsn,
-      std::vector<PageInfo> &pages)
+    get_infos(Connection &conn, const PageInfo &start_page, std::vector<PageInfo> &pages)
     {
         Connection::StatementPtr stmt = conn.db_statement(Statement::GET_PAGE_INFOS);
-        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 1, static_cast<sqlite3_int64>(table_id));
-        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 2, static_cast<sqlite3_int64>(page_id));
-        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 3, static_cast<sqlite3_int64>(lsn));
-        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 4, static_cast<sqlite3_int64>(now_us()));
+        SQ_CHECK(
+          sqlite3_bind_int64, stmt.get(), 1, static_cast<sqlite3_int64>(start_page.table_id));
+        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 2, static_cast<sqlite3_int64>(start_page.page_id));
+        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 3, static_cast<sqlite3_int64>(start_page.lsn));
+        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 4,
+          static_cast<sqlite3_int64>(start_page.flags & WT_PAGE_LOG_DELTA ? 1 : 0));
+        SQ_CHECK(
+          sqlite3_bind_int64, stmt.get(), 5, static_cast<sqlite3_int64>(start_page.base_lsn));
 
         pages.clear();
         while (SQ_CHECK(sqlite3_step, stmt.get()) == SQLITE_ROW) {
@@ -1943,16 +1904,16 @@ private:
      * Throws on error.
      */
     void
-    verify_chain(Connection &conn, uint64_t table_id, uint64_t page_id, uint64_t lsn)
+    verify_chain(Connection &conn, const PageInfo &start_page)
     {
         std::vector<PageInfo> pages;
-        get_infos(conn, table_id, page_id, lsn, pages);
+        get_infos(conn, start_page, pages);
         if (pages.size() == 0) {
-            LOG_AND_THROW(
-              "No pages found for table_id={}, page_id={} at lsn<={}", table_id, page_id, lsn);
+            LOG_AND_THROW("No pages found for table_id={}, page_id={} at lsn<={}",
+              start_page.table_id, start_page.page_id, start_page.lsn);
         }
 
-        const uint64_t prev_full_lsn = get_prev_full_page_lsn(conn, table_id, page_id, lsn);
+        const uint64_t prev_full_lsn = get_prev_full_page_lsn(conn, start_page);
 
         verify_chain(pages, prev_full_lsn);
     }

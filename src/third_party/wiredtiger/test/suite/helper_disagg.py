@@ -251,7 +251,7 @@ class DisaggConfigMixin:
         self.close_conn()
         self.open_conn(directory, config)
 
-    def restart_without_local_files(self, pickup_checkpoint=True, step_up=False):
+    def restart_without_local_files(self, config=None, pickup_checkpoint=True, step_up=False):
         """
         Restart the node without local files.
         """
@@ -278,7 +278,7 @@ class DisaggConfigMixin:
         shutil.copytree('kv_home', os.path.join(dir, 'kv_home'))
 
         # Reopen the connection
-        self.open_conn()
+        self.open_conn(config=config)
 
         # Pick up the last checkpoint
         if pickup_checkpoint:
