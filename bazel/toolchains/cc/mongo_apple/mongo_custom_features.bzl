@@ -8,7 +8,9 @@ load(
 load(
     "//bazel/toolchains/cc:mongo_custom_features.bzl",
     "all_compile_actions",
+    "all_link_actions",
     "get_common_features",
+    "lto_index_actions",
 )
 
 _OBJCPP_EXECUTABLE_ACTION_NAME = "objc++-executable"
@@ -241,6 +243,22 @@ def get_apple_features(ctx):
                         flag_group(
                             flags = [
                                 "-g3",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        feature(
+            name = "rpath_override",
+            enabled = not ctx.attr.linkstatic,
+            flag_sets = [
+                flag_set(
+                    actions = all_link_actions + lto_index_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "-Wl,-rpath,\\$ORIGIN/../lib",
                             ],
                         ),
                     ],
