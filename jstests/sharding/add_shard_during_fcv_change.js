@@ -2,7 +2,9 @@
  * Test to ensure that fcv change and add shard are mutually exclusive
  * @tags: [
  *   requires_fcv_82,
- *   # TODO(SERVER-108416): Remove exclusion when 8.2 -> 8.3 FCV change finishes
+ *   # Not all multiversion combination is downgradable to lastLTSFCV (eg. 8.3 binary running
+ *   # 8.2 FCV trying to downgrade to 8.0 is invalid) and multiversion testing doesn't give any more
+ *   # coverage for this scenario.
  *   multiversion_incompatible,
  * ]
  */
