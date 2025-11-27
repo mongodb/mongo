@@ -1568,6 +1568,15 @@ Execution Engine: sbe
 						{
 							"inputStages" : [
 								{
+									"direction" : "forward",
+									"filter" : {
+										"d" : {
+											"$lt" : 3
+										}
+									},
+									"stage" : "COLLSCAN"
+								},
+								{
 									"inputStage" : {
 										"direction" : "forward",
 										"filter" : {
@@ -1581,40 +1590,31 @@ Execution Engine: sbe
 										"a" : true,
 										"b" : true
 									}
-								},
-								{
-									"direction" : "forward",
-									"filter" : {
-										"b" : {
-											"$gt" : "aaa"
-										}
-									},
-									"stage" : "COLLSCAN"
 								}
 							],
 							"joinPredicates" : [
-								"b = b"
+								"a = a"
 							],
-							"leftEmbeddingField" : "none",
-							"rightEmbeddingField" : "y",
+							"leftEmbeddingField" : "x",
+							"rightEmbeddingField" : "none",
 							"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 						},
 						{
 							"direction" : "forward",
 							"filter" : {
-								"d" : {
-									"$lt" : 3
+								"b" : {
+									"$gt" : "aaa"
 								}
 							},
 							"stage" : "COLLSCAN"
 						}
 					],
 					"joinPredicates" : [
-						"a = a"
+						"b = b"
 					],
 					"leftEmbeddingField" : "none",
 					"planNodeId" : 6,
-					"rightEmbeddingField" : "x",
+					"rightEmbeddingField" : "y",
 					"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 				}
 			}
@@ -1709,6 +1709,15 @@ Execution Engine: sbe
 						{
 							"inputStages" : [
 								{
+									"direction" : "forward",
+									"filter" : {
+										"d" : {
+											"$lt" : 3
+										}
+									},
+									"stage" : "COLLSCAN"
+								},
+								{
 									"inputStage" : {
 										"direction" : "forward",
 										"filter" : {
@@ -1722,40 +1731,31 @@ Execution Engine: sbe
 										"a" : true,
 										"b" : true
 									}
-								},
-								{
-									"direction" : "forward",
-									"filter" : {
-										"b" : {
-											"$gt" : "aaa"
-										}
-									},
-									"stage" : "COLLSCAN"
 								}
 							],
 							"joinPredicates" : [
-								"b = b"
+								"a = a"
 							],
-							"leftEmbeddingField" : "none",
-							"rightEmbeddingField" : "y",
+							"leftEmbeddingField" : "x",
+							"rightEmbeddingField" : "none",
 							"stage" : "HASH_JOIN_EMBEDDING"
 						},
 						{
 							"direction" : "forward",
 							"filter" : {
-								"d" : {
-									"$lt" : 3
+								"b" : {
+									"$gt" : "aaa"
 								}
 							},
 							"stage" : "COLLSCAN"
 						}
 					],
 					"joinPredicates" : [
-						"a = a"
+						"b = b"
 					],
 					"leftEmbeddingField" : "none",
 					"planNodeId" : 6,
-					"rightEmbeddingField" : "x",
+					"rightEmbeddingField" : "y",
 					"stage" : "HASH_JOIN_EMBEDDING"
 				}
 			}
@@ -1850,6 +1850,15 @@ Execution Engine: sbe
 						{
 							"inputStages" : [
 								{
+									"direction" : "forward",
+									"filter" : {
+										"b" : {
+											"$gt" : "aaa"
+										}
+									},
+									"stage" : "COLLSCAN"
+								},
+								{
 									"inputStage" : {
 										"direction" : "forward",
 										"filter" : {
@@ -1863,40 +1872,31 @@ Execution Engine: sbe
 										"a" : true,
 										"b" : true
 									}
-								},
-								{
-									"direction" : "forward",
-									"filter" : {
-										"d" : {
-											"$lt" : 3
-										}
-									},
-									"stage" : "COLLSCAN"
 								}
 							],
 							"joinPredicates" : [
-								"a = a"
+								"b = b"
 							],
-							"leftEmbeddingField" : "none",
-							"rightEmbeddingField" : "x",
+							"leftEmbeddingField" : "y",
+							"rightEmbeddingField" : "none",
 							"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 						},
 						{
 							"direction" : "forward",
 							"filter" : {
-								"b" : {
-									"$gt" : "aaa"
+								"d" : {
+									"$lt" : 3
 								}
 							},
 							"stage" : "COLLSCAN"
 						}
 					],
 					"joinPredicates" : [
-						"b = b"
+						"a = a"
 					],
 					"leftEmbeddingField" : "none",
 					"planNodeId" : 6,
-					"rightEmbeddingField" : "y",
+					"rightEmbeddingField" : "x",
 					"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 				}
 			}
@@ -1991,6 +1991,15 @@ Execution Engine: sbe
 						{
 							"inputStages" : [
 								{
+									"direction" : "forward",
+									"filter" : {
+										"b" : {
+											"$gt" : "aaa"
+										}
+									},
+									"stage" : "COLLSCAN"
+								},
+								{
 									"inputStage" : {
 										"direction" : "forward",
 										"filter" : {
@@ -2004,40 +2013,31 @@ Execution Engine: sbe
 										"a" : true,
 										"b" : true
 									}
-								},
-								{
-									"direction" : "forward",
-									"filter" : {
-										"d" : {
-											"$lt" : 3
-										}
-									},
-									"stage" : "COLLSCAN"
 								}
 							],
 							"joinPredicates" : [
-								"a = a"
+								"b = b"
 							],
-							"leftEmbeddingField" : "none",
-							"rightEmbeddingField" : "x",
+							"leftEmbeddingField" : "y",
+							"rightEmbeddingField" : "none",
 							"stage" : "HASH_JOIN_EMBEDDING"
 						},
 						{
 							"direction" : "forward",
 							"filter" : {
-								"b" : {
-									"$gt" : "aaa"
+								"d" : {
+									"$lt" : 3
 								}
 							},
 							"stage" : "COLLSCAN"
 						}
 					],
 					"joinPredicates" : [
-						"b = b"
+						"a = a"
 					],
 					"leftEmbeddingField" : "none",
 					"planNodeId" : 6,
-					"rightEmbeddingField" : "y",
+					"rightEmbeddingField" : "x",
 					"stage" : "HASH_JOIN_EMBEDDING"
 				}
 			}
@@ -2358,43 +2358,43 @@ Execution Engine: sbe
 					{
 						"direction" : "forward",
 						"filter" : {
-							
+							"d" : {
+								"$lt" : 3
+							}
 						},
 						"stage" : "COLLSCAN"
 					},
 					{
 						"direction" : "forward",
 						"filter" : {
-							"b" : {
-								"$gt" : "aaa"
-							}
+							
 						},
 						"stage" : "COLLSCAN"
 					}
 				],
 				"joinPredicates" : [
-					"b = b"
+					"a = a"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "y",
+				"leftEmbeddingField" : "x",
+				"rightEmbeddingField" : "none",
 				"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 			},
 			{
 				"direction" : "forward",
 				"filter" : {
-					"d" : {
-						"$lt" : 3
+					"b" : {
+						"$gt" : "aaa"
 					}
 				},
 				"stage" : "COLLSCAN"
 			}
 		],
 		"joinPredicates" : [
-			"a = a"
+			"b = b"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "x",
+		"rightEmbeddingField" : "y",
 		"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 	}
 }
@@ -2466,43 +2466,43 @@ Execution Engine: sbe
 					{
 						"direction" : "forward",
 						"filter" : {
-							
+							"d" : {
+								"$lt" : 3
+							}
 						},
 						"stage" : "COLLSCAN"
 					},
 					{
 						"direction" : "forward",
 						"filter" : {
-							"b" : {
-								"$gt" : "aaa"
-							}
+							
 						},
 						"stage" : "COLLSCAN"
 					}
 				],
 				"joinPredicates" : [
-					"b = b"
+					"a = a"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "y",
+				"leftEmbeddingField" : "x",
+				"rightEmbeddingField" : "none",
 				"stage" : "HASH_JOIN_EMBEDDING"
 			},
 			{
 				"direction" : "forward",
 				"filter" : {
-					"d" : {
-						"$lt" : 3
+					"b" : {
+						"$gt" : "aaa"
 					}
 				},
 				"stage" : "COLLSCAN"
 			}
 		],
 		"joinPredicates" : [
-			"a = a"
+			"b = b"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "x",
+		"rightEmbeddingField" : "y",
 		"stage" : "HASH_JOIN_EMBEDDING"
 	}
 }
@@ -2574,43 +2574,43 @@ Execution Engine: sbe
 					{
 						"direction" : "forward",
 						"filter" : {
-							
+							"b" : {
+								"$gt" : "aaa"
+							}
 						},
 						"stage" : "COLLSCAN"
 					},
 					{
 						"direction" : "forward",
 						"filter" : {
-							"d" : {
-								"$lt" : 3
-							}
+							
 						},
 						"stage" : "COLLSCAN"
 					}
 				],
 				"joinPredicates" : [
-					"a = a"
+					"b = b"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x",
+				"leftEmbeddingField" : "y",
+				"rightEmbeddingField" : "none",
 				"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 			},
 			{
 				"direction" : "forward",
 				"filter" : {
-					"b" : {
-						"$gt" : "aaa"
+					"d" : {
+						"$lt" : 3
 					}
 				},
 				"stage" : "COLLSCAN"
 			}
 		],
 		"joinPredicates" : [
-			"b = b"
+			"a = a"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "y",
+		"rightEmbeddingField" : "x",
 		"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 	}
 }
@@ -2682,43 +2682,43 @@ Execution Engine: sbe
 					{
 						"direction" : "forward",
 						"filter" : {
-							
+							"b" : {
+								"$gt" : "aaa"
+							}
 						},
 						"stage" : "COLLSCAN"
 					},
 					{
 						"direction" : "forward",
 						"filter" : {
-							"d" : {
-								"$lt" : 3
-							}
+							
 						},
 						"stage" : "COLLSCAN"
 					}
 				],
 				"joinPredicates" : [
-					"a = a"
+					"b = b"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x",
+				"leftEmbeddingField" : "y",
+				"rightEmbeddingField" : "none",
 				"stage" : "HASH_JOIN_EMBEDDING"
 			},
 			{
 				"direction" : "forward",
 				"filter" : {
-					"b" : {
-						"$gt" : "aaa"
+					"d" : {
+						"$lt" : 3
 					}
 				},
 				"stage" : "COLLSCAN"
 			}
 		],
 		"joinPredicates" : [
-			"b = b"
+			"a = a"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "y",
+		"rightEmbeddingField" : "x",
 		"stage" : "HASH_JOIN_EMBEDDING"
 	}
 }
@@ -3105,6 +3105,15 @@ Execution Engine: sbe
 						{
 							"inputStages" : [
 								{
+									"direction" : "forward",
+									"filter" : {
+										"d" : {
+											"$lt" : 3
+										}
+									},
+									"stage" : "COLLSCAN"
+								},
+								{
 									"inputStage" : {
 										"direction" : "forward",
 										"filter" : {
@@ -3120,40 +3129,31 @@ Execution Engine: sbe
 										"a" : true,
 										"b" : true
 									}
-								},
-								{
-									"direction" : "forward",
-									"filter" : {
-										"b" : {
-											"$gt" : "aaa"
-										}
-									},
-									"stage" : "COLLSCAN"
 								}
 							],
 							"joinPredicates" : [
-								"b = b"
+								"a = a"
 							],
-							"leftEmbeddingField" : "none",
-							"rightEmbeddingField" : "y",
+							"leftEmbeddingField" : "x",
+							"rightEmbeddingField" : "none",
 							"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 						},
 						{
 							"direction" : "forward",
 							"filter" : {
-								"d" : {
-									"$lt" : 3
+								"b" : {
+									"$gt" : "aaa"
 								}
 							},
 							"stage" : "COLLSCAN"
 						}
 					],
 					"joinPredicates" : [
-						"a = a"
+						"b = b"
 					],
 					"leftEmbeddingField" : "none",
 					"planNodeId" : 6,
-					"rightEmbeddingField" : "x",
+					"rightEmbeddingField" : "y",
 					"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 				}
 			}
@@ -3254,6 +3254,15 @@ Execution Engine: sbe
 						{
 							"inputStages" : [
 								{
+									"direction" : "forward",
+									"filter" : {
+										"d" : {
+											"$lt" : 3
+										}
+									},
+									"stage" : "COLLSCAN"
+								},
+								{
 									"inputStage" : {
 										"direction" : "forward",
 										"filter" : {
@@ -3269,40 +3278,31 @@ Execution Engine: sbe
 										"a" : true,
 										"b" : true
 									}
-								},
-								{
-									"direction" : "forward",
-									"filter" : {
-										"b" : {
-											"$gt" : "aaa"
-										}
-									},
-									"stage" : "COLLSCAN"
 								}
 							],
 							"joinPredicates" : [
-								"b = b"
+								"a = a"
 							],
-							"leftEmbeddingField" : "none",
-							"rightEmbeddingField" : "y",
+							"leftEmbeddingField" : "x",
+							"rightEmbeddingField" : "none",
 							"stage" : "HASH_JOIN_EMBEDDING"
 						},
 						{
 							"direction" : "forward",
 							"filter" : {
-								"d" : {
-									"$lt" : 3
+								"b" : {
+									"$gt" : "aaa"
 								}
 							},
 							"stage" : "COLLSCAN"
 						}
 					],
 					"joinPredicates" : [
-						"a = a"
+						"b = b"
 					],
 					"leftEmbeddingField" : "none",
 					"planNodeId" : 6,
-					"rightEmbeddingField" : "x",
+					"rightEmbeddingField" : "y",
 					"stage" : "HASH_JOIN_EMBEDDING"
 				}
 			}
@@ -3403,6 +3403,15 @@ Execution Engine: sbe
 						{
 							"inputStages" : [
 								{
+									"direction" : "forward",
+									"filter" : {
+										"b" : {
+											"$gt" : "aaa"
+										}
+									},
+									"stage" : "COLLSCAN"
+								},
+								{
 									"inputStage" : {
 										"direction" : "forward",
 										"filter" : {
@@ -3418,40 +3427,31 @@ Execution Engine: sbe
 										"a" : true,
 										"b" : true
 									}
-								},
-								{
-									"direction" : "forward",
-									"filter" : {
-										"d" : {
-											"$lt" : 3
-										}
-									},
-									"stage" : "COLLSCAN"
 								}
 							],
 							"joinPredicates" : [
-								"a = a"
+								"b = b"
 							],
-							"leftEmbeddingField" : "none",
-							"rightEmbeddingField" : "x",
+							"leftEmbeddingField" : "y",
+							"rightEmbeddingField" : "none",
 							"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 						},
 						{
 							"direction" : "forward",
 							"filter" : {
-								"b" : {
-									"$gt" : "aaa"
+								"d" : {
+									"$lt" : 3
 								}
 							},
 							"stage" : "COLLSCAN"
 						}
 					],
 					"joinPredicates" : [
-						"b = b"
+						"a = a"
 					],
 					"leftEmbeddingField" : "none",
 					"planNodeId" : 6,
-					"rightEmbeddingField" : "y",
+					"rightEmbeddingField" : "x",
 					"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 				}
 			}
@@ -3552,6 +3552,15 @@ Execution Engine: sbe
 						{
 							"inputStages" : [
 								{
+									"direction" : "forward",
+									"filter" : {
+										"b" : {
+											"$gt" : "aaa"
+										}
+									},
+									"stage" : "COLLSCAN"
+								},
+								{
 									"inputStage" : {
 										"direction" : "forward",
 										"filter" : {
@@ -3567,40 +3576,31 @@ Execution Engine: sbe
 										"a" : true,
 										"b" : true
 									}
-								},
-								{
-									"direction" : "forward",
-									"filter" : {
-										"d" : {
-											"$lt" : 3
-										}
-									},
-									"stage" : "COLLSCAN"
 								}
 							],
 							"joinPredicates" : [
-								"a = a"
+								"b = b"
 							],
-							"leftEmbeddingField" : "none",
-							"rightEmbeddingField" : "x",
+							"leftEmbeddingField" : "y",
+							"rightEmbeddingField" : "none",
 							"stage" : "HASH_JOIN_EMBEDDING"
 						},
 						{
 							"direction" : "forward",
 							"filter" : {
-								"b" : {
-									"$gt" : "aaa"
+								"d" : {
+									"$lt" : 3
 								}
 							},
 							"stage" : "COLLSCAN"
 						}
 					],
 					"joinPredicates" : [
-						"b = b"
+						"a = a"
 					],
 					"leftEmbeddingField" : "none",
 					"planNodeId" : 6,
-					"rightEmbeddingField" : "y",
+					"rightEmbeddingField" : "x",
 					"stage" : "HASH_JOIN_EMBEDDING"
 				}
 			}
@@ -3943,8 +3943,8 @@ Execution Engine: sbe
 					{
 						"direction" : "forward",
 						"filter" : {
-							"a" : {
-								"$gt" : 1
+							"d" : {
+								"$lt" : 3
 							}
 						},
 						"stage" : "COLLSCAN"
@@ -3952,36 +3952,36 @@ Execution Engine: sbe
 					{
 						"direction" : "forward",
 						"filter" : {
-							"b" : {
-								"$gt" : "aaa"
+							"a" : {
+								"$gt" : 1
 							}
 						},
 						"stage" : "COLLSCAN"
 					}
 				],
 				"joinPredicates" : [
-					"b = b"
+					"a = a"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "y",
+				"leftEmbeddingField" : "x",
+				"rightEmbeddingField" : "none",
 				"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 			},
 			{
 				"direction" : "forward",
 				"filter" : {
-					"d" : {
-						"$lt" : 3
+					"b" : {
+						"$gt" : "aaa"
 					}
 				},
 				"stage" : "COLLSCAN"
 			}
 		],
 		"joinPredicates" : [
-			"a = a"
+			"b = b"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "x",
+		"rightEmbeddingField" : "y",
 		"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 	}
 }
@@ -4058,8 +4058,8 @@ Execution Engine: sbe
 					{
 						"direction" : "forward",
 						"filter" : {
-							"a" : {
-								"$gt" : 1
+							"d" : {
+								"$lt" : 3
 							}
 						},
 						"stage" : "COLLSCAN"
@@ -4067,36 +4067,36 @@ Execution Engine: sbe
 					{
 						"direction" : "forward",
 						"filter" : {
-							"b" : {
-								"$gt" : "aaa"
+							"a" : {
+								"$gt" : 1
 							}
 						},
 						"stage" : "COLLSCAN"
 					}
 				],
 				"joinPredicates" : [
-					"b = b"
+					"a = a"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "y",
+				"leftEmbeddingField" : "x",
+				"rightEmbeddingField" : "none",
 				"stage" : "HASH_JOIN_EMBEDDING"
 			},
 			{
 				"direction" : "forward",
 				"filter" : {
-					"d" : {
-						"$lt" : 3
+					"b" : {
+						"$gt" : "aaa"
 					}
 				},
 				"stage" : "COLLSCAN"
 			}
 		],
 		"joinPredicates" : [
-			"a = a"
+			"b = b"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "x",
+		"rightEmbeddingField" : "y",
 		"stage" : "HASH_JOIN_EMBEDDING"
 	}
 }
@@ -4173,8 +4173,8 @@ Execution Engine: sbe
 					{
 						"direction" : "forward",
 						"filter" : {
-							"a" : {
-								"$gt" : 1
+							"b" : {
+								"$gt" : "aaa"
 							}
 						},
 						"stage" : "COLLSCAN"
@@ -4182,36 +4182,36 @@ Execution Engine: sbe
 					{
 						"direction" : "forward",
 						"filter" : {
-							"d" : {
-								"$lt" : 3
+							"a" : {
+								"$gt" : 1
 							}
 						},
 						"stage" : "COLLSCAN"
 					}
 				],
 				"joinPredicates" : [
-					"a = a"
+					"b = b"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x",
+				"leftEmbeddingField" : "y",
+				"rightEmbeddingField" : "none",
 				"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 			},
 			{
 				"direction" : "forward",
 				"filter" : {
-					"b" : {
-						"$gt" : "aaa"
+					"d" : {
+						"$lt" : 3
 					}
 				},
 				"stage" : "COLLSCAN"
 			}
 		],
 		"joinPredicates" : [
-			"b = b"
+			"a = a"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "y",
+		"rightEmbeddingField" : "x",
 		"stage" : "NESTED_LOOP_JOIN_EMBEDDING"
 	}
 }
@@ -4288,8 +4288,8 @@ Execution Engine: sbe
 					{
 						"direction" : "forward",
 						"filter" : {
-							"a" : {
-								"$gt" : 1
+							"b" : {
+								"$gt" : "aaa"
 							}
 						},
 						"stage" : "COLLSCAN"
@@ -4297,36 +4297,36 @@ Execution Engine: sbe
 					{
 						"direction" : "forward",
 						"filter" : {
-							"d" : {
-								"$lt" : 3
+							"a" : {
+								"$gt" : 1
 							}
 						},
 						"stage" : "COLLSCAN"
 					}
 				],
 				"joinPredicates" : [
-					"a = a"
+					"b = b"
 				],
-				"leftEmbeddingField" : "none",
-				"rightEmbeddingField" : "x",
+				"leftEmbeddingField" : "y",
+				"rightEmbeddingField" : "none",
 				"stage" : "HASH_JOIN_EMBEDDING"
 			},
 			{
 				"direction" : "forward",
 				"filter" : {
-					"b" : {
-						"$gt" : "aaa"
+					"d" : {
+						"$lt" : 3
 					}
 				},
 				"stage" : "COLLSCAN"
 			}
 		],
 		"joinPredicates" : [
-			"b = b"
+			"a = a"
 		],
 		"leftEmbeddingField" : "none",
 		"planNodeId" : 5,
-		"rightEmbeddingField" : "y",
+		"rightEmbeddingField" : "x",
 		"stage" : "HASH_JOIN_EMBEDDING"
 	}
 }
