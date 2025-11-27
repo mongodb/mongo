@@ -49,13 +49,9 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
-#include <tuple>
 #include <type_traits>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -80,15 +76,14 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
     : _opCtx(opCtx),
       _db(dbName),
       _readPreference(readPreference),
+      // Initialize command metadata to handle the read preference.
+      _metadataObj(_readPreference.toContainingBSON()),
       _retryPolicy(retryPolicy),
       _subExecutor(std::move(executor)),
       _subBaton(opCtx->getBaton()->makeSubBaton()),
       _resourceYielder(std::move(resourceYielder)) {
 
     _remotesLeft = requests.size();
-
-    // Initialize command metadata to handle the read preference.
-    _metadataObj = readPreference.toContainingBSON();
 
     _remotes.reserve(requests.size());
     for (const auto& request : requests) {
@@ -130,7 +125,7 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
         if (_failedUnyield && response.swResponse != _interruptStatus) {
             // If the interrupt was caused by an unyield error, every subsequent response must
             // also have that unyield error.
-            auto failedResponse = response;
+            auto failedResponse = std::move(response);
 
             // TODO (SERVER-97256): Remove this workaround once a proper solution is implemented.
             //
@@ -141,8 +136,8 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
             // exception, preventing the router from invalidating the stale routing entry and
             // causing it to not converge.
             if (auto si = _interruptStatus.extraInfo<TransactionParticipantFailedUnyieldInfo>();
-                si && response.swResponse.isOK()) {
-                auto status = getStatusFromCommandResult(response.swResponse.getValue().data);
+                si && failedResponse.swResponse.isOK()) {
+                auto status = getStatusFromCommandResult(failedResponse.swResponse.getValue().data);
                 failedResponse.swResponse =
                     Status{TransactionParticipantFailedUnyieldInfo(si->getOriginalError(), status),
                            _interruptStatus.reason()};
@@ -232,7 +227,7 @@ bool AsyncRequestsSender::done() const noexcept {
 }
 
 AsyncRequestsSender::Request::Request(ShardId shardId, BSONObj cmdObj, std::shared_ptr<Shard> shard)
-    : shardId(shardId), cmdObj(cmdObj), shard(std::move(shard)) {}
+    : shardId(std::move(shardId)), cmdObj(std::move(cmdObj)), shard(std::move(shard)) {}
 
 Status AsyncRequestsSender::Response::getEffectiveStatus(
     const AsyncRequestsSender::Response& response) {

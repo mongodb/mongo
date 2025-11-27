@@ -27,10 +27,8 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/s/query/exec/establish_cursors.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -42,10 +40,11 @@
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
+#include "mongo/db/router_role/router_role.h"
 #include "mongo/db/shard_role/resource_yielders.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/s/query/exec/establish_cursors.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -57,6 +56,9 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -141,7 +143,7 @@ public:
         }
     }
 
-    void onCommandThrowStaleConifg(ShardId shardId) {
+    void onCommandThrowStaleConfig(ShardId shardId) {
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
 
@@ -210,7 +212,6 @@ TEST_F(EstablishCursorsTest, NoRemotes) {
                                     remotes,
                                     false);  // allowPartialResults
 
-
     ASSERT_EQUALS(remotes.size(), cursors.size());
 }
 
@@ -234,6 +235,32 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithSuccess) {
 
         std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
         CursorResponse cursorResponse(_nss, CursorId(123), batch);
+        return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    future.default_timed_get();
+}
+
+TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithSuccessAndSingleResponseBatch) {
+    BSONObj cmdObj = fromjson("{find: 'testcoll'}");
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
+
+    auto future = launchAsync([&] {
+        auto cursors = establishCursors(operationContext(),
+                                        executor(),
+                                        _nss,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        remotes,
+                                        false);  // allowPartialResults
+        ASSERT_EQUALS(remotes.size(), cursors.size());
+    });
+
+    // Remote responds.
+    onCommand([this](const RemoteCommandRequest& request) {
+        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+        std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+        CursorResponse cursorResponse(_nss, CursorId(0), batch);
         return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
     });
 
@@ -374,6 +401,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithNonretriableError) {
         ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
         return createErrorCursorResponse(Status(ErrorCodes::FailedToParse, "failed to parse"));
     });
+
     future.default_timed_get();
 }
 
@@ -661,6 +689,75 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteRespondsWithNonretriableErr
     future.default_timed_get();
 }
 
+TEST_F(EstablishCursorsTest,
+       MultipleRemotesOneRemoteRespondsWithErrorOthersReturnSingleResponseBatch) {
+    std::vector<UUID> providedOpKeys = {UUID::gen(), UUID::gen(), UUID::gen()};
+    // Use different opKeys for the different requests, so we can better track the killOperation
+    // commands later.
+    auto cmdObj0 = BSON("find" << "testcoll"
+                               << "clientOperationKey" << providedOpKeys[0]);
+    auto cmdObj1 = BSON("find" << "testcoll"
+                               << "clientOperationKey" << providedOpKeys[1]);
+    auto cmdObj2 = BSON("find" << "testcoll"
+                               << "clientOperationKey" << providedOpKeys[2]);
+
+    std::vector<AsyncRequestsSender::Request> remotes{
+        {kTestShardIds[0], cmdObj0}, {kTestShardIds[1], cmdObj1}, {kTestShardIds[2], cmdObj2}};
+
+    auto future = launchAsync([&] {
+        ASSERT_THROWS(establishCursors(operationContext(),
+                                       executor(),
+                                       _nss,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       remotes,
+                                       false,  // allowPartialResults
+                                       nullptr /* RoutingContext */,
+                                       Shard::RetryPolicy::kIdempotent,
+                                       providedOpKeys),
+                      ExceptionFor<ErrorCodes::FailedToParse>);
+    });
+
+    // First remote responds with success, but a single response batch (i.e. no persisted remote
+    // cursors).
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+        ASSERT_TRUE(request.cmdObj.hasField("clientOperationKey")) << request;
+        ASSERT_EQ(providedOpKeys[0], UUID::parse(request.cmdObj["clientOperationKey"]));
+
+        std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+        CursorResponse cursorResponse(_nss, CursorId(0), batch);
+        return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    // Second remote responds with a non-retriable error.
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+        ASSERT_TRUE(request.cmdObj.hasField("clientOperationKey")) << request;
+        ASSERT_EQ(providedOpKeys[1], UUID::parse(request.cmdObj["clientOperationKey"]));
+
+        return createErrorCursorResponse(Status(ErrorCodes::FailedToParse, "failed to parse"));
+    });
+
+    // Third remote responds with success (must give some response to mock network for each remote).
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+        ASSERT_TRUE(request.cmdObj.hasField("clientOperationKey")) << request;
+        ASSERT_EQ(providedOpKeys[2], UUID::parse(request.cmdObj["clientOperationKey"]));
+
+        std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+        CursorResponse cursorResponse(_nss, CursorId(123), batch);
+        return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    // Expect a single killOperation command, for the only persisted remote cursor.
+    expectKillOperations(1, providedOpKeys);
+
+    future.default_timed_get();
+}
+
 TEST_F(EstablishCursorsTest, AcceptsCustomOpKeys) {
     std::vector<UUID> providedOpKeys = {UUID::gen(), UUID::gen()};
     auto cmdObj0 = BSON("find" << "testcoll"
@@ -689,11 +786,8 @@ TEST_F(EstablishCursorsTest, AcceptsCustomOpKeys) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
 
-        // All commands use the opKey they were given.
         ASSERT_TRUE(request.cmdObj.hasField("clientOperationKey")) << request;
-        auto opKey = unittest::assertGet(UUID::parse(request.cmdObj["clientOperationKey"]));
-        ASSERT_TRUE(std::find(providedOpKeys.begin(), providedOpKeys.end(), opKey) !=
-                    providedOpKeys.end());
+        ASSERT_EQ(providedOpKeys[0], UUID::parse(request.cmdObj["clientOperationKey"]));
 
         std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
         CursorResponse cursorResponse(_nss, CursorId(123), batch);
@@ -704,11 +798,8 @@ TEST_F(EstablishCursorsTest, AcceptsCustomOpKeys) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
 
-        // All commands use the opKey they were given.
         ASSERT_TRUE(request.cmdObj.hasField("clientOperationKey")) << request;
-        auto opKey = unittest::assertGet(UUID::parse(request.cmdObj["clientOperationKey"]));
-        ASSERT_TRUE(std::find(providedOpKeys.begin(), providedOpKeys.end(), opKey) !=
-                    providedOpKeys.end());
+        ASSERT_EQ(providedOpKeys[1], UUID::parse(request.cmdObj["clientOperationKey"]));
 
         return createErrorCursorResponse(Status(ErrorCodes::FailedToParse, "failed to parse"));
     });
@@ -717,11 +808,8 @@ TEST_F(EstablishCursorsTest, AcceptsCustomOpKeys) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
 
-        // All commands use the opKey they were given.
         ASSERT_TRUE(request.cmdObj.hasField("clientOperationKey")) << request;
-        auto opKey = unittest::assertGet(UUID::parse(request.cmdObj["clientOperationKey"]));
-        ASSERT_TRUE(std::find(providedOpKeys.begin(), providedOpKeys.end(), opKey) !=
-                    providedOpKeys.end());
+        ASSERT_EQ(providedOpKeys[1], UUID::parse(request.cmdObj["clientOperationKey"]));
 
         std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
         CursorResponse cursorResponse(_nss, CursorId(123), batch);
@@ -915,12 +1003,12 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteMaxesOutRetriableErrors) {
         return Status(ErrorCodes::HostUnreachable, "host unreachable");
     });
 
-    // Third remote responds with success.
+    // Third remote responds with success, and single response batch.
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
 
         std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
-        CursorResponse cursorResponse(_nss, CursorId(123), batch);
+        CursorResponse cursorResponse(_nss, CursorId(0), batch);
         return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
     });
 
@@ -932,8 +1020,8 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteMaxesOutRetriableErrors) {
         });
     }
 
-    // Expect two killOperation commands, one for each remote which responded with a cursor.
-    expectKillOperations(2);
+    // Expect a single killOperation command, for the remote that responded with a cursor.
+    expectKillOperations(1);
 
     future.default_timed_get();
 }
@@ -1123,7 +1211,7 @@ TEST_F(EstablishCursorsTest, InterruptedAfterErrorResponse) {
     });
 
     // First remote responds StaleConfig.
-    onCommandThrowStaleConifg(kTestShardIds[0]);
+    onCommandThrowStaleConfig(kTestShardIds[0]);
 
     // Wait until we hit the hangBeforePollResponse failpoint with remotesLeft 1.
     // This ensures the first response has been processed.
@@ -1193,7 +1281,7 @@ TEST_F(EstablishCursorsTest, FailedUnyieldAfterErrorResponse) {
     });
 
     // First remote responds StaleConfig.
-    onCommandThrowStaleConifg(kTestShardIds[0]);
+    onCommandThrowStaleConfig(kTestShardIds[0]);
 
     // Wait until we hit the hangBeforePollResponse failpoint with remotesLeft 1.
     // This ensures the first response has been processed.
@@ -1233,7 +1321,7 @@ TEST_F(EstablishCursorsTest, MultipleRemotesMultipleDifferentErrors) {
     });
 
     // First remote responds with stale config error.
-    onCommandThrowStaleConifg(kTestShardIds[0]);
+    onCommandThrowStaleConfig(kTestShardIds[0]);
 
     // Second remote responds encounters simulated yield error.
     onCommand([&](const RemoteCommandRequest& request) {

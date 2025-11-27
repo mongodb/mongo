@@ -303,6 +303,11 @@ public:
     std::size_t getNumRemotes() const;
 
     /**
+     * Returns the number of buffered response documents.
+     */
+    std::size_t getNumBufferedResponses_forTest() const;
+
+    /**
      * Returns true if we have a cursor established for the specified shard and shard tag, false
      * otherwise.
      */
@@ -701,7 +706,7 @@ private:
     /**
      * Cleans up after remote query failure.
      */
-    void _cleanUpFailedBatch(WithLock, Status status, RemoteCursorData& remote);
+    void _cleanUpFailedBatch(WithLock lk, Status status, RemoteCursorData& remote);
 
     /**
      * Processes results from a remote query.
@@ -813,6 +818,11 @@ private:
      */
     void _cancelCallbackForRemote(WithLock lk, const RemoteCursorPtr& remote);
 
+    /**
+     * Clear internal document buffers in order to release memory as early as possible.
+     */
+    void _clearBuffers(WithLock);
+
     OperationContext* _opCtx;
     std::shared_ptr<executor::TaskExecutor> _executor;
 
@@ -853,6 +863,8 @@ private:
     /**
      * List of pending responses to be processed for additional participants. Remote responses are
      * buffered here until they are processed in 'nextReady()' or 'detachFromOperationContext()'.
+     * Only the parsed parts of the response pertaining to additional transaction participants are
+     * included here and not the full remote responses.
      */
     std::queue<RemoteResponse> _remoteResponses;
 

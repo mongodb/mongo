@@ -90,7 +90,7 @@ MONGO_MOD_NEEDS_REPLACEMENT std::vector<RemoteCursor> establishCursors(
     RoutingContext* routingCtx = nullptr,
     Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kIdempotent,
     std::vector<OperationKey> providedOpKeys = {},
-    AsyncRequestsSender::ShardHostMap designatedHostsMap = {});
+    const AsyncRequestsSender::ShardHostMap& designatedHostsMap = {});
 
 /**
  * Establishes cursors on every host in the remote shards by issuing requests in parallel with the

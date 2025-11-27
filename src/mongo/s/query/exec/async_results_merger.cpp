@@ -497,6 +497,14 @@ std::size_t AsyncResultsMerger::getNumRemotes() const {
     });
 }
 
+std::size_t AsyncResultsMerger::getNumBufferedResponses_forTest() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return std::accumulate(
+        _remotes.begin(), _remotes.end(), 0, [](std::size_t current, const auto& remote) {
+            return current + remote->docBuffer.size();
+        });
+}
+
 bool AsyncResultsMerger::hasCursorForShard_forTest(const ShardId& shardId,
                                                    const ShardTag& tag) const {
     // Take the lock to guard against shard additions or disconnections.
@@ -1416,7 +1424,7 @@ void AsyncResultsMerger::_cleanUpKilledBatch(WithLock lk) {
     }
 }
 
-void AsyncResultsMerger::_cleanUpFailedBatch(WithLock, Status status, RemoteCursorData& remote) {
+void AsyncResultsMerger::_cleanUpFailedBatch(WithLock lk, Status status, RemoteCursorData& remote) {
     // 'cleanUpFailedBatch()' can reset the remote's status from non-OK back to OK if partial
     // results are allowed.
     remote.cleanUpFailedBatch(status, _params.getAllowPartialResults());
@@ -1426,7 +1434,33 @@ void AsyncResultsMerger::_cleanUpFailedBatch(WithLock, Status status, RemoteCurs
     // the AsyncResultsMerger will never be changed back to non-OK.
     if (!remote.status.isOK() && _status.isOK()) {
         _status = remote.status;
+
+        // Release memory for document buffers as early as possible.
+        // This is ok, because once the AsyncResultsMerger has stored a non-OK '_status' value, it
+        // does not return any further results.
+        _clearBuffers(lk);
     }
+}
+
+void AsyncResultsMerger::_clearBuffers(WithLock lk) {
+    // Clear buffers for all remotes.
+    for (auto& remote : _remotes) {
+        // Create a new docBuffer instance to make sure that the old one fully releases its memory.
+        remote->docBuffer = decltype(remote->docBuffer)();
+        remote->promisedMinSortKey.reset();
+    }
+
+    decltype(_promisedMinSortKeys) newPromisedMinSortKeys(
+        PromisedMinSortKeyComparator(_params.getSort().value_or(BSONObj())));
+    std::swap(_promisedMinSortKeys, newPromisedMinSortKeys);
+
+    // 'std::priority_queue<T>' doesn't have a clear nor assign method, so we need to swap the
+    // cleaned merge queue instead.
+    decltype(_mergeQueue) newMergeQueue(
+        _remotes.end(),
+        _remotes.end(),
+        MergingComparator(_params.getSort().value_or(BSONObj()), _params.getCompareWholeSortKey()));
+    std::swap(_mergeQueue, newMergeQueue);
 }
 
 void AsyncResultsMerger::_processBatchResults(WithLock lk,
@@ -1463,6 +1497,14 @@ bool AsyncResultsMerger::_addBatchToBuffer(WithLock lk,
             !remote->closed);
 
     _updateRemoteMetadata(lk, remote, response);
+
+    // Once the AsyncResultsMerger contains a non-OK status or has received a kill command, it is
+    // not necessary to buffer the received documents anymore. These can be immediately discarded so
+    // the memory usage of the AsyncResultsMerger is not unnecessarily inflated.
+    if (!_status.isOK() || _lifecycleState != kAlive) {
+        return false;
+    }
+
     for (const auto& obj : response.getBatch()) {
         // If there's a sort, we're expecting the remote node to have given us back a sort key.
         if (_params.getSort()) {
@@ -1597,6 +1639,11 @@ SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
     _killCompleteInfo.emplace();
 
     _cancellationSource.cancel();
+
+    // Release memory for document buffers as early as possible.
+    // This is ok, because once the AsyncResultsMerger has received a kill command, it does not
+    // return any further results.
+    _clearBuffers(lk);
 
     _scheduleKillCursors(lk, opCtx);
 

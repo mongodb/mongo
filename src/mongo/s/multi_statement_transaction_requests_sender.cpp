@@ -119,7 +119,7 @@ MultiStatementTransactionRequestsSender::MultiStatementTransactionRequestsSender
     const std::vector<AsyncRequestsSender::Request>& requests,
     const ReadPreferenceSetting& readPreference,
     Shard::RetryPolicy retryPolicy,
-    AsyncRequestsSender::ShardHostMap designatedHostsMap)
+    const AsyncRequestsSender::ShardHostMap& designatedHostsMap)
     : _opCtx(opCtx),
       _ars(std::make_unique<AsyncRequestsSender>(
           opCtx,

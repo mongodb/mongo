@@ -33,9 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/client.h"
@@ -43,6 +41,7 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/client_cursor/kill_cursors_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/router_role/router_role.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -64,13 +63,8 @@
 #include "mongo/util/uuid.h"
 
 #include <set>
-#include <string>
-#include <tuple>
 #include <utility>
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -95,15 +89,15 @@ public:
                       const NamespaceString& nss,
                       bool allowPartialResults,
                       std::vector<OperationKey> providedOpKeys,
-                      AsyncRequestsSender::ShardHostMap designatedHostsMap)
+                      const AsyncRequestsSender::ShardHostMap& designatedHostsMap)
         : _opCtx(opCtx),
           _routingCtx(routingCtx),
           _executor{std::move(executor)},
           _nss(nss),
-          _allowPartialResults(allowPartialResults),
           _defaultOpKey{UUID::gen()},
           _providedOpKeys(std::move(providedOpKeys)),
-          _designatedHostsMap(std::move(designatedHostsMap)) {}
+          _allowPartialResults(allowPartialResults),
+          _designatedHostsMap(designatedHostsMap) {}
 
     /**
      * Make a RequestSender and thus send requests.
@@ -161,7 +155,6 @@ private:
     RoutingContext* _routingCtx;
     const std::shared_ptr<executor::TaskExecutor> _executor;
     const NamespaceString _nss;
-    const bool _allowPartialResults;
 
     // Callers may provide an array of OperationKeys already included in the given requests and
     // those will be used to clean up cursors on failure, otherwise one key will be generated and
@@ -169,12 +162,18 @@ private:
     const OperationKey _defaultOpKey;
     const std::vector<OperationKey> _providedOpKeys;
 
-    boost::optional<MultiStatementTransactionRequestsSender> _ars;
+    const bool _allowPartialResults;
 
     bool _wasInterrupted = false;
+
+    boost::optional<MultiStatementTransactionRequestsSender> _ars;
+
     boost::optional<Status> _maybeFailure;
     std::vector<RemoteCursor> _remoteCursors;
     std::vector<HostAndPort> _remotesToClean;
+
+    // The hosts map is only stored temporarily before the '_ars' member is instantiated. It will be
+    // empty after the '_ars' member instantiation.
     AsyncRequestsSender::ShardHostMap _designatedHostsMap;
     static logv2::SeveritySuppressor _logSeveritySuppressor;
 };
@@ -236,7 +235,7 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
                  std::move(requests),
                  readPref,
                  retryPolicy,
-                 _designatedHostsMap);
+                 std::move(_designatedHostsMap));
 
     if (_routingCtx && _routingCtx->hasNss(_nss)) {
         _routingCtx->onRequestSentForNss(_nss);
@@ -274,31 +273,45 @@ void CursorEstablisher::_waitForResponse() {
     try {
         auto cursors = CursorResponse::parseFromBSONMany(std::move(responseData));
 
-        bool hadValidCursor = false;
+        bool hasCursorToClean = false;
         for (auto& cursor : cursors) {
             if (!cursor.isOK()) {
                 _handleFailure(response, cursor.getStatus());
                 continue;
             }
 
-            hadValidCursor = true;
-
             auto& cursorValue = cursor.getValue();
+
+            // Only persisted remote cursors need cleanup. If the returned cursor has a "cursorId"
+            // value of 0, it means that it is not a persisted cursor and does not need cleanup.
+            hasCursorToClean |= cursorValue.getCursorId() != 0;
+
             if (const auto& cursorMetrics = cursorValue.getCursorMetrics()) {
                 CurOp::get(_opCtx)->debug().additiveMetrics.aggregateCursorMetrics(*cursorMetrics);
             }
 
-            _remoteCursors.emplace_back(
-                response.shardId.toString(), *response.shardHostAndPort, std::move(cursorValue));
+            // If we have already received an error back and are going to abort the operation
+            // anyway, avoid storing the cursor response to reduce memory usage.
+            if (!_maybeFailure) {
+                _remoteCursors.emplace_back(response.shardId.toString(),
+                                            *response.shardHostAndPort,
+                                            std::move(cursorValue));
+            }
         }
 
-        if (response.shardHostAndPort && !hadValidCursor) {
+        if (response.shardHostAndPort && !hasCursorToClean) {
             // If we never got a valid cursor, we do not need to clean the host.
             _remotesToClean.pop_back();
         }
     } catch (const DBException& ex) {
         _handleFailure(response, ex.toStatus());
     }
+
+    // In case any error occurred, the already-received cursor responses should have been cleared by
+    // '_handleFailure()' to reduce memory usage.
+    tassert(11401200,
+            "expecting _remoteCursors responses to be empty in case of failure",
+            !_maybeFailure || _remoteCursors.empty());
 }
 
 // Schedule killOperations against all cursors that were established. Make sure to
@@ -330,7 +343,7 @@ void CursorEstablisher::checkForFailedRequests() {
         return;
     }
 
-    if (!(_maybeFailure->code() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod)) {
+    if (_maybeFailure->code() != ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
         // LOGV2_DEBUG sets the log severity level based on the value defined by
         // _logSeveritySuppressor().toInt(). This severity level is not restricted to DEBUG and can
         // be any defined level.
@@ -346,19 +359,17 @@ void CursorEstablisher::checkForFailedRequests() {
             txnRouter.onViewResolutionError(_opCtx, _nss);
         }
     }
-    if (_remotesToClean.empty()) {
-        // If we don't have any remotes to clean, throw early.
-        uassertStatusOK(*_maybeFailure);
+
+    if (!_remotesToClean.empty()) {
+        // Filter out duplicate hosts.
+        auto remotes = std::set<HostAndPort>(_remotesToClean.begin(), _remotesToClean.end());
+
+        uassertStatusOK(scheduleCursorCleanup(
+            _executor,
+            _opCtx->getServiceContext(),
+            _providedOpKeys.size() ? _providedOpKeys : std::vector<OperationKey>{_defaultOpKey},
+            std::move(remotes)));
     }
-
-    // Filter out duplicate hosts.
-    auto remotes = std::set<HostAndPort>(_remotesToClean.begin(), _remotesToClean.end());
-
-    uassertStatusOK(scheduleCursorCleanup(
-        _executor,
-        _opCtx->getServiceContext(),
-        _providedOpKeys.size() ? _providedOpKeys : std::vector<OperationKey>{_defaultOpKey},
-        std::move(remotes)));
 
     // Throw our failure.
     uassertStatusOK(*_maybeFailure);
@@ -422,6 +433,10 @@ void CursorEstablisher::_handleFailure(
     if (isInterruption) {
         _wasInterrupted = true;
     }
+
+    // Release memory for received responses as early as possible.
+    decltype(_remoteCursors)().swap(_remoteCursors);
+
     _maybeFailure = status;
     _ars->stopRetrying();
 }
@@ -513,23 +528,24 @@ void appendOpKey(const OperationKey& opKey, BSONObjBuilder* cmdBuilder) {
     opKey.appendToBuilder(cmdBuilder, kOperationKeyField);
 }
 
-std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
-                                           std::shared_ptr<executor::TaskExecutor> executor,
-                                           const NamespaceString& nss,
-                                           const ReadPreferenceSetting readPref,
-                                           const std::vector<AsyncRequestsSender::Request>& remotes,
-                                           bool allowPartialResults,
-                                           RoutingContext* routingCtx,
-                                           Shard::RetryPolicy retryPolicy,
-                                           std::vector<OperationKey> providedOpKeys,
-                                           AsyncRequestsSender::ShardHostMap designatedHostsMap) {
+std::vector<RemoteCursor> establishCursors(
+    OperationContext* opCtx,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    const NamespaceString& nss,
+    const ReadPreferenceSetting readPref,
+    const std::vector<AsyncRequestsSender::Request>& remotes,
+    bool allowPartialResults,
+    RoutingContext* routingCtx,
+    Shard::RetryPolicy retryPolicy,
+    std::vector<OperationKey> providedOpKeys,
+    const AsyncRequestsSender::ShardHostMap& designatedHostsMap) {
     auto establisher = CursorEstablisher(opCtx,
                                          routingCtx,
                                          executor,
                                          nss,
                                          allowPartialResults,
                                          std::move(providedOpKeys),
-                                         std::move(designatedHostsMap));
+                                         designatedHostsMap);
     establisher.sendRequests(readPref, remotes, retryPolicy);
     establisher.waitForResponses();
     establisher.checkForFailedRequests();
