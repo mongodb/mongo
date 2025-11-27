@@ -192,13 +192,13 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                 return Status(ErrorCodes::BadValue, "Graph is too big: too many nodes");
             }
 
-            pathResolver.addNode(*foreignNodeId, lookup->getAsField());
-
             if (lookup->hasLocalFieldForeignFieldJoin()) {
                 // The order of resolving the paths are important here: localPathId shouln't be
                 // resolved to the foreign collection even if it is prefixed by the foreign
                 // collection's embedPath.
                 auto localPathId = pathResolver.resolve(*lookup->getLocalField());
+
+                pathResolver.addNode(*foreignNodeId, lookup->getAsField());
                 auto foreignPathId =
                     pathResolver.addPath(*foreignNodeId, *lookup->getForeignField());
 
@@ -208,6 +208,8 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                     // Cannot add an edge for existing nodes.
                     return Status(ErrorCodes::BadValue, "Graph is too big: too many edges");
                 }
+            } else {
+                pathResolver.addNode(*foreignNodeId, lookup->getAsField());
             }
 
             // TODO SERVER-111164: add edges from $expr's

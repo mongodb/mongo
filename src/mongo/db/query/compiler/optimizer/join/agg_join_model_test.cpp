@@ -411,4 +411,23 @@ TEST_F(PipelineAnalyzerTest, LongPrefix) {
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
+
+TEST_F(PipelineAnalyzerTest, LocalFieldOverride) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "a"}},
+            {$unwind: "$a"},
+            {$lookup: {from: "B", localField: "b", foreignField: "b", as: "b"}},
+            {$unwind: "$b"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A", "B"});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
 }  // namespace mongo::join_ordering
