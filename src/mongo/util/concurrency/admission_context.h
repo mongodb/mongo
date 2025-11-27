@@ -111,6 +111,11 @@ public:
     std::int32_t getExemptedAdmissions() const;
 
     /**
+     * Returns true if the operation was load shed due to queue overflow.
+     */
+    bool getLoadShed() const;
+
+    /**
      * Returns true if the operation is already holding a ticket.
      */
     bool isHoldingTicket() const {
@@ -140,6 +145,8 @@ protected:
 
     void recordExemptedAdmission();
 
+    void recordOperationLoadShed();
+
     void markTicketHeld() {
         tassert(
             9150200,
@@ -161,6 +168,7 @@ protected:
     Atomic<std::int64_t> _totalTimeQueuedMicros;
     WaitableAtomic<TickSource::Tick> _startQueueingTime{kNotQueueing};
     Atomic<bool> _holdingTicket;
+    Atomic<bool> _loadShed;
 };
 
 /**

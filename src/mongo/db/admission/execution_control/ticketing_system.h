@@ -68,8 +68,8 @@ public:
     static constexpr auto kExemptPriorityName = "exempt"_sd;
     static constexpr auto kLowPriorityName = "lowPriority"_sd;
     static constexpr auto kNormalPriorityName = "normalPriority"_sd;
-
-    enum class OperationType { kRead = 0, kWrite };
+    static constexpr auto kShortRunningName = "shortRunning"_sd;
+    static constexpr auto kLongRunningName = "longRunning"_sd;
 
     struct RWTicketHolder {
         std::unique_ptr<TicketHolder> read;
@@ -208,7 +208,7 @@ public:
      * Bumps the delinquency counters to all ticket holders (read and write pools) and the
      * de-prioritization stats.
      */
-    void incrementStats(OperationContext* opCtx);
+    void incrementStats(OperationContext* opCtx, int64_t elapsedMicros, int64_t cpuUsageMicros);
 
     /**
      * Attempts to acquire a ticket within a deadline, 'until'.
@@ -228,6 +228,25 @@ private:
      * Returns the appropriate TicketHolder based on the given priority and operation type.
      */
     TicketHolder* _getHolder(AdmissionContext::Priority p, OperationType o) const;
+
+    /**
+     * Appends long/short operation statistics.
+     */
+    void _appendOperationStats(BSONObjBuilder& b, OperationType opType) const;
+
+    /**
+     * Helper function to generalize ticket holder stats report.
+     */
+    void _appendTicketHolderStats(BSONObjBuilder& b,
+                                  StringData fieldName,
+                                  bool usesPrioritization,
+                                  const AdmissionContext::Priority& priority,
+                                  const std::unique_ptr<TicketHolder>& holder,
+                                  OperationType opType,
+                                  boost::optional<BSONObjBuilder>& opStats,
+                                  int32_t& out,
+                                  int32_t& available,
+                                  int32_t& totalTickets) const;
 
     /**
      * Encapsulates the ticketing system's concurrency mode and the logic that defines its behavior.
@@ -314,6 +333,14 @@ private:
      * Counts the total number of operations deprioritized.
      */
     AtomicWord<std::int64_t> _opsDeprioritized;
+
+    /**
+     * Accumulate long/short operation statistics for read and write operations.
+     */
+    OperationExecutionStats _readShortExecutionStats;
+    mongo::admission::execution_control::OperationExecutionStats _readLongExecutionStats;
+    mongo::admission::execution_control::OperationExecutionStats _writeShortExecutionStats;
+    mongo::admission::execution_control::OperationExecutionStats _writeLongExecutionStats;
 };
 
 }  // namespace mongo::admission::execution_control

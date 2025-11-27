@@ -49,12 +49,21 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
     ServiceContext* svcCtx, ExecutionControlConcurrencyAdjustmentAlgorithmEnum algorithm) {
     using enum ExecutionControlConcurrencyAdjustmentAlgorithmEnum;
 
-    auto delinquentReadCb = [](AdmissionContext* admCtx, Milliseconds delta) {
-        static_cast<ExecutionAdmissionContext*>(admCtx)->recordDelinquentReadAcquisition(delta);
+    auto delinquentCb = [](AdmissionContext* admCtx, Milliseconds delta) {
+        static_cast<ExecutionAdmissionContext*>(admCtx)->recordDelinquentAcquisition(delta);
     };
 
-    auto delinquentWriteCb = [](AdmissionContext* admCtx, Milliseconds delta) {
-        static_cast<ExecutionAdmissionContext*>(admCtx)->recordDelinquentWriteAcquisition(delta);
+    auto acquisitionCb = [](AdmissionContext* admCtx) {
+        static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionAcquisition();
+    };
+
+    auto waitedAcquisitionCb = [](AdmissionContext* admCtx, Microseconds timeQueued) {
+        static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionWaitedAcquisition(
+            timeQueued);
+    };
+
+    auto releaseCb = [](AdmissionContext* admCtx, Microseconds timeProcessed) {
+        static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionRelease(timeProcessed);
     };
 
     return std::make_unique<TicketingSystem>(
@@ -64,25 +73,37 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
                                            gConcurrentReadTransactions.load(),
                                            true /* trackPeakUsed */,
                                            gReadMaxQueueDepth.load(),
-                                           delinquentReadCb),
+                                           delinquentCb,
+                                           acquisitionCb,
+                                           waitedAcquisitionCb,
+                                           releaseCb),
             std::make_unique<TicketHolder>(svcCtx,
                                            gConcurrentWriteTransactions.load(),
                                            true /* trackPeakUsed */,
                                            gWriteMaxQueueDepth.load(),
-                                           delinquentWriteCb)},
+                                           delinquentCb,
+                                           acquisitionCb,
+                                           waitedAcquisitionCb,
+                                           releaseCb)},
         TicketingSystem::RWTicketHolder{
             std::make_unique<TicketHolder>(
                 svcCtx,
                 TicketingSystem::resolveLowPriorityTickets(gConcurrentReadLowPriorityTransactions),
                 false /* trackPeakUsed */,
                 gReadLowPriorityMaxQueueDepth.load(),
-                delinquentReadCb),
+                delinquentCb,
+                acquisitionCb,
+                waitedAcquisitionCb,
+                releaseCb),
             std::make_unique<TicketHolder>(
                 svcCtx,
                 TicketingSystem::resolveLowPriorityTickets(gConcurrentWriteLowPriorityTransactions),
                 false /* trackPeakUsed */,
                 gWriteLowPriorityMaxQueueDepth.load(),
-                delinquentWriteCb)},
+                delinquentCb,
+                acquisitionCb,
+                waitedAcquisitionCb,
+                releaseCb)},
         algorithm);
 }
 

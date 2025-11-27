@@ -664,10 +664,8 @@ TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
 
     // If the delinquent stats are not zero, they *are* included in the state.
     {
-        ExecutionAdmissionContext::get(opCtx.get())
-            .recordDelinquentReadAcquisition(Milliseconds(20));
-        ExecutionAdmissionContext::get(opCtx.get())
-            .recordDelinquentReadAcquisition(Milliseconds(10));
+        ExecutionAdmissionContext::get(opCtx.get()).recordDelinquentAcquisition(Milliseconds(20));
+        ExecutionAdmissionContext::get(opCtx.get()).recordDelinquentAcquisition(Milliseconds(10));
         BSONObjBuilder bob;
         curOp->reportState(&bob, SerializationContext{});
         BSONObj state = bob.obj();

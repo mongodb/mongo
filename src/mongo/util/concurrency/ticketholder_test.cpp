@@ -115,6 +115,9 @@ public:
                                               false /* trackPeakUsed */,
                                               TicketHolder::kDefaultMaxQueueDepth,
                                               nullptr /* delinquentCallback */,
+                                              nullptr /* executionAcquisitionCallback */,
+                                              nullptr /* executionWaitedAcquisitionCallback */,
+                                              nullptr /* executionReleaseCallback */,
                                               TicketHolder::ResizePolicy::kImmediate);
     }
 
@@ -315,9 +318,9 @@ TEST_F(TicketHolderTest, DelinquentAcquisitionStats) {
         ASSERT_EQ(admCtx.maxAcquisitionDelinquencyMillis, threshold * 2);
 
         // Normally an operation will call this as it completes.
-        holder->incrementDelinquencyStats(admCtx.delinquentAcquisitions,
-                                          Milliseconds(admCtx.totalAcquisitionDelinquencyMillis),
-                                          Milliseconds(admCtx.maxAcquisitionDelinquencyMillis));
+        holder->incrementDelinquencyStats({admCtx.delinquentAcquisitions,
+                                           admCtx.totalAcquisitionDelinquencyMillis,
+                                           admCtx.maxAcquisitionDelinquencyMillis});
 
         auto currentStats = stats.getNonTicketStats();
         ASSERT_EQ(currentStats["normalPriority"]["totalDelinquentAcquisitions"].Long(), 1);
@@ -338,9 +341,9 @@ TEST_F(TicketHolderTest, DelinquentAcquisitionStats) {
         ASSERT_EQ(admCtx2.totalAcquisitionDelinquencyMillis, threshold * 5);
         ASSERT_EQ(admCtx2.maxAcquisitionDelinquencyMillis, threshold * 5);
 
-        holder->incrementDelinquencyStats(admCtx2.delinquentAcquisitions,
-                                          Milliseconds(admCtx2.totalAcquisitionDelinquencyMillis),
-                                          Milliseconds(admCtx2.maxAcquisitionDelinquencyMillis));
+        holder->incrementDelinquencyStats({admCtx2.delinquentAcquisitions,
+                                           admCtx2.totalAcquisitionDelinquencyMillis,
+                                           admCtx2.maxAcquisitionDelinquencyMillis});
 
         auto currentStats = stats.getNonTicketStats();
         ASSERT_EQ(currentStats["normalPriority"]["totalDelinquentAcquisitions"].Long(), 2);
@@ -809,6 +812,9 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax0) {
                                                  false /* trackPeakUsed */,
                                                  maxNumberOfWaiters,
                                                  nullptr /* delinquentCallback */,
+                                                 nullptr /* executionAcquisitionCallback */,
+                                                 nullptr /* executionWaitedAcquisitionCallback */,
+                                                 nullptr /* executionReleaseCallback */,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
@@ -844,6 +850,9 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax1) {
                                                  false /* trackPeakUsed */,
                                                  maxNumberOfWaiters,
                                                  nullptr /* delinquentCallback */,
+                                                 nullptr /* executionAcquisitionCallback */,
+                                                 nullptr /* executionWaitedAcquisitionCallback */,
+                                                 nullptr /* executionReleaseCallback */,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
@@ -907,6 +916,9 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMaxChange) {
                                                  false /* trackPeakUsed */,
                                                  TicketHolder::kDefaultMaxQueueDepth,
                                                  nullptr /* delinquentCallback */,
+                                                 nullptr /* executionAcquisitionCallback */,
+                                                 nullptr /* executionWaitedAcquisitionCallback */,
+                                                 nullptr /* executionReleaseCallback */,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
@@ -987,6 +999,9 @@ TEST_F(TicketHolderTestTick, TotalTimeQueueMicrosAccumulated) {
                                                  false /* trackPeakUsed */,
                                                  TicketHolder::kDefaultMaxQueueDepth,
                                                  nullptr /* delinquentCallback */,
+                                                 nullptr /* executionAcquisitionCallback */,
+                                                 nullptr /* executionWaitedAcquisitionCallback */,
+                                                 nullptr /* executionReleaseCallback */,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
 

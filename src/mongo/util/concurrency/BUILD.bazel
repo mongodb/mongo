@@ -55,6 +55,7 @@ mongo_cc_library(
         ":admission_context",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/admission/execution_control:execution_control_stats",
         "//src/third_party/boost:boost_filesystem",
         "//src/third_party/boost:boost_iostreams",
         "//src/third_party/boost:boost_log",

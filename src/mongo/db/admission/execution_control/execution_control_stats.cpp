@@ -1,0 +1,129 @@
+/**
+ *    Copyright (C) 2025-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include "mongo/db/admission/execution_control/execution_control_stats.h"
+
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
+namespace mongo::admission::execution_control {
+
+DelinquencyStats::DelinquencyStats(int64_t totalDelinquentAcquisitions,
+                                   int64_t totalAcquisitionDelinquencyMillis,
+                                   int64_t maxAcquisitionDelinquencyMillis)
+    : totalDelinquentAcquisitions(totalDelinquentAcquisitions),
+      totalAcquisitionDelinquencyMillis(totalAcquisitionDelinquencyMillis),
+      maxAcquisitionDelinquencyMillis(maxAcquisitionDelinquencyMillis) {}
+
+DelinquencyStats::DelinquencyStats(const DelinquencyStats& other) {
+    *this = other;
+}
+
+DelinquencyStats& DelinquencyStats::operator=(const DelinquencyStats& other) {
+    totalDelinquentAcquisitions.storeRelaxed(other.totalDelinquentAcquisitions.loadRelaxed());
+    totalAcquisitionDelinquencyMillis.storeRelaxed(
+        other.totalAcquisitionDelinquencyMillis.loadRelaxed());
+    maxAcquisitionDelinquencyMillis.storeRelaxed(
+        other.maxAcquisitionDelinquencyMillis.loadRelaxed());
+    return *this;
+}
+
+DelinquencyStats& DelinquencyStats::operator+=(const DelinquencyStats& other) {
+    totalDelinquentAcquisitions.fetchAndAddRelaxed(other.totalDelinquentAcquisitions.loadRelaxed());
+    totalAcquisitionDelinquencyMillis.fetchAndAddRelaxed(
+        other.totalAcquisitionDelinquencyMillis.loadRelaxed());
+    int64_t currentMax, newMax;
+    do {
+        currentMax = maxAcquisitionDelinquencyMillis.loadRelaxed();
+        newMax = other.maxAcquisitionDelinquencyMillis.loadRelaxed();
+    } while (newMax > currentMax &&
+             !maxAcquisitionDelinquencyMillis.compareAndSwap(&currentMax, newMax));
+    return *this;
+}
+
+void DelinquencyStats::appendStats(BSONObjBuilder& b) const {
+    b.append("totalDelinquentAcquisitions", totalDelinquentAcquisitions.loadRelaxed());
+    b.append("totalAcquisitionDelinquencyMillis", totalAcquisitionDelinquencyMillis.loadRelaxed());
+    b.append("maxAcquisitionDelinquencyMillis", maxAcquisitionDelinquencyMillis.loadRelaxed());
+}
+
+OperationExecutionStats::OperationExecutionStats(const OperationExecutionStats& other) {
+    *this = other;
+}
+
+OperationExecutionStats& OperationExecutionStats::operator=(const OperationExecutionStats& other) {
+    totalElapsedTimeMicros.storeRelaxed(other.totalElapsedTimeMicros.loadRelaxed());
+    totalTimeQueuedMicros.storeRelaxed(other.totalTimeQueuedMicros.loadRelaxed());
+    totalTimeProcessingMicros.storeRelaxed(other.totalTimeProcessingMicros.loadRelaxed());
+    totalCPUUsageMicros.storeRelaxed(other.totalCPUUsageMicros.loadRelaxed());
+    totalAdmissions.storeRelaxed(other.totalAdmissions.loadRelaxed());
+    newAdmissions.storeRelaxed(other.newAdmissions.loadRelaxed());
+    newAdmissionsLoadShed.storeRelaxed(other.newAdmissionsLoadShed.loadRelaxed());
+    totalAdmissionsLoadShed.storeRelaxed(other.totalAdmissionsLoadShed.loadRelaxed());
+    totalQueuedTimeMicrosLoadShed.storeRelaxed(other.totalQueuedTimeMicrosLoadShed.loadRelaxed());
+    totalElapsedTimeMicrosLoadShed.storeRelaxed(other.totalElapsedTimeMicrosLoadShed.loadRelaxed());
+    totalCPUUsageLoadShed.storeRelaxed(other.totalCPUUsageLoadShed.loadRelaxed());
+    delinquencyStats = other.delinquencyStats;
+    return *this;
+}
+
+OperationExecutionStats& OperationExecutionStats::operator+=(const OperationExecutionStats& other) {
+    totalElapsedTimeMicros.fetchAndAddRelaxed(other.totalElapsedTimeMicros.loadRelaxed());
+    totalTimeQueuedMicros.fetchAndAddRelaxed(other.totalTimeQueuedMicros.loadRelaxed());
+    totalTimeProcessingMicros.fetchAndAddRelaxed(other.totalTimeProcessingMicros.loadRelaxed());
+    totalCPUUsageMicros.fetchAndAddRelaxed(other.totalCPUUsageMicros.loadRelaxed());
+    totalAdmissions.fetchAndAddRelaxed(other.totalAdmissions.loadRelaxed());
+    newAdmissions.fetchAndAddRelaxed(other.newAdmissions.loadRelaxed());
+    newAdmissionsLoadShed.fetchAndAddRelaxed(other.newAdmissionsLoadShed.loadRelaxed());
+    totalAdmissionsLoadShed.fetchAndAddRelaxed(other.totalAdmissionsLoadShed.loadRelaxed());
+    totalQueuedTimeMicrosLoadShed.fetchAndAddRelaxed(
+        other.totalQueuedTimeMicrosLoadShed.loadRelaxed());
+    totalElapsedTimeMicrosLoadShed.fetchAndAddRelaxed(
+        other.totalElapsedTimeMicrosLoadShed.loadRelaxed());
+    totalCPUUsageLoadShed.fetchAndAddRelaxed(other.totalCPUUsageLoadShed.loadRelaxed());
+    delinquencyStats += other.delinquencyStats;
+    return *this;
+}
+
+void OperationExecutionStats::appendStats(BSONObjBuilder& b) const {
+    b.append("totalElapsedTimeMicros", totalElapsedTimeMicros.loadRelaxed());
+    b.append("totalCPUUsageMicros", totalCPUUsageMicros.loadRelaxed());
+    b.append("totalTimeProcessingMicros", totalTimeProcessingMicros.loadRelaxed());
+    b.append("totalTimeQueuedMicros", totalTimeQueuedMicros.loadRelaxed());
+    b.append("totalAdmissions", totalAdmissions.loadRelaxed());
+    b.append("newAdmissions", newAdmissions.loadRelaxed());
+    b.append("newAdmissionsLoadShed", newAdmissionsLoadShed.loadRelaxed());
+    b.append("totalElapsedTimeMicrosLoadShed", totalElapsedTimeMicrosLoadShed.loadRelaxed());
+    b.append("totalCPUUsageLoadShed", totalCPUUsageLoadShed.loadRelaxed());
+    b.append("totalQueuedTimeMicrosLoadShed", totalQueuedTimeMicrosLoadShed.loadRelaxed());
+    b.append("totalAdmissionsLoadShed", totalAdmissionsLoadShed.loadRelaxed());
+    delinquencyStats.appendStats(b);
+}
+}  // namespace mongo::admission::execution_control

@@ -54,6 +54,9 @@ void IngressAdmissionController::init() {
                                                    false,
                                                    gIngressAdmissionControllerMaxQueueDepth.load(),
                                                    nullptr /* delinquentCallback */,
+                                                   nullptr /* executionAcquisitionCallback */,
+                                                   nullptr /* executionWaitedAcquisitionCallback */,
+                                                   nullptr /* executionReleaseCallback */,
                                                    TicketHolder::ResizePolicy::kImmediate);
 }
 

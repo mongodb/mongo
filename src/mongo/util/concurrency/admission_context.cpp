@@ -83,6 +83,10 @@ AdmissionContext::Priority AdmissionContext::getPriority() const {
     return _priority.loadRelaxed();
 }
 
+bool AdmissionContext::getLoadShed() const {
+    return _loadShed.loadRelaxed();
+}
+
 void AdmissionContext::recordAdmission() {
     _admissions.fetchAndAdd(1);
 }
@@ -101,6 +105,10 @@ void AdmissionContext::recordLowAdmission() {
 
 void AdmissionContext::recordExemptedAdmission() {
     _exemptedAdmissions.fetchAndAdd(1);
+}
+
+void AdmissionContext::recordOperationLoadShed() {
+    _loadShed.store(true);
 }
 
 ScopedAdmissionPriorityBase::ScopedAdmissionPriorityBase(OperationContext* opCtx,

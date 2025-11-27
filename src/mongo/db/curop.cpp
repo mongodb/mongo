@@ -810,7 +810,13 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         // Queue's stats.
         if (auto ticketingSystem =
                 admission::execution_control::TicketingSystem::get(opCtx->getServiceContext())) {
-            ticketingSystem->incrementStats(opCtx);
+            calculateCpuTime();
+            auto start = _start.load();
+            auto end = _end.load();
+            ticketingSystem->incrementStats(
+                opCtx,
+                start != 0 ? durationCount<Microseconds>(computeElapsedTimeTotal(start, end)) : 0,
+                durationCount<Microseconds>(_debug.cpuTime));
         }
     }
 

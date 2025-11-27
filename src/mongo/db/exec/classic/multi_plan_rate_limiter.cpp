@@ -130,7 +130,10 @@ MultiPlanTicketHolder::MultiPlanTicketHolder(ServiceContext* serviceContext, int
                     numTickets,
                     /*trackPeakUsed*/ false,
                     TicketHolder::kDefaultMaxQueueDepth,
-                    /* delinquentCallback*/ nullptr,
+                    /* delinquentCallback */ nullptr,
+                    /* executionAcquisitionCallback */ nullptr,
+                    /* executionWaitedAcquisitionCallback */ nullptr,
+                    /* executionReleaseCallback */ nullptr,
                     TicketHolder::ResizePolicy::kImmediate),
       _isReleased(false) {}
 

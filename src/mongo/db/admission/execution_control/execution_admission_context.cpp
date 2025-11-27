@@ -29,7 +29,10 @@
 
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 
+#include "mongo/db/admission/execution_control/execution_control_heuristic_parameters_gen.h"
 #include "mongo/db/operation_context.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
 
@@ -37,22 +40,11 @@ namespace {
 const auto contextDecoration = OperationContext::declareDecoration<ExecutionAdmissionContext>();
 }  // namespace
 
-ExecutionAdmissionContext::DelinquencyStats::DelinquencyStats(const DelinquencyStats& other) {
-    delinquentAcquisitions.storeRelaxed(other.delinquentAcquisitions.loadRelaxed());
-    totalAcquisitionDelinquencyMillis.storeRelaxed(
-        other.totalAcquisitionDelinquencyMillis.loadRelaxed());
-    maxAcquisitionDelinquencyMillis.storeRelaxed(
-        other.maxAcquisitionDelinquencyMillis.loadRelaxed());
-}
 
-ExecutionAdmissionContext::DelinquencyStats& ExecutionAdmissionContext::DelinquencyStats::operator=(
-    const DelinquencyStats& other) {
-    delinquentAcquisitions.storeRelaxed(other.delinquentAcquisitions.loadRelaxed());
-    totalAcquisitionDelinquencyMillis.storeRelaxed(
-        other.totalAcquisitionDelinquencyMillis.loadRelaxed());
-    maxAcquisitionDelinquencyMillis.storeRelaxed(
-        other.maxAcquisitionDelinquencyMillis.loadRelaxed());
-    return *this;
+bool ExecutionAdmissionContext::shouldDeprioritize(ExecutionAdmissionContext* admCtx) {
+    // If the op is eligible, downgrade it if it has yielded enough times to meet the threshold.
+    return admCtx->getAdmissions() >=
+        admission::execution_control::gHeuristicNumAdmissionsDeprioritizeThreshold.load();
 }
 
 ExecutionAdmissionContext& ExecutionAdmissionContext::get(OperationContext* opCtx) {
@@ -70,5 +62,131 @@ ExecutionAdmissionContext& ExecutionAdmissionContext::operator=(
     _readDelinquencyStats = other._readDelinquencyStats;
     _writeDelinquencyStats = other._writeDelinquencyStats;
     return *this;
+}
+
+admission::execution_control::OperationExecutionStats&
+ExecutionAdmissionContext::_getOperationExecutionStats() {
+    auto dePrioritized = ExecutionAdmissionContext::shouldDeprioritize(this) ||
+        getPriority() == AdmissionContext::Priority::kLow;
+    switch (getOperationType()) {
+        case admission::execution_control::OperationType::kRead:
+            return dePrioritized ? _readShortStats : _readLongStats;
+
+        case admission::execution_control::OperationType::kWrite:
+            return dePrioritized ? _writeShortStats : _writeLongStats;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+void ExecutionAdmissionContext::recordExecutionAcquisition() {
+    if (!_isUserOperation())
+        return;
+
+    _recordExecutionAcquisition(_getOperationExecutionStats());
+}
+
+void ExecutionAdmissionContext::recordExecutionWaitedAcquisition(Microseconds queueTimeMicros) {
+    if (!_isUserOperation())
+        return;
+
+    _recordExecutionTimeQueued(queueTimeMicros, _getOperationExecutionStats());
+}
+
+void ExecutionAdmissionContext::recordExecutionRelease(Microseconds processedTimeMicros) {
+    if (!_isUserOperation())
+        return;
+
+    _recordExecutionProcessedTime(processedTimeMicros, _getOperationExecutionStats());
+}
+
+void ExecutionAdmissionContext::recordOperationLoadShed() {
+    AdmissionContext::recordOperationLoadShed();
+    _recordExecutionShed(_getOperationExecutionStats());
+}
+
+void ExecutionAdmissionContext::recordExecutionCPUUsageAndElapsedTime(int64_t cpuUsageMicros,
+                                                                      int64_t elapsedMicros) {
+    if (!_isUserOperation())
+        return;
+
+    _recordExecutionCPUUsageAndElapsedTimeShed(
+        cpuUsageMicros, elapsedMicros, _getOperationExecutionStats());
+    if (getLoadShed()) {
+        recordOperationLoadShed();
+    }
+}
+
+void ExecutionAdmissionContext::recordDelinquentAcquisition(Milliseconds delay) {
+    _recordDelinquentAcquisition(delay, _getDelinquencyStats());
+    _recordDelinquentAcquisition(delay, _getOperationExecutionStats().delinquencyStats);
+}
+
+admission::execution_control::DelinquencyStats& ExecutionAdmissionContext::_getDelinquencyStats() {
+    return (getOperationType() == admission::execution_control::OperationType::kRead)
+        ? _readDelinquencyStats
+        : _writeDelinquencyStats;
+}
+
+bool ExecutionAdmissionContext::_isUserOperation() {
+    // We want the long/short running stats to reflect the behavior of user workloads, by preventing
+    // counting commands with exempted acquisitions, we remove noise comming from internal
+    // operations.
+    return getExemptedAdmissions() == 0;
+}
+
+void ExecutionAdmissionContext::_recordDelinquentAcquisition(
+    Milliseconds delay, admission::execution_control::DelinquencyStats& stats) {
+    const int64_t delayMs = delay.count();
+    stats.totalDelinquentAcquisitions.fetchAndAddRelaxed(1);
+    stats.totalAcquisitionDelinquencyMillis.fetchAndAddRelaxed(delayMs);
+    stats.maxAcquisitionDelinquencyMillis.storeRelaxed(
+        std::max(stats.maxAcquisitionDelinquencyMillis.loadRelaxed(), delayMs));
+}
+
+void ExecutionAdmissionContext::_recordExecutionTimeQueued(
+    Microseconds queueTimeMillis, admission::execution_control::OperationExecutionStats& stats) {
+    stats.totalTimeQueuedMicros.fetchAndAddRelaxed(queueTimeMillis.count());
+}
+
+void ExecutionAdmissionContext::_recordExecutionAcquisition(
+    admission::execution_control::OperationExecutionStats& stats) {
+    if (!_isUserOperation())
+        return;
+
+    auto admissions = getAdmissions();
+    if (admissions == 1) {
+        stats.newAdmissions.fetchAndAddRelaxed(1);
+    }
+    stats.totalAdmissions.fetchAndAddRelaxed(1);
+}
+
+void ExecutionAdmissionContext::_recordExecutionProcessedTime(
+    Microseconds processedTimeMillis,
+    admission::execution_control::OperationExecutionStats& stats) {
+    stats.totalTimeProcessingMicros.fetchAndAddRelaxed(processedTimeMillis.count());
+}
+
+void ExecutionAdmissionContext::_recordExecutionShed(
+    admission::execution_control::OperationExecutionStats& stats) {
+    stats.newAdmissionsLoadShed.fetchAndAddRelaxed(1);
+    stats.totalAdmissionsLoadShed.fetchAndAddRelaxed(getAdmissions() - getExemptedAdmissions());
+    stats.totalQueuedTimeMicrosLoadShed.fetchAndAddRelaxed(totalTimeQueuedMicros().count());
+}
+
+void ExecutionAdmissionContext::_recordExecutionCPUUsageAndElapsedTime(
+    int64_t cpuUsageMicros,
+    int64_t elapsedMicros,
+    admission::execution_control::OperationExecutionStats& stats) {
+    stats.totalCPUUsageMicros.fetchAndAddRelaxed(cpuUsageMicros);
+    stats.totalElapsedTimeMicros.fetchAndAddRelaxed(elapsedMicros);
+}
+
+void ExecutionAdmissionContext::_recordExecutionCPUUsageAndElapsedTimeShed(
+    int64_t cpuUsage,
+    int64_t elapsedMicros,
+    admission::execution_control::OperationExecutionStats& stats) {
+    stats.totalCPUUsageLoadShed.fetchAndAddRelaxed(cpuUsage);
+    stats.totalElapsedTimeMicrosLoadShed.fetchAndAddRelaxed(elapsedMicros);
 }
 }  // namespace mongo

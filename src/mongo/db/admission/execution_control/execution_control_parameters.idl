@@ -206,19 +206,6 @@ server_parameters:
         default: true
         redact: false
 
-    executionControlHeuristicNumAdmissionsDeprioritizeThreshold:
-        description: >-
-            The number of admissions an operation must perform before it is deprioritized to the low-priority
-            ticket pool. This parameter only takes effect when `executionControlHeuristicDeprioritization`
-            is true.
-        set_at: [startup, runtime]
-        cpp_vartype: Atomic<int>
-        cpp_varname: gHeuristicNumAdmissionsDeprioritizeThreshold
-        default: 3
-        validator:
-            gte: 0
-        redact: false
-
     executionControlBackgroundTasksDeprioritization:
         description: >-
             This controls whether background tasks (defined as index builds, range deletions, and

@@ -19,6 +19,24 @@ idl_generator(
     src = "throughput_probing.idl",
 )
 
+idl_generator(
+    name = "execution_control_heuristic_parameters_gen",
+    src = "execution_control_heuristic_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "execution_control_stats",
+    srcs = [
+        "execution_control_stats.cpp",
+    ],
+    hdrs = [
+        "execution_control_stats.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
 mongo_cc_library(
     name = "ticketing_system",
     srcs = [
@@ -40,8 +58,11 @@ mongo_cc_library(
     name = "execution_admission_context",
     srcs = [
         "execution_admission_context.cpp",
+        "execution_control_heuristic_parameters_gen",
     ],
     deps = [
+        ":execution_control_stats",
+        "//src/mongo/db:server_base",
         "//src/mongo/util/concurrency:admission_context",
     ],
 )
@@ -68,5 +89,8 @@ mongo_cc_unit_test(
 # TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:execution_admission_context.h to //src/mongo/db/admission/execution_control:execution_admission_context
 filegroup(
     name = "execution_admission_context_hdrs",
-    srcs = [":execution_admission_context.h"],
+    srcs = [
+        ":execution_admission_context.h",
+        ":execution_control_stats.h",
+    ],
 )

@@ -30,6 +30,20 @@ function getExecutionControlParameter(node, parameterName) {
 }
 
 /**
+ * Sets the execution control queue depth for the normal priority read pool.
+ */
+export function setExecutionControlReadMaxQueueDepth(node, depth) {
+    setExecutionControlParameter(node, "executionControlReadMaxQueueDepth", depth);
+}
+
+/**
+ * Sets the execution control queue depth for the low priority read pool.
+ */
+export function setExecutionControlReadLowPriorityMaxQueueDepth(node, depth) {
+    setExecutionControlParameter(node, "executionControlReadLowPriorityMaxQueueDepth", depth);
+}
+
+/**
  * Sets the execution control concurrency adjustment algorithm.
  */
 export function setExecutionControlAlgorithm(node, algorithm) {
@@ -55,6 +69,13 @@ export function setDeprioritizationGate(node, enabled) {
  */
 export function setHeuristicDeprioritization(node, enabled) {
     setExecutionControlParameter(node, "executionControlHeuristicDeprioritization", enabled);
+}
+
+/**
+ * Sets the heuristic deprioritization threshold for long-running operations.
+ */
+export function setHeuristicDeprioritizationThreshold(node, threshold) {
+    setExecutionControlParameter(node, "executionControlHeuristicNumAdmissionsDeprioritizeThreshold", threshold);
 }
 
 /**

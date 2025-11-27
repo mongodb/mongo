@@ -46,6 +46,9 @@ TicketHolder::TicketHolder(ServiceContext* serviceContext,
                            bool trackPeakUsed,
                            std::int32_t maxQueueDepth,
                            DelinquentCallback delinquentCallback,
+                           AcquisitionCallback acquisitionCallback,
+                           WaitedAcquisitionCallback waitedAcquisitionCallback,
+                           ReleaseCallback releaseCallback,
                            ResizePolicy resizePolicy)
     : _trackPeakUsed(trackPeakUsed),
       _resizePolicy(resizePolicy),
@@ -53,7 +56,10 @@ TicketHolder::TicketHolder(ServiceContext* serviceContext,
       _tickets(numTickets),
       _maxQueueDepth(maxQueueDepth),
       _outof(numTickets),
-      _reportDelinquentOpCallback(delinquentCallback) {
+      _reportDelinquentOpCallback(delinquentCallback),
+      _reportAcquisitionOpCallback(acquisitionCallback),
+      _reportWaitedAcquisitionOpCallback(waitedAcquisitionCallback),
+      _reportReleaseOpCallback(releaseCallback) {
     _enabledDelinquent = gFeatureFlagRecordDelinquentMetrics.isEnabled();
     _delinquentMs = Milliseconds(gDelinquentAcquisitionIntervalMillis.load());
 }
@@ -153,6 +159,9 @@ boost::optional<Ticket> TicketHolder::_waitForTicketUntilMaybeInterruptible(
         auto waitDelta = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startWaitTime);
         _holderStats.totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta.count());
         _holderStats.totalRemovedQueue.fetchAndAddRelaxed(1);
+        if (_reportWaitedAcquisitionOpCallback) {
+            _reportWaitedAcquisitionOpCallback(admCtx, waitDelta);
+        }
     });
 
     ScopeGuard cancelWait([&] {
@@ -160,7 +169,7 @@ boost::optional<Ticket> TicketHolder::_waitForTicketUntilMaybeInterruptible(
         _holderStats.totalCanceled.fetchAndAddRelaxed(1);
     });
 
-    WaitingForAdmissionGuard waitForAdmission(admCtx, _serviceContext->getTickSource());
+    WaitingForAdmissionGuard waitForAdmission(admCtx, tickSource);
     auto ticket = _performWaitForTicketUntil(opCtx, admCtx, until, interruptible);
 
     if (ticket) {
@@ -210,9 +219,12 @@ boost::optional<Ticket> TicketHolder::_performWaitForTicketUntil(OperationContex
         if (!hasStartedWaiting) {
             const auto previousWaiterCount = _waiterCount.fetchAndAdd(1);
             hasStartedWaiting = true;
-            uassert(ErrorCodes::AdmissionQueueOverflow,
-                    "MongoDB is overloaded and cannot accept new operations. Try again later.",
-                    previousWaiterCount < _maxQueueDepth.loadRelaxed());
+            if (previousWaiterCount >= _maxQueueDepth.loadRelaxed()) {
+                admCtx->recordOperationLoadShed();
+                uasserted(
+                    ErrorCodes::AdmissionQueueOverflow,
+                    "MongoDB is overloaded and cannot accept new operations. Try again later.");
+            }
         }
 
         _tickets.waitUntil(0, deadline);
@@ -280,12 +292,7 @@ void TicketHolder::appendExemptStats(BSONObjBuilder& b) const {
 
 void TicketHolder::appendHolderStats(BSONObjBuilder& b) const {
     _appendQueueStats(b, _holderStats);
-    b.append("totalDelinquentAcquisitions",
-             _delinquencyStats.totalDelinquentAcquisitions.loadRelaxed());
-    b.append("totalAcquisitionDelinquencyMillis",
-             _delinquencyStats.totalAcquisitionDelinquencyMillis.loadRelaxed());
-    b.append("maxAcquisitionDelinquencyMillis",
-             _delinquencyStats.maxAcquisitionDelinquencyMillis.loadRelaxed());
+    _delinquencyStats.appendStats(b);
 }
 
 void TicketHolder::appendTicketStats(BSONObjBuilder& b) const {
@@ -325,6 +332,9 @@ void TicketHolder::_updateQueueStatsOnRelease(TicketHolder::QueueStats& queueSta
         _reportDelinquentOpCallback(ticket.getAdmissionContext(),
                                     duration_cast<Milliseconds>(delta));
     }
+    if (_reportReleaseOpCallback) {
+        _reportReleaseOpCallback(ticket._admissionContext, duration_cast<Microseconds>(delta));
+    }
 }
 
 void TicketHolder::_updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx,
@@ -344,6 +354,9 @@ void TicketHolder::_updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx
 
     admCtx->recordAdmission();
     queueStats.totalStartedProcessing.fetchAndAddRelaxed(1);
+    if (_reportAcquisitionOpCallback) {
+        _reportAcquisitionOpCallback(admCtx);
+    }
 }
 
 int64_t TicketHolder::numFinishedProcessing() const {
@@ -382,16 +395,9 @@ int32_t TicketHolder::waiting_forTest() const {
     return _waiterCount.load();
 }
 
-void TicketHolder::incrementDelinquencyStats(int64_t delinquentAcquisitions,
-                                             Milliseconds totalAcquisitionDelinquency,
-                                             Milliseconds maxAcquisitionDelinquency) {
-    auto& stats = _delinquencyStats;
-    stats.totalDelinquentAcquisitions.fetchAndAddRelaxed(delinquentAcquisitions);
-
-    stats.totalAcquisitionDelinquencyMillis.fetchAndAddRelaxed(totalAcquisitionDelinquency.count());
-
-    stats.maxAcquisitionDelinquencyMillis.storeRelaxed(std::max(
-        stats.maxAcquisitionDelinquencyMillis.loadRelaxed(), maxAcquisitionDelinquency.count()));
+void TicketHolder::incrementDelinquencyStats(
+    const admission::execution_control::DelinquencyStats& newStats) {
+    _delinquencyStats += newStats;
 }
 
 }  // namespace mongo

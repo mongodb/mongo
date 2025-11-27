@@ -15,6 +15,7 @@ import {findMatchingLogLine} from "jstests/libs/log.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 import {
     getExecutionControlStats,
     getTotalDeprioritizationCount,
@@ -24,7 +25,10 @@ import {
     setBackgroundTaskDeprioritization,
     setDeprioritizationGate,
     setExecutionControlAlgorithm,
+    setExecutionControlReadMaxQueueDepth,
+    setExecutionControlReadLowPriorityMaxQueueDepth,
     setHeuristicDeprioritization,
+    setHeuristicDeprioritizationThreshold,
 } from "jstests/noPassthrough/admission/execution_control/libs/execution_control_helper.js";
 
 describe("Execution control statistics and observability", function () {
@@ -255,6 +259,7 @@ describe("Execution control statistics and observability", function () {
 
     describe("Deprioritized operation statistics and observability", function () {
         let replTest, mongod, db, coll;
+        const kNumOpsThreshold = 5;
         const findComment = "deprioritized_find_test";
 
         before(function () {
@@ -384,6 +389,20 @@ describe("Execution control statistics and observability", function () {
             runDeprioritizedFind(coll, findComment + "_totalization");
             assert.lt(beforeStats, getTotalDeprioritizationCount(mongod));
         });
+
+        it("should report the heuristic threshold", function () {
+            setHeuristicDeprioritizationThreshold(mongod, kNumOpsThreshold);
+            const stats = getExecutionControlStats(mongod);
+            assert(
+                stats.hasOwnProperty("heuristicDeprioritizationThreshold"),
+                `Missing heuristicDeprioritizationThreshold in execution stats: ` + tojson(stats),
+            );
+            assert.eq(
+                kNumOpsThreshold,
+                stats.heuristicDeprioritizationThreshold,
+                "Heuristic deprioritization threshold not reported correctly in serverStatus",
+            );
+        });
     });
 
     describe("Delinquent operation statistics", function () {
@@ -442,6 +461,233 @@ describe("Execution control statistics and observability", function () {
 
             const afterStats = getExecutionControlStats(mongod).read.lowPriority;
             assert.gt(afterStats.totalDelinquentAcquisitions, beforeStats.totalDelinquentAcquisitions);
+        });
+    });
+
+    describe("Short/long running operation statistics", function () {
+        const dbName = jsTestName();
+        const collName = "testcoll";
+
+        const kNumDocs = 1000;
+        const kNumReadTickets = 5;
+        const kNumWriteTickets = 5;
+        const kQueuedReaders = 20;
+        const kBusyTimeMs = 2000;
+        let replTest, mongod, db, coll;
+
+        function assertExecutionStatsPresent(stats) {
+            const requiredKeys = [
+                "totalElapsedTimeMicros",
+                "totalCPUUsageMicros",
+                "totalTimeProcessingMicros",
+                "totalTimeQueuedMicros",
+                "totalAdmissions",
+                "newAdmissions",
+                "newAdmissionsLoadShed",
+                "totalElapsedTimeMicrosLoadShed",
+                "totalCPUUsageLoadShed",
+                "totalQueuedTimeMicrosLoadShed",
+                "totalDelinquentAcquisitions",
+                "totalAcquisitionDelinquencyMillis",
+                "maxAcquisitionDelinquencyMillis",
+            ];
+
+            requiredKeys.forEach((key) => {
+                assert(stats.hasOwnProperty(key), `Missing ${key} in execution stats: ` + tojson(stats));
+            });
+        }
+
+        function assertExecutionStatsCorrect(executionStats) {
+            assert.gte(
+                executionStats.read.normalPriority.totalTimeQueuedMicros +
+                    executionStats.read.lowPriority.totalTimeQueuedMicros,
+                executionStats.read.shortRunning.totalTimeQueuedMicros +
+                    executionStats.read.longRunning.totalTimeQueuedMicros,
+                "Read totalTimeQueuedMicros mismatch: " + tojson(executionStats),
+            );
+            assert.gte(
+                executionStats.write.normalPriority.totalTimeQueuedMicros +
+                    executionStats.write.lowPriority.totalTimeQueuedMicros,
+                executionStats.write.shortRunning.totalTimeQueuedMicros +
+                    executionStats.write.longRunning.totalTimeQueuedMicros,
+                "Write totalTimeQueuedMicros mismatch: " + tojson(executionStats),
+            );
+            assert.gte(
+                executionStats.write.normalPriority.totalDelinquentAcquisitions +
+                    executionStats.write.lowPriority.totalDelinquentAcquisitions,
+                executionStats.write.shortRunning.totalDelinquentAcquisitions +
+                    executionStats.write.longRunning.totalDelinquentAcquisitions,
+                "Write totalDelinquentAcquisitions mismatch: " + tojson(executionStats),
+            );
+            assert.gte(
+                executionStats.write.normalPriority.totalAcquisitionDelinquencyMillis +
+                    executionStats.write.lowPriority.totalAcquisitionDelinquencyMillis,
+                executionStats.write.shortRunning.totalAcquisitionDelinquencyMillis +
+                    executionStats.write.longRunning.totalAcquisitionDelinquencyMillis,
+                "Write totalAcquisitionDelinquencyMillis mismatch: " + tojson(executionStats),
+            );
+            assert.gte(
+                executionStats.read.normalPriority.startedProcessing +
+                    executionStats.read.lowPriority.startedProcessing +
+                    executionStats.read.exempt.startedProcessing,
+                executionStats.read.longRunning.totalAdmissions + executionStats.read.shortRunning.totalAdmissions,
+                "Read startedProcessing mismatch: " + tojson(executionStats),
+            );
+            assert.gte(
+                executionStats.write.normalPriority.startedProcessing +
+                    executionStats.write.lowPriority.startedProcessing +
+                    executionStats.write.exempt.startedProcessing,
+                executionStats.write.longRunning.totalAdmissions + executionStats.write.shortRunning.totalAdmissions,
+                "Write startedProcessing mismatch: " + tojson(executionStats),
+            );
+            assert.gte(
+                executionStats.read.normalPriority.newAdmissions +
+                    executionStats.read.lowPriority.newAdmissions +
+                    executionStats.read.exempt.newAdmissions,
+                executionStats.read.longRunning.newAdmissions + executionStats.read.shortRunning.newAdmissions,
+                "Read newAdmissions mismatch: " + tojson(executionStats),
+            );
+            assert.gte(
+                executionStats.write.normalPriority.newAdmissions +
+                    executionStats.write.lowPriority.newAdmissions +
+                    executionStats.write.exempt.newAdmissions,
+                executionStats.write.longRunning.newAdmissions + executionStats.write.shortRunning.newAdmissions,
+                "Write newAdmissions mismatch: " + tojson(executionStats),
+            );
+        }
+
+        function assertExecutionShedStatsCorrect(executionStats) {
+            assert.gt(
+                executionStats.read.shortRunning.newAdmissionsLoadShed +
+                    executionStats.read.longRunning.newAdmissionsLoadShed,
+                0,
+                "Read newAdmissionsLoadShed mismatch: " + tojson(executionStats),
+            );
+            assert.gt(
+                executionStats.read.shortRunning.totalElapsedTimeMicrosLoadShed +
+                    executionStats.read.longRunning.totalElapsedTimeMicrosLoadShed,
+                0,
+                "Read totalElapsedTimeMicrosLoadShed mismatch: " + tojson(executionStats),
+            );
+        }
+
+        function exhaustReadTicketsForLimitedTime() {
+            let threads = [];
+            jsTestLog("Starting " + kQueuedReaders + " readers for " + kBusyTimeMs + " ms");
+            for (let i = 0; i < kQueuedReaders; i++) {
+                threads.push(
+                    new Thread(
+                        (host, dbName, collName, kBusyTimeMs) => {
+                            let mongo = new Mongo(host);
+                            mongo.setSecondaryOk();
+                            let db = mongo.getDB(dbName);
+                            let startTime = Date.now();
+                            do {
+                                try {
+                                    db[collName].aggregate([{"$count": "x"}]);
+                                } catch (e) {
+                                    // Ignore errors due to operation being shed.
+                                    if (e.code == ErrorCodes.AdmissionQueueOverflow) {
+                                        continue;
+                                    }
+                                    throw e;
+                                }
+                            } while (Date.now() - startTime < kBusyTimeMs);
+                        },
+                        mongod.host,
+                        dbName,
+                        collName,
+                        kBusyTimeMs,
+                    ),
+                );
+            }
+            threads.forEach((thread) => thread.start());
+            jsTestLog("Waiting for " + kQueuedReaders + " readers to finish");
+            threads.forEach((thread) => thread.join());
+        }
+
+        before(function () {
+            // We start the server with a low number of read and write tickets to make sure we eventually run out of available tickets.
+            replTest = new ReplSetTest({
+                nodes: 1,
+                nodeOptions: {
+                    setParameter: {
+                        executionControlConcurrentReadTransactions: kNumReadTickets,
+                        executionControlConcurrentWriteTransactions: kNumWriteTickets,
+                        executionControlConcurrentReadLowPriorityTransactions: kNumReadTickets,
+                        executionControlConcurrentWriteLowPriorityTransactions: kNumWriteTickets,
+                        // Make yielding more common.
+                        internalQueryExecYieldPeriodMS: 1,
+                        internalQueryExecYieldIterations: 1,
+                    },
+                },
+            });
+            replTest.startSet();
+            replTest.initiate();
+            mongod = replTest.getPrimary();
+            db = mongod.getDB(dbName);
+            coll = db[collName];
+        });
+
+        after(function () {
+            replTest.stopSet();
+        });
+
+        it("should report short/long running stats in serverStatus", function () {
+            insertTestDocuments(coll, kNumDocs);
+
+            let executionStats = db.serverStatus().queues.execution;
+            assert(
+                executionStats.read.hasOwnProperty("shortRunning"),
+                "Missing shortRunning stats :" + tojson(executionStats.read),
+            );
+            assertExecutionStatsPresent(executionStats.read.shortRunning);
+            assert(
+                executionStats.read.hasOwnProperty("longRunning"),
+                "Missing longRunning stats :" + tojson(executionStats.read),
+            );
+            assertExecutionStatsPresent(executionStats.read.longRunning);
+            assert(
+                executionStats.write.hasOwnProperty("shortRunning"),
+                "Missing shortRunning stats :" + tojson(executionStats.write),
+            );
+            assertExecutionStatsPresent(executionStats.write.shortRunning);
+            assert(
+                executionStats.write.hasOwnProperty("longRunning"),
+                "Missing longRunning stats :" + tojson(executionStats.write),
+            );
+            assertExecutionStatsPresent(executionStats.write.longRunning);
+        });
+        function configureExecutionControlState(enableDeprioritization, shedding) {
+            setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
+
+            setDeprioritizationGate(mongod, enableDeprioritization);
+
+            if (shedding) {
+                setExecutionControlReadMaxQueueDepth(mongod, 0);
+                setExecutionControlReadLowPriorityMaxQueueDepth(mongod, 0);
+            }
+        }
+
+        it("Check that short/long running stats are correct without deprioritization", function () {
+            configureExecutionControlState(false /*deprioritization*/, false /*shedding*/);
+            exhaustReadTicketsForLimitedTime();
+            assertExecutionStatsCorrect(db.serverStatus().queues.execution);
+        });
+        it("Check that short/long running stats are correct with deprioritization", function () {
+            configureExecutionControlState(true /*deprioritization*/, false /*shedding*/);
+            exhaustReadTicketsForLimitedTime();
+            assertExecutionStatsCorrect(db.serverStatus().queues.execution);
+        });
+        it("Checks the shed operations are counted in the stats without deprioritization", function () {
+            configureExecutionControlState(false /*deprioritization*/, true /*shedding*/);
+            exhaustReadTicketsForLimitedTime();
+            assertExecutionShedStatsCorrect(db.serverStatus().queues.execution);
+        });
+        it("Checks the shed operations are counted in the stats with deprioritization", function () {
+            configureExecutionControlState(true /*deprioritization*/, true /*shedding*/);
+            exhaustReadTicketsForLimitedTime();
+            assertExecutionShedStatsCorrect(db.serverStatus().queues.execution);
         });
     });
 });

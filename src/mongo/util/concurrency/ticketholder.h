@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/execution_control/execution_control_stats.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/waitable_atomic.h"
@@ -59,6 +60,9 @@ class TicketHolder {
 
 public:
     using DelinquentCallback = std::function<void(AdmissionContext*, Milliseconds)>;
+    using AcquisitionCallback = std::function<void(AdmissionContext*)>;
+    using WaitedAcquisitionCallback = std::function<void(AdmissionContext*, Microseconds)>;
+    using ReleaseCallback = std::function<void(AdmissionContext*, Microseconds)>;
 
     /**
      * Describes the algorithm used to update the TicketHolder when the size of the ticket pool
@@ -84,6 +88,9 @@ public:
                  bool trackPeakUsed,
                  std::int32_t maxQueueDepth,
                  DelinquentCallback delinquentCallback = nullptr,
+                 AcquisitionCallback acquisitionCallback = nullptr,
+                 WaitedAcquisitionCallback waitedAcquisitionCallback = nullptr,
+                 ReleaseCallback releaseCallback = nullptr,
                  ResizePolicy resizePolicy = ResizePolicy::kGradual);
 
     /**
@@ -203,9 +210,7 @@ public:
      * an operation completes, with the value of each of the delinquency counters accumulated
      * during its execution.
      */
-    void incrementDelinquencyStats(int64_t delinquentAcquisitions,
-                                   Milliseconds totalAcquisitionDelinquency,
-                                   Milliseconds maxAcquisitionDelinquency);
+    void incrementDelinquencyStats(const admission::execution_control::DelinquencyStats& newStats);
 
 private:
     /**
@@ -222,16 +227,6 @@ private:
         AtomicWord<std::int64_t> totalStartedProcessing{0};
         AtomicWord<std::int64_t> totalCanceled{0};
         AtomicWord<std::int64_t> totalTimeQueuedMicros{0};
-    };
-
-    /**
-     * Tracks stats around normal-priority operations that were delinquent in returning their
-     * ticket.
-     */
-    struct DelinquencyStats {
-        AtomicWord<std::int64_t> totalDelinquentAcquisitions{0};
-        AtomicWord<std::int64_t> totalAcquisitionDelinquencyMillis{0};
-        AtomicWord<std::int64_t> maxAcquisitionDelinquencyMillis{0};
     };
 
     /**
@@ -294,7 +289,10 @@ private:
     bool _enabledDelinquent{false};
     Milliseconds _delinquentMs{0};
     DelinquentCallback _reportDelinquentOpCallback{nullptr};
-    DelinquencyStats _delinquencyStats;
+    AcquisitionCallback _reportAcquisitionOpCallback{nullptr};
+    WaitedAcquisitionCallback _reportWaitedAcquisitionOpCallback{nullptr};
+    ReleaseCallback _reportReleaseOpCallback{nullptr};
+    mongo::admission::execution_control::DelinquencyStats _delinquencyStats;
 };
 
 /**

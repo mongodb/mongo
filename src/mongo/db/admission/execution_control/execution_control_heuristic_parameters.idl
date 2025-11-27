@@ -1,0 +1,47 @@
+# Copyright (C) 2025-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# TODO (SERVER-96853): This IDL file is a temporary location for parameters related to
+# execution control heuristics. These parameters should be moved to execution_control_parameters.idl
+# once the cycle dependency of execution_admission_context is fixed.
+global:
+    cpp_namespace: "mongo::admission::execution_control"
+
+server_parameters:
+    executionControlHeuristicNumAdmissionsDeprioritizeThreshold:
+        description: >-
+            The number of admissions an operation must perform before it is deprioritized to the low-priority
+            ticket pool. This parameter only takes effect when `executionControlHeuristicDeprioritization`
+            is true.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<int>
+        cpp_varname: gHeuristicNumAdmissionsDeprioritizeThreshold
+        default: 3
+        validator:
+            gte: 0
+        redact: false

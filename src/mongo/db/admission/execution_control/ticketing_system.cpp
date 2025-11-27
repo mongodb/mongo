@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/execution_control_heuristic_parameters_gen.h"
 #include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
 #include "mongo/db/admission/execution_control/throughput_probing_gen.h"
 #include "mongo/db/client.h"
@@ -114,8 +115,7 @@ bool wasOperationDowngradedToLowPriority(OperationContext* opCtx,
         return false;
     }
 
-    // If the op is eligible, downgrade it if it has yielded enough times to meet the threshold.
-    return admCtx->getAdmissions() >= gHeuristicNumAdmissionsDeprioritizeThreshold.load();
+    return ExecutionAdmissionContext::shouldDeprioritize(admCtx);
 }
 
 Status checkPrioritizationTransition(bool oldStateUsesPrioritization,
@@ -445,13 +445,71 @@ Status TicketingSystem::setBackgroundTasksDeprioritization(bool enabled) {
     });
 }
 
+void TicketingSystem::_appendOperationStats(BSONObjBuilder& b, OperationType opType) const {
+    const auto& shortExecutionStats = [&]() {
+        if (opType == OperationType::kRead) {
+            return _readShortExecutionStats;
+        } else {
+            return _writeShortExecutionStats;
+        }
+    }();
+    const auto& longExecutionStats = [&]() {
+        if (opType == OperationType::kRead) {
+            return _readLongExecutionStats;
+        } else {
+            return _writeLongExecutionStats;
+        }
+    }();
+    BSONObjBuilder shortB(b.subobjStart(kShortRunningName));
+    shortExecutionStats.appendStats(shortB);
+    shortB.done();
+    BSONObjBuilder longB(b.subobjStart(kLongRunningName));
+    longExecutionStats.appendStats(longB);
+    longB.done();
+}
+
+void TicketingSystem::_appendTicketHolderStats(BSONObjBuilder& b,
+                                               StringData fieldName,
+                                               bool prioritizationEnabled,
+                                               const AdmissionContext::Priority& priority,
+                                               const std::unique_ptr<TicketHolder>& holder,
+                                               OperationType opType,
+                                               boost::optional<BSONObjBuilder>& opStats,
+                                               int32_t& out,
+                                               int32_t& available,
+                                               int32_t& totalTickets) const {
+    if (!opStats.is_initialized()) {
+        opStats.emplace();
+    }
+    BSONObjBuilder bb(opStats->subobjStart(fieldName));
+    holder->appendTicketStats(bb);
+    holder->appendHolderStats(bb);
+    auto obj = bb.done();
+    // Totalization of tickets for the aggregate only if prioritization is enabled.
+    if (priority == AdmissionContext::Priority::kNormal || prioritizationEnabled) {
+        out += obj.getIntField("out");
+        available += obj.getIntField("available");
+        totalTickets += obj.getIntField("totalTickets");
+    }
+    if (priority == AdmissionContext::Priority::kNormal) {
+        BSONObjBuilder exemptBuilder(opStats->subobjStart(kExemptPriorityName));
+        holder->appendExemptStats(opStats.value());
+        exemptBuilder.done();
+        // Report short/long running operation that lives in the normal holder.
+        _appendOperationStats(opStats.value(), opType);
+    }
+}
+
 void TicketingSystem::appendStats(BSONObjBuilder& b) const {
     boost::optional<BSONObjBuilder> readStats;
     boost::optional<BSONObjBuilder> writeStats;
     int32_t readOut = 0, readAvailable = 0, readTotalTickets = 0;
     int32_t writeOut = 0, writeAvailable = 0, writeTotalTickets = 0;
+    bool pioritizationEnabled = usesPrioritization();
     _state.loadRelaxed().appendStats(b);
     b.append("totalDeprioritizations", _opsDeprioritized.loadRelaxed());
+    b.append("heuristicDeprioritizationThreshold",
+             admission::execution_control::gHeuristicNumAdmissionsDeprioritizeThreshold.load());
 
     for (size_t i = 0; i < _holders.size(); ++i) {
         const auto priority = static_cast<AdmissionContext::Priority>(i);
@@ -469,44 +527,28 @@ void TicketingSystem::appendStats(BSONObjBuilder& b) const {
             ? kNormalPriorityName
             : kLowPriorityName;
         if (rw.read) {
-            if (!readStats.is_initialized()) {
-                readStats.emplace();
-            }
-            BSONObjBuilder bb(readStats->subobjStart(fieldName));
-            rw.read->appendTicketStats(bb);
-            rw.read->appendHolderStats(bb);
-            if (priority == AdmissionContext::Priority::kNormal) {
-                BSONObjBuilder exemptBuilder(readStats->subobjStart(kExemptPriorityName));
-                rw.read->appendExemptStats(readStats.value());
-                exemptBuilder.done();
-            }
-            auto obj = bb.done();
-            // Totalization of tickets for the aggregate only if prioritization is enabled.
-            if (priority == AdmissionContext::Priority::kNormal || usesPrioritization()) {
-                readOut += obj.getIntField("out");
-                readAvailable += obj.getIntField("available");
-                readTotalTickets += obj.getIntField("totalTickets");
-            }
+            _appendTicketHolderStats(b,
+                                     fieldName,
+                                     pioritizationEnabled,
+                                     priority,
+                                     rw.read,
+                                     OperationType::kRead,
+                                     readStats,
+                                     readOut,
+                                     readAvailable,
+                                     readTotalTickets);
         }
         if (rw.write) {
-            if (!writeStats.is_initialized()) {
-                writeStats.emplace();
-            }
-            BSONObjBuilder bb(writeStats->subobjStart(fieldName));
-            rw.write->appendTicketStats(bb);
-            rw.write->appendHolderStats(bb);
-            if (priority == AdmissionContext::Priority::kNormal) {
-                BSONObjBuilder exemptBuilder(writeStats->subobjStart(kExemptPriorityName));
-                rw.write->appendExemptStats(writeStats.value());
-                exemptBuilder.done();
-            }
-            auto obj = bb.done();
-            // Totalization of tickets for the aggregate only if prioritization is enabled.
-            if (priority == AdmissionContext::Priority::kNormal || usesPrioritization()) {
-                writeOut += obj.getIntField("out");
-                writeAvailable += obj.getIntField("available");
-                writeTotalTickets += obj.getIntField("totalTickets");
-            }
+            _appendTicketHolderStats(b,
+                                     fieldName,
+                                     pioritizationEnabled,
+                                     priority,
+                                     rw.write,
+                                     OperationType::kWrite,
+                                     writeStats,
+                                     writeOut,
+                                     writeAvailable,
+                                     writeTotalTickets);
         }
     }
     if (readStats.is_initialized()) {
@@ -544,28 +586,29 @@ int32_t TicketingSystem::numOfTicketsUsed() const {
     return total;
 }
 
-void TicketingSystem::incrementStats(OperationContext* opCtx) {
+void TicketingSystem::incrementStats(OperationContext* opCtx,
+                                     int64_t elapsedMicros,
+                                     int64_t cpuUsageMicros) {
     auto& admCtx = ExecutionAdmissionContext::get(opCtx);
 
     auto priority = admCtx.getPriorityLowered() ? AdmissionContext::Priority::kLow
                                                 : AdmissionContext::Priority::kNormal;
-    {
-        const auto& stats = admCtx.readDelinquencyStats();
-        _getHolder(priority, OperationType::kRead)
-            ->incrementDelinquencyStats(
-                stats.delinquentAcquisitions.loadRelaxed(),
-                Milliseconds(stats.totalAcquisitionDelinquencyMillis.loadRelaxed()),
-                Milliseconds(stats.maxAcquisitionDelinquencyMillis.loadRelaxed()));
-    }
+
+    // Update delinquency stats.
 
     {
-        const auto& stats = admCtx.writeDelinquencyStats();
-        _getHolder(priority, OperationType::kWrite)
-            ->incrementDelinquencyStats(
-                stats.delinquentAcquisitions.loadRelaxed(),
-                Milliseconds(stats.totalAcquisitionDelinquencyMillis.loadRelaxed()),
-                Milliseconds(stats.maxAcquisitionDelinquencyMillis.loadRelaxed()));
+        const auto& readStats = admCtx.readDelinquencyStats();
+        _getHolder(priority, OperationType::kRead)->incrementDelinquencyStats(readStats);
+        const auto& writeStats = admCtx.writeDelinquencyStats();
+        _getHolder(priority, OperationType::kWrite)->incrementDelinquencyStats(writeStats);
     }
+
+    // Update long/short operation stats.
+    admCtx.recordExecutionCPUUsageAndElapsedTime(cpuUsageMicros, elapsedMicros);
+    _writeShortExecutionStats += admCtx.writeShortExecutionStats();
+    _writeLongExecutionStats += admCtx.writeLongExecutionStats();
+    _readShortExecutionStats += admCtx.readShortExecutionStats();
+    _readLongExecutionStats += admCtx.readLongExecutionStats();
 
     if (admCtx.getPriorityLowered()) {
         _opsDeprioritized.fetchAndAddRelaxed(1);
@@ -595,6 +638,7 @@ boost::optional<Ticket> TicketingSystem::waitForTicketUntil(OperationContext* op
 
     auto* holder = _getHolder(effectivePriority, o);
     invariant(holder);
+    admCtx->setOperationType(o);
 
     if (opCtx->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
         return holder->waitForTicketUntilNoInterrupt_DO_NOT_USE(opCtx, admCtx, until);
