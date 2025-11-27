@@ -226,8 +226,6 @@ public:
                 return false;
             }
 
-            // TODO (SERVER-87463): Investigate why the embedded router is not able to sign once the
-            // router port is opened.
             // There are some contexts where refreshing is not permitted.
             if (opCtx && serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
                 signedTime = validator->signLogicalTime(opCtx, time);
