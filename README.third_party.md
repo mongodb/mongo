@@ -69,7 +69,7 @@ a notice will be included in
 | [timelib]                                            | MIT                                            | 2022.13                                  |                      | ✗                               |
 | [Unicode Character Database]                         | Unicode-DFS-2016                               | 8.0.0                                    | ✗                    | ✗                               |
 | [valgrind.h]                                         | BSD-4-Clause                                   | 093bef43d69236287ccc748591c9560a71181b0a |                      | ✗                               |
-| [WiredTiger]                                         | GPL-2.0-only OR GPL-3.0-only                   | 8.2.0-alpha2                             | ✗                    | ✗                               |
+| [WiredTiger]                                         | GPL-2.0-only OR GPL-3.0-only                   | 12.0.0                                   | ✗                    | ✗                               |
 | [yaml-cpp]                                           | MIT                                            | 0.6.3                                    |                      | ✗                               |
 | [zlib]                                               | Zlib                                           | 1.3.1                                    | ✗                    | ✗                               |
 | [Zstandard (zstd)]                                   | BSD-3-Clause OR GPL-2.0-only                   | 1.5.5                                    | ✗                    | ✗                               |
@@ -94,7 +94,7 @@ a notice will be included in
 [S2 Geometry Library]: https://github.com/google/s2geometry.git
 [SafeInt]: https://github.com/dcleblanc/safeint.git
 [Snowball Stemming Algorithms (libstemmer)]: http://github.com/snowballstem/snowball.git
-[Unicode Character Database]: http://www.unicode.org/versions/enumeratedversions.html
+[Unicode Character Database]: https://www.unicode.org/Public/8.0.0/
 [WiredTiger]: https://github.com/wiredtiger/wiredtiger.git
 [Zstandard (zstd)]: https://github.com/facebook/zstd.git
 [benchmark]: https://github.com/google/benchmark.git
@@ -115,8 +115,8 @@ a notice will be included in
 [node]: https://nodejs.org/
 [opentelemetry-cpp]: https://github.com/open-telemetry/opentelemetry-cpp.git
 [opentelemetry-proto]: https://github.com/open-telemetry/opentelemetry-proto
-[pypi/ocspbuilder]: https://github.com/wbond/ocspbuilder
-[pypi/ocspresponder]: https://github.com/threema-ch/ocspresponder
+[pypi/ocspbuilder]: https://pypi.org/project/ocspbuilder/
+[pypi/ocspresponder]: https://pypi.org/project/ocspresponder/
 [re2]: https://github.com/google/re2.git
 [snappy]: https://github.com/google/tcmalloc.git
 [tcmalloc]: https://github.com/google/tcmalloc.git
