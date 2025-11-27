@@ -474,7 +474,8 @@ private:
      * If geo, do nothing.
      * If text, punt to finishTextNode.
      */
-    static void finishLeafNode(QuerySolutionNode* node,
+    static void finishLeafNode(const CanonicalQuery& cq,
+                               QuerySolutionNode* node,
                                const IndexEntry& index,
                                std::vector<interval_evaluation_tree::Builder> ietBuilders);
 
@@ -486,7 +487,8 @@ private:
      * If 'scanState' is building an index scan for OR-related predicates, filters may be affixed to
      * the scan as necessary.
      */
-    static void finishAndOutputLeaf(ScanBuildingState* scanState,
+    static void finishAndOutputLeaf(const CanonicalQuery& cq,
+                                    ScanBuildingState* scanState,
                                     std::vector<std::unique_ptr<QuerySolutionNode>>* out);
 
     /**
@@ -494,7 +496,9 @@ private:
      */
     static bool orNeedsFetch(const ScanBuildingState* scanState);
 
-    static void finishTextNode(QuerySolutionNode* node, const IndexEntry& index);
+    static void finishTextNode(const CanonicalQuery& cq,
+                               QuerySolutionNode* node,
+                               const IndexEntry& index);
 
     /**
      * Add the filter 'match' to the query solution node 'node'. Takes

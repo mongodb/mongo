@@ -36,6 +36,8 @@
 
 namespace mongo::plan_ranker {
 namespace {
+const auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+
 IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
     return {kp,
             IndexNames::nameToType(IndexNames::findPluginName(kp)),
@@ -63,7 +65,7 @@ OrderedIntervalList makeOIL(const std::string& fieldName,
 
 std::unique_ptr<QuerySolution> makeSolution(std::unique_ptr<QuerySolutionNode> child) {
     auto solution = std::make_unique<QuerySolution>();
-    solution->setRoot(std::make_unique<FetchNode>(std::move(child)));
+    solution->setRoot(std::make_unique<FetchNode>(std::move(child), testNss));
     return solution;
 }
 
@@ -74,7 +76,7 @@ std::unique_ptr<IndexScanNode> makeIndexScan(
         bounds.fields.emplace_back(std::move(field));
     }
 
-    auto indexScan = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(indexKey));
+    auto indexScan = std::make_unique<IndexScanNode>(testNss, buildSimpleIndexEntry(indexKey));
     indexScan->bounds = std::move(bounds);
     indexScan->computeProperties();
 

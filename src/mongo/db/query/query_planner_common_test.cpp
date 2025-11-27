@@ -52,7 +52,8 @@ protected:
 
 // Test the analysis of scan directions.
 TEST_F(QueryPlannerCommonTest, ForwardScanDirectionIndexScan) {
-    IndexScanNode ixscan(buildSimpleIndexEntry(fromjson("{a: 1, b: 1}")));
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    IndexScanNode ixscan(testNss, buildSimpleIndexEntry(fromjson("{a: 1, b: 1}")));
     OrderedIntervalList a{"a"};
     a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         BSON("" << 1 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
@@ -64,7 +65,8 @@ TEST_F(QueryPlannerCommonTest, ForwardScanDirectionIndexScan) {
 }
 
 TEST_F(QueryPlannerCommonTest, BackwardScanDirectionIndexScan) {
-    IndexScanNode ixscan(buildSimpleIndexEntry(fromjson("{a: 1, b: 1}")));
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    IndexScanNode ixscan(testNss, buildSimpleIndexEntry(fromjson("{a: 1, b: 1}")));
     OrderedIntervalList a{"a"};
     a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         BSON("" << 10 << "" << 1), BoundInclusion::kIncludeBothStartAndEndKeys));
@@ -77,7 +79,8 @@ TEST_F(QueryPlannerCommonTest, BackwardScanDirectionIndexScan) {
 }
 
 TEST_F(QueryPlannerCommonTest, ForwardScanDirectionReversedIndexScan) {
-    IndexScanNode ixscan(buildSimpleIndexEntry(fromjson("{a: -1, b: -1}")));
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    IndexScanNode ixscan(testNss, buildSimpleIndexEntry(fromjson("{a: -1, b: -1}")));
     OrderedIntervalList a{"a"};
     a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         BSON("" << 10 << "" << 1), BoundInclusion::kIncludeBothStartAndEndKeys));
@@ -90,7 +93,8 @@ TEST_F(QueryPlannerCommonTest, ForwardScanDirectionReversedIndexScan) {
 
 
 TEST_F(QueryPlannerCommonTest, BackwardScanDirectionReversedIndexScan) {
-    IndexScanNode ixscan(buildSimpleIndexEntry(fromjson("{a: -1, b: -1}")));
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    IndexScanNode ixscan(testNss, buildSimpleIndexEntry(fromjson("{a: -1, b: -1}")));
     OrderedIntervalList a{"a"};
     a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         BSON("" << 1 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));

@@ -40,6 +40,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_util.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
@@ -673,7 +674,7 @@ void FetchNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> FetchNode::clone() const {
-    auto copy = std::make_unique<FetchNode>();
+    auto copy = std::make_unique<FetchNode>(this->nss);
     cloneBaseData(copy.get());
     return copy;
 }
@@ -682,8 +683,9 @@ std::unique_ptr<QuerySolutionNode> FetchNode::clone() const {
 // IndexScanNode
 //
 
-IndexScanNode::IndexScanNode(IndexEntry indexEntry)
-    : index(std::move(indexEntry)),
+IndexScanNode::IndexScanNode(NamespaceString nss, IndexEntry indexEntry)
+    : nss(std::move(nss)),
+      index(std::move(indexEntry)),
       direction(1),
       addKeyMetadata(false),
       shouldDedup(index.multikey),
@@ -1218,7 +1220,7 @@ void IndexScanNode::computeProperties() {
 }
 
 std::unique_ptr<QuerySolutionNode> IndexScanNode::clone() const {
-    auto copy = std::make_unique<IndexScanNode>(this->index);
+    auto copy = std::make_unique<IndexScanNode>(this->nss, this->index);
     cloneBaseData(copy.get());
 
     copy->direction = this->direction;
@@ -1668,7 +1670,7 @@ void CountScanNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> CountScanNode::clone() const {
-    auto copy = std::make_unique<CountScanNode>(this->index);
+    auto copy = std::make_unique<CountScanNode>(this->nss, this->index);
     cloneBaseData(copy.get());
 
     copy->startKey = this->startKey;
@@ -1750,7 +1752,7 @@ void TextMatchNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> TextMatchNode::clone() const {
-    auto copy = std::make_unique<TextMatchNode>(index, ftsQuery->clone(), wantTextScore);
+    auto copy = std::make_unique<TextMatchNode>(nss, index, ftsQuery->clone(), wantTextScore);
     cloneBaseData(copy.get());
     copy->indexPrefix = indexPrefix;
     return copy;
@@ -1927,7 +1929,7 @@ void SentinelNode::appendToString(str::stream* ss, int indent) const {
 
 std::unique_ptr<QuerySolutionNode> SearchNode::clone() const {
     return std::make_unique<SearchNode>(
-        isSearchMeta, searchQuery, limit, sortSpec, remoteCursorId, remoteCursorVars);
+        nss, isSearchMeta, searchQuery, limit, sortSpec, remoteCursorId, remoteCursorVars);
 }
 
 void SearchNode::appendToString(str::stream* ss, int indent) const {

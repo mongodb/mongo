@@ -33,6 +33,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/trial_period_utils.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/canonical_query.h"
@@ -534,12 +535,6 @@ public:
         // values.
         bool canProcessBlockValues{false};
 
-        // Tracks the current namespace that we're building a plan over. Given that the stage
-        // builder can build plans for multiple namespaces, a node in the tree that targets a
-        // namespace different from its parent node can set this value to notify any child nodes of
-        // the correct namespace.
-        NamespaceString targetNamespace;
-
         // When the pipeline has a limit stage this will be set to true. The flag is used by the
         // sort stage to improve the performance of queries that have both sort and limit.
         bool hasLimit{false};
@@ -782,15 +777,6 @@ public:
     PlanStageReqs& setCanProcessBlockValues(bool b) {
         _data->canProcessBlockValues = b;
         return *this;
-    }
-
-    PlanStageReqs& setTargetNamespace(const NamespaceString& nss) {
-        _data->targetNamespace = nss;
-        return *this;
-    }
-
-    const NamespaceString& getTargetNamespace() const {
-        return _data->targetNamespace;
     }
 
     bool getHasLimit() const {
@@ -1188,11 +1174,10 @@ private:
                                        size_t limitSkipSum);
 
     /**
-     * Returns a CollectionPtr corresponding to the collection that we are currently building a
-     * plan over. If no current namespace is configured, a CollectionPtr referencing the main
-     * collection tracked by '_collections' is returned.
+     * Returns a CollectionPtr for the requested collection, which must exist in the '_collections'
+     * set.
      */
-    CollectionPtr getCurrentCollection(const PlanStageReqs& reqs) const;
+    CollectionPtr getCollection(const NamespaceString& nss) const;
 
     std::pair<std::vector<std::string>, sbe::value::SlotVector> buildSearchMetadataSlots();
 

@@ -152,7 +152,8 @@ TEST(PlannerWildcardHelpersTest, FinalizeBasicPatternInCompoundWildcardIndexScan
     ASSERT_EQ(expectedMks, expandedIndex.multikeyPaths);
 
     // Create an 'IndexScanNode' with the expanded 'IndexEntry' for testing finalization.
-    IndexScanNode idxScan{expandedIndex};
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    IndexScanNode idxScan{testNss, expandedIndex};
 
     std::vector<interval_evaluation_tree::Builder> ietBuilders;
     ietBuilders.resize(3);
@@ -181,7 +182,8 @@ TEST(PlannerWildcardHelpersTest, AddSubpathBoundsIfBoundsOverlapWithObjects) {
     const auto& expandedIndex = expandedIndexes[0];
 
     // Create an 'IndexScanNode' with the expanded 'IndexEntry' for testing finalization.
-    IndexScanNode idxScan{expandedIndex};
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    IndexScanNode idxScan{testNss, expandedIndex};
 
     std::vector<interval_evaluation_tree::Builder> ietBuilders;
     ietBuilders.resize(2);

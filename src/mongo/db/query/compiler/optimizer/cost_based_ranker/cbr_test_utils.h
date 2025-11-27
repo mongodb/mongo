@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
@@ -54,17 +55,20 @@ IndexEntry buildMultikeyIndexEntry(const std::vector<std::string>& indexFields,
 CollectionInfo buildCollectionInfo(const std::vector<IndexEntry>& indexes,
                                    std::unique_ptr<stats::CollectionStatistics> collStats);
 
-std::unique_ptr<IndexScanNode> makeIndexScan(IndexBounds bounds,
+std::unique_ptr<IndexScanNode> makeIndexScan(const NamespaceString& nss,
+                                             IndexBounds bounds,
                                              std::vector<std::string> indexFields,
                                              std::unique_ptr<MatchExpression> filter = nullptr);
 
 std::unique_ptr<QuerySolution> makeIndexScanFetchPlan(
+    const NamespaceString& nss,
     IndexBounds bounds,
     std::vector<std::string> indexFields,
     std::unique_ptr<MatchExpression> indexFilter = nullptr,
     std::unique_ptr<MatchExpression> fetchFilter = nullptr);
 
 std::unique_ptr<QuerySolution> makeMultiKeyIndexScanFetchPlan(
+    const NamespaceString& nss,
     IndexBounds bounds,
     std::vector<std::string> indexFields,
     std::string multikeyField,

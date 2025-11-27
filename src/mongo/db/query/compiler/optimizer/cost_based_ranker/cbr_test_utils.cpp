@@ -30,6 +30,7 @@
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/ce/ce_test_utils.h"
 #include "mongo/db/query/compiler/ce/histogram/histogram_test_utils.h"
@@ -114,10 +115,11 @@ CollectionInfo buildCollectionInfo(const std::vector<IndexEntry>& indexes,
     return collInfo;
 }
 
-std::unique_ptr<IndexScanNode> makeIndexScan(IndexBounds bounds,
+std::unique_ptr<IndexScanNode> makeIndexScan(const NamespaceString& nss,
+                                             IndexBounds bounds,
                                              std::vector<std::string> indexFields,
                                              std::unique_ptr<MatchExpression> filter) {
-    auto indexScan = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(indexFields));
+    auto indexScan = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(indexFields));
     indexScan->bounds = std::move(bounds);
     if (filter) {
         indexScan->filter = std::move(filter);
@@ -125,12 +127,13 @@ std::unique_ptr<IndexScanNode> makeIndexScan(IndexBounds bounds,
     return indexScan;
 }
 
-std::unique_ptr<IndexScanNode> makeMultiKeyIndexScan(IndexBounds bounds,
+std::unique_ptr<IndexScanNode> makeMultiKeyIndexScan(const NamespaceString& nss,
+                                                     IndexBounds bounds,
                                                      std::vector<std::string> indexFields,
                                                      std::string multikeyField,
                                                      std::unique_ptr<MatchExpression> filter) {
     auto indexScan =
-        std::make_unique<IndexScanNode>(buildMultikeyIndexEntry(indexFields, multikeyField));
+        std::make_unique<IndexScanNode>(nss, buildMultikeyIndexEntry(indexFields, multikeyField));
     indexScan->bounds = std::move(bounds);
     if (filter) {
         indexScan->filter = std::move(filter);
@@ -139,13 +142,14 @@ std::unique_ptr<IndexScanNode> makeMultiKeyIndexScan(IndexBounds bounds,
 }
 
 std::unique_ptr<QuerySolution> makeIndexScanFetchPlan(
+    const NamespaceString& nss,
     IndexBounds bounds,
     std::vector<std::string> indexFields,
     std::unique_ptr<MatchExpression> indexFilter,
     std::unique_ptr<MatchExpression> fetchFilter) {
 
-    auto fetch =
-        std::make_unique<FetchNode>(makeIndexScan(bounds, indexFields, std::move(indexFilter)));
+    auto fetch = std::make_unique<FetchNode>(
+        makeIndexScan(nss, bounds, indexFields, std::move(indexFilter)), nss);
     if (fetchFilter) {
         fetch->filter = std::move(fetchFilter);
     }
@@ -156,6 +160,7 @@ std::unique_ptr<QuerySolution> makeIndexScanFetchPlan(
 }
 
 std::unique_ptr<QuerySolution> makeMultiKeyIndexScanFetchPlan(
+    const NamespaceString& nss,
     IndexBounds bounds,
     std::vector<std::string> indexFields,
     std::string multikeyField,
@@ -163,7 +168,8 @@ std::unique_ptr<QuerySolution> makeMultiKeyIndexScanFetchPlan(
     std::unique_ptr<MatchExpression> fetchFilter) {
 
     auto fetch = std::make_unique<FetchNode>(
-        makeMultiKeyIndexScan(bounds, indexFields, multikeyField, std::move(indexFilter)));
+        makeMultiKeyIndexScan(nss, bounds, indexFields, multikeyField, std::move(indexFilter)),
+        nss);
     if (fetchFilter) {
         fetch->filter = std::move(fetchFilter);
     }

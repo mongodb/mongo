@@ -292,7 +292,7 @@ std::unique_ptr<QuerySolution> constructCoveredDistinctScan(
         std::unique_ptr<QuerySolutionNode> solnRoot = std::move(dn);
         if (plannerParams.mainCollectionInfo.indexes[distinctNodeIndex].collator) {
             if (!solnRoot->fetched()) {
-                auto fetch = std::make_unique<FetchNode>();
+                auto fetch = std::make_unique<FetchNode>(canonicalQuery.nss());
                 fetch->children.push_back(std::move(solnRoot));
                 solnRoot = std::move(fetch);
             }

@@ -246,7 +246,8 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
                 feature_flags::gFeatureFlagSearchInSbe.isEnabled());
 
         // Build a SearchNode in order to retrieve the search info.
-        auto searchNode = search_helpers::getSearchNode(query.cqPipeline().front().get());
+        auto searchNode =
+            search_helpers::getSearchNode(query.nss(), query.cqPipeline().front().get());
 
         if (searchNode->searchQuery.getBoolField(mongot_cursor::kReturnStoredSourceArg) ||
             searchNode->isSearchMeta) {

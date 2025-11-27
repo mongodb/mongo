@@ -1488,16 +1488,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookupUnwind(
 namespace {
 PlanStageReqs makeReqsForRightSideOfNestedLoopJoin(
     const QuerySolutionNode* root, std::vector<PlanStageReqs::OwnedSlotName> fieldRequests) {
-    auto [leaf, numCollScanNodes] = root->getFirstNodeByType(STAGE_COLLSCAN);
-    auto collectionScanNode = dynamic_cast<const CollectionScanNode*>(leaf);
-    tassert(10984700,
-            "Expected exactly one CollectionScanNode in right side of NestedLoopJoinEmbeddingNode",
-            collectionScanNode != nullptr && numCollScanNodes == 1);
-
-    return PlanStageReqs{}
-        .setTargetNamespace(collectionScanNode->nss)
-        .setResultObj()
-        .set(std::move(fieldRequests));
+    return PlanStageReqs{}.setResultObj().set(std::move(fieldRequests));
 }
 
 /**
@@ -1799,7 +1790,6 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildNestedLoopJoinEmb
     // Recursively build the executable plan for each side of the join.
     PlanStageReqs leftChildReqs =
         PlanStageReqs{}
-            .setTargetNamespace(reqs.getTargetNamespace())
             .setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}), FieldEffects())
             .set(std::move(leftRequests));
     auto [leftStage, leftOutputs] =
@@ -1915,7 +1905,6 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildHashJoinEmbedding
     // Recursively build the executable plan for each side of the join.
     PlanStageReqs leftChildReqs =
         PlanStageReqs{}
-            .setTargetNamespace(reqs.getTargetNamespace())
             .setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}), FieldEffects())
             .set(std::move(leftRequests));
     auto [leftStage, leftOutputs] = build(hashJoinEmbeddingNode->children[0].get(), leftChildReqs);

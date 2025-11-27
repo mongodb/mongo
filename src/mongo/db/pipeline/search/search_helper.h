@@ -222,6 +222,6 @@ void promoteStoredSourceOrAddIdLookup(
  * Creates a Search QSN from the given DocumentSource stage, if isSearchStage(stage) or
  * isSearchMetaStage(stage) return 'true'. Else, an error is thrown.
  */
-std::unique_ptr<SearchNode> getSearchNode(DocumentSource* stage);
+std::unique_ptr<SearchNode> getSearchNode(NamespaceString nss, DocumentSource* stage);
 }  // namespace search_helpers
 }  // namespace mongo

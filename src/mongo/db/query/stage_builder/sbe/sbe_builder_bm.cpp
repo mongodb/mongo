@@ -55,7 +55,8 @@ public:
                                                      std::string indexName,
                                                      double lowBound,
                                                      double highBound) {
-        auto child = std::make_unique<IndexScanNode>(createIndexEntry(BSON(index << 1), indexName));
+        auto child =
+            std::make_unique<IndexScanNode>(kNss, createIndexEntry(BSON(index << 1), indexName));
         IndexBounds bounds{};
         OrderedIntervalList oil(index);
         oil.intervals.emplace_back(BSON("" << lowBound << "" << highBound), true, true);
@@ -145,7 +146,7 @@ void BM_Simple(benchmark::State& state) {
 
     // Create QuerySolution
     auto child = fixture.makeIndexScanNode("x1", "index1", -INFINITY, kIndexUpperBound);
-    auto root = std::make_unique<FetchNode>(std::move(child));
+    auto root = std::make_unique<FetchNode>(std::move(child), kNss);
 
     auto bsonObj = fixture.buildFilter(state.range(0), false);
     root->filter = std::move(

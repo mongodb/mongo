@@ -792,8 +792,9 @@ struct MergeSortNode : public QuerySolutionNodeWithSortSet {
 };
 
 struct FetchNode : public QuerySolutionNode {
-    FetchNode() {}
-    FetchNode(std::unique_ptr<QuerySolutionNode> child) : QuerySolutionNode(std::move(child)) {}
+    explicit FetchNode(NamespaceString nss) : nss(std::move(nss)) {}
+    FetchNode(std::unique_ptr<QuerySolutionNode> child, NamespaceString nss)
+        : QuerySolutionNode(std::move(child)), nss(std::move(nss)) {}
     ~FetchNode() override {}
 
     StageType getType() const override {
@@ -816,10 +817,12 @@ struct FetchNode : public QuerySolutionNode {
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
+
+    NamespaceString nss;
 };
 
 struct MONGO_MOD_NEEDS_REPLACEMENT IndexScanNode : public QuerySolutionNodeWithSortSet {
-    IndexScanNode(IndexEntry index);
+    IndexScanNode(NamespaceString nss, IndexEntry index);
     ~IndexScanNode() override {}
 
     void computeProperties() override;
@@ -856,6 +859,8 @@ struct MONGO_MOD_NEEDS_REPLACEMENT IndexScanNode : public QuerySolutionNodeWithS
         // that share the same plan cache key.
         QuerySolutionNode::hash(std::move(h));
     }
+
+    NamespaceString nss;
 
     IndexEntry index;
 
@@ -1539,7 +1544,8 @@ struct DistinctNode : public QuerySolutionNodeWithSortSet {
  * Some count queries reduce to counting how many keys are between two entries in a Btree.
  */
 struct CountScanNode : public QuerySolutionNodeWithSortSet {
-    CountScanNode(IndexEntry index) : index(std::move(index)) {}
+    CountScanNode(NamespaceString nss, IndexEntry index)
+        : nss(std::move(nss)), index(std::move(index)) {}
 
     ~CountScanNode() override {}
 
@@ -1559,6 +1565,8 @@ struct CountScanNode : public QuerySolutionNodeWithSortSet {
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
+
+    NamespaceString nss;
 
     IndexEntry index;
 
@@ -1612,8 +1620,14 @@ struct TextOrNode : public OrNode {
 };
 
 struct TextMatchNode : public QuerySolutionNodeWithSortSet {
-    TextMatchNode(IndexEntry index, std::unique_ptr<fts::FTSQuery> ftsQuery, bool wantTextScore)
-        : index(std::move(index)), ftsQuery(std::move(ftsQuery)), wantTextScore(wantTextScore) {}
+    TextMatchNode(NamespaceString nss,
+                  IndexEntry index,
+                  std::unique_ptr<fts::FTSQuery> ftsQuery,
+                  bool wantTextScore)
+        : nss(std::move(nss)),
+          index(std::move(index)),
+          ftsQuery(std::move(ftsQuery)),
+          wantTextScore(wantTextScore) {}
 
     StageType getType() const override {
         return STAGE_TEXT_MATCH;
@@ -1633,6 +1647,8 @@ struct TextMatchNode : public QuerySolutionNodeWithSortSet {
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
+
+    NamespaceString nss;
 
     IndexEntry index;
     std::unique_ptr<fts::FTSQuery> ftsQuery;
@@ -2016,13 +2032,15 @@ struct SentinelNode : public QuerySolutionNode {
 struct SearchNode : public QuerySolutionNode {
     SearchNode() = default;
 
-    SearchNode(bool isSearchMeta,
+    SearchNode(NamespaceString nss,
+               bool isSearchMeta,
                BSONObj searchQuery,
                boost::optional<long long> limit,
                boost::optional<BSONObj> sortSpec,
                size_t remoteCursorId,
                boost::optional<BSONObj> remoteCursorVars)
-        : isSearchMeta(isSearchMeta),
+        : nss(std::move(nss)),
+          isSearchMeta(isSearchMeta),
           searchQuery(searchQuery),
           limit(limit),
           sortSpec(sortSpec),
@@ -2052,6 +2070,8 @@ struct SearchNode : public QuerySolutionNode {
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
+
+    NamespaceString nss;
 
     /**
      * True for $searchMeta, False for $search query.

@@ -38,6 +38,7 @@
 #include "mongo/db/exec/shard_filterer_mock.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_text.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
@@ -325,7 +326,7 @@ TEST_F(GoldenSbeStageBuilderTest, TestCountScan) {
         {fromjson("{_id: 0, a: 1}"), fromjson("{_id: 1, a: 2}"), fromjson("{_id: 2, a: 3}")},
         BSON("a" << 1));
     // Build COUNT_SCAN node
-    auto csn = std::make_unique<CountScanNode>(makeIndexEntry(BSON("a" << 1)));
+    auto csn = std::make_unique<CountScanNode>(_nss, makeIndexEntry(BSON("a" << 1)));
     csn->startKey = BSON("a" << BSONType::minKey);
     csn->startKeyInclusive = false;
     csn->endKey = BSON("a" << BSONType::maxKey);
@@ -420,11 +421,12 @@ TEST_F(GoldenSbeStageBuilderTest, TestSortLimitSkip) {
     runTest(std::move(limitSkipNode), expected, {.limit = 1, .skip = 1});
 }
 
-std::unique_ptr<IndexScanNode> makeIdxScanNode(BSONObj idxPattern,
+std::unique_ptr<IndexScanNode> makeIdxScanNode(const NamespaceString& nss,
+                                               BSONObj idxPattern,
                                                std::string key,
                                                boost::optional<double> lowerBound,
                                                boost::optional<double> upperBound) {
-    auto indexScanNode = std::make_unique<IndexScanNode>(makeIndexEntry(idxPattern));
+    auto indexScanNode = std::make_unique<IndexScanNode>(nss, makeIndexEntry(idxPattern));
     IndexBounds bounds{};
     if (lowerBound && upperBound) {
         OrderedIntervalList oil(key);
@@ -457,7 +459,7 @@ TEST_F(GoldenSbeStageBuilderTest, TestSortCovered) {
 
     // Build an index scan node for covered sort.
     auto coveredSortNode =
-        std::make_unique<SortNodeDefault>(makeIdxScanNode(indexKeyPattern, "a", 1, 3),
+        std::make_unique<SortNodeDefault>(makeIdxScanNode(_nss, indexKeyPattern, "a", 1, 3),
                                           BSON("a" << -1) /* pattern */,
                                           -1 /* limit */,
                                           LimitSkipParameterization::Disabled);
@@ -480,10 +482,10 @@ TEST_F(GoldenSbeStageBuilderTest, TestMergeSort) {
     auto mergeSortNode = std::make_unique<MergeSortNode>();
     // The first branch has [{_id: 0, a: 1}, {_id: 1, a: 2}]
     mergeSortNode->children.push_back(
-        std::make_unique<FetchNode>(makeIdxScanNode(BSON("a" << 1), "a", 1, 2)));
+        std::make_unique<FetchNode>(makeIdxScanNode(_nss, BSON("a" << 1), "a", 1, 2), _nss));
     // The second branch has [{_id: 1, a: 2}, {_id: 2, a: 3}]
     mergeSortNode->children.push_back(
-        std::make_unique<FetchNode>(makeIdxScanNode(BSON("a" << 1), "a", 2, 3)));
+        std::make_unique<FetchNode>(makeIdxScanNode(_nss, BSON("a" << 1), "a", 2, 3), _nss));
     mergeSortNode->sort = BSON("a" << 1);
     mergeSortNode->dedup = true;
 
@@ -626,8 +628,8 @@ TEST_F(GoldenSbeStageBuilderTest, TestTextMatch) {
                                                                      .language = "english",
                                                                      .caseSensitive = true});
     auto textNode = std::make_unique<TextMatchNode>(
-        makeIndexEntry(BSON("a" << "text")), textExpr.getFTSQuery().clone(), false);
-    auto indexScanNode = std::make_unique<IndexScanNode>(makeIndexEntry(BSON("a" << "text")));
+        _nss, makeIndexEntry(BSON("a" << "text")), textExpr.getFTSQuery().clone(), false);
+    auto indexScanNode = std::make_unique<IndexScanNode>(_nss, makeIndexEntry(BSON("a" << "text")));
     IndexBounds bounds{};
     OrderedIntervalList oil("a");
     oil.intervals.emplace_back(BSON("" << "a"
@@ -638,7 +640,7 @@ TEST_F(GoldenSbeStageBuilderTest, TestTextMatch) {
     bounds.fields.emplace_back(std::move(oil));
     indexScanNode->bounds = std::move(bounds);
     indexScanNode->sortSet = ProvidedSortSet{BSON("a" << "text")};
-    textNode->children.push_back(std::make_unique<FetchNode>(std::move(indexScanNode)));
+    textNode->children.push_back(std::make_unique<FetchNode>(std::move(indexScanNode), _nss));
     runTest(std::move(textNode),
             BSON_ARRAY(BSON("_id" << 0 << "a"
                                   << "this is test")
@@ -799,7 +801,8 @@ TEST_F(SearchSbeStageBuilderTest, TestSearch) {
     {
         _gctx->outStream() << "SearchMeta Test" << std::endl;
         auto node =
-            std::make_unique<SearchNode>(true /* isSearchMeta */,
+            std::make_unique<SearchNode>(_nss,
+                                         true /* isSearchMeta */,
                                          BSON("query" << "test"
                                                       << "path"
                                                       << "a"),
@@ -812,7 +815,8 @@ TEST_F(SearchSbeStageBuilderTest, TestSearch) {
     // Test non-stored_source case.
     {
         _gctx->outStream() << "Search NonStoredSource Test" << std::endl;
-        auto node = std::make_unique<SearchNode>(false /* isSearchMeta */,
+        auto node = std::make_unique<SearchNode>(_nss,
+                                                 false /* isSearchMeta */,
                                                  BSON("query" << "test"
                                                               << "path"
                                                               << "a"),
@@ -826,7 +830,8 @@ TEST_F(SearchSbeStageBuilderTest, TestSearch) {
     // Test stored_source case with limit.
     {
         _gctx->outStream() << "Search NonStoredSource Test" << std::endl;
-        auto node = std::make_unique<SearchNode>(false /* isSearchMeta */,
+        auto node = std::make_unique<SearchNode>(_nss,
+                                                 false /* isSearchMeta */,
                                                  BSON("query" << "test"
                                                               << "path"
                                                               << "a"

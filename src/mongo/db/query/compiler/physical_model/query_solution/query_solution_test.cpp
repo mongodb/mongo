@@ -36,6 +36,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -57,6 +58,7 @@
 #include <initializer_list>
 #include <memory>
 #include <ostream>
+#include <set>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -130,18 +132,29 @@ IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
 void assertNamespaceVectorsAreEqual(const std::vector<NamespaceStringOrUUID>& secondaryNssVector,
                                     const std::vector<NamespaceStringOrUUID>& expectedNssVector) {
     ASSERT_EQ(secondaryNssVector.size(), expectedNssVector.size());
+
+    // Use multisets to perform a comparison that ignores order.
+    std::multiset<NamespaceString> secondaryNssMultiset;
+    std::multiset<NamespaceString> expectedNssMultiset;
+
     for (size_t i = 0; i < secondaryNssVector.size(); ++i) {
         ASSERT(secondaryNssVector[i].isNamespaceString());
+        secondaryNssMultiset.emplace(secondaryNssVector[i].nss());
+
         ASSERT(expectedNssVector[i].isNamespaceString());
-        ASSERT_EQ(secondaryNssVector[i].nss(), expectedNssVector[i].nss());
+        expectedNssMultiset.emplace(expectedNssVector[i].nss());
     }
+
+    ASSERT_EQ(secondaryNssMultiset, expectedNssMultiset);
 }
 
 // Index: {a: 1, b: 1, c: 1, d: 1, e: 1}
 // Min: {a: 1, b: 1, c: 1, d: 1, e: 1}
 // Max: {a: 1, b: 1, c: 1, d: 1, e: 1}
 TEST(QuerySolutionTest, SimpleRangeAllEqual) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     IndexScanNode node{
+        mainNss,
         buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1))};
     node.bounds.isSimpleRange = true;
     node.bounds.startKey = BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1);
@@ -166,7 +179,9 @@ TEST(QuerySolutionTest, SimpleRangeAllEqual) {
 // Min: {a: 1, b: 1, c: 1, d: 1, e: 1}
 // Max: {a: 2, b: 2, c: 2, d: 2, e: 2}
 TEST(QuerySolutionTest, SimpleRangeNoneEqual) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     IndexScanNode node{
+        mainNss,
         buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1))};
     node.bounds.isSimpleRange = true;
     node.bounds.startKey = BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1);
@@ -189,7 +204,9 @@ TEST(QuerySolutionTest, SimpleRangeNoneEqual) {
 // Min: {a: 1, b: 1, c: 1, d: 1, e: 1}
 // Max: {a: 1, b: 1, c: 2, d: 2, e: 2}
 TEST(QuerySolutionTest, SimpleRangeSomeEqual) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     IndexScanNode node{
+        mainNss,
         buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1))};
     node.bounds.isSimpleRange = true;
     node.bounds.startKey = BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1);
@@ -215,7 +232,9 @@ TEST(QuerySolutionTest, SimpleRangeSomeEqual) {
 // Index: {a: 1, b: 1, c: 1, d: 1, e: 1}
 // Intervals: a: [1,1], b: [1,1], c: [1,1], d: [1,1], e: [1,1]
 TEST(QuerySolutionTest, IntervalListAllPoints) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     IndexScanNode node{
+        mainNss,
         buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1))};
 
     OrderedIntervalList a{};
@@ -273,7 +292,9 @@ TEST(QuerySolutionTest, IntervalListAllPoints) {
 // Index: {a: 1, b: 1, c: 1, d: 1, e: 1}
 // Intervals: a: [1,2], b: [1,2], c: [1,2], d: [1,2], e: [1,2]
 TEST(QuerySolutionTest, IntervalListNoPoints) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     IndexScanNode node{
+        mainNss,
         buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1))};
 
     OrderedIntervalList a{};
@@ -323,7 +344,9 @@ TEST(QuerySolutionTest, IntervalListNoPoints) {
 // Index: {a: 1, b: 1, c: 1, d: 1, e: 1}
 // Intervals: a: [1,1], b: [1,1], c: [1,2], d: [1,2], e: [1,2]
 TEST(QuerySolutionTest, IntervalListSomePoints) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     IndexScanNode node{
+        mainNss,
         buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1))};
 
     OrderedIntervalList a{};
@@ -548,7 +571,8 @@ TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsWithInclusiveB
 }
 
 TEST(QuerySolutionTest, IndexScanNodeRemovesNonMatchingCollatedFieldsFromSortsOnSimpleBounds) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
     CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
     node.queryCollator = &queryCollator;
 
@@ -565,7 +589,8 @@ TEST(QuerySolutionTest, IndexScanNodeRemovesNonMatchingCollatedFieldsFromSortsOn
 }
 
 TEST(QuerySolutionTest, IndexScanNodeGetFieldsWithStringBoundsCorrectlyHandlesEndKeyInclusive) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
     CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
     node.queryCollator = &queryCollator;
 
@@ -597,7 +622,8 @@ TEST(QuerySolutionTest, IndexScanNodeGetFieldsWithStringBoundsCorrectlyHandlesEn
 // Index: {a: 1}
 // Bounds: [MINKEY, MAXKEY]
 TEST(QuerySolutionTest, IndexScanNodeRemovesCollatedFieldsFromSortsIfCollationDifferent) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a" << 1))};
     CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
     node.queryCollator = &queryCollator;
 
@@ -615,7 +641,8 @@ TEST(QuerySolutionTest, IndexScanNodeRemovesCollatedFieldsFromSortsIfCollationDi
 }
 
 TEST(QuerySolutionTest, IndexScanNodeDoesNotRemoveCollatedFieldsFromSortsIfCollationMatches) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a" << 1))};
     CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
 
     OrderedIntervalList oilA{};
@@ -635,7 +662,9 @@ TEST(QuerySolutionTest, IndexScanNodeDoesNotRemoveCollatedFieldsFromSortsIfColla
 // Index: {a: 1, b: "hashed", c: 1}
 // Bounds: a: [1, 1], b: [MINKEY, MAXKEY], c: [1, 2]
 TEST(QuerySolutionTest, HashedIndexScanNodeTruncatesSort) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1 << "b"
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss,
+                       buildSimpleIndexEntry(BSON("a" << 1 << "b"
                                                       << "hashed"
                                                       << "c" << 1))};
     OrderedIntervalList a{};
@@ -672,7 +701,9 @@ TEST(QuerySolutionTest, HashedIndexScanNodeTruncatesSort) {
 // Index: {a: 1, b: "hashed", c: 1}
 // Bounds: a: [1, 1], b: [MINKEY, MAXKEY], c: [1, 1]
 TEST(QuerySolutionTest, HashedIndexScanNodeTruncatesSortUnlessFollowedByEquality) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1 << "b"
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss,
+                       buildSimpleIndexEntry(BSON("a" << 1 << "b"
                                                       << "hashed"
                                                       << "c" << 1))};
     OrderedIntervalList a{};
@@ -708,7 +739,9 @@ TEST(QuerySolutionTest, HashedIndexScanNodeTruncatesSortUnlessFollowedByEquality
 // Index: {a: 1, b: "hashed", c: 1}
 // Bounds: a: [1, 1], b: [1, 1], c: [MINKEY, MAXKEY]
 TEST(QuerySolutionTest, HashedIndexScanNodeDoesNotTruncateSortWhenEquality) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1 << "b"
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss,
+                       buildSimpleIndexEntry(BSON("a" << 1 << "b"
                                                       << "hashed"
                                                       << "c" << 1))};
     OrderedIntervalList a{};
@@ -744,7 +777,9 @@ TEST(QuerySolutionTest, HashedIndexScanNodeDoesNotTruncateSortWhenEquality) {
 // Index: {a: 1, b: "hashed", c: 1}
 // Bounds: a: [1, 1], b: ["p", "p"], c: [MINKEY, MAXKEY]
 TEST(QuerySolutionTest, HashedIndexScanNodeDoesTruncatesSortWhenCollationDoesntMatch) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1 << "b"
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss,
+                       buildSimpleIndexEntry(BSON("a" << 1 << "b"
                                                       << "hashed"
                                                       << "c" << 1))};
     CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kToLowerString);
@@ -785,7 +820,9 @@ TEST(QuerySolutionTest, HashedIndexScanNodeDoesTruncatesSortWhenCollationDoesntM
 // Bounds: a: [1, 1], b: ["a", "b"], c: [MINKEY, MAXKEY]
 TEST(QuerySolutionTest,
      HashedIndexScanNodeDoesTruncatesSortWhenCollationDoesntMatchWithRangeQuery) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1 << "b"
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss,
+                       buildSimpleIndexEntry(BSON("a" << 1 << "b"
                                                       << "hashed"
                                                       << "c" << 1))};
     CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kToLowerString);
@@ -829,6 +866,8 @@ TEST(QuerySolutionTest,
 // Expanded wildcard index: {a: 1, b.$**: 1, c: 1}
 // Bounds: a: [1, 1], $_path: ["b", "b"], b: [1, 2], c: [2, 3]
 TEST(QuerySolutionTest, WildcardIndexSupportsSortWhenIndexOnlyNeedsToLookAtOnePath) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+
     mongo::wildcard_planning::WildcardIndexEntryMock wildcardIndex{
         BSON("a" << 1 << "b.$**" << 1 << "c" << 1), BSONObj{}, {}};
 
@@ -841,7 +880,7 @@ TEST(QuerySolutionTest, WildcardIndexSupportsSortWhenIndexOnlyNeedsToLookAtOnePa
         *wildcardIndex.indexEntry, fields, &expandedIndexes);
 
     ASSERT_EQ(expandedIndexes.size(), 1);
-    IndexScanNode node{expandedIndexes.at(0)};
+    IndexScanNode node{mainNss, expandedIndexes.at(0)};
 
     OrderedIntervalList a{};
     a.name = "a";
@@ -884,6 +923,8 @@ TEST(QuerySolutionTest, WildcardIndexSupportsSortWhenIndexOnlyNeedsToLookAtOnePa
 // Index: {a: 1, b.$**: 1, c: 1}
 // Bounds: a: [1, 1], b: [MINKEY, MAXKEY], c: [2, 3]
 TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenIndexNeedsToLookAtMultiplePaths) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+
     // The following setup mimics a query that queries against fields "a", "b", and "c". This
     // matches the bounds we generate for those fields below. However, only pass "b" as 'fields'
     // here, because we only want to consider the expanded index with that field plugged in.
@@ -895,7 +936,7 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenIndexNeedsToLookAtMul
         *wildcardIndex.indexEntry, fields, &expandedIndexes);
 
     ASSERT_EQ(expandedIndexes.size(), 1);
-    IndexScanNode node{expandedIndexes.at(0)};
+    IndexScanNode node{mainNss, expandedIndexes.at(0)};
 
     OrderedIntervalList a{};
     a.name = "a";
@@ -933,6 +974,8 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenIndexNeedsToLookAtMul
 // Index: {a: 1, b.$**: 1, c: 1}
 // Bounds: a: [1, 1], b: ["p", "p"], c: [2, 3]
 TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatch) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+
     // The following setup mimics a query that queries against fields "a", "b.d", and "c". This
     // matches the bounds we generate for those fields below.  However, only pass "b.d" as 'fields'
     // here, because we only want to consider the expanded index with that field plugged in.
@@ -944,7 +987,7 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatch)
         *wildcardIndex.indexEntry, fields, &expandedIndexes);
 
     ASSERT_EQ(expandedIndexes.size(), 1);
-    IndexScanNode node{expandedIndexes.at(0)};
+    IndexScanNode node{mainNss, expandedIndexes.at(0)};
 
     CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kToLowerString);
     node.queryCollator = &queryCollator;
@@ -988,6 +1031,8 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatch)
 // Index: {a: 1, b.$**: 1, c: 1}
 // Bounds: a: [1, 1], b: ["a", "b"], c: [2, 3]
 TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatchWithRangeQuery) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+
     // The following setup mimics a query that queries against fields "a", "b.d", and "c". This
     // matches the bounds we generate for those fields below. However, only pass "b.d" as 'fields'
     // here, because we only want to consider the expanded index with that field plugged in.
@@ -999,7 +1044,7 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatchW
         *wildcardIndex.indexEntry, fields, &expandedIndexes);
 
     ASSERT_EQ(expandedIndexes.size(), 1);
-    IndexScanNode node{expandedIndexes.at(0)};
+    IndexScanNode node{mainNss, expandedIndexes.at(0)};
 
     CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kToLowerString);
     node.queryCollator = &queryCollator;
@@ -1046,7 +1091,10 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatchW
 // Index: {a: 1, b: 1, c: 1, d: 1, e: 1}
 // Intervals: a: [1,1], b: ['p','p'], c: [1,2], d: [MinKey, MaxKey], e: [1,2]
 TEST(QuerySolutionTest, CompoundIndexWithNonMatchingCollationFiltersAllSortsWithCollatedField) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+
     IndexScanNode node{
+        mainNss,
         buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1))};
     CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
     node.queryCollator = &queryCollator;
@@ -1097,7 +1145,8 @@ TEST(QuerySolutionTest, CompoundIndexWithNonMatchingCollationFiltersAllSortsWith
 // Index: {a : 1}
 // Bounds: [{}, {}]
 TEST(QuerySolutionTest, IndexScanNodeWithNonMatchingCollationFiltersObjectField) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a" << 1))};
     CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
     node.queryCollator = &queryCollator;
 
@@ -1116,7 +1165,8 @@ TEST(QuerySolutionTest, IndexScanNodeWithNonMatchingCollationFiltersObjectField)
 // Index: {a : 1}
 // Bounds: [[], []]
 TEST(QuerySolutionTest, IndexScanNodeWithNonMatchingCollationFiltersArrayField) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a" << 1))};
     CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
     node.queryCollator = &queryCollator;
 
@@ -1133,7 +1183,8 @@ TEST(QuerySolutionTest, IndexScanNodeWithNonMatchingCollationFiltersArrayField) 
 }
 
 TEST(QuerySolutionTest, WithNonMatchingCollatorAndNoEqualityPrefixSortsAreNotDuplicated) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
     CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
     node.queryCollator = &queryCollator;
 
@@ -1159,7 +1210,8 @@ TEST(QuerySolutionTest, WithNonMatchingCollatorAndNoEqualityPrefixSortsAreNotDup
 }
 
 TEST(QuerySolutionTest, IndexScanNodeHasFieldIncludesStringFieldWhenNoCollator) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
 
     OrderedIntervalList oilA{};
     oilA.name = "a";
@@ -1180,7 +1232,8 @@ TEST(QuerySolutionTest, IndexScanNodeHasFieldIncludesStringFieldWhenNoCollator) 
 }
 
 TEST(QuerySolutionTest, IndexScanNodeHasFieldIncludesSimpleBoundsStringFieldWhenNoCollator) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
 
     node.bounds.isSimpleRange = true;
     node.bounds.startKey = BSON("a" << 1 << "b" << 2);
@@ -1192,7 +1245,8 @@ TEST(QuerySolutionTest, IndexScanNodeHasFieldIncludesSimpleBoundsStringFieldWhen
 }
 
 TEST(QuerySolutionTest, IndexScanNodeHasFieldExcludesStringFieldWhenIndexHasCollator) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
     CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
     node.index.collator = &indexCollator;
 
@@ -1216,7 +1270,8 @@ TEST(QuerySolutionTest, IndexScanNodeHasFieldExcludesStringFieldWhenIndexHasColl
 }
 
 TEST(QuerySolutionTest, IndexScanNodeHasFieldExcludesSimpleBoundsStringFieldWhenIndexHasCollator) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
     CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
     node.index.collator = &indexCollator;
 
@@ -1244,8 +1299,10 @@ auto createMatchExprAndProjection(const BSONObj& query, const BSONObj& projObj) 
 }
 
 TEST(QuerySolutionTest, InclusionProjectionPreservesSort) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+
     auto index = buildSimpleIndexEntry(BSON("a" << 1));
-    auto node = std::make_unique<IndexScanNode>(index);
+    auto node = std::make_unique<IndexScanNode>(mainNss, index);
 
     BSONObj projection = BSON("a" << 1);
     BSONObj match;
@@ -1261,8 +1318,9 @@ TEST(QuerySolutionTest, InclusionProjectionPreservesSort) {
 }
 
 TEST(QuerySolutionTest, ExclusionProjectionDoesNotPreserveSort) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     auto index = buildSimpleIndexEntry(BSON("a" << 1));
-    auto node = std::make_unique<IndexScanNode>(index);
+    auto node = std::make_unique<IndexScanNode>(mainNss, index);
 
     BSONObj projection = BSON("a" << 0);
     BSONObj match;
@@ -1278,7 +1336,9 @@ TEST(QuerySolutionTest, ExclusionProjectionDoesNotPreserveSort) {
 }
 
 TEST(QuerySolutionTest, InclusionProjectionTruncatesSort) {
-    auto node = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto node =
+        std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
 
     BSONObj projection = BSON("a" << 1);
     BSONObj match;
@@ -1294,7 +1354,9 @@ TEST(QuerySolutionTest, InclusionProjectionTruncatesSort) {
 }
 
 TEST(QuerySolutionTest, ExclusionProjectionTruncatesSort) {
-    auto node = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto node =
+        std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
 
     BSONObj projection = BSON("b" << 0);
     BSONObj match;
@@ -1311,8 +1373,9 @@ TEST(QuerySolutionTest, ExclusionProjectionTruncatesSort) {
 }
 
 TEST(QuerySolutionTest, NonMultikeyIndexWithoutPathLevelInfoCanCoverItsFields) {
-    auto node =
-        std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto node = std::make_unique<IndexScanNode>(
+        mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
     node->index.multikey = false;
     node->index.multikeyPaths = MultikeyPaths{};
     ASSERT_TRUE(node->hasField("a"));
@@ -1323,8 +1386,9 @@ TEST(QuerySolutionTest, NonMultikeyIndexWithoutPathLevelInfoCanCoverItsFields) {
 }
 
 TEST(QuerySolutionTest, NonMultikeyIndexWithPathLevelInfoCanCoverItsFields) {
-    auto node =
-        std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto node = std::make_unique<IndexScanNode>(
+        mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
     node->index.multikey = false;
     node->index.multikeyPaths = MultikeyPaths{{}, {}};
     ASSERT_TRUE(node->hasField("a"));
@@ -1335,8 +1399,9 @@ TEST(QuerySolutionTest, NonMultikeyIndexWithPathLevelInfoCanCoverItsFields) {
 }
 
 TEST(QuerySolutionTest, MultikeyIndexWithoutPathLevelInfoCannotCoverAnyFields) {
-    auto node =
-        std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto node = std::make_unique<IndexScanNode>(
+        mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
     node->index.multikey = true;
     node->index.multikeyPaths = MultikeyPaths{};
     ASSERT_FALSE(node->hasField("a"));
@@ -1347,8 +1412,9 @@ TEST(QuerySolutionTest, MultikeyIndexWithoutPathLevelInfoCannotCoverAnyFields) {
 }
 
 TEST(QuerySolutionTest, MultikeyIndexWithPathLevelInfoCanCoverNonMultikeyFields) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     auto node = std::make_unique<IndexScanNode>(
-        buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1)));
+        mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1)));
 
     // Add metadata indicating that "b" is multikey.
     node->index.multikey = true;
@@ -1361,8 +1427,9 @@ TEST(QuerySolutionTest, MultikeyIndexWithPathLevelInfoCanCoverNonMultikeyFields)
 }
 
 TEST(QuerySolutionTest, MultikeyIndexCannotCoverFieldWithAnyMultikeyPathComponent) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     auto node = std::make_unique<IndexScanNode>(
-        buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1 << "e" << 1)));
+        mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1 << "e" << 1)));
 
     // Add metadata indicating that "b.c" is multikey.
     node->index.multikey = true;
@@ -1376,7 +1443,8 @@ TEST(QuerySolutionTest, MultikeyIndexCannotCoverFieldWithAnyMultikeyPathComponen
 }
 
 TEST(QuerySolutionTest, MultikeyIndexWithoutPathLevelInfoCannotProvideAnySorts) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1))};
     node.index.multikey = true;
 
     {
@@ -1402,7 +1470,9 @@ TEST(QuerySolutionTest, MultikeyIndexWithoutPathLevelInfoCannotProvideAnySorts) 
 // Intervals: a: [1,1], b: [1,1], 'c.z': [1,1], d: [1, 1], e: [1,2]
 // Multikeys: ['b', 'c.z']
 TEST(QuerySolutionTest, SimpleRangeWithEqualIgnoresFieldWithMultikeyComponent) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     IndexScanNode node{
+        mainNss,
         buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c.z" << 1 << "d" << 1 << "e" << 1))};
     node.bounds.isSimpleRange = true;
     node.bounds.startKey = BSON("a" << 1 << "b" << 1 << "c.z" << 1 << "d" << 1 << "e" << 1);
@@ -1428,7 +1498,8 @@ TEST(QuerySolutionTest, SimpleRangeWithEqualIgnoresFieldWithMultikeyComponent) {
 }
 
 TEST(QuerySolutionTest, MultikeyFieldsEmptyWhenIndexIsNotMultikey) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a.b" << 1 << "c.d" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a.b" << 1 << "c.d" << 1))};
     node.index.multikey = false;
     node.index.multikeyPaths = MultikeyPaths{};
     node.computeProperties();
@@ -1436,7 +1507,8 @@ TEST(QuerySolutionTest, MultikeyFieldsEmptyWhenIndexIsNotMultikey) {
 }
 
 TEST(QuerySolutionTest, MultikeyFieldsEmptyWhenIndexHasNoMultikeynessMetadata) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a.b" << 1 << "c.d" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("a.b" << 1 << "c.d" << 1))};
     node.index.multikey = true;
     node.index.multikeyPaths = MultikeyPaths{};
     node.computeProperties();
@@ -1444,7 +1516,9 @@ TEST(QuerySolutionTest, MultikeyFieldsEmptyWhenIndexHasNoMultikeynessMetadata) {
 }
 
 TEST(QuerySolutionTest, MultikeyFieldsChosenCorrectlyWhenIndexHasPathLevelMultikeyMetadata) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("a.b" << 1 << "c.d" << 1 << "e.f" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss,
+                       buildSimpleIndexEntry(BSON("a.b" << 1 << "c.d" << 1 << "e.f" << 1))};
     node.index.multikey = true;
     node.index.multikeyPaths = MultikeyPaths{{0U}, {}, {0U, 1U}};
     node.computeProperties();
@@ -1454,7 +1528,9 @@ TEST(QuerySolutionTest, MultikeyFieldsChosenCorrectlyWhenIndexHasPathLevelMultik
 }
 
 TEST(QuerySolutionTest, NonSimpleRangeAllEqualExcludesFieldWithMultikeyComponent) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     IndexScanNode node{
+        mainNss,
         buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c.z" << 1 << "d" << 1 << "e" << 1))};
     // Add metadata indicating that "c.z" is multikey.
     node.index.multikey = true;
@@ -1478,7 +1554,8 @@ TEST(QuerySolutionTest, NonSimpleRangeAllEqualExcludesFieldWithMultikeyComponent
 }
 
 TEST(QuerySolutionTest, SharedPrefixMultikeyNonMinMaxBoundsDoesNotProvideAnySorts) {
-    IndexScanNode node{buildSimpleIndexEntry(BSON("c.x" << 1 << "c.z" << 1))};
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode node{mainNss, buildSimpleIndexEntry(BSON("c.x" << 1 << "c.z" << 1))};
 
     node.index.multikey = true;
     node.index.multikeyPaths = MultikeyPaths{{1U}, {1U}};
@@ -1501,10 +1578,14 @@ TEST(QuerySolutionTest, SharedPrefixMultikeyNonMinMaxBoundsDoesNotProvideAnySort
 }
 
 TEST(QuerySolutionTest, NodeIdsAssignedInPostOrderFashionStartingFromOne) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+
     // Construct a QuerySolution consisting of a root node with two children.
     std::vector<std::unique_ptr<QuerySolutionNode>> children;
-    children.push_back(std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1))));
-    children.push_back(std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("b" << 1))));
+    children.push_back(
+        std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1))));
+    children.push_back(
+        std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("b" << 1))));
     auto orNode = std::make_unique<OrNode>();
     orNode->addChildren(std::move(children));
 
@@ -1532,8 +1613,8 @@ TEST(QuerySolutionTest, GroupNodeWithIndexScan) {
                             .opCtx(opCtx.get())
                             .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
                             .build();
-    auto scanNode =
-        std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    auto scanNode = std::make_unique<IndexScanNode>(
+        expCtx->getNamespaceString(), buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
     scanNode->bounds.isSimpleRange = true;
     scanNode->bounds.startKey = BSON("a" << 1 << "b" << 1);
     scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1);
@@ -1554,15 +1635,19 @@ TEST(QuerySolutionTest, GroupNodeWithIndexScan) {
 }
 
 TEST(QuerySolutionTest, EqLookupNodeWithIndexScan) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    const NamespaceString foreignColl =
+        NamespaceString::createNamespaceString_forTest("db.foreign");
+
     // Simple EqLookupNode with IndexScan subtree.
     auto scanNode =
-        std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+        std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
     scanNode->bounds.isSimpleRange = true;
     scanNode->bounds.startKey = BSON("a" << 1 << "b" << 1);
     scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1);
 
     EqLookupNode node(std::move(scanNode),
-                      NamespaceString::createNamespaceString_forTest("db.col"),
+                      foreignColl,
                       "local",
                       "foreign",
                       "as",
@@ -1585,10 +1670,15 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScan) {
 }
 
 TEST(QuerySolutionTest, EqLookupNodeWithIndexScanFieldOverwrite) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    const NamespaceString foreignColl =
+        NamespaceString::createNamespaceString_forTest("db.foreign");
+
     // A EqLookupNode with IndexScan subtree, where local field "b" is overwritten.
     // This affects the field availability and sort order.
     auto scanNode =
-        std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c"
+        std::make_unique<IndexScanNode>(mainNss,
+                                        buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c"
                                                                        << "1")));
     scanNode->bounds.isSimpleRange = true;
     scanNode->bounds.startKey = BSON("a" << 1 << "b" << 1 << "c"
@@ -1597,7 +1687,7 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScanFieldOverwrite) {
                                        << "1");
 
     EqLookupNode node(std::move(scanNode),
-                      NamespaceString::createNamespaceString_forTest("db.col"),
+                      foreignColl,
                       "local",
                       "foreign",
                       "b",
@@ -1668,9 +1758,10 @@ TEST(QuerySolutionTest, FieldAvailabilityOutputStreamOperator) {
 }
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverSingleEqLookupNode) {
-    auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
     const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
-    const NamespaceString foreignColl = NamespaceString::createNamespaceString_forTest("db.col");
+    const NamespaceString foreignColl =
+        NamespaceString::createNamespaceString_forTest("db.foreign");
+    auto scanNode = std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
     auto root = std::make_unique<EqLookupNode>(std::move(scanNode),
                                                foreignColl,
                                                "local",
@@ -1691,10 +1782,11 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverSingleEqLookupNode) {
 
 TEST(QuerySolutionTest, AssertSameHashes) {
     auto makeQs = []() {
-        auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
         const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
         const NamespaceString foreignColl =
-            NamespaceString::createNamespaceString_forTest("db.col");
+            NamespaceString::createNamespaceString_forTest("db.foreign");
+        auto scanNode =
+            std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
         auto root = std::make_unique<EqLookupNode>(std::move(scanNode),
                                                    foreignColl,
                                                    "local",
@@ -1713,8 +1805,8 @@ TEST(QuerySolutionTest, AssertSameHashes) {
 }
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
-    auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
     const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto scanNode = std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
     auto root = std::make_unique<EqLookupNode>(std::move(scanNode),
                                                mainNss,
                                                "local",
@@ -1735,10 +1827,12 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
 }
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverNestedEqLookupNodes) {
-    auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
     const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
-    const NamespaceString foreignCollOne = NamespaceString::createNamespaceString_forTest("db.col");
-    const NamespaceString foreignCollTwo = NamespaceString::createNamespaceString_forTest("db.foo");
+    const NamespaceString foreignCollOne =
+        NamespaceString::createNamespaceString_forTest("db.foreign");
+    const NamespaceString foreignCollTwo =
+        NamespaceString::createNamespaceString_forTest("db.foreign2");
+    auto scanNode = std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
     auto childEqLookupNode =
         std::make_unique<EqLookupNode>(std::move(scanNode),
                                        foreignCollOne,
@@ -1770,9 +1864,10 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverNestedEqLookupNodes) {
 }
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesNestedEqLookupNodes) {
-    auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
     const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
-    const NamespaceString foreignColl = NamespaceString::createNamespaceString_forTest("db.col");
+    const NamespaceString foreignColl =
+        NamespaceString::createNamespaceString_forTest("db.foreign");
+    auto scanNode = std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
     auto childEqLookupNode =
         std::make_unique<EqLookupNode>(std::move(scanNode),
                                        foreignColl,

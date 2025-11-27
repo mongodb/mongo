@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
 
@@ -732,8 +733,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
         *tightnessOut = IndexBoundsBuilder::EXACT;
         auto textExpr = static_cast<const TextMatchExpressionBase*>(expr);
         bool wantTextScore = DepsTracker::needsTextScoreMetadata(query.metadataDeps());
-        auto ret =
-            std::make_unique<TextMatchNode>(index, textExpr->getFTSQuery().clone(), wantTextScore);
+        auto ret = std::make_unique<TextMatchNode>(
+            query.nss(), index, textExpr->getFTSQuery().clone(), wantTextScore);
         // Count the number of prefix fields before the "text" field.
         for (auto&& keyPatternElt : ret->index.keyPattern) {
             // We know that the only key pattern with a type of String is the _fts field
@@ -748,7 +749,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
     } else {
         // Note that indexKeyPattern.firstElement().fieldName() may not equal expr->path()
         // because expr might be inside an array operator that provides a path prefix.
-        auto isn = std::make_unique<IndexScanNode>(index);
+        auto isn = std::make_unique<IndexScanNode>(query.nss(), index);
         isn->bounds.fields.resize(index.keyPattern.nFields());
         isn->addKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kIndexKey];
         isn->queryCollator = query.getCollator();
@@ -964,7 +965,7 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
     }
 }
 
-void buildTextSubPlan(TextMatchNode* tn) {
+void buildTextSubPlan(const CanonicalQuery& cq, TextMatchNode* tn) {
     tassert(5432205, "text match node is null", tn);
     tassert(5432206, "text match node already has children", tn->children.empty());
     tassert(5432207, "text search query is not provided", tn->ftsQuery.get());
@@ -992,7 +993,7 @@ void buildTextSubPlan(TextMatchNode* tn) {
     std::vector<std::unique_ptr<QuerySolutionNode>> indexScanList;
     indexScanList.reserve(query->getTermsForBounds().size());
     for (const auto& term : query->getTermsForBounds()) {
-        auto ixscan = std::make_unique<IndexScanNode>(tn->index);
+        auto ixscan = std::make_unique<IndexScanNode>(cq.nss(), tn->index);
         ixscan->bounds.startKey = fts::FTSIndexFormat::getIndexKey(
             fts::MAX_WEIGHT, term, tn->indexPrefix, textIndexVersion);
         ixscan->bounds.endKey =
@@ -1048,20 +1049,22 @@ void buildTextSubPlan(TextMatchNode* tn) {
         // Unlike the TEXT_OR stage, the OR stage does not fetch the documents that it outputs. We
         // add our own FETCH stage to satisfy the requirement of the TEXT_MATCH stage that its
         // WorkingSetMember inputs have fetched data.
-        auto fetchNode = std::make_unique<FetchNode>();
+        auto fetchNode = std::make_unique<FetchNode>(cq.nss());
         fetchNode->children.push_back(std::move(textSearcher));
 
         tn->children.push_back(std::move(fetchNode));
     }
 }
 
-void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntry& index) {
+void QueryPlannerAccess::finishTextNode(const CanonicalQuery& cq,
+                                        QuerySolutionNode* node,
+                                        const IndexEntry& index) {
     auto tn = static_cast<TextMatchNode*>(node);
 
     // If there's no prefix, the filter is already on the node and the index prefix is null.
     // We can just return.
     if (!tn->numPrefixFields) {
-        buildTextSubPlan(tn);
+        buildTextSubPlan(cq, tn);
         return;
     }
 
@@ -1149,7 +1152,7 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
 
     tn->indexPrefix = prefixBob.obj();
 
-    buildTextSubPlan(tn);
+    buildTextSubPlan(cq, tn);
 }
 
 bool QueryPlannerAccess::orNeedsFetch(const ScanBuildingState* scanState) {
@@ -1167,9 +1170,11 @@ bool QueryPlannerAccess::orNeedsFetch(const ScanBuildingState* scanState) {
     }
 }
 
-void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
+void QueryPlannerAccess::finishAndOutputLeaf(const CanonicalQuery& cq,
+                                             ScanBuildingState* scanState,
                                              vector<std::unique_ptr<QuerySolutionNode>>* out) {
-    finishLeafNode(scanState->currentScan.get(),
+    finishLeafNode(cq,
+                   scanState->currentScan.get(),
                    scanState->indices[scanState->currentIndexNumber],
                    std::move(scanState->ietBuilders));
 
@@ -1178,7 +1183,7 @@ void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
             // In order to correctly evaluate the predicates for this index, we have to
             // fetch the full documents. Add a fetch node above the index scan whose filter
             // includes *all* of the predicates used to generate the ixscan.
-            auto fetch = std::make_unique<FetchNode>();
+            auto fetch = std::make_unique<FetchNode>(cq.nss());
             // Takes ownership.
             fetch->filter = std::move(scanState->curOr);
             // Takes ownership.
@@ -1203,13 +1208,14 @@ void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
 }
 
 void QueryPlannerAccess::finishLeafNode(
+    const CanonicalQuery& cq,
     QuerySolutionNode* node,
     const IndexEntry& index,
     std::vector<interval_evaluation_tree::Builder> ietBuilders) {
     const StageType type = node->getType();
 
     if (STAGE_TEXT_MATCH == type) {
-        return finishTextNode(node, index);
+        return finishTextNode(cq, node, index);
     }
 
     IndexEntry* nodeIndex = nullptr;
@@ -1500,7 +1506,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
         } else {
             if (nullptr != scanState.currentScan.get()) {
                 // Output the current scan before starting to construct a new out.
-                finishAndOutputLeaf(&scanState, out);
+                finishAndOutputLeaf(query, &scanState, out);
             } else {
                 MONGO_verify(IndexTag::kNoIndex == scanState.currentIndexNumber);
             }
@@ -1558,7 +1564,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
 
     // Output the scan we're done with, if it exists.
     if (nullptr != scanState.currentScan.get()) {
-        finishAndOutputLeaf(&scanState, out);
+        finishAndOutputLeaf(query, &scanState, out);
     }
 
     return true;
@@ -1648,7 +1654,7 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
             mergeWithLeafNode(emChild, scanState);
         } else {
             if (nullptr != scanState->currentScan.get()) {
-                finishAndOutputLeaf(scanState, out);
+                finishAndOutputLeaf(query, scanState, out);
             } else {
                 MONGO_verify(IndexTag::kNoIndex == scanState->currentIndexNumber);
             }
@@ -1829,7 +1835,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
         // matches all indexed predicates simultaneously. Therefore, it is necessary to add a fetch
         // stage which will explicitly evaluate the entire predicate (see SERVER-16750).
         tassert(11321018, "clonedRoot must not be null", clonedRoot);
-        auto fetch = std::make_unique<FetchNode>();
+        auto fetch = std::make_unique<FetchNode>(query.nss());
         fetch->filter = std::move(clonedRoot);
         fetch->children.push_back(std::move(andResult));
         return fetch;
@@ -1838,7 +1844,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
     // If there are any nodes still attached to the AND, we can't answer them using the
     // index, so we put a fetch with filter.
     if (root->numChildren() > 0) {
-        auto fetch = std::make_unique<FetchNode>();
+        auto fetch = std::make_unique<FetchNode>(query.nss());
         MONGO_verify(ownedRoot);
         if (ownedRoot->numChildren() == 1) {
             // An $and of one thing is that thing.
@@ -1913,7 +1919,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
         if (usedClusteredCollScan) {
             for (size_t i = 0; i < scanNodes.size(); ++i) {
                 if (scanNodes[i]->getType() == STAGE_IXSCAN) {
-                    scanNodes[i] = std::make_unique<FetchNode>(std::move(scanNodes[i]));
+                    scanNodes[i] =
+                        std::make_unique<FetchNode>(std::move(scanNodes[i]), query.nss());
                 }
             }
         }
@@ -2044,7 +2051,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
 
             auto soln = makeLeafNode(query, index, tag->pos, root, &tightness, ietBuilder);
             MONGO_verify(nullptr != soln);
-            finishLeafNode(soln.get(), index, std::move(ietBuilders));
+            finishLeafNode(query, soln.get(), index, std::move(ietBuilders));
 
             if (!ownedRoot) {
                 // We're performing access planning for the child of an array operator such as
@@ -2073,7 +2080,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
                 soln->filter = std::move(ownedRoot);
                 return soln;
             } else {
-                auto fetch = std::make_unique<FetchNode>();
+                auto fetch = std::make_unique<FetchNode>(query.nss());
                 fetch->filter = std::move(ownedRoot);
                 fetch->children.push_back(std::move(soln));
                 return fetch;
@@ -2097,7 +2104,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
                 return solution;
             }
 
-            auto fetch = std::make_unique<FetchNode>();
+            auto fetch = std::make_unique<FetchNode>(query.nss());
             fetch->filter = std::move(ownedRoot);
             fetch->children.push_back(std::move(solution));
             return fetch;
@@ -2113,7 +2120,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(const Inde
     std::unique_ptr<QuerySolutionNode> solnRoot;
 
     // Build an ixscan over the id index, use it, and return it.
-    unique_ptr<IndexScanNode> isn = std::make_unique<IndexScanNode>(index);
+    unique_ptr<IndexScanNode> isn = std::make_unique<IndexScanNode>(query.nss(), index);
     isn->addKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kIndexKey];
     isn->queryCollator = query.getCollator();
 
@@ -2132,7 +2139,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(const Inde
     } else {
         // TODO: We may not need to do the fetch if the predicates in root are covered.  But
         // for now it's safe (though *maybe* slower).
-        unique_ptr<FetchNode> fetch = std::make_unique<FetchNode>();
+        unique_ptr<FetchNode> fetch = std::make_unique<FetchNode>(query.nss());
         fetch->filter = std::move(filter);
         fetch->children.push_back(std::move(isn));
         solnRoot = std::move(fetch);
@@ -2245,7 +2252,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeIndexScan(
     std::unique_ptr<QuerySolutionNode> solnRoot;
 
     // Build an ixscan over the id index, use it, and return it.
-    auto isn = std::make_unique<IndexScanNode>(index);
+    auto isn = std::make_unique<IndexScanNode>(query.nss(), index);
     isn->direction = 1;
     isn->addKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kIndexKey];
     isn->bounds.isSimpleRange = true;
@@ -2262,7 +2269,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeIndexScan(
     } else {
         // TODO: We may not need to do the fetch if the predicates in root are covered.  But
         // for now it's safe (though *maybe* slower).
-        unique_ptr<FetchNode> fetch = std::make_unique<FetchNode>();
+        unique_ptr<FetchNode> fetch = std::make_unique<FetchNode>(query.nss());
         fetch->filter = std::move(filter);
         fetch->children.push_back(std::move(isn));
         solnRoot = std::move(fetch);

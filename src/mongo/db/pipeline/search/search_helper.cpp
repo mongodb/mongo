@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/search/search_helper.h"
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -697,10 +698,11 @@ void promoteStoredSourceOrAddIdLookup(
     }
 }
 
-std::unique_ptr<SearchNode> getSearchNode(DocumentSource* stage) {
+std::unique_ptr<SearchNode> getSearchNode(NamespaceString nss, DocumentSource* stage) {
     if (search_helpers::isSearchStage(stage)) {
         auto searchStage = dynamic_cast<mongo::DocumentSourceSearch*>(stage);
-        auto node = std::make_unique<SearchNode>(false,
+        auto node = std::make_unique<SearchNode>(std::move(nss),
+                                                 false,
                                                  searchStage->getSearchQuery(),
                                                  searchStage->getLimit(),
                                                  searchStage->getSortSpec(),
@@ -709,7 +711,8 @@ std::unique_ptr<SearchNode> getSearchNode(DocumentSource* stage) {
         return node;
     } else if (search_helpers::isSearchMetaStage(stage)) {
         auto searchStage = dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage);
-        return std::make_unique<SearchNode>(true,
+        return std::make_unique<SearchNode>(std::move(nss),
+                                            true,
                                             searchStage->getSearchQuery(),
                                             boost::none /* limit */,
                                             boost::none /* sortSpec */,

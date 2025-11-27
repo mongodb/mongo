@@ -30,6 +30,7 @@
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cost_estimator.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/unittest/unittest.h"
@@ -97,7 +98,8 @@ TEST(CostEstimator, VirtualScan) {
 TEST(CostEstimator, PointIndexScanLessCostThanRange) {
     EstimateMap estimates;
 
-    auto pointIndexScan = makeIndexScanFetchPlan(makePointIntervalBounds(1, "a"), {"a"});
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    auto pointIndexScan = makeIndexScanFetchPlan(testNss, makePointIntervalBounds(1, "a"), {"a"});
     // Fetch
     estimates[pointIndexScan->root()] = QSNEstimate{.outCE = makeCard(1)};
     // IndexScan
@@ -105,6 +107,7 @@ TEST(CostEstimator, PointIndexScanLessCostThanRange) {
         QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(1)};
 
     auto rangeIndexScan = makeIndexScanFetchPlan(
+        testNss,
         makeRangeIntervalBounds(
             BSON("" << 5 << "" << 6), BoundInclusion::kIncludeBothStartAndEndKeys, "a"),
         {"a"});
@@ -125,8 +128,10 @@ TEST(CostEstimator, PointIndexScanLessCostThanRange) {
               estimates[pointIndexScan->root()->children[0].get()].cost);
 }
 
-std::unique_ptr<IndexScanNode> indexScanNode(EstimateMap& estimates, QSNEstimate est) {
-    auto node = makeIndexScan(makePointIntervalBounds(1, "a"), {"a"});
+std::unique_ptr<IndexScanNode> indexScanNode(const NamespaceString& nss,
+                                             EstimateMap& estimates,
+                                             QSNEstimate est) {
+    auto node = makeIndexScan(nss, makePointIntervalBounds(1, "a"), {"a"});
     estimates[node.get()] = est;
     return node;
 }
@@ -134,13 +139,14 @@ std::unique_ptr<IndexScanNode> indexScanNode(EstimateMap& estimates, QSNEstimate
 template <typename IndexCombinationNode>
 void testIndexCombinationDependsOnChildren() {
     EstimateMap estimates;
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     auto indexIntersectNode = std::make_unique<IndexCombinationNode>();
     indexIntersectNode->addChildren([&]() {
         std::vector<std::unique_ptr<QuerySolutionNode>> children;
-        children.push_back(
-            indexScanNode(estimates, QSNEstimate{.inCE = makeCard(10), .outCE = makeCard(10)}));
-        children.push_back(
-            indexScanNode(estimates, QSNEstimate{.inCE = makeCard(10), .outCE = makeCard(10)}));
+        children.push_back(indexScanNode(
+            testNss, estimates, QSNEstimate{.inCE = makeCard(10), .outCE = makeCard(10)}));
+        children.push_back(indexScanNode(
+            testNss, estimates, QSNEstimate{.inCE = makeCard(10), .outCE = makeCard(10)}));
         return children;
     }());
     estimates[indexIntersectNode.get()] = QSNEstimate{.outCE = makeCard(5)};
@@ -150,10 +156,10 @@ void testIndexCombinationDependsOnChildren() {
     auto expensiveIndexIntersectNode = std::make_unique<IndexCombinationNode>();
     expensiveIndexIntersectNode->addChildren([&]() {
         std::vector<std::unique_ptr<QuerySolutionNode>> children;
-        children.push_back(
-            indexScanNode(estimates, QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(100)}));
-        children.push_back(
-            indexScanNode(estimates, QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(100)}));
+        children.push_back(indexScanNode(
+            testNss, estimates, QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(100)}));
+        children.push_back(indexScanNode(
+            testNss, estimates, QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(100)}));
         return children;
     }());
     estimates[expensiveIndexIntersectNode.get()] = QSNEstimate{.outCE = makeCard(5)};

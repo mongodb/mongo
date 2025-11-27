@@ -342,7 +342,7 @@ bool explodeNode(const QuerySolutionNode* node,
             prefixIndices.size() == fieldsToExplode);
 
         // Copy boring fields into new child.
-        auto child = std::make_unique<IndexScanNode>(isn->index);
+        auto child = std::make_unique<IndexScanNode>(isn->nss, isn->index);
         child->direction = isn->direction;
         child->addKeyMetadata = isn->addKeyMetadata;
         child->queryCollator = isn->queryCollator;
@@ -404,7 +404,7 @@ bool explodeNode(const QuerySolutionNode* node,
         // If the explosion is on a FetchNode, make a copy and add the 'isn' as a child.
         if (STAGE_FETCH == node->getType()) {
             auto origFetchNode = static_cast<const FetchNode*>(node);
-            auto newFetchNode = std::make_unique<FetchNode>();
+            auto newFetchNode = std::make_unique<FetchNode>(origFetchNode->nss);
 
             // Copy the FETCH's filter, if it exists.
             if (const auto origFetchFilter = origFetchNode->filter.get()) {
@@ -532,7 +532,7 @@ std::unique_ptr<QuerySolutionNode> analyzeProjection(
     if (!solnRoot->fetched() &&
         (projection.requiresDocument() ||
          !providesAllFields(projection.getRequiredFields(), *solnRoot))) {
-        auto fetch = std::make_unique<FetchNode>();
+        auto fetch = std::make_unique<FetchNode>(query.nss());
         fetch->children.push_back(std::move(solnRoot));
         solnRoot = std::move(fetch);
     }
@@ -608,7 +608,7 @@ std::unique_ptr<QuerySolutionNode> analyzeDistinct(const CanonicalQuery& query,
         // This was likely called from aggregation: add a FETCH stage to make sure we provide all
         // fields.
         if (!solnRoot->fetched()) {
-            auto fetch = std::make_unique<FetchNode>();
+            auto fetch = std::make_unique<FetchNode>(query.nss());
             fetch->children.push_back(std::move(solnRoot));
             solnRoot = std::move(fetch);
         }
@@ -1338,7 +1338,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
         });
 
         if (!sortIsCovered) {
-            auto fetch = std::make_unique<FetchNode>();
+            auto fetch = std::make_unique<FetchNode>(query.nss());
             fetch->children.push_back(std::move(solnRoot));
             solnRoot = std::move(fetch);
         }
@@ -1423,7 +1423,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
             }
 
             if (fetch) {
-                auto fetchNode = std::make_unique<FetchNode>();
+                auto fetchNode = std::make_unique<FetchNode>(query.nss());
                 fetchNode->children.push_back(std::move(solnRoot));
                 solnRoot = std::move(fetchNode);
             }
@@ -1476,7 +1476,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
 
         // If there's no projection, we must fetch, as the user wants the entire doc.
         if (!solnRoot->fetched() && !query.isCountLike()) {
-            auto fetch = std::make_unique<FetchNode>();
+            auto fetch = std::make_unique<FetchNode>(query.nss());
             fetch->children.push_back(std::move(solnRoot));
             solnRoot = std::move(fetch);
         }
@@ -1568,7 +1568,7 @@ bool QueryPlannerAnalysis::turnIxscanIntoCount(QuerySolution* soln) {
             std::swap(startKeyInclusive, endKeyInclusive);
         }
 
-        auto csn = std::make_unique<CountScanNode>(isn->index);
+        auto csn = std::make_unique<CountScanNode>(isn->nss, isn->index);
         csn->startKey = csnStartKey;
         csn->startKeyInclusive = startKeyInclusive;
         csn->endKey = csnEndKey;
