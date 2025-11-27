@@ -650,9 +650,9 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
             !CollectionCatalog::get(opCtx)->isDropPending(nss.dbName()));
 }
 
-Status DatabaseImpl::createView(OperationContext* opCtx,
-                                const NamespaceString& viewName,
-                                const CollectionOptions& options) const {
+Status DatabaseImpl::_createView(OperationContext* opCtx,
+                                 const NamespaceString& viewName,
+                                 const CollectionOptions& options) const {
     dassert(shard_role_details::getLocker(opCtx)->isDbLockedForMode(name(), MODE_IX));
     dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(viewName, MODE_IX));
     dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
@@ -688,6 +688,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                            bool createIdIndex,
                                            const BSONObj& idIndex,
                                            bool fromMigrate) const {
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
 
     return _createCollection(
         opCtx,
@@ -697,19 +698,6 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         createIdIndex,
         idIndex,
         fromMigrate);
-}
-
-Collection* DatabaseImpl::createVirtualCollection(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
-                                                  const CollectionOptions& opts,
-                                                  const VirtualCollectionOptions& vopts) const {
-    return _createCollection(opCtx,
-                             nss,
-                             opts,
-                             vopts,
-                             /*createIdIndex=*/false,
-                             /*idIndex=*/BSONObj(),
-                             /*fromMigrate=*/false);
 }
 
 Collection* DatabaseImpl::_createCollection(
@@ -944,6 +932,9 @@ Status DatabaseImpl::userCreateNS(
     const BSONObj& idIndex,
     bool fromMigrate,
     const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) const {
+    // Acquire an OFCV to get stable FCV-gated feature flag checks even during concurrent setFCV.
+    // We may not have an OFCV yet because implicit creation, moveChunk, etc. call here directly.
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
     LOGV2_DEBUG(20324,
                 1,
                 "create collection {namespace} {collectionOptions}",
@@ -1033,7 +1024,7 @@ Status DatabaseImpl::userCreateNS(
             return Status(
                 ErrorCodes::InvalidNamespace,
                 "View name cannot start with 'system.', which is reserved for system namespaces");
-        return createView(opCtx, nss, collectionOptions);
+        return _createView(opCtx, nss, collectionOptions);
     } else {
         invariant(
             _createCollection(opCtx,
@@ -1055,6 +1046,7 @@ Status DatabaseImpl::userCreateVirtualNS(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          CollectionOptions opts,
                                          const VirtualCollectionOptions& vopts) const {
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
     LOGV2_DEBUG(6968505,
                 1,
                 "create collection {namespace} {collectionOptions}",

@@ -84,6 +84,26 @@ constexpr StringData kNewPrimaryMsgField = "msg"_sd;
  */
 constexpr StringData kNewPrimaryMsg = "new primary"_sd;
 
+inline void setVersionContextIfHasOperationFCV(DurableReplOperation& op,
+                                               const VersionContext& vCtx) {
+    if (vCtx.hasOperationFCV() &&
+        // The `versionContext` field is only supported by v8.2+ binaries.
+
+        // We replicate the OFCV in FCV 8.2+, as well as upgrading/downgrading from/to FCV 8.0.
+        // (Note `gReplicateOFCVInOplog` is marked as `enable_on_transitional_fcv_UNSAFE: true`).
+
+        // Feature flag stability for operations with OFCV=8.0 is separately guaranteed, by setFCV
+        // preventing operations spanning from fully downgraded to fully upgraded FCV via draining.
+
+        // The FCV can only be uninitialized if during replication initiation & the initial step up,
+        // the oplog is created before the FCV is initialized. This behavior is only possible
+        // on v8.2+ binaries, so we can assume that the `versionContext` field is also supported.
+        mongo::feature_flags::gReplicateOFCVInOplog.isEnabledUseLatestFCVWhenUninitialized(
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        op.setVersionContext(vCtx);
+    }
+}
+
 /**
  * A parsed DurableReplOperation along with information about the operation that should only exist
  * in-memory.
@@ -213,11 +233,7 @@ public:
     }
 
     void setVersionContextIfHasOperationFCV(const VersionContext& vCtx) {
-        if (vCtx.hasOperationFCV() &&
-            mongo::feature_flags::gReplicateOFCVInOplog.isEnabled(
-                vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            setVersionContext(vCtx);
-        }
+        repl::setVersionContextIfHasOperationFCV(*this, vCtx);
     }
 
     void setFromMigrateIfTrue(bool value) & {
@@ -421,11 +437,7 @@ public:
     }
 
     void setVersionContextIfHasOperationFCV(const VersionContext& vCtx) {
-        if (vCtx.hasOperationFCV() &&
-            mongo::feature_flags::gReplicateOFCVInOplog.isEnabled(
-                vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            setVersionContext(vCtx);
-        }
+        repl::setVersionContextIfHasOperationFCV(getDurableReplOperation(), vCtx);
     }
 
     /**

@@ -36,7 +36,7 @@ filters:
   - "downgrade_replset.js":
     approvers:
       - 10gen/server-fcv
-  - "drain_transactions_on_FCV_transition.js":
+  - "draining_on_FCV_transition.js":
     approvers:
       - 10gen/server-fcv
   - "feature_compatibility_version_lagging_secondary.js":

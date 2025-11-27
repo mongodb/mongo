@@ -275,8 +275,8 @@ TEST_F(DatabaseTest, CreateCollectionDoesNotReportCatalogIdentifierForVirtualCol
         ASSERT_TRUE(db);
 
         // Signals 'onCreateCollection()' to the OpObserver once complete.
-        ASSERT_TRUE(
-            db->createVirtualCollection(opCtx, _nss, collectionOptions, virtualCollectionOptions));
+        uassertStatusOK(
+            db->userCreateVirtualNS(opCtx, _nss, collectionOptions, virtualCollectionOptions));
         wuow.commit();
     });
 }

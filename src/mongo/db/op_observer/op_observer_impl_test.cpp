@@ -558,6 +558,7 @@ protected:
         OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
         {
             // Generate the create oplog entry.
+            VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
             AutoGetCollection autoColl(opCtx, nss, MODE_X);
             WriteUnitOfWork wuow(opCtx);
             opObserver.onCreateCollection(opCtx,
@@ -600,6 +601,7 @@ protected:
         OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
         {
             // Generate the create oplog entry.
+            VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
             AutoGetCollection autoColl(opCtx, nss, MODE_X);
             WriteUnitOfWork wuow(opCtx);
             opObserver.onCreateCollection(opCtx,
@@ -649,6 +651,7 @@ protected:
         }
 
         {
+            VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx.get());
             AutoGetCollection autoColl(opCtx.get(), localNSS, MODE_X);
             WriteUnitOfWork wuow(opCtx.get());
             opObserver.onCreateCollection(opCtx.get(),
@@ -717,7 +720,7 @@ TEST_F(OpObserverOnCreateCollectionTest, UnreplicatedCollectionNotInLocalCatalog
 using OpObserverOnCreateCollectionTestDeathTest = OpObserverOnCreateCollectionTest;
 DEATH_TEST_F(OpObserverOnCreateCollectionTestDeathTest,
              CrashIfNoReplicatedCatalogIdentifier,
-             "invariant") {
+             "Missing catalog identifier") {
     // Invariant only enforced when replicated local catalog identifiers are required for
     // replication correctness.
     RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
@@ -726,6 +729,7 @@ DEATH_TEST_F(OpObserverOnCreateCollectionTestDeathTest,
     auto opCtx = cc().makeOperationContext();
 
     ASSERT_TRUE(nss.isReplicated());
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx.get());
     AutoGetCollection autoColl(opCtx.get(), nss, MODE_X);
     WriteUnitOfWork wuow(opCtx.get());
     opObserver.onCreateCollection(opCtx.get(),

@@ -112,6 +112,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(failTimeseriesViewCreation);
 MONGO_FAIL_POINT_DEFINE(clusterAllCollectionsByDefault);
 MONGO_FAIL_POINT_DEFINE(skipIdIndex);
+MONGO_FAIL_POINT_DEFINE(hangCreateCollectionBeforeLockAcquisition);
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
@@ -951,6 +952,11 @@ Status createCollectionForApplyOps(
     bool allowRenameOutOfTheWay,
     const boost::optional<BSONObj>& idIndex,
     const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) {
+    // While applying a collection creation op serializes with FCV changes, acquire an OFCV so:
+    // - We can check feature flags defined as `check_against_fcv: operation_fcv_only`.
+    // - If we enter here through the applyOps command, the OFCV will be replicated in the oplog,
+    //   ensuring that oplog entries for create always have an OFCV.
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IX));
 
     const NamespaceString newCollectionName(
@@ -1032,6 +1038,10 @@ Status createCollection(OperationContext* opCtx,
                         const NamespaceString& ns,
                         const CollectionOptions& optionsArg,
                         const boost::optional<BSONObj>& idIndex) {
+    // Acquire an OFCV to get stable FCV-gated feature flag checks even during concurrent setFCV.
+    // We may not have an OFCV yet because e.g. system collection creations (in the config DB) call
+    // here directly, without going through the user command.
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
     const auto createViewlessTimeseriesColl = optionsArg.timeseries &&
         gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
@@ -1050,6 +1060,8 @@ Status createCollection(OperationContext* opCtx,
     if (!status.isOK()) {
         return status;
     }
+
+    hangCreateCollectionBeforeLockAcquisition.pauseWhileSet();
 
     if (options.isView()) {
         return _createView(opCtx, ns, options);
@@ -1073,6 +1085,7 @@ Status createCollection(OperationContext* opCtx,
 Status createVirtualCollection(OperationContext* opCtx,
                                const NamespaceString& ns,
                                const VirtualCollectionOptions& vopts) {
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
     tassert(6968504,
             "Virtual collection is available when the compute mode is enabled",
             computeModeEnabled);

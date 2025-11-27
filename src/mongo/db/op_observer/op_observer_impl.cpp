@@ -1366,6 +1366,10 @@ void OpObserverImpl::onCreateCollection(
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
     bool fromMigrate,
     bool isTimeseries) {
+    tassert(11145000,
+            "All collection creation paths are expected to acquire an Operation FCV",
+            VersionContext::getDecoration(opCtx).hasOperationFCV());
+
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
         return;
     }

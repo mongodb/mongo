@@ -160,6 +160,7 @@ MONGO_FAIL_POINT_DEFINE(automaticallyCollmodToRecordIdsReplicatedFalse);
 MONGO_FAIL_POINT_DEFINE(setFCVPauseAfterReadingConfigDropPedingDBs);
 MONGO_FAIL_POINT_DEFINE(failDowngradeValidationDueToIncompatibleFeature);
 MONGO_FAIL_POINT_DEFINE(failUpgradeValidationDueToIncompatibleFeature);
+MONGO_FAIL_POINT_DEFINE(immediatelyTimeOutWaitForStaleOFCV);
 
 
 /**
@@ -1408,7 +1409,12 @@ private:
      * --- All new operations are guaranteed to see at least the current FCV state
      */
     void _waitForOperationsRelyingOnStaleFcvToComplete(OperationContext* opCtx, FCV version) {
-        waitForOperationsNotMatchingVersionContextToComplete(opCtx, VersionContext(version));
+        auto waitForStaleOFcvDeadline = Date_t::max();
+        if (MONGO_unlikely(immediatelyTimeOutWaitForStaleOFCV.shouldFail())) {
+            waitForStaleOFcvDeadline = Date_t::now();
+        }
+        waitForOperationsNotMatchingVersionContextToComplete(
+            opCtx, VersionContext(version), waitForStaleOFcvDeadline);
 
         // Take the global lock in S mode to create a barrier for operations taking the global
         // IX or X locks. This ensures that either:

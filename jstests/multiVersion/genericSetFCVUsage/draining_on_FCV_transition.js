@@ -1,12 +1,17 @@
 /**
- * Tests the interaction of transactions with FCV upgrade/downgrade. We forbid transactions from
- * spanning a full FCV transition because otherwise they may persist old format metadata after
- * setFCV has finished cleaning up all server metadata from old to new formats.
+ * Tests the draining of operations and transactions during FCV upgrade/downgrade.
  *
- * To achieve this we drain transactions across FCV transitions (all of kVersion_X -> kUpgrading,
- * and kUpgrading -> kVersion_Y, kVersion_Y -> kDowngrading, and kDowngrading -> kVersion_X) via:
+ * We forbid operations and transactions from spanning across FCV transitions, because otherwise
+ * they may persist old format metadata after setFCV has finished cleaning up all server metadata
+ * from old to new formats.
+ *
+ * This is achieved as follows:
  * - For unprepared transaction, we abort them.
  * - For prepared transactions, we wait for them to finish.
+ * - For operations with an Operation FCV, we wait for them to finish.
+ *
+ * This behavior applies across all across FCV transitions (kVersion_X -> kUpgrading,
+ * and kUpgrading -> kVersion_Y, kVersion_Y -> kDowngrading, and kDowngrading -> kVersion_X).
  *
  * @tags: [uses_transactions, uses_prepare_transaction, multiversion_incompatible]
  */
@@ -170,12 +175,62 @@ function runAwaitPreparedTransactionsTest(initialFCV, targetFCV, runSetFCVFn) {
     testDB[collName].drop({writeConcern: {w: "majority"}});
 }
 
+function runAwaitOperationsWithOFCV(initialFCV, targetFCV, runSetFCVFn) {
+    jsTestLog(`Starting await for operations with Operation FCV test from ${initialFCV} to ${targetFCV}.`);
+
+    jsTestLog(`Set the initial featureCompatibilityVersion to ${initialFCV}.`);
+    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: initialFCV, confirm: true}));
+
+    let hangCreateFp, createThread;
+    try {
+        assert.commandFailedWithCode(
+            runSetFCVFn(targetFCV, function beforeTransition() {
+                jsTestLog("Start a transaction.");
+                // Start creating a collection, but hang it before it acquires locks
+                hangCreateFp = configureFailPoint(primary, "hangCreateCollectionBeforeLockAcquisition");
+                createThread = new Thread(
+                    function (host, dbName, collName) {
+                        const conn = new Mongo(host);
+                        assert.commandWorked(conn.getDB(dbName).createCollection(collName));
+                    },
+                    primary.host,
+                    dbName,
+                    collName,
+                );
+                createThread.start();
+                hangCreateFp.wait();
+
+                // This fail point makes setFCV fail immediately if it has to wait for operations
+                // with an Operation FCV, rather than waiting indefinitely.
+                assert.commandWorked(
+                    primary.adminCommand({configureFailPoint: "immediatelyTimeOutWaitForStaleOFCV", mode: "alwaysOn"}),
+                );
+            }),
+            ErrorCodes.ExceededTimeLimit,
+        );
+    } finally {
+        assert.commandWorked(
+            primary.adminCommand({configureFailPoint: "immediatelyTimeOutWaitForStaleOFCV", mode: "off"}),
+        );
+        hangCreateFp?.off();
+        createThread?.join();
+    }
+
+    jsTestLog("Restore the featureCompatibilityVersion to latest.");
+    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+
+    testDB[collName].drop({writeConcern: {w: "majority"}});
+}
+
 function runTest(initialFCV, targetFCV) {
     runAwaitPreparedTransactionsTest(initialFCV, targetFCV, runFCVTransitionToUpgradingOrDowngradingAndDraining);
     runAwaitPreparedTransactionsTest(initialFCV, targetFCV, runFCVTransitionToUpgradedOrDowngradedAndDraining);
 
     runAbortUnpreparedTransactionsTest(initialFCV, targetFCV, runFCVTransitionToUpgradingOrDowngradingAndDraining);
     runAbortUnpreparedTransactionsTest(initialFCV, targetFCV, runFCVTransitionToUpgradedOrDowngradedAndDraining);
+
+    runAwaitOperationsWithOFCV(initialFCV, targetFCV, runFCVTransitionToUpgradingOrDowngradingAndDraining);
+    runAwaitOperationsWithOFCV(initialFCV, targetFCV, runFCVTransitionToUpgradedOrDowngradedAndDraining);
 }
 
 runTest(latestFCV, lastLTSFCV);
