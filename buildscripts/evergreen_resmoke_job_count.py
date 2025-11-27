@@ -36,7 +36,9 @@ SYS_PLATFORM = sys.platform
 _AUBSAN_TASK_FACTOR_OVERRIDES = [
     {"task": r"bulk_write_targeted_override.*", "factor": 0.25},
     {"task": r".*causally_consistent_jscore_passthrough.*", "factor": 0.25},
+    {"task": r"change_streams$", "factor": 0.5},
     {"task": r"change_streams_mongos_sessions_passthrough", "factor": 0.25},
+    {"task": r"change_streams_whole_cluster_passthrough.*", "factor": 0.5},
     {"task": r"fcv_upgrade_downgrade_sharded_collections_jscore_passthrough", "factor": 0.25},
     {"task": r"fcv_upgrade_downgrade_sharding_jscore_passthrough", "factor": 0.25},
     {"task": r"noPassthrough", "factor": 0.25},
