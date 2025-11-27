@@ -207,7 +207,7 @@ public:
      * and downgraded FCV, which means the code gated by this feature flag is allowed to run even if
      * the FCV requirement of this feature flag is not met.
      *
-     * isEnabled() is prefered over this function since it will prevent upgrade/downgrade issues,
+     * isEnabled() is preferred over this function since it will prevent upgrade/downgrade issues,
      * or use isEnabledUseLatestFCVWhenUninitialized if your feature flag could be run while FCV is
      * uninitialized during initial sync.
      *
