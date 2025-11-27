@@ -512,7 +512,6 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/search:document_source_vector_search.cpp",
         "//src/mongo/db/pipeline/search:search_helper.cpp",
         "//src/mongo/db/pipeline/search:vector_search_helper.cpp",
-        "//src/mongo/db/pipeline/visitors:document_source_walker.cpp",
         "//src/mongo/db/pipeline/window_function:partition_iterator.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_exec.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_exec_derivative.cpp",
@@ -1017,6 +1016,17 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "pipeline_visitor",
+    srcs = [
+        "//src/mongo/db/pipeline/visitors:document_source_walker.cpp",
+    ],
+    deps = [
+        ":pipeline",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
     name = "docs_needed_bounds_visitor",
     srcs = [
         "//src/mongo/db/pipeline/visitors:document_source_visitor_docs_needed_bounds.cpp",
@@ -1026,6 +1036,7 @@ mongo_cc_library(
         ":docs_needed_bounds",
         ":document_source_internal_apply_oplog_update",
         ":pipeline",
+        ":pipeline_visitor",
     ],
 )
 
@@ -1287,6 +1298,7 @@ mongo_cc_unit_test(
         ":field_path",
         ":granularity_rounder",
         ":pipeline",
+        ":pipeline_visitor",
         ":sharded_agg_helpers",
         ":stage_params",
         "//src/mongo:base",
