@@ -877,7 +877,11 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
     const bool usingReplication =
         repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
     if (isWriteableStorageEngine() && !usingReplication) {
-        FeatureCompatibilityVersion::setIfCleanStartup(opCtx, repl::StorageInterface::get(opCtx));
+        const auto minumumRequiredFCV = rss::ReplicatedStorageService::get(opCtx)
+                                            .getPersistenceProvider()
+                                            .getMinimumRequiredFCV();
+        FeatureCompatibilityVersion::setIfCleanStartup(
+            opCtx, repl::StorageInterface::get(opCtx), minumumRequiredFCV);
     }
 
     if (storageGlobalParams.repair) {

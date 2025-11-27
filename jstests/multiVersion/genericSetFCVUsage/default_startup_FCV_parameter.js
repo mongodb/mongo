@@ -179,57 +179,80 @@ function runReplicaSetTest() {
 }
 
 function runShardingTest() {
-    jsTestLog("Test starting sharded cluster with defaultStartupFCV = lastLTS");
-    let st = new ShardingTest({
-        shards: 2,
-        mongos: 1,
-        config: 1,
-        // Shards should ignore the defaultStartupFCV parameter.
-        rsOptions: {binVersion: latest, setParameter: {defaultStartupFCV: latestFCV}},
-        configOptions: {binVersion: latest, setParameter: {defaultStartupFCV: lastLTSFCV}},
-    });
-    let configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
-    let shard0PrimaryAdminDB = st.rs0.getPrimary().getDB("admin");
-    let shard1PrimaryAdminDB = st.rs1.getPrimary().getDB("admin");
+    // By default, shards attempt to start with lastLTS to minimise the risk of requiring manual
+    // intervention in the case the cluster FCV is downgraded. Test that this can be overridden by
+    // setting defaultStartupFCV.
+    jsTestLog("Test starting sharded cluster with defaultStartupFCV = latestFCV");
+    {
+        const st = new ShardingTest({
+            shards: 1,
+            mongos: 1,
+            config: 1,
+            rsOptions: {binVersion: latest, setParameter: {defaultStartupFCV: latestFCV}},
+            configOptions: {binVersion: latest, setParameter: {defaultStartupFCV: latestFCV}},
+        });
+        const configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
+        const shard0PrimaryAdminDB = st.rs0.getPrimary().getDB("admin");
 
-    checkFCV(configPrimaryAdminDB, lastLTSFCV);
-    checkFCV(shard0PrimaryAdminDB, lastLTSFCV);
-    checkFCV(shard1PrimaryAdminDB, lastLTSFCV);
-    st.stop();
+        checkFCV(configPrimaryAdminDB, latestFCV);
+        checkFCV(shard0PrimaryAdminDB, latestFCV);
 
-    st = new ShardingTest({
-        shards: 2,
-        mongos: 1,
-        config: 1,
-        configOptions: {binVersion: latest, setParameter: {defaultStartupFCV: lastContinuousFCV}},
-    });
-    configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
-    shard0PrimaryAdminDB = st.rs0.getPrimary().getDB("admin");
-    shard1PrimaryAdminDB = st.rs1.getPrimary().getDB("admin");
+        jsTestLog("Test that a replica set started with shardsvr applies defaultStartupFCV");
+        const newShard = new ReplSetTest({
+            nodes: 2,
+            nodeOptions: {binVersion: latest, setParameter: {defaultStartupFCV: lastContinuousFCV}},
+        });
+        newShard.startSet({shardsvr: ""});
+        newShard.initiate();
 
-    checkFCV(configPrimaryAdminDB, lastContinuousFCV);
-    checkFCV(shard0PrimaryAdminDB, lastContinuousFCV);
-    checkFCV(shard1PrimaryAdminDB, lastContinuousFCV);
+        const primaryAdminDB = newShard.getPrimary().getDB("admin");
+        const secondaryAdminDB = newShard.getSecondary().getDB("admin");
+        checkFCV(primaryAdminDB, lastContinuousFCV);
+        checkFCV(secondaryAdminDB, lastContinuousFCV);
+        assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: newShard.name}));
 
-    jsTestLog("Test that a replica set started with shardsvr still defaults to lastLTS");
-    const newShard = new ReplSetTest({
-        nodes: 2,
-        nodeOptions: {binVersion: latest, setParameter: {defaultStartupFCV: latestFCV}},
-    });
-    newShard.startSet({shardsvr: ""});
-    newShard.initiate();
+        jsTestLog("Test that the FCV should be set to the cluster's FCV after running addShard");
+        checkFCV(primaryAdminDB, latestFCV);
+        checkFCV(secondaryAdminDB, latestFCV);
+        newShard.stopSet();
+        st.stop();
+    }
 
-    let primaryAdminDB = newShard.getPrimary().getDB("admin");
-    let secondaryAdminDB = newShard.getSecondary().getDB("admin");
-    checkFCV(primaryAdminDB, lastLTSFCV);
-    checkFCV(secondaryAdminDB, lastLTSFCV);
-    assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: newShard.name}));
+    jsTestLog("Test starting sharded cluster with defaultStartupFCV = lastContinuousFCV on CSRS");
+    {
+        const st = new ShardingTest({
+            shards: 1,
+            mongos: 1,
+            config: 1,
+            configOptions: {binVersion: latest, setParameter: {defaultStartupFCV: lastContinuousFCV}},
+        });
+        const configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
+        const shard0PrimaryAdminDB = st.rs0.getPrimary().getDB("admin");
 
-    jsTestLog("Test that the FCV should be set to the cluster's FCV after running addShard");
-    checkFCV(primaryAdminDB, lastContinuousFCV);
-    checkFCV(secondaryAdminDB, lastContinuousFCV);
-    newShard.stopSet();
-    st.stop();
+        checkFCV(configPrimaryAdminDB, lastContinuousFCV);
+        checkFCV(shard0PrimaryAdminDB, lastContinuousFCV);
+
+        jsTestLog("Test starting replica set with shardsvr without defaultStartupFCV uses lastLTSFCV");
+        const newShard = new ReplSetTest({
+            nodes: 2,
+            nodeOptions: {binVersion: latest},
+        });
+        newShard.startSet({shardsvr: ""});
+        newShard.initiate();
+
+        const primaryAdminDB = newShard.getPrimary().getDB("admin");
+        const secondaryAdminDB = newShard.getSecondary().getDB("admin");
+        checkFCV(primaryAdminDB, lastLTSFCV);
+        checkFCV(secondaryAdminDB, lastLTSFCV);
+        assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: newShard.name}));
+
+        jsTestLog("Test that the FCV should be set to the cluster's FCV after running addShard");
+        checkFCV(primaryAdminDB, lastContinuousFCV);
+        checkFCV(secondaryAdminDB, lastContinuousFCV);
+
+        newShard.stopSet();
+        st.stop();
+    }
 }
 
 runStandaloneTest();

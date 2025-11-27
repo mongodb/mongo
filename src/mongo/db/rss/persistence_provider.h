@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/version/releases.h"
 
 #include <string>
 #include <utility>
@@ -164,6 +165,12 @@ public:
      * TODO SERVER-113061: remove this workaround.
      */
     virtual bool supportsTableVerify() const = 0;
+
+    /**
+     * The default feature compatibility version to be used on a new cluster. Some persistence
+     * providers depend on features only available on the latest FCV.
+     */
+    virtual multiversion::FeatureCompatibilityVersion getMinimumRequiredFCV() const = 0;
 };
 
 }  // namespace rss

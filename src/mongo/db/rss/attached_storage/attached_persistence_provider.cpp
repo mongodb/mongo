@@ -120,4 +120,11 @@ bool AttachedPersistenceProvider::supportsOplogSampling() const {
 bool AttachedPersistenceProvider::supportsTableVerify() const {
     return true;
 }
+
+multiversion::FeatureCompatibilityVersion AttachedPersistenceProvider::getMinimumRequiredFCV()
+    const {
+    // (Generic FCV reference): Attached storage can operate at any FCV.
+    return multiversion::GenericFCV::kLastLTS;
+}
+
 }  // namespace mongo::rss

@@ -92,6 +92,7 @@
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/internal_session_pool.h"
@@ -4232,8 +4233,11 @@ Status ReplicationCoordinatorImpl::_runReplSetInitiate(const BSONObj& configObj,
 
     lk.unlock();
 
+    const auto minumumRequiredFCV =
+        rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider().getMinimumRequiredFCV();
+
     // Initiate FCV in local storage. This will propagate to other nodes via initial sync.
-    FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storage);
+    FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storage, minumumRequiredFCV);
 
     ReplSetConfig newConfig;
     try {

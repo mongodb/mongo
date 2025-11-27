@@ -1234,3 +1234,15 @@ mongo_cc_unit_test(
         "//src/mongo/util:version_impl",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "mongod_fcv_test",
+    srcs = [
+        "feature_compatibility_version_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        "mongod_fcv",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+    ],
+)

@@ -132,6 +132,11 @@ public:
      * We can support table verify.
      */
     bool supportsTableVerify() const override;
+
+    /**
+     * The minumum FCV required for disaggregated storage clusters.
+     */
+    multiversion::FeatureCompatibilityVersion getMinimumRequiredFCV() const override;
 };
 
 }  // namespace mongo::rss

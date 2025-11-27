@@ -105,6 +105,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/modules/atlas/OWNERS.yml
 /buildscripts/modules/atlas/ @10gen/server-disagg-storage @svc-auto-approve-bot
+/buildscripts/modules/atlas/suites/*sharding*.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/monitor_build_status/OWNERS.yml
 /buildscripts/monitor_build_status/ @10gen/devprod-correctness @svc-auto-approve-bot
