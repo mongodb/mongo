@@ -14,6 +14,7 @@ import {
 } from "jstests/sharding/libs/last_lts_mongos_commands.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {isUweEnabled, mapUweShardCmdName} from "jstests/libs/query/uwe_utils.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -1853,6 +1854,7 @@ export let MongosAPIParametersUtil = (function () {
     const st = new ShardingTest({mongos: 1, shards: 2, config: 1, rs: {nodes: 1}});
     const listCommandsRes = st.s0.adminCommand({listCommands: 1});
     assert.commandWorked(listCommandsRes);
+    const uweEnabled = isUweEnabled(st.s);
 
     const supportsCommittedReads = assert.commandWorked(st.rs0.getPrimary().adminCommand({serverStatus: 1}))
         .storageEngine.supportsCommittedReads;
@@ -2104,14 +2106,16 @@ export let MongosAPIParametersUtil = (function () {
             );
 
             const configServerCommandName = runOrExplain.configServerCommandName;
-            const shardCommandName = runOrExplain.shardCommandName;
-
             if (configServerCommandName) {
                 jsTestLog(`Check for ${configServerCommandName} in config server's log`);
                 checkPrimaryLog(configPrimary, configServerCommandName, apiParameters);
             }
 
+            let shardCommandName = runOrExplain.shardCommandName;
             if (shardCommandName) {
+                if (uweEnabled) {
+                    shardCommandName = mapUweShardCmdName(shardCommandName);
+                }
                 jsTestLog(`Check for ${shardCommandName} in shard server's log`);
                 checkPrimaryLog(shardPrimary, shardCommandName, apiParameters);
             }

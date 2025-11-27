@@ -16,6 +16,7 @@ import {
 import {assertStagesForExplainOfCommand} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {isUweEnabled, mapUweShardCmdName} from "jstests/libs/query/uwe_utils.js";
 
 const st = new ShardingTest({shards: 2});
 const kDbName = jsTestName();
@@ -28,6 +29,7 @@ const sessionDB = session.getDatabase(kDbName);
 const coll = sessionDB["coll"];
 const shard0DB = st.shard0.getDB(kDbName);
 const shard1DB = st.shard1.getDB(kDbName);
+const uweEnabled = isUweEnabled(st.s);
 
 /**
  * Enables profiling on both shards so that we can verify the targeting behaviour.
@@ -78,25 +80,32 @@ restartProfiling();
 
 // Test to verify that insert operations are routed to correct shard and succeeds on the respective
 // shards.
+let shardCmdName = uweEnabled ? mapUweShardCmdName("insert") : "insert";
 for (let i = 20; i < 40; i++) {
     assert.commandWorked(coll.insert({a: i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)}));
     profilerHasZeroMatchingEntriesOrThrow({
         profileDB: shard0DB,
-        filter: {ns: ns, "command.insert": "coll", "command.documents.a": i},
+        filter: {ns: ns, op: shardCmdName, "command.insert": {$exists: true}, "command.documents.a": i},
     });
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: shard1DB,
-        filter: {ns: ns, "command.insert": "coll", "command.documents.a": i, "ninserted": 1},
+        filter: {ns: ns, op: shardCmdName, "command.insert": {$exists: true}, "command.documents.a": i, "ninserted": 1},
     });
 
     assert.commandWorked(coll.insert({a: -i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)}));
     profilerHasZeroMatchingEntriesOrThrow({
         profileDB: shard1DB,
-        filter: {ns: ns, "command.insert": "coll", "command.documents.a": -i},
+        filter: {ns: ns, op: shardCmdName, "command.insert": {$exists: true}, "command.documents.a": -i},
     });
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: shard0DB,
-        filter: {ns: ns, "command.insert": "coll", "command.documents.a": -i, "ninserted": 1},
+        filter: {
+            ns: ns,
+            op: shardCmdName,
+            "command.insert": {$exists: true},
+            "command.documents.a": -i,
+            "ninserted": 1,
+        },
     });
 }
 
@@ -150,8 +159,9 @@ let updateObj = {a: 22, b: {subObj: "str_0"}, c: "update", p: 1};
 let res = assert.commandWorked(coll.update({a: 26, b: {subObj: "str_0"}, c: 6}, updateObj));
 assert.eq(res.nModified, 1, res);
 assert.eq(coll.count(updateObj), 1);
-profilerHasSingleMatchingEntryOrThrow({profileDB: shard1DB, filter: {ns: ns, "op": "update"}});
-profilerHasZeroMatchingEntriesOrThrow({profileDB: shard0DB, filter: {ns: ns, "op": "update"}});
+shardCmdName = uweEnabled ? mapUweShardCmdName("update") : "update";
+profilerHasSingleMatchingEntryOrThrow({profileDB: shard1DB, filter: {ns: ns, "op": shardCmdName}});
+profilerHasZeroMatchingEntriesOrThrow({profileDB: shard0DB, filter: {ns: ns, "op": shardCmdName}});
 
 // Test to verify that the update operation can use query to route the operation. Also verify that
 // updating shard key value succeeds when the document has to move shard.
@@ -164,8 +174,11 @@ res = assert.commandWorked(coll.update({a: 22, b: {subObj: "str_0"}, c: "update"
 assert.eq(res.nModified, 1, res);
 
 // Verify that the 'update' command gets targeted to 'shard1DB'.
-profilerHasAtLeastOneMatchingEntryOrThrow({profileDB: shard1DB, filter: {ns: ns, "op": "update"}});
-profilerHasZeroMatchingEntriesOrThrow({profileDB: shard0DB, filter: {ns: ns, "op": "update"}});
+// TODO SERVER-104122: Handle WCOS error in UWE.
+if (!uweEnabled) {
+    profilerHasAtLeastOneMatchingEntryOrThrow({profileDB: shard1DB, filter: {ns: ns, "op": shardCmdName}});
+    profilerHasZeroMatchingEntriesOrThrow({profileDB: shard0DB, filter: {ns: ns, "op": shardCmdName}});
+}
 
 // Verify that the 'count' command gets targeted to 'shard0DB' after the update.
 assert.eq(coll.count(updateObj["$set"]), 1);
@@ -178,8 +191,9 @@ restartProfiling();
 res = assert.commandWorked(coll.remove({a: {$lte: -1}}));
 assert.eq(res.nRemoved, 21, res);
 assert.eq(coll.count({a: {$lte: -1}}), 0);
-profilerHasSingleMatchingEntryOrThrow({profileDB: shard0DB, filter: {ns: ns, "op": "remove"}});
-profilerHasZeroMatchingEntriesOrThrow({profileDB: shard1DB, filter: {ns: ns, "op": "remove"}});
+shardCmdName = uweEnabled ? mapUweShardCmdName("remove") : "remove";
+profilerHasSingleMatchingEntryOrThrow({profileDB: shard0DB, filter: {ns: ns, "op": shardCmdName}});
+profilerHasZeroMatchingEntriesOrThrow({profileDB: shard1DB, filter: {ns: ns, "op": shardCmdName}});
 
 /**
  * Test when hashed field is a prefix.
@@ -220,8 +234,15 @@ function verifyProfilerEntryOnCorrectShard(fieldValue, filter) {
 // shards.
 restartProfiling();
 let profileFilter = {};
+shardCmdName = uweEnabled ? mapUweShardCmdName("insert") : "insert";
 for (let i = -10; i < 10; i++) {
-    profileFilter = {ns: ns, "command.insert": "coll", "command.documents.a": i, "ninserted": 1};
+    profileFilter = {
+        ns: ns,
+        op: shardCmdName,
+        "command.insert": {$exists: true},
+        "command.documents.a": i,
+        "ninserted": 1,
+    };
     assert.commandWorked(coll.insert({_id: i, a: i, b: {subObj: "str_" + (i % 5)}, c: NumberInt(i % 4)}));
     verifyProfilerEntryOnCorrectShard(i, profileFilter);
 }
@@ -270,9 +291,10 @@ assert.eq(res.nModified, 1, res);
 assert.eq(coll.count({a: 0, p: testName}), 1);
 
 // Verify that the update has been routed to the correct shard.
+shardCmdName = uweEnabled ? mapUweShardCmdName("update") : "update";
 profileFilter = {
     ns: ns,
-    "op": "update",
+    "op": shardCmdName,
 };
 verifyProfilerEntryOnCorrectShard(0, profileFilter);
 
@@ -282,13 +304,15 @@ res = assert.commandWorked(coll.update({a: {$lt: 1}}, updateObj));
 assert.eq(res.nMatched, 1, res);
 
 // Test to verify that delete with full shard key in the query can be routed correctly.
+restartProfiling();
 res = assert.commandWorked(coll.deleteOne({a: 1, b: {subObj: "str_1"}, c: 1}));
 assert.eq(res.deletedCount, 1, res);
 assert.eq(coll.count({a: 1, b: {subObj: "str_1"}, c: 1}), 0);
 
+shardCmdName = uweEnabled ? mapUweShardCmdName("remove") : "remove";
 profileFilter = {
     ns: ns,
-    "op": "remove",
+    "op": shardCmdName,
 };
 verifyProfilerEntryOnCorrectShard(1, profileFilter);
 

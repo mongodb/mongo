@@ -14,6 +14,7 @@ selector:
     - jstests/sharding/batched_writes_with_id_without_shard_key_basic.js
     - jstests/sharding/batched_writes_with_id_without_shard_key_stale_config.js
     - jstests/sharding/chunk_migration_with_bulk_write.js
+    - jstests/sharding/compound_hashed_shard_key_targeting.js
     # - jstests/sharding/database_versioning_all_commands.js
     - jstests/sharding/deleteOne_with_id_without_shard_key_basic.js
     - jstests/sharding/deleteOne_with_id_without_shard_key_stale_config.js
@@ -42,6 +43,7 @@ selector:
     - jstests/sharding/retryable_writes.js
     - jstests/sharding/retryable_writes_nested_shard_key.js
     - jstests/sharding/server_status_crud_metrics_write_without_shard_key_with_id.js
+    - jstests/sharding/stale_mongos_and_restarted_shards_agree_on_shard_version.js
     - jstests/sharding/swallow_unnecessary_uuid_mismatch_error.js
     - jstests/sharding/timeseries/**/*.js
     - jstests/sharding/txn*.js
@@ -75,6 +77,17 @@ selector:
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_update_shard_key.js
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_write_concern_errors_unsharded.js
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle_tassert_log_omit.js
+
+    - jstests/sharding/migration_blocking_operation/mongos_calls_shardsvr_coordinate_multi_update_command.js
+    - jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
+    - jstests/sharding/migration_blocking_operation/pause_during_multi_updates_cluster_parameter_requires_feature_flag.js
+
+    - jstests/sharding/swallow_unnecessary_uuid_mismatch_error.js
+    - jstests/sharding/fsync_lock_unlock.js
+    - jstests/sharding/query/comment_field_sharded.js
+    - jstests/sharding/query/sharded_profile.js
+    - jstests/sharding/query/api_version/*.js
+    - jstests/sharding/query/update/update_replace_id.js
 
 executor:
   archive:

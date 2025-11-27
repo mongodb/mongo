@@ -1,9 +1,30 @@
 /**
- * Check whether unified write executor is used for sharded writes.
+ * Checks whether the unified write executor is used for sharded writes.
  */
 export function isUweEnabled(db) {
-    return db.adminCommand({
-        getParameter: 1,
-        internalQueryUnifiedWriteExecutor: 1,
-    }).internalQueryUnifiedWriteExecutor;
+    return !!assert.commandWorkedOrFailedWithCode(
+        db.adminCommand({
+            getParameter: 1,
+            internalQueryUnifiedWriteExecutor: 1,
+        }),
+        // Allow the error when the query knob is not present.
+        ErrorCodes.InvalidOptions,
+    ).internalQueryUnifiedWriteExecutor;
+}
+
+/**
+ * Checks whether the unified write executor uses a different write command name on the shards.
+ */
+export function isUweShardCmdNameChanged(cmdName) {
+    return ["insert", "update", "delete", "remove"].includes(cmdName);
+}
+
+/**
+ * Maps the write command name that the unified write executor uses on the shards.
+ */
+export function mapUweShardCmdName(cmdName) {
+    if (isUweShardCmdNameChanged(cmdName)) {
+        return "bulkWrite";
+    }
+    return cmdName;
 }

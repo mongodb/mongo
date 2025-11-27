@@ -6,6 +6,7 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {isUweEnabled, mapUweShardCmdName, isUweShardCmdNameChanged} from "jstests/libs/query/uwe_utils.js";
 
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
@@ -17,6 +18,7 @@ const shardedColl = testDB.coll;
 const unshardedColl = testDB.unsharded;
 const shard0DB = st.shard0.getDB(jsTestName());
 const shard1DB = st.shard1.getDB(jsTestName());
+const uweEnabled = isUweEnabled(testDB);
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 
@@ -70,7 +72,14 @@ function runCommentParamTest({
     if (!cmdName) {
         cmdName = Object.keys(command)[0];
     }
-    setPostCommandFailpointOnShards({mode: "alwaysOn", options: {ns: coll.getFullName(), commands: [cmdName]}});
+    const shardCmdName = uweEnabled ? mapUweShardCmdName(cmdName) : cmdName;
+    setPostCommandFailpointOnShards({
+        mode: "alwaysOn",
+        options: {
+            ns: uweEnabled && isUweShardCmdNameChanged(cmdName) ? "admin" : coll.getFullName(),
+            commands: [shardCmdName],
+        },
+    });
 
     // Restart profiler.
     for (let shardDB of [shard0DB, shard1DB]) {
@@ -124,15 +133,17 @@ function runCommentParamTest({
 
     // Wait for the parallel shell to hit the failpoint and verify that the 'comment' field is
     // present in $currentOp.
-    const filter = {
-        [`command.${cmdName}`]: cmdName == "explain" || cmdName == "getMore" ? {$exists: true} : coll.getName(),
+    const shardFilter = {
+        [`command.${shardCmdName}`]: ["explain", "getMore", "bulkWrite"].includes(shardCmdName)
+            ? {$exists: true}
+            : coll.getName(),
         "command.comment": commentObj,
     };
     assert.soon(
         () =>
             testDB
                 .getSiblingDB("admin")
-                .aggregate([{$currentOp: {localOps: false}}, {$match: filter}])
+                .aggregate([{$currentOp: {localOps: false}}, {$match: shardFilter}])
                 .toArray().length == expectedRunningOps,
         () =>
             tojson(
@@ -144,10 +155,14 @@ function runCommentParamTest({
     );
 
     // Verify that MongoS also shows the comment field in $currentOp.
+    const localFilter = {
+        [`command.${cmdName}`]: ["explain", "getMore"].includes(cmdName) ? {$exists: true} : coll.getName(),
+        "command.comment": commentObj,
+    };
     assert.eq(
         testDB
             .getSiblingDB("admin")
-            .aggregate([{$currentOp: {localOps: true}}, {$match: filter}])
+            .aggregate([{$currentOp: {localOps: true}}, {$match: localFilter}])
             .toArray().length,
         1,
         testDB
@@ -195,13 +210,14 @@ function runCommentParamTest({
             '"command":{' + (cmdName === "getMore" ? '"' + cmdName + '"' : ""),
         ];
 
+        const logCountFromShardProfiles = foundProfilerEntriesCount;
+        // For 'update' and 'delete' commands, or "bulkWrite" when UWE is enabled, we also log an additional line for the entire operation.
+        const logCountFromShardOps = ["update", "delete", "bulkWrite"].includes(shardCmdName) ? expectedRunningOps : 0;
+        const logCountFromMongos = 1;
         verifyLogContains(
             [testDB, shard0DB, shard1DB],
             expectStrings,
-            (cmdName === "update" || cmdName === "delete" ? expectedRunningOps : 0) + // For 'update' and 'delete' commands we also log an additional line
-                // for the entire operation.
-                foundProfilerEntriesCount +
-                1, // +1 to account for log line on mongos.
+            logCountFromShardProfiles + logCountFromShardOps + logCountFromMongos,
         );
     }
 }

@@ -274,13 +274,10 @@ BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
     bulkRequest.setBypassDocumentValidation(_cmdRef.getBypassDocumentValidation());
     bulkRequest.setBypassEmptyTsReplacement(_cmdRef.getBypassEmptyTsReplacement());
     bulkRequest.setLet(_cmdRef.getLet());
+    bulkRequest.setComment(_cmdRef.getComment());
+    bulkRequest.setMaxTimeMS(_cmdRef.getMaxTimeMS());
 
     bulkRequest.setErrorsOnly(errorsOnly);
-
-    if (_cmdRef.isBulkWriteCommand()) {
-        bulkRequest.setComment(_cmdRef.getComment());
-        bulkRequest.setMaxTimeMS(_cmdRef.getMaxTimeMS());
-    }
 
     if (isEmbeddedCommand) {
         filterGenericArgumentsForEmbeddedCommand(opCtx, bulkRequest);
