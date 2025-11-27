@@ -5,6 +5,8 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_dlq.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_one_partition.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_many_partitions.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_tpcc_orders.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_tpcc_orders_mixedoperations.js
 
 executor:
   fixture:
