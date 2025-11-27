@@ -197,12 +197,11 @@ teams:
       - "<!subteam^S02P8DH4XNH>" # @leads-storage-execution - Leads
   - name: "Storage Engines"
     slack_tags:
-      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
       - "<!subteam^S05UGLCB76U>" # @leads-storage-engines - Leads
       - "<!subteam^S08DQ4QBP6K>" # @storage-engines-wiredtiger-primary - Triager
-    thresholds: # triage should route these elsewhere quickly
-      hot: 2
-      cold: 2
+    thresholds: # triage should route these elsewhere quickly (ie faster than the cooldown)
+      hot: 0
+      cold: 0
   - name: "Storage Engines - Server Integration"
     slack_tags:
       - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
