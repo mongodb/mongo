@@ -165,6 +165,22 @@ DEATH_TEST(PortsTestDeathTest,
     std::ignore = TransportLayerManagerImpl::make(svcCtx.get(), true);
 }
 
+DEATH_TEST(PortsTestDeathTest,
+           ShouldFailIfFeatureFlagIsNotEnabled,
+           "Maintenance port support is not enabled") {
+    serverGlobalParams.port = 27017;
+    serverGlobalParams.maintenancePort = 27018;
+
+    gFeatureFlagDedicatedPortForMaintenanceOperations.setForServerParameter(false);
+
+    auto svcCtx = ServiceContext::make();
+    svcCtx->setPeriodicRunner(makePeriodicRunner(svcCtx.get()));
+    svcCtx->getService()->setServiceEntryPoint(
+        std::make_unique<test::ServiceEntryPointUnimplemented>());
+
+    std::ignore = TransportLayerManagerImpl::make(svcCtx.get(), true);
+}
+
 TEST_F(TransportLayerManagerTest, ConnectEgressLayer) {
     std::vector<std::unique_ptr<TransportLayer>> layers;
 
