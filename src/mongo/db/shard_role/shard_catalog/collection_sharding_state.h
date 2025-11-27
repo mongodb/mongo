@@ -33,7 +33,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 
@@ -72,15 +71,12 @@ public:
  *
  * On shard servers, the implementation used is CollectionShardingRuntime.
  *
- * On embedded or non-shard servers, the implementation used is CollectionShardingStateStandalone,
- * which is a mostly empty implementation.
- *
  * The CollectionShardingStateFactory class below is used to instantiate the correct subclass of
  * CollectionShardingState at runtime.
  *
- * SYNCHRONISATION: In order to obtain an instance of this object, the caller must have some lock on
- * the respective collection. Different functions require different lock levels though, so be sure
- * to check the function-level comments for details.
+ * SYNCHRONIZATION: This class is not thread-safe by itself. It relies on external locking. For
+ * this reason, it must always be accessed through ScopedCollectionShardingState  helper classes,
+ * which acquire the appropriate read locks to protect against concurrent modifications.
  */
 class CollectionShardingState {
 public:
@@ -95,14 +91,48 @@ public:
      * concurrent modifications, which will be held util the object goes out of scope.
      */
     class ScopedCollectionShardingState {
-        // This used to be a ResourceMutex, we use a shared_mutex instead to keep similar semantics.
-        using LockType = std::variant<std::shared_lock<std::shared_mutex>,   // NOLINT
-                                      std::unique_lock<std::shared_mutex>>;  // NOLINT
-
     public:
         ScopedCollectionShardingState(ScopedCollectionShardingState&&);
 
         ~ScopedCollectionShardingState();
+
+        const CollectionShardingState* operator->() const {
+            return _css;
+        }
+        const CollectionShardingState& operator*() const {
+            return *_css;
+        }
+
+        ScopedCollectionShardingState(std::shared_lock<std::shared_mutex> lock,
+                                      CollectionShardingState* css);
+
+    private:
+        friend class CollectionShardingState;
+        friend class CollectionShardingRuntime;
+
+        // Constructor without the lock.
+        // Important: Only for use in non-shard servers!
+        ScopedCollectionShardingState(CollectionShardingState* css);
+
+        static ScopedCollectionShardingState acquire(OperationContext* opCtx,
+                                                     const NamespaceString& nss);
+
+        boost::optional<std::shared_lock<std::shared_mutex>> _lock;  //  NOLINT
+        CollectionShardingState* _css;
+    };
+
+    /**
+     * Obtains the sharding state for the specified collection, along with a lock in exclusive mode
+     * protecting it from concurrent modifications, which will be held until the object goes out of
+     * scope.
+     *
+     * Exclusive access is only used by catalog operations that modify the collection sharding
+     * state.
+     */
+    class ScopedExclusiveCollectionShardingState {
+    public:
+        ScopedExclusiveCollectionShardingState(ScopedExclusiveCollectionShardingState&&) = default;
+        ~ScopedExclusiveCollectionShardingState() = default;
 
         CollectionShardingState* operator->() const {
             return _css;
@@ -111,24 +141,39 @@ public:
             return *_css;
         }
 
-    private:
-        friend class CollectionShardingState;
-        friend class CollectionShardingRuntime;
+        ScopedExclusiveCollectionShardingState(std::unique_lock<std::shared_mutex> lock,
+                                               CollectionShardingState* css)
+            : _lock(std::move(lock)), _css(css) {}
 
-        ScopedCollectionShardingState(LockType lock, CollectionShardingState* css);
+    private:
+        friend class CollectionShardingRuntime;
 
         // Constructor without the lock.
         // Important: Only for use in non-shard servers!
-        ScopedCollectionShardingState(CollectionShardingState* css);
+        ScopedExclusiveCollectionShardingState(CollectionShardingState* css);
 
-        static ScopedCollectionShardingState acquireScopedCollectionShardingState(
-            OperationContext* opCtx, const NamespaceString& nss, LockMode mode);
+        static ScopedExclusiveCollectionShardingState acquire(OperationContext* opCtx,
+                                                              const NamespaceString& nss);
 
-        boost::optional<LockType> _lock;
+        boost::optional<std::unique_lock<std::shared_mutex>> _lock;  //  NOLINT
         CollectionShardingState* _css;
     };
+
+    /**
+     * Obtains the collection sharding state for the requested 'nss', along with the necessary
+     * shared CSS locks that guarantee its stability. The locks will be held until the returned
+     * object goes out of scope.
+     *
+     * It must be called with the collection lock held in at least MODE_IS.
+     */
     static ScopedCollectionShardingState assertCollectionLockedAndAcquire(
         OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Obtains the collection sharding state for the requested 'nss', along with the necessary
+     * shared CSS locks that guarantee its stability. The locks will be held until the returned
+     * object goes out of scope.
+     */
     static ScopedCollectionShardingState acquire(OperationContext* opCtx,
                                                  const NamespaceString& nss);
 

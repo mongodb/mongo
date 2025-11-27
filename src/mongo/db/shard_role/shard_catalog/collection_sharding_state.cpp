@@ -55,10 +55,11 @@ public:
     CollectionShardingStateMap(std::unique_ptr<CollectionShardingStateFactory> factory)
         : _factory(std::move(factory)) {}
 
-    struct CSSAndLock {
+    class CSSAndLock {
+    public:
         CSSAndLock(std::unique_ptr<CollectionShardingState> css) : css(std::move(css)) {}
 
-        std::shared_mutex cssMutex;  // NOLINT
+        mutable std::shared_mutex cssMutex;  // NOLINT
         std::unique_ptr<CollectionShardingState> css;
     };
 
@@ -85,7 +86,9 @@ public:
 
         BSONObjBuilder versionB(builder->subobjStart("versions"));
         for (auto cssAndLock : cssAndLocks) {
-            cssAndLock->css->appendShardVersion(builder);
+            CollectionShardingState::ScopedCollectionShardingState scopedCss(
+                std::shared_lock(cssAndLock->cssMutex), cssAndLock->css.get());
+            scopedCss->appendShardVersion(builder);
         }
         versionB.done();
     }
@@ -125,7 +128,7 @@ const ServiceContext::Decoration<boost::optional<CollectionShardingStateMap>>
 }  // namespace
 
 CollectionShardingState::ScopedCollectionShardingState::ScopedCollectionShardingState(
-    LockType lock, CollectionShardingState* css)
+    std::shared_lock<std::shared_mutex> lock, CollectionShardingState* css)
     : _lock(std::move(lock)), _css(css) {}
 
 CollectionShardingState::ScopedCollectionShardingState::ScopedCollectionShardingState(
@@ -141,12 +144,8 @@ CollectionShardingState::ScopedCollectionShardingState::ScopedCollectionSharding
 CollectionShardingState::ScopedCollectionShardingState::~ScopedCollectionShardingState() = default;
 
 CollectionShardingState::ScopedCollectionShardingState
-CollectionShardingState::ScopedCollectionShardingState::acquireScopedCollectionShardingState(
-    OperationContext* opCtx, const NamespaceString& nss, LockMode mode) {
-    // Only IS and X modes are supported.
-    invariant(mode == MODE_IS || mode == MODE_X);
-    const bool shared = mode == MODE_IS;
-
+CollectionShardingState::ScopedCollectionShardingState::acquire(OperationContext* opCtx,
+                                                                const NamespaceString& nss) {
     CollectionShardingStateMap::CSSAndLock* cssAndLock =
         CollectionShardingStateMap::get(opCtx->getServiceContext())->getOrCreate(nss);
 
@@ -154,13 +153,8 @@ CollectionShardingState::ScopedCollectionShardingState::acquireScopedCollectionS
         // First lock the shared_mutex associated to this nss to guarantee stability of the
         // CollectionShardingState* . After that, it is safe to get and store the
         // CollectionShardingState*, as long as the mutex is kept locked.
-        if (shared) {
-            return ScopedCollectionShardingState(std::shared_lock(cssAndLock->cssMutex),
-                                                 cssAndLock->css.get());
-        } else {
-            return ScopedCollectionShardingState(std::unique_lock(cssAndLock->cssMutex),
-                                                 cssAndLock->css.get());
-        }
+        return ScopedCollectionShardingState(std::shared_lock(cssAndLock->cssMutex),
+                                             cssAndLock->css.get());
     } else {
         // No need to lock the CSSLock on non-shardsvrs. For performance, skip doing it.
         return ScopedCollectionShardingState(cssAndLock->css.get());
@@ -179,7 +173,7 @@ CollectionShardingState::assertCollectionLockedAndAcquire(OperationContext* opCt
 
 CollectionShardingState::ScopedCollectionShardingState CollectionShardingState::acquire(
     OperationContext* opCtx, const NamespaceString& nss) {
-    return ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_IS);
+    return ScopedCollectionShardingState::acquire(opCtx, nss);
 }
 
 void CollectionShardingState::appendInfoForShardingStateCommand(OperationContext* opCtx,
@@ -210,6 +204,28 @@ void CollectionShardingStateFactory::set(ServiceContext* service,
 void CollectionShardingStateFactory::clear(ServiceContext* service) {
     if (auto& collectionsMap = CollectionShardingStateMap::get(service))
         collectionsMap.reset();
+}
+
+CollectionShardingState::ScopedExclusiveCollectionShardingState::
+    ScopedExclusiveCollectionShardingState(CollectionShardingState* css)
+    : _lock(boost::none), _css(css) {}
+
+CollectionShardingState::ScopedExclusiveCollectionShardingState
+CollectionShardingState::ScopedExclusiveCollectionShardingState::acquire(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    CollectionShardingStateMap::CSSAndLock* cssAndLock =
+        CollectionShardingStateMap::get(opCtx->getServiceContext())->getOrCreate(nss);
+
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+        // First lock the shared_mutex associated to this nss to guarantee stability of the
+        // CollectionShardingState* . After that, it is safe to get and store the
+        // CollectionShardingState*, as long as the mutex is kept locked.
+        return ScopedExclusiveCollectionShardingState(std::unique_lock(cssAndLock->cssMutex),
+                                                      cssAndLock->css.get());
+    } else {
+        // No need to lock the CSSLock on non-shardsvrs. For performance, skip doing it.
+        return ScopedExclusiveCollectionShardingState(cssAndLock->css.get());
+    }
 }
 
 }  // namespace mongo

@@ -149,11 +149,11 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
     }
 
     auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
-    CollectionShardingState* css = &(*scopedCss);
+    const CollectionShardingState* css = &(*scopedCss);
     css->checkShardVersionOrThrow(opCtx);
     DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
 
-    auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
+    auto* const csr = checked_cast<const CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->hasRoutingTable()) {
         MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(opCtx, nss);
@@ -210,11 +210,11 @@ void MigrationChunkClonerSourceOpObserver::onUpdate(OperationContext* opCtx,
     const auto& postImageDoc = args.updateArgs->updatedDoc;
 
     auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
-    CollectionShardingState* css = &(*scopedCss);
+    const CollectionShardingState* css = &(*scopedCss);
     css->checkShardVersionOrThrow(opCtx);
     DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
 
-    auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
+    auto* const csr = checked_cast<const CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->hasRoutingTable()) {
         MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(opCtx, nss);
@@ -257,11 +257,11 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
     }
 
     auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
-    CollectionShardingState* css = &(*scopedCss);
+    const CollectionShardingState* css = &(*scopedCss);
     css->checkShardVersionOrThrow(opCtx);
     DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
 
-    auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
+    auto* const csr = checked_cast<const CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->hasRoutingTable()) {
         assertNoMovePrimaryInProgress(opCtx, nss);

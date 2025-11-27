@@ -169,7 +169,7 @@ CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(OperationConte
     dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IS) ||
             (nss.isCommand() && opCtx->inMultiDocumentTransaction()));
     return ScopedSharedCollectionShardingRuntime(
-        ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_IS));
+        ScopedCollectionShardingState::acquire(opCtx, nss));
 }
 
 CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime
@@ -177,19 +177,19 @@ CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(OperationCo
                                                                      const NamespaceString& nss) {
     dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IS));
     return ScopedExclusiveCollectionShardingRuntime(
-        ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_X));
+        ScopedExclusiveCollectionShardingState::acquire(opCtx, nss));
 }
 
 CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime
 CollectionShardingRuntime::acquireShared(OperationContext* opCtx, const NamespaceString& nss) {
     return ScopedSharedCollectionShardingRuntime(
-        ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_IS));
+        ScopedCollectionShardingState::acquire(opCtx, nss));
 }
 
 CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime
 CollectionShardingRuntime::acquireExclusive(OperationContext* opCtx, const NamespaceString& nss) {
     return ScopedExclusiveCollectionShardingRuntime(
-        ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_X));
+        ScopedExclusiveCollectionShardingState::acquire(opCtx, nss));
 }
 
 void CollectionShardingRuntime::invalidateRangePreserversOlderThanShardVersion(
@@ -197,7 +197,7 @@ void CollectionShardingRuntime::invalidateRangePreserversOlderThanShardVersion(
     if (shardVersion == ChunkVersion::IGNORED()) {
         return;
     }
-    stdx::lock_guard lk(_metadataManagerLock);
+
     if (_metadataManager) {
         const auto metadataUuid = _metadataManager->getCollectionUuid();
         if (metadataUuid && collectionUUID != metadataUuid.get()) {
@@ -340,15 +340,13 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
                           << " must never have a routing table.",
             !newMetadata.hasRoutingTable() || !_nss.isNamespaceAlwaysUntracked());
 
-    stdx::lock_guard lk(_metadataManagerLock);
-
     // If the collection was tracked and the new metadata represents a new collection we might need
     // to clean up some sharding-related state
     if (_metadataManager) {
         const auto oldShardPlacementVersion = _metadataManager->getActivePlacementVersion();
         const auto newShardPlacementVersion = newMetadata.getShardPlacementVersion();
         if (!oldShardPlacementVersion.isSameCollection(newShardPlacementVersion))
-            _cleanupBeforeInstallingNewCollectionMetadata(lk, opCtx);
+            _cleanupBeforeInstallingNewCollectionMetadata(opCtx);
     }
 
     if (!newMetadata.hasRoutingTable()) {
@@ -387,7 +385,6 @@ void CollectionShardingRuntime::_clearFilteringMetadata(OperationContext* opCtx,
         return;
     }
 
-    stdx::lock_guard lk(_metadataManagerLock);
     LOGV2_DEBUG(4798530,
                 1,
                 "Clearing collection metadata",
@@ -396,7 +393,7 @@ void CollectionShardingRuntime::_clearFilteringMetadata(OperationContext* opCtx,
 
     // If the collection is sharded and it's being dropped we might need to clean up some state.
     if (collIsDropped)
-        _cleanupBeforeInstallingNewCollectionMetadata(lk, opCtx);
+        _cleanupBeforeInstallingNewCollectionMetadata(opCtx);
 
     _metadataType = MetadataType::kUnknown;
     if (collIsDropped)
@@ -422,7 +419,7 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             const auto self =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
-            stdx::lock_guard lk(self->_metadataManagerLock);
+
             // If the metadata was reset, or the collection was dropped and recreated since the
             // metadata manager was created, return an error.
             if (self->_metadataType != MetadataType::kTracked ||
@@ -477,8 +474,6 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
 
 SharedSemiFuture<void> CollectionShardingRuntime::getOngoingQueriesCompletionFuture(
     const UUID& collectionUuid, ChunkRange const& range) const {
-    stdx::lock_guard lk(_metadataManagerLock);
-
     if (!_metadataManager || !_metadataManager->getCollectionUuid().has_value() ||
         _metadataManager->getCollectionUuid().get() != collectionUuid) {
         return SemiFuture<void>::makeReady().share();
@@ -489,7 +484,6 @@ SharedSemiFuture<void> CollectionShardingRuntime::getOngoingQueriesCompletionFut
 std::shared_ptr<ScopedCollectionDescription::Impl>
 CollectionShardingRuntime::_getCurrentMetadataIfKnown(
     const boost::optional<LogicalTime>& atClusterTime, bool preserveRange) const {
-    stdx::lock_guard lk(_metadataManagerLock);
     switch (_metadataType) {
         case MetadataType::kUnknown:
             return nullptr;
@@ -704,7 +698,7 @@ void CollectionCriticalSection::enterCommitPhase() {
 }
 
 void CollectionShardingRuntime::_cleanupBeforeInstallingNewCollectionMetadata(
-    WithLock, OperationContext* opCtx) {
+    OperationContext* opCtx) {
     if (!_metadataManager) {
         // The old collection metadata was unknown, nothing to cleanup so far.
         return;
@@ -757,7 +751,7 @@ CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime::
     ScopedSharedCollectionShardingRuntime(ScopedCollectionShardingState&& scopedCss)
     : _scopedCss(std::move(scopedCss)) {}
 CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime::
-    ScopedExclusiveCollectionShardingRuntime(ScopedCollectionShardingState&& scopedCss)
+    ScopedExclusiveCollectionShardingRuntime(ScopedExclusiveCollectionShardingState&& scopedCss)
     : _scopedCss(std::move(scopedCss)) {}
 
 }  // namespace mongo

@@ -44,9 +44,7 @@
 #include "mongo/db/shard_role/shard_catalog/metadata_manager.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
-#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
@@ -68,6 +66,11 @@ namespace mongo {
 /**
  * See the comments for CollectionShardingState for more information on how this class fits in the
  * sharding architecture.
+ *
+ * This class is not thread-safe by itself. For this reason, it must always be accessed through
+ * ScopedSharedCollectionShardingRuntime and ScopedExclusiveCollectionShardingRuntime helper
+ * classes, which acquire the appropriate collection resource locks to protect against concurrent
+ * modifications.
  */
 class MONGO_MOD_USE_REPLACEMENT(CollectionShardingState) CollectionShardingRuntime final
     : public CollectionShardingState,
@@ -83,16 +86,18 @@ public:
      * Obtains the sharding runtime for the specified collection, along with a resource lock in
      * shared mode protecting it from concurrent modifications, which will be held until the object
      * goes out of scope.
+     *
+     * Note how this class provides only const access to the underlying CollectionShardingRuntime.
      */
     class ScopedSharedCollectionShardingRuntime {
     public:
         ScopedSharedCollectionShardingRuntime(ScopedSharedCollectionShardingRuntime&&) = default;
 
         const CollectionShardingRuntime* operator->() const {
-            return checked_cast<CollectionShardingRuntime*>(&*_scopedCss);
+            return checked_cast<const CollectionShardingRuntime*>(&*_scopedCss);
         }
         const CollectionShardingRuntime& operator*() const {
-            return checked_cast<CollectionShardingRuntime&>(*_scopedCss);
+            return checked_cast<const CollectionShardingRuntime&>(*_scopedCss);
         }
 
     private:
@@ -107,6 +112,8 @@ public:
      * Obtains the sharding runtime for the specified collection, along with a resource lock in
      * exclusive mode protecting it from concurrent modifications, which will be held until the
      * object goes out of scope.
+     *
+     * Note how this class provides non-const access to the underlying CollectionShardingRuntime.
      */
     class ScopedExclusiveCollectionShardingRuntime {
     public:
@@ -123,9 +130,10 @@ public:
     private:
         friend class CollectionShardingRuntime;
 
-        ScopedExclusiveCollectionShardingRuntime(ScopedCollectionShardingState&& scopedCss);
+        ScopedExclusiveCollectionShardingRuntime(
+            ScopedExclusiveCollectionShardingState&& scopedCss);
 
-        ScopedCollectionShardingState _scopedCss;
+        ScopedExclusiveCollectionShardingState _scopedCss;
     };
 
     static ScopedSharedCollectionShardingRuntime assertCollectionLockedAndAcquireShared(
@@ -326,7 +334,7 @@ private:
      * This function cleans up some state associated with the current sharded metadata before it's
      * replaced by the new metadata.
      */
-    void _cleanupBeforeInstallingNewCollectionMetadata(WithLock, OperationContext* opCtx);
+    void _cleanupBeforeInstallingNewCollectionMetadata(OperationContext* opCtx);
 
     // The service context under which this instance runs
     ServiceContext* const _serviceContext;
@@ -336,14 +344,6 @@ private:
 
     // Tracks the migration critical section state for this collection.
     ShardingMigrationCriticalSection _critSec;
-
-    // CSS/CSR objects are normally synchronized via the CSS mutex (which lives outside the objects
-    // themselves). However, components like the range deleter and state dumping access CSS/CSR
-    // pointers directly, bypassing normal synchronization. This mutex protects state modifications
-    // for those cases.
-    //
-    // TODO (SERVER-113665): Remove this mutex and instead rely on the CSS mutex
-    mutable stdx::mutex _metadataManagerLock;
 
     // Track status of filtering metadata for a specific collection
     enum class MetadataType {
