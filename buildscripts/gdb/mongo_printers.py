@@ -807,6 +807,25 @@ class ImmutableSetPrinter:
         return "array"
 
 
+class MatchExpressionPrinter:
+    """Pretty-printer for mongo::MatchExpression."""
+
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        gdb.set_convenience_variable("_mep_tmp", self.val.reference_value())
+        return (
+            gdb.parse_and_eval("$_mep_tmp.toString()")
+            .format_string()
+            .encode()
+            .decode("unicode_escape")[1:-1]
+        )
+
+    def display_hint(self):
+        return "map"
+
+
 def find_match_brackets(search, opening="<", closing=">"):
     """Return the index of the closing bracket that matches the first opening bracket.
 
@@ -1177,6 +1196,7 @@ def build_pretty_printer():
     pp.add("boost::optional", "boost::optional", True, BoostOptionalPrinter)
     pp.add("immutable::map", "mongo::immutable::map", True, ImmutableMapPrinter)
     pp.add("immutable::set", "mongo::immutable::set", True, ImmutableSetPrinter)
+    pp.add("MatchExpression", "mongo::MatchExpression", False, MatchExpressionPrinter)
 
     # Optimizer/ABT related pretty printers that can be used only with a running process.
     register_optimizer_printers(pp)

@@ -29,10 +29,6 @@ except ImportError:
 
 def __lldb_init_module(debugger, *_args):
     """Register pretty printers."""
-    debugger.HandleCommand(
-        "type summary add -s 'A${*var.__ptr_.__value_}' -x '^std::__1::unique_ptr<.+>$'"
-    )
-
     debugger.HandleCommand("type summary add -s '${var._value}' -x '^mongo::AtomicWord<.+>$'")
     debugger.HandleCommand("type summary add -s '${var._M_base._M_i}' 'std::atomic<bool>'")
     debugger.HandleCommand("type summary add -s '${var._M_i}' -x '^std::atomic<.+>$'")
@@ -61,9 +57,6 @@ def __lldb_init_module(debugger, *_args):
     debugger.HandleCommand(
         "type synthetic add -x '^boost::optional<.+>$' --python-class lldb_printers.OptionalPrinter"
     )
-    debugger.HandleCommand(
-        "type synthetic add -x '^std::unique_ptr<.+>$' --python-class lldb_printers.UniquePtrPrinter"
-    )
 
     debugger.HandleCommand(
         "type summary add -x '^boost::optional<.+>$' -F lldb_printers.OptionalSummaryPrinter"
@@ -77,6 +70,10 @@ def __lldb_init_module(debugger, *_args):
     )
     debugger.HandleCommand(
         "type synthetic add -x '^mongo::stdx::unordered_map<.+>$' --python-class lldb_printers.AbslHashSetPrinter"
+    )
+
+    debugger.HandleCommand(
+        "type summary add mongo::MatchExpression -F lldb_printers.MatchExpressionPrinter"
     )
 
 
@@ -221,48 +218,6 @@ def Decimal128Printer(valobj, *_args):
     low64 = value.GetChildMemberWithName("low64").GetValueAsUnsigned()
     high64 = value.GetChildMemberWithName("high64").GetValueAsUnsigned()
     return Decimal128((high64, low64))
-
-
-class UniquePtrPrinter:
-    """Pretty printer for std::unique_ptr."""
-
-    def __init__(self, valobj, *_args):
-        """Store valobj and retrieve object held at the unique_ptr."""
-        self.valobj = valobj
-        self.update()
-
-    def num_children(self):
-        """Match LLDB's expected API."""
-        return 1
-
-    def get_child_index(self, name):
-        """Match LLDB's expected API."""
-        if name == "ptr":
-            return 0
-        else:
-            return None
-
-    def get_child_at_index(self, index):
-        """Match LLDB's expected API.
-
-        Always prints object pointed at by the ptr.
-        """
-        if index == 0:
-            return (
-                self.valobj.GetChildMemberWithName("__ptr_")
-                .GetChildMemberWithName("__value_")
-                .Dereference()
-            )
-        else:
-            return None
-
-    def has_children(self):
-        """Match LLDB's expected API."""
-        return True
-
-    def update(self):
-        """Match LLDB's expected API."""
-        pass
 
 
 class OptionalPrinter:
@@ -537,3 +492,9 @@ def dump_value(value):
     print("value.value: %s" % (value.value))
     print("value.value_type: %s" % (value.value_type))
     print("----------------------------------------")
+
+
+def MatchExpressionPrinter(valobj, *_args):
+    return (
+        valobj.EvaluateExpression("toString()").GetSummary().encode().decode("unicode_escape")[1:-1]
+    )
