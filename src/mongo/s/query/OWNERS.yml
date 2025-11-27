@@ -18,3 +18,6 @@ filters:
   - "document_source_visitor_docs_needed_bounds*":
     approvers:
       - 10gen/query-integration-search
+  - "shard_key_pattern_query_util*":
+    approvers:
+      - 10gen/query-optimization

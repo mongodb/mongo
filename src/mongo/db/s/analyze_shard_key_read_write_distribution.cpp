@@ -32,7 +32,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/commands/query_cmd/bulk_write_crud_op.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/global_catalog/shard_key_pattern_query_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/variables.h"
@@ -45,6 +44,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
+#include "mongo/s/query/shard_key_pattern_query_util.h"
 #include "mongo/util/intrusive_counter.h"
 
 #include <memory>

@@ -30,7 +30,6 @@
 #include "mongo/db/query/query_planner_params.h"
 
 #include "mongo/db/exec/projection_executor_utils.h"
-#include "mongo/db/global_catalog/shard_key_pattern_query_util.h"
 #include "mongo/db/index/multikey_metadata_access_stats.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/query/compiler/stats/collection_statistics_impl.h"
@@ -43,6 +42,7 @@
 #include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/s/query/shard_key_pattern_query_util.h"
 #include "mongo/s/shard_targeting_helpers.h"
 #include "mongo/util/assert_util.h"
 

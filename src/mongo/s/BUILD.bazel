@@ -73,7 +73,6 @@ mongo_cc_library(
         "transaction_router.cpp",
         "transaction_router_resource_yielder.cpp",
         ":router_transactions_stats_gen",
-        "//src/mongo/db/global_catalog:shard_key_pattern_query_util.cpp",
         "//src/mongo/db/global_catalog/ddl:cluster_ddl.cpp",
         "//src/mongo/db/router_role:cluster_commands_helpers.cpp",
         "//src/mongo/db/router_role:collection_routing_info_targeter.cpp",
@@ -81,6 +80,7 @@ mongo_cc_library(
         "//src/mongo/db/router_role:router_role.cpp",
         "//src/mongo/db/router_role:routing_context.cpp",
         "//src/mongo/db/topology/cluster_parameters:set_cluster_server_parameter_router_impl.cpp",
+        "//src/mongo/s/query:shard_key_pattern_query_util.cpp",
     ],
     deps = [
         ":async_requests_sender",

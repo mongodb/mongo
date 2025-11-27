@@ -39,7 +39,6 @@
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
-#include "mongo/db/global_catalog/shard_key_pattern_query_util.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -53,6 +52,7 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/query/shard_key_pattern_query_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

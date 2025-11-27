@@ -34,7 +34,6 @@
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
-#include "mongo/db/global_catalog/shard_key_pattern_query_util.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
@@ -47,6 +46,7 @@
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
+#include "mongo/s/query/shard_key_pattern_query_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
