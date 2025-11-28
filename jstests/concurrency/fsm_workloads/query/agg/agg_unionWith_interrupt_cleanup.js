@@ -58,46 +58,51 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
-        // Ensure that no operations, cursors, or sub-operations are left active. After
-        // SERVER-46255, We normally expect all operations to be cleaned up safely, but there are
-        // race conditions or possible network blips where the kill won't arrive as expected. We
-        // don't want to block the interrupt thread or the operation itself to wait around to make
-        // sure everything dies correctly, so we just rely on cursor timeouts or session reaps to
-        // cover these rare cases. Here we make sure everything is cleaned up so we avoid hogging
-        // resources for future tests.
-        this.killOpsMatchingFilter(db, {
-            $and: [
-                {active: true},
-                {
-                    $or: [{"command.comment": this.commentStr}, {"cursor.originatingCommand.comment": this.commentStr}],
-                },
-            ],
-        });
+        const runCleanup = () => {
+            // Ensure that no operations, cursors, or sub-operations are left active. After
+            // SERVER-46255, We normally expect all operations to be cleaned up safely, but there are
+            // race conditions or possible network blips where the kill won't arrive as expected. We
+            // don't want to block the interrupt thread or the operation itself to wait around to make
+            // sure everything dies correctly, so we just rely on cursor timeouts or session reaps to
+            // cover these rare cases. Here we make sure everything is cleaned up so we avoid hogging
+            // resources for future tests.
+            this.killOpsMatchingFilter(db, {
+                $and: [
+                    {active: true},
+                    {
+                        $or: [
+                            {"command.comment": this.commentStr},
+                            {"cursor.originatingCommand.comment": this.commentStr},
+                        ],
+                    },
+                ],
+            });
 
-        const killCursors = (db) => {
-            const adminDB = db.getSiblingDB("admin");
+            const killCursors = (db) => {
+                const adminDB = db.getSiblingDB("admin");
 
-            const curOpCursor = adminDB.aggregate([
-                {$currentOp: {idleCursors: true, localOps: true}},
-                {$match: {"cursor.originatingCommand.comment": this.commentStr}},
-                {$project: {"cursor.cursorId": 1}},
-            ]);
+                const curOpCursor = adminDB.aggregate([
+                    {$currentOp: {idleCursors: true, localOps: true}},
+                    {$match: {"cursor.originatingCommand.comment": this.commentStr}},
+                    {$project: {"cursor.cursorId": 1}},
+                ]);
 
-            while (curOpCursor.hasNext()) {
-                let result = curOpCursor.next();
-                if (result.cursor) {
-                    const cursorId = result.cursor.cursorId;
-                    jsTestLog(`Killing cursor: ${cursorId}, database ${db.getName()}`);
-                    assert.commandWorked(db.runCommand({killCursors: collName, cursors: [cursorId]}));
+                while (curOpCursor.hasNext()) {
+                    let result = curOpCursor.next();
+                    if (result.cursor) {
+                        const cursorId = result.cursor.cursorId;
+                        jsTestLog(`Killing cursor: ${cursorId}, database ${db.getName()}`);
+                        assert.commandWorked(db.runCommand({killCursors: collName, cursors: [cursorId]}));
+                    }
                 }
+            };
+
+            cluster.executeOnMongodNodes(killCursors);
+            cluster.executeOnMongosNodes(killCursors);
+            if (cluster.isSharded()) {
+                cluster.executeOnConfigNodes(killCursors);
             }
         };
-
-        cluster.executeOnMongodNodes(killCursors);
-        cluster.executeOnMongosNodes(killCursors);
-        if (cluster.isSharded()) {
-            cluster.executeOnConfigNodes(killCursors);
-        }
 
         const remainingOps = () =>
             db
@@ -117,8 +122,30 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                     },
                 ])
                 .toArray();
+
+        // Run cleanup once.
+        runCleanup();
+
+        let iterations = 0;
+
+        // Retry until we have zero open cursors left.
         assert.soon(
-            () => remainingOps().length == 0,
+            () => {
+                const remaining = remainingOps();
+                if (remaining.length == 0) {
+                    return true;
+                }
+
+                // In case there are still open cursors, retry the clean up.
+                // This is beneficial because the initial cleanup may have failed because of
+                // network blips, high load/unreachable hosts or other subtle races.
+                // This is especially important for slow build variants.
+                jsTest.log.info(
+                    `Running additional cleanup round #${++iterations} after finding ${remaining.length} active cursors`,
+                );
+                runCleanup();
+                return false;
+            },
             () => "tried to kill cursors but they're still alive\n" + tojson(remainingOps()),
         );
     };
