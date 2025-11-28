@@ -84,22 +84,35 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     auto indexToShardId = std::make_shared<stdx::unordered_map<int, ShardId>>();
 
     CancellationSource cancelSource(originalOpts->token);
-
-    for (size_t i = 0; i < shardIds.size(); ++i) {
-        std::unique_ptr<async_rpc::Targeter> targeter =
-            std::make_unique<async_rpc::ShardIdTargeter>(
-                originalOpts->exec, opCtx, shardIds[i], readPref);
-        auto shard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIds[i]));
-        auto retryStrategy = std::make_shared<Shard::OwnerRetryStrategy>(
-            shard, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
-        auto opts = std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(
-            originalOpts->exec, cancelSource.token(), originalOpts->cmd, retryStrategy);
-        if (shardVersions) {
-            opts->cmd.setShardVersion((*shardVersions)[i]);
+    try {
+        for (size_t i = 0; i < shardIds.size(); ++i) {
+            std::unique_ptr<async_rpc::Targeter> targeter =
+                std::make_unique<async_rpc::ShardIdTargeter>(
+                    originalOpts->exec, opCtx, shardIds[i], readPref);
+            auto shard =
+                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIds[i]));
+            auto retryStrategy = std::make_shared<Shard::OwnerRetryStrategy>(
+                shard, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
+            auto opts = std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(
+                originalOpts->exec, cancelSource.token(), originalOpts->cmd, retryStrategy);
+            if (shardVersions) {
+                opts->cmd.setShardVersion((*shardVersions)[i]);
+            }
+            futures.push_back(
+                async_rpc::sendCommand<CommandType>(opts, opCtx, std::move(targeter)));
+            (*indexToShardId)[i] = shardIds[i];
         }
-        futures.push_back(async_rpc::sendCommand<CommandType>(opts, opCtx, std::move(targeter)));
-        (*indexToShardId)[i] = shardIds[i];
+    } catch (const DBException&) {
+        // In case of exception, we might have already sent some commands.
+        // Before returning the exception to the caller, we have to cancel the scheduled async
+        // operations and wait for them to drain or we might access invalid pointers.
+        cancelSource.cancel();
+
+        // Wait for all futures to cancel, discarding results and errors
+        for (auto&& future : futures) {
+            auto _ = std::move(future).getNoThrow();
+        }
+        throw;
     }
 
     auto formatResponse = [](async_rpc::AsyncRPCResponse<typename CommandType::Reply> reply) {
