@@ -2447,6 +2447,14 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_list_catalog* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_list_extensions* @10gen/query-integration-extensions-api @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/pipeline/optimization/OWNERS.yml
+/src/mongo/db/pipeline/optimization/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/pipeline/optimization/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+/src/mongo/db/pipeline/optimization/**/change_stream* @10gen/query-execution-change-streams @svc-auto-approve-bot
+/src/mongo/db/pipeline/optimization/**/qe_rules_to_move.cpp @10gen/query-execution-classic @svc-auto-approve-bot
+/src/mongo/db/pipeline/optimization/**/qi_rules_to_move.cpp @10gen/query-integration-features @svc-auto-approve-bot
+/src/mongo/db/pipeline/optimization/**/cr_rules_to_move.cpp @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/pipeline/search/OWNERS.yml
 /src/mongo/db/pipeline/search/**/* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/pipeline/search/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot

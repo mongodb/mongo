@@ -1,0 +1,20 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-optimization
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-optimization-staff-leads
+  - "change_stream*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "qe_rules_to_move.cpp":
+    approvers:
+      - 10gen/query-execution-classic
+  - "qi_rules_to_move.cpp":
+    approvers:
+      - 10gen/query-integration-features
+  - "cr_rules_to_move.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

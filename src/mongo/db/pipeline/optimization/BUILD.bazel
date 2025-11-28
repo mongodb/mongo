@@ -12,8 +12,11 @@ exports_files(
 mongo_cc_library(
     name = "pipeline_optimization",
     srcs = [
+        "cr_rules_to_move.cpp",
         "match_rules.cpp",
-        "rules_to_move.cpp",
+        "qe_rules_to_move.cpp",
+        "qi_rules_to_move.cpp",
+        "qo_rules_to_move.cpp",
         "simple_rules.cpp",
     ],
     deps = [
