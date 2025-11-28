@@ -183,7 +183,7 @@ filters:
   - "javascript_execution*":
     approvers:
       - 10gen/query-integration-extensions
-  - "initialize_auto_get_helper.h":
+  - "initialize_auto_get_helper*":
     approvers:
       - 10gen/query-execution-classic
   - "lookup_set_cache*":

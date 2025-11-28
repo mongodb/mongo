@@ -47,6 +47,13 @@ inline std::vector<ScopedSetShardRole> createScopedShardRoles(
     std::vector<ScopedSetShardRole> scopedShardRoles;
     scopedShardRoles.reserve(nssList.size());
     const auto myShardId = ShardingState::get(opCtx)->shardId();
+    const auto placementConflictTime = [&] {
+        const auto txnRouter = TransactionRouter::get(opCtx);
+        return txnRouter && opCtx->inMultiDocumentTransaction()
+            ? txnRouter.getPlacementConflictTime()
+            : boost::none;
+    }();
+
     for (const auto& nss : nssList) {
         const auto nssCri = criMap.find(nss);
         tassert(8322004,
@@ -54,22 +61,44 @@ inline std::vector<ScopedSetShardRole> createScopedShardRoles(
                 nssCri != criMap.end());
 
         bool isTracked = nssCri->second.hasRoutingTable();
+
         auto shardVersion = [&] {
             auto sv =
                 isTracked ? nssCri->second.getShardVersion(myShardId) : ShardVersion::UNSHARDED();
-
-            if (auto txnRouter = TransactionRouter::get(opCtx);
-                txnRouter && opCtx->inMultiDocumentTransaction()) {
-                if (auto optOriginalPlacementConflictTime = txnRouter.getPlacementConflictTime()) {
-                    sv.setPlacementConflictTime(*optOriginalPlacementConflictTime);
-                }
+            if (placementConflictTime) {
+                sv.setPlacementConflictTime(*placementConflictTime);
             }
             return sv;
         }();
-        const auto dbVersion =
-            isTracked ? boost::none : OperationShardingState::get(opCtx).getDbVersion(nss.dbName());
 
-        scopedShardRoles.emplace_back(opCtx, nss, shardVersion, dbVersion);
+        // For UNTRACKED collections, the collection will only be potentially considered local if
+        // this shard is the dbPrimary shard.
+        //
+        // If the routing info tells this shard is, then attach the DatabaseVersion to validate
+        // that. For the opposite case, where the routing info says that this shard is not the
+        // dbPrimary shard, we cannot attach the DatabaseVersion because the protocol does not allow
+        // a way to express that, so it won't be validated. If the routing info was stale, this will
+        // potentially result in executing a correct but sub-optimal query plan (only this time,
+        // because the next executions will see an updated routing info as a side effect of this
+        // execution having targeted a "remotely" and therefore will choose the optimal plan).
+        const bool isDbPrimaryShard = nssCri->second.getDbPrimaryShardId() == myShardId;
+        auto dbVersion = !isTracked && isDbPrimaryShard
+            ? boost::optional<DatabaseVersion>(nssCri->second.getDbVersion())
+            : boost::none;
+
+        if (placementConflictTime && dbVersion) {
+            dbVersion->setPlacementConflictTime(*placementConflictTime);
+        }
+
+        try {
+            scopedShardRoles.emplace_back(opCtx, nss, shardVersion, dbVersion);
+        } catch (const ExceptionFor<ErrorCodes::IllegalChangeToExpectedDatabaseVersion>&) {
+            // Only one can be correct. Check css and the new one.
+            const auto scopedDss = DatabaseShardingState::acquire(opCtx, nss.dbName());
+            scopedDss->checkDbVersionOrThrow(opCtx);
+            scopedDss->checkDbVersionOrThrow(opCtx, *dbVersion);
+            MONGO_UNREACHABLE_TASSERT(10825600);
+        }
     }
     return scopedShardRoles;
 }

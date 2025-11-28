@@ -488,7 +488,7 @@ if (!isAuthoritativeShardEnabled) {
                                   // collection is unsharded.
                                   toplevelExec: [true, false],
                                   subPipelineLocal: [true, false],
-                                  subPipelineRemote: [true, false],
+                                  subPipelineRemote: [false, false],
                               });
 }
 
