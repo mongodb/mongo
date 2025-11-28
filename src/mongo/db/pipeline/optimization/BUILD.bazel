@@ -9,6 +9,18 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "pipeline_optimization",
+    srcs = [
+        "match_rules.cpp",
+        "rules_to_move.cpp",
+        "simple_rules.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "pipeline_rewriter_test",
     srcs = [

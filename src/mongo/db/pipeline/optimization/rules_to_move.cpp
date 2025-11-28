@@ -53,7 +53,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::rule_based_rewrites::pipeline {
-// TODO(SERVER-112281): Split these into separate files by team ownership.
+// TODO(SERVER-114467): Split these into separate files by team ownership.
 
 // Owned by the Query Optimization team.
 REGISTER_RULES(DocumentSourceSkip,
