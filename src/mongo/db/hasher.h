@@ -51,7 +51,7 @@ public:
      * by choosing from among a family of hash functions. When it is not specified,
      * use this.
      *
-     * WARNING: do not change the hash see value. Hash-based sharding clusters will
+     * WARNING: do not change the hash seed value. Hash-based sharding clusters will
      * expect that value to be zero.
      */
     static constexpr HashSeed const DEFAULT_HASH_SEED = 0;
