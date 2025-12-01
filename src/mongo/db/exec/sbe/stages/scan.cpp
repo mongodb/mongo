@@ -192,53 +192,81 @@ void ScanStageBase::getStatsShared(BSONObjBuilder& bob) const {
 }
 
 void ScanStageBase::debugPrintShared(std::vector<DebugPrinter::Block>& ret) const {
+    bool first = true;
+    ret.emplace_back(DebugPrinter::Block("[`"));
     if (_state->recordSlot) {
+        if (!first) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
         DebugPrinter::addIdentifier(ret, _state->recordSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+        ret.emplace_back("=");
+        DebugPrinter::addKeyword(ret, "record");
+        first = false;
     }
 
     if (_state->recordIdSlot) {
+        if (!first) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
         DebugPrinter::addIdentifier(ret, _state->recordIdSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+        ret.emplace_back("=");
+        DebugPrinter::addKeyword(ret, "recordId");
+        first = false;
     }
 
     if (_state->snapshotIdSlot) {
+        if (!first) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
         DebugPrinter::addIdentifier(ret, _state->snapshotIdSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+        ret.emplace_back("=");
+        DebugPrinter::addKeyword(ret, "snapshotId");
+        first = false;
     }
 
     if (_state->indexIdentSlot) {
+        if (!first) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
         DebugPrinter::addIdentifier(ret, _state->indexIdentSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+        ret.emplace_back("=");
+        DebugPrinter::addKeyword(ret, "indexIdent");
+        first = false;
     }
 
     if (_state->indexKeySlot) {
+        if (!first) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
         DebugPrinter::addIdentifier(ret, _state->indexKeySlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+        ret.emplace_back("=");
+        DebugPrinter::addKeyword(ret, "indexKey");
+        first = false;
     }
 
     if (_state->indexKeyPatternSlot) {
-        DebugPrinter::addIdentifier(ret, _state->indexKeyPatternSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
-    }
-
-    ret.emplace_back(DebugPrinter::Block("[`"));
-    for (size_t idx = 0; idx < _state->scanFieldNames.size(); ++idx) {
-        if (idx) {
+        if (!first) {
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
-
-        DebugPrinter::addIdentifier(ret, _state->scanFieldSlots[idx]);
+        DebugPrinter::addIdentifier(ret, _state->indexKeyPatternSlot.value());
         ret.emplace_back("=");
-        DebugPrinter::addIdentifier(ret, _state->scanFieldNames[idx]);
+        DebugPrinter::addKeyword(ret, "indexKeyPattern");
+        first = false;
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
+
+    if (_state->scanFieldNames.size()) {
+        ret.emplace_back(DebugPrinter::Block("[`"));
+        for (size_t idx = 0; idx < _state->scanFieldNames.size(); ++idx) {
+            if (idx) {
+                ret.emplace_back(DebugPrinter::Block("`,"));
+            }
+            DebugPrinter::addIdentifier(ret, _state->scanFieldSlots[idx]);
+            ret.emplace_back("=");
+            DebugPrinter::addIdentifier(ret, _state->scanFieldNames[idx]);
+        }
+        ret.emplace_back(DebugPrinter::Block("`]"));
+    }
 
     ret.emplace_back("@\"`");
     DebugPrinter::addIdentifier(ret, _state->collUuid.toString());
@@ -670,20 +698,23 @@ std::unique_ptr<PlanStageStats> ScanStage::getStats(bool includeDebugInfo) const
 
 std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
     std::vector<DebugPrinter::Block> ret = PlanStage::debugPrint();
+    bool first = true;
     if (_minRecordIdSlot) {
         DebugPrinter::addIdentifier(ret, _minRecordIdSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+        ret.emplace_back("=");
+        DebugPrinter::addKeyword(ret, "minRecordId");
+        first = false;
     }
-
     if (_maxRecordIdSlot) {
+        if (!first) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
         DebugPrinter::addIdentifier(ret, _maxRecordIdSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+        ret.emplace_back("=");
+        DebugPrinter::addKeyword(ret, "maxRecordId");
     }
     debugPrintShared(ret);
-    ret.emplace_back(_state->forward ? "true" : "false");
-
+    ret.emplace_back(_state->forward ? "forward" : "reverse");
     return ret;
 }
 

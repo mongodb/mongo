@@ -161,7 +161,6 @@ std::vector<DebugPrinter::Block> RandomScanStage::debugPrint() const {
     std::vector<DebugPrinter::Block> ret = PlanStage::debugPrint();
     DebugPrinter::addKeyword(ret, "random");
     debugPrintShared(ret);
-    ret.emplace_back("true");
 
     return ret;
 }

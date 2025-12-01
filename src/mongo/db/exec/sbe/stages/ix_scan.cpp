@@ -372,29 +372,45 @@ const SpecificStats* IndexScanStageBase::getSpecificStats() const {
 }
 
 void IndexScanStageBase::debugPrintImpl(std::vector<DebugPrinter::Block>& blocks) const {
+    blocks.emplace_back(DebugPrinter::Block("[`"));
+    bool first = true;
     if (_indexKeySlot) {
         DebugPrinter::addIdentifier(blocks, _indexKeySlot.value());
-    } else {
-        DebugPrinter::addIdentifier(blocks, DebugPrinter::kNoneKeyword);
+        blocks.emplace_back("=");
+        DebugPrinter::addKeyword(blocks, "indexKey");
+        first = false;
     }
 
     if (_recordIdSlot) {
+        if (!first) {
+            blocks.emplace_back(DebugPrinter::Block("`,"));
+        }
         DebugPrinter::addIdentifier(blocks, _recordIdSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(blocks, DebugPrinter::kNoneKeyword);
+        blocks.emplace_back("=");
+        DebugPrinter::addKeyword(blocks, "recordId");
+        first = false;
     }
 
     if (_snapshotIdSlot) {
+        if (!first) {
+            blocks.emplace_back(DebugPrinter::Block("`,"));
+        }
         DebugPrinter::addIdentifier(blocks, _snapshotIdSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(blocks, DebugPrinter::kNoneKeyword);
+        blocks.emplace_back("=");
+        DebugPrinter::addKeyword(blocks, "snapshotId");
+        first = false;
     }
 
     if (_indexIdentSlot) {
+        if (!first) {
+            blocks.emplace_back(DebugPrinter::Block("`,"));
+        }
         DebugPrinter::addIdentifier(blocks, _indexIdentSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(blocks, DebugPrinter::kNoneKeyword);
+        blocks.emplace_back("=");
+        DebugPrinter::addKeyword(blocks, "indexIdent");
+        first = false;
     }
+    blocks.emplace_back(DebugPrinter::Block("`]"));
 
     blocks.emplace_back(DebugPrinter::Block("[`"));
     size_t varIndex = 0;
@@ -420,7 +436,7 @@ void IndexScanStageBase::debugPrintImpl(std::vector<DebugPrinter::Block>& blocks
     DebugPrinter::addIdentifier(blocks, _indexName);
     blocks.emplace_back("`\"");
 
-    blocks.emplace_back(_forward ? "true" : "false");
+    blocks.emplace_back(_forward ? "forward" : "reverse");
 }
 
 size_t IndexScanStageBase::estimateCompileTimeSizeImpl() const {
@@ -607,11 +623,13 @@ std::vector<DebugPrinter::Block> SimpleIndexScanStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
 
     if (_seekKeyLow) {
+        DebugPrinter::addKeyword(ret, "seekKeyLow");
+        ret.emplace_back("=");
         DebugPrinter::addBlocks(ret, _seekKeyLow->debugPrint());
         if (_seekKeyHigh) {
+            DebugPrinter::addKeyword(ret, "seekKeyHigh");
+            ret.emplace_back("=");
             DebugPrinter::addBlocks(ret, _seekKeyHigh->debugPrint());
-        } else {
-            DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
         }
     }
 

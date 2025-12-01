@@ -4,5 +4,5 @@
     then ftsMatch(FtsMatcher({"terms" : ["test"], "negatedTerms" : [], "phrases" : [], "negatedPhrases" : []}), s6) 
     else fail(4623400, "textmatch requires input to be an object") 
 } 
-[2] fetch s1 s6 s7 s4 s2 s3 s5 [] @"UUID" 
-[1] ixseek KS(3C610001) KS(3C7A00FE) s3 s1 s4 s2 [] @"UUID" @"a_text" true 
+[2] fetch s1 = seek, s6 = result, s7 = recordId, s4 = inSnapshotId, s2 = inIndexIdent, s3 = inIndexKey, s5 = inIndexKeyPattern [] @"UUID" 
+[1] ixseek seekKeyLow = KS(3C610001) seekKeyHigh = KS(3C7A00FE) [s3 = indexKey, s1 = recordId, s4 = snapshotId, s2 = indexIdent] [] @"UUID" @"a_text" forward 

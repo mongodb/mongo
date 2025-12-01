@@ -1,10 +1,10 @@
 # Golden test output of GoldenSbeStageBuilderTest/TestMergeSort
 [5] unique_roaring s18 
 [5] smerge [s18, s19, s20] [asc] [
-    [s2] [s9, s7, s2] [2] fetch s1 s8 s9 s5 s3 s4 s6 [] @"UUID" 
+    [s2] [s9, s7, s2] [2] fetch s1 = seek, s8 = result, s9 = recordId, s5 = inSnapshotId, s3 = inIndexIdent, s4 = inIndexKey, s6 = inIndexKeyPattern [] @"UUID" 
     [1] project [s7 = newObj("a", s2)] 
-    [1] ixseek KS(2B0201) KS(2B04FE) s4 s1 s5 s3 [s2 = 0] @"UUID" @"a_1" true , 
-    [s11] [s17, s15, s11] [4] fetch s10 s16 s17 s14 s12 s13 s6 [] @"UUID" 
+    [1] ixseek seekKeyLow = KS(2B0201) seekKeyHigh = KS(2B04FE) [s4 = indexKey, s1 = recordId, s5 = snapshotId, s3 = indexIdent] [s2 = 0] @"UUID" @"a_1" forward , 
+    [s11] [s17, s15, s11] [4] fetch s10 = seek, s16 = result, s17 = recordId, s14 = inSnapshotId, s12 = inIndexIdent, s13 = inIndexKey, s6 = inIndexKeyPattern [] @"UUID" 
     [3] project [s15 = newObj("a", s11)] 
-    [3] ixseek KS(2B0401) KS(2B06FE) s13 s10 s14 s12 [s11 = 0] @"UUID" @"a_1" true 
+    [3] ixseek seekKeyLow = KS(2B0401) seekKeyHigh = KS(2B06FE) [s13 = indexKey, s10 = recordId, s14 = snapshotId, s12 = indexIdent] [s11 = 0] @"UUID" @"a_1" forward 
 ] 

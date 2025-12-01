@@ -582,8 +582,12 @@ std::vector<DebugPrinter::Block> MakeObjStageBase<O>::debugPrint() const {
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 
-    ret.emplace_back(_forceNewObject ? "true" : "false");
-    ret.emplace_back(_returnOldObject ? "true" : "false");
+    if (_forceNewObject) {
+        ret.emplace_back("forceNewObject");
+    }
+    if (_returnOldObject) {
+        ret.emplace_back("returnOldObject");
+    }
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());

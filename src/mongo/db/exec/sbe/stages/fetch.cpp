@@ -323,31 +323,46 @@ const SpecificStats* FetchStage::getSpecificStats() const {
 std::vector<DebugPrinter::Block> FetchStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
     DebugPrinter::addIdentifier(ret, _state->seekSlot);
+    ret.emplace_back("=");
+    DebugPrinter::addKeyword(ret, "seek");
+    ret.emplace_back(DebugPrinter::Block("`,"));
+
     DebugPrinter::addIdentifier(ret, _state->resultSlot);
+    ret.emplace_back("=");
+    DebugPrinter::addKeyword(ret, "result");
+    ret.emplace_back(DebugPrinter::Block("`,"));
+
     DebugPrinter::addIdentifier(ret, _state->recordIdSlot);
+    ret.emplace_back("=");
+    DebugPrinter::addKeyword(ret, "recordId");
+    ret.emplace_back(DebugPrinter::Block("`,"));
+
     if (_state->inSnapshotIdSlot) {
         DebugPrinter::addIdentifier(ret, _state->inSnapshotIdSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+        ret.emplace_back("=");
+        DebugPrinter::addKeyword(ret, "inSnapshotId");
+        ret.emplace_back(DebugPrinter::Block("`,"));
     }
 
     if (_state->inIndexIdentSlot) {
         DebugPrinter::addIdentifier(ret, _state->inIndexIdentSlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+        ret.emplace_back("=");
+        DebugPrinter::addKeyword(ret, "inIndexIdent");
+        ret.emplace_back(DebugPrinter::Block("`,"));
     }
 
     if (_state->inIndexKeySlot) {
         DebugPrinter::addIdentifier(ret, _state->inIndexKeySlot.value());
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+        ret.emplace_back("=");
+        DebugPrinter::addKeyword(ret, "inIndexKey");
+        ret.emplace_back(DebugPrinter::Block("`,"));
     }
 
     if (_state->inIndexKeyPatternSlot) {
         DebugPrinter::addIdentifier(ret, _state->inIndexKeyPatternSlot.value());
-
-    } else {
-        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+        ret.emplace_back("=");
+        DebugPrinter::addKeyword(ret, "inIndexKeyPattern");
+        // No trailing commma.
     }
 
     ret.emplace_back(DebugPrinter::Block("[`"));
