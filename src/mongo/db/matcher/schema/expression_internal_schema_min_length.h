@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_str_length.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>

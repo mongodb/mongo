@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -51,7 +52,7 @@ namespace mongo {
  * Container for a parsed MatchExpression and top-level field name that it's over.
  * For example, {"i.a": 0, "i.b": 1} is a filter with a single top-level field name "i".
  */
-class ExpressionWithPlaceholder {
+class MONGO_MOD_NEEDS_REPLACEMENT ExpressionWithPlaceholder {
 
 public:
     /**

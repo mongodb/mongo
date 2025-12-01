@@ -39,6 +39,7 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -134,7 +135,7 @@ private:
     std::vector<std::unique_ptr<MatchExpression>> _expressions;
 };
 
-class AndMatchExpression : public ListOfMatchExpression {
+class MONGO_MOD_NEEDS_REPLACEMENT AndMatchExpression : public ListOfMatchExpression {
 public:
     static constexpr StringData kName = "$and"_sd;
 
@@ -261,7 +262,7 @@ public:
     }
 };
 
-class NotMatchExpression final : public MatchExpression {
+class MONGO_MOD_NEEDS_REPLACEMENT NotMatchExpression final : public MatchExpression {
 public:
     static constexpr int kNumChildren = 1;
     explicit NotMatchExpression(MatchExpression* e,

@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <functional>
@@ -42,7 +43,7 @@
 #include <variant>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class PathMatchExpression;
 
@@ -353,4 +354,4 @@ std::unique_ptr<MatchExpression> copyExpressionAndApplyRenames(
 std::string filterMapToString(const StringMap<std::unique_ptr<MatchExpression>>&);
 
 }  // namespace expression
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

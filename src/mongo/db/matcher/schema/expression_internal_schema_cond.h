@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_arity.h"
 #include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <memory>

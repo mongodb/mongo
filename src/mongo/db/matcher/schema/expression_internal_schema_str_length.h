@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>

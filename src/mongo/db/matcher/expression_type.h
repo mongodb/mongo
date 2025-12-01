@@ -46,6 +46,7 @@
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -61,7 +62,7 @@ namespace mongo {
 /**
  * The structure represents how data is laid out in an encrypted payload.
  */
-struct FleBlobHeader {
+struct MONGO_MOD_NEEDS_REPLACEMENT FleBlobHeader {
     int8_t fleBlobSubtype;
     int8_t keyUUID[16];
     int8_t originalBsonType;

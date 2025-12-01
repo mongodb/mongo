@@ -40,6 +40,7 @@
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/string_map.h"
 

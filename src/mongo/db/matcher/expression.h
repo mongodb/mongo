@@ -46,6 +46,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -69,7 +70,7 @@ namespace mongo {
  */
 extern FailPoint disableMatchExpressionOptimization;
 
-class MatchExpression {
+class MONGO_MOD_PUBLIC MatchExpression {
     MatchExpression(const MatchExpression&) = delete;
     MatchExpression& operator=(const MatchExpression&) = delete;
 
@@ -563,6 +564,6 @@ inline MatchExpression::ConstIterator end(const MatchExpression& expr) {
     return {&expr, expr.numChildren()};
 }
 
-using StatusWithMatchExpression = StatusWith<std::unique_ptr<MatchExpression>>;
+using StatusWithMatchExpression MONGO_MOD_PUBLIC = StatusWith<std::unique_ptr<MatchExpression>>;
 
 }  // namespace mongo

@@ -31,6 +31,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /**

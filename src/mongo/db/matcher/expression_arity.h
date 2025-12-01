@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <array>

@@ -32,6 +32,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

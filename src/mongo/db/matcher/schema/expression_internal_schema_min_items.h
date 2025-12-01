@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_num_array_items.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>

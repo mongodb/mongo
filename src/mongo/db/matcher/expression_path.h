@@ -31,6 +31,7 @@
 
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -58,7 +59,7 @@ public:
      * empty path as well as no path cases. optPath() should be preferred in order to
      * distinguish between the two.
      */
-    StringData path() const final {
+    MONGO_MOD_NEEDS_REPLACEMENT StringData path() const final {
         return _elementPath ? _elementPath->fieldRef().dottedField() : "";
     }
 

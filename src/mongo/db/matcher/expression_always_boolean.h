@@ -39,6 +39,7 @@
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -98,7 +99,8 @@ public:
     }
 };
 
-class AlwaysFalseMatchExpression final : public AlwaysBooleanMatchExpression {
+class MONGO_MOD_NEEDS_REPLACEMENT AlwaysFalseMatchExpression final
+    : public AlwaysBooleanMatchExpression {
 public:
     static constexpr StringData kName = "$alwaysFalse"_sd;
 
@@ -126,7 +128,8 @@ public:
     }
 };
 
-class AlwaysTrueMatchExpression final : public AlwaysBooleanMatchExpression {
+class MONGO_MOD_NEEDS_REPLACEMENT AlwaysTrueMatchExpression final
+    : public AlwaysBooleanMatchExpression {
 public:
     static constexpr StringData kName = "$alwaysTrue"_sd;
 

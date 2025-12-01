@@ -37,6 +37,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <algorithm>

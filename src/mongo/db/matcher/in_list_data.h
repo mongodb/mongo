@@ -39,6 +39,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/util/lazily_initialized.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 

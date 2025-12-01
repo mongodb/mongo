@@ -39,6 +39,7 @@
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

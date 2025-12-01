@@ -39,6 +39,7 @@
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>

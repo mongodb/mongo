@@ -48,6 +48,7 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/pcre.h"
 
 #include <cstddef>
@@ -189,7 +190,7 @@ public:
      */
     virtual StringData name() const = 0;
 
-    const BSONElement& getData() const {
+    MONGO_MOD_NEEDS_REPLACEMENT const BSONElement& getData() const {
         return _rhs;
     }
 
@@ -305,7 +306,7 @@ public:
     ~ComparisonMatchExpression() override = default;
 };
 
-class EqualityMatchExpression final : public ComparisonMatchExpression {
+class MONGO_MOD_NEEDS_REPLACEMENT EqualityMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr StringData kName = "$eq"_sd;
 
@@ -351,7 +352,7 @@ public:
     }
 };
 
-class LTEMatchExpression final : public ComparisonMatchExpression {
+class MONGO_MOD_NEEDS_REPLACEMENT LTEMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr StringData kName = "$lte"_sd;
 
@@ -736,7 +737,7 @@ public:
 /**
  * query operator: $in
  */
-class InMatchExpression : public LeafMatchExpression {
+class MONGO_MOD_NEEDS_REPLACEMENT InMatchExpression : public LeafMatchExpression {
 public:
     explicit InMatchExpression(boost::optional<StringData> path,
                                clonable_ptr<ErrorAnnotation> annotation = nullptr);
