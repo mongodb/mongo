@@ -20,8 +20,8 @@ export function line(msg) {
     printGolden(msg);
 }
 
-export function codeOneLine(msg) {
-    printGolden("`" + tojsononeline(msg) + "`");
+export function codeOneLine(msg, noJson = false) {
+    printGolden("`" + (noJson ? msg : tojsononeline(msg)) + "`");
 }
 
 export function note(msg) {

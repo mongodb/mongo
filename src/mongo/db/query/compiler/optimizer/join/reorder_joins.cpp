@@ -334,8 +334,7 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(
     const std::vector<ResolvedPath>& resolvedPaths,
     const MultipleCollectionAccessor& mca,
     int seed,
-    bool defaultHJ,
-    bool enableBaseReordering) {
+    bool defaultHJ) {
     random_utils::PseudoRandomGenerator rand(seed);
     ReorderContext ctx(joinGraph, resolvedPaths);
 
@@ -345,9 +344,7 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(
     std::vector<NodeId> frontier;
 
     // Randomly select a base collection.
-    NodeId baseId = enableBaseReordering
-        ? rand.generateUniformInt(0, (int)(joinGraph.numNodes() - 1))
-        : 0 /* Use first node seen by graph. */;
+    NodeId baseId = rand.generateUniformInt(0, (int)(joinGraph.numNodes() - 1));
     frontier.push_back(baseId);
 
     // Final query solution
