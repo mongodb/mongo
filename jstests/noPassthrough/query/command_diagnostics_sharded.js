@@ -12,6 +12,7 @@ import {
 } from "jstests/libs/query/command_diagnostic_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {setParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {isUweEnabled, mapUweShardCmdName} from "jstests/libs/query/uwe_utils.js";
 
 // This test triggers an unclean shutdown, which may cause inaccurate fast counts.
 TestData.skipEnforceFastCountOnValidate = true;
@@ -129,6 +130,8 @@ const defaultExpCtxLog = [
 const shardKeyLog = `\'shardKeyPattern\': { a: 1.0, b: 1.0, c: 1.0 }`;
 
 function runTests(onMongos = false) {
+    const uweEnabled = isUweEnabled(mongosConn);
+
     // Find
     runTest({
         description: "find",
@@ -210,7 +213,8 @@ function runTests(onMongos = false) {
             deletes: [{q: query, limit: 1}],
         },
         expectedDiagnosticInfo: [
-            `{\'currentOp\': { op: \\"remove\\", ns: \\"${ns}\\"`,
+            // When UWE is enabled, the shard gets a bulkWrite command instead.
+            `{\'currentOp\': { op: \\"${uweEnabled && !onMongos ? mapUweShardCmdName("remove") : "remove"}\\", ns: \\"${ns}\\"`,
             "'opDescription': ",
             shardKeyLog,
         ],
@@ -225,7 +229,8 @@ function runTests(onMongos = false) {
             updates: [{q: query, u: {a: 2, b: 2}}],
         },
         expectedDiagnosticInfo: [
-            `{\'currentOp\': { op: \\"update\\", ns: \\"${ns}\\"`,
+            // When UWE is enabled, the shard gets a bulkWrite command instead.
+            `{\'currentOp\': { op: \\"${uweEnabled && !onMongos ? mapUweShardCmdName("update") : "update"}\\", ns: \\"${ns}\\"`,
             "'opDescription': ",
             shardKeyLog,
         ],
@@ -263,10 +268,8 @@ function runTests(onMongos = false) {
             "update: 1",
             "filter: { a: 1.0, b: 1.0 }",
             "updateMods: { a: 1.0 }",
-            onMongos
-                ? (`'test.differentNamespace': omitted: collection isn't sharded`,
-                  `'test.command_diagnostics_sharded': { a: 1.0, b: 1.0, c: 1.0 }`)
-                : shardKeyLog,
+            onMongos ? `'test.${jsTestName()}': {${shardKeyLog}}` : shardKeyLog,
+            onMongos ? `'test.differentNamespace': {'shardKeyPattern': omitted: collection isn't sharded}` : "",
         ],
     });
 

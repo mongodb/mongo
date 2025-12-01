@@ -80,7 +80,7 @@ struct MultipleShardKeysDiagnosticPrinter {
         for (const auto& [ns, shardKey] : namespaceToShardKeyMap) {
             out = fmt::format_to(
                 out,
-                "{}'{}': {}",
+                "{}'{}': {{'shardKeyPattern': {}}}",
                 std::exchange(sep, ", "_sd),
                 NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault()),
                 shardKey.has_value() ? shardKey.value().toString()

@@ -241,31 +241,6 @@ public:
             std::vector<std::unique_ptr<NSTargeter>> targeters;
             targeters.reserve(bulkRequest.getNsInfo().size());
 
-            // This is used only for the ScopedDebugInfo construction below.
-            stdx::unordered_map<NamespaceString, boost::optional<BSONObj>> shardKeyDiagnosticInfo;
-
-            for (const auto& nsInfo : bulkRequest.getNsInfo()) {
-                auto targeter =
-                    std::make_unique<CollectionRoutingInfoTargeter>(opCtx, nsInfo.getNs());
-
-                shardKeyDiagnosticInfo.insert(
-                    {nsInfo.getNs(),
-                     targeter->getRoutingInfo().getChunkManager().isSharded()
-                         ? boost::optional<BSONObj>(targeter->getRoutingInfo()
-                                                        .getChunkManager()
-                                                        .getShardKeyPattern()
-                                                        .toBSON())
-                         : boost::none});
-
-                targeters.push_back(std::move(targeter));
-            }
-
-            // Create an RAII object that prints each collection's shard key in the case of a
-            // tassert or crash.
-            ScopedDebugInfo shardKeyDiagnostics(
-                "MultipleShardKeysDiagnostics",
-                diagnostic_printers::MultipleShardKeysDiagnosticPrinter{shardKeyDiagnosticInfo});
-
             if (auto let = bulkRequest.getLet()) {
                 // Evaluate the let parameters.
                 auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).letParameters(*let).build();
@@ -279,6 +254,33 @@ public:
             if (unified_write_executor::isEnabled(opCtx)) {
                 response = unified_write_executor::bulkWrite(opCtx, bulkRequest);
             } else {
+                // This is used only for the ScopedDebugInfo construction below.
+                stdx::unordered_map<NamespaceString, boost::optional<BSONObj>>
+                    shardKeyDiagnosticInfo;
+
+                for (const auto& nsInfo : bulkRequest.getNsInfo()) {
+                    auto targeter =
+                        std::make_unique<CollectionRoutingInfoTargeter>(opCtx, nsInfo.getNs());
+
+                    shardKeyDiagnosticInfo.insert(
+                        {nsInfo.getNs(),
+                         targeter->getRoutingInfo().getChunkManager().isSharded()
+                             ? boost::optional<BSONObj>(targeter->getRoutingInfo()
+                                                            .getChunkManager()
+                                                            .getShardKeyPattern()
+                                                            .toBSON())
+                             : boost::none});
+
+                    targeters.push_back(std::move(targeter));
+                }
+
+                // Create an RAII object that prints each collection's shard key in the case of a
+                // tassert or crash.
+                ScopedDebugInfo shardKeyDiagnostics(
+                    "MultipleShardKeysDiagnostics",
+                    diagnostic_printers::MultipleShardKeysDiagnosticPrinter{
+                        shardKeyDiagnosticInfo});
+
                 // Dispatch the bulk write through the cluster.
                 // - To ensure that possible writeErrors are properly managed, a "fire and forget"
                 //   request needs to be temporarily upgraded to 'w:1'(unless the request belongs to

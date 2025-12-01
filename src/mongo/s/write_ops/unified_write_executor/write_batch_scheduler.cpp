@@ -30,6 +30,7 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_scheduler.h"
 
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
+#include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/server_feature_flags_gen.h"
 
@@ -102,6 +103,21 @@ bool WriteBatchScheduler::executeRound(OperationContext* opCtx) {
 
     auto result = routing_context_utils::runAndValidate(
         *swRoutingCtx.getValue(), [&](RoutingContext& routingCtx) -> ProcessorResult {
+            // Create an RAII object that prints each collection's shard key in the case of a
+            // tassert or crash.
+            stdx::unordered_map<NamespaceString, boost::optional<BSONObj>> shardKeys;
+            for (auto& nss : nssList) {
+                const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
+                shardKeys.emplace(nss,
+                                  cri.isSharded()
+                                      ? boost::optional<BSONObj>(
+                                            cri.getChunkManager().getShardKeyPattern().toBSON())
+                                      : boost::none);
+            }
+            ScopedDebugInfo shardKeyDiagnostics(
+                "ShardKeyDiagnostics",
+                diagnostic_printers::MultipleShardKeysDiagnosticPrinter{shardKeys});
+
             // Call getNextBatch() and handle any target errors that occurred.
             auto batch = getNextBatchAndHandleTargetErrors(opCtx, routingCtx);
 
