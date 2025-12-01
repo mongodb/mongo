@@ -15,9 +15,12 @@ export function shardCollectionMoveChunks(st, kDbName, ns, shardKey, docsToInser
 
     if (docsToInsert.length > 0) {
         assert.commandWorked(st.s.adminCommand({split: ns, find: splitDoc}));
-        assert.commandWorked(
-            st.s.adminCommand({moveChunk: ns, find: moveChunkDoc, to: st.shard1.shardName, _waitForDelete: true}),
-        );
+        assert.soonNoExcept(() => {
+            assert.commandWorked(
+                st.s.adminCommand({moveChunk: ns, find: moveChunkDoc, to: st.shard1.shardName, _waitForDelete: true}),
+            );
+            return true;
+        });
     }
 
     if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "ShardAuthoritativeDbMetadataCRUD")) {
