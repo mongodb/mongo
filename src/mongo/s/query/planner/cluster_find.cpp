@@ -823,7 +823,7 @@ void ClusterFind::runQuery(OperationContext* opCtx,
                 const auto targeter = CollectionRoutingInfoTargeter(opCtx, origNss);
                 auto qNss = origNss;
                 auto cmdRequest = std::make_unique<FindCommandRequest>(*originalRequest);
-                auto& routingCtx = translateNssForRawDataAccordingToRoutingInfo(
+                auto& routingCtx = performTimeseriesTranslationAccordingToRoutingInfo(
                     opCtx,
                     origNss,
                     targeter,

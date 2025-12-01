@@ -411,7 +411,8 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
     }
 }
 
-BSONObj generateExplainResponseForTwoPhaseWriteProtocol(
+void generateExplainResponseForTwoPhaseWriteProtocol(
+    BSONObjBuilder& explainOutputBuilder,
     const BSONObj& clusterQueryWithoutShardKeyExplainObj,
     const BSONObj& clusterWriteWithoutShardKeyExplainObj) {
     // To express the two phase nature of the two phase write protocol, we use the output of the
@@ -485,7 +486,6 @@ BSONObj generateExplainResponseForTwoPhaseWriteProtocol(
         return newExecutionStatsBuilder.obj();
     }();
 
-    BSONObjBuilder explainOutputBuilder;
     if (!queryPlannerOutput.isEmpty()) {
         explainOutputBuilder.appendObject("queryPlanner", queryPlannerOutput.objdata());
     }
@@ -495,7 +495,6 @@ BSONObj generateExplainResponseForTwoPhaseWriteProtocol(
     // This step is to get 'command', 'serverInfo', and 'serverParamter' fields to return in the
     // final explain output.
     explainOutputBuilder.appendElementsUnique(clusterWriteWithoutShardKeyExplainObj);
-    return explainOutputBuilder.obj();
 }
 }  // namespace write_without_shard_key
 }  // namespace mongo

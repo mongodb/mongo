@@ -222,7 +222,7 @@ public:
                 auto cmdRequest = std::make_unique<FindCommandRequest>(*_cmdRequest);
                 bool cmdShouldBeTranslatedForRawData = false;
                 const auto targeter = CollectionRoutingInfoTargeter(opCtx, ns());
-                auto& routingCtx = translateNssForRawDataAccordingToRoutingInfo(
+                auto& routingCtx = performTimeseriesTranslationAccordingToRoutingInfo(
                     opCtx,
                     ns(),
                     targeter,

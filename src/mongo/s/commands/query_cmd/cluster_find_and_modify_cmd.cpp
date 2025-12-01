@@ -1206,7 +1206,9 @@ void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
         auto opMsg = OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
                                                  nss.dbName(),
                                                  explainClusterQueryWithoutShardKeyCmd);
-        return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
+        auto res = CommandHelpers::runCommandDirectly(opCtx, opMsg);
+        uassertStatusOK(getStatusFromCommandResult(res));
+        return res.getOwned();
     }();
 
     auto clusterWriteWithoutShardKeyExplainRes = [&] {
@@ -1222,12 +1224,14 @@ void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
         auto opMsg = OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
                                                  nss.dbName(),
                                                  explainClusterWriteWithoutShardKeyCmd);
-        return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
+        auto res = CommandHelpers::runCommandDirectly(opCtx, opMsg);
+        uassertStatusOK(getStatusFromCommandResult(res));
+        return res.getOwned();
     }();
 
-    auto output = write_without_shard_key::generateExplainResponseForTwoPhaseWriteProtocol(
-        clusterQueryWithoutShardKeyExplainRes, clusterWriteWithoutShardKeyExplainRes);
-    result->appendElementsUnique(output);
+
+    write_without_shard_key::generateExplainResponseForTwoPhaseWriteProtocol(
+        *result, clusterQueryWithoutShardKeyExplainRes, clusterWriteWithoutShardKeyExplainRes);
 }
 
 // Command invocation to be used if a shard key is specified or the collection is unsharded.

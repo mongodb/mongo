@@ -190,7 +190,7 @@ public:
                     BSONObj cmdObj = originalCmdObj;
                     auto nss = originalNss;
                     const auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
-                    auto& routingCtx = translateNssForRawDataAccordingToRoutingInfo(
+                    auto& routingCtx = performTimeseriesTranslationAccordingToRoutingInfo(
                         opCtx,
                         originalNss,
                         targeter,
@@ -436,7 +436,7 @@ public:
                 BSONObj cmdObj = originalCmdObj;
                 auto nss = originalNss;
                 const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
-                auto& routingCtx = translateNssForRawDataAccordingToRoutingInfo(
+                auto& routingCtx = performTimeseriesTranslationAccordingToRoutingInfo(
                     opCtx,
                     originalNss,
                     targeter,

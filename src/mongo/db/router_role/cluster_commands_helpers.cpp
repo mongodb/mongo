@@ -1187,16 +1187,19 @@ StatusWith<boost::optional<int64_t>> addLimitAndSkipForShards(boost::optional<in
     return newLimit;
 }
 
-RoutingContext& translateNssForRawDataAccordingToRoutingInfo(
+
+RoutingContext& performTimeseriesTranslationAccordingToRoutingInfo(
     OperationContext* opCtx,
     const NamespaceString& originalNss,
     const CollectionRoutingInfoTargeter& targeter,
     RoutingContext& originalRoutingCtx,
-    std::function<void(const NamespaceString& translatedNss)> translateNssFunc) {
-    const bool shouldTranslateCmdForRawDataOperation =
-        isRawDataOperation(opCtx) && targeter.timeseriesNamespaceNeedsRewrite(originalNss);
+    std::function<void(const NamespaceString& translatedNss)> translateNssFunc,
+    bool translateLogicalCmd) {
 
-    if (shouldTranslateCmdForRawDataOperation) {
+    const auto requireTranslation = (translateLogicalCmd || isRawDataOperation(opCtx)) &&
+        targeter.timeseriesNamespaceNeedsRewrite(originalNss);
+
+    if (requireTranslation) {
         const auto& nss = originalNss.makeTimeseriesBucketsNamespace();
         translateNssFunc(nss);
 

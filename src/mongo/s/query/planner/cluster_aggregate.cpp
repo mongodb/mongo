@@ -670,7 +670,7 @@ Status runAggregateImpl(OperationContext* opCtx,
     auto& routingCtx = std::invoke([&]() -> RoutingContext& {
         if (originalRoutingCtx.hasNss(namespaces.executionNss)) {
             collectionTargeter = CollectionRoutingInfoTargeter(opCtx, namespaces.executionNss);
-            return translateNssForRawDataAccordingToRoutingInfo(
+            return performTimeseriesTranslationAccordingToRoutingInfo(
                 opCtx,
                 namespaces.executionNss,
                 *collectionTargeter,

@@ -546,11 +546,16 @@ StatusWith<boost::optional<int64_t>> addLimitAndSkipForShards(boost::optional<in
 
 
 /**
- * This function abstracts the complexity of using the appropriate routingContext when the operation
- * is of type rawData.
+ * This function abstracts the complexity of using the appropriate routingContext when the command
+ * namespace needs to be translated for viewful timeseries collections.
  *
- * If `rawData` is enabled for the current operation, and the collection is a tracked viewful
- * timeseries, and the buckets nss is present on the router cache:
+ * Namespace translation will be performed when the given namespace is a viewful timeseries
+ * collection and the command contains rawData:true or `translateLogicalCmd` is set.
+ *
+ * translateLogicalCmd is used for write commands, in fact for those we don't rely on the view
+ * resolution logic, but rather translate directly the namespace on the router.
+ *
+ * If the command require translation this function:
  *   1. Executes `translateNssFunc` using the appropriate buckets namespace.
  *   2. Returns the routing context held by the CollectionRoutingInfoTargeter.
  * Otherwise, it will just return the `originalRoutingCtx`.
@@ -563,11 +568,12 @@ StatusWith<boost::optional<int64_t>> addLimitAndSkipForShards(boost::optional<in
  * TODO (SERVER-108351) Remove all usages of this function once all timeseries collections become
  * viewless.
  */
-RoutingContext& translateNssForRawDataAccordingToRoutingInfo(
+RoutingContext& performTimeseriesTranslationAccordingToRoutingInfo(
     OperationContext* opCtx,
     const NamespaceString& originalNss,
     const CollectionRoutingInfoTargeter& targeter,
     RoutingContext& originalRoutingCtx,
-    std::function<void(const NamespaceString& translatedNss)> translateNssFunc);
+    std::function<void(const NamespaceString& translatedNss)> translateNssFunc,
+    bool translateLogicalCmd = false);
 
 }  // namespace mongo

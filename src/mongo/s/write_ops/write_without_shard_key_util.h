@@ -102,10 +102,11 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
     const BSONObj& cmdObj,
     boost::optional<WriteConcernErrorDetail>& wce);
 /**
- * Return a formatted 'explain' response that describes the work done in the two phase write
- * protocol.
+ * Append to the given builder the formatted 'explain' response that describes the work done in the
+ * two phase write protocol.
  **/
-BSONObj generateExplainResponseForTwoPhaseWriteProtocol(
+void generateExplainResponseForTwoPhaseWriteProtocol(
+    BSONObjBuilder& explainOutputBuilder,
     const BSONObj& clusterQueryWithoutShardKeyExplainObj,
     const BSONObj& clusterWriteWithoutShardKeyExplainObj);
 

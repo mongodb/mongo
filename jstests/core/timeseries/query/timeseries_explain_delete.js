@@ -9,13 +9,14 @@
  * ]
  */
 
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getExecutionStages, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
 const dateTime = ISODate("2021-07-12T16:00:00Z");
-const collNamePrefix = jsTestName() + "_";
 let testCaseId = 0;
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -44,12 +45,12 @@ function testDeleteExplain({
     assert(expectedDeleteStageName === "TS_MODIFY" || expectedDeleteStageName === "DELETE");
 
     // Prepares a timeseries collection.
-    const coll = testDB.getCollection(collNamePrefix + testCaseId++);
-    coll.drop();
-
+    const collName = `${jsTestName()}_${testCaseId++}`;
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        testDB.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
     );
+
+    let coll = testDB[collName];
 
     // Creates an index same as the one in the hint so as to verify that the index hint is honored.
     if (singleDeleteOp.hasOwnProperty("hint")) {
@@ -236,6 +237,12 @@ function testDeleteExplain({
 })();
 
 (function testDeleteOneWithBucketFilterAndIndexHint() {
+    if (!areViewlessTimeseriesEnabled(db) && FixtureHelpers.isMongos(db)) {
+        // TODO SERVER-114442 re-enable this test case once hint on explain is properly handle for
+        // timeseries collections
+        jsTest.log("Skipping test case that uses an hint on timeseries collectin in sharded cluster");
+        return;
+    }
     testDeleteExplain({
         singleDeleteOp: {
             // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so

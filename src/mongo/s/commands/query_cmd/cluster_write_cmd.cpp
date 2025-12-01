@@ -97,6 +97,51 @@ namespace {
 
 using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
 
+std::pair<NamespaceString, BSONObj> translateRequestForTimeseriesIfNeeded(
+    OperationContext* opCtx,
+    RoutingContext& originalRoutingCtx,
+    const NamespaceString& originalNss,
+    const BatchedCommandRequest& req,
+    const CollectionRoutingInfoTargeter& targeter) {
+    auto translatedReqBSON = req.toBSON();
+    auto translatedNss = originalNss;
+    auto& unusedRoutingCtx = performTimeseriesTranslationAccordingToRoutingInfo(
+        opCtx,
+        originalNss,
+        targeter,
+        originalRoutingCtx,
+        [&](const NamespaceString& bucketsNss) {
+            translatedNss = bucketsNss;
+
+            switch (req.getBatchType()) {
+                case BatchedCommandRequest::BatchType_Insert:
+                    translatedReqBSON =
+                        rewriteCommandForRawDataOperation<write_ops::InsertCommandRequest>(
+                            translatedReqBSON, translatedNss.coll());
+                    break;
+                case BatchedCommandRequest::BatchType_Update:
+                    translatedReqBSON =
+                        rewriteCommandForRawDataOperation<write_ops::UpdateCommandRequest>(
+                            translatedReqBSON, translatedNss.coll());
+                    break;
+                case BatchedCommandRequest::BatchType_Delete:
+                    translatedReqBSON =
+                        rewriteCommandForRawDataOperation<write_ops::DeleteCommandRequest>(
+                            translatedReqBSON, translatedNss.coll());
+                    break;
+                default:
+                    MONGO_UNREACHABLE_TASSERT(10370603);
+            }
+
+            translatedReqBSON = translatedReqBSON.addFields(
+                BSON(write_ops::WriteCommandRequestBase::kIsTimeseriesNamespaceFieldName << true));
+        },
+        /* translateLogicalCmd = */ true);
+    unusedRoutingCtx.skipValidation();
+    return {std::move(translatedNss), std::move(translatedReqBSON)};
+}
+
+
 void batchErrorToNotPrimaryErrorTracker(const BatchedCommandRequest& request,
                                         const BatchedCommandResponse& response,
                                         NotPrimaryErrorTracker* tracker) {
@@ -516,38 +561,9 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
         opCtx,
         "explain write"_sd,
         [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
-            auto translatedReqBSON = req.toBSON();
-            auto translatedNss = originalNss;
             const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
-            auto& unusedRoutingCtx = translateNssForRawDataAccordingToRoutingInfo(
-                opCtx,
-                originalNss,
-                targeter,
-                originalRoutingCtx,
-                [&](const NamespaceString& bucketsNss) {
-                    translatedNss = bucketsNss;
-                    switch (req.getBatchType()) {
-                        case BatchedCommandRequest::BatchType_Insert:
-                            translatedReqBSON =
-                                rewriteCommandForRawDataOperation<write_ops::InsertCommandRequest>(
-                                    translatedReqBSON, translatedNss.coll());
-                            break;
-                        case BatchedCommandRequest::BatchType_Update:
-                            translatedReqBSON =
-                                rewriteCommandForRawDataOperation<write_ops::UpdateCommandRequest>(
-                                    translatedReqBSON, translatedNss.coll());
-                            break;
-                        case BatchedCommandRequest::BatchType_Delete:
-                            translatedReqBSON =
-                                rewriteCommandForRawDataOperation<write_ops::DeleteCommandRequest>(
-                                    translatedReqBSON, translatedNss.coll());
-                            break;
-                        default:
-                            MONGO_UNREACHABLE_TASSERT(10370603);
-                    }
-                });
-            unusedRoutingCtx.skipValidation();
-
+            auto [translatedNss, translatedReqBSON] = translateRequestForTimeseriesIfNeeded(
+                opCtx, originalRoutingCtx, originalNss, req, targeter);
             if (!write_without_shard_key::useTwoPhaseProtocol(
                     opCtx,
                     translatedNss,
@@ -571,7 +587,9 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
                     clusterQueryWithoutShardKeyCommand.toBSON(), verbosity);
                 auto opMsg = OpMsgRequestBuilder::create(
                     vts, translatedNss.dbName(), explainClusterQueryWithoutShardKeyCmd);
-                return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
+                auto res = CommandHelpers::runCommandDirectly(opCtx, opMsg);
+                uassertStatusOK(getStatusFromCommandResult(res));
+                return res.getOwned();
             }();
 
             // Since 'explain' does not return the results of the query, we do not have an _id
@@ -579,7 +597,7 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
             // document 'Write Phase'.
             auto clusterWriteWithoutShardKeyExplainRes = [&] {
                 ClusterWriteWithoutShardKey clusterWriteWithoutShardKeyCommand(
-                    ClusterExplain::wrapAsExplain(req.toBSON(), verbosity),
+                    ClusterExplain::wrapAsExplain(translatedReqBSON, verbosity),
                     std::string{
                         clusterQueryWithoutShardKeyExplainRes.getStringField("targetShardId")},
                     write_without_shard_key::targetDocForExplain);
@@ -588,12 +606,16 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
 
                 auto opMsg = OpMsgRequestBuilder::create(
                     vts, translatedNss.dbName(), explainClusterWriteWithoutShardKeyCmd);
-                return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
+                auto res = CommandHelpers::runCommandDirectly(opCtx, opMsg);
+                uassertStatusOK(getStatusFromCommandResult(res));
+                return res.getOwned();
             }();
 
-            auto output = write_without_shard_key::generateExplainResponseForTwoPhaseWriteProtocol(
-                clusterQueryWithoutShardKeyExplainRes, clusterWriteWithoutShardKeyExplainRes);
-            result->appendElementsUnique(output);
+            result->append("command", req.toBSON());
+            write_without_shard_key::generateExplainResponseForTwoPhaseWriteProtocol(
+                *result,
+                clusterQueryWithoutShardKeyExplainRes,
+                clusterWriteWithoutShardKeyExplainRes);
             return true;
         });
 }
@@ -613,7 +635,6 @@ void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
     const NamespaceString originalNss = req ? req->getNS() : batchedRequest.getNS();
     auto requestPtr = req ? req.get() : &batchedRequest;
     auto bodyBuilder = result->getBodyBuilder();
-    const auto originalRequestBSON = req ? req->toBSON() : requestObj;
 
     // If we aren't running an explain for updateOne or deleteOne without shard key,
     // continue and run the original explain path.
@@ -632,37 +653,9 @@ void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
         opCtx,
         "explain write"_sd,
         [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
-            auto translatedReqBSON = originalRequestBSON;
-            auto translatedNss = originalNss;
             const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
-
-            auto& unusedRoutingCtx = translateNssForRawDataAccordingToRoutingInfo(
-                opCtx,
-                originalNss,
-                targeter,
-                originalRoutingCtx,
-                [&](const NamespaceString& bucketsNss) {
-                    translatedNss = bucketsNss;
-                    switch (batchedRequest.getBatchType()) {
-                        case BatchedCommandRequest::BatchType_Insert:
-                            translatedReqBSON =
-                                rewriteCommandForRawDataOperation<write_ops::InsertCommandRequest>(
-                                    originalRequestBSON, translatedNss.coll());
-                            break;
-                        case BatchedCommandRequest::BatchType_Update:
-                            translatedReqBSON =
-                                rewriteCommandForRawDataOperation<write_ops::UpdateCommandRequest>(
-                                    originalRequestBSON, translatedNss.coll());
-                            break;
-                        case BatchedCommandRequest::BatchType_Delete:
-                            translatedReqBSON =
-                                rewriteCommandForRawDataOperation<write_ops::DeleteCommandRequest>(
-                                    originalRequestBSON, translatedNss.coll());
-                            break;
-                    }
-                });
-            unusedRoutingCtx.skipValidation();
-
+            auto [translatedNss, translatedReqBSON] = translateRequestForTimeseriesIfNeeded(
+                opCtx, originalRoutingCtx, originalNss, *requestPtr, targeter);
             const auto explainCmd = ClusterExplain::wrapAsExplain(translatedReqBSON, verbosity);
 
             // We will time how long it takes to run the commands on the shards.
@@ -682,7 +675,7 @@ void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
                                                    shardResponses,
                                                    ClusterExplain::kWriteOnShards,
                                                    timer.millis(),
-                                                   originalRequestBSON,
+                                                   requestObj,
                                                    &bodyBuilder));
         });
 }
