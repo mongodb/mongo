@@ -131,7 +131,7 @@ public:
                         int dataLength,
                         int numElements,
                         Timestamp timestampToUse) {
-        AutoGetCollection coll(opCtx, nss, MODE_IX);
+        AutoGetCollection coll(opCtx, nss, MODE_X);
         const auto correctedSize = dataLength - BSON("x" << "").objsize();
         invariant(correctedSize >= 0);
         const auto objToInsert = BSON("x" << std::string(correctedSize, 'a'));
