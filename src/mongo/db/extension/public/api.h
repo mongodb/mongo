@@ -679,12 +679,13 @@ typedef enum MongoExtensionGetNextRequestType : uint8_t {
 } MongoExtensionGetNextRequestType;
 
 /**
- * MongoExtensionGetNextResult is a container used to fetch results from an
- * ExecutableStage's get_next() function. Callers of ExecutableStage::get_next() are responsible for
- * instantiating this struct and passing the corresponding pointer to the function invocation.
+ * MongoExtensionGetNextResult is a container used to fetch results (with or without metadata) from
+ * an ExecutableStage's get_next() function. Callers of ExecutableStage::get_next() are responsible
+ * for instantiating this struct and passing the corresponding pointer to the function invocation.
  */
 typedef struct MongoExtensionGetNextResult {
     MongoExtensionGetNextResultCode code;
+    MongoExtensionByteContainer resultMetadata;
     MongoExtensionByteContainer resultDocument;
     MongoExtensionGetNextRequestType requestType;
 } MongoExtensionGetNextResult;
