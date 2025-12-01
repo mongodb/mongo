@@ -716,6 +716,7 @@ tasks:
       - func: "cleanup environment"
       - func: "set up venv"
       - func: "upload pip requirements"
+      - func: "configure evergreen api credentials"
       - func: "get engflow creds"
       - func: "bazel run"
         vars:

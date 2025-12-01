@@ -367,20 +367,6 @@ tasks:
         vars:
           target: //evergreen:validate_compile_commands
 
-  - name: run_bazel_program_windows
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "bazel run"
-        vars:
-          target: >-
-            //src/mongo/platform:visibility1_test
-          # TODO DEVPROD-2508 remove dbg flags when compilation_mode is synced with build_mode automatically
-          args: >-
-            --compilation_mode=dbg
-
   - name: compile_upload_benchmarks
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
@@ -1313,6 +1299,7 @@ tasks:
     # don't want to publish packages.
     patchable: false
     stepback: false
+    disable: true # TODO(SERVER-114245) Remove this to re-enable the task
     # Same dependencies as "push" below
     depends_on:
       - name: crypt_push

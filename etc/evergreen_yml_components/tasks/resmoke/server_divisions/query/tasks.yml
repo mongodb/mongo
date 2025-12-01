@@ -2532,7 +2532,7 @@ tasks:
     name: query_cbr_histogram_jscore_passthrough
     # Currently disabled due to an OOM in SERVER-109720
     # To be re-enabled in SERVER-109881 Re-enable the cbr_histogram passthroughs
-    activate: false
+    disable: true
     tags: [
         "assigned_to_jira_team_server_query_optimization",
         "experimental",
@@ -2548,7 +2548,7 @@ tasks:
     name: query_cbr_histogram_aggregation_passthrough
     # Currently disabled due to an OOM in SERVER-109720
     # To be re-enabled in SERVER-109881 Re-enable the cbr_histogram passthroughs
-    activate: false
+    disable: true
     tags: [
         "assigned_to_jira_team_server_query_optimization",
         "experimental",
@@ -2564,7 +2564,7 @@ tasks:
     name: query_golden_cbr_histogram
     # Currently disabled due to plan flips due to SERVER-108077
     # To be re-enabled in SERVER-109881 Re-enable the cbr_histogram passthroughs
-    activate: false
+    disable: true
     tags: [
         "assigned_to_jira_team_server_query_optimization",
         "experimental",

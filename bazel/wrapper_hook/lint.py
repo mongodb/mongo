@@ -345,7 +345,6 @@ def run_rules_lint(bazel_bin: str, args: List[str]):
             "buildscripts:validate_evg_project_config",
             [
                 f"--evg-project-name={parsed_args.lint_yaml_project}",
-                "--evg-auth-config=.evergreen.yml",
             ],
         )
 

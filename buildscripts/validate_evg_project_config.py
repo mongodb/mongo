@@ -14,8 +14,6 @@ from buildscripts.ciconfig.evergreen import find_evergreen_binary
 
 LOGGER = structlog.get_logger(__name__)
 
-DEFAULT_LOCAL_EVG_AUTH_CONFIG = os.path.expanduser("~/.evergreen.yml")
-
 DEFAULT_EVG_PROJECT_NAME = "mongodb-mongo-master"
 DEFAULT_EVG_NIGHTLY_PROJECT_NAME = "mongodb-mongo-master-nightly"
 DEFAULT_EVG_PROJECT_CONFIG = "etc/evergreen.yml"
@@ -61,14 +59,29 @@ def messages_to_report(messages, num_of_projects):
     return (error_on_evg_validate_messages, shared_evg_validate_messages)
 
 
+def default_evg_config():
+    config_locations = [
+        os.path.join(os.getcwd(), ".evergreen.yml"),
+        os.path.expanduser("~/.evergreen.yml"),
+    ]
+    for candidate in config_locations:
+        if os.path.exists(candidate):
+            return candidate
+    LOGGER.error(f"No evergreen config exists at any of {config_locations}.")
+    sys.exit(1)
+
+
 def main(
     evg_project_name: Annotated[
         str, typer.Option(help="Evergreen project name")
     ] = DEFAULT_EVG_PROJECT_NAME,
-    evg_auth_config: Annotated[
-        str, typer.Option(help="Evergreen auth config file")
-    ] = DEFAULT_LOCAL_EVG_AUTH_CONFIG,
+    evg_auth_config: Annotated[str, typer.Option(help="Evergreen auth config file")] = None,
 ):
+    os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
+
+    if not evg_auth_config:
+        evg_auth_config = default_evg_config()
+
     evg_project_config_map = {evg_project_name: DEFAULT_EVG_NIGHTLY_PROJECT_CONFIG}
     if evg_project_name == DEFAULT_EVG_PROJECT_NAME:
         evg_project_config_map = {
@@ -95,6 +108,7 @@ def main(
     shared_evg_validate_messages = []
     error_on_evg_validate_messages = defaultdict(list)
 
+    exit_code = 0
     num_of_projects = len(evg_project_config_map)
     evergreen_bin = find_evergreen_binary("evergreen")
     for project, project_config in evg_project_config_map.items():
@@ -110,6 +124,11 @@ def main(
         ]
         LOGGER.info(f"Running command: {cmd}")
         result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode:
+            LOGGER.error(
+                f"Command failed with return code {result.returncode}.\nstdout:{result.stdout}stderr:{result.stderr}"
+            )
+            exit_code = 1
         interesting_messages = result.stdout.strip().split("\n")[:-1]
 
         (error_on_evg_validate_messages[project], allowed_if_not_shared) = messages_to_report(
@@ -122,7 +141,6 @@ def main(
         if shared_evg_validate_messages.count(message) == num_of_projects:
             error_on_shared_evg_validate_messages.append(message)
 
-    exit_code = 0
     all_configs = list(evg_project_config_map.values())
     all_projects = list(evg_project_config_map.keys())
 

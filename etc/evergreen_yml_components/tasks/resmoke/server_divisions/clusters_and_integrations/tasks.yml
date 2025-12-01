@@ -519,7 +519,6 @@ tasks:
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
-      - name: compile_libraries_for_unittests
     commands:
       - func: "do bazel setup"
       - func: "bazel compile"
@@ -544,7 +543,6 @@ tasks:
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
-      - name: compile_libraries_for_unittests
     commands:
       - func: "do bazel setup"
       - func: "bazel compile"
