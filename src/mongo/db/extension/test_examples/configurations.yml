@@ -13,5 +13,5 @@ extensions:
       max: 10
   toaster:
     extensionOptions:
-      maxToasterHeat: 5
+      maxToasterHeat: 450
       allowBagels: false

@@ -42,7 +42,6 @@ extensions_with_config(
         ":explain_mongo_extension",
         ":idle_threads_mongo_extension",
         ":interrupt_mongo_extension",
-        ":foo_source_mongo_extension",
         ":match_topN_mongo_extension",
         ":native_vector_search_mongo_extension",
         ":metrics_mongo_extension",
@@ -73,7 +72,6 @@ pkg_name = "//" + package_name() + "/"
     )
     for extension_name in [
         "foo",
-        "foo_source",
         "foo_v2",
         "bar",
     ]
