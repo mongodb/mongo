@@ -35,11 +35,14 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 class DeleteRequest;
@@ -77,14 +80,14 @@ concept IsDeleteOrUpdateRequest =
     std::is_same_v<T, UpdateRequest> || std::is_same_v<T, DeleteRequest>;
 
 namespace impl {
+
 /**
- * Parses the filter of 'request'or the given filter (if given) to a CanonicalQuery. This does a
+ * Parses the filter of 'request' or the given filter (if given) to a ParsedFindCommand. This does a
  * direct transformation and doesn't do any special handling, e.g. for timeseries.
  */
 template <typename T>
 requires IsDeleteOrUpdateRequest<T>
-StatusWith<std::unique_ptr<CanonicalQuery>> parseWriteQueryToCQ(
-    OperationContext* opCtx,
+StatusWith<std::unique_ptr<ParsedFindCommand>> parseWriteQueryToParsedFindCommand(
     ExpressionContext* expCtx,
     const ExtensionsCallback& extensionsCallback,
     const T& request,
@@ -130,32 +133,43 @@ StatusWith<std::unique_ptr<CanonicalQuery>> parseWriteQueryToCQ(
     if (auto& letParams = request.getLet()) {
         findCommand->setLet(*letParams);
     }
-    auto expCtxForCq = [&]() {
-        if (expCtx) {
-            return boost::intrusive_ptr<ExpressionContext>(expCtx);
-        }
+    ParsedFindCommandParams params{.findCommand = std::move(findCommand),
+                                   .extensionsCallback = extensionsCallback,
+                                   .allowedFeatures = allowedMatcherFeatures,
+                                   .projectionPolicies =
+                                       ProjectionPolicies::findProjectionPolicies()};
+    return parsed_find_command::parse(expCtx, std::move(params));
+}
 
-        return ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build();
-    }();
+/**
+ * Parses the filter of 'request' or the given filter (if given) to a CanonicalQuery. This does a
+ * direct transformation and doesn't do any special handling, e.g. for timeseries.
+ */
+template <typename T>
+requires IsDeleteOrUpdateRequest<T>
+StatusWith<std::unique_ptr<CanonicalQuery>> parseWriteQueryToCQ(
+    ExpressionContext* expCtx,
+    const ExtensionsCallback& extensionsCallback,
+    const T& request,
+    const MatchExpression* rewrittenFilter = nullptr) {
+    auto swParsedFind =
+        parseWriteQueryToParsedFindCommand(expCtx, extensionsCallback, request, rewrittenFilter);
+    if (!swParsedFind.isOK()) {
+        return swParsedFind.getStatus();
+    }
     return CanonicalQuery::make(
-        {.expCtx = std::move(expCtxForCq),
-         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
-                                               .extensionsCallback = extensionsCallback,
-                                               .allowedFeatures = allowedMatcherFeatures}});
+        {.expCtx = expCtx, .parsedFind = std::move(swParsedFind.getValue())});
 }
 }  // namespace impl
 
 template <typename T>
 requires IsDeleteOrUpdateRequest<T>
 StatusWith<std::unique_ptr<CanonicalQuery>> parseWriteQueryToCQ(
-    OperationContext* opCtx,
-    ExpressionContext* expCtx,
-    const T& request,
-    const MatchExpression* rewrittenFilter = nullptr) {
-    return impl::parseWriteQueryToCQ<T>(opCtx,
-                                        expCtx,
-                                        ExtensionsCallbackReal(opCtx, &request.getNsString()),
-                                        request,
-                                        rewrittenFilter);
+    ExpressionContext* expCtx, const T& request, const MatchExpression* rewrittenFilter = nullptr) {
+    return impl::parseWriteQueryToCQ<T>(
+        expCtx,
+        ExtensionsCallbackReal(expCtx->getOperationContext(), &request.getNsString()),
+        request,
+        rewrittenFilter);
 }
 }  // namespace mongo

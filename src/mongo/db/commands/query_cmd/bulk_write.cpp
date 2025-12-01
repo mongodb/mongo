@@ -1756,8 +1756,22 @@ bool handleUpdateOp(OperationContext* opCtx,
                                                                        op->getMulti());
                     return true;
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
-                    auto cq = uassertStatusOK(
-                        parseWriteQueryToCQ(opCtx, nullptr /* expCtx */, updateRequest));
+                    // The function shouldRetryDuplicateKeyException() will check the collation from
+                    // the collection using 'ex'. So we only need to resolve the collator from the
+                    // request and pass it into 'expCtx'.
+                    auto requestCollator = [&]() -> std::unique_ptr<CollatorInterface> {
+                        if (updateRequest.getCollation().isEmpty()) {
+                            return nullptr;
+                        }
+                        return uassertStatusOK(
+                            CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                ->makeFromBSON(updateRequest.getCollation()));
+                    }();
+                    auto expCtx = ExpressionContextBuilder{}
+                                      .fromRequest(opCtx, updateRequest)
+                                      .collator(std::move(requestCollator))
+                                      .build();
+                    auto cq = uassertStatusOK(parseWriteQueryToCQ(expCtx.get(), updateRequest));
                     if (!write_ops_exec::shouldRetryDuplicateKeyException(
                             opCtx,
                             updateRequest,

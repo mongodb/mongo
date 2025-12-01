@@ -1695,7 +1695,21 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
 
             return ret;
         } catch (ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
-            auto cq = uassertStatusOK(parseWriteQueryToCQ(opCtx, nullptr /* expCtx */, request));
+            // The function shouldRetryDuplicateKeyException() will check the collation from
+            // the collection using 'ex'. So we only need to resolve the collator from the
+            // request and pass it into 'expCtx'.
+            auto requestCollator = [&]() -> std::unique_ptr<CollatorInterface> {
+                if (request.getCollation().isEmpty()) {
+                    return nullptr;
+                }
+                return uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                           ->makeFromBSON(request.getCollation()));
+            }();
+            auto expCtx = ExpressionContextBuilder{}
+                              .fromRequest(opCtx, request)
+                              .collator(std::move(requestCollator))
+                              .build();
+            auto cq = uassertStatusOK(parseWriteQueryToCQ(expCtx.get(), request));
 
             if (!write_ops_exec::shouldRetryDuplicateKeyException(
                     opCtx, request, *cq, *ex.extraInfo<DuplicateKeyErrorInfo>(), retryAttempts)) {

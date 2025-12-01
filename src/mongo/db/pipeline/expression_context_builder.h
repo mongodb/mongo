@@ -125,6 +125,10 @@ public:
     ExpressionContextBuilder& fromRequest(OperationContext*,
                                           const AggregateCommandRequest&,
                                           bool useDisk = false);
+    ExpressionContextBuilder& fromRequest(OperationContext*,
+                                          const UpdateRequest& request,
+                                          bool forgoOpCounterIncrements = false);
+    ExpressionContextBuilder& fromRequest(OperationContext*, const DeleteRequest& request);
 
     boost::intrusive_ptr<ExpressionContext> build();
 

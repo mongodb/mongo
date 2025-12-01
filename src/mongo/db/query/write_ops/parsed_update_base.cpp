@@ -89,17 +89,7 @@ ParsedUpdateBase::ParsedUpdateBase(OperationContext* opCtx,
     : _opCtx(opCtx),
       _request(request),
       _expCtx(ExpressionContextBuilder{}
-                  .opCtx(opCtx)
-                  .ns(_request->getNamespaceString())
-                  // mayDbProfile. We pass 'true' here conservatively. In the
-                  // future we may change this.
-                  .mayDbProfile(true)
-                  .allowDiskUse(allowDiskUseByDefault.load())
-                  .explain(_request->explain())
-                  .runtimeConstants(_request->getLegacyRuntimeConstants())
-                  .letParameters(_request->getLetParameters())
-                  .isUpsert(request->isUpsert())
-                  .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
+                  .fromRequest(opCtx, *_request, forgoOpCounterIncrements)
                   .build()),
       _driver(_expCtx),
       _modification(
@@ -116,9 +106,6 @@ ParsedUpdateBase::ParsedUpdateBase(OperationContext* opCtx,
                     collection)
               : nullptr),
       _isRequestToTimeseries(isRequestToTimeseries) {
-    if (forgoOpCounterIncrements) {
-        _expCtx->setEnabledCounters(false);
-    }
     tassert(
         7655104, "timeseries collection must already exist", _collection || !isRequestToTimeseries);
 
@@ -253,7 +240,6 @@ Status ParsedUpdateBase::parseQueryToCQ() {
     // _timeseriesUpdateQueryExprs may be null even if _isRequestToTimeseries is true. See
     // createTimeseriesWritesQueryExprsIfNecessary() for details.
     auto statusWithCQ = impl::parseWriteQueryToCQ(
-        _expCtx->getOperationContext(),
         _expCtx.get(),
         *_extensionsCallback,
         *_request,

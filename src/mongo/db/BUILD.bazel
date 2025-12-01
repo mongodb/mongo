@@ -1807,6 +1807,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:expression_context_builder.cpp",
     ],
     deps = [
+        ":disk_use_options_idl",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/query/compiler/dependency_analysis",
     ],

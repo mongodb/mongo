@@ -85,11 +85,8 @@ Status ParsedDelete::parseRequest() {
     auto [collatorToUse, collationMatchesDefault] =
         resolveCollator(_opCtx, _request->getCollation(), _collection);
     _expCtx = ExpressionContextBuilder{}
-                  .opCtx(_opCtx)
+                  .fromRequest(_opCtx, *_request)
                   .collator(std::move(collatorToUse))
-                  .ns(_request->getNsString())
-                  .runtimeConstants(_request->getLegacyRuntimeConstants())
-                  .letParameters(_request->getLet())
                   .collationMatchesDefault(collationMatchesDefault)
                   .build();
 
@@ -145,7 +142,6 @@ Status ParsedDelete::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
     auto statusWithCQ = mongo::parseWriteQueryToCQ(
-        _expCtx->getOperationContext(),
         _expCtx.get(),
         *_request,
         _timeseriesDeleteQueryExprs ? _timeseriesDeleteQueryExprs->_bucketExpr.get() : nullptr);
