@@ -32,7 +32,13 @@ function getPendingCount() {
 function threadFunc(host, dbName, collName) {
     const mongos = new Mongo(host);
     const database = mongos.getDB(dbName);
-    assert.commandWorked(database.runCommand({update: collName, updates: [{q: {_id: 1}, u: {name: "Mongo"}}]}));
+    assert.commandWorked(
+        database.adminCommand({
+            bulkWrite: 1,
+            ops: [{update: 0, filter: {_id: 1}, updateMods: {name: "Mongo"}}],
+            nsInfo: [{ns: `${dbName}.${collName}`}],
+        }),
+    );
 }
 
 assert.commandWorked(database.runCommand({create: collectionName, writeConcern: {w: "majority"}}));
@@ -49,7 +55,7 @@ admin.runCommand({setParameter: 1, ShardingTaskExecutorPoolMaxSize: kMaxPoolSize
 
 // Make sure both connections are checked out and blocked, so new requests have to enqueue.
 const primaryFP = configureFailPoint(st.rs0.getPrimary().getDB("admin"), "waitAfterCommandFinishesExecution", {
-    ns: fullCollectionName,
+    commands: ["bulkWrite"],
 });
 
 let blockedThreads = [];
@@ -59,7 +65,7 @@ for (let i = 0; i < kMaxPoolSize; ++i) {
     t.start();
 }
 
-primaryFP.wait(1000 * kFailPointTimeoutInSeconds, kMaxPoolSize);
+primaryFP.wait({maxTimeMS: 1000 * kFailPointTimeoutInSeconds, timesEntered: kMaxPoolSize});
 
 // New requests should go and wait in the queue.
 for (let i = 0; i < kMaxQueueDepth; ++i) {
