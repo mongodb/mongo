@@ -468,6 +468,7 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           <<: *jstestfuzz_config_vars
+          use_large_distro: "true"
           num_files: 10
           num_tasks: 40
           jstestfuzz_vars: --diffTestingMode wildcard
@@ -1765,6 +1766,7 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           <<: *jstestfuzz_config_vars
+          use_large_distro: "true"
           num_files: 20
           num_tasks: 20
           jstestfuzz_vars: --diffTestingMode optimization
@@ -1792,6 +1794,7 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           <<: *jstestfuzz_config_vars
+          use_large_distro: "true"
           num_files: 20
           num_tasks: 20
           jstestfuzz_vars: --diffTestingMode optimization --numPipelines=3000
