@@ -5,7 +5,7 @@
  *
  * Modules included by this file are: danish, dutch, english, finnish, french,
  * german, hungarian, italian, norwegian, porter, portuguese, romanian,
- * russian, spanish, swedish, turkish
+ * russian, serbian, spanish, swedish, turkish
  */
 
 #include "../src_c/stem_ISO_8859_1_danish.h"
@@ -34,6 +34,7 @@
 #include "../src_c/stem_UTF_8_romanian.h"
 #include "../src_c/stem_KOI8_R_russian.h"
 #include "../src_c/stem_UTF_8_russian.h"
+#include "../src_c/stem_UTF_8_serbian.h"
 #include "../src_c/stem_ISO_8859_1_spanish.h"
 #include "../src_c/stem_UTF_8_spanish.h"
 #include "../src_c/stem_ISO_8859_1_swedish.h"
@@ -154,10 +155,13 @@ static struct stemmer_modules modules[] = {
   {"rus", ENC_UTF_8, russian_UTF_8_create_env, russian_UTF_8_close_env, russian_UTF_8_stem},
   {"russian", ENC_KOI8_R, russian_KOI8_R_create_env, russian_KOI8_R_close_env, russian_KOI8_R_stem},
   {"russian", ENC_UTF_8, russian_UTF_8_create_env, russian_UTF_8_close_env, russian_UTF_8_stem},
+  {"serbian", ENC_UTF_8, serbian_UTF_8_create_env, serbian_UTF_8_close_env, serbian_UTF_8_stem},
   {"spa", ENC_ISO_8859_1, spanish_ISO_8859_1_create_env, spanish_ISO_8859_1_close_env, spanish_ISO_8859_1_stem},
   {"spa", ENC_UTF_8, spanish_UTF_8_create_env, spanish_UTF_8_close_env, spanish_UTF_8_stem},
   {"spanish", ENC_ISO_8859_1, spanish_ISO_8859_1_create_env, spanish_ISO_8859_1_close_env, spanish_ISO_8859_1_stem},
   {"spanish", ENC_UTF_8, spanish_UTF_8_create_env, spanish_UTF_8_close_env, spanish_UTF_8_stem},
+  {"sr", ENC_UTF_8, serbian_UTF_8_create_env, serbian_UTF_8_close_env, serbian_UTF_8_stem},
+  {"srp", ENC_UTF_8, serbian_UTF_8_create_env, serbian_UTF_8_close_env, serbian_UTF_8_stem},
   {"sv", ENC_ISO_8859_1, swedish_ISO_8859_1_create_env, swedish_ISO_8859_1_close_env, swedish_ISO_8859_1_stem},
   {"sv", ENC_UTF_8, swedish_UTF_8_create_env, swedish_UTF_8_close_env, swedish_UTF_8_stem},
   {"swe", ENC_ISO_8859_1, swedish_ISO_8859_1_create_env, swedish_ISO_8859_1_close_env, swedish_ISO_8859_1_stem},
@@ -183,6 +187,7 @@ static const char * algorithm_names[] = {
   "portuguese", 
   "romanian", 
   "russian", 
+  "serbian", 
   "spanish", 
   "swedish", 
   "turkish", 
