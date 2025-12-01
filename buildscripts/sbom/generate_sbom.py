@@ -256,6 +256,7 @@ def sbom_components_to_dict(sbom: dict, with_version: bool = False) -> dict:
 
 
 def check_metadata_sbom(meta_bom: dict) -> None:
+    """Run checks on SBOM component metadata for expected fields."""
     for component in meta_bom["components"]:
         for field in METADATA_FIELDS_REQUIRED:
             if field not in component:
@@ -820,18 +821,20 @@ def main() -> None:
                 ",".join(
                     [
                         "endor:",
-                        versions["endor"],
+                        str(versions["endor"]),
                         "semver(endor):",
                         get_semver_from_release_version(versions["endor"]),
                         "import_script:",
-                        versions["import_script"],
+                        str(versions["import_script"]),
                         "semver(import_script):",
                         get_semver_from_release_version(versions["import_script"]),
+                        "priority_version_source:",
+                        str(versions["priority_version_source"]),
                     ]
                 )
             )
             logger.warning(
-                f"VERSION MISMATCH: {component_key}: Endor version {versions['endor']} does not match import script version {versions['import_script']}"
+                f"VERSION MISMATCH: {component_key}: Endor version {versions['endor']} does not match import script version {versions['import_script']}. 'priority_version_source' from metadata: {versions['priority_version_source']}"
             )
 
         # For the standard workflow, we favor the pre-set priority version source,
