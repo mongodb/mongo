@@ -33,6 +33,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/util/modules.h"
 
 #include <compare>
 #include <ostream>
@@ -45,7 +46,7 @@ namespace mongo {
 /**
  * A RecordId bound for a collection scan, with an optional BSON representation for pretty printing.
  */
-class RecordIdBound {
+class MONGO_MOD_PUBLIC RecordIdBound {
 public:
     RecordIdBound() = default;
 

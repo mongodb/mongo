@@ -48,6 +48,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
@@ -72,7 +73,7 @@ struct UpdateStageParams;
  * The internal planner is a one-stop shop for "off-the-shelf" plans.  Most internal procedures
  * that do not require advanced queries could be served by plans already in here.
  */
-class InternalPlanner {
+class MONGO_MOD_NEEDS_REPLACEMENT InternalPlanner {
 public:
     enum Direction {
         FORWARD = 1,

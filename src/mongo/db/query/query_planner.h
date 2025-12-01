@@ -43,6 +43,7 @@
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <functional>
@@ -59,7 +60,7 @@ class CollectionPtr;
  * QueryPlanner's job is to provide an entry point to the query planning and optimization
  * process.
  */
-class QueryPlanner {
+class MONGO_MOD_NEEDS_REPLACEMENT QueryPlanner {
 public:
     /**
      * Holds the result of subqueries planning for rooted $or queries.

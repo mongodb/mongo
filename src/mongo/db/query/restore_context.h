@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 namespace mongo {
 class CollectionPtr;
 
@@ -38,7 +39,7 @@ class CollectionPtr;
  * Contains reference to a CollectionPtr owned by an AutoGetCollection lock helper to be used by the
  * RequiresCollectionStage plan stage.
  */
-class RestoreContext {
+class MONGO_MOD_PUBLIC RestoreContext {
 public:
     enum class RestoreType {
         kExternal,  // Restore on the PlanExecutor by an external call

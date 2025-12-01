@@ -36,6 +36,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /**
@@ -52,7 +53,7 @@ bool isMatchIdHackEligible(MatchExpression* me);
 /**
  * Returns true if 'query' describes an exact-match query on _id.
  */
-bool isSimpleIdQuery(const BSONObj& query);
+MONGO_MOD_NEEDS_REPLACEMENT bool isSimpleIdQuery(const BSONObj& query);
 
 /**
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan,

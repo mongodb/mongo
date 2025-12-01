@@ -41,6 +41,7 @@
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 
 #include <memory>
@@ -84,7 +85,7 @@ Status validateResumeInput(OperationContext* opCtx,
  * value) or if there is a bad combination of options (e.g. awaitData is illegal without
  * tailable).
  */
-Status validateFindCommandRequest(const FindCommandRequest& findCommand);
+MONGO_MOD_PUBLIC Status validateFindCommandRequest(const FindCommandRequest& findCommand);
 
 /**
  * Parses a find command object, 'cmdObj'. Caller must indicate whether or not this lite
@@ -94,13 +95,13 @@ Status validateFindCommandRequest(const FindCommandRequest& findCommand);
  * Returns a heap allocated FindCommandRequest on success or an error if 'cmdObj' is not well
  * formed.
  */
-std::unique_ptr<FindCommandRequest> makeFromFindCommand(
+MONGO_MOD_PUBLIC std::unique_ptr<FindCommandRequest> makeFromFindCommand(
     const BSONObj& cmdObj,
     const boost::optional<auth::ValidatedTenancyScope>& vts,
     const boost::optional<TenantId>& tenantId,
     const SerializationContext& sc);
 
-std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
+MONGO_MOD_PUBLIC std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
     const BSONObj& cmdObj, boost::optional<NamespaceString> nss = boost::none);
 
 /**
@@ -121,8 +122,8 @@ static constexpr auto kUnwrappedReadPrefField = "$queryOptions";
 
 // Names of the maxTimeMS command and query option.
 // Char arrays because they are used in static initialization.
-static constexpr auto cmdOptionMaxTimeMS = GenericArguments::kMaxTimeMSFieldName;
-static constexpr auto queryOptionMaxTimeMS = "$maxTimeMS";
+MONGO_MOD_PUBLIC static constexpr auto cmdOptionMaxTimeMS = GenericArguments::kMaxTimeMSFieldName;
+MONGO_MOD_PUBLIC static constexpr auto queryOptionMaxTimeMS = "$maxTimeMS";
 
 // Names of the $meta projection values.
 static constexpr auto metaGeoNearDistance = "geoNearDistance";
@@ -157,7 +158,7 @@ void addShowRecordIdMetaProj(FindCommandRequest* findCommand);
  */
 bool hasInvalidNaturalParam(const BSONObj& obj);
 
-long long getDefaultBatchSize();
+MONGO_MOD_PUBLIC long long getDefaultBatchSize();
 
 }  // namespace query_request_helper
 }  // namespace mongo

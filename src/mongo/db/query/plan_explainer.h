@@ -37,6 +37,7 @@
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /**
@@ -85,7 +86,7 @@ public:
     /**
      * Returns a short string, suitable for the logs, which summarizes the execution plan.
      */
-    virtual std::string getPlanSummary() const = 0;
+    MONGO_MOD_NEEDS_REPLACEMENT virtual std::string getPlanSummary() const = 0;
 
     /**
      * Fills out 'statsOut' with summary stats collected during the execution of the underlying
@@ -95,7 +96,7 @@ public:
      * The summary stats are consumed by debug mechanisms such as the profiler and the slow query
      * log.
      */
-    virtual void getSummaryStats(PlanSummaryStats* statsOut) const = 0;
+    MONGO_MOD_NEEDS_REPLACEMENT virtual void getSummaryStats(PlanSummaryStats* statsOut) const = 0;
 
     /**
      * Fills out 'statsOut' for the secondary collection 'secondaryColl'. Subclasses may
@@ -111,7 +112,8 @@ public:
      *
      * The 'verbosity' level parameter determines the amount of information to be returned.
      */
-    virtual PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const = 0;
+    MONGO_MOD_NEEDS_REPLACEMENT virtual PlanStatsDetails getWinningPlanStats(
+        ExplainOptions::Verbosity verbosity) const = 0;
 
     /**
      * Returns statistics for the trial period of the winning plan selected by the multi-planner.

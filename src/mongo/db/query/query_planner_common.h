@@ -37,6 +37,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 
@@ -47,7 +48,7 @@ namespace mongo {
 /**
  * Methods used by several parts of the planning process.
  */
-class QueryPlannerCommon {
+class MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerCommon {
 public:
     /**
      * Does the tree rooted at 'root' have a node with matchType 'type'?

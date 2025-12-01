@@ -38,6 +38,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>
@@ -52,12 +53,13 @@ struct IndexProperties {
 };
 
 // A relevant field to index requirement map.
-using RelevantFieldIndexMap = stdx::unordered_map<std::string, IndexProperties>;
+using RelevantFieldIndexMap MONGO_MOD_NEEDS_REPLACEMENT =
+    stdx::unordered_map<std::string, IndexProperties>;
 
 /**
  * Methods for determining what fields and predicates can use indices.
  */
-class QueryPlannerIXSelect {
+class MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerIXSelect {
 public:
     /**
      * Used to keep track of if any $elemMatch predicates were encountered when walking a

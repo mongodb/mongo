@@ -32,6 +32,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
@@ -41,7 +42,7 @@ namespace mongo {
  * single ServiceContext for their execution context. The owned ServiceContext is decorated with a
  * CollatorFactoryMock.
  */
-class QueryTestServiceContext {
+class MONGO_MOD_NEEDS_REPLACEMENT QueryTestServiceContext {
 public:
     QueryTestServiceContext(std::unique_ptr<TickSourceMock<Nanoseconds>> tickSource =
                                 std::make_unique<TickSourceMock<Nanoseconds>>());

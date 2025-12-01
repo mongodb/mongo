@@ -36,6 +36,7 @@
 #include "mongo/db/query/plan_cache/plan_cache_invalidator.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -50,7 +51,7 @@ class OperationContext;
  *
  * Decorates a Collection instance. Lifecycle is the same as the Collection instance.
  */
-class CollectionQueryInfo {
+class MONGO_MOD_PUBLIC CollectionQueryInfo {
 public:
     CollectionQueryInfo();
 

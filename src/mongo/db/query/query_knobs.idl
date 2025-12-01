@@ -36,6 +36,7 @@ global:
         - "mongo/db/query/query_knob_expressions.h"
         - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
         - "mongo/platform/atomic_word.h"
+    mod_visibility: public
 
 enums:
     QueryFrameworkControl:

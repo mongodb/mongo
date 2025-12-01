@@ -40,6 +40,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
@@ -110,7 +111,7 @@ struct TraversalPreference {
     std::string clusterField;
 };
 
-struct QueryPlannerParams {
+struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
     enum Options {
         // You probably want to set this.
         DEFAULT = 0,

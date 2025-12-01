@@ -55,6 +55,7 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/executor/task_executor_cursor.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -92,7 +93,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
  * prefix of the pipeline might be moved into the provided 'canonicalQuery' for pushing down into
  * the find layer.
  */
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
+MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
@@ -189,7 +190,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
  *
  * If the query cannot be executed, returns a Status indicating why.
  */
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
+MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     OpDebug* opDebug,
     CollectionAcquisition coll,
     ParsedDelete* parsedDelete,
@@ -215,7 +216,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
  *
  * If the query cannot be executed, returns a Status indicating why.
  */
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
+MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
     CollectionAcquisition coll,
     ParsedUpdate* parsedUpdate,
@@ -224,12 +225,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 /**
  * Direction of collection scan plan executor returned by makeCollectionScanPlanExecutor() below.
  */
-enum class CollectionScanDirection {
+enum class MONGO_MOD_PUBLIC CollectionScanDirection {
     kForward = 1,
     kBackward = -1,
 };
 
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
+MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
     OperationContext* opCtx,
     const CollectionAcquisition& collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,

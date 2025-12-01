@@ -31,6 +31,7 @@
 
 #include "mongo/db/field_ref.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <set>
 #include <string>
@@ -64,8 +65,7 @@ std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
  * Returns the set of all paths for which the wildcard index has multikey metadata keys.
  * Statistics reporting index seeks and keys examined are written to 'stats'.
  */
-std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
-                                              const IndexCatalogEntry* entry,
-                                              MultikeyMetadataAccessStats* stats);
+MONGO_MOD_NEEDS_REPLACEMENT std::set<FieldRef> getWildcardMultikeyPathSet(
+    OperationContext* opCtx, const IndexCatalogEntry* entry, MultikeyMetadataAccessStats* stats);
 
 }  // namespace mongo

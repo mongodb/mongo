@@ -33,6 +33,7 @@
 #include "mongo/db/partitioned.h"
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/util/container_size_helper.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -159,7 +160,7 @@ public:
      * removed entries.
      */
     template <typename UnaryPredicate>
-    size_t removeIf(UnaryPredicate predicate) {
+    MONGO_MOD_PUBLIC size_t removeIf(UnaryPredicate predicate) {
         size_t nRemoved = 0;
         for (size_t partitionId = 0; partitionId < _numPartitions; ++partitionId) {
             auto lockedPartition = _partitionedCache->lockOnePartitionById(partitionId);

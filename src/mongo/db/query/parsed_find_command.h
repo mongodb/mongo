@@ -42,6 +42,7 @@
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -50,7 +51,7 @@
 
 namespace mongo {
 
-struct ParsedFindCommandParams {
+struct MONGO_MOD_PUBLIC ParsedFindCommandParams {
     std::unique_ptr<FindCommandRequest> findCommand;
     const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop();
     MatchExpressionParser::AllowedFeatureSet allowedFeatures =
@@ -62,7 +63,7 @@ struct ParsedFindCommandParams {
  * Represents a find command request, but with more fully parsed ASTs for some fields which are
  * still raw BSONObj on the FindCommandRequest type.
  */
-struct ParsedFindCommand {
+struct MONGO_MOD_PUBLIC ParsedFindCommand {
     ParsedFindCommand() = default;
 
     /**
