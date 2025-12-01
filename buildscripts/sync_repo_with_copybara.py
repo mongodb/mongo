@@ -16,6 +16,9 @@ from github import GithubIntegration
 from buildscripts.util.read_config import read_config_file
 from evergreen.api import RetryingEvergreenApi
 
+# Commit hash of Copybara to use (v20251110)
+COPYBARA_COMMIT_HASH = "3f050c9e08b84aeda98875bf1b02a3288d351333"
+
 
 class CopybaraRepoConfig(NamedTuple):
     """Copybara source and destination repo sync configuration."""
@@ -362,7 +365,10 @@ def main():
     if os.path.exists('copybara'):
         print("Copybara directory already exists.")
     else:
-        run_command("git clone --branch d03973e9fe1 https://github.com/10gen/copybara.git")
+        run_command("git clone https://github.com/10gen/copybara.git")
+
+    # Checkout the specific commit of Copybara we want to use
+    run_command(f"cd copybara && git checkout {COPYBARA_COMMIT_HASH}")
 
     # Navigate to the Copybara directory and build the Copybara Docker image
     run_command("cd copybara && docker build --rm -t copybara .")
