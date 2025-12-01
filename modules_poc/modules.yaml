@@ -810,6 +810,7 @@ storage_engine_api:
   meta:
     slack: storage-engines-server-integration
     jira: Server Integration
+    fully_marked: true
   files:
     - src/mongo/db/repair*
     - src/mongo/db/storage/wiredtiger
@@ -865,6 +866,7 @@ dbhash:
   meta:
     slack: storage-engines-server-integration
     jira: Server Integration
+    fully_marked: true
   files:
     - src/mongo/db/commands/dbhash*
 
