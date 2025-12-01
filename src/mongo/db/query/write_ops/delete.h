@@ -33,10 +33,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class Database;
 class OperationContext;
@@ -63,4 +64,4 @@ DeleteResult deleteObject(OperationContext* opCtx,
                           const CollectionAcquisition& collection,
                           const DeleteRequest& request);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

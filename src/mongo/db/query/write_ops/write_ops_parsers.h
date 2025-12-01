@@ -41,6 +41,7 @@
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 #include <cstdint>
@@ -57,9 +58,9 @@ namespace write_ops {
 // Conservative per array element overhead. This value was calculated as 1 byte (element type) + 5
 // bytes (max string encoding of the array index encoded as string and the maximum key is 99999) + 1
 // byte (zero terminator) = 7 bytes
-constexpr int kWriteCommandBSONArrayPerElementOverheadBytes = 7;
+MONGO_MOD_PUBLIC constexpr int kWriteCommandBSONArrayPerElementOverheadBytes = 7;
 
-constexpr int kRetryableAndTxnBatchWriteBSONSizeOverhead =
+MONGO_MOD_PUBLIC constexpr int kRetryableAndTxnBatchWriteBSONSizeOverhead =
     kWriteCommandBSONArrayPerElementOverheadBytes * 2;
 
 /**
@@ -91,7 +92,7 @@ void opTimeSerializerWithTermCheck(repl::OpTime opTime, StringData fieldName, BS
  */
 repl::OpTime opTimeParser(BSONElement elem);
 
-class UpdateModification {
+class MONGO_MOD_PUBLIC UpdateModification {
 public:
     enum class Type { kReplacement, kModifier, kPipeline, kDelta, kTransform };
     using TransformFunc = std::function<boost::optional<BSONObj>(const BSONObj&)>;
@@ -241,7 +242,7 @@ private:
  * model doesn't fit with IDL, which does not have support for placing fields at the same level as
  * the owning object.
  */
-class WriteError {
+class MONGO_MOD_PUBLIC WriteError {
 public:
     static constexpr auto kIndexFieldName = "index"_sd;
     static constexpr auto kCodeFieldName = "code"_sd;

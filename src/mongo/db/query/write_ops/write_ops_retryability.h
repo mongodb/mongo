@@ -39,16 +39,18 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 class BSONObjBuilder;
 class OperationContext;
 
-const BSONObj kWouldChangeOwningShardSentinel(BSON("$wouldChangeOwningShard" << 1));
+MONGO_MOD_PUBLIC const BSONObj kWouldChangeOwningShardSentinel(BSON("$wouldChangeOwningShard"
+                                                                    << 1));
 
 template <typename OplogEntryType>
-bool isWouldChangeOwningShardSentinelOplogEntry(const OplogEntryType& oplogEntry) {
+MONGO_MOD_PUBLIC bool isWouldChangeOwningShardSentinelOplogEntry(const OplogEntryType& oplogEntry) {
     return (oplogEntry.getOpType() == repl::OpTypeEnum::kNoop) &&
         (oplogEntry.getObject().woCompare(kWouldChangeOwningShardSentinel) == 0) &&
         oplogEntry.getObject2() && oplogEntry.getObject2()->isEmpty();

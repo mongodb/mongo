@@ -30,12 +30,13 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
 namespace mongo {
 
-struct UpdateResult {
+struct MONGO_MOD_PUBLIC UpdateResult {
     UpdateResult(bool existing,
                  bool modifiers,
                  unsigned long long numDocsModified,

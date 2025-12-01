@@ -31,6 +31,7 @@ global:
     cpp_includes:
         - "mongo/db/query/write_ops/write_ops_parsers.h"
         - "mongo/db/repl/optime.h"
+    mod_visibility: public
 
 imports:
     - "mongo/crypto/fle_field_schema.idl"

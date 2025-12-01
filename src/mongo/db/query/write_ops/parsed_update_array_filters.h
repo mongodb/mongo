@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>
@@ -47,6 +48,7 @@ namespace mongo {
 /**
  * Parses the array filters portion of the update request.
  */
+MONGO_MOD_PUBLIC
 StatusWith<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>>
 parsedUpdateArrayFilters(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const std::vector<BSONObj>& rawArrayFiltersIn,

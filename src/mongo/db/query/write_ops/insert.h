@@ -33,8 +33,9 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class OperationContext;
 
@@ -64,4 +65,4 @@ Status userAllowedWriteNS(OperationContext* opCtx, const NamespaceString& ns);
  * Checks if the namespace is valid for user create operations.
  */
 Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns);
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

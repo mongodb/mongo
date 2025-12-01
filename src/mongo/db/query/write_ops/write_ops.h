@@ -35,6 +35,7 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
@@ -43,7 +44,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class InsertOp {
 public:
@@ -196,4 +197,4 @@ T checkWriteErrors(T op) {
 }
 
 }  // namespace write_ops
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

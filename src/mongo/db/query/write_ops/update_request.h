@@ -39,6 +39,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_operation_source.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
@@ -63,7 +64,7 @@ void appendArrayToString(const T& arr, StringBuilder* builder) {
 
 class FieldRef;
 
-class UpdateRequest {
+class MONGO_MOD_PUBLIC UpdateRequest {
 public:
     enum ReturnDocOption {
         // Return no document.

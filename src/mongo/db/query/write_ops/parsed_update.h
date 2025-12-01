@@ -45,6 +45,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>
@@ -53,7 +54,7 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class CanonicalQuery;
 class ExtensionsCallbackNoop;
@@ -277,7 +278,7 @@ public:
  *
  * ParsedUpdate is a ParsedUpdate that can be used in mongod.
  */
-class ParsedUpdate : public impl::ParsedUpdateBase {
+class MONGO_MOD_PUBLIC ParsedUpdate : public impl::ParsedUpdateBase {
 public:
     ParsedUpdate(OperationContext* opCtx,
                  const UpdateRequest* request,
@@ -286,4 +287,4 @@ public:
                  bool isRequestToTimeseries = false);
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

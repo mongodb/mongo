@@ -37,6 +37,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -49,7 +50,7 @@ class UpdateRequest;
  * residual expression. The bucket expression is used to find the buckets and the residual
  * expression is used to filter the documents in the buckets.
  */
-struct TimeseriesWritesQueryExprs {
+struct MONGO_MOD_PUBLIC TimeseriesWritesQueryExprs {
     // The bucket-level match expression.
     std::unique_ptr<MatchExpression> _bucketExpr = nullptr;
 
