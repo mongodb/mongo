@@ -14,7 +14,7 @@ Search queries on views operate differently from standard view queries. Normally
 
 To resolve this, the `$_internalSearchIdLookup` stage applies the view's transformations within its own sub-pipeline. This means the view is applied after the `$_internalSearchMongotRemote` stage but before the rest of the user's pipeline. While this technically violates the rule that a view pipeline must come first, it is permitted because `$_internalSearchMongotRemote` does not modify documents; it only retrieves document IDs from `mongot`.
 
-In summary, `$_internalSearchIdLookup` takes unmodified documents from the `_id` values returned by `$_internalSearchMongotRemote`, applies the view's data transforms, and passes said transformed documents through the rest of the user pipeline [^1].
+In summary, `$_internalSearchIdLookup` takes unmodified documents from the `_id` values returned by `$_internalSearchMongotRemote`, applies the view's data transforms, and passes said transformed documents through the rest of the user pipeline.
 
 ## Technical Details
 

@@ -119,3 +119,5 @@ behavior of the RAII locking types acquiring locks on resources upon their const
 unlocking the lock upon their destruction when going out of scope. Instead, the responsibility of
 unlocking the locks is transferred to the WriteUnitOfWork destructor. Note this is only true for
 transactions that do writes, and therefore only for code that uses WriteUnitOfWork.
+
+[Multiversion concurrency control]: https://en.wikipedia.org/wiki/Multiversion_concurrency_control

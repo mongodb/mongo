@@ -742,7 +742,7 @@ values are ObjectId's.
 
 For more information on time-series collections, see the [timeseries/README][].
 
-[timeseries/README]: ../timeseries/README.md
+[timeseries/README]: /src/mongo/db/timeseries/README.md
 
 ## Capped clustered collections
 
@@ -804,8 +804,3 @@ requirements for atomicity, consistency, isolation, and durability, storage engi
 some form of transaction. In contrast, a multi-document transaction in MongoDB is a user-facing
 feature providing similar guarantees across many nodes in a sharded cluster; a storage transaction
 only provides guarantees within one node.
-
-[`BSONObj::woCompare`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/bsonobj.h#L460
-[`BSONElement::compareElements`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/bsonelement.cpp#L285
-[`Ordering`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/ordering.h
-[initial sync]: ../repl/README.md#initial-sync

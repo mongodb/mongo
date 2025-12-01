@@ -8,7 +8,8 @@ Link Types Validated
 --------------------
 1. Intra-document anchors: `[text](#some-heading)`
 2. Relative file links: `[text](../../path/to/OtherFile.md#anchor)`
-3. Repo-root relative paths beginning with `/src/` (e.g. `[feature flags](/src/mongo/db/query/README_query_feature_flags.md)`).
+3. Repo-root relative paths beginning with `/` (e.g. `[feature flags](/src/mongo/db/query/README_query_feature_flags.md)`)
+4. Reference-style links: `[text][label]` or `[text][]` with definitions like `[label]: url`
 
 External (http/https) links are currently skipped (no network requests performed) except for a trivial malformed scheme check (e.g. `hhttps://`).
 
@@ -126,11 +127,16 @@ HTML_ANCHOR_RE = re.compile(r'<a\s+(?:name|id)=["\']([^"\']+)["\']\s*>\s*</a>?',
 LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 # Inline link references: [text]: url
 REF_DEF_RE = re.compile(r"^\s*\[([^\]]+)\]:\s+(\S+)")
-REF_USE_RE = re.compile(r"\[([^\]]+)\]\[(?:(?:[^\]]+))?\]")  # simplified
+# Reference-style links: [text][label] or [text][] but NOT [[double brackets]]
+# Negative lookbehind (?<!\[) ensures first [ is not preceded by [
+# Negative lookahead (?!\[) ensures first [ is not followed by another [
+REF_USE_RE = re.compile(r"(?<!\[)\[([^\]]+)\](?!\])\[(?:(?:[^\]]+))?\]")
 
 # Characters removed for anchor IDs (GitHub rules simplified). We strip most punctuation except hyphen and underscore.
 PUNCT_TO_STRIP = "\"'!#$%&()*+,./:;<=>?@[]^`{|}~"  # punctuation characters to remove
 ANCHOR_CACHE: dict[str, set[str]] = {}
+# Cache for reference-style link definitions: file_path -> {label: target_url}
+REFERENCE_CACHE: dict[str, dict[str, str]] = {}
 
 
 def _detect_repo_root(start: str | None = None) -> str:
@@ -244,6 +250,25 @@ def collect_headings(path: str) -> set[str]:
     return anchors
 
 
+def collect_reference_definitions(path: str) -> dict[str, str]:
+    """Parse all reference-style link definitions [label]: url from a markdown file."""
+    if path in REFERENCE_CACHE:
+        return REFERENCE_CACHE[path]
+    references: dict[str, str] = {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                m = REF_DEF_RE.match(line)
+                if m:
+                    label = m.group(1).strip().lower()  # case-insensitive matching
+                    target = m.group(2).strip()
+                    references[label] = target
+    except Exception:
+        pass
+    REFERENCE_CACHE[path] = references
+    return references
+
+
 def is_http_url(url: str) -> bool:
     return url.startswith("http://") or url.startswith("https://")
 
@@ -266,8 +291,8 @@ def parse_links(file_path: str) -> List[Tuple[int, str, str]]:
             fence_delim = None  # track ``` or ~~~
             for idx, raw_line in enumerate(f, start=1):
                 line = raw_line.rstrip("\n")
-                # Detect start/end of fenced code blocks. Accept ``` or ~~~ with optional language.
-                fence_match = re.match(r"^(?P<delim>`{3,}|~{3,})(.*)$", line)
+                # Detect start/end of fenced code blocks. Accept ``` or ~~~ with optional language and leading whitespace.
+                fence_match = re.match(r"^\s*(?P<delim>`{3,}|~{3,})(.*)$", line)
                 if fence_match:
                     full = fence_match.group("delim")
                     # Toggle if same delimiter starts/ends
@@ -292,15 +317,102 @@ def parse_links(file_path: str) -> List[Tuple[int, str, str]]:
                         in_blockquote = False
                     else:
                         continue
+                # Skip lines that are reference definitions themselves
+                if REF_DEF_RE.match(line):
+                    continue
+
+                # Find all backtick regions to exclude from link detection
+                # Build a set of character positions that are inside backticks
+                backtick_positions = set()
+                in_code = False
+                for i, char in enumerate(line):
+                    if char == "`":
+                        in_code = not in_code
+                    elif in_code:
+                        backtick_positions.add(i)
+
+                # Helper function to check if the opening bracket of a link is inside backticks
+                # We only check the start position because if the [ is in code, the whole link should be skipped
+                def is_in_code_span(match_start):
+                    return match_start in backtick_positions
+
+                # Track character ranges of all matched links to avoid double-processing
+                matched_ranges = []
+
+                def overlaps_matched_range(start, end):
+                    """Check if a position range overlaps with any previously matched range."""
+                    for m_start, m_end in matched_ranges:
+                        # Check for any overlap
+                        if start < m_end and end > m_start:
+                            return True
+                    return False
+
+                # Inline links [text](url)
                 for m in LINK_RE.finditer(line):
+                    if is_in_code_span(m.start()):
+                        continue  # Skip links inside backticks
                     text, target = m.group(1), m.group(2).strip()
                     links.append((idx, text, target))
+                    matched_ranges.append((m.start(), m.end()))
+
+                # Reference-style links [text][label] or [text][]
+                for m in REF_USE_RE.finditer(line):
+                    if is_in_code_span(m.start()):
+                        continue  # Skip links inside backticks
+                    full_match = m.group(0)
+                    text = m.group(1).strip()
+                    # Extract label from [text][label] - if empty brackets [], use text as label
+                    label_part = full_match[len(text) + 2 :]  # skip [text]
+                    if label_part == "[]":
+                        label = text  # implicit reference: [text][] uses "text" as label
+                    else:
+                        # Explicit label: [text][label]
+                        label = label_part.strip("[]").strip()
+                    # Use special marker to indicate this is a reference link
+                    links.append((idx, text, f"__REF__{label}"))
+                    matched_ranges.append((m.start(), m.end()))
+
+                # Shortcut reference links [text] - single bracket that references a definition
+                # Only match if not already matched by inline or reference-style patterns
+                # Pattern: single bracket pair not preceded by [ and not followed by ( or [
+                for m in re.finditer(r"(?<!\[)\[([^\]]+)\](?![(\[])", line):
+                    if is_in_code_span(m.start()):
+                        continue  # Skip links inside backticks
+                    # Skip if overlaps with already matched ranges
+                    if overlaps_matched_range(m.start(), m.end()):
+                        continue
+                    # Skip if this is part of a double bracket pattern [[...]]
+                    if m.end() < len(line) and line[m.end()] == "]":
+                        continue
+                    text = m.group(1).strip()
+                    # Only treat as reference link if it could plausibly be one
+                    # (contains text, not just punctuation or numbers)
+                    if text and not text.isdigit():
+                        # Use special marker to indicate this is a reference link
+                        # For shortcut references, the label is the text itself
+                        links.append((idx, text, f"__REF__{text}"))
     except Exception:
         pass
     return links
 
 
 def validate_link(current_file: str, line: int, text: str, target: str) -> Optional[LinkIssue]:
+    # Handle reference-style links [text][label]
+    if target.startswith("__REF__"):
+        label = target[7:].lower()  # Extract label and normalize to lowercase
+        references = collect_reference_definitions(current_file)
+        if label not in references:
+            return LinkIssue(
+                current_file,
+                line,
+                text,
+                f"[{label}]",
+                f'reference link label "{label}" not defined in this file',
+            )
+        # Resolve the reference and validate the actual target
+        resolved_target = references[label]
+        return validate_link(current_file, line, text, resolved_target)
+
     # Remove surrounding <> used sometimes in markdown
     if target.startswith("<") and target.endswith(">"):
         target = target[1:-1]
@@ -396,7 +508,19 @@ def validate_link(current_file: str, line: int, text: str, target: str) -> Optio
         resolved_path = os.path.normpath(os.path.join(current_dir, file_part))
 
     if not os.path.exists(resolved_path):
-        return LinkIssue(current_file, line, text, target, f"file does not exist: {resolved_path}")
+        # Try appending .md extension if the path doesn't exist
+        if not resolved_path.endswith(".md"):
+            resolved_path_with_md = resolved_path + ".md"
+            if os.path.exists(resolved_path_with_md):
+                resolved_path = resolved_path_with_md
+            else:
+                return LinkIssue(
+                    current_file, line, text, target, f"file does not exist: {resolved_path}"
+                )
+        else:
+            return LinkIssue(
+                current_file, line, text, target, f"file does not exist: {resolved_path}"
+            )
 
     if frag_part:
         # If target file is NOT markdown and fragment matches a GitHub line anchor (#Lnn or #Lnn-Lmm), accept.
@@ -835,6 +959,7 @@ def main(argv: List[str]) -> int:
         # Re-run lint to update issues list after fixes
         if fix_count:
             ANCHOR_CACHE.clear()
+            REFERENCE_CACHE.clear()
             issues = lint_files(files, args.workers)
 
     if args.json:

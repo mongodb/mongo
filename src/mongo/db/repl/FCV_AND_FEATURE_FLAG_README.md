@@ -374,7 +374,7 @@ There are three locks used in the setFCV command:
   - Other operations should [take this lock in shared mode](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/feature_compatibility_version.cpp#L594-L599)
     if they want to ensure that the FCV state _does not change at all_ during the operation.
     See [example](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/s/config/sharding_catalog_manager_collection_operations.cpp#L489-L490)
-- [Global lock]
+- [Global lock](/src/mongo/db/shard_role/lock_manager/d_concurrency.h)
   - The setFCV command [takes this lock in S mode and then releases it immediately](https://github.com/mongodb/mongo/blob/418028cf4dcf416d5ab87552721ed3559bce5507/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L551-L557)
     shortly after the FCV transitions to a new value (either to the upgrading/downgrading state,
     or to the fully upgrade/downgraded state).

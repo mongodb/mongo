@@ -197,8 +197,6 @@ ianb:
 > the tests has an assertion about the order of the oplog entries to this
 > effect: [v2_delta_oplog_entries_fcv.js][v2_delta_oplog_entries_fcv_dot_js]
 
-\[snippet\]
-
 ```js
 // Check that the sequence of oplog entries is right. We expect to see the following
 // sequence, in ascending order by timestamp:

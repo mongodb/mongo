@@ -71,7 +71,7 @@ on entering quiesce mode, prompting it to respond to all waiting hello requests.
 ### helloOk Protocol Negotation
 
 In order to preserve backwards compatibility with old drivers, mongos currently supports both
-the [`isMaster`] command and the [`hello`] command. New drivers and 5.0+ versions of the server
+the [isMaster command][] and the [hello command][]. New drivers and 5.0+ versions of the server
 will support `hello`. When connecting to a sharded cluster via mongos, a new driver will send
 "helloOk: true" as a part of the initial handshake. If mongos supports hello, it will respond
 with "helloOk: true" as well. This way, new drivers know that they're communicating with a version
@@ -85,7 +85,5 @@ drivers will not specify this flag at all, so the behavior remains the same.
 When mongos establishes outgoing connections to mongod nodes in the cluster, it always uses `hello`
 rather than `isMaster`.
 
-#### Code references
-
-- [isMaster command](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/s/commands/cluster_is_master_cmd.cpp#L248) for mongos.
-- [hello command](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/s/commands/cluster_is_master_cmd.cpp#L64) for mongos.
+[isMaster command]: https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/s/commands/cluster_is_master_cmd.cpp#L248
+[hello command]: https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/s/commands/cluster_is_master_cmd.cpp#L64

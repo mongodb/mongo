@@ -217,8 +217,7 @@ document as its baseline.
 #### Run length encoding of zeros
 
 A sequence of zeros is compressed to a pair of numbers `[0, x]` where `x` is non-zero positive
-integer that indicates the number of zeros in a sequence. For instance, an array of zeros `[0, 0, 0,
-0]` is transformed to `[0, 4]`.
+integer that indicates the number of zeros in a sequence. For instance, an array of zeros `[0, 0, 0, 0]` is transformed to `[0, 4]`.
 
 #### Varint compression
 
