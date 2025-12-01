@@ -499,6 +499,7 @@ mongo_cc_library(
     deps = [
         ":query_planner_test_lib",
         "//src/mongo:base",
+        "//src/mongo/db/shard_role/shard_catalog:index_catalog_mock",
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
     ],
@@ -573,6 +574,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_d",
         "//src/mongo/db/query/compiler/optimizer/index_bounds_builder:index_bounds_builder_test_fixture",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
+        "//src/mongo/db/shard_role/shard_catalog:index_catalog_mock",
     ],
 )
 

@@ -79,14 +79,10 @@ CoreIndexInfo indexInfoFromIndexCatalogEntry(std::shared_ptr<const IndexCatalogE
     if (desc->getIndexType() == IndexType::INDEX_WILDCARD)
         projExec = static_cast<const WildcardAccessMethod*>(accessMethod)->getWildcardProjection();
 
-    auto filterExpression = ice->getFilterExpression();
-    auto collator = ice->getCollator();
     return {desc->keyPattern(),
             desc->getIndexType(),
             desc->isSparse(),
             IndexEntry::Identifier{desc->indexName()},
-            filterExpression,
-            collator,
             projExec,
             std::move(ice)};
 }

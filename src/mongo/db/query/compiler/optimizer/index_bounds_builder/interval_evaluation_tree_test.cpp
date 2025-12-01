@@ -197,9 +197,7 @@ public:
                 false,
                 false,
                 CoreIndexInfo::Identifier("test_foo"),
-                nullptr,
                 {},
-                nullptr,
                 nullptr};
     }
 

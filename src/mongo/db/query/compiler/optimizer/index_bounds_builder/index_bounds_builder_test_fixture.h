@@ -95,9 +95,7 @@ public:
                 false,
                 false,
                 CoreIndexInfo::Identifier("test_foo"),
-                nullptr,
                 {},
-                nullptr,
                 nullptr};
     }
 
@@ -114,9 +112,7 @@ public:
                 false,
                 false,
                 IndexEntry::Identifier{"test_multikey"},
-                nullptr,
                 {},
-                nullptr,
                 nullptr};
     }
 
@@ -142,9 +138,7 @@ public:
                 false,
                 false,
                 IndexEntry::Identifier{"test_wildcard"},
-                nullptr,
                 {},
-                nullptr,
                 nullptr,
                 nullptr,
                 wildcardPos};

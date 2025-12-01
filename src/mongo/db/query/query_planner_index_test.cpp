@@ -370,7 +370,7 @@ TEST_F(QueryPlannerTest, PlannerCanUseIndexesWithSameKeyButDifferentSparseProper
     // Create two indexes on the same key pattern; one sparse, the other non-sparse. This is
     // permitted because the 'sparse' property is part of the index signature.
     addIndex(fromjson("{a: 1}"), /*multikey*/ false, /*sparse*/ false);
-    addIndex(fromjson("{a: 1}"), /*multikey*/ false, /*sparse*/ true, /*unique*/ false, "a_sparse");
+    addIndex(fromjson("{a: 1}"), "a_sparse", /*multikey*/ false, /*sparse*/ true, /*unique*/ false);
 
     runQuery(fromjson("{a: 1}"));
 
@@ -387,7 +387,7 @@ TEST_F(QueryPlannerTest, PlannerCanUseIndexesWithSameKeyButDifferentUniqueProper
     // Create two indexes on the same key pattern; one unique, the other non-unique. This is
     // permitted because the 'unique' property is part of the index signature.
     addIndex(fromjson("{a: 1}"), /*multikey*/ false, /*sparse*/ false, /*unique*/ false);
-    addIndex(fromjson("{a: 1}"), /*multikey*/ false, /*sparse*/ false, /*unique*/ true, "a_unique");
+    addIndex(fromjson("{a: 1}"), "a_unique", /*multikey*/ false, /*sparse*/ false, /*unique*/ true);
 
     runQuery(fromjson("{a: 1}"));
 
@@ -1640,7 +1640,7 @@ TEST_F(QueryPlannerTest, NoFetchWhenProjectionAssignsToIndexedNonArrayField) {
 
 TEST_F(QueryPlannerTest, MustFetchWhenExpressionUsesMultiKeyPath) {
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
-    addIndex(fromjson("{a: 1, b: 1}"), {{}, {0}});
+    addIndex(fromjson("{a: 1, b: 1}"), MultikeyPaths{{}, {0}});
 
     // Cannot be covered since 'b' is multikey.
     runQueryAsCommand(fromjson(
@@ -1653,7 +1653,7 @@ TEST_F(QueryPlannerTest, MustFetchWhenExpressionUsesMultiKeyPath) {
 
 TEST_F(QueryPlannerTest, MustFetchWhenExpressionUsesDottedMultiKeyPath) {
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
-    addIndex(fromjson("{a: 1, b: 1}"), {{}, {0}});
+    addIndex(fromjson("{a: 1, b: 1}"), MultikeyPaths{{}, {0}});
 
     // Cannot be covered since 'b' is multikey, meaning the result of the expression '$b.c' could
     // result in an array.
@@ -1667,7 +1667,7 @@ TEST_F(QueryPlannerTest, MustFetchWhenExpressionUsesDottedMultiKeyPath) {
 
 TEST_F(QueryPlannerTest, MustFetchWhenExpressionUsesROOT) {
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
-    addIndex(fromjson("{a: 1, b: 1}"), {{}, {0}});
+    addIndex(fromjson("{a: 1, b: 1}"), MultikeyPaths{{}, {0}});
 
     runQueryAsCommand(
         fromjson("{find: 'testns', filter: {a: {$gt: 0}}, projection: {_id: 0, x: '$$ROOT'}}"));

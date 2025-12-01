@@ -45,6 +45,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry_mock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/op_msg.h"
@@ -78,97 +79,53 @@ void QueryPlannerTest::clearState() {
     relaxBoundsCheck = false;
 }
 
-void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey) {
-    params.mainCollectionInfo.indexes.push_back(
-        {keyPattern,
-         IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-         IndexConfig::kLatestIndexVersion,
-         multikey,
-         {},
-         {},
-         false,  // sparse
-         false,  // unique
-         // Add the position to the name so we have a unique set of index names.
-         IndexEntry::Identifier{"hari_king_of_the_stove" +
-                                std::to_string(params.mainCollectionInfo.indexes.size())},
-         nullptr,  // filterExpr
-         BSONObj(),
-         nullptr,
-         nullptr});
-}
+void QueryPlannerTest::addIndex(BSONObj keyPattern,
+                                StringData indexName,
+                                bool multikey,
+                                bool sparse,
+                                bool unique,
+                                BSONObj infoObj,
+                                MatchExpression* filterExpr,
+                                const CollatorInterface* collator) {
+    const auto type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
 
-void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey, bool sparse) {
-    params.mainCollectionInfo.indexes.push_back(
-        {keyPattern,
-         IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-         IndexConfig::kLatestIndexVersion,
-         multikey,
-         {},
-         {},
-         sparse,
-         false,  // unique
-         IndexEntry::Identifier{"note_to_self_dont_break_build"},
-         nullptr,  // filterExpr
-         BSONObj(),
-         nullptr,
-         nullptr});
+    IndexSpec spec;
+    spec.version(1).name(indexName).addKeys(keyPattern);
+    auto descriptor = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
+    auto mockIndexCatalogEntry = std::make_shared<IndexCatalogEntryMock>(nullptr,
+                                                                         nullptr,
+                                                                         "" /* ident */,
+                                                                         std::move(descriptor),
+                                                                         false, /* isFrozen */
+                                                                         filterExpr,
+                                                                         collator);
+
+    IndexEntry entry(keyPattern,
+                     type,
+                     IndexConfig::kLatestIndexVersion,
+                     multikey,
+                     {},
+                     {},
+                     sparse,
+                     unique,
+                     IndexEntry::Identifier{std::string(indexName)},
+                     std::move(infoObj),
+                     nullptr,
+                     std::move(mockIndexCatalogEntry));
+    params.mainCollectionInfo.indexes.push_back(entry);
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey, bool sparse, bool unique) {
     addIndex(
-        keyPattern, multikey, sparse, unique, "sql_query_walks_into_bar_and_says_can_i_join_you?");
-}
-
-void QueryPlannerTest::addIndex(
-    BSONObj keyPattern, bool multikey, bool sparse, bool unique, const std::string& name) {
-    params.mainCollectionInfo.indexes.push_back(
-        {keyPattern,
-         IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-         IndexConfig::kLatestIndexVersion,
-         multikey,
-         {},
-         {},
-         sparse,
-         unique,
-         IndexEntry::Identifier{name},
-         nullptr,  // filterExpr
-         BSONObj(),
-         nullptr,
-         nullptr});
+        keyPattern, "sql_query_walks_into_bar_and_says_can_i_join_you?", multikey, sparse, unique);
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, BSONObj infoObj) {
-    params.mainCollectionInfo.indexes.push_back(
-        {keyPattern,
-         IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-         IndexConfig::kLatestIndexVersion,
-         false,  // multikey
-         {},
-         {},
-         false,  // sparse
-         false,  // unique
-         IndexEntry::Identifier{"foo"},
-         nullptr,  // filterExpr
-         infoObj,
-         nullptr,
-         nullptr});
+    addIndex(keyPattern, "foo", false, false, false, std::move(infoObj));
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, MatchExpression* filterExpr) {
-    params.mainCollectionInfo.indexes.push_back(
-        {keyPattern,
-         IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-         IndexConfig::kLatestIndexVersion,
-         false,  // multikey
-         {},
-         {},
-         false,  // sparse
-         false,  // unique
-         IndexEntry::Identifier{"foo"},
-         filterExpr,
-         BSONObj(),
-         nullptr,
-         nullptr});
+    addIndex(keyPattern, "foo", false, false, false, BSONObj(), filterExpr);
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, const MultikeyPaths& multikeyPaths) {
@@ -183,100 +140,56 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, const MultikeyPaths& multike
     const bool unique = false;
     const char name[] = "my_index_with_path_level_multikey_info";
     const MatchExpression* filterExpr = nullptr;
+    const CollatorInterface* collator = nullptr;
     const BSONObj infoObj;
+
+    IndexSpec spec;
+    spec.version(1).name("test_index").addKeys(keyPattern);
+    auto descriptor = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
+    auto mockIndexCatalogEntry = std::make_shared<IndexCatalogEntryMock>(nullptr,
+                                                                         nullptr,
+                                                                         "" /* ident */,
+                                                                         std::move(descriptor),
+                                                                         false /* isFrozen */,
+                                                                         filterExpr,
+                                                                         collator);
     IndexEntry entry(keyPattern,
                      type,
                      IndexConfig::kLatestIndexVersion,
                      multikey,
-                     {},
+                     multikeyPaths,
                      {},
                      sparse,
                      unique,
                      IndexEntry::Identifier{name},
-                     filterExpr,
                      infoObj,
                      nullptr,
-                     nullptr);
-    entry.multikeyPaths = multikeyPaths;
+                     std::move(mockIndexCatalogEntry));
     params.mainCollectionInfo.indexes.push_back(entry);
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, const CollatorInterface* collator) {
-    const auto type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
-    const bool sparse = false;
-    const bool unique = false;
-    const bool multikey = false;
-    const char name[] = "my_index_with_collator";
-    const MatchExpression* filterExpr = nullptr;
-    const BSONObj infoObj;
-    IndexEntry entry(keyPattern,
-                     type,
-                     IndexConfig::kLatestIndexVersion,
-                     multikey,
-                     {},
-                     {},
-                     sparse,
-                     unique,
-                     IndexEntry::Identifier{name},
-                     filterExpr,
-                     infoObj,
-                     nullptr,
-                     nullptr);
-    entry.collator = collator;
-    params.mainCollectionInfo.indexes.push_back(entry);
+    addIndex(
+        keyPattern, "my_index_with_collator", false, false, false, BSONObj(), nullptr, collator);
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern,
                                 const CollatorInterface* collator,
                                 StringData indexName) {
-    const auto type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
-    const bool sparse = false;
-    const bool unique = false;
-    const bool multikey = false;
-    const auto name = std::string{indexName};
-    const MatchExpression* filterExpr = nullptr;
-    const BSONObj infoObj;
-    IndexEntry entry(keyPattern,
-                     type,
-                     IndexConfig::kLatestIndexVersion,
-                     multikey,
-                     {},
-                     {},
-                     sparse,
-                     unique,
-                     IndexEntry::Identifier{name},
-                     filterExpr,
-                     infoObj,
-                     nullptr,
-                     nullptr);
-    entry.collator = collator;
-    params.mainCollectionInfo.indexes.push_back(entry);
+    addIndex(keyPattern, indexName, false, false, false, BSONObj(), nullptr, collator);
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern,
                                 MatchExpression* filterExpr,
                                 const CollatorInterface* collator) {
-    const auto type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
-    const bool sparse = false;
-    const bool unique = false;
-    const bool multikey = false;
-    const char name[] = "my_partial_index_with_collator";
-    const BSONObj infoObj;
-    IndexEntry entry(keyPattern,
-                     type,
-                     IndexConfig::kLatestIndexVersion,
-                     multikey,
-                     {},
-                     {},
-                     sparse,
-                     unique,
-                     IndexEntry::Identifier{name},
-                     filterExpr,
-                     infoObj,
-                     nullptr,
-                     nullptr);
-    entry.collator = collator;
-    params.mainCollectionInfo.indexes.push_back(entry);
+    addIndex(keyPattern,
+             "my_partial_index_with_collator",
+             false,
+             false,
+             false,
+             BSONObj(),
+             filterExpr,
+             collator);
 }
 
 void QueryPlannerTest::addIndex(const IndexEntry& ie) {

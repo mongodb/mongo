@@ -146,14 +146,16 @@ protected:
         callback();
     }
 
-    void addIndex(BSONObj keyPattern, bool multikey = false);
+    void addIndex(BSONObj keyPattern,
+                  StringData indexName = "test_index",
+                  bool multikey = false,
+                  bool sparse = false,
+                  bool unique = false,
+                  BSONObj infoObj = BSONObj(),
+                  MatchExpression* filterExpr = nullptr,
+                  const CollatorInterface* collator = nullptr);
 
-    void addIndex(BSONObj keyPattern, bool multikey, bool sparse);
-
-    void addIndex(BSONObj keyPattern, bool multikey, bool sparse, bool unique);
-
-    void addIndex(
-        BSONObj keyPattern, bool multikey, bool sparse, bool unique, const std::string& name);
+    void addIndex(BSONObj keyPattern, bool multikey, bool sparse = false, bool unique = false);
 
     void addIndex(BSONObj keyPattern, BSONObj infoObj);
 

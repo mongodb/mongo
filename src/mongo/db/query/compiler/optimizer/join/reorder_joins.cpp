@@ -312,8 +312,6 @@ boost::optional<IndexEntry> bestIndexSatisfyingJoinPredicates(
     }
     if (bestIndex) {
         auto desc = bestIndex->descriptor();
-        auto filterExpression = bestIndex->getFilterExpression();
-        auto collator = bestIndex->getCollator();
         return IndexEntry{desc->keyPattern(),
                           desc->getIndexType(),
                           desc->version(),
@@ -323,9 +321,7 @@ boost::optional<IndexEntry> bestIndexSatisfyingJoinPredicates(
                           desc->isSparse(),
                           desc->unique(),
                           IndexEntry::Identifier{desc->indexName()},
-                          filterExpression,
                           desc->infoObj(),
-                          collator,
                           nullptr /*wildcardProjection*/,
                           std::move(bestIndex)};
     }

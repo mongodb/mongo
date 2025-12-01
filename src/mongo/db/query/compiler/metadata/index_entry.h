@@ -72,22 +72,23 @@ struct CoreIndexInfo {
                   IndexType type,
                   bool sp,
                   Identifier ident,
-                  const MatchExpression* fe = nullptr,
-                  const CollatorInterface* ci = nullptr,
                   const IndexPathProjection* indexPathProj = nullptr,
                   std::shared_ptr<const IndexCatalogEntry> iceStorage = nullptr)
         : identifier(std::move(ident)),
           keyPattern(kp),
-          filterExpr(fe),
           type(type),
           sparse(sp),
-          collator(ci),
           indexPathProjection(indexPathProj),
           indexCatalogEntryStorage(std::move(iceStorage)) {
         if (indexPathProjection != nullptr)
             tassert(11051934,
                     "Wildcard index is expected if index path projection is provided",
                     type == IndexType::INDEX_WILDCARD);
+
+        if (indexCatalogEntryStorage != nullptr) {
+            filterExpr = indexCatalogEntryStorage->getFilterExpression();
+            collator = indexCatalogEntryStorage->getCollator();
+        }
     }
 
     virtual ~CoreIndexInfo() = default;
@@ -146,10 +147,9 @@ struct CoreIndexInfo {
     BSONObj keyPattern;
 
     // If this index is a partial index, 'filterExpr' is the MatchExpression representing the
-    // filter predicate. Otherwise, 'filterExpr' is null. It is the caller's responsibility to
-    // ensure that the pointer remains valid for the lifetime of this CoreIndexInfo.
+    // filter predicate. Otherwise, 'filterExpr' is null.
     // See 'indexCatalogEntryStorage' for more details.
-    const MatchExpression* filterExpr;
+    const MatchExpression* filterExpr = nullptr;
 
     // What type of index is this? (What access method can we use on the index described by the
     // keyPattern?)
@@ -166,8 +166,6 @@ struct CoreIndexInfo {
 
     // For $** indexes, a pointer to the projection executor owned by the index access method. Null
     // unless this IndexEntry represents a wildcard index, in which case this is always non-null.
-    // It is the caller's responsibility to ensure that the pointer remains valid for the lifetime
-    // of this CoreIndexInfo.
     // See 'indexCatalogEntryStorage' for more details.
     const IndexPathProjection* indexPathProjection = nullptr;
 
@@ -195,14 +193,11 @@ struct MONGO_MOD_NEEDS_REPLACEMENT IndexEntry : CoreIndexInfo {
                bool sp,
                bool unq,
                Identifier ident,
-               const MatchExpression* fe,
                const BSONObj& io,
-               const CollatorInterface* ci,
                const WildcardProjection* wildcardProjection,
                std::shared_ptr<const IndexCatalogEntry> iceStorage = nullptr,
                size_t wildcardPos = 0)
-        : CoreIndexInfo(
-              kp, type, sp, std::move(ident), fe, ci, wildcardProjection, std::move(iceStorage)),
+        : CoreIndexInfo(kp, type, sp, std::move(ident), wildcardProjection, std::move(iceStorage)),
           version(version),
           multikey(mk),
           unique(unq),

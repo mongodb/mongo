@@ -157,9 +157,7 @@ std::pair<IndexEntry, std::unique_ptr<WildcardProjection>> makeWildcardEntry(BSO
                        false,  // sparse
                        false,  // unique
                        IndexEntry::Identifier{"indexName"},
-                       nullptr,
                        BSONObj(),
-                       nullptr,
                        wcProj.get()),
             std::move(wcProj)};
 }
@@ -953,9 +951,7 @@ protected:
                        false,
                        false,
                        IndexEntry::Identifier{indexName},
-                       nullptr,
                        BSONObj(),
-                       nullptr,
                        nullptr));
     }
 
@@ -970,9 +966,7 @@ protected:
                        sparse,
                        false,
                        IndexEntry::Identifier{indexName},
-                       nullptr,
                        BSONObj(),
-                       nullptr,
                        nullptr));
     }
 
@@ -986,9 +980,7 @@ protected:
                          false,
                          false,
                          IndexEntry::Identifier{indexName},
-                         nullptr,
                          BSONObj(),
-                         nullptr,
                          nullptr);
         entry.collator = collator;
         params.mainCollectionInfo.indexes.push_back(entry);

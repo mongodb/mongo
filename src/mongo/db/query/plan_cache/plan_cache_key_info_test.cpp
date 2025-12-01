@@ -120,8 +120,6 @@ std::pair<CoreIndexInfo, std::unique_ptr<WildcardProjection>> makeWildcardUpdate
                           IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                           false,                                // sparse
                           IndexEntry::Identifier{"indexName"},  // name
-                          nullptr,                              // filterExpr
-                          nullptr,                              // collation
                           wcProj.get()),                        // wildcard
             std::move(wcProj)};
 }
@@ -238,12 +236,12 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyPartialIndex) {
     unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
     const auto keyPattern = BSON("a" << 1);
-    const std::vector<CoreIndexInfo> indexCores = {
-        CoreIndexInfo(keyPattern,
-                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      false,                       // sparse
-                      IndexEntry::Identifier{""},  // name
-                      filterExpr.get())};          // filterExpr
+    auto coreInfo = CoreIndexInfo(keyPattern,
+                                  IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                                  false,                        // sparse
+                                  IndexEntry::Identifier{""});  // name
+    coreInfo.filterExpr = filterExpr.get();
+    const std::vector<CoreIndexInfo> indexCores = {std::move(coreInfo)};
 
     unique_ptr<CanonicalQuery> cqGtNegativeFive(canonicalize("{f: {$gt: -5}}"));
     unique_ptr<CanonicalQuery> cqGtZero(canonicalize("{f: {$gt: 0}}"));
@@ -262,12 +260,12 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyPartialIndexConjunction) {
     unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
     const auto keyPattern = BSON("a" << 1);
-    const std::vector<CoreIndexInfo> indexCores = {
-        CoreIndexInfo(keyPattern,
-                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      false,                       // sparse
-                      IndexEntry::Identifier{""},  // name
-                      filterExpr.get())};          // filterExpr
+    auto coreInfo = CoreIndexInfo(keyPattern,
+                                  IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                                  false,                        // sparse
+                                  IndexEntry::Identifier{""});  // name
+    coreInfo.filterExpr = filterExpr.get();
+    const std::vector<CoreIndexInfo> indexCores = {std::move(coreInfo)};
 
     unique_ptr<CanonicalQuery> satisfySinglePredicate(canonicalize("{f: {$gt: 0}}"));
     ASSERT_EQ(makeKey(*satisfySinglePredicate, indexCores).getIndexabilityDiscriminators(), "(0)");
@@ -299,12 +297,12 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyPartialIndexDisjunction) {
     unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
     const auto keyPattern = BSON("a" << 1);
-    const std::vector<CoreIndexInfo> indexCores = {
-        CoreIndexInfo(keyPattern,
-                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      false,                       // sparse
-                      IndexEntry::Identifier{""},  // name
-                      filterExpr.get())};          // filterExpr
+    auto coreInfo = CoreIndexInfo(keyPattern,
+                                  IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                                  false,                        // sparse
+                                  IndexEntry::Identifier{""});  // name
+    coreInfo.filterExpr = filterExpr.get();
+    const std::vector<CoreIndexInfo> indexCores = {std::move(coreInfo)};
 
     unique_ptr<CanonicalQuery> satisfySinglePredicate(canonicalize("{f: {$eq: 11}}"));
     ASSERT_EQ(makeKey(*satisfySinglePredicate, indexCores).getIndexabilityDiscriminators(), "(1)");
@@ -346,12 +344,12 @@ TEST_F(PlanCacheKeyInfoTest, PartialIndexQueryElemMatch) {
     unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
     const auto keyPattern = BSON("a" << 1);
-    const std::vector<CoreIndexInfo> indexCores = {
-        CoreIndexInfo(keyPattern,
-                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      false,                       // sparse
-                      IndexEntry::Identifier{""},  // name
-                      filterExpr.get())};          // filterExpr
+    auto coreInfo = CoreIndexInfo(keyPattern,
+                                  IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                                  false,                        // sparse
+                                  IndexEntry::Identifier{""});  // name
+    coreInfo.filterExpr = filterExpr.get();
+    const std::vector<CoreIndexInfo> indexCores = {std::move(coreInfo)};
 
     {
         unique_ptr<CanonicalQuery> nonElemMatch(
@@ -380,12 +378,12 @@ TEST_F(PlanCacheKeyInfoTest, PartialIndexQueryNegation) {
     unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
     const auto keyPattern = BSON("a" << 1);
-    const std::vector<CoreIndexInfo> indexCores = {
-        CoreIndexInfo(keyPattern,
-                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      false,                       // sparse
-                      IndexEntry::Identifier{""},  // name
-                      filterExpr.get())};          // filterExpr
+    auto coreInfo = CoreIndexInfo(keyPattern,
+                                  IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                                  false,                        // sparse
+                                  IndexEntry::Identifier{""});  // name
+    coreInfo.filterExpr = filterExpr.get();
+    const std::vector<CoreIndexInfo> indexCores = {std::move(coreInfo)};
 
     {
         unique_ptr<CanonicalQuery> nor(canonicalize("{$nor: [{a: 1}]}"));
@@ -406,13 +404,12 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyPartialIndexNestedDisjunction) {
     unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
     const auto keyPattern = BSON("a" << 1);
-    const std::vector<CoreIndexInfo> indexCores = {
-        CoreIndexInfo(keyPattern,
-                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      false,                       // sparse
-                      IndexEntry::Identifier{""},  // name
-                      filterExpr.get())};          // filterExpr
-
+    auto coreInfo = CoreIndexInfo(keyPattern,
+                                  IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                                  false,                        // sparse
+                                  IndexEntry::Identifier{""});  // name
+    coreInfo.filterExpr = filterExpr.get();
+    const std::vector<CoreIndexInfo> indexCores = {std::move(coreInfo)};
 
     unique_ptr<CanonicalQuery> satisfySinglePredicate(canonicalize("{f: {$eq: 11}}"));
     ASSERT_EQ(makeKey(*satisfySinglePredicate, indexCores).getIndexabilityDiscriminators(), "(0)");
@@ -426,13 +423,12 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyCollationIndex) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
 
     const auto keyPattern = BSON("a" << 1);
-    const std::vector<CoreIndexInfo> indexCores = {
-        CoreIndexInfo(keyPattern,
-                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      false,                       // sparse
-                      IndexEntry::Identifier{""},  // name
-                      nullptr,                     // filterExpr
-                      &collator)};                 // collation
+    auto coreInfo = CoreIndexInfo(keyPattern,
+                                  IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                                  false,                        // sparse
+                                  IndexEntry::Identifier{""});  // name
+    coreInfo.collator = &collator;
+    const std::vector<CoreIndexInfo> indexCores = {std::move(coreInfo)};
 
     unique_ptr<CanonicalQuery> containsString(canonicalize("{a: 'abc'}"));
     unique_ptr<CanonicalQuery> containsObject(canonicalize("{a: {b: 'abc'}}"));
@@ -515,13 +511,12 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyCollationIndex) {
 TEST_F(PlanCacheKeyInfoTest, ComputeKeyElemMatchNoIndexOnPath) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     const auto keyPattern = BSON("a" << 1);
-    const std::vector<CoreIndexInfo> indexCores = {
-        CoreIndexInfo(keyPattern,
-                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      false,                       // sparse
-                      IndexEntry::Identifier{""},  // name
-                      nullptr,                     // filterExpr
-                      &collator)};                 // collation
+    auto coreInfo = CoreIndexInfo(keyPattern,
+                                  IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                                  false,                        // sparse
+                                  IndexEntry::Identifier{""});  // name
+    coreInfo.collator = &collator;
+    const std::vector<CoreIndexInfo> indexCores = {std::move(coreInfo)};
 
     // $elemMatch on "b.a" cannot use the index on field "a"; it should recognize that the field "a"
     // being referred to in the query is not top-level.
@@ -533,13 +528,12 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyElemMatchNoIndexOnPath) {
 TEST_F(PlanCacheKeyInfoTest, ComputeKeyObjectElemMatch) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     const auto keyPattern = BSON("a.b" << 1);
-    const std::vector<CoreIndexInfo> indexCores = {
-        CoreIndexInfo(keyPattern,
-                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      false,                       // sparse
-                      IndexEntry::Identifier{""},  // name
-                      nullptr,                     // filterExpr
-                      &collator)};                 // collation
+    auto coreInfo = CoreIndexInfo(keyPattern,
+                                  IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                                  false,                        // sparse
+                                  IndexEntry::Identifier{""});  // name
+    coreInfo.collator = &collator;
+    const std::vector<CoreIndexInfo> indexCores = {std::move(coreInfo)};
 
     // Object elemMatch on "a.b" should detect string comparison when query collation differs.
     unique_ptr<CanonicalQuery> objElemMatchNoString(
@@ -567,16 +561,12 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyWithNot) {
     const std::vector<CoreIndexInfo> indexCores = {
         CoreIndexInfo(keyPattern,
                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      false,                       // sparse
-                      IndexEntry::Identifier{""},  // name
-                      nullptr,                     // filterExpr
-                      nullptr),                    // collation
+                      false,                        // sparse
+                      IndexEntry::Identifier{""}),  // name
         CoreIndexInfo(keyPattern2,
                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern2)),
-                      false,                       // sparse
-                      IndexEntry::Identifier{""},  // name
-                      nullptr,                     // filterExpr
-                      nullptr),                    // collation
+                      false,                        // sparse
+                      IndexEntry::Identifier{""}),  // name
     };
 
     // $not with a child that does array matching should be differentiated from $not when the child
@@ -614,19 +604,20 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyWithLogicalNodes) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     const auto keyPattern = BSON("a" << 1);
     const auto dottedKeyPattern = BSON("a.b" << 1);
-    const std::vector<CoreIndexInfo> indexCores = {
-        CoreIndexInfo(keyPattern,
-                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      false,                       // sparse
-                      IndexEntry::Identifier{""},  // name
-                      nullptr,                     // filterExpr
-                      &collator),                  // collation
+
+    auto coreInfo = CoreIndexInfo(keyPattern,
+                                  IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                                  false,                        // sparse
+                                  IndexEntry::Identifier{""});  // name
+    coreInfo.collator = &collator;
+    auto dottedPathCoreInfo =
         CoreIndexInfo(dottedKeyPattern,
                       IndexNames::nameToType(IndexNames::findPluginName(dottedKeyPattern)),
-                      false,                       // sparse
-                      IndexEntry::Identifier{""},  // name
-                      nullptr,                     // filterExpr
-                      &collator)};                 // collation
+                      false,                        // sparse
+                      IndexEntry::Identifier{""});  // name
+    dottedPathCoreInfo.collator = &collator;
+    const std::vector<CoreIndexInfo> indexCores = {std::move(coreInfo),
+                                                   std::move(dottedPathCoreInfo)};
 
     // Top-level logical nodes have no path, so they shouldn't be included.
     unique_ptr<CanonicalQuery> simpleAnd(canonicalize("{$and: [{a: 1}, {b: 1}]}"));
@@ -929,7 +920,7 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyNotEqualsArray) {
         CoreIndexInfo(keyPattern,
                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                       false,                         // sparse
-                      IndexEntry::Identifier{""})};  // name*/
+                      IndexEntry::Identifier{""})};  // name
 
     const auto withIndexNeArrayKey = makeKey(*cqNeArray, indexCores);
     const auto withIndexNeScalarKey = makeKey(*cqNeScalar, indexCores);

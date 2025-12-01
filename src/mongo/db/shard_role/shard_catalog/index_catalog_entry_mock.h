@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 
@@ -45,8 +46,10 @@ public:
                           const CollectionPtr&,
                           const std::string& ident,
                           IndexDescriptor&& descriptor,
-                          bool)
-        : _descriptor(descriptor), _ident(ident) {
+                          bool isFrozen,
+                          const MatchExpression* filter = nullptr,
+                          const CollatorInterface* collator = nullptr)
+        : _descriptor(descriptor), _ident(ident), _filter(filter), _collator(collator) {
         _descriptor.setEntry(this);
     }
 
@@ -94,11 +97,11 @@ public:
     }
 
     const MatchExpression* getFilterExpression() const final {
-        return nullptr;
+        return _filter;
     }
 
     const CollatorInterface* getCollator() const final {
-        return nullptr;
+        return _collator;
     }
 
     NamespaceString getNSSFromCatalog(OperationContext* opCtx) const final {
@@ -165,6 +168,8 @@ public:
 private:
     IndexDescriptor _descriptor;
     const std::string _ident;
+    const MatchExpression* _filter;
+    const CollatorInterface* _collator;
 };
 
 }  // namespace mongo

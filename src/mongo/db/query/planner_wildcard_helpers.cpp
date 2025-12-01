@@ -450,9 +450,7 @@ boost::optional<IndexEntry> createExpandedIndexEntry(const IndexEntry& wildcardI
                      true,   // sparse
                      false,  // unique
                      {wildcardIndex.identifier.catalogName, fieldName},
-                     wildcardIndex.filterExpr,
                      wildcardIndex.infoObj,
-                     wildcardIndex.collator,
                      wildcardIndex.indexPathProjection,
                      wildcardIndex.indexCatalogEntryStorage,
                      wildcardFieldPos);

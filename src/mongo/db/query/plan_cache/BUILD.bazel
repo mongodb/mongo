@@ -104,6 +104,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:canonical_query_test_util",
         "//src/mongo/db/query:query_planner_test_lib",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
+        "//src/mongo/db/shard_role/shard_catalog:index_catalog_mock",
         "//src/mongo/idl:server_parameter_test_util",
     ],
 )

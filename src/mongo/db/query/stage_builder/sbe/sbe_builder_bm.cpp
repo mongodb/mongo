@@ -102,9 +102,7 @@ private:
                           false /*sparse*/,
                           false /*unique*/,
                           IndexEntry::Identifier{indexName},
-                          nullptr /*filterExpr*/,
                           BSONObj() /*infoObj*/,
-                          nullptr /*collatorInterface*/,
                           nullptr /*wildcardProjection*/);
     }
 };

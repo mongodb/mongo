@@ -72,8 +72,6 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
     tassert(11321048, "Index catalog entry descriptor must not be null", desc);
 
     if (desc->isIdIndex()) {
-        auto filterExpression = ice->getFilterExpression();
-        auto collator = ice->getCollator();
         // _id indexes are guaranteed to be non-multikey. Determining whether the index is multikey
         // has a small cost associated with it, so we skip that here to make _id lookups faster.
         return {desc->keyPattern(),
@@ -85,9 +83,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                 desc->isSparse(),
                 desc->unique(),
                 IndexEntry::Identifier{desc->indexName()},
-                filterExpression,
                 desc->infoObj(),
-                collator,
                 nullptr /* wildcard projection */,
                 std::move(ice)};
     }
@@ -128,8 +124,6 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
         }
     }
 
-    auto filterExpression = ice->getFilterExpression();
-    auto collator = ice->getCollator();
     auto multikeyPaths = ice->getMultikeyPaths(opCtx, collection);
     return {desc->keyPattern(),
             desc->getIndexType(),
@@ -145,9 +139,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             desc->isSparse(),
             desc->unique(),
             IndexEntry::Identifier{desc->indexName()},
-            filterExpression,
             desc->infoObj(),
-            collator,
             wildcardProjection,
             std::move(ice)};
 }

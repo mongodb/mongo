@@ -55,9 +55,7 @@ IndexEntry makeIndexEntry(BSONObj keyPattern, MultikeyPaths multiKeyPaths) {
             false,
             false,
             CoreIndexInfo::Identifier("test_foo"),
-            nullptr,
             {},
-            nullptr,
             nullptr};
 }
 

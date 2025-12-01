@@ -789,9 +789,7 @@ CEResult CardinalityEstimator::estimateConjWithHistogram(
                          false /* sparse */,
                          false /* unique */,
                          CoreIndexInfo::Identifier("idx"),
-                         nullptr /* filterExpression */,
                          BSONObj::kEmptyObject /* infoObj */,
-                         nullptr /* collatorInterface */,
                          nullptr /* wildcardProjection */);
     OrderedIntervalList oil;
     IndexBoundsBuilder::allValuesForField(fakeIndex.keyPattern.firstElement(), &oil);

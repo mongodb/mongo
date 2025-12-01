@@ -48,9 +48,7 @@ IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
             false,
             false,
             CoreIndexInfo::Identifier("test_foo"),
-            nullptr,
             {},
-            nullptr,
             nullptr};
 }
 

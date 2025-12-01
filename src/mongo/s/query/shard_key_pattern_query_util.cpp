@@ -438,9 +438,7 @@ boost::optional<IndexBounds> getIndexBoundsForQuery(const BSONObj& key,
                           false /* sparse */,
                           false /* unique */,
                           IndexEntry::Identifier{"shardkey"},
-                          nullptr /* filterExpr */,
                           BSONObj(),
-                          nullptr, /* collator */
                           nullptr /* projExec */);
     ;
 

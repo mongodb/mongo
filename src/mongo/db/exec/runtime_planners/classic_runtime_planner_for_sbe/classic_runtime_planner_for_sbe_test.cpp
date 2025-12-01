@@ -186,9 +186,7 @@ protected:
                                       false,
                                       false,
                                       IndexEntry::Identifier{indexName},
-                                      nullptr,
                                       BSONObj(),
-                                      nullptr,
                                       nullptr));
     }
 

@@ -75,9 +75,7 @@ IndexEntry buildSimpleIndexEntry(const std::vector<std::string>& indexFields) {
             false,
             false,
             CoreIndexInfo::Identifier("test_foo"),
-            nullptr,
             {},
-            nullptr,
             nullptr};
 }
 
@@ -101,9 +99,7 @@ IndexEntry buildMultikeyIndexEntry(const std::vector<std::string>& indexFields,
             false,
             false,
             CoreIndexInfo::Identifier("test_foo"),
-            nullptr,
             {},
-            nullptr,
             nullptr};
 }
 

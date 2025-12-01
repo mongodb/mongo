@@ -68,9 +68,7 @@ IndexEntry createIndexEntry(BSONObj keyPattern) {
                       false /*sparse*/,
                       false /*unique*/,
                       IndexEntry::Identifier{"ident"},
-                      nullptr /*filterExpr*/,
                       BSONObj() /*infoObj*/,
-                      nullptr /*collatorInterface*/,
                       nullptr /*wildcardProjection*/);
 }
 

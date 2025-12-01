@@ -64,9 +64,7 @@ TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByName) {
                      false,
                      false,
                      IndexEntry::Identifier{"a_1"},
-                     nullptr,
                      BSONObj(),
-                     nullptr,
                      nullptr);
     IndexEntry ab_idx(keyPat,
                       mongo::IndexNames::nameToType(mongo::IndexNames::findPluginName(keyPat)),
@@ -77,9 +75,7 @@ TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByName) {
                       false,
                       false,
                       IndexEntry::Identifier{"a_1:2"},
-                      nullptr,
                       BSONObj(),
-                      nullptr,
                       nullptr);
 
     ASSERT_TRUE(filter.allows(a_idx));
@@ -99,9 +95,7 @@ TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByKeyPattern) {
                      false,
                      false,
                      IndexEntry::Identifier{"foo"},
-                     nullptr,
                      BSONObj(),
-                     nullptr,
                      nullptr);
     auto keyPat_ab = fromjson("{a:1, b:1}");
     IndexEntry ab_idx(keyPat_ab,
@@ -113,9 +107,7 @@ TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByKeyPattern) {
                       false,
                       false,
                       IndexEntry::Identifier{"bar"},
-                      nullptr,
                       BSONObj(),
-                      nullptr,
                       nullptr);
 
     ASSERT_TRUE(filter.allows(a_idx));

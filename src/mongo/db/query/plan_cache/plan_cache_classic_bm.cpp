@@ -269,9 +269,7 @@ IndexEntry createIndexEntry(BSONObj keyPattern, const std::string& indexName) {
                       false,
                       false,
                       IndexEntry::Identifier{indexName},
-                      nullptr,
                       BSONObj(),
-                      nullptr,
                       nullptr);
 }
 

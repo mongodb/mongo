@@ -55,9 +55,7 @@ struct WildcardIndexEntryMock {
                                                   true,
                                                   false,
                                                   CoreIndexInfo::Identifier{indexName},
-                                                  nullptr,
                                                   BSONObj(),
-                                                  nullptr,
                                                   &wildcardProjection);
     }
 

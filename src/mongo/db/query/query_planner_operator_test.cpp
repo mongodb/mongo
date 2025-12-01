@@ -426,9 +426,7 @@ TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchObjectSparseMultiKeyBelowElemMa
                    true,
                    false,
                    IndexEntry::Identifier{"ind"},
-                   nullptr,  // filterExpr
                    BSONObj(),
-                   nullptr,
                    nullptr);
     ind.multikeyPaths = {{2U}};
     addIndex(ind);

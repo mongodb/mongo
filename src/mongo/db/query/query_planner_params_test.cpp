@@ -142,9 +142,7 @@ IndexEntry buildSimpleIndexEntry(const BSONObj& kp, const std::string& indexName
             false,
             false,
             CoreIndexInfo::Identifier(indexName),
-            nullptr,
             {},
-            nullptr,
             nullptr};
 }
 
@@ -164,9 +162,7 @@ IndexEntry buildWildcardIndexEntry(const BSONObj& kp,
             false,
             false,
             CoreIndexInfo::Identifier(indexName),
-            nullptr,
             {},
-            nullptr,
             &wcProj};
 }
 

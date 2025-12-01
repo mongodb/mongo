@@ -161,9 +161,7 @@ IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
             false,
             false,
             CoreIndexInfo::Identifier("a_1"),
-            nullptr,
             {},
-            nullptr,
             nullptr};
 }
 }  // namespace

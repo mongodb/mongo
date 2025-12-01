@@ -251,9 +251,7 @@ IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
             false,
             false,
             CoreIndexInfo::Identifier("test_foo"),
-            nullptr,
             {},
-            nullptr,
             nullptr};
 }
 
@@ -1173,14 +1171,12 @@ auto makeIndexEntry(BSONObj keyPattern,
                                      indexType,
                                      IndexConfig::kLatestIndexVersion,
                                      multiKey,
-                                     multiKeyPaths,
+                                     std::move(multiKeyPaths),
                                      multiKeyPathSet,
                                      false,
                                      false,
                                      CoreIndexInfo::Identifier("test_foo"),
-                                     nullptr,
                                      {},
-                                     nullptr,
                                      wcProj.get()),
                           std::move(wcProj));
 }
@@ -1839,9 +1835,7 @@ TEST(QueryPlannerIXSelectTest, SparseIndexCannotBeUsedInALookup) {
                            true,  /* sparse */
                            false, /* unique */
                            CoreIndexInfo::Identifier("test_foo"),
-                           nullptr,
                            {},
-                           nullptr,
                            nullptr);
 
     RelevantFieldIndexMap fields = {{"_id", {true}},

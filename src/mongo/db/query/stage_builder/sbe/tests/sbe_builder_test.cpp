@@ -315,9 +315,7 @@ IndexEntry makeIndexEntry(BSONObj keyPattern) {
             false /* sp */,
             false /* unq */,
             CoreIndexInfo::Identifier(DBClientBase::genIndexName(keyPattern)),
-            nullptr /* fe */,
             {} /* io */,
-            nullptr /* ci */,
             nullptr /* wildcardProjection */};
 }
 
