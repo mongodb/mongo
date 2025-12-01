@@ -47,6 +47,24 @@ Error:
   linking mongo dynamically is not currently supported on Windows
 """
 
+# This is a hack to work around the fact that the cc_library flag
+# additional_compiler_inputs doesn't exist in cc_binary. Instead, we add the
+# denylists to srcs as header files to make them visible to the compiler
+# executable.
+SANITIZER_DENYLIST_HEADERS = select({
+    "//bazel/config:asan_enabled": ["//etc:asan_denylist_h"],
+    "//conditions:default": [],
+}) + select({
+    "//bazel/config:msan_enabled": ["//etc:msan_denylist_h"],
+    "//conditions:default": [],
+}) + select({
+    "//bazel/config:tsan_enabled": ["//etc:tsan_denylist_h"],
+    "//conditions:default": [],
+}) + select({
+    "//bazel/config:ubsan_enabled": ["//etc:ubsan_denylist_h"],
+    "//conditions:default": [],
+})
+
 ASAN_OPTIONS = [
     "detect_leaks=1",
     "check_initialization_order=true",
@@ -161,6 +179,11 @@ SKIP_ARCHIVE_ENABLED = select({
     "//conditions:default": True,
 })
 
+SKIP_ARCHIVE_FEATURE = select({
+    "@platforms//os:windows": [],
+    "//conditions:default": ["supports_start_end_lib"],
+})
+
 SEPARATE_DEBUG_ENABLED = select({
     "//bazel/config:separate_debug_enabled": True,
     "//conditions:default": False,
@@ -199,16 +222,15 @@ SYMBOL_ORDER_FILES = [
     "//buildscripts:symbols-al2023.orderfile",
 ]
 
-# This contains a list of features that we use for third parties but disable for mongo code
-DISABLE_3RD_PARTY_FEATURES = select({
+# These are warnings are disabled globally at the toolchain level to allow external repository compilation.
+# Re-enable them for MongoDB source code.
+RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES = select({
     "//bazel/config:compiler_type_clang": [
         "-disable_warnings_for_third_party_libraries_clang",
         "thread_safety_warnings",
-        "-ubsan_third_party",
     ],
     "//bazel/config:compiler_type_gcc": [
         "-disable_warnings_for_third_party_libraries_gcc",
-        "-ubsan_third_party",
     ],
     "//conditions:default": [],
 })
@@ -382,7 +404,7 @@ def mongo_cc_library(
 
         if name != "mongoca" and name != "cyrus_sasl_windows_test_plugin":
             deps += MONGO_GLOBAL_SRC_DEPS
-        features = features + DISABLE_3RD_PARTY_FEATURES
+        features = features + RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES
     else:
         srcs = _final_srcs_for_cc + private_hdrs
 
@@ -397,13 +419,10 @@ def mongo_cc_library(
             "//conditions:default": ["@platforms//:incompatible"],
         })
 
-    if "third_party" not in native.package_name():
-        tags = tags + ["not_third_party"]
+    if "third_party" in native.package_name():
+        tags = tags + ["third_party"]
 
-    copts = get_copts(name, native.package_name(), copts)
-    if skip_windows_crt_flags:
-        features = features + ["-multithreaded_feature", "-single_threaded_feature"]
-
+    copts = get_copts(name, native.package_name(), copts, skip_windows_crt_flags)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
     linkopts = get_linkopts(native.package_name(), linkopts)
 
@@ -422,6 +441,27 @@ def mongo_cc_library(
     visibility_support_shared_flags = select({
         "//bazel/config:visibility_support_enabled_dynamic_linking_non_windows_setting": visibility_support_shared_lib_flags_list,
         "//conditions:default": [],
+    })
+
+    linux_rpath_flags = [
+        "-Wl,-z,origin",
+        "-Wl,--enable-new-dtags",
+        "-Wl,-rpath,\\$ORIGIN/../lib",
+        "-Wl,-h,lib" + name + ".so",
+    ]
+    macos_rpath_flags = [
+        "-Wl,-rpath,\\$ORIGIN/../lib",
+        "-Wl,-install_name,@rpath/lib" + name + ".dylib",
+    ]
+
+    rpath_flags = select({
+        "//bazel/config:linux_aarch64": linux_rpath_flags,
+        "//bazel/config:linux_ppc64le": linux_rpath_flags,
+        "//bazel/config:linux_s390x": linux_rpath_flags,
+        "//bazel/config:linux_x86_64": linux_rpath_flags,
+        "//bazel/config:macos_aarch64": macos_rpath_flags,
+        "//bazel/config:macos_x86_64": macos_rpath_flags,
+        "//bazel/config:windows_x86_64": [],
     })
 
     if no_undefined_ref_DO_NOT_USE:
@@ -445,7 +485,7 @@ def mongo_cc_library(
 
     cc_library(
         name = name + WITH_DEBUG_SUFFIX,
-        srcs = srcs,
+        srcs = srcs + SANITIZER_DENYLIST_HEADERS,
         hdrs = hdrs + fincludes_hdr,
         deps = deps + cc_deps,
         textual_hdrs = textual_hdrs,
@@ -463,7 +503,7 @@ def mongo_cc_library(
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         defines = defines,
         includes = includes,
-        features = features,
+        features = SKIP_ARCHIVE_FEATURE + features,
         target_compatible_with = target_compatible_with,
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         exec_properties = exec_properties,
@@ -481,7 +521,7 @@ def mongo_cc_library(
             deps = [name + WITH_DEBUG_SUFFIX],
             visibility = visibility,
             tags = tags + ["mongo_library"],
-            user_link_flags = get_linkopts(native.package_name()) + undefined_ref_flag + non_transitive_dyn_linkopts + visibility_support_shared_flags + select({
+            user_link_flags = get_linkopts(native.package_name()) + undefined_ref_flag + non_transitive_dyn_linkopts + rpath_flags + visibility_support_shared_flags + select({
                 "//bazel/config:simple_build_id_enabled": ["-Wl,--build-id=0x" +
                                                            hex32(hash(name)) +
                                                            hex32(hash(name)) +
@@ -496,7 +536,7 @@ def mongo_cc_library(
             }) + select({
                 "//bazel/config:simple_build_id_enabled": ["-build_id"],
                 "//conditions:default": [],
-            }) + ["rpath_override"],
+            }),
             additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
             exec_properties = exec_properties,
             win_def_file = win_def_file,
@@ -581,13 +621,12 @@ def _mongo_cc_binary_and_test(
         elif not in_third_party:
             # all_headers mode (binary flavor): returns a srcs list
             srcs = binary_srcs_with_all_headers(name, _final_srcs_for_cc, private_hdrs)
-            tags = tags + ["not_third_party"]
         else:
             # third_party inside src/mongo: append private headers as sources
             srcs = _final_srcs_for_cc + private_hdrs
 
         deps += MONGO_GLOBAL_SRC_DEPS
-        features = features + DISABLE_3RD_PARTY_FEATURES
+        features = features + RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES
     else:
         # Non-mongo pkgs: append private headers as sources
         srcs = _final_srcs_for_cc + private_hdrs
@@ -604,10 +643,7 @@ def _mongo_cc_binary_and_test(
                 "//conditions:default": ["@platforms//:incompatible"],
             })
 
-    copts = get_copts(name, native.package_name(), copts)
-    if skip_windows_crt_flags:
-        features = features + ["-multithreaded_feature", "-single_threaded_feature"]
-
+    copts = get_copts(name, native.package_name(), copts, skip_windows_crt_flags)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
     linkopts = get_linkopts(native.package_name(), linkopts)
 
@@ -655,7 +691,7 @@ def _mongo_cc_binary_and_test(
 
     args = {
         "name": name + WITH_DEBUG_SUFFIX,
-        "srcs": srcs + fincludes_hdr,
+        "srcs": srcs + fincludes_hdr + SANITIZER_DENYLIST_HEADERS,
         "deps": all_deps,
         "visibility": visibility,
         "testonly": testonly,
@@ -679,7 +715,7 @@ def _mongo_cc_binary_and_test(
         "local_defines": MONGO_GLOBAL_DEFINES + local_defines,
         "defines": defines,
         "includes": includes,
-        "features": ["-pic", "pie"] + features + select({
+        "features": SKIP_ARCHIVE_FEATURE + ["-pic", "pie"] + features + select({
             "//bazel/config:windows_debug_symbols_enabled": ["generate_pdb_file"],
             "//conditions:default": [],
         }) + select({

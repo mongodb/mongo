@@ -2166,6 +2166,38 @@ config_setting(
     },
 )
 
+selects.config_setting_group(
+    name = "disable_warnings_as_errors_linux",
+    match_all = [
+        "@platforms//os:linux",
+        ":warnings_as_errors_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "disable_warnings_as_errors_posix",
+    match_all = [
+        ":not_windows",
+        ":warnings_as_errors_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "disable_warnings_as_errors_macos",
+    match_all = [
+        "@platforms//os:macos",
+        ":warnings_as_errors_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "disable_warnings_as_errors_windows",
+    match_all = [
+        "@platforms//os:windows",
+        ":warnings_as_errors_enabled",
+    ],
+)
+
 # -----------
 # ssl options
 # -----------

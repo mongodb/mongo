@@ -232,7 +232,7 @@ def _impl(ctx):
 
     supports_start_end_lib_feature = feature(
         name = "supports_start_end_lib",
-        enabled = True,
+        enabled = False,
     )
 
     objcopy_embed_flags_feature = feature(
@@ -798,6 +798,52 @@ def _impl(ctx):
         ],
     )
 
+    disable_warnings_for_third_party_libraries_clang_feature = feature(
+        name = "disable_warnings_for_third_party_libraries_clang",
+        enabled = ctx.attr.compiler == COMPILERS.CLANG,
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    "-Wno-deprecated-declarations",
+                    "-Wno-deprecated-non-prototype",
+                    "-Wno-missing-template-arg-list-after-template-kw",
+                    "-Wno-sign-compare",
+                ])],
+            ),
+        ],
+    )
+
+    disable_warnings_for_third_party_libraries_gcc_feature = feature(
+        name = "disable_warnings_for_third_party_libraries_gcc",
+        enabled = ctx.attr.compiler == COMPILERS.GCC,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    "-Wno-overloaded-virtual",
+                    "-Wno-dangling-reference",
+                    "-Wno-deprecated",
+                    "-Wno-deprecated-declarations",
+                    "-Wno-class-memaccess",
+                    "-Wno-uninitialized",
+                    "-Wno-array-bounds",
+                    "-Wno-sign-compare",
+                    "-Wno-stringop-overflow",
+                    "-Wno-stringop-overread",
+                    "-Wno-restrict",
+                    "-Wno-dangling-pointer",
+                ])],
+            ),
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    "-Wno-attributes",
+                ])],
+            ),
+        ],
+    )
+
     # Disable floating-point contractions such as forming of fused multiply-add
     # operations.
     disable_floating_point_contractions_feature = feature(
@@ -1338,411 +1384,6 @@ def _impl(ctx):
         ],
     )
 
-    shared_archive_gcc_feature = feature(
-        name = "shared_archive_gcc",
-        enabled = ctx.attr.shared_archive and ctx.attr.compiler == COMPILERS.GCC,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = ["-fno-gnu-unique"])],
-            ),
-            flag_set(
-                actions = all_link_actions + lto_index_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = ["-Wl,--no-gnu-unique", "-Wl,-Bsymbolic"] if ctx.attr.linker != LINKERS.MOLD else ["-Wl,-Bsymbolic"],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    # SERVER-9761: Ensure early detection of missing symbols in dependent libraries
-    # at program startup. For non-release dynamic builds we disable this behavior in
-    # the interest of improved mongod startup times. Xcode15 removed bind_at_load
-    # functionality so we cannot have a selection for macosx here
-    # ld: warning: -bind_at_load is deprecated on macOS
-    # TODO: SERVER-90596 reenable loading at startup
-    bind_at_load_feature = feature(
-        name = "bind_at_load",
-        enabled = ctx.attr.linkstatic,
-        flag_sets = [
-            flag_set(
-                actions = all_link_actions + lto_index_actions,
-                flag_groups = [flag_group(flags = ["-Wl,-z,now"])],
-            ),
-        ],
-    )
-
-    implicit_fallthrough_feature = feature(
-        name = "implicit_fallthrough",
-        enabled = True,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = ["-Wimplicit-fallthrough"] if ctx.attr.compiler == COMPILERS.CLANG else ["-Wimplicit-fallthrough=5"],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    any_sanitizer_feature = feature(
-        name = "any_sanitizer",
-        enabled = ctx.attr.any_sanitizer_enabled,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = ["-fno-omit-frame-pointer"])],
-            ),
-            flag_set(
-                actions = all_link_actions + lto_index_actions,
-                flag_groups = [
-                    # Sanitizer libs may inject undefined refs (for hooks) at link time, but the
-                    # symbols will be available at runtime via the compiler runtime lib.
-                    flag_group(
-                        flags = [
-                            "-Wl,--allow-shlib-undefined",
-                            "-rtlib=compiler-rt",
-                            "-unwindlib=libgcc",
-                        ] if not ctx.attr.tsan_enabled else ["-Wl,--allow-shlib-undefined"],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    asan_feature = feature(
-        name = "asan",
-        enabled = ctx.attr.asan_enabled,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-fsanitize=address",
-                            "-fsanitize-blacklist=" + ctx.attr.asan_denylist[DefaultInfo].files.to_list()[0].path if ctx.attr.asan_denylist != None else "",
-                        ],
-                    ),
-                ],
-            ),
-            flag_set(
-                actions = all_link_actions + lto_index_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = ["-fsanitize=address"],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    # We can't include the fuzzer flag with the other sanitize flags. The libfuzzer
-    # library already has a main function, which will cause the dependencies check
-    # to fail
-    fsan_feature = feature(
-        name = "fsan",
-        enabled = ctx.attr.fsan_enabled,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-fsanitize=fuzzer-no-link",
-                            "-fprofile-instr-generate",
-                            "-fcoverage-mapping",
-                        ],
-                    ),
-                ],
-            ),
-            flag_set(
-                actions = all_link_actions + lto_index_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-fsanitize=fuzzer-no-link",
-                            "-fprofile-instr-generate",
-                            "-fcoverage-mapping",
-                            "-nostdlib++",
-                            "-lstdc++",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    # Makes it easier to debug memory failures at the cost of some perf:
-    #   -fsanitize-memory-track-origins
-    msan_feature = feature(
-        name = "msan",
-        enabled = ctx.attr.msan_enabled,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-fsanitize=memory",
-                            "-fsanitize-memory-track-origins",
-                            "-fsanitize-blacklist=" + ctx.attr.msan_denylist[DefaultInfo].files.to_list()[0].path if ctx.attr.msan_denylist != None else "",
-                        ],
-                    ),
-                ],
-            ),
-            flag_set(
-                actions = all_link_actions + lto_index_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-fsanitize=memory",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    tsan_feature = feature(
-        name = "tsan",
-        enabled = ctx.attr.tsan_enabled,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-fsanitize=thread",
-                            "-fsanitize-blacklist=" + ctx.attr.tsan_denylist[DefaultInfo].files.to_list()[0].path if ctx.attr.tsan_denylist != None else "",
-                        ],
-                    ),
-                ],
-            ),
-            flag_set(
-                actions = all_link_actions + lto_index_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-fsanitize=thread",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    # By default, undefined behavior sanitizer doesn't stop on the first error. Make
-    # it so. Newer versions of clang have renamed the flag. However, this flag
-    # cannot be included when using the fuzzer sanitizer if we want to suppress
-    # errors to uncover new ones.
-
-    # In dynamic builds, the `vptr` sanitizer check can require additional
-    # dependency edges. That is very inconvenient, because such builds can't use
-    # z,defs. The result is a very fragile link graph, where refactoring the link
-    # graph in one place can have surprising effects in others. Instead, we just
-    # disable the `vptr` sanitizer for dynamic builds. We tried some other
-    # approaches in SERVER-49798 of adding a new descriptor type, but that didn't
-    # address the fundamental issue that the correct link graph for a dynamic+ubsan
-    # build isn't the same as the correct link graph for a regular dynamic build.
-    ubsan_compile_flags = []
-    if not ctx.attr.fsan_enabled:
-        ubsan_compile_flags += ["-fno-sanitize=vptr"]
-    if not ctx.attr.linkstatic:
-        ubsan_compile_flags += ["-fno-sanitize-recover"]
-    ubsan_feature = feature(
-        name = "ubsan",
-        enabled = ctx.attr.ubsan_enabled,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-fsanitize=undefined",
-                            "-fsanitize-blacklist=" + ctx.attr.ubsan_denylist[DefaultInfo].files.to_list()[0].path if ctx.attr.ubsan_denylist != None else "",
-                        ] + ubsan_compile_flags,
-                    ),
-                ],
-            ),
-            flag_set(
-                actions = all_link_actions + lto_index_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-fsanitize=undefined",
-                        ] + [] if ctx.attr.linkstatic else ["-fno-sanitize=vptr"],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    # Suppress the function sanitizer check for third party libraries, because:
-    #
-    # - mongod (a C++ binary) links in WiredTiger (a C library)
-    # - If/when mongod--built under ubsan--fails, the sanitizer will by
-    #   default analyze the failed execution for undefined behavior related to
-    #   function pointer usage. See:
-    #   https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html#available-checks
-    # - When this happens, the sanitizer will attempt to dynamically load to perform
-    #   the analysis.
-    # - However, since WT was built as a C library, is not linked with the function
-    #   sanitizer library symbols despite its C++ dependencies referencing them.
-    # - This will cause the sanitizer itself to fail, resulting in debug information
-    #   being unavailable.
-    # - So by suppressing the function ubsan check, we won't reference symbols
-    #   defined in the unavailable ubsan function sanitier library and will get
-    #   useful debugging information.
-    ubsan_third_party_feature = feature(
-        name = "ubsan_third_party",
-        enabled = ctx.attr.ubsan_enabled and not ctx.attr.linkstatic,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-fno-sanitize=function",
-                        ],
-                    ),
-                ],
-            ),
-            flag_set(
-                actions = all_link_actions + lto_index_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-fno-sanitize=function",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    mtune_flags = []
-    if ctx.attr.is_aarch64:
-        mtune_flags += ["-march=armv8.2-a", "-mtune=generic"]
-    if ctx.attr.is_ppc64le:
-        mtune_flags += ["-mcpu=power8", "-mtune=power8", "-mcmodel=medium"]
-    if ctx.attr.is_s390x:
-        mtune_flags += ["-march=z196", "-mtune=zEC12"]
-    if ctx.attr.is_x86_64:
-        mtune_flags += ["-march=sandybridge", "-mtune=generic", "-mprefer-vector-width=128"]
-
-    mtune_march_feature = feature(
-        name = "mtune_march",
-        enabled = True,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = mtune_flags,
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    compress_debug_disable_feature = feature(
-        name = "compress_debug_disable",
-        enabled = not ctx.attr.compress_debug_enabled and ctx.attr.compiler == COMPILERS.GCC,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    "-Wa,--nocompress-debug-sections",
-                ])],
-            ),
-        ],
-    )
-
-    rpath_override_feature = feature(
-        name = "rpath_override",
-        enabled = not ctx.attr.linkstatic,
-        flag_sets = [
-            flag_set(
-                actions = all_link_actions + lto_index_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-Wl,-z,origin",
-                            "-Wl,--enable-new-dtags",
-                            "-Wl,-rpath,\\$ORIGIN/../lib",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    warnings_as_errors_link_feature = feature(
-        name = "warnings_as_errors_link",
-        enabled = ctx.attr.warnings_as_errors_enabled,
-        flag_sets = [
-            flag_set(
-                actions = all_link_actions + lto_index_actions,
-                flag_groups = [flag_group(flags = [
-                    "-Wl,--fatal-warnings",
-                ])],
-            ),
-        ],
-    )
-
-    disable_warnings_for_third_party_libraries_clang_feature = feature(
-        name = "disable_warnings_for_third_party_libraries_clang",
-        enabled = ctx.attr.compiler == COMPILERS.CLANG,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    "-Wno-deprecated-declarations",
-                    "-Wno-deprecated-non-prototype",
-                    "-Wno-missing-template-arg-list-after-template-kw",
-                    "-Wno-sign-compare",
-                    "-Wno-implicit-fallthrough",
-                ])],
-            ),
-        ],
-    )
-
-    disable_warnings_for_third_party_libraries_gcc_feature = feature(
-        name = "disable_warnings_for_third_party_libraries_gcc",
-        enabled = ctx.attr.compiler == COMPILERS.GCC,
-        flag_sets = [
-            flag_set(
-                actions = all_cpp_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    "-Wno-overloaded-virtual",
-                    "-Wno-dangling-reference",
-                    "-Wno-deprecated",
-                    "-Wno-deprecated-declarations",
-                    "-Wno-class-memaccess",
-                    "-Wno-uninitialized",
-                    "-Wno-array-bounds",
-                    "-Wno-sign-compare",
-                    "-Wno-stringop-overflow",
-                    "-Wno-stringop-overread",
-                    "-Wno-restrict",
-                    "-Wno-dangling-pointer",
-                    "-Wno-implicit-fallthrough",
-                ])],
-            ),
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    "-Wno-attributes",
-                    "-Wno-implicit-fallthrough",
-                ])],
-            ),
-        ],
-    )
-
     features = [
         enable_all_warnings_feature,
         general_clang_or_gcc_warnings_feature,
@@ -1760,10 +1401,14 @@ def _impl(ctx):
         objcopy_embed_flags_feature,
         opt_feature,
         dbg_feature,
+        user_compile_flags_feature,
         sysroot_feature,
         unfiltered_compile_flags_feature,
         omitted_timestamps_feature,
         thin_archive_feature,
+        extra_cflags_feature,
+        extra_cxxflags_feature,
+        extra_ldflags_feature,
         includes_feature,
         dependency_file_feature,
         verbose_feature,
@@ -1788,6 +1433,8 @@ def _impl(ctx):
         no_class_memaccess_warning_feature,
         no_interference_size_warning_feature,
         thread_safety_warnings_feature,
+        disable_warnings_for_third_party_libraries_clang_feature,
+        disable_warnings_for_third_party_libraries_gcc_feature,
         disable_floating_point_contractions_feature,
         general_clang_warnings_feature,
         general_gcc_warnings_feature,
@@ -1812,30 +1459,7 @@ def _impl(ctx):
         file_prefix_map,
         strip_debug_feature,
         clang_toolchain_resource_dir_feature,
-        shared_archive_gcc_feature,
-        bind_at_load_feature,
-        implicit_fallthrough_feature,
-        any_sanitizer_feature,
-        asan_feature,
-        fsan_feature,
-        msan_feature,
-        tsan_feature,
-        ubsan_feature,
-        ubsan_third_party_feature,
-        mtune_march_feature,
-        compress_debug_disable_feature,
-        rpath_override_feature,
-        warnings_as_errors_link_feature,
-    ] + get_common_features(ctx) + [
-        # These flags are at the bottom so they get applied after anything else.
-        # These are things like the flags people apply directly on cc_library through copts/linkopts
-        user_compile_flags_feature,
-        extra_cflags_feature,
-        extra_cxxflags_feature,
-        extra_ldflags_feature,
-        disable_warnings_for_third_party_libraries_clang_feature,
-        disable_warnings_for_third_party_libraries_gcc_feature,
-    ]
+    ] + get_common_features(ctx)
 
     return [
         cc_common.create_cc_toolchain_config_info(
@@ -1892,24 +1516,6 @@ mongo_linux_cc_toolchain_config = rule(
         "propeller_profile_generate": attr.bool(default = False, mandatory = False),
         "propeller_profile_use": attr.label(default = None, allow_single_file = True, mandatory = False),
         "distributed_thin_lto": attr.bool(default = False, mandatory = False),
-        "any_sanitizer_enabled": attr.bool(default = False, mandatory = False),
-        "asan_enabled": attr.bool(default = False, mandatory = False),
-        "asan_denylist": attr.label(default = None, mandatory = False),
-        "fsan_enabled": attr.bool(default = False, mandatory = False),
-        "msan_enabled": attr.bool(default = False, mandatory = False),
-        "msan_denylist": attr.label(default = None, mandatory = False),
-        "tsan_enabled": attr.bool(default = False, mandatory = False),
-        "tsan_denylist": attr.label(default = None, mandatory = False),
-        "ubsan_enabled": attr.bool(default = False, mandatory = False),
-        "ubsan_denylist": attr.label(default = None, mandatory = False),
-        "is_aarch64": attr.bool(default = False, mandatory = False),
-        "is_ppc64le": attr.bool(default = False, mandatory = False),
-        "is_s390x": attr.bool(default = False, mandatory = False),
-        "is_x86_64": attr.bool(default = False, mandatory = False),
-        "internal_thin_lto_enabled": attr.bool(default = False, mandatory = False),
-        "coverage_enabled": attr.bool(default = False, mandatory = False),
-        "compress_debug_enabled": attr.bool(default = False, mandatory = False),
-        "warnings_as_errors_enabled": attr.bool(default = False, mandatory = False),
     },
     provides = [CcToolchainConfigInfo],
 )

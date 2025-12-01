@@ -21,31 +21,6 @@ DEBUG_LEVEL = select({
     "@//bazel/config:gcc_or_clang_dbg_level_3": 3,
 })
 
-INTERNAL_THIN_LTO_ENABLED = select({
-    "@//bazel/config:thin_lto_enabled": True,
-    "@//conditions:default": False,
-})
-
-COVERAGE_ENABLED = select({
-    "@//bazel/config:gcov_enabled": True,
-    "@//conditions:default": False,
-})
-
-COMPRESS_DEBUG_ENABLED = select({
-    "@//bazel/config:compress_debug_compile_enabled": True,
-    "@//conditions:default": False,
-})
-
-WARNINGS_AS_ERRORS_ENABLED = select({
-    "@//bazel/config:warnings_as_errors_enabled": True,
-    "@//conditions:default": False,
-})
-
-LINKSTATIC_ENABLED = select({
-    "@//bazel/config:linkstatic_enabled": True,
-    "@//conditions:default": False,
-})
-
 [
     cc_toolchain(
         name = "cc-compiler-" + arch,
@@ -98,11 +73,6 @@ feature_attrs = get_common_features_attrs()
         optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
         debug_level = DEBUG_LEVEL,
         supports_start_end_lib = True,
-        internal_thin_lto_enabled = INTERNAL_THIN_LTO_ENABLED,
-        coverage_enabled = COVERAGE_ENABLED,
-        compress_debug_enabled = COMPRESS_DEBUG_ENABLED,
-        warnings_as_errors_enabled = WARNINGS_AS_ERRORS_ENABLED,
-        linkstatic = LINKSTATIC_ENABLED,
     )
     for arch, cpu in get_supported_apple_archs().items()
 ]

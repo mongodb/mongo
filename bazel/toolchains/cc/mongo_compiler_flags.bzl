@@ -5,12 +5,42 @@ load(
     "MONGO_LINUX_CC_COPTS",
     "MONGO_LINUX_CC_LINKFLAGS",
 )
+load(
+    "//bazel/toolchains/cc/mongo_windows:mongo_compiler_flags.bzl",
+    "MONGO_WIN_CC_COPTS",
+    "MONGO_WIN_CC_LINKFLAGS",
+    "WINDOWS_MULTITHREAD_RUNTIME_COPTS",
+)
 
 # Only visible in the build system.
 visibility([
     "//bazel",
     "//src/mongo/util",
 ])
+
+# Used as both link flags and copts
+# Suppress the function sanitizer check for third party libraries, because:
+#
+# - mongod (a C++ binary) links in WiredTiger (a C library)
+# - If/when mongod--built under ubsan--fails, the sanitizer will by
+#   default analyze the failed execution for undefined behavior related to
+#   function pointer usage. See:
+#   https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html#available-checks
+# - When this happens, the sanitizer will attempt to dynamically load to perform
+#   the analysis.
+# - However, since WT was built as a C library, is not linked with the function
+#   sanitizer library symbols despite its C++ dependencies referencing them.
+# - This will cause the sanitizer itself to fail, resulting in debug information
+#   being unavailable.
+# - So by suppressing the function ubsan check, we won't reference symbols
+#   defined in the unavailable ubsan function sanitier library and will get
+#   useful debugging information.
+UBSAN_OPTS_THIRD_PARTY = select({
+    "//bazel/config:sanitize_undefined_dynamic_link_settings": [
+        "-fno-sanitize=function",
+    ],
+    "//conditions:default": [],
+})
 
 def force_includes_copt(package_name, name):
     if package_name.startswith("src/mongo"):
@@ -36,15 +66,28 @@ def force_includes_copt(package_name, name):
 # TODO(SERVER-103006): Stop including this flag when ASP is able to upgrade mongoc and mongocxx
 STREAMS_THIRD_PARTY_DIR = "src/mongo/db/modules/enterprise/src/streams/third_party"
 
-MONGO_GLOBAL_COPTS = MONGO_LINUX_CC_COPTS
+def package_specific_copt(package_name):
+    if package_name.startswith("src/third_party") or package_name.startswith(STREAMS_THIRD_PARTY_DIR):
+        return UBSAN_OPTS_THIRD_PARTY
+    return []
 
-def get_copts(name, package_name, copts = []):
+def package_specific_linkflag(package_name):
+    if package_name.startswith("src/third_party") or package_name.startswith(STREAMS_THIRD_PARTY_DIR):
+        return UBSAN_OPTS_THIRD_PARTY
+    return []
+
+MONGO_GLOBAL_COPTS = MONGO_LINUX_CC_COPTS + MONGO_WIN_CC_COPTS
+
+def get_copts(name, package_name, copts = [], skip_windows_crt_flags = False):
     copts = MONGO_GLOBAL_COPTS + \
+            package_specific_copt(package_name) + \
             copts + \
             force_includes_copt(package_name, name)
+    if not skip_windows_crt_flags:
+        copts = copts + WINDOWS_MULTITHREAD_RUNTIME_COPTS
     return copts
 
-MONGO_GLOBAL_LINKFLAGS = MONGO_LINUX_CC_LINKFLAGS
+MONGO_GLOBAL_LINKFLAGS = MONGO_LINUX_CC_LINKFLAGS + MONGO_WIN_CC_LINKFLAGS
 
 def get_linkopts(package_name, linkopts = []):
-    return MONGO_GLOBAL_LINKFLAGS + linkopts
+    return MONGO_GLOBAL_LINKFLAGS + package_specific_linkflag(package_name) + linkopts

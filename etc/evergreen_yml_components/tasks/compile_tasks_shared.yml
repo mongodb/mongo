@@ -225,8 +225,6 @@ tasks:
             "src/bazel/**"
             "src/buildscripts/**"
             "src/docker_compose/**"
-            "src/etc/BUILD.bazel"
-            "src/etc/*san.denylist"
             "src/etc/*san.suppressions"
             "src/etc/backports_required_for_multiversion_tests.yml"
             "src/etc/evergreen.yml"

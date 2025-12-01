@@ -1620,7 +1620,6 @@ def _impl(ctx):
             extension = ".dylib",
         ),
     ]
-
     features = [
         framework_paths_feature,
         cpp_modules_feature,
@@ -1721,11 +1720,6 @@ mongo_apple_llvm_cc_toolchain_config = rule(
         "builtin_sysroot": attr.label(mandatory = True),
         "optimization_level": attr.string(mandatory = False),
         "debug_level": attr.int(mandatory = False),
-        "internal_thin_lto_enabled": attr.bool(default = False, mandatory = False),
-        "coverage_enabled": attr.bool(default = False, mandatory = False),
-        "compress_debug_enabled": attr.bool(default = False, mandatory = False),
-        "warnings_as_errors_enabled": attr.bool(default = True, mandatory = False),
-        "linkstatic": attr.bool(mandatory = True),
     },
     fragments = ["apple", "cpp"],
     provides = [CcToolchainConfigInfo],

@@ -5,41 +5,6 @@ SMALLER_BINARY = select({
     "//conditions:default": False,
 })
 
-WARNINGS_AS_ERRORS_ENABLED = select({
-    "@//bazel/config:warnings_as_errors_enabled": True,
-    "@//conditions:default": False,
-})
-
-OPT_DEBUG = select({
-    "@//bazel/config:windows_opt_debug": True,
-    "//conditions:default": False,
-})
-
-OPT_OFF = select({
-    "@//bazel/config:windows_opt_off": True,
-    "//conditions:default": False,
-})
-
-OPT_ON = select({
-    "@//bazel/config:windows_opt_on": True,
-    "//conditions:default": False,
-})
-
-OPT_SIZE = select({
-    "@//bazel/config:windows_opt_size": True,
-    "//conditions:default": False,
-})
-
-DBG = select({
-    "@//bazel/config:windows_dbg_enabled": True,
-    "//conditions:default": False,
-})
-
-DEBUG_SYMBOLS = select({
-    "@//bazel/config:windows_debug_symbols_enabled": True,
-    "//conditions:default": False,
-})
-
 DEFAULT_LINK_FLAGS = [
     "/MACHINE:X64",
     "/NODEFAULTLIB:library",
@@ -102,13 +67,6 @@ mongo_windows_cc_toolchain_config(
     toolchain_identifier = "msvc_x64",
     supports_parse_showincludes = True,
     smaller_binary = SMALLER_BINARY,
-    warnings_as_errors_enabled = WARNINGS_AS_ERRORS_ENABLED,
-    opt_debug = OPT_DEBUG,
-    opt_off = OPT_OFF,
-    opt_on = OPT_ON,
-    opt_size = OPT_SIZE,
-    dbg = DBG,
-    debug_symbols = DEBUG_SYMBOLS,
 )
 
 exports_files(["rc_wrapper.cmd"])

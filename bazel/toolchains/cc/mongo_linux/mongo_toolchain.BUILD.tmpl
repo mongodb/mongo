@@ -13,12 +13,6 @@ load(
     "@//bazel/toolchains/cc:mongo_custom_features.bzl",
     "FEATURES_ATTR_NAMES",
     "get_common_features_attrs")
-load(
-    "@//bazel/toolchains/cc:mongo_errors.bzl",
-    "REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE",
-    "SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE",
-    "THREAD_SANITIZER_ERROR_MESSAGE",
-)
 
 package(default_visibility = ["//visibility:public"])
 
@@ -119,97 +113,6 @@ DTLTO_ENABLED = select({
     "@//conditions:default": False,
 })
 
-ANY_SANITIZER_ENABLED = select({
-    "@//bazel/config:no_enabled_sanitizer": False,
-    "@//bazel/config:any_sanitizer_required_setting": True,
-}, no_match_error = REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE)
-
-ASAN_ENABLED = select({
-    "@//bazel/config:asan_disabled": False,
-    "@//bazel/config:sanitize_address_required_settings": True,
-}, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE)
-
-ASAN_DENYLIST = "@//etc:asan_denylist_h"
-
-FSAN_ENABLED = select({
-    "@//bazel/config:sanitize_fuzzer_required_settings": True,
-    "@//bazel/config:fsan_disabled": False,
-}, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE + "fuzzer")
-
-MSAN_ENABLED = select({
-    "@//bazel/config:msan_disabled": False,
-    "@//bazel/config:sanitize_memory_required_settings": True
-}, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE)
-
-MSAN_DENYLIST = "@//etc:msan_denylist_h"
-
-# Combines following two conditions -
-# 1.
-# TODO: SERVER-48622
-#
-# See https://github.com/google/sanitizers/issues/943 for why we disallow
-# combining TSAN with libunwind. We could, aternatively, have added logic to
-# automate the decision about whether to enable libunwind based on whether TSAN
-# is enabled, but that logic is already complex, and it feels better to make it
-# explicit that using TSAN means you won't get the benefits of libunwind.
-#
-# 2.
-# We add suppressions based on the library file in etc/tsan.suppressions so the
-# link-model needs to be dynamic.
-TSAN_ENABLED = select({
-    "@//bazel/config:sanitize_thread_required_settings": True,
-    "@//bazel/config:tsan_disabled": False,
-}, no_match_error = THREAD_SANITIZER_ERROR_MESSAGE)
-
-TSAN_DENYLIST = "@//etc:tsan_denylist_h"
-
-UBSAN_ENABLED = select({
-    "@//bazel/config:ubsan_enabled": True,
-    "@//conditions:default": False,
-})
-
-UBSAN_DENYLIST = "@//etc:ubsan_denylist_h"
-
-IS_AARCH64 = select({
-    "@//bazel/config:linux_aarch64": True,
-    "@//conditions:default": False,
-})
-
-IS_PPC64LE = select({
-    "@//bazel/config:linux_ppc64le": True,
-    "@//conditions:default": False,
-})
-
-IS_S390X = select({
-    "@//bazel/config:linux_s390x": True,
-    "@//conditions:default": False,
-})
-
-IS_X86_64 = select({
-    "@//bazel/config:linux_x86_64": True,
-    "@//conditions:default": False,
-})
-
-INTERNAL_THIN_LTO_ENABLED = select({
-    "@//bazel/config:thin_lto_enabled": True,
-    "@//conditions:default": False,
-})
-
-COVERAGE_ENABLED = select({
-    "@//bazel/config:gcov_enabled": True,
-    "@//conditions:default": False,
-})
-
-COMPRESS_DEBUG_ENABLED = select({
-    "@//bazel/config:compress_debug_compile_enabled": True,
-    "@//conditions:default": False,
-})
-
-WARNINGS_AS_ERRORS_ENABLED = select({
-    "@//bazel/config:warnings_as_errors_enabled": True,
-    "@//conditions:default": False,
-})
-
 LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
 
 # Helper target for the toolchain (see below):
@@ -218,18 +121,6 @@ filegroup(
     srcs = glob(["**/*"]) + select({
         "@//bazel/config:pgo_profile_use_clang_enabled_linkstatic_enabled": ["@pgo_data//:clang_pgo_files"],
         "@//bazel/config:pgo_profile_use_gcc_enabled_linkstatic_enabled": ["@pgo_data//:gcc_pgo_files"],
-        "@//conditions:default": [],
-    }) + select ({
-        "@//bazel/config:asan_disabled": [],
-        "@//bazel/config:sanitize_address_required_settings": ["@//etc:asan_denylist_h"],
-    }) + select ({
-        "@//bazel/config:msan_disabled": [],
-        "@//bazel/config:sanitize_memory_required_settings": ["@//etc:msan_denylist_h"],
-    }) + select ({
-        "@//bazel/config:sanitize_thread_required_settings": ["@//etc:tsan_denylist_h"],
-        "@//bazel/config:tsan_disabled": [],
-    }) + select ({
-        "@//bazel/config:ubsan_enabled": ["@//etc:ubsan_denylist_h"],
         "@//conditions:default": [],
     })
 )
@@ -276,24 +167,6 @@ mongo_linux_cc_toolchain_config(
     pgo_profile_generate = PGO_PROFILE_GENERATE_ENABLED,
     pgo_profile_use = PGO_PROFILE_USE_ENABLED,
     distributed_thin_lto = DTLTO_ENABLED,
-    any_sanitizer_enabled = ANY_SANITIZER_ENABLED,
-    asan_enabled = ASAN_ENABLED,
-    asan_denylist = ASAN_DENYLIST,
-    fsan_enabled = FSAN_ENABLED,
-    msan_enabled = MSAN_ENABLED,
-    msan_denylist = MSAN_DENYLIST,
-    tsan_enabled = TSAN_ENABLED,
-    tsan_denylist = TSAN_DENYLIST,
-    ubsan_enabled = UBSAN_ENABLED,
-    ubsan_denylist = UBSAN_DENYLIST,
-    is_aarch64 = IS_AARCH64,
-    is_ppc64le = IS_PPC64LE,
-    is_s390x = IS_S390X,
-    is_x86_64 = IS_X86_64,
-    internal_thin_lto_enabled = False,
-    coverage_enabled = COVERAGE_ENABLED,
-    compress_debug_enabled = COMPRESS_DEBUG_ENABLED,
-    warnings_as_errors_enabled = WARNINGS_AS_ERRORS_ENABLED,
 )
 
 mongo_linux_cc_toolchain_config(
@@ -342,24 +215,6 @@ mongo_linux_cc_toolchain_config(
     pgo_profile_use = PGO_PROFILE_USE_ENABLED,
     propeller_profile_generate = PROPELLER_PROFILE_GENERATE_ENABLED,
     distributed_thin_lto = DTLTO_ENABLED,
-    any_sanitizer_enabled = ANY_SANITIZER_ENABLED,
-    asan_enabled = ASAN_ENABLED,
-    asan_denylist = ASAN_DENYLIST,
-    fsan_enabled = FSAN_ENABLED,
-    msan_enabled = MSAN_ENABLED,
-    msan_denylist = MSAN_DENYLIST,
-    tsan_enabled = TSAN_ENABLED,
-    tsan_denylist = TSAN_DENYLIST,
-    ubsan_enabled = UBSAN_ENABLED,
-    ubsan_denylist = UBSAN_DENYLIST,
-    is_aarch64 = IS_AARCH64,
-    is_ppc64le = IS_PPC64LE,
-    is_s390x = IS_S390X,
-    is_x86_64 = IS_X86_64,
-    internal_thin_lto_enabled = INTERNAL_THIN_LTO_ENABLED,
-    coverage_enabled = COVERAGE_ENABLED,
-    compress_debug_enabled = COMPRESS_DEBUG_ENABLED,
-    warnings_as_errors_enabled = WARNINGS_AS_ERRORS_ENABLED,
 )
 
 cc_toolchain(

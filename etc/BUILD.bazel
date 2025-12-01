@@ -10,24 +10,28 @@ exports_files([
 # This is a hack to work around the fact that the cc_library flag additional_compiler_inputs doesn't
 # exist in cc_binary. Instead, we add the denylists to srcs as header files to make them visible to
 # the compiler executable.
-filegroup(
+symlink(
     name = "asan_denylist_h",
-    srcs = ["asan.denylist"],
+    input = "asan.denylist",
+    output = "asan.denylist.h",
 )
 
-filegroup(
+symlink(
     name = "msan_denylist_h",
-    srcs = ["msan.denylist"],
+    input = "msan.denylist",
+    output = "msan.denylist.h",
 )
 
-filegroup(
+symlink(
     name = "tsan_denylist_h",
-    srcs = ["tsan.denylist"],
+    input = "tsan.denylist",
+    output = "tsan.denylist.h",
 )
 
-filegroup(
+symlink(
     name = "ubsan_denylist_h",
-    srcs = ["ubsan.denylist"],
+    input = "ubsan.denylist",
+    output = "ubsan.denylist.h",
 )
 
 filegroup(
