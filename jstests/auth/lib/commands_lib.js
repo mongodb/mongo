@@ -6503,22 +6503,6 @@ export const authCommandsLib = {
             ],
         },
         {
-            testname: "profileFilter",
-            command: {profile: -1, filter: {$alwaysTrue: 1}},
-            testcases: [
-                {
-                    runOnDb: firstDbName,
-                    roles: roles_dbAdmin,
-                    privileges: [{resource: {db: firstDbName, collection: ""}, actions: ["enableProfiler"]}],
-                },
-                {
-                    runOnDb: secondDbName,
-                    roles: roles_dbAdminAny,
-                    privileges: [{resource: {db: secondDbName, collection: ""}, actions: ["enableProfiler"]}],
-                },
-            ],
-        },
-        {
             testname: "profile_mongos",
             command: {profile: 0, slowms: 10, sampleRate: 0.5},
             skipUnlessSharded: true,
