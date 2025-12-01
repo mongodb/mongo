@@ -227,9 +227,9 @@ mongo_cc_benchmark(
     deps = [
         ":expression_bm_fixture",
         "//src/mongo/db:query_expressions",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/shard_role:service_context_non_d",
     ],
 )
 

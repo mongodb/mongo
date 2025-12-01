@@ -28,3 +28,13 @@ idl_generator(
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "metadata_consistency_types_idl",
+    srcs = [
+        ":metadata_consistency_types_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

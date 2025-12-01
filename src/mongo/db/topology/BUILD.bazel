@@ -65,3 +65,14 @@ idl_generator(
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "remove_shard_exception",
+    srcs = [
+        "remove_shard_exception.cpp",
+        ":remove_shard_draining_progress_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

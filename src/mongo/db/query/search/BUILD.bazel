@@ -84,8 +84,8 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:docs_needed_bounds",
         "//src/mongo/db/query:common_query_enums_and_helpers",
         "//src/mongo/db/query:plan_yield_policy",
+        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter",
         "//src/mongo/executor:task_executor_cursor",
-        "//src/mongo/idl:cluster_server_parameter",
     ],
 )
 

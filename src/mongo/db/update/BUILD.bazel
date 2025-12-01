@@ -97,7 +97,7 @@ mongo_cc_library(
     deps = [
         ":update_common",
         "//src/mongo/db:update_index_data",
-        "//src/mongo/db:vector_clock_mutable",
+        "//src/mongo/db/topology/vector_clock:vector_clock_mutable",
     ],
 )
 
@@ -174,9 +174,7 @@ mongo_cc_unit_test(
         ":update_driver",
         ":update_test_helpers",
         "//src/mongo/db:query_expressions",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/db:vector_clock_trivial",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/exec/mutable_bson",
@@ -185,5 +183,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_planner",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/db/topology/vector_clock:vector_clock_trivial",
     ],
 )

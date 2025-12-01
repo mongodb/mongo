@@ -182,8 +182,8 @@ mongo_cc_library(
         "plan_yield_policy.cpp",
     ],
     deps = [
-        "//src/mongo/db:shard_role",
         "//src/mongo/db/query/query_settings",
+        "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/util:elapsed_tracker",
     ],
@@ -278,7 +278,7 @@ mongo_cc_library(
     deps = [
         ":on_parameter_change_updaters",
         "//src/mongo/db:server_base",
-        "//src/mongo/idl:cluster_server_parameter",
+        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter",
     ],
 )
 
@@ -698,5 +698,28 @@ mongo_cc_benchmark(
     deps = [
         "query_bm_constants",
         "query_bm_fixture",
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_query_info",
+    srcs = [
+        "collection_index_usage_tracker_decoration.cpp",
+        "collection_query_info.cpp",
+        "query_settings_decoration.cpp",
+        "//src/mongo/db/query/plan_cache:plan_cache_key_factory.cpp",
+    ],
+    deps = [
+        ":query_planner",
+        "//src/mongo/db:collection_index_usage_tracker",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/fts:base_fts",
+        "//src/mongo/db/query/plan_cache:query_plan_cache",
+        "//src/mongo/db/query/query_settings",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/shard_role/shard_catalog:index_catalog",
+        "//src/mongo/db/storage:storage_options",
     ],
 )

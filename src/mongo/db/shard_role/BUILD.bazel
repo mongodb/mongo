@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/config:generate_config_header.bzl", "generate_config_header")
 
 package(default_visibility = ["//visibility:public"])
@@ -17,5 +17,115 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "service_context_non_d",
+    srcs = [
+        "transaction_resources_init_non_mongod.cpp",
+    ],
+    tags = [
+        "mongo_crypt",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+    ],
+)
+
+mongo_cc_library(
+    name = "shard_role_api_stor_ex",
+    srcs = [
+        "//src/mongo/db:replication_state_transition_lock_guard.cpp",
+        "//src/mongo/db/shard_role/lock_manager:d_concurrency.cpp",
+        "//src/mongo/db/shard_role/shard_catalog:collection.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query/collation:collator_factory_interface",
+        "//src/mongo/db/repl:intent_registry",
+        "//src/mongo/db/shard_role/lock_manager",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
+        "//src/mongo/s:common_s",
+    ],
+)
+
+mongo_cc_library(
+    name = "shard_role",
+    srcs = [
+        "direct_connection_util.cpp",
+        "post_resharding_placement.cpp",
+        "shard_role.cpp",
+        "shard_role_loop.cpp",
+        "shard_role_mock.cpp",
+        "//src/mongo/db/shard_role/ddl:direct_connection_ddl_hook.cpp",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_helper.cpp",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_raii.cpp",
+        "//src/mongo/db/shard_role/shard_catalog:collection_uuid_mismatch.cpp",
+        "//src/mongo/db/shard_role/shard_catalog:collection_yield_restore.cpp",
+        "//src/mongo/db/shard_role/shard_catalog:db_raii.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/repl:local_oplog_info",
+        "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
+        "//src/mongo/db/shard_role/shard_catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/shard_role/shard_catalog:database_holder",
+        "//src/mongo/db/shard_role/shard_catalog:snapshot_helper",
+        "//src/mongo/db/sharding_environment:sharding_runtime_d_params_idl",
+        "//src/mongo/db/stats:top",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "shard_role_test",
+    srcs = [
+        "shard_role_loop_test.cpp",
+        "shard_role_test.cpp",
+        "//src/mongo/db:database_name_test.cpp",
+        "//src/mongo/db/shard_role/lock_manager:d_concurrency_test.cpp",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_raii_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":shard_role",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/admission/execution_control:ticketing_system",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/query/client_cursor",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/db/shard_role/lock_manager:exception_util",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_control",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/shard_role/shard_catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/shard_role/shard_catalog:database_holder",
+        "//src/mongo/db/shard_role/shard_catalog:database_holder_mock",
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
+        "//src/mongo/util:progress_meter",
+        "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "direct_shard_client_tracker_test",
+    srcs = [
+        "direct_shard_client_tracker_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db:commands_test_example",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/global_catalog/ddl:sharding_catalog_manager",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/rpc:message",
+        "//src/mongo/transport:transport_layer_mock",
     ],
 )

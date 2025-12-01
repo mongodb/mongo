@@ -142,8 +142,8 @@ mongo_cc_library(
     ],
     deps = [
         "storage_wiredtiger_core",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/db/storage:sorted_data_interface_test_harness",
     ],
 )
@@ -230,8 +230,8 @@ mongo_cc_benchmark(
     tags = ["storage_bm"],
     deps = [
         ":storage_wiredtiger_core",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/util:clock_source_mock",
     ],
 )

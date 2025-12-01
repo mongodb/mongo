@@ -77,6 +77,7 @@ mongo_cc_library(
         "//src/mongo/client:remote_command_targeter",
         "//src/mongo/crypto:fle_fields",
         "//src/mongo/crypto:sha256_block",
+        "//src/mongo/db:index_key_validate",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db/commands/server_status:server_status_core",
@@ -87,9 +88,8 @@ mongo_cc_library(
         "//src/mongo/db/query/query_shape",
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
-        "//src/mongo/db/shard_role/shard_catalog:index_key_validate",
+        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter",
         "//src/mongo/executor:async_rpc",
-        "//src/mongo/idl:cluster_server_parameter",
     ],
 )
 
@@ -111,8 +111,8 @@ mongo_cc_unit_test(
         ":query_settings",
         "//src/mongo/db/commands/query_cmd:query_settings_cmds",  # Necessary because tests rely on $querySettings pipeline stage.
         "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",
         "//src/mongo/executor:mock_async_rpc",
-        "//src/mongo/s:sharding_mongos_test_fixture",
         "//src/mongo/unittest",
     ],
 )
@@ -125,11 +125,11 @@ mongo_cc_benchmark(
     tags = ["query_bm"],
     deps = [
         "query_settings_service",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:canonical_query_base",
         "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/util:processinfo",
     ],
 )

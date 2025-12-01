@@ -19,10 +19,10 @@ mongo_cc_library(
     deps = [
         ":cursor_server_params",
         "//src/mongo/db:commands",
-        "//src/mongo/db:shard_role",
         "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/memory_tracking",
         "//src/mongo/db/repl:optime",
+        "//src/mongo/db/shard_role",
     ],
 )
 
@@ -128,9 +128,9 @@ mongo_cc_unit_test(
         ":client_cursor",
         "//src/mongo/db:query_exec",
         "//src/mongo/db:service_context",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/util:clock_source_mock",
     ],
 )

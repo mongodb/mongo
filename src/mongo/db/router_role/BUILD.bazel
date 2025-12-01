@@ -1,4 +1,5 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library")
+load("//bazel/config:generate_config_header.bzl", "generate_config_header")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -15,5 +16,21 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/versioning_protocol:chunk_version_gen",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "sharding_write_router_bm",
+    srcs = [
+        "sharding_write_router_bm.cpp",
+    ],
+    tags = ["sharding_bm"],
+    deps = [
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/db/global_catalog:sharding_catalog_client_impl",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/db/sharding_environment:sharding_test_fixture_common",
     ],
 )

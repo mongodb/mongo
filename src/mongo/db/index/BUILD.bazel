@@ -111,8 +111,8 @@ mongo_cc_unit_test(
     deps = [
         ":index_access_method",
         "//src/mongo/db:service_context_d_test_fixture",
-        "//src/mongo/db:shard_role",
         "//src/mongo/db/index_builds:index_build_test_helpers",
+        "//src/mongo/db/shard_role",
     ],
 )
 
@@ -148,7 +148,6 @@ mongo_cc_unit_test(
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:record_id_helpers",
-        "//src/mongo/db:shard_role",
         "//src/mongo/db/exec:working_set",
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/index_builds:index_build_test_helpers",
@@ -156,6 +155,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
+        "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/storage:storage_options",

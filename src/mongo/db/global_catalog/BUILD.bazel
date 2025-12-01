@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -170,5 +170,16 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/timeseries:timeseries_gen",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "chunk_manager_refresh_bm",
+    srcs = [
+        "chunk_manager_refresh_bm.cpp",
+    ],
+    tags = ["sharding_bm"],
+    deps = [
+        "//src/mongo/db:shard_role_api",
     ],
 )

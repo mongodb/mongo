@@ -175,9 +175,9 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_second_group"],
     deps = [
         ":ftdc",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/util:clock_source_mock",
     ],
 )

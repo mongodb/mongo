@@ -61,8 +61,8 @@ mongo_cc_unit_test(
     deps = [
         ":bucket_catalog",
         "//src/mongo/db:dbdirectclient",
-        "//src/mongo/db:shard_role",
         "//src/mongo/db/collection_crud",
+        "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/timeseries:bucket_compression",
         "//src/mongo/db/timeseries:timeseries_metadata",

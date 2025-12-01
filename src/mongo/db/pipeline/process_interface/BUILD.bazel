@@ -145,15 +145,15 @@ mongo_cc_unit_test(
     deps = [
         ":mongos_process_interface",
         ":shardsvr_process_interface",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db:shard_role_api",
-        "//src/mongo/db:vector_clock_mongod",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/repl:replmocks",
-        "//src/mongo/s:sharding_mongos_test_fixture",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",
+        "//src/mongo/db/topology/vector_clock:vector_clock_mongod",
     ],
 )
 
@@ -164,6 +164,6 @@ mongo_cc_unit_test(
     deps = [
         ":mongod_process_interfaces",
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/db/s:shard_server_test_fixture",
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
     ],
 )

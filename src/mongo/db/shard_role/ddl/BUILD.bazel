@@ -194,8 +194,34 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_seventh_group"],
     deps = [
-        "//src/mongo/db:shard_role",
         "//src/mongo/db/auth:authorization_session_test_fixture",
-        "//src/mongo/db/s:shard_server_test_fixture",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
+    ],
+)
+
+mongo_cc_library(
+    name = "coll_mod_command_idl",
+    srcs = [
+        ":coll_mod_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
+        "//src/mongo/db/timeseries:timeseries_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_commands_idl",
+    srcs = [
+        ":create_indexes_gen",
+        ":drop_indexes_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/index_builds:commit_quorum_options",
     ],
 )

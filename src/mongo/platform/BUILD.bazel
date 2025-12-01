@@ -147,7 +147,7 @@ mongo_cc_benchmark(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/util:processinfo",
     ],

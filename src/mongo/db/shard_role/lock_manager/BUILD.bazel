@@ -100,10 +100,10 @@ mongo_cc_unit_test(
     deps = [
         ":exception_util",
         ":lock_manager",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/transport:transport_layer_common",
         "//src/mongo/transport:transport_layer_mock",
     ],
@@ -145,5 +145,16 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/auth:authprivilege",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "d_concurrency_bm",
+    srcs = [
+        "d_concurrency_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/db/shard_role:shard_role_api_stor_ex",
     ],
 )

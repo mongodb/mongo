@@ -64,3 +64,29 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
+
+mongo_cc_library(
+    name = "user_writes_recoverable_critical_section",
+    srcs = [
+        "user_writes_recoverable_critical_section_service.cpp",
+        ":user_writes_critical_section_document_gen",
+    ],
+    deps = [
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:rw_concern_d",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/repl:replica_set_aware_service",
+    ],
+)
+
+mongo_cc_library(
+    name = "write_block_bypass",
+    srcs = [
+        "write_block_bypass.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authprivilege",
+    ],
+)

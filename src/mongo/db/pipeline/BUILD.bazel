@@ -137,7 +137,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/query/query_shape",
         "//src/mongo/db/query/query_stats:query_stats_parse",
-        "//src/mongo/db/shard_role/shard_catalog:local_oplog_info",
+        "//src/mongo/db/repl:local_oplog_info",
         "//src/mongo/db/storage/key_string",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/idl:idl_parser",
@@ -1044,7 +1044,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:change_stream_pre_images_collection_manager",
-        "//src/mongo/db:shard_role",
+        "//src/mongo/db/shard_role",
         "//src/mongo/util:periodic_runner",
     ],
 )
@@ -1329,11 +1329,11 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:oplog_entry",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
-        "//src/mongo/db/s:shard_server_test_fixture",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
+        "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",
         "//src/mongo/db/storage/devnull:storage_devnull_core",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
-        "//src/mongo/s:sharding_mongos_test_fixture",
         "//src/mongo/s/query/exec:router_exec_stage",
         "//src/mongo/unittest",
         "//src/mongo/util:clock_source_mock",
@@ -1374,8 +1374,8 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         "//src/mongo/db:shard_role_api",
-        "//src/mongo/db/s:shard_server_test_fixture",
         "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
         "//src/mongo/s:sharding_router_api",
     ],
 )
@@ -1403,9 +1403,9 @@ mongo_cc_benchmark(
         ":aggregation_context_fixture",
         ":document_source_mock",
         ":pipeline",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/shard_role:service_context_non_d",
     ],
 )
 
@@ -1427,9 +1427,9 @@ mongo_cc_benchmark(
     deps = [
         ":accumulator",
         ":expression_context_for_test",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db/query:query_fcv_environment_for_test",
         "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/shard_role:service_context_non_d",
     ],
 )
 
@@ -1440,9 +1440,9 @@ mongo_cc_benchmark(
     deps = [
         ":accumulator",
         ":expression_context_for_test",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db/query:query_fcv_environment_for_test",
         "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/shard_role:service_context_non_d",
     ],
 )
 

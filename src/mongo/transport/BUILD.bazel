@@ -353,9 +353,9 @@ mongo_cc_unit_test(
         "//src/mongo:base",
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/db:dbmessage",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/rpc",
         "//src/mongo/rpc:message",
         "//src/mongo/transport/asio:asio_socket_test_util",
@@ -388,8 +388,8 @@ mongo_cc_benchmark(
     deps = [
         ":service_executor",
         ":transport_layer_mock",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/shard_role:service_context_non_d",
     ],
 )
 
@@ -402,8 +402,8 @@ mongo_cc_benchmark(
         ":session_manager",
         ":transport_layer_manager",
         ":transport_layer_mock",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/shard_role:service_context_non_d",
     ],
 )
 

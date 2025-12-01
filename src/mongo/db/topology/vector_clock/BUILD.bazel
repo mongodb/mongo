@@ -24,3 +24,52 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "vector_clock_mutable",
+    srcs = [
+        "vector_clock_mutable.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:vector_clock",
+    ],
+)
+
+mongo_cc_library(
+    name = "logical_time_metadata_hook",
+    srcs = [
+        "vector_clock_metadata_hook.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:operation_time_tracker",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/rpc:metadata",
+    ],
+)
+
+mongo_cc_library(
+    name = "vector_clock_mongod",
+    srcs = [
+        "topology_time_ticker.cpp",
+        "vector_clock_mongod.cpp",
+    ],
+    deps = [
+        ":vector_clock_mutable",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:rw_concern_d",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/repl:replica_set_aware_service",
+        "//src/mongo/db/shard_role/lock_manager",
+        "//src/mongo/s:grid",
+    ],
+)
+
+mongo_cc_library(
+    name = "vector_clock_trivial",
+    srcs = [
+        "vector_clock_trivial.cpp",
+    ],
+    deps = [
+        ":vector_clock_mutable",
+    ],
+)

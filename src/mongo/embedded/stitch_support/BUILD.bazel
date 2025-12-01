@@ -63,11 +63,11 @@ mongo_cc_library(
     }),
     deps = [
         "//src/mongo/db:query_expressions",
-        "//src/mongo/db:vector_clock_trivial",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query/collation:collator_factory_icu",
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/write_ops:parsed_update",
+        "//src/mongo/db/topology/vector_clock:vector_clock_trivial",
     ],
 )
 
@@ -115,11 +115,11 @@ mongo_cc_library(
     tags = ["stitch_support"],
     deps = [
         "//src/mongo/db:query_expressions",
-        "//src/mongo/db:vector_clock_trivial",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query/collation:collator_factory_icu",
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/write_ops:parsed_update",
+        "//src/mongo/db/topology/vector_clock:vector_clock_trivial",
     ],
 )
 
@@ -142,7 +142,7 @@ mongo_cc_unit_test(
     }),
     deps = [
         "stitch_support_duplicate",
-        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/unittest",
     ],
 )

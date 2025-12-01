@@ -19,7 +19,7 @@ mongo_cc_library(
         "//src/mongo/client:remote_command_retry_scheduler",
         "//src/mongo/client:retry_strategy",
         "//src/mongo/db:server_base",
-        "//src/mongo/s:shard_shared_state_cache",
+        "//src/mongo/db/sharding_environment:shard_shared_state_cache",
         "//src/mongo/s/write_ops:batch_write_types",
     ],
 )

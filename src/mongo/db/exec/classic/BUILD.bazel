@@ -25,7 +25,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
-        "//src/mongo/db/s:shard_server_test_fixture",
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
     ],
 )
 

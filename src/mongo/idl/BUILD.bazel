@@ -9,16 +9,6 @@ exports_files(
     ]),
 )
 
-mongo_cc_library(
-    name = "cluster_server_parameter",
-    srcs = [
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_gen",
-    ],
-    deps = [
-        "//src/mongo/db:server_base",
-    ],
-)
-
 idl_generator(
     name = "generic_argument_gen",
     src = "generic_argument.idl",
@@ -42,16 +32,6 @@ idl_generator(
 idl_generator(
     name = "config_option_no_init_test_gen",
     src = "config_option_no_init_test.idl",
-)
-
-mongo_cc_library(
-    name = "cluster_server_parameter_server_status",
-    srcs = ["//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_server_status.cpp"],
-    deps = [
-        "//src/mongo/bson:bson_validate",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",
-    ],
 )
 
 idl_generator(
@@ -122,121 +102,10 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "cluster_parameter_synchronization_helpers",
-    srcs = [
-        "//src/mongo/db/topology/cluster_parameters:cluster_parameter_synchronization_helpers.cpp",
-    ],
-    deps = [
-        "//src/mongo/db:audit",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
-    ],
-)
-
-mongo_cc_library(
-    name = "cluster_server_parameter_initializer",
-    srcs = [
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_initializer.cpp",
-    ],
-    deps = [
-        ":cluster_parameter_synchronization_helpers",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db/repl:replica_set_aware_service",
-        "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
-    ],
-)
-
-mongo_cc_library(
-    name = "cluster_server_parameter_op_observer",
-    srcs = [
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_op_observer.cpp",
-    ],
-    deps = [
-        ":cluster_parameter_synchronization_helpers",
-        ":cluster_server_parameter_initializer",
-        "//src/mongo/db:dbdirectclient",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db/op_observer",
-    ],
-)
-
-mongo_cc_library(
-    name = "cluster_server_parameter_common",
-    srcs = [
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_common.cpp",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db/commands:list_databases_for_all_tenants_command",
-        "//src/mongo/s:grid",
-    ],
-)
-
-mongo_cc_library(
-    name = "cluster_server_parameter_refresher",
-    srcs = [
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_refresher.cpp",
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_refresher_gen",
-    ],
-    deps = [
-        ":cluster_server_parameter",
-        ":cluster_server_parameter_common",
-        "//src/mongo/db:audit",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/transaction:transaction_api",
-        "//src/mongo/executor:inline_executor",
-        "//src/mongo/s:grid",
-    ],
-)
-
-mongo_cc_library(
     name = "server_parameter_test_util",
     srcs = [],
     deps = [
         "//src/mongo/db:service_context_d_test_fixture",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "cluster_server_parameter_test",
-    srcs = [
-        "//src/mongo/db/topology/cluster_parameters:cluster_parameter_synchronization_helpers_test.cpp",
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_common_test.cpp",
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_initializer_test.cpp",
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_op_observer_test.cpp",
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_refresher_test.cpp",
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_server_status_test.cpp",
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_test_gen",
-        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_test_util.cpp",
-    ],
-    tags = ["mongo_unittest_fourth_group"],
-    deps = [
-        ":cluster_parameter_synchronization_helpers",
-        ":cluster_server_parameter",
-        ":cluster_server_parameter_common",
-        ":cluster_server_parameter_initializer",
-        ":cluster_server_parameter_op_observer",
-        ":cluster_server_parameter_refresher",
-        ":cluster_server_parameter_server_status",
-        "//src/mongo/db:change_stream_options_manager",
-        "//src/mongo/db:service_context_d_test_fixture",
-        "//src/mongo/db/auth:authmocks",
-        "//src/mongo/db/commands:create_command",
-        "//src/mongo/db/op_observer",
-        "//src/mongo/db/op_observer:op_observer_util",
-        "//src/mongo/db/query/client_cursor:cursor_response_idl",
-        "//src/mongo/db/query/query_settings:query_settings_service",
-        "//src/mongo/db/repl:oplog",
-        "//src/mongo/db/repl:oplog_interface_local",
-        "//src/mongo/db/repl:replmocks",
-        "//src/mongo/db/repl:storage_interface_impl",
-        "//src/mongo/db/s:sharding_runtime_d",
-        "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
-        "//src/mongo/s:sharding_mongos_test_fixture",
-        "//src/mongo/util:signal_handlers",
     ],
 )
 
@@ -262,7 +131,6 @@ mongo_cc_unit_test(
         "server-programmability",
     ],
     deps = [
-        ":cluster_server_parameter",
         ":idl_parser",
         ":server_parameter_test_util",
         "//src/mongo/client:connection_string",
@@ -272,6 +140,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/auth:security_token_auth",
         "//src/mongo/db/shard_role/lock_manager",
+        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter",
         "//src/mongo/rpc:message",
         "//src/mongo/util/cmdline_utils",
         "//src/mongo/util/options_parser",

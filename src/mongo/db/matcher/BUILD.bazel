@@ -30,9 +30,9 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:query_expressions",
-        "//src/mongo/db:shard_role",
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/fts:base_fts",
+        "//src/mongo/db/shard_role",
         "//src/mongo/scripting:scripting_server",
     ],
 )
@@ -97,11 +97,11 @@ mongo_cc_unit_test(
         "//src/mongo/crypto:encrypted_field_config",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:query_matcher",
-        "//src/mongo/db:service_context_non_d",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_planner",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/query/compiler/parsers/matcher:parsed_match_expression_for_test",
+        "//src/mongo/db/shard_role:service_context_non_d",
     ],
 )

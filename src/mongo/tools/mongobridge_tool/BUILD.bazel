@@ -31,7 +31,7 @@ mongo_cc_binary(
     ],
     deps = [
         "//src/mongo/db:dbmessage",
-        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/shard_role:service_context_non_d",
         # UBSAN builds needs the RTTI info for WhereMatchExpression, that is defined in this project.
         "//src/mongo/db/matcher:expressions_mongod_only",
         "//src/mongo/rpc",
