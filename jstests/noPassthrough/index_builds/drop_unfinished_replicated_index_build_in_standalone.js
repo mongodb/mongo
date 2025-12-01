@@ -38,6 +38,10 @@ const createIdx2 = IndexBuildTest.startIndexBuild(primary, primaryColl2.getFullN
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName1);
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName2);
 
+// Waiting for secondary to register the indexes in durable catalog.
+IndexBuildTest.assertIndexesSoon(secondaryDB.getCollection(collName1), 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexesSoon(secondaryDB.getCollection(collName2), 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+
 jsTestLog("Shutting down secondary");
 rst.stop(secondary);
 
