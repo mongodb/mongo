@@ -243,7 +243,8 @@ struct BtreeExternalSortComparison {
 
 }  // namespace
 
-auto& duplicateKeyErrors = *MetricBuilder<Counter64>{"operation.duplicateKeyErrors"};
+auto& insertFailedDueToDuplicateKeyError =
+    *MetricBuilder<Counter64>{"operation.insertFailedDueToDuplicateKeyError"};
 
 SortedDataIndexAccessMethod::SortedDataIndexAccessMethod(const IndexCatalogEntry* btreeState,
                                                          std::unique_ptr<SortedDataInterface> btree)
@@ -462,7 +463,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
             }
         }
         if (auto duplicate = std::get_if<SortedDataInterface::DuplicateKey>(&result)) {
-            duplicateKeyErrors.increment();
+            insertFailedDueToDuplicateKeyError.increment();
             return buildDupKeyErrorStatus(duplicate->key,
                                           coll->ns(),
                                           entry->descriptor()->indexName(),
@@ -734,7 +735,7 @@ Status SortedDataIndexAccessMethod::doUpdate(OperationContext* opCtx,
             ticket.dupsAllowed;
         auto result = _newInterface->insert(opCtx, ru, keyString, dupsAllowed);
         if (auto duplicate = std::get_if<SortedDataInterface::DuplicateKey>(&result)) {
-            duplicateKeyErrors.increment();
+            insertFailedDueToDuplicateKeyError.increment();
             return buildDupKeyErrorStatus(duplicate->key,
                                           coll->ns(),
                                           entry->descriptor()->indexName(),
@@ -1731,7 +1732,7 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
 }
 
 long long SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest() {
-    return duplicateKeyErrors.get();
+    return insertFailedDueToDuplicateKeyError.get();
 }
 
 }  // namespace mongo

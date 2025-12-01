@@ -10,7 +10,7 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {IndexBuildTest, ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -18,20 +18,68 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 const collName = "t";
 const dbName = "test";
 
-function getLastCommittedMillis(conn) {
-    const serverStatus = conn.serverStatus();
+describe("index build failures", function () {
+    before(() => {
+        this.conn = MongoRunner.runMongod();
+        this.db = this.conn.getDB(dbName);
+    });
 
-    assert(serverStatus.hasOwnProperty("indexBuilds"), "indexBuilds section missing: " + tojson(serverStatus));
-    const indexBuilds = serverStatus.indexBuilds;
+    beforeEach(() => {
+        this.coll = this.db.getCollection(collName);
+        assert.commandWorked(this.coll.insertMany(Array.from({length: 10}, () => ({a: "foo"}))));
+    });
 
-    assert(indexBuilds.hasOwnProperty("phases"), "phases missing: " + tojson(indexBuilds));
-    const phases = indexBuilds.phases;
+    it("failedDueToDuplicateKeyError", () => {
+        // Check that creating an index over a collection with duplicate keys only increments
+        // failedDueToDuplicateKeyError.
+        assert.eq(0, this.db.serverStatus().indexBuilds.failedDueToDuplicateKeyError);
+        assert.eq(0, this.db.serverStatus().metrics.operation.insertFailedDueToDuplicateKeyError);
 
-    assert(phases.hasOwnProperty("lastCommittedMillis"), "lastCommittedMillis missing: " + tojson(phases));
-    return phases.lastCommittedMillis;
-}
+        assert.commandFailedWithCode(this.coll.createIndex({a: 1}, {unique: 1}), ErrorCodes.DuplicateKey);
 
-describe("indexBuilds serverStatus metrics", function () {
+        IndexBuildTest.assertIndexes(this.coll, 1, ["_id_"]);
+        assert.eq(1, this.db.serverStatus().indexBuilds.failedDueToDuplicateKeyError);
+        assert.eq(0, this.db.serverStatus().metrics.operation.insertFailedDueToDuplicateKeyError);
+
+        this.coll.drop();
+
+        // Check that inserting a duplicate key into a unique index only increments
+        // insertFailedDueToDuplicateKeyError.
+        assert.commandWorked(this.coll.createIndex({a: 1}, {unique: 1}));
+        assert.commandWorked(this.coll.insert({a: "foo"}));
+        assert.commandFailedWithCode(this.coll.insert({a: "foo"}), ErrorCodes.DuplicateKey);
+
+        assert.eq(1, this.db.serverStatus().indexBuilds.failedDueToDuplicateKeyError);
+        assert.eq(1, this.db.serverStatus().metrics.operation.insertFailedDueToDuplicateKeyError);
+    });
+
+    it("failedDueToManualCancellation", () => {
+        assert.eq(0, this.db.serverStatus().indexBuilds.failedDueToManualCancellation);
+
+        const fp = configureFailPoint(this.db, "hangAfterInitializingIndexBuild");
+        const awaitCreateIndex = IndexBuildTest.startIndexBuild(this.conn, this.coll.getFullName(), {a: 1});
+
+        fp.wait();
+        assert.commandWorked(this.coll.dropIndex({a: 1}));
+        awaitCreateIndex({checkExitStatus: false});
+
+        // Wait for index build to be fully aborted before reading metrics.
+        IndexBuildTest.waitForIndexBuildToStop(this.db, this.coll.getName(), "a_1");
+
+        IndexBuildTest.assertIndexes(this.coll, 1, ["_id_"]);
+        assert.eq(1, this.db.serverStatus().indexBuilds.failedDueToManualCancellation);
+    });
+
+    afterEach(() => {
+        this.coll.drop();
+    });
+
+    after(() => {
+        MongoRunner.stopMongod(this.conn);
+    });
+});
+
+describe("lastCommittedMillis", function () {
     before(() => {
         this.rst = new ReplSetTest({
             nodes: 1,
@@ -49,13 +97,8 @@ describe("indexBuilds serverStatus metrics", function () {
         assert.commandWorked(this.coll.insertMany(Array.from({length: 10}, () => ({a: "foo"}))));
     });
 
-    afterEach(() => {
-        this.rst.stopSet();
-    });
-
     it("during steady state", () => {
-        let duration = getLastCommittedMillis(this.db);
-        assert.eq(duration, 0, `Expected lastCommittedMillis to be 0 on startup, but got ${duration}`);
+        assert.eq(0, this.db.serverStatus().indexBuilds.phases.lastCommittedMillis);
 
         // Hang index build before completion to extend duration.
         const fp = configureFailPoint(this.primary, "hangIndexBuildBeforeCommit");
@@ -69,13 +112,11 @@ describe("indexBuilds serverStatus metrics", function () {
         // Wait for the parallel shell to exit.
         awaitCreateIndex();
 
-        duration = getLastCommittedMillis(this.db);
-        assert.gt(duration, 1000, `Expected lastCommittedMillis to be > 1000 after index build, but got ${duration}`);
+        assert.lt(1000, this.db.serverStatus().indexBuilds.phases.lastCommittedMillis);
     });
 
     it("on resume", () => {
-        let duration = getLastCommittedMillis(this.db);
-        assert.eq(duration, 0, `Expected lastCommittedMillis to be 0 on startup, but got ${duration}`);
+        assert.eq(0, this.db.serverStatus().indexBuilds.phases.lastCommittedMillis);
 
         // Hang index build before completion to require resume.
         const fp = configureFailPoint(this.primary, "hangIndexBuildBeforeCommit");
@@ -108,13 +149,11 @@ describe("indexBuilds serverStatus metrics", function () {
         // Ensure index build is completed before reading metrics.
         ResumableIndexBuildTest.assertCompleted(this.primary, this.coll, [buildUUID], ["a_1"]);
 
-        duration = getLastCommittedMillis(this.db);
-        assert.gt(duration, 0, `Expected lastCommittedMillis to be > 0 after index build, but got ${duration}`);
+        assert.lt(0, this.db.serverStatus().indexBuilds.phases.lastCommittedMillis);
     });
 
     it("on restart", function () {
-        let duration = getLastCommittedMillis(this.db);
-        assert.eq(duration, 0, `Expected lastCommittedMillis to be 0 on startup, but got ${duration}`);
+        assert.eq(0, this.db.serverStatus().indexBuilds.phases.lastCommittedMillis);
 
         // Hang index build before completion to require restart.
         const fp = configureFailPoint(this.primary, "hangIndexBuildBeforeCommit");
@@ -150,7 +189,10 @@ describe("indexBuilds serverStatus metrics", function () {
         // Ensure index build is completed before reading metrics.
         ResumableIndexBuildTest.assertCompleted(this.primary, this.coll, [buildUUID], ["a_1"]);
 
-        duration = getLastCommittedMillis(this.db);
-        assert.gt(duration, 0, `Expected lastCommittedMillis to be > 0 after index build, but got ${duration}`);
+        assert.lt(0, this.db.serverStatus().indexBuilds.phases.lastCommittedMillis);
+    });
+
+    afterEach(() => {
+        this.rst.stopSet();
     });
 });
