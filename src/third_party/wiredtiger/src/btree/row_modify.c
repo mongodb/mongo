@@ -347,16 +347,13 @@ err:
  *     Check for obsolete updates and force evict the page if the update list is too long.
  */
 void
-__wt_update_obsolete_check(
-  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd, bool update_accounting)
+__wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
     WT_PAGE *page;
     WT_TXN_GLOBAL *txn_global;
-    WT_UPDATE *first, *next;
-    size_t size;
+    WT_UPDATE *first;
     u_int count;
 
-    next = NULL;
     page = cbt->ref->page;
     txn_global = &S2C(session)->txn_global;
 
@@ -402,28 +399,16 @@ __wt_update_obsolete_check(
             first = NULL;
     }
 
-    /*
-     * We cannot discard this WT_UPDATE structure, we can only discard WT_UPDATE structures
-     * subsequent to it, other threads of control will terminate their walk in this element. Save a
-     * reference to the list we will discard, and terminate the list.
-     */
-    if (first != NULL && (next = first->next) != NULL) {
+    if (first != NULL && first->next != NULL)
+        __wt_free_obsolete_updates(session, page, first);
+    else if (count > 20) {
         /*
-         * No need to use a compare and swap because we have obtained a lock at the start of the
-         * function.
+         * If the list is long, don't retry checks on this page until the transaction state has
+         * moved forwards.
          */
-        first->next = NULL;
-
-        /*
-         * Decrement the dirty byte count while holding the page lock, else we can race with
-         * checkpoints cleaning a page.
-         */
-        if (update_accounting) {
-            for (size = 0, upd = next; upd != NULL; upd = upd->next)
-                size += WT_UPDATE_MEMSIZE(upd);
-            if (size != 0)
-                __wt_cache_page_inmem_decr(session, page, size);
-        }
+        page->modify->obsolete_check_txn = __wt_atomic_loadv64(&txn_global->last_running);
+        if (txn_global->has_pinned_timestamp)
+            page->modify->obsolete_check_timestamp = txn_global->pinned_timestamp;
     }
 
     /*
@@ -435,20 +420,6 @@ __wt_update_obsolete_check(
     if (count > WT_THOUSAND) {
         WT_STAT_CONN_INCR(session, eviction_force_long_update_list);
         __wt_evict_page_soon(session, cbt->ref);
-    }
-
-    if (next != NULL)
-        __wt_free_update_list(session, &next);
-    else {
-        /*
-         * If the list is long, don't retry checks on this page until the transaction state has
-         * moved forwards.
-         */
-        if (count > 20) {
-            page->modify->obsolete_check_txn = __wt_atomic_loadv64(&txn_global->last_running);
-            if (txn_global->has_pinned_timestamp)
-                page->modify->obsolete_check_timestamp = txn_global->pinned_timestamp;
-        }
     }
 
     WT_PAGE_UNLOCK(session, page);

@@ -237,16 +237,17 @@ err:
 }
 
 /*
- * __rec_find_and_save_delete_hs_upd --
- *     Find and save the update that needs to be deleted from the history store later
+ * __rec_save_delete_hs_upd_and_free_obs_updates --
+ *     Find and save the update that needs to be deleted from the history store later and also free
+ *     the obsolete updates in the update chain.
  */
 static int
-__rec_find_and_save_delete_hs_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
-  WT_ROW *rip, WTI_UPDATE_SELECT *upd_select)
+__rec_save_delete_hs_upd_and_free_obs_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r,
+  WT_INSERT *ins, WT_ROW *rip, WTI_UPDATE_SELECT *upd_select)
 {
-    WT_UPDATE *delete_tombstone, *delete_upd;
+    WT_UPDATE *delete_tombstone, *delete_upd, *visible_all_upd;
 
-    delete_tombstone = NULL;
+    delete_tombstone = visible_all_upd = NULL;
 
     for (delete_upd = upd_select->tombstone != NULL ? upd_select->tombstone : upd_select->upd;
          delete_upd != NULL; delete_upd = delete_upd->next) {
@@ -263,9 +264,21 @@ __rec_find_and_save_delete_hs_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT
             else {
                 WT_RET(
                   __rec_delete_hs_upd_save(session, r, ins, rip, delete_upd, delete_tombstone));
+                visible_all_upd = NULL;
                 break;
             }
         }
+
+        /* Track the first self-contained value that is globally visible. */
+        if (F_ISSET(r, WT_REC_CHECKPOINT) && visible_all_upd == NULL && delete_upd->next != NULL &&
+          __wt_txn_upd_visible_all(session, delete_upd) && WT_UPDATE_DATA_VALUE(delete_upd))
+            visible_all_upd = delete_upd;
+    }
+
+    /* Free obsolete updates, excluding the on-page tombstone if exist. */
+    if (visible_all_upd != NULL && visible_all_upd != upd_select->tombstone) {
+        __wt_free_obsolete_updates(session, r->page, visible_all_upd);
+        WT_STAT_CONN_DSRC_INCR(session, cache_obsolete_updates_removed);
     }
 
     WT_ASSERT_ALWAYS(session, delete_tombstone == NULL || delete_upd != NULL,
@@ -977,7 +990,8 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
      * chain but the same value is left in the history store. Save it to delete it from the history
      * store later.
      */
-    WT_RET(__rec_find_and_save_delete_hs_upd(session, r, ins, rip, upd_select));
+    if (F_ISSET(r, WT_REC_HS))
+        WT_RET(__rec_save_delete_hs_upd_and_free_obs_updates(session, r, ins, rip, upd_select));
 
     /* Check the update chain for conditions that could prevent it's eviction. */
     WT_RET(__rec_validate_upd_chain(session, r, onpage_upd, &upd_select->tw, vpack));
