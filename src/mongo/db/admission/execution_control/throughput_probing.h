@@ -38,6 +38,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/timer.h"
 
@@ -45,23 +46,28 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo::admission::execution_control {
-namespace throughput_probing {
+namespace mongo {
+namespace admission {
+namespace execution_control {
+namespace MONGO_MOD_PUBLIC throughput_probing {
 
-class ThroughputProbingTest;
+class MONGO_MOD_PRIVATE ThroughputProbingTest;
 
-Status validateInitialConcurrency(int32_t concurrency, const boost::optional<TenantId>&);
-Status validateMinConcurrency(int32_t concurrency, const boost::optional<TenantId>&);
-Status validateMaxConcurrency(int32_t concurrency, const boost::optional<TenantId>&);
+MONGO_MOD_PRIVATE Status validateInitialConcurrency(int32_t concurrency,
+                                                    const boost::optional<TenantId>&);
+MONGO_MOD_PRIVATE Status validateMinConcurrency(int32_t concurrency,
+                                                const boost::optional<TenantId>&);
+MONGO_MOD_PRIVATE Status validateMaxConcurrency(int32_t concurrency,
+                                                const boost::optional<TenantId>&);
 
-}  // namespace throughput_probing
+}  // namespace MONGO_MOD_PUBLIC throughput_probing
 
 /**
  * Adjusts the level of concurrency on the read and write ticket holders by probing up/down and
  * attempting to maximize throughput. Assumes both ticket holders have the same starting
  * concurrency level and always keeps the same concurrency level for both.
  */
-class ThroughputProbing {
+class MONGO_MOD_PUBLIC ThroughputProbing {
 public:
     ThroughputProbing(ServiceContext* svcCtx,
                       TicketHolder* readTicketHolder,
@@ -129,4 +135,6 @@ private:
     PeriodicJobAnchor _job;
 };
 
-}  // namespace mongo::admission::execution_control
+}  // namespace execution_control
+}  // namespace admission
+}  // namespace mongo

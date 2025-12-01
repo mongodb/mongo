@@ -33,6 +33,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
@@ -54,7 +55,7 @@ class ServiceContext;
  * the next time period (one second). The consumers will call `getTicket` and the producer will call
  * `refreshTo`.
  */
-class FlowControlTicketholder {
+class MONGO_MOD_PUBLIC FlowControlTicketholder {
 public:
     /**
      * A structure to accommodate curop reporting.

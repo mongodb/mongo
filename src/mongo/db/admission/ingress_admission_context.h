@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -37,7 +38,7 @@ class OperationContext;
 /**
  * Stores state and statistics related to ingress admission for a given transactional context.
  */
-class IngressAdmissionContext : public AdmissionContext {
+class MONGO_MOD_PUBLIC IngressAdmissionContext : public AdmissionContext {
 public:
     IngressAdmissionContext() = default;
 

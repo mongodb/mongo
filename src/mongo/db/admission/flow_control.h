@@ -40,6 +40,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 
@@ -61,9 +62,9 @@ namespace mongo {
  * Otherwise this class' only output is to refresh the tickets available in the
  * `FlowControlTicketholder`.
  */
-class FlowControl {
+class MONGO_MOD_PUBLIC FlowControl {
 public:
-    class TimestampProvider {
+    class MONGO_MOD_OPEN TimestampProvider {
     public:
         virtual ~TimestampProvider() = default;
         /**
@@ -172,24 +173,24 @@ public:
     /**
      * Underscore methods are public for testing.
      */
-    std::int64_t _getLocksUsedLastPeriod();
-    double _getLocksPerOp();
+    MONGO_MOD_PRIVATE std::int64_t _getLocksUsedLastPeriod();
+    MONGO_MOD_PRIVATE double _getLocksPerOp();
 
-    std::int64_t _approximateOpsBetween(Timestamp prevTs, Timestamp currTs);
+    MONGO_MOD_PRIVATE std::int64_t _approximateOpsBetween(Timestamp prevTs, Timestamp currTs);
 
-    int _calculateNewTicketsForLag(const Timestamp& prevSustainerTimestamp,
-                                   const Timestamp& currSustainerTimestamp,
-                                   std::int64_t locksUsedLastPeriod,
-                                   double locksPerOp,
-                                   std::uint64_t lagMillis,
-                                   std::uint64_t thresholdLagMillis);
+    MONGO_MOD_PRIVATE int _calculateNewTicketsForLag(const Timestamp& prevSustainerTimestamp,
+                                                     const Timestamp& currSustainerTimestamp,
+                                                     std::int64_t locksUsedLastPeriod,
+                                                     double locksPerOp,
+                                                     std::uint64_t lagMillis,
+                                                     std::uint64_t thresholdLagMillis);
 
-    void _trimSamples(Timestamp trimSamplesTo);
+    MONGO_MOD_PRIVATE void _trimSamples(Timestamp trimSamplesTo);
 
     // Sample of (timestamp, ops, lock acquisitions) where ops and lock acquisitions are
     // observations of the corresponding counter at (roughly) <timestamp>.
     typedef std::tuple<std::uint64_t, std::uint64_t, std::int64_t> Sample;
-    const std::deque<Sample>& _getSampledOpsApplied_forTest() {
+    MONGO_MOD_PRIVATE const std::deque<Sample>& _getSampledOpsApplied_forTest() {
         return _sampledOpsApplied;
     }
 
@@ -225,7 +226,7 @@ private:
 };
 
 namespace flow_control_details {
-class ReplicationTimestampProvider final : public FlowControl::TimestampProvider {
+class MONGO_MOD_PUBLIC ReplicationTimestampProvider final : public FlowControl::TimestampProvider {
 public:
     explicit ReplicationTimestampProvider(repl::ReplicationCoordinator* replCoord);
     Timestamp getCurrSustainerTimestamp() const final;

@@ -26,6 +26,7 @@
 # it in the license file.
 #
 global:
+    mod_visibility: public
     cpp_namespace: "mongo"
 
 server_parameters:

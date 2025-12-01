@@ -37,6 +37,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 
@@ -55,7 +56,7 @@ class Ticket;
  * mechanism is required for global lock acquisition to reduce contention on storage engine
  * resources.
  */
-class TicketHolder {
+class MONGO_MOD_PUBLIC TicketHolder {
     friend class Ticket;
 
 public:
@@ -186,9 +187,9 @@ public:
      */
     int64_t numFinishedProcessing() const;
 
-    void setNumFinishedProcessing_forTest(int32_t numFinishedProcessing);
+    MONGO_MOD_PRIVATE void setNumFinishedProcessing_forTest(int32_t numFinishedProcessing);
 
-    void setPeakUsed_forTest(int32_t used);
+    MONGO_MOD_PRIVATE void setPeakUsed_forTest(int32_t used);
 
     /**
      * Appends all queue and delinquency stats.
@@ -299,7 +300,7 @@ private:
  * RAII-style movable token that gets generated when a ticket is acquired and is automatically
  * released when going out of scope.
  */
-class Ticket {
+class MONGO_MOD_PUBLIC Ticket {
     Ticket(const Ticket&) = delete;
     Ticket& operator=(const Ticket&) = delete;
 

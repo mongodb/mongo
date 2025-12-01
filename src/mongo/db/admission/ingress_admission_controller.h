@@ -33,12 +33,13 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
 namespace mongo {
 
-class IngressAdmissionController {
+class MONGO_MOD_PUBLIC IngressAdmissionController {
 public:
     static constexpr auto kNormalPriorityName = "normalPriority"_sd;
     static constexpr auto kExemptPriorityName = "exempt"_sd;

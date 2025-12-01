@@ -31,13 +31,14 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/admission/rate_limiter.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
 
 namespace mongo {
 
-class IngressRequestRateLimiter {
+class MONGO_MOD_PUBLIC IngressRequestRateLimiter {
 public:
     IngressRequestRateLimiter();
     /**
@@ -62,13 +63,13 @@ public:
      * Called automatically when the value of the server parameter
      * ingressRequestAdmissionRatePerSec changes value.
      */
-    static Status onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec);
+    MONGO_MOD_PRIVATE static Status onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec);
 
     /**
      * Called automatically when the value of the server parameter
      * ingressRequestAdmissionBurstCapacitySecs changes value.
      */
-    static Status onUpdateAdmissionBurstCapacitySecs(double burstCapacitySecs);
+    MONGO_MOD_PRIVATE static Status onUpdateAdmissionBurstCapacitySecs(double burstCapacitySecs);
 
     /**
      * Reports the ingress admission rate limiter metrics.

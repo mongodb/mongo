@@ -27,6 +27,7 @@
 #
 
 global:
+    mod_visibility: public
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/admission/ingress_admission_controller.h"

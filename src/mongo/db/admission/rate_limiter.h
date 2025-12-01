@@ -32,16 +32,18 @@
 #include "mongo/base/counter.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/moving_average.h"
 #include "mongo/util/system_tick_source.h"
 
-namespace mongo::admission {
+namespace mongo {
+namespace MONGO_MOD_PUBLIC admission {
 
 /**
  * The RateLimiter offers a thin wrapper around the folly::TokenBucket augmented with
  * interruptibility, maximum queue depth, and metrics.
  */
-class RateLimiter {
+class MONGO_MOD_PUBLIC RateLimiter {
 public:
     struct Stats {
         /**
@@ -157,4 +159,5 @@ private:
     class RateLimiterPrivate;
     std::unique_ptr<RateLimiterPrivate> _impl;
 };
-}  // namespace mongo::admission
+}  // namespace MONGO_MOD_PUBLIC admission
+}  // namespace mongo

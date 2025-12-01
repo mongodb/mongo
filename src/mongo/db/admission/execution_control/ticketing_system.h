@@ -37,6 +37,7 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
@@ -44,7 +45,9 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo::admission::execution_control {
+namespace mongo {
+namespace admission {
+namespace MONGO_MOD_PUBLIC execution_control {
 
 enum class ExecutionControlConcurrencyAdjustmentAlgorithmEnum;
 
@@ -61,7 +64,7 @@ enum class ExecutionControlConcurrencyAdjustmentAlgorithmEnum;
  * pool based on a heuristic.
  *   - Throughput probing: a single pool is dynamically adjusted based on observed throughput.
  */
-class TicketingSystem {
+class MONGO_MOD_PUBLIC TicketingSystem {
 public:
     static constexpr auto kDefaultConcurrentTransactionsValue = 128;
     static constexpr auto kUnsetLowPriorityConcurrentTransactionsValue = -1;
@@ -91,10 +94,10 @@ public:
         static Status updateReadMaxQueueDepth(std::int32_t newReadMaxQueueDepth);
         static Status updateConcurrentWriteTransactions(const int32_t& newWriteTransactions);
         static Status updateConcurrentReadTransactions(const int32_t& newReadTransactions);
-        static Status validateConcurrentWriteTransactions(const int32_t& newWriteTransactions,
-                                                          boost::optional<TenantId>);
-        static Status validateConcurrentReadTransactions(const int32_t& newReadTransactions,
-                                                         boost::optional<TenantId>);
+        MONGO_MOD_PRIVATE static Status validateConcurrentWriteTransactions(
+            const int32_t& newWriteTransactions, boost::optional<TenantId>);
+        MONGO_MOD_PRIVATE static Status validateConcurrentReadTransactions(
+            const int32_t& newReadTransactions, boost::optional<TenantId>);
     };
 
     /**
@@ -106,14 +109,14 @@ public:
         static Status updateReadMaxQueueDepth(std::int32_t newReadMaxQueueDepth);
         static Status updateConcurrentWriteTransactions(const int32_t& newWriteTransactions);
         static Status updateConcurrentReadTransactions(const int32_t& newReadTransactions);
-        static Status validateConcurrentWriteTransactions(const int32_t& newWriteTransactions,
-                                                          boost::optional<TenantId>);
-        static Status validateConcurrentReadTransactions(const int32_t& newReadTransactions,
-                                                         boost::optional<TenantId>);
+        MONGO_MOD_PRIVATE static Status validateConcurrentWriteTransactions(
+            const int32_t& newWriteTransactions, boost::optional<TenantId>);
+        MONGO_MOD_PRIVATE static Status validateConcurrentReadTransactions(
+            const int32_t& newReadTransactions, boost::optional<TenantId>);
     };
 
-    static Status validateConcurrencyAdjustmentAlgorithm(const std::string& name,
-                                                         const boost::optional<TenantId>&);
+    MONGO_MOD_PRIVATE static Status validateConcurrencyAdjustmentAlgorithm(
+        const std::string& name, const boost::optional<TenantId>&);
 
     static Status updateConcurrencyAdjustmentAlgorithm(std::string newAlgorithm);
 
@@ -343,4 +346,6 @@ private:
     mongo::admission::execution_control::OperationExecutionStats _writeLongExecutionStats;
 };
 
-}  // namespace mongo::admission::execution_control
+}  // namespace MONGO_MOD_PUBLIC execution_control
+}  // namespace admission
+}  // namespace mongo

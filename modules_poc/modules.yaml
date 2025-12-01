@@ -412,6 +412,7 @@ admission:
     - src/mongo/db/admission/
     - src/mongo/db/flow_control_ticketholder*
     - src/mongo/util/concurrency/admission_context*
+    - src/mongo/util/concurrency/ticketholder*
 
 workload_simulation:
   meta:
