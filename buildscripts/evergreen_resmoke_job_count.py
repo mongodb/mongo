@@ -52,6 +52,14 @@ _AUBSAN_TASK_FACTOR_OVERRIDES = [
 ]
 # Apply factor for a task based on the build variant it is running on.
 VARIANT_TASK_FACTOR_OVERRIDES = {
+    "enterprise-rhel-8-64-bit-dynamic-all-feature-flags": [
+        {"task": r"sharding_csrs_continuous_config_stepdown", "factor": 0.5},
+        {"task": r"sharding", "factor": 0.5},
+    ],
+    "rhel8": [
+        {"task": r"sharding_csrs_continuous_config_stepdown", "factor": 0.5},
+        {"task": r"sharding", "factor": 0.5},
+    ],
     "enterprise-rhel-8-64-bit": [{"task": r"logical_session_cache_replication.*", "factor": 0.75}],
     "enterprise-rhel-8-64-bit-inmem": [
         {"task": "secondary_reads_passthrough", "factor": 0.3},
