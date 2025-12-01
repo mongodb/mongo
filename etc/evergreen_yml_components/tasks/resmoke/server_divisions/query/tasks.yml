@@ -580,11 +580,12 @@ tasks:
 
   - <<: *task_template
     name: change_streams_mongos_sessions_passthrough
-    tags:
-      [
+    tags: [
         "assigned_to_jira_team_server_query_execution",
         "default",
         "change_streams",
+        # TODO: SERVER-114563 for re-enabling this. Right now very slow for TSAN builds.
+        "incompatible_tsan",
       ]
     commands:
       - func: "do setup"
@@ -592,11 +593,12 @@ tasks:
 
   - <<: *task_template
     name: change_streams_mongos_sessions_passthrough_v2
-    tags:
-      [
+    tags: [
         "assigned_to_jira_team_server_query_execution",
         "default",
         "change_streams",
+        # TODO: SERVER-114563 for re-enabling this. Right now very slow for TSAN builds.
+        "incompatible_tsan",
       ]
     commands:
       - func: "do setup"
