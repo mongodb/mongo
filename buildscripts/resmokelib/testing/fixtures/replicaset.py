@@ -1210,15 +1210,20 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 if db_name not in hashes:
                     hashes[db_name] = {}
                 db = client.get_database(db_name)
-                for coll_name in db.list_collection_names(filter=filter):
+                for coll in db.list_collections(filter=filter):
+                    coll_name = coll["name"]
                     # Skip excluded collections which all live in the 'config' database.
                     if db_name == "config" and coll_name in excluded_config_collections:
                         continue
                     if coll_name in excluded_any_db_collections:
                         continue
-                    # Skip collections that contain TTL indexes.
-                    if "ttl" in coll_name:
+                    # Skip collections that contain TTL indexes or TTL options.
+                    indexes = db.get_collection(coll_name).list_indexes()
+                    if any("expireAfterSeconds" in index for index in indexes):
                         continue
+                    if "expireAfterSeconds" in coll["options"]:
+                        continue
+
                     validate_cmd = {"validate": coll_name, "collHash": True}
                     ret = db.command(validate_cmd, check=False)
                     if "all" in ret and "metadata" in ret:
