@@ -2,8 +2,6 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
-# TODO(SERVER-80603): conditionally inject libunwind.
-
 mongo_cc_library(
     name = "tcmalloc_minimal",
     srcs = [
