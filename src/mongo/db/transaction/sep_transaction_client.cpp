@@ -58,9 +58,9 @@ SyncTransactionWithRetries::SyncTransactionWithRetries(
     std::shared_ptr<executor::InlineExecutor> inlineExecutor,
     std::unique_ptr<TransactionClient> txnClient)
     : _resourceYielder(std::move(resourceYielder)),
-      _inlineExecutor(inlineExecutor),
-      _sleepExec(inlineExecutor->getSleepableExecutor(sleepAndCleanupExecutor)),
-      _cleanupExecutor(sleepAndCleanupExecutor),
+      _inlineExecutor(std::move(inlineExecutor)),
+      _sleepExec(_inlineExecutor->getSleepableExecutor(sleepAndCleanupExecutor)),
+      _cleanupExecutor(std::move(sleepAndCleanupExecutor)),
       _txn(std::make_shared<details::TransactionWithRetries>(
           opCtx,
           _sleepExec,
@@ -68,7 +68,7 @@ SyncTransactionWithRetries::SyncTransactionWithRetries(
           txnClient ? std::move(txnClient)
                     : std::make_unique<details::SEPTransactionClient>(
                           opCtx,
-                          inlineExecutor,
+                          _inlineExecutor,
                           _sleepExec,
                           _cleanupExecutor,
                           std::make_unique<details::DefaultSEPTransactionClientBehaviors>()))) {

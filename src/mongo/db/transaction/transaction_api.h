@@ -124,7 +124,7 @@ struct AbortResult {
  */
 class TransactionClient {
 public:
-    virtual ~TransactionClient() {};
+    virtual ~TransactionClient() {}
 
     /**
      * Called by the transaction that owns this transaction client to install hooks for attaching
@@ -334,9 +334,9 @@ public:
                          std::shared_ptr<executor::TaskExecutor> cancelExecutor,
                          std::unique_ptr<SEPTransactionClientBehaviors> behaviors)
         : _serviceContext(opCtx->getServiceContext()),
-          _inlineExecutor(inlineExecutor),
-          _executor(executor),
-          _cancelExecutor(cancelExecutor),
+          _inlineExecutor(std::move(inlineExecutor)),
+          _executor(std::move(executor)),
+          _cancelExecutor(std::move(cancelExecutor)),
           _behaviors(std::move(behaviors)) {}
 
     SEPTransactionClient(const SEPTransactionClient&) = delete;
@@ -648,7 +648,7 @@ public:
                            const CancellationToken& token,
                            std::unique_ptr<TransactionClient> txnClient)
         : _internalTxn(std::make_shared<Transaction>(opCtx, executor, token, std::move(txnClient))),
-          _executor(executor),
+          _executor(std::move(executor)),
           _token(token) {}
 
     /**

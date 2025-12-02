@@ -1058,6 +1058,7 @@ void TransactionRouter::Router::_clearPendingParticipants(OperationContext* opCt
         // guarantees no transactions will be left open if the retry does not re-target any of these
         // shards.
         std::vector<AsyncRequestsSender::Request> abortRequests;
+        abortRequests.reserve(pendingParticipants.size());
         for (const auto& participant : pendingParticipants) {
             abortRequests.emplace_back(participant,
                                        BSON("abortTransaction"
@@ -1735,6 +1736,7 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
     auto abortCmd = BSON("abortTransaction" << 1 << WriteConcernOptions::kWriteConcernField
                                             << opCtx->getWriteConcern().toBSON());
     std::vector<AsyncRequestsSender::Request> abortRequests;
+    abortRequests.reserve(o().participants.size());
     for (const auto& participantEntry : o().participants) {
         abortRequests.emplace_back(ShardId(participantEntry.first), abortCmd);
     }
@@ -1841,6 +1843,7 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
     auto abortCmd = BSON("abortTransaction" << 1 << WriteConcernOptions::kWriteConcernField
                                             << WriteConcernOptions().toBSON());
     std::vector<AsyncRequestsSender::Request> abortRequests;
+    abortRequests.reserve(o().participants.size());
     for (const auto& participantEntry : o().participants) {
         abortRequests.emplace_back(ShardId(participantEntry.first), abortCmd);
     }
