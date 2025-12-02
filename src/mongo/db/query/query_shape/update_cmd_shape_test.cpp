@@ -32,6 +32,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape/let_shape_component.h"
+#include "mongo/db/query/query_shape/update_cmd_builder.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/unittest/unittest.h"
@@ -43,53 +44,6 @@ using write_ops::UpdateCommandRequest;
 
 static const NamespaceString kDefaultTestNss =
     NamespaceString::createNamespaceString_forTest("testDB.testColl");
-
-struct UpdateCmdBuilder {
-    std::string database;
-    std::string collection;
-    boost::optional<bool> multi;
-    boost::optional<bool> upsert;
-    BSONObj q;
-    BSONObj u;
-    boost::optional<BSONObj> c;
-    BSONObj let = BSONObj();
-    BSONObj collation = BSONObj();
-
-    BSONObj toBSON() const {
-        BSONObjBuilder builder;
-        builder.append("update", collection);
-        BSONArrayBuilder updates(builder.subarrayStart("updates"));
-        BSONObjBuilder updateObj;
-        updateObj.append("q", q);
-
-        if (u.couldBeArray()) {
-            updateObj.appendArray("u", u);
-        } else {
-            updateObj.append("u", u);
-        }
-        if (c.has_value()) {
-            updateObj.append("c", *c);
-        }
-
-        if (multi.has_value()) {
-            updateObj.append("multi", *multi);
-        }
-        if (upsert.has_value()) {
-
-            updateObj.append("upsert", *upsert);
-        }
-        if (!collation.isEmpty()) {
-            updateObj.append("collation", collation);
-        }
-        updates.append(updateObj.obj());
-        updates.done();
-        if (!let.isEmpty()) {
-            builder.append("let", let);
-        }
-        builder.append("$db", database);
-        return builder.obj();
-    }
-};
 
 class UpdateCmdShapeTest : public unittest::Test {
 public:

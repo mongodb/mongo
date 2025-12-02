@@ -32,6 +32,7 @@
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/query_bm_constants.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
+#include "mongo/db/query/query_shape/update_cmd_builder.h"
 #include "mongo/db/query/query_shape/update_cmd_shape.h"
 #include "mongo/db/query/query_stats/update_key.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
@@ -51,9 +52,6 @@ static const NamespaceStringOrUUID kDefaultTestNss =
     NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("test.coll")};
 
 static constexpr auto kCollectionType = query_shape::CollectionType::kCollection;
-
-// A simple replacement update used in the benchmarks.
-const auto kReplacementUpdate = fromjson(R"({ name: "John", age: 30 })");
 
 // Different types of shapifying update benchmarks.
 // We have separate benchmark: One for computing QSH and another that computes the UpdateKey
@@ -86,7 +84,7 @@ int shapifyAndSHA256Hash(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 }
 
 void runBenchmark(BSONObj predicate,
-                  BSONObj update,
+                  const query_benchmark_constants::UpdateSpec& updateSpec,
                   const ShapifyUpdateTestType& testType,
                   benchmark::State& state) {
     QueryFCVEnvironmentForTest::setUp();
@@ -99,19 +97,23 @@ void runBenchmark(BSONObj predicate,
         opCtx->getClient(), query_benchmark_constants::kMockClientMetadataElem, false);
 
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get());
-    auto updateCommandRequest =
-        std::make_unique<write_ops::UpdateCommandRequest>(expCtx->getNamespaceString());
 
-    std::vector<mongo::write_ops::UpdateOpEntry> updates;
-    write_ops::UpdateOpEntry updateOp;
-    updateOp.setQ(predicate);
-    updateOp.setU(update);
-    updateOp.setMulti(false);
-    updateOp.setCollation(BSON("locale" << "fr"));
+    query_shape::UpdateCmdBuilder builder;
+    builder.database = "test";
+    builder.collection = "coll";
+    builder.q = predicate;
+    builder.u = updateSpec.u;
+    builder.c = updateSpec.c;
+    builder.multi = false;
+    builder.collation = BSON("locale" << "fr");
+    builder.let = BSON("z" << "abc");
 
-    updates.push_back(updateOp);
-    updateCommandRequest->setUpdates(updates);
-    updateCommandRequest->setLet(BSON("z" << "abc"));
+    auto updateCommandRequest = write_ops::UpdateCommandRequest::parseOwned(builder.toBSON());
+
+    auto& updates = updateCommandRequest.getUpdates();
+    tassert(
+        11400600, "UpdateCommandRequest must contain at least one update entry", !updates.empty());
+    auto& updateOp = updates[0];
 
     mongo::UpdateRequest updateRequest(updateOp);
     updateRequest.setNamespaceString(expCtx->getNamespaceString());
@@ -128,50 +130,94 @@ void runBenchmark(BSONObj predicate,
         switch (testType) {
             case ShapifyUpdateTestType::kGenerateUpdateKey:
                 benchmark::DoNotOptimize(
-                    shapifyAndGenerateKey(expCtx, parsedUpdate, *updateCommandRequest));
+                    shapifyAndGenerateKey(expCtx, parsedUpdate, updateCommandRequest));
                 break;
             case ShapifyUpdateTestType::kSHA256Hash:
                 benchmark::DoNotOptimize(
-                    shapifyAndSHA256Hash(expCtx, parsedUpdate, *updateCommandRequest));
+                    shapifyAndSHA256Hash(expCtx, parsedUpdate, updateCommandRequest));
                 break;
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(1140062);
         }
     }
 }
 
-void runBenchmark(ShapifyUpdateTestType testType, benchmark::State& state) {
+// Benchmark functions for replacement updates.
+void BM_ReplacementUpdate_ShapifyAndGenerateKey(benchmark::State& state) {
     auto queryComplexity = static_cast<query_benchmark_constants::QueryComplexity>(state.range(0));
     runBenchmark(query_benchmark_constants::queryComplexityToJSON(queryComplexity),
-                 kReplacementUpdate,
-                 testType,
+                 query_benchmark_constants::kReplacementUpdate,
+                 ShapifyUpdateTestType::kGenerateUpdateKey,
                  state);
 }
 
-void BM_ShapifyAndGenerateKey(benchmark::State& state) {
-    runBenchmark(ShapifyUpdateTestType::kGenerateUpdateKey, state);
+void BM_ReplacementUpdate_ShapifyAndSHA256Hash(benchmark::State& state) {
+    auto queryComplexity = static_cast<query_benchmark_constants::QueryComplexity>(state.range(0));
+    runBenchmark(query_benchmark_constants::queryComplexityToJSON(queryComplexity),
+                 query_benchmark_constants::kReplacementUpdate,
+                 ShapifyUpdateTestType::kSHA256Hash,
+                 state);
 }
 
-void BM_ShapifyAndSHA256Hash(benchmark::State& state) {
-    runBenchmark(ShapifyUpdateTestType::kSHA256Hash, state);
+// Benchmark functions for pipeline updates.
+void BM_PipelineUpdate_ShapifyAndGenerateKey(benchmark::State& state) {
+    auto queryComplexity = static_cast<query_benchmark_constants::QueryComplexity>(state.range(0));
+    auto pipelineComplexity =
+        static_cast<query_benchmark_constants::PipelineComplexity>(state.range(1));
+
+    auto updateSpec = query_benchmark_constants::getUpdateSpec(pipelineComplexity);
+    runBenchmark(query_benchmark_constants::queryComplexityToJSON(queryComplexity),
+                 updateSpec,
+                 ShapifyUpdateTestType::kGenerateUpdateKey,
+                 state);
+}
+
+void BM_PipelineUpdate_ShapifyAndSHA256Hash(benchmark::State& state) {
+    auto queryComplexity = static_cast<query_benchmark_constants::QueryComplexity>(state.range(0));
+    auto pipelineComplexity =
+        static_cast<query_benchmark_constants::PipelineComplexity>(state.range(1));
+
+    auto updateSpec = query_benchmark_constants::getUpdateSpec(pipelineComplexity);
+    runBenchmark(query_benchmark_constants::queryComplexityToJSON(queryComplexity),
+                 updateSpec,
+                 ShapifyUpdateTestType::kSHA256Hash,
+                 state);
 }
 
 // TODO SERVER-111930: Enable this benchmark once recording query stats for
 // updates with simple ID query.
 // static_cast<int>(query_benchmark_constants::QueryComplexity::kIDHack),
-// TODO SERVER-114006 and SERVER-110344: Once shapifying modifier and pipeline update types are
-// supported, add arguments for those as well.
-#define ADD_ARGS()                                                                          \
-    ArgNames({"queryComplexity"})                                                           \
-        ->ArgsProduct(                                                                      \
-            {{static_cast<int>(query_benchmark_constants::QueryComplexity::kMildlyComplex), \
-              static_cast<int>(query_benchmark_constants::QueryComplexity::kMkComplex),     \
-              static_cast<int>(query_benchmark_constants::QueryComplexity::kVeryComplex)}}) \
+
+// We do not add a complexity dimension for replacement updates because the 'u' statement will
+// always get shapified into '?object'. In other words, the shapification work done for the 'u'
+// field for replacement updates is O(1).
+#define REPLACEMENT_ARGS()                                                                     \
+    ArgNames({"queryComplexity"})                                                              \
+        ->Args({static_cast<int>(query_benchmark_constants::QueryComplexity::kMildlyComplex)}) \
+        ->Args({static_cast<int>(query_benchmark_constants::QueryComplexity::kMkComplex)})     \
+        ->Args({static_cast<int>(query_benchmark_constants::QueryComplexity::kVeryComplex)})   \
         ->Threads(1)
 
+#define PIPELINE_ARGS()                                                                        \
+    ArgNames({"queryComplexity", "pipelineComplexity"})                                        \
+        ->ArgsProduct(                                                                         \
+            {{static_cast<int>(query_benchmark_constants::QueryComplexity::kMildlyComplex),    \
+              static_cast<int>(query_benchmark_constants::QueryComplexity::kMkComplex),        \
+              static_cast<int>(query_benchmark_constants::QueryComplexity::kVeryComplex)},     \
+             {static_cast<int>(query_benchmark_constants::PipelineComplexity::kSimple),        \
+              static_cast<int>(query_benchmark_constants::PipelineComplexity::kWithConstants), \
+              static_cast<int>(                                                                \
+                  query_benchmark_constants::PipelineComplexity::kWithMultipleStages),         \
+              static_cast<int>(query_benchmark_constants::PipelineComplexity::                 \
+                                   kWithMultipleStagesAndExpressions)}})                       \
+        ->Threads(1)
 
-BENCHMARK(BM_ShapifyAndGenerateKey)->ADD_ARGS();
-BENCHMARK(BM_ShapifyAndSHA256Hash)->ADD_ARGS();
+BENCHMARK(BM_ReplacementUpdate_ShapifyAndGenerateKey)->REPLACEMENT_ARGS();
+BENCHMARK(BM_ReplacementUpdate_ShapifyAndSHA256Hash)->REPLACEMENT_ARGS();
+BENCHMARK(BM_PipelineUpdate_ShapifyAndGenerateKey)->PIPELINE_ARGS();
+BENCHMARK(BM_PipelineUpdate_ShapifyAndSHA256Hash)->PIPELINE_ARGS();
+
+// TODO SERVER-110344: Add benchmarks for modifier-style updates.
 
 }  // namespace
 }  // namespace mongo

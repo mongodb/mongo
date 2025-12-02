@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2024-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -30,43 +30,64 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/util/modules.h"
+#include "mongo/bson/bsonobjbuilder.h"
+
+#include <string>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
-namespace query_benchmark_constants {
-extern const BSONObj kMockMetadataWrapper;
-extern const BSONElement kMockClientMetadataElem;
+namespace query_shape {
 
-enum class QueryComplexity : int { kIDHack = 0, kMildlyComplex, kMkComplex, kVeryComplex };
-extern BSONObj queryComplexityToJSON(const QueryComplexity& complexity);
-
-extern const BSONObj kIDHackPredicate;
-extern const BSONObj kMildlyComplexPredicate;
-
-extern const BSONObj kComplexPredicate;
-extern const BSONObj kComplexProjection;
-
-extern const BSONObj kChangeStreamPredicate;
-extern const BSONObj kVeryComplexProjection;
-
-struct UpdateSpec {
+/**
+ * Helper struct for constructing UpdateCommandRequest BSON in tests and benchmarks.
+ */
+struct UpdateCmdBuilder {
+    std::string database;
+    std::string collection;
+    boost::optional<bool> multi;
+    boost::optional<bool> upsert;
+    BSONObj q;
     BSONObj u;
     boost::optional<BSONObj> c;
+    BSONObj let = BSONObj();
+    BSONObj collation = BSONObj();
+
+    BSONObj toBSON() const {
+        BSONObjBuilder builder;
+        builder.append("update", collection);
+        BSONArrayBuilder updates(builder.subarrayStart("updates"));
+        BSONObjBuilder updateObj;
+        updateObj.append("q", q);
+
+        if (u.couldBeArray()) {
+            updateObj.appendArray("u", u);
+        } else {
+            updateObj.append("u", u);
+        }
+        if (c.has_value()) {
+            updateObj.append("c", *c);
+        }
+
+        if (multi.has_value()) {
+            updateObj.append("multi", *multi);
+        }
+        if (upsert.has_value()) {
+            updateObj.append("upsert", *upsert);
+        }
+        if (!collation.isEmpty()) {
+            updateObj.append("collation", collation);
+        }
+        updates.append(updateObj.obj());
+        updates.done();
+        if (!let.isEmpty()) {
+            builder.append("let", let);
+        }
+        builder.append("$db", database);
+        return builder.obj();
+    }
 };
 
-enum class PipelineComplexity : int {
-    kSimple = 0,
-    kWithConstants,
-    kWithMultipleStages,
-    kWithMultipleStagesAndExpressions,
-};
-
-extern UpdateSpec getUpdateSpec(const PipelineComplexity& complexity);
-
-extern const UpdateSpec kReplacementUpdate;
-extern const UpdateSpec kPipelineUpdateSimple;
-extern const UpdateSpec kPipelineUpdateWithConstants;
-extern const UpdateSpec kPipelineUpdateWithMultipleStages;
-extern const UpdateSpec kPipelineUpdateWithMultipleStagesAndExpressions;
-}  // namespace query_benchmark_constants
+}  // namespace query_shape
 }  // namespace mongo
+

@@ -298,5 +298,55 @@ const BSONObj kVeryComplexProjection = fromjson(R"({
                             "else": 0
                           } } } } ] } } } } } }
 )");
+
+// Update complexity constants for benchmarks.
+
+// A simple replacement update used in the benchmarks.
+const UpdateSpec kReplacementUpdate = {fromjson(R"({ name: "John", age: 30 })") /*u*/,
+                                       boost::none /*c*/};
+
+// An equivalent pipeline-style update, so we are benchmarking the overhead of the update style.
+const UpdateSpec kPipelineUpdateSimple = {
+    fromjson(R"([{ $set: { name: "John", age: 30 } }])") /*u*/, boost::none /*c*/};
+
+// A pipeline update that uses constants.
+const UpdateSpec kPipelineUpdateWithConstants = {
+    fromjson(R"([{ $set: { name: "$$constName", age: "$$constAge" } }])") /*u*/,
+    fromjson(R"({ constName: "John", constAge: 30 })") /*c*/};
+
+// A more complex pipeline update with multiple stages.
+const UpdateSpec kPipelineUpdateWithMultipleStages = {fromjson(R"([
+    { "$addFields": { "dessert": "Pumpkin Pie", "servings": 12 } },
+    { "$project": { "dessert": 1, "_id": 1 } }, 
+    { "$replaceRoot": { "newRoot": { "originalDoc": "$$ROOT", "napped": true } } }
+])") /*u*/,
+                                                      boost::none /*c*/};
+
+// The same pipeline structure, but using expressions instead of constants to test expression
+// shapification overhead.
+const UpdateSpec kPipelineUpdateWithMultipleStagesAndExpressions = {fromjson(R"([
+    { "$addFields": { 
+        "dessert": { "$concat": ["Pumpkin", " ", "Pie"] }, 
+        "servings": { "$multiply": [3, 4] } 
+    } },
+    { "$project": { "dessert": 1, "_id": 1 } }, 
+    { "$replaceRoot": { "newRoot": { "originalDoc": "$$ROOT", "napped": { "$eq": [1, 1] } } } }
+])") /*u*/,
+                                                                    boost::none /*c*/};
+
+UpdateSpec getUpdateSpec(const PipelineComplexity& complexity) {
+    switch (complexity) {
+        case PipelineComplexity::kSimple:
+            return kPipelineUpdateSimple;
+        case PipelineComplexity::kWithConstants:
+            return kPipelineUpdateWithConstants;
+        case PipelineComplexity::kWithMultipleStages:
+            return kPipelineUpdateWithMultipleStages;
+        case PipelineComplexity::kWithMultipleStagesAndExpressions:
+            return kPipelineUpdateWithMultipleStagesAndExpressions;
+        default:
+            MONGO_UNREACHABLE_TASSERT(11400601);
+    }
+}
 }  // namespace query_benchmark_constants
 }  // namespace mongo
