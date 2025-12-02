@@ -123,9 +123,9 @@ bool ReplayCommand::isSessionEnd() const {
     return _packet.eventType == EventType::kSessionEnd;
 }
 
-std::pair<Microseconds, int64_t> extractOffsetAndSessionFromCommand(const ReplayCommand& command) {
+std::pair<Microseconds, uint64_t> extractOffsetAndSessionFromCommand(const ReplayCommand& command) {
     const Microseconds offset = command.fetchRequestOffset();
-    const int64_t sessionId = command.fetchRequestSessionId();
+    const uint64_t sessionId = command.fetchRequestSessionId();
     return {offset, sessionId};
 }
 }  // namespace mongo

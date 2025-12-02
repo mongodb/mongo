@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -36,6 +37,7 @@ struct ReplayConfig {
     std::string recordingPath;
     std::string mongoURI;
     std::string enablePerformanceRecording;
+    std::chrono::seconds sessionPreInitTime = std::chrono::seconds(5);
 
     explicit operator bool() const {
         return !recordingPath.empty() && !mongoURI.empty();
