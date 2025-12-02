@@ -41,6 +41,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
@@ -142,7 +143,7 @@ public:
         static Status getEffectiveStatus(const AsyncRequestsSender::Response& response);
     };
 
-    typedef stdx::unordered_map<ShardId, HostAndPort> ShardHostMap;
+    using ShardHostMap = stdx::unordered_map<ShardId, HostAndPort>;
 
     /**
      * Constructs a new AsyncRequestsSender. The OperationContext* and TaskExecutor* must remain
@@ -159,6 +160,8 @@ public:
                         Shard::RetryPolicy retryPolicy,
                         std::unique_ptr<ResourceYielder> resourceYielder,
                         const ShardHostMap& designatedHostsMap);
+
+    ~AsyncRequestsSender();
 
     /**
      * Returns true if responses for all requests have been returned via next().

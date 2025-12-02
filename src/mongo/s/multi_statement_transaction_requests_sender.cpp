@@ -137,6 +137,13 @@ MultiStatementTransactionRequestsSender::~MultiStatementTransactionRequestsSende
     invariant(_opCtx);
     auto baton = _opCtx->getBaton();
     invariant(baton);
+
+    // Cancel any scheduled retry requests here, in case we missed cancelling them in the
+    // AsyncRequestsSender before. The retries will be canceled in the AsyncRequestsSender as well
+    // as a last resort, but in case we got here without a previous cancellation, we can avoid some
+    // unnecessary work by cancelling the callbacks here.
+    _ars->stopRetrying();
+
     // Delegate the destruction of `_ars` to the `_opCtx` baton to potentially move the cost off of
     // the critical path. The assumption is that postponing the destruction is safe so long as the
     // `_opCtx` that corresponds to `_ars` remains alive.

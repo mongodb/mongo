@@ -79,11 +79,10 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
       // Initialize command metadata to handle the read preference.
       _metadataObj(_readPreference.toContainingBSON()),
       _retryPolicy(retryPolicy),
+      _remotesLeft(requests.size()),
       _subExecutor(std::move(executor)),
       _subBaton(opCtx->getBaton()->makeSubBaton()),
       _resourceYielder(std::move(resourceYielder)) {
-
-    _remotesLeft = requests.size();
 
     _remotes.reserve(requests.size());
     for (const auto& request : requests) {
@@ -99,6 +98,18 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
     }
 
     CurOp::get(_opCtx)->ensureRecordRemoteOpWait();
+}
+
+AsyncRequestsSender::~AsyncRequestsSender() {
+    // It is necessary to cancel all outstanding retries here. This is required because the
+    // callbacks for retry requests need access to the AsyncRequestsSender's internals, and we
+    // cannot destroy the AsyncRequestsSender when there are still outstanding retry requests on the
+    // baton.
+    _cancellationSource.cancel();
+
+    // Any scheduled callbacks from this AsyncResultsMerger instance cannot be serviced anymore when
+    // the instance goes out of scope.
+    _subBaton.shutdown();
 }
 
 AsyncRequestsSender::Response AsyncRequestsSender::next() {
@@ -198,6 +209,9 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
         _interruptStatus = ex.toStatus();
     }
 
+    // abort any ongoing backoff.
+    _cancellationSource.cancel();
+
     // Make failed responses for all outstanding remotes with the interruption status and push them
     // onto the response queue
     for (auto& remote : _remotes) {
@@ -205,9 +219,6 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
             _responseQueue.push(std::move(remote).makeFailedResponse(_interruptStatus));
         }
     }
-
-    // abort any ongoing backoff.
-    _cancellationSource.cancel();
 
     // Stop servicing callbacks
     _subBaton.shutdown();
@@ -220,6 +231,9 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
 
 void AsyncRequestsSender::stopRetrying() noexcept {
     _stopRetrying = true;
+
+    // Cancel all pending retry operations, as they are not needed anymore.
+    _cancellationSource.cancel();
 }
 
 bool AsyncRequestsSender::done() const noexcept {
