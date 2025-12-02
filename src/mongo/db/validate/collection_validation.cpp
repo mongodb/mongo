@@ -740,6 +740,32 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
         CollectionValidation::validateHashes(*revealHashedIds, /*equalLength=*/false);
     }
 
+    boost::optional<Timestamp> timestamp = boost::none;
+    if (cmdObj["atClusterTime"]) {
+        if (background) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "Running the validate command with { background: true } "
+                                       "cannot be done with {atClusterTime: ...} because "
+                                       "background already sets a read timestamp.");
+        }
+        if (!nss.isReplicated()) {
+            uasserted(ErrorCodes::CommandNotSupported,
+                      str::stream() << "Running the validate command with { atClusterTime: ... } "
+                                    << "is not supported on unreplicated collections");
+        }
+        timestamp = cmdObj["atClusterTime"].timestamp();
+    }
+    if (background) {
+        // Background validation reads data from the last stable checkpoint.
+        timestamp =
+            opCtx->getServiceContext()->getStorageEngine()->getLastStableRecoveryTimestamp();
+        if (!timestamp) {
+            uasserted(ErrorCodes::NamespaceNotFound,
+                      fmt::format("Cannot run background validation on collection because there "
+                                  "is no checkpoint yet"));
+        }
+    }
+
     const auto validateMode = [&] {
         if (metadata) {
             return CollectionValidation::ValidateMode::kMetadata;
@@ -808,6 +834,7 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
             getTestCommandsEnabled() ? (ValidationVersion)bsonTestValidationVersion
                                      : currentValidationVersion,
             getConfigOverrideOrThrow(rawConfigOverride),
+            timestamp,
             hashPrefixes,
             revealHashedIds};
 }
@@ -879,7 +906,7 @@ Status validate(OperationContext* opCtx,
 
     results->setNamespaceString(validateState.nss());
     results->setUUID(validateState.uuid());
-    results->setReadTimestamp(validateState.getValidateTimestamp());
+    results->setReadTimestamp(validateState.getReadTimestamp());
 
     try {
         invariant(!validateState.isFullIndexValidation() ||

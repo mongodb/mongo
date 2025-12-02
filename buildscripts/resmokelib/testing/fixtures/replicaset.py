@@ -1168,6 +1168,14 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         coll.insert_one({"a": 1})
         coll.drop()
 
+        res = primary_client.admin.command({"replSetGetStatus": 1})
+
+        if "appliedOpTime" not in res["optimes"]:
+            # This can be null when the node is starting up.
+            return False
+
+        clusterTime = res["optimes"]["appliedOpTime"]["ts"]
+
         self.logger.info("Performing Internode Validation")
 
         # Collections we exclude from the hash comparisons. This is because these collections can contain different document contents for valid reasons (i.e. implicitly replicated, TTL indexes, updated by background threads, etc)
@@ -1224,7 +1232,11 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                     if "expireAfterSeconds" in coll["options"]:
                         continue
 
-                    validate_cmd = {"validate": coll_name, "collHash": True}
+                    validate_cmd = {
+                        "validate": coll_name,
+                        "collHash": True,
+                        "atClusterTime": clusterTime,
+                    }
                     ret = db.command(validate_cmd, check=False)
                     if "all" in ret and "metadata" in ret:
                         something_set = True

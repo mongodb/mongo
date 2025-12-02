@@ -148,10 +148,6 @@ public:
      */
     void initializeCursors(OperationContext* opCtx);
 
-    boost::optional<Timestamp> getValidateTimestamp() {
-        return _validateTs;
-    }
-
 private:
     ValidateState() = delete;
 
@@ -182,8 +178,6 @@ private:
     RecordId _firstRecordId;
 
     DataThrottle _dataThrottle;
-
-    boost::optional<Timestamp> _validateTs = boost::none;
 };
 
 }  // namespace CollectionValidation

@@ -108,6 +108,7 @@ public:
                       bool logDiagnostics,
                       ValidationVersion validationVersion = currentValidationVersion,
                       boost::optional<std::string> verifyConfigurationOverride = boost::none,
+                      boost::optional<Timestamp> readTimestamp = boost::none,
                       boost::optional<std::vector<std::string>> hashPrefixes = boost::none,
                       boost::optional<std::vector<std::string>> revealHashedIds = boost::none);
 
@@ -161,6 +162,10 @@ public:
         return _validateMode == ValidateMode::kForegroundFullEnforceFastCount;
     }
 
+    const boost::optional<Timestamp>& getReadTimestamp() const {
+        return _readTimestamp;
+    }
+
     const boost::optional<std::vector<std::string>>& getHashPrefixes() const {
         return _hashPrefixes;
     }
@@ -207,6 +212,8 @@ private:
     const ValidationVersion _validationVersion;
 
     const boost::optional<std::string> _verifyConfigurationOverride;
+
+    const boost::optional<Timestamp> _readTimestamp;
 
     const boost::optional<std::vector<std::string>> _hashPrefixes;
 
