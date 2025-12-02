@@ -102,6 +102,7 @@ void unblockConflictingDDLs(OperationContext* opCtx) {
 
 void broadcastPlacementHistoryChangedNotification(
     OperationContext* opCtx,
+    const Timestamp& committedAt,
     const OperationSessionInfo& osi,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
@@ -109,7 +110,7 @@ void broadcastPlacementHistoryChangedNotification(
 
     ShardsvrNotifyShardingEventRequest request(
         notify_sharding_event::kPlacementHistoryMetadataChanged,
-        PlacementHistoryMetadataChanged().toBSON());
+        PlacementHistoryMetadataChanged(committedAt).toBSON());
 
     request.setDbName(DatabaseName::kAdmin);
     generic_argument_util::setMajorityWriteConcern(request);
@@ -255,7 +256,8 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
             Phase::kFinalize,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 const auto osi = getNewSession(opCtx);
-                broadcastPlacementHistoryChangedNotification(opCtx, osi, executor, token);
+                broadcastPlacementHistoryChangedNotification(
+                    opCtx, _doc.getInitializationTime().value(), osi, executor, token);
                 PlacementHistoryCleaner::get(opCtx)->resume(opCtx);
                 ShardingLogging::get(opCtx)->logChange(opCtx, "resetPlacementHistory.end", nss());
             }))

@@ -114,14 +114,22 @@ structs:
             "Notification of the commit of a metadata change affecting the whole content of config.placementHistory.
             Shards are expected to react by emitting a no-op log entry directed to change stream readers."
         strict: false
+        fields:
+            committedAt:
+                description:
+                    "The cluster time associated to the metadata change,
+                    as persistent in the related config.placementHistory documents."
+                type: timestamp
 
 commands:
     _shardsvrNotifyShardingEvent:
         command_name: _shardsvrNotifyShardingEvent
         cpp_name: ShardsvrNotifyShardingEventRequest
         description:
-            "Internal command to be invoked by the config server to notify a shard
-            of an event concerning the shard itself or the whole cluster."
+            "Internal command supporting the integration between Sharding DDL operations and change stream readers.
+            A remote coordinator node may use it to dispatch the notification of an upcoming/committed event to one or more of its participants.
+            The recipient is expected to react with the generation of a no-op entry describing the details of the notification,
+            which will be later interpreted as a change/control event by change stream readers targeting it."
         namespace: ignored
         api_version: ""
         strict: false

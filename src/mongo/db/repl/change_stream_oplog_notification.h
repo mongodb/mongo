@@ -120,7 +120,8 @@ void notifyChangeStreamsOnNamespacePlacementChanged(OperationContext* opCtx,
  * Writes a no-op oplog entry concerning the commit of an operation
  * modifying the operational boundaries of config.placementHistory.
  */
-void notifyChangeStreamsOnPlacementHistoryMetadataChanged(OperationContext* opCtx);
+void notifyChangeStreamsOnPlacementHistoryMetadataChanged(
+    OperationContext* opCtx, const PlacementHistoryMetadataChanged& notification);
 
 /**
  * Writes a no-op oplog entry on the end of multi shard transaction.

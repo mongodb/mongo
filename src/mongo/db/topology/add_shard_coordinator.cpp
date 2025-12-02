@@ -317,6 +317,24 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     }
                 }
 
+                // V2 Change stream readers consuming events from a promoted replica set that
+                // predate this commit need to receive a notification about the presence of new
+                // metadata in config.placementHistory to execute proper retargeting.
+                if (generatePlacementHistoryInitMetadata) {
+                    auto& targeter = _getTargeter(opCtx);
+                    ShardsvrNotifyShardingEventRequest request(
+                        notify_sharding_event::kPlacementHistoryMetadataChanged,
+                        PlacementHistoryMetadataChanged(newTopologyTime.asTimestamp()).toBSON());
+                    request.setDbName(DatabaseName::kAdmin);
+                    const auto session = getNewSession(opCtx);
+                    generic_argument_util::setMajorityWriteConcern(request);
+                    generic_argument_util::setOperationSessionInfo(request, session);
+                    uassertStatusOK(
+                        topology_change_helpers::runCommandForAddShard(
+                            opCtx, targeter, DatabaseName::kAdmin, request.toBSON(), **executor)
+                            .commandStatus);
+                }
+
                 if (feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
                         VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {

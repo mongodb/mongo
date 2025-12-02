@@ -43,6 +43,31 @@ describe("Activity of the addShard commit within config.placementHistory", funct
             assert.sameMembers(fallbackResponseDescriptor.shards, fallbackResponse);
             assert(timestampCmp(fallbackResponseDescriptor.timestamp, Timestamp(0, 1)) === 0);
         };
+
+        this.verifyPostCommitNotificationOnAddedReplicaSet = function (replicaSet, expectedCommitTimeValue) {
+            const namespacePlacementChangedFilter = {op: "n", ns: "", o: {msg: {namespacePlacementChanged: ""}}};
+            const matchingOpEntries = replicaSet
+                .getPrimary()
+                .getCollection("local.oplog.rs")
+                .find(namespacePlacementChangedFilter)
+                .toArray();
+
+            if (expectedCommitTimeValue === null) {
+                assert.eq(0, matchingOpEntries.length);
+                return;
+            }
+
+            assert.eq(1, matchingOpEntries.length);
+            let placementChangedNotification = matchingOpEntries[0];
+            const expectedNotificationDetails = {
+                namespacePlacementChanged: 1,
+                ns: {},
+                committedAt: expectedCommitTimeValue,
+            };
+
+            assert.docEq(placementChangedNotification.o2, expectedNotificationDetails);
+            assert(timestampCmp(expectedCommitTimeValue, placementChangedNotification.ts) < 0);
+        };
     });
 
     beforeEach(() => {
@@ -67,7 +92,7 @@ describe("Activity of the addShard commit within config.placementHistory", funct
         assert.eq(0, this.st.config.placementHistory.countDocuments({}));
     });
 
-    it("addShard generates initialization metadata when a first empty shard is added", () => {
+    it("addShard generates initialization metadata and a post-commit notification when a first empty shard is added", () => {
         const firstShardName = "firstShard";
         const firstShardRS = this.spinNewReplicaSet(firstShardName);
 
@@ -75,30 +100,35 @@ describe("Activity of the addShard commit within config.placementHistory", funct
 
         const firstShardCreationTime = this.getTopologyTimeOf(firstShardName);
         this.verifyPlacementHistoryInitMetadata(firstShardCreationTime, [firstShardName]);
+        this.verifyPostCommitNotificationOnAddedReplicaSet(firstShardRS, firstShardCreationTime);
     });
 
-    it("transitionFromDedicatedConfigServer generates initialization metadata", () => {
+    it("transitionFromDedicatedConfigServer generates initialization metadata and a post-commit notification", () => {
         const configShardName = "config";
         assert.commandWorked(this.st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
         const firstShardCreationTime = this.getTopologyTimeOf(configShardName);
         this.verifyPlacementHistoryInitMetadata(firstShardCreationTime, [configShardName]);
+        this.verifyPostCommitNotificationOnAddedReplicaSet(this.st.configRS, firstShardCreationTime);
     });
 
-    it("addShard preserves the original initialization metadata when a second shard is added", () => {
+    it("the addition of a second shard of the cluster do not generate any initialization metadata or post-commit notification", () => {
         const firstShardName = "firstShard";
         const firstShardRS = this.spinNewReplicaSet(firstShardName);
 
         assert.commandWorked(this.st.s.adminCommand({addShard: firstShardRS.getURL(), name: firstShardName}));
         const firstShardCreationTime = this.getTopologyTimeOf(firstShardName);
+
+        this.verifyPostCommitNotificationOnAddedReplicaSet(firstShardRS, firstShardCreationTime);
 
         const secondShardName = "secondShard";
         const secondShardRS = this.spinNewReplicaSet(secondShardName);
         assert.commandWorked(this.st.s.adminCommand({addShard: secondShardRS.getURL(), name: secondShardName}));
 
         this.verifyPlacementHistoryInitMetadata(firstShardCreationTime, [firstShardName]);
+        this.verifyPostCommitNotificationOnAddedReplicaSet(secondShardRS, null);
     });
 
-    it("addShard generates initialization metadata and placement documents when a first not-empty shard is added", () => {
+    it("addShard generates initialization metadata, placement documents  and a post-commit notification when a first not-empty shard is added", () => {
         const firstShardName = "firstShard";
         const firstShardRS = this.spinNewReplicaSet(firstShardName);
 
@@ -123,5 +153,6 @@ describe("Activity of the addShard commit within config.placementHistory", funct
         }
 
         this.verifyPlacementHistoryInitMetadata(firstShardCreationTime, [firstShardName]);
+        this.verifyPostCommitNotificationOnAddedReplicaSet(firstShardRS, firstShardCreationTime);
     });
 });

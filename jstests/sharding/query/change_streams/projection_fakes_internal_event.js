@@ -73,11 +73,6 @@ describe("$changeStream", function () {
         assert.commandWorked(testColl.insert(invalidShardDoc));
         assert.commandWorked(testColl.insert(fakeShardDoc));
 
-        // TODO: SERVER-113286 Generate NamespacePlacementChanged on addition of first shard in the sharded cluster.
-        if (FeatureFlagUtil.isPresentAndEnabled(testDB, "ChangeStreamPreciseShardTargeting")) {
-            assert.commandWorked(testDB.adminCommand({resetPlacementHistory: 1}));
-        }
-
         // Log the shard description documents that we just inserted into the collection.
         jsTest.log.info("Shard docs: ", {docs: testColl.find().toArray()});
     });

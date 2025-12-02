@@ -254,14 +254,15 @@ void notifyChangeStreamsOnNamespacePlacementChanged(OperationContext* opCtx,
                                    "NamespacePlacementChangedWritesOplog");
 }
 
-void notifyChangeStreamsOnPlacementHistoryMetadataChanged(OperationContext* opCtx) {
-    Timestamp now(opCtx->fastClockSource().now());
+void notifyChangeStreamsOnPlacementHistoryMetadataChanged(
+    OperationContext* opCtx, const PlacementHistoryMetadataChanged& notification) {
     // Global changes to the metadata of placementHistory are encoded as a NamespacePlacementChanged
     // notification with an unspecified namespace.
-    NamespacePlacementChanged globalChangeNotification(NamespaceString::kEmpty, now);
+    NamespacePlacementChanged repackagedNotification(NamespaceString::kEmpty,
+                                                     notification.getCommittedAt());
     insertNotificationOplogEntries(
         opCtx,
-        {buildNamespacePlacementChangedOplogEntry(opCtx, globalChangeNotification)},
+        {buildNamespacePlacementChangedOplogEntry(opCtx, repackagedNotification)},
         "PlacementHistoryMetadataChangedWritesOplog");
 }
 

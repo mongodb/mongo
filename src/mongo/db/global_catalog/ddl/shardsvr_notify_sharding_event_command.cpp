@@ -49,10 +49,6 @@
 
 namespace mongo {
 
-/**
- * This command notifies an event on the shard server. The action taken is determined by the
- * event ShardsvrAddShard: Add an oplog entry for the new shard.
- */
 class ShardsvrNotifyShardingEventCommand : public TypedCommand<ShardsvrNotifyShardingEventCommand> {
 public:
     using Request = ShardsvrNotifyShardingEventRequest;
@@ -122,7 +118,9 @@ public:
 
             if (request().getEventType() ==
                 notify_sharding_event::kPlacementHistoryMetadataChanged) {
-                notifyChangeStreamsOnPlacementHistoryMetadataChanged(opCtx);
+                const auto event = PlacementHistoryMetadataChanged::parse(
+                    request().getDetails(), IDLParserContext("_shardsvrNotifyShardingEvent"));
+                notifyChangeStreamsOnPlacementHistoryMetadataChanged(opCtx, event);
                 return;
             }
 
