@@ -43,24 +43,7 @@ using namespace mongo;
 
 static constexpr std::string kIdleThreadsStageName = "$idleThreads";
 
-class IdleThreadsExecAggStage : public sdk::ExecAggStageTransform {
-public:
-    IdleThreadsExecAggStage() : sdk::ExecAggStageTransform(kIdleThreadsStageName) {}
-
-    mongo::extension::ExtensionGetNextResult getNext(
-        const sdk::QueryExecutionContextHandle& execCtx,
-        ::MongoExtensionExecAggStage* execStage) override {
-        // TODO SERVER-113905: once we support metadata, we should only support returning both
-        // document and metadata.
-        return _getSource().getNext(execCtx.get());
-    }
-
-    void open() override {}
-
-    void reopen() override {}
-
-    void close() override {}
-};
+DEFAULT_EXEC_STAGE(IdleThreads);
 
 class IdleThreadsLogicalStage : public sdk::LogicalAggStage {
 public:
@@ -75,7 +58,7 @@ public:
     }
 
     std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
-        return std::make_unique<IdleThreadsExecAggStage>();
+        return std::make_unique<IdleThreadsExecStage>(kIdleThreadsStageName, BSONObj());
     }
 
     std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {

@@ -488,7 +488,7 @@ TEST(AggregationStageTest, SimpleSerializationSucceeds) {
                       serialized);
 }
 
-TEST(AggregationStageTest, Explain) {
+TEST(AggregationStageTest, ExplainQueryPlanner) {
     auto logicalStage =
         new extension::sdk::ExtensionLogicalAggStage(SimpleSerializationLogicalStage::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};
@@ -513,6 +513,36 @@ TEST(AggregationStageTest, Explain) {
         auto output = handle.explain(ExplainOptions::Verbosity::kExecAllPlans);
         ASSERT_BSONOBJ_EQ(BSON(SimpleSerializationLogicalStage::kStageName
                                << ::MongoExtensionExplainVerbosity::kExecAllPlans),
+                          output);
+    }
+}
+
+
+TEST(AggregationStageTest, ExplainExecutionStats) {
+    auto validExecAggStage = new extension::sdk::ExtensionExecAggStage(
+        shared_test_stages::ValidExtensionExecAggStage::make());
+    auto handle = extension::ExecAggStageHandle{validExecAggStage};
+
+    // Test that different verbosity levels can be passed through to the extension implementation
+    // correctly.
+    {
+        auto output = handle.explain(ExplainOptions::Verbosity::kQueryPlanner);
+        ASSERT_BSONOBJ_EQ(BSON("execField" << "execMetric" << "verbosity"
+                                           << ::MongoExtensionExplainVerbosity::kQueryPlanner),
+                          output);
+    }
+
+    {
+        auto output = handle.explain(ExplainOptions::Verbosity::kExecStats);
+        ASSERT_BSONOBJ_EQ(BSON("execField" << "execMetric" << "verbosity"
+                                           << ::MongoExtensionExplainVerbosity::kExecStats),
+                          output);
+    }
+
+    {
+        auto output = handle.explain(ExplainOptions::Verbosity::kExecAllPlans);
+        ASSERT_BSONOBJ_EQ(BSON("execField" << "execMetric" << "verbosity"
+                                           << ::MongoExtensionExplainVerbosity::kExecAllPlans),
                           output);
     }
 }
@@ -876,6 +906,10 @@ public:
         return _initialized;
     }
 
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
+
     static inline std::unique_ptr<ExecAggStageBase> make() {
         return std::make_unique<ResourceTrackingExecAggStage>("$resourceTracking");
     }
@@ -977,6 +1011,10 @@ public:
     void reopen() override {}
 
     void close() override {}
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
 
     static inline std::unique_ptr<ExecAggStageBase> make() {
         return std::make_unique<GetMetricsExtensionExecAggStage>("$getMetrics");

@@ -28,6 +28,7 @@
  */
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 
+#include "mongo/db/extension/shared/explain_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
 
 namespace mongo::extension {
@@ -100,6 +101,21 @@ void ExecAggStageHandle::reopen() {
 
 void ExecAggStageHandle::close() {
     invokeCAndConvertStatusToException([&]() { return vtable().close(get()); });
+}
+
+BSONObj ExecAggStageHandle::explain(mongo::ExplainOptions::Verbosity verbosity) const {
+    ::MongoExtensionByteBuf* buf;
+    auto extVerbosity = convertHostVerbosityToExtVerbosity(verbosity);
+    invokeCAndConvertStatusToException(
+        [&]() { return vtable().explain(get(), extVerbosity, &buf); });
+
+    tassert(11239500, "buffer returned from explain must not be null", buf);
+
+    // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
+    // BSONObj to return to the host.
+    // TODO: SERVER-112442 Avoid the BSON copy in getOwned() once the work is completed.
+    ExtensionByteBufHandle ownedBuf{buf};
+    return bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
 }
 
 }  // namespace mongo::extension

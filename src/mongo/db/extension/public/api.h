@@ -366,7 +366,8 @@ typedef struct MongoExtensionLogicalAggStageVTable {
      *
      * Output is expected to be in the form {$stageName: {...}}.
      *
-     * Note that this method will be called for all three verbosity levels.
+     * Note that this method will be called for all three verbosity levels, but will only populate
+     * the query plan portion of explain.
      */
     MongoExtensionStatus* (*explain)(const MongoExtensionLogicalAggStage* logicalStage,
                                      MongoExtensionExplainVerbosity verbosity,
@@ -769,6 +770,19 @@ typedef struct MongoExtensionExecAggStageVTable {
      * Frees all acquired resources.
      */
     MongoExtensionStatus* (*close)(MongoExtensionExecAggStage* execAggStage);
+
+    /**
+     * Populates the ByteBuf with the stage's explain output as serialized BSON. Ownership is
+     * transferred to the caller.
+     *
+     * Output is expected to be in the form {metricA: val1, metricB: val2, ...}}.
+     *
+     * Note that this method will be called for verbosity levels >= 'executionStats', and will only
+     * populate the execution metrics portion of the explain output.
+     */
+    MongoExtensionStatus* (*explain)(const MongoExtensionExecAggStage* execAggStage,
+                                     MongoExtensionExplainVerbosity verbosity,
+                                     MongoExtensionByteBuf** output);
 } MongoExtensionExecAggStageVTable;
 
 /**

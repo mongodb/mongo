@@ -50,6 +50,9 @@ public:
     void open() override {}
     void reopen() override {}
     void close() override {}
+    mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
 
 protected:
     const mongo::BSONObj _arguments;

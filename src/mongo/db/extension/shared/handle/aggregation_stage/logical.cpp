@@ -29,26 +29,11 @@
 
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 
+#include "mongo/db/extension/shared/explain_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
-
-namespace {
-::MongoExtensionExplainVerbosity convertHostVerbosityToExtVerbosity(
-    mongo::ExplainOptions::Verbosity hostVerbosity) {
-    switch (hostVerbosity) {
-        case mongo::ExplainOptions::Verbosity::kQueryPlanner:
-            return ::MongoExtensionExplainVerbosity::kQueryPlanner;
-        case mongo::ExplainOptions::Verbosity::kExecStats:
-            return ::MongoExtensionExplainVerbosity::kExecStats;
-        case mongo::ExplainOptions::Verbosity::kExecAllPlans:
-            return ::MongoExtensionExplainVerbosity::kExecAllPlans;
-        default:
-            MONGO_UNREACHABLE_TASSERT(11239404);
-    }
-}
-}  // namespace
 
 namespace mongo::extension {
 

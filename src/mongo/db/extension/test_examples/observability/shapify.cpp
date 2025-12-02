@@ -74,6 +74,10 @@ public:
     void reopen() override {}
 
     void close() override {}
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
 };
 
 class ShapifyLogicalStage : public sdk::LogicalAggStage {

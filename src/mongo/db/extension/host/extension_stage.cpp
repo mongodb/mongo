@@ -112,5 +112,16 @@ GetNextResult ExtensionStage::doGetNext() {
                           << "Invalid GetNextCode: " << static_cast<int>(_lastGetNextResult.code));
     }
 }
+
+Document ExtensionStage::getExplainOutput(const SerializationOptions& opts) const {
+    MutableDocument output(Stage::getExplainOutput(opts));
+
+    BSONObj explainSerialization = _execAggStageHandle.explain(*opts.verbosity);
+    for (auto elem : explainSerialization) {
+        output.addField(elem.fieldName(), Value(elem));
+    }
+
+    return output.freeze();
+}
 }  // namespace exec::agg
 }  // namespace mongo

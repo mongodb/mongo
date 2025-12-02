@@ -26,40 +26,25 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/exec/agg/stage.h"
-#include "mongo/db/extension/shared/get_next_result.h"
-#include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/extension/public/api.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/util/modules.h"
 
-namespace mongo {
-namespace exec {
-namespace agg {
-/**
- * A Stage implementation for an extension aggregation stage. ExtensionStage is a facade around
- * handles to extension API objects.
- */
-class ExtensionStage final : public Stage {
-public:
-    ExtensionStage(StringData name,
-                   const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                   extension::ExecAggStageHandle execAggStageHandle);
-    void setSource(Stage* source) override;
+namespace mongo::extension {
 
-    Document getExplainOutput(
-        const SerializationOptions& opts = SerializationOptions{}) const override;
-
-private:
-    GetNextResult doGetNext() final;
-
-    extension::ExecAggStageHandle _execAggStageHandle{nullptr};
-    extension::ExecAggStageHandle _sourceAggStageHandle{nullptr};
-    extension::ExtensionGetNextResult _lastGetNextResult;
-};
-}  // namespace agg
-}  // namespace exec
-}  // namespace mongo
+inline ::MongoExtensionExplainVerbosity convertHostVerbosityToExtVerbosity(
+    mongo::ExplainOptions::Verbosity hostVerbosity) {
+    switch (hostVerbosity) {
+        case mongo::ExplainOptions::Verbosity::kQueryPlanner:
+            return ::MongoExtensionExplainVerbosity::kQueryPlanner;
+        case mongo::ExplainOptions::Verbosity::kExecStats:
+            return ::MongoExtensionExplainVerbosity::kExecStats;
+        case mongo::ExplainOptions::Verbosity::kExecAllPlans:
+            return ::MongoExtensionExplainVerbosity::kExecAllPlans;
+        default:
+            MONGO_UNREACHABLE_TASSERT(11239404);
+    }
+}
+}  // namespace mongo::extension

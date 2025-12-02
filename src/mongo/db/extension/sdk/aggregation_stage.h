@@ -503,6 +503,8 @@ public:
 
     virtual void close() = 0;
 
+    virtual BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const = 0;
+
 protected:
     ExecAggStageBase(std::string_view name) : _name(name) {}
 
@@ -652,6 +654,19 @@ private:
             [&]() { static_cast<ExtensionExecAggStage*>(execAggStage)->getImpl().close(); });
     }
 
+    static ::MongoExtensionStatus* _extExplain(const ::MongoExtensionExecAggStage* execAggStage,
+                                               ::MongoExtensionExplainVerbosity verbosity,
+                                               ::MongoExtensionByteBuf** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            *output = nullptr;
+
+            const auto& impl = static_cast<const ExtensionExecAggStage*>(execAggStage)->getImpl();
+
+            // Allocate a buffer on the heap. Ownership is transferred to the caller.
+            *output = new VecByteBuf(impl.explain(verbosity));
+        });
+    };
+
     static constexpr ::MongoExtensionExecAggStageVTable VTABLE = {.destroy = &_extDestroy,
                                                                   .get_next = &_extGetNext,
                                                                   .get_name = &_extGetName,
@@ -660,7 +675,8 @@ private:
                                                                   .set_source = &_extSetSource,
                                                                   .open = &_extOpen,
                                                                   .reopen = &_extReopen,
-                                                                  .close = &_extClose};
+                                                                  .close = &_extClose,
+                                                                  .explain = &_extExplain};
     std::unique_ptr<ExecAggStageBase> _execAggStage;
 };
 

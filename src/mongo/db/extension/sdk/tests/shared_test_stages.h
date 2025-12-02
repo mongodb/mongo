@@ -76,6 +76,10 @@ public:
 
     void close() override {}
 
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
+
     static inline std::unique_ptr<sdk::ExecAggStageTransform> make() {
         return std::make_unique<TransformExecAggStage>();
     }
@@ -195,6 +199,10 @@ public:
     void reopen() override {}
 
     void close() override {}
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
 
     static inline std::unique_ptr<FruitsAsDocumentsExecAggStage> make() {
         return std::make_unique<FruitsAsDocumentsExecAggStage>();
@@ -326,6 +334,10 @@ public:
 
     void close() override {}
 
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
+
     static inline std::unique_ptr<sdk::ExecAggStageTransform> make() {
         return std::make_unique<AddFruitsToDocumentsExecAggStage>();
     }
@@ -420,9 +432,12 @@ public:
  * General execution-related stages testing
  * =========================================================
  */
+
 class ValidExtensionExecAggStage : public extension::sdk::ExecAggStageSource {
 public:
-    ValidExtensionExecAggStage() : sdk::ExecAggStageSource("$validExtension") {}
+    static constexpr std::string kStageName = "$validExtension";
+
+    ValidExtensionExecAggStage() : sdk::ExecAggStageSource(kStageName) {}
 
     extension::ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
                                               ::MongoExtensionExecAggStage* execStage) override {
@@ -453,6 +468,10 @@ public:
     void reopen() override {}
 
     void close() override {}
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSON("execField" << "execMetric" << "verbosity" << verbosity);
+    }
 
     static inline std::unique_ptr<sdk::ExecAggStageSource> make() {
         return std::make_unique<ValidExtensionExecAggStage>();

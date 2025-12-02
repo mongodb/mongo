@@ -104,6 +104,10 @@ public:
 
     void close() override {}
 
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
+
     /**
      * Create metrics instance for this stage.
      * The instance will be stored on the OperationContext and accessed via execCtx.getMetrics().

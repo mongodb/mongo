@@ -31,6 +31,7 @@
 #include "mongo/db/extension/host_connector/handle/host_operation_metrics_handle.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/extension/shared/handle/handle.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::extension {
@@ -57,6 +58,11 @@ public:
     void reopen();
 
     void close();
+
+    /**
+     * Collects explain output at the specified verbosity from this executable stage.
+     */
+    BSONObj explain(ExplainOptions::Verbosity verbosity) const;
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {

@@ -97,6 +97,10 @@ public:
 
     void close() override {}
 
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
+
 private:
     int _callCount;
     int _uassertOn;
