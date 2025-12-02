@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:b5575296-afef-4ad6-b619-f0c999b1b7e2",
-  "version": 6,
+  "version": 8,
   "metadata": {
-    "timestamp": "2025-11-11T19:39:40Z",
+    "timestamp": "2025-12-01T19:11:00Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -63,7 +63,7 @@
       "services": [
         {
           "name": "Endor Labs Inc",
-          "version": "v1.7.637"
+          "version": "v1.7.671"
         }
       ]
     }
@@ -82,6 +82,7 @@
       "group": "mozilla",
       "name": "Mozilla Firefox ESR",
       "version": "128.11.0esr",
+      "description": "The C++-only SpiderMonkey component of FireFox ESR used by MongoDB.",
       "licenses": [
         {
           "license": {
@@ -197,6 +198,12 @@
       ],
       "copyright": "Copyright \u00a9 1991\u20132015 Unicode, Inc",
       "purl": "pkg:generic/unicode-org/unicode@8.0.0?repository_url=https%3A%2F%2Fwww.unicode.org%2FPublic%2F8.0.0%2F",
+      "externalReferences": [
+        {
+          "url": "https://www.unicode.org/Public/8.0.0/",
+          "type": "distribution"
+        }
+      ],
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -205,10 +212,6 @@
         {
           "name": "emits_persisted_data",
           "value": "true"
-        },
-        {
-          "name": "info_link",
-          "value": "http://www.unicode.org/versions/enumeratedversions.html"
         }
       ],
       "evidence": {
@@ -269,6 +272,7 @@
       "group": "aappleby",
       "name": "MurmurHash3",
       "version": "a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
+      "description": "MurmurHash is a non-cryptographic hash function suitable for general hash-based lookup.",
       "licenses": [
         {
           "license": {
@@ -316,6 +320,7 @@
       "group": "google.opensource",
       "name": "Abseil Common Libraries (C++)",
       "version": "20250512.1",
+      "description": "Abseil is an open-source collection of C++ code (compliant to C++17) designed to augment the C++ standard library.",
       "licenses": [
         {
           "license": {
@@ -371,6 +376,12 @@
       ],
       "copyright": "Copyright (c) 2010-2014, Salvatore Sanfilippo <antirez at gmail dot com>. Copyright (c) 2010-2013, Pieter Noordhuis <pcnoordhuis at gmail dot com>. All rights reserved.",
       "purl": "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
+      "externalReferences": [
+        {
+          "url": "https://github.com/antirez/linenoise",
+          "type": "distribution"
+        }
+      ],
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -379,10 +390,6 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
-        },
-        {
-          "name": "info_link",
-          "value": "https://github.com/antirez/linenoise"
         }
       ],
       "evidence": {
@@ -407,6 +414,7 @@
       "group": "arximboldi",
       "name": "immer",
       "version": "0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3",
+      "description": "Postmodern immutable and persistent data structures for C++ \u2014 value semantics at scale",
       "licenses": [
         {
           "license": {
@@ -606,6 +614,7 @@
       "group": "chriskohlhoff",
       "name": "Asio C++ Library",
       "version": "1.12.2",
+      "description": "Asio is a cross-platform C++ library for network and low-level I/O programming that provides developers with a consistent asynchronous model using a modern C++ approach.",
       "licenses": [
         {
           "license": {
@@ -642,14 +651,15 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/confluentinc/librdkafka@v2.0.2-RC2",
+      "bom-ref": "pkg:github/confluentinc/librdkafka@2.0.2",
       "supplier": {
         "name": "Confluent Inc."
       },
       "author": "Magnus Edenhill",
       "group": "confluentinc",
       "name": "librdkafka - The Apache Kafka C/C++ library",
-      "version": "2.0.2-RC2",
+      "version": "2.0.2",
+      "description": "The Apache Kafka C/C++ library",
       "licenses": [
         {
           "license": {
@@ -658,8 +668,8 @@
         }
       ],
       "copyright": "Copyright (c) 2012-2022, Magnus Edenhill; 2023, Confluent Inc.",
-      "cpe": "cpe:2.3:a:confluent:librdkafka:2.0.2-RC2:*:*:*:*:*:*:*",
-      "purl": "pkg:github/confluentinc/librdkafka@v2.0.2-RC2",
+      "cpe": "cpe:2.3:a:confluent:librdkafka:2.0.2:*:*:*:*:*:*:*",
+      "purl": "pkg:github/confluentinc/librdkafka@2.0.2",
       "externalReferences": [
         {
           "url": "https://github.com/confluentinc/librdkafka.git",
@@ -997,6 +1007,7 @@
       "group": "google.opensource",
       "name": "benchmark",
       "version": "1.5.2",
+      "description": "A microbenchmark support library",
       "licenses": [
         {
           "license": {
@@ -1037,7 +1048,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/google/re2@2024-02-01",
+      "bom-ref": "pkg:github/google/re2@2023-11-01",
       "supplier": {
         "name": "Google LLC",
         "url": [
@@ -1047,7 +1058,7 @@
       "author": "The RE2 Authors",
       "group": "google.opensource",
       "name": "re2",
-      "version": "2024-02-01",
+      "version": "2023-11-01",
       "description": "RE2 is a fast, safe, thread-friendly alternative to backtracking regular expression engines like those used in PCRE, Perl, and Python. It is a C++ library.",
       "licenses": [
         {
@@ -1057,8 +1068,8 @@
         }
       ],
       "copyright": "Copyright (c) 2009 The RE2 Authors. All rights reserved.",
-      "cpe": "cpe:2.3:h:google:re2:2024-02-01:*:*:*:*:*:*:*",
-      "purl": "pkg:github/google/re2@2024-02-01",
+      "cpe": "cpe:2.3:h:google:re2:2023-11-01:*:*:*:*:*:*:*",
+      "purl": "pkg:github/google/re2@2023-11-01",
       "externalReferences": [
         {
           "url": "https://github.com/google/re2.git",
@@ -1622,7 +1633,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/mongodb/libmongocrypt@1.14.1",
+      "bom-ref": "pkg:github/mongodb/libmongocrypt@1.14.0",
       "supplier": {
         "name": "MongoDB, Inc.",
         "url": [
@@ -1632,7 +1643,7 @@
       "author": "MongoDB, Inc.",
       "group": "mongodb",
       "name": "libmongocrypt",
-      "version": "1.14.1",
+      "version": "1.14.0",
       "description": "Required C library for Client Side and Queryable Encryption in MongoDB",
       "licenses": [
         {
@@ -1642,8 +1653,8 @@
         }
       ],
       "copyright": "Copyright 2019-present MongoDB, Inc.",
-      "cpe": "cpe:2.3:a:mongodb:libmongocrypt:1.14.1:*:*:*:*:*:*:*",
-      "purl": "pkg:github/mongodb/libmongocrypt@1.14.1",
+      "cpe": "cpe:2.3:a:mongodb:libmongocrypt:1.14.0:*:*:*:*:*:*:*",
+      "purl": "pkg:github/mongodb/libmongocrypt@1.14.0",
       "externalReferences": [
         {
           "url": "https://github.com/mongodb/libmongocrypt.git",
@@ -1675,7 +1686,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/mongodb/mongo-c-driver@debian/1.28.1-1",
+      "bom-ref": "pkg:github/mongodb/mongo-c-driver@1.28.1",
       "supplier": {
         "name": "MongoDB, Inc.",
         "url": [
@@ -1685,6 +1696,7 @@
       "author": "MongoDB, Inc.",
       "group": "mongodb",
       "name": "MongoDB C Driver",
+      "description": "The Official MongoDB driver for C language",
       "version": "1.28.1",
       "licenses": [
         {
@@ -1695,7 +1707,7 @@
       ],
       "copyright": "2009-present, MongoDB, Inc.",
       "cpe": "cpe:2.3:a:mongodb:c_driver:1.28.1:*:*:*:*:*:*:*",
-      "purl": "pkg:github/mongodb/mongo-c-driver@debian/1.28.1-1",
+      "purl": "pkg:github/mongodb/mongo-c-driver@1.28.1",
       "externalReferences": [
         {
           "url": "https://github.com/mongodb/mongo-c-driver.git",
@@ -1992,7 +2004,7 @@
         }
       ],
       "copyright": "Copyright 2008 Google Inc. Copyright 2023 Google LLC. All rights reserved.",
-      "cpe": "cpe:2.3:a:google:protobuf:4.25.0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:google:protobuf:v25.0:*:*:*:*:*:*:*",
       "purl": "pkg:github/protocolbuffers/protobuf@v25.0",
       "externalReferences": [
         {
@@ -2230,7 +2242,7 @@
     },
     {
       "type": "framework",
-      "bom-ref": "pkg:github/wiredtiger/wiredtiger@mongodb-8.2.1-rc0",
+      "bom-ref": "pkg:github/wiredtiger/wiredtiger@12.0.0",
       "supplier": {
         "name": "MongoDB, Inc.",
         "url": [
@@ -2240,7 +2252,7 @@
       "author": "MongoDB, Inc.",
       "group": "mongodb",
       "name": "WiredTiger",
-      "version": "8.2.1-rc0",
+      "version": "12.0.0",
       "description": "WiredTiger is an high performance, scalable, production quality, NoSQL, Open Source extensible platform for data management.",
       "licenses": [
         {
@@ -2248,7 +2260,7 @@
         }
       ],
       "copyright": "Copyright (c) 2014-present MongoDB, Inc., Copyright (c) 2008-2014 WiredTiger, Inc., All rights reserved.",
-      "purl": "pkg:github/wiredtiger/wiredtiger@mongodb-8.2.1-rc0",
+      "purl": "pkg:github/wiredtiger/wiredtiger@12.0.0",
       "externalReferences": [
         {
           "url": "https://github.com/wiredtiger/wiredtiger.git",
@@ -2291,6 +2303,12 @@
       ],
       "copyright": "Copyright (c) 2015-2018 Will Bond <will@wbond.net>",
       "purl": "pkg:pypi/ocspbuilder@0.10.2",
+      "externalReferences": [
+        {
+          "url": "https://pypi.org/project/ocspbuilder/",
+          "type": "distribution"
+        }
+      ],
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -2299,10 +2317,6 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
-        },
-        {
-          "name": "info_link",
-          "value": "https://github.com/wbond/ocspbuilder"
         }
       ],
       "evidence": {
@@ -2337,6 +2351,12 @@
       ],
       "copyright": "Copyright 2016 Threema GmbH",
       "purl": "pkg:pypi/ocspresponder@0.5.0",
+      "externalReferences": [
+        {
+          "url": "https://pypi.org/project/ocspresponder/",
+          "type": "distribution"
+        }
+      ],
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -2345,10 +2365,6 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
-        },
-        {
-          "name": "info_link",
-          "value": "https://github.com/threema-ch/ocspresponder"
         }
       ],
       "evidence": {
@@ -2367,7 +2383,6 @@
       "dependsOn": [
         "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
         "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
-        "pkg:github/nodejs/node@22.1.0?download_url=https%3A%2F%2Fgithub.com%2Fnodejs%2Fnode%2Fblob%2F8b45c5d26a829bcd3280401dbc1874bcd1302289%2Fsrc%2Fnode_i18n.cc%23L825%23src%2Fnode_i18n.cc%3AGetStringWidth#src/node_i18n.cc",
         "pkg:generic/unicode-org/unicode@8.0.0",
         "pkg:generic/valgrind/valgrind@093bef43d69236287ccc748591c9560a71181b0a",
         "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
@@ -2378,7 +2393,7 @@
         "pkg:github/boostorg/boost@boost-1.88.0",
         "pkg:github/c-ares/c-ares@cares-1_27_0",
         "pkg:github/chriskohlhoff/asio@asio-1-12-2",
-        "pkg:github/confluentinc/librdkafka@v2.0.2-RC2",
+        "pkg:github/confluentinc/librdkafka@2.0.2",
         "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
         "pkg:github/dcleblanc/safeint@3.0.26",
         "pkg:github/derickr/timelib@2022.13",
@@ -2386,7 +2401,7 @@
         "pkg:github/facebook/zstd@v1.5.5",
         "pkg:github/fmtlib/fmt@11.1.3",
         "pkg:github/google/benchmark@v1.5.2",
-        "pkg:github/google/re2@2024-02-01",
+        "pkg:github/google/re2@2023-11-01",
         "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
         "pkg:github/google/snappy@1.1.10",
         "pkg:github/google/tcmalloc@f3b20f9a07e175c5d897df7b49d9830d4efa6110",
@@ -2397,9 +2412,10 @@
         "pkg:github/libtom/libtomcrypt@v1.18.2",
         "pkg:github/libunwind/libunwind@v1.8.1",
         "pkg:github/madler/zlib@1.3.1",
-        "pkg:github/mongodb/libmongocrypt@1.14.1",
-        "pkg:github/mongodb/mongo-c-driver@debian/1.28.1-1",
+        "pkg:github/mongodb/libmongocrypt@1.14.0",
+        "pkg:github/mongodb/mongo-c-driver@1.28.1",
         "pkg:github/nlohmann/json@v3.11.3",
+        "pkg:github/nodejs/node@22.1.0?download_url=https%3A%2F%2Fgithub.com%2Fnodejs%2Fnode%2Fblob%2F8b45c5d26a829bcd3280401dbc1874bcd1302289%2Fsrc%2Fnode_i18n.cc%23L825%23src%2Fnode_i18n.cc%3AGetStringWidth#src/node_i18n.cc",
         "pkg:github/open-telemetry/opentelemetry-cpp@v1.17.0",
         "pkg:github/open-telemetry/opentelemetry-proto@1.3.2",
         "pkg:github/pcre2project/pcre2@pcre2-10.40",
@@ -2408,13 +2424,37 @@
         "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
         "pkg:github/snowballstem/snowball@1.0.0",
         "pkg:github/unicode-org/icu@icu-release-57-1",
-        "pkg:github/wiredtiger/wiredtiger@mongodb-8.2.1-rc0",
+        "pkg:github/wiredtiger/wiredtiger@12.0.0",
         "pkg:pypi/ocspbuilder@0.10.2",
         "pkg:pypi/ocspresponder@0.5.0"
       ]
     },
     {
+      "ref": "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:generic/unicode-org/unicode@8.0.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:generic/valgrind/valgrind@093bef43d69236287ccc748591c9560a71181b0a",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:github/abseil/abseil-cpp@20250512.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
       "dependsOn": []
     },
     {
@@ -2422,15 +2462,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/chriskohlhoff/asio@asio-1-12-2",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:github/aws/aws-sdk-cpp@1.11.471",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/google/benchmark@v1.5.2",
       "dependsOn": []
     },
     {
@@ -2439,6 +2471,14 @@
     },
     {
       "ref": "pkg:github/c-ares/c-ares@cares-1_27_0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/chriskohlhoff/asio@asio-1-12-2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/confluentinc/librdkafka@2.0.2",
       "dependsOn": []
     },
     {
@@ -2454,15 +2494,23 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/fmtlib/fmt@11.1.3",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:github/facebook/folly@v2023.12.25.00",
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/google/re2@2024-02-01",
+      "ref": "pkg:github/facebook/zstd@v1.5.5",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/fmtlib/fmt@11.1.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/google/benchmark@v1.5.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/google/re2@2023-11-01",
       "dependsOn": []
     },
     {
@@ -2474,19 +2522,15 @@
       "dependsOn": []
     },
     {
+      "ref": "pkg:github/google/tcmalloc@f3b20f9a07e175c5d897df7b49d9830d4efa6110",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:github/gperftools/gperftools@gperftools-2.9.1",
       "dependsOn": []
     },
     {
       "ref": "pkg:github/grpc/grpc@1.59.5",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/unicode-org/icu@icu-release-57-1",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
       "dependsOn": []
     },
     {
@@ -2498,14 +2542,6 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/mongodb/libmongocrypt@1.14.1",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/confluentinc/librdkafka@v2.0.2-RC2",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:github/libtom/libtomcrypt@v1.18.2",
       "dependsOn": []
     },
@@ -2514,15 +2550,19 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
+      "ref": "pkg:github/madler/zlib@1.3.1",
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/mongodb/mongo-c-driver@debian/1.28.1-1",
+      "ref": "pkg:github/mongodb/libmongocrypt@1.14.0",
       "dependsOn": []
     },
     {
-      "ref": "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
+      "ref": "pkg:github/mongodb/mongo-c-driver@1.28.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/nlohmann/json@v3.11.3",
       "dependsOn": []
     },
     {
@@ -2530,11 +2570,11 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:pypi/ocspbuilder@0.10.2",
+      "ref": "pkg:github/open-telemetry/opentelemetry-cpp@v1.17.0",
       "dependsOn": []
     },
     {
-      "ref": "pkg:pypi/ocspresponder@0.5.0",
+      "ref": "pkg:github/open-telemetry/opentelemetry-proto@1.3.2",
       "dependsOn": []
     },
     {
@@ -2554,47 +2594,23 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:github/snowballstem/snowball@1.0.0",
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/google/tcmalloc@f3b20f9a07e175c5d897df7b49d9830d4efa6110",
+      "ref": "pkg:github/unicode-org/icu@icu-release-57-1",
       "dependsOn": []
     },
     {
-      "ref": "pkg:generic/unicode-org/unicode@8.0.0",
+      "ref": "pkg:github/wiredtiger/wiredtiger@12.0.0",
       "dependsOn": []
     },
     {
-      "ref": "pkg:generic/valgrind/valgrind@093bef43d69236287ccc748591c9560a71181b0a",
+      "ref": "pkg:pypi/ocspbuilder@0.10.2",
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/madler/zlib@1.3.1",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/facebook/zstd@v1.5.5",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/open-telemetry/opentelemetry-cpp@v1.17.0",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/open-telemetry/opentelemetry-proto@1.3.2",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/nlohmann/json@v3.11.3",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/wiredtiger/wiredtiger@mongodb-8.2.1-rc0",
+      "ref": "pkg:pypi/ocspresponder@0.5.0",
       "dependsOn": []
     }
   ]

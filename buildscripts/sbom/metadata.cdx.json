@@ -74,6 +74,7 @@
       "group": "google.opensource",
       "name": "Abseil Common Libraries (C++)",
       "version": "{{VERSION}}",
+      "description": "Abseil is an open-source collection of C++ code (compliant to C++17) designed to augment the C++ standard library.",
       "licenses": [
         {
           "license": {
@@ -122,6 +123,7 @@
       "group": "arximboldi",
       "name": "immer",
       "version": "{{VERSION}}",
+      "description": "Postmodern immutable and persistent data structures for C++ — value semantics at scale",
       "licenses": [
         {
           "license": {
@@ -163,6 +165,7 @@
       "group": "chriskohlhoff",
       "name": "Asio C++ Library",
       "version": "{{VERSION}}",
+      "description": "Asio is a cross-platform C++ library for network and low-level I/O programming that provides developers with a consistent asynchronous model using a modern C++ approach.",
       "licenses": [
         {
           "license": {
@@ -262,6 +265,7 @@
       "group": "google.opensource",
       "name": "benchmark",
       "version": "{{VERSION}}",
+      "description": "A microbenchmark support library",
       "licenses": [
         {
           "license": {
@@ -375,7 +379,7 @@
         }
       ],
       "copyright": "Copyright (c) 2007 - 2023 Daniel Stenberg with many contributors, see AUTHORS file.",
-      "cpe": "cpe:2.3:a:c-ares:c-ares:1.27.0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:c-ares:c-ares:{{VERSION}}:*:*:*:*:*:*:*",
       "purl": "pkg:github/c-ares/c-ares@{{VERSION}}",
       "externalReferences": [
         {
@@ -533,6 +537,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/timelib/scripts/import.sh"
+        },
+        {
+          "name": "generate_sbom:priority_version_source",
+          "value": "import_script"
         }
       ],
       "evidence": {
@@ -692,6 +700,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/re2/scripts/import.sh"
+        },
+        {
+          "name": "generate_sbom:priority_version_source",
+          "value": "import_script"
         }
       ],
       "evidence": {
@@ -804,7 +816,6 @@
       },
       "scope": "required"
     },
-
     {
       "type": "library",
       "bom-ref": "pkg:github/gperftools/gperftools@{{VERSION}}",
@@ -1155,6 +1166,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/libmongocrypt/import.sh"
+        },
+        {
+          "name": "generate_sbom:priority_version_source",
+          "value": "import_script"
         }
       ],
       "evidence": {
@@ -1176,6 +1191,7 @@
       "group": "confluentinc",
       "name": "librdkafka - The Apache Kafka C/C++ library",
       "version": "{{VERSION}}",
+      "description": "The Apache Kafka C/C++ library",
       "licenses": [
         {
           "license": {
@@ -1204,6 +1220,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/librdkafka/scripts/librdkafka_get_sources.sh"
+        },
+        {
+          "name": "generate_sbom:priority_version_source",
+          "value": "import_script"
         }
       ],
       "evidence": {
@@ -1338,6 +1358,12 @@
       ],
       "copyright": "Copyright (c) 2010-2014, Salvatore Sanfilippo <antirez at gmail dot com>. Copyright (c) 2010-2013, Pieter Noordhuis <pcnoordhuis at gmail dot com>. All rights reserved.",
       "purl": "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
+      "externalReferences": [
+        {
+          "url": "https://github.com/antirez/linenoise",
+          "type": "distribution"
+        }
+      ],
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -1346,10 +1372,6 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
-        },
-        {
-          "name": "info_link",
-          "value": "https://github.com/antirez/linenoise"
         }
       ],
       "evidence": {
@@ -1376,6 +1398,7 @@
       "author": "MongoDB, Inc.",
       "group": "mongodb",
       "name": "MongoDB C Driver",
+      "description": "The Official MongoDB driver for C language",
       "version": "{{VERSION}}",
       "licenses": [
         {
@@ -1429,6 +1452,7 @@
       "group": "mozilla",
       "name": "Mozilla Firefox ESR",
       "version": "{{VERSION}}",
+      "description": "The C++-only SpiderMonkey component of FireFox ESR used by MongoDB.",
       "licenses": [
         {
           "license": {
@@ -1529,6 +1553,12 @@
       ],
       "copyright": "Copyright (c) 2015-2018 Will Bond <will@wbond.net>",
       "purl": "pkg:pypi/ocspbuilder@0.10.2",
+      "externalReferences": [
+        {
+          "url": "https://pypi.org/project/ocspbuilder/",
+          "type": "distribution"
+        }
+      ],
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -1537,10 +1567,6 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
-        },
-        {
-          "name": "info_link",
-          "value": "https://github.com/wbond/ocspbuilder"
         }
       ],
       "evidence": {
@@ -1575,6 +1601,12 @@
       ],
       "copyright": "Copyright 2016 Threema GmbH",
       "purl": "pkg:pypi/ocspresponder@0.5.0",
+      "externalReferences": [
+        {
+          "url": "https://pypi.org/project/ocspresponder/",
+          "type": "distribution"
+        }
+      ],
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -1583,10 +1615,6 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
-        },
-        {
-          "name": "info_link",
-          "value": "https://github.com/threema-ch/ocspresponder"
         }
       ],
       "evidence": {
@@ -1671,7 +1699,7 @@
         }
       ],
       "copyright": "Copyright 2008 Google Inc. Copyright 2023 Google LLC. All rights reserved.",
-      "cpe": "cpe:2.3:a:google:protobuf:4.25.0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:google:protobuf:{{VERSION}}:*:*:*:*:*:*:*",
       "purl": "pkg:github/protocolbuffers/protobuf@{{VERSION}}",
       "externalReferences": [
         {
@@ -1808,6 +1836,7 @@
       "group": "aappleby",
       "name": "MurmurHash3",
       "version": "a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
+      "description": "MurmurHash is a non-cryptographic hash function suitable for general hash-based lookup.",
       "licenses": [
         {
           "license": {
@@ -1988,6 +2017,12 @@
       ],
       "copyright": "Copyright \u00a9 1991–2015 Unicode, Inc",
       "purl": "pkg:generic/unicode-org/unicode@8.0.0?repository_url=https%3A%2F%2Fwww.unicode.org%2FPublic%2F8.0.0%2F",
+      "externalReferences": [
+        {
+          "url": "https://www.unicode.org/Public/8.0.0/",
+          "type": "distribution"
+        }
+      ],
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -1996,10 +2031,6 @@
         {
           "name": "emits_persisted_data",
           "value": "true"
-        },
-        {
-          "name": "info_link",
-          "value": "http://www.unicode.org/versions/enumeratedversions.html"
         }
       ],
       "evidence": {
@@ -2277,7 +2308,7 @@
         }
       ],
       "copyright": "Copyright (c) 2013-2022 Niels Lohmann <http://nlohmann.me>.",
-      "purl": "pkg:github/nlohmann/json@3.11.3",
+      "purl": "pkg:github/nlohmann/json@{{VERSION}}",
       "externalReferences": [
         {
           "url": "https://github.com/nlohmann/json.git",
@@ -2360,7 +2391,6 @@
       "dependsOn": [
         "pkg:deb/debian/firefox-esr@{{VERSION}}-1?arch=source",
         "pkg:generic/intel/IntelRDFPMathLib@{{VERSION}}",
-        "pkg:github/nodejs/node@22.1.0?download_url=https%3A%2F%2Fgithub.com%2Fnodejs%2Fnode%2Fblob%2F8b45c5d26a829bcd3280401dbc1874bcd1302289%2Fsrc%2Fnode_i18n.cc%23L825%23src%2Fnode_i18n.cc%3AGetStringWidth#src/node_i18n.cc",
         "pkg:generic/unicode-org/unicode@8.0.0",
         "pkg:generic/valgrind/valgrind@{{VERSION}}",
         "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
@@ -2393,6 +2423,7 @@
         "pkg:github/mongodb/libmongocrypt@{{VERSION}}",
         "pkg:github/mongodb/mongo-c-driver@{{VERSION}}",
         "pkg:github/nlohmann/json@{{VERSION}}",
+        "pkg:github/nodejs/node@22.1.0?download_url=https%3A%2F%2Fgithub.com%2Fnodejs%2Fnode%2Fblob%2F8b45c5d26a829bcd3280401dbc1874bcd1302289%2Fsrc%2Fnode_i18n.cc%23L825%23src%2Fnode_i18n.cc%3AGetStringWidth#src/node_i18n.cc",
         "pkg:github/open-telemetry/opentelemetry-cpp@{{VERSION}}",
         "pkg:github/open-telemetry/opentelemetry-proto@{{VERSION}}",
         "pkg:github/pcre2project/pcre2@{{VERSION}}",
@@ -2407,7 +2438,31 @@
       ]
     },
     {
+      "ref": "pkg:deb/debian/firefox-esr@{{VERSION}}-1?arch=source",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:generic/intel/IntelRDFPMathLib@{{VERSION}}",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:generic/unicode-org/unicode@8.0.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:generic/valgrind/valgrind@{{VERSION}}",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:github/abseil/abseil-cpp@{{VERSION}}",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
       "dependsOn": []
     },
     {
@@ -2415,15 +2470,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/chriskohlhoff/asio@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:github/aws/aws-sdk-cpp@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/google/benchmark@{{VERSION}}",
       "dependsOn": []
     },
     {
@@ -2432,6 +2479,14 @@
     },
     {
       "ref": "pkg:github/c-ares/c-ares@{{VERSION}}",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/chriskohlhoff/asio@{{VERSION}}",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/confluentinc/librdkafka@{{VERSION}}",
       "dependsOn": []
     },
     {
@@ -2447,11 +2502,19 @@
       "dependsOn": []
     },
     {
+      "ref": "pkg:github/facebook/folly@{{VERSION}}",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/facebook/zstd@{{VERSION}}",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:github/fmtlib/fmt@{{VERSION}}",
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/facebook/folly@{{VERSION}}",
+      "ref": "pkg:github/google/benchmark@{{VERSION}}",
       "dependsOn": []
     },
     {
@@ -2467,19 +2530,15 @@
       "dependsOn": []
     },
     {
+      "ref": "pkg:github/google/tcmalloc@{{VERSION}}",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:github/gperftools/gperftools@{{VERSION}}",
       "dependsOn": []
     },
     {
       "ref": "pkg:github/grpc/grpc@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/unicode-org/icu@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:generic/intel/IntelRDFPMathLib@{{VERSION}}",
       "dependsOn": []
     },
     {
@@ -2491,14 +2550,6 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/mongodb/libmongocrypt@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/confluentinc/librdkafka@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:github/libtom/libtomcrypt@{{VERSION}}",
       "dependsOn": []
     },
@@ -2507,7 +2558,11 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
+      "ref": "pkg:github/madler/zlib@{{VERSION}}",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/mongodb/libmongocrypt@{{VERSION}}",
       "dependsOn": []
     },
     {
@@ -2515,7 +2570,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:deb/debian/firefox-esr@{{VERSION}}-1?arch=source",
+      "ref": "pkg:github/nlohmann/json@{{VERSION}}",
       "dependsOn": []
     },
     {
@@ -2523,11 +2578,11 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:pypi/ocspbuilder@0.10.2",
+      "ref": "pkg:github/open-telemetry/opentelemetry-cpp@{{VERSION}}",
       "dependsOn": []
     },
     {
-      "ref": "pkg:pypi/ocspresponder@0.5.0",
+      "ref": "pkg:github/open-telemetry/opentelemetry-proto@{{VERSION}}",
       "dependsOn": []
     },
     {
@@ -2547,47 +2602,23 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:github/snowballstem/snowball@{{VERSION}}",
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/google/tcmalloc@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:generic/unicode-org/unicode@8.0.0",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:generic/valgrind/valgrind@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/madler/zlib@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/facebook/zstd@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/open-telemetry/opentelemetry-cpp@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/open-telemetry/opentelemetry-proto@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/nlohmann/json@{{VERSION}}",
+      "ref": "pkg:github/unicode-org/icu@{{VERSION}}",
       "dependsOn": []
     },
     {
       "ref": "pkg:github/wiredtiger/wiredtiger@{{VERSION}}",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/ocspbuilder@0.10.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/ocspresponder@0.5.0",
       "dependsOn": []
     }
   ]
