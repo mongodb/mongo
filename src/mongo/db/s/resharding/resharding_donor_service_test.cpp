@@ -1262,8 +1262,6 @@ TEST_F(ReshardingDonorServiceTest, AbortWhileChangeStreamsMonitorInProgress) {
 
 TEST_F(ReshardingDonorServiceTest, AbortAfterStepUpWithAbortReasonFromCoordinator) {
     repl::primaryOnlyServiceTestStepUpWaitForRebuildComplete.setMode(FailPoint::alwaysOn);
-    const auto abortErrMsg = "Recieved abort from the resharding coordinator";
-
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(8743302,
               "Running case",
@@ -1298,8 +1296,10 @@ TEST_F(ReshardingDonorServiceTest, AbortAfterStepUpWithAbortReasonFromCoordinato
 
             auto abortReason = persistedDonorDocument.getMutableState().getAbortReason();
             ASSERT(abortReason);
-            ASSERT_EQ(abortReason->getIntField("code"), ErrorCodes::ReshardCollectionAborted);
-            ASSERT_EQ(abortReason->getStringField("errmsg"), abortErrMsg);
+            ASSERT_EQ(abortReason->getIntField("code"),
+                      resharding::kCoordinatorAbortedError.code());
+            ASSERT_EQ(abortReason->getStringField("errmsg"),
+                      resharding::kCoordinatorAbortedError.reason());
         }
 
         stepDown();

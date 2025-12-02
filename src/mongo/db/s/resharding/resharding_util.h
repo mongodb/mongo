@@ -98,6 +98,9 @@ static const auto kReshardErrorMaxBytes = 2000;
 const WriteConcernOptions kMajorityWriteConcern{
     WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
+inline const Status kCoordinatorAbortedError{ErrorCodes::ReshardCollectionAborted,
+                                             "Received abort from the resharding coordinator"};
+
 struct ParticipantShardsAndChunks {
     std::vector<DonorShardEntry> donorShards;
     std::vector<RecipientShardEntry> recipientShards;
@@ -447,8 +450,6 @@ bool isRewriteCollection(const boost::optional<ReshardingProvenanceEnum>& proven
  * Helper function to create a thread pool for _markKilledExecutor member of resharding POS.
  */
 std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::string& poolName);
-
-boost::optional<Status> coordinatorAbortedError();
 
 /**
  * If 'performVerification' is true, asserts that featureFlagReshardingVerification is enabled.

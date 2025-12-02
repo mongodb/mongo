@@ -357,23 +357,18 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrErrored(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken,
     std::shared_ptr<otel::TelemetryContext> telemetryCtx) {
     return _retryingCancelableOpCtxFactory
-        ->withAutomaticRetry([this, executor, abortToken, telemetryCtx = telemetryCtx->clone()](
+        ->withAutomaticRetry([this, executor, telemetryCtx = telemetryCtx->clone()](
                                  const auto& factory) {
             return ExecutorFuture(**executor)
-                .then([this,
-                       executor,
-                       abortToken,
-                       &factory,
-                       telemetryCtx = telemetryCtx->clone()]() mutable {
+                .then([this, executor, &factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
                         "ReshardingRecipientService::_"
                         "awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection");
                     return _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
-                        executor, abortToken, factory);
+                        executor, factory);
                 })
                 .then([this, &factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span =
@@ -382,57 +377,37 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                                    "createTemporaryReshardingCollectionThenTransitionToCloning");
                     _createTemporaryReshardingCollectionThenTransitionToCloning(factory);
                 })
-                .then([this,
-                       executor,
-                       abortToken,
-                       &factory,
-                       telemetryCtx = telemetryCtx->clone()]() mutable {
+                .then([this, executor, &factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
                         "ReshardingRecipientService::_cloneThenTransitionToBuildingIndex");
-                    return _cloneThenTransitionToBuildingIndex(executor, abortToken, factory);
+                    return _cloneThenTransitionToBuildingIndex(executor, factory);
                 })
-                .then([this,
-                       executor,
-                       abortToken,
-                       &factory,
-                       telemetryCtx = telemetryCtx->clone()]() mutable {
+                .then([this, executor, &factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
                         "ReshardingRecipientService::_buildIndexThenTransitionToApplying");
-                    return _buildIndexThenTransitionToApplying(executor, abortToken, factory);
+                    return _buildIndexThenTransitionToApplying(executor, factory);
                 })
-                .then([this,
-                       executor,
-                       abortToken,
-                       &factory,
-                       telemetryCtx = telemetryCtx->clone()]() mutable {
+                .then([this, executor, &factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
                         "ReshardingRecipientService::_createAndStartChangeStreamsMonitor");
-                    return _createAndStartChangeStreamsMonitor(executor, abortToken, factory);
+                    return _createAndStartChangeStreamsMonitor(executor, factory);
                 })
-                .then([this,
-                       executor,
-                       abortToken,
-                       &factory,
-                       telemetryCtx = telemetryCtx->clone()]() mutable {
+                .then([this, executor, &factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span =
                         _startSpan(telemetryCtx,
                                    "ReshardingRecipientService::_"
                                    "awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency");
-                    return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
-                        executor, abortToken, factory);
+                    return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(executor,
+                                                                                          factory);
                 })
-                .then([this,
-                       executor,
-                       abortToken,
-                       &factory,
-                       telemetryCtx = telemetryCtx->clone()]() mutable {
+                .then([this, executor, &factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
                         "ReshardingRecipientService::_awaitChangeStreamsMonitorCompleted");
-                    return _awaitChangeStreamsMonitorCompleted(executor, abortToken, factory);
+                    return _awaitChangeStreamsMonitorCompleted(executor, factory);
                 });
         })
         .onTransientError([](const Status& status) {
@@ -445,10 +420,10 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                   "Recipient _runUntilStrictConsistencyOrErrored encountered unrecoverable error",
                   "error"_attr = redact(status));
         })
-        .until<Status>([abortToken](const Status& status) { return status.isOK(); })
-        .on(**executor, abortToken)
-        .onError([this, executor, abortToken](Status status) {
-            if (abortToken.isCanceled()) {
+        .until<Status>([](const Status& status) { return status.isOK(); })
+        .on(**executor, _cancelState->getAbortOrStepdownToken())
+        .onError([this, executor](Status status) {
+            if (_cancelState->isAbortedOrSteppingDown()) {
                 return ExecutorFuture<void>(**executor, status);
             }
 
@@ -488,10 +463,10 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                           "error"_attr = redact(status));
                 })
                 .until<Status>([](const Status& retryStatus) { return retryStatus.isOK(); })
-                .on(**executor, abortToken);
+                .on(**executor, _cancelState->getAbortOrStepdownToken());
         })
-        .onCompletion([this, executor, abortToken](Status status) {
-            if (abortToken.isCanceled()) {
+        .onCompletion([this, executor](Status status) {
+            if (_cancelState->isAbortedOrSteppingDown()) {
                 return ExecutorFuture<void>(**executor, status);
             }
 
@@ -508,8 +483,7 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
 
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDecision(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_recipientCtx.getState() > RecipientStateEnum::kStrictConsistency) {
         // The recipient has progressed past the point where it needs to update the coordinator in
         // order for the coordinator to make its decision.
@@ -535,24 +509,23 @@ ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDec
                   "error"_attr = redact(status));
         })
         .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, abortToken)
-        .then([this, abortToken] {
+        .on(**executor, _cancelState->getAbortOrStepdownToken())
+        .then([this] {
             return future_util::withCancellation(_coordinatorHasDecisionPersisted.getFuture(),
-                                                 abortToken);
+                                                 _cancelState->getAbortOrStepdownToken());
         });
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishReshardingOperation(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& stepdownToken,
-    bool aborted) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     return _retryingCancelableOpCtxFactory
-        ->withAutomaticRetry([this, executor, aborted, stepdownToken](const auto& factory) {
+        ->withAutomaticRetry([this, executor](const auto& factory) {
             return ExecutorFuture<void>(**executor)
-                .then([this, executor, aborted, stepdownToken, &factory] {
-                    if (aborted) {
+                .then([this, executor, &factory] {
+                    if (_cancelState->isAbortedOrSteppingDown()) {
                         return future_util::withCancellation(
-                                   _dataReplicationQuiesced.thenRunOn(**executor), stepdownToken)
+                                   _dataReplicationQuiesced.thenRunOn(**executor),
+                                   _cancelState->getStepdownToken())
                             .thenRunOn(**executor)
                             .onError([](Status status) {
                                 // Wait for all of the data replication components to halt. We
@@ -569,18 +542,18 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                     auto opCtx = factory.makeOperationContext(&cc());
                     _updateContextMetrics(opCtx.get());
                 })
-                .then([this, aborted, &factory] {
+                .then([this, &factory] {
                     // It is safe to drop the oplog collections once either (1) the
                     // collection is renamed or (2) the operation is aborting.
                     invariant(_recipientCtx.getState() >= RecipientStateEnum::kStrictConsistency ||
-                              aborted);
-                    _cleanupReshardingCollections(aborted, factory);
+                              _cancelState->isAbortedOrSteppingDown());
+                    _cleanupReshardingCollections(factory);
                 })
-                .then([this, aborted, &factory] {
+                .then([this, &factory] {
                     if (_recipientCtx.getState() != RecipientStateEnum::kDone) {
                         // If a failover occured before removing the recipient document, the
                         // recipient could already be in state done.
-                        _transitionToDone(aborted, factory);
+                        _transitionToDone(factory);
                     }
 
                     if (!_isAlsoDonor) {
@@ -602,12 +575,12 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                     auto opCtx = factory.makeOperationContext(&cc());
                     return _updateCoordinator(opCtx.get(), executor, factory);
                 })
-                .then([this, aborted, &factory] {
+                .then([this, &factory] {
                     {
                         auto opCtx = factory.makeOperationContext(&cc());
                         removeRecipientDocFailpoint.pauseWhileSet(opCtx.get());
                     }
-                    _removeRecipientDocument(aborted, factory);
+                    _removeRecipientDocument(factory);
                 });
         })
         .onTransientError([](const Status& status) {
@@ -617,11 +590,11 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
         })
         .onUnrecoverableError([](const Status& status) {})
         .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, stepdownToken);
+        .on(**executor, _cancelState->getStepdownToken());
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMandatoryCleanup(
-    Status status, const CancellationToken& stepdownToken) {
+    Status status) {
     if (_dataReplication) {
         // We explicitly shut down and join the ReshardingDataReplication::_oplogFetcherExecutor
         // because waiting on the _dataReplicationQuiesced future may not do this automatically if
@@ -638,10 +611,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMand
             return _changeStreamsMonitorQuiesced.thenRunOn(
                 _recipientService->getInstanceCleanupExecutor());
         })
-        .onCompletion([this,
-                       self = shared_from_this(),
-                       outerStatus = status,
-                       isCanceled = stepdownToken.isCanceled()](Status changeStreamsMonitorStatus) {
+        .onCompletion([this, self = shared_from_this(), outerStatus = status](
+                          Status changeStreamsMonitorStatus) {
             _metrics->onStateTransition(_recipientCtx.getState(), boost::none);
 
             // Unregister metrics early so the cumulative metrics do not continue to track these
@@ -654,7 +625,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMand
                 // If the stepdownToken was triggered, it takes priority in order to make sure that
                 // the promise is set with an error that the coordinator can retry with. If it ran
                 // into an unrecoverable error, it would have fasserted earlier.
-                auto statusForPromise = isCanceled
+                auto statusForPromise = _cancelState->isSteppingDown()
                     ? Status{ErrorCodes::InterruptedDueToReplStateChange,
                              "Resharding operation recipient state machine interrupted due to "
                              "replica set stepdown"}
@@ -680,49 +651,47 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
         ? otel::traces::TelemetryContextSerializer::fromBSON(*_recipientCtx.getTelemetryContext())
         : otel::traces::Span::createTelemetryContext();
     auto span = _startSpan(telemetryCtx, "ReshardingRecipientService::run");
-    auto abortToken = _initAbortSource(stepdownToken);
+
+    _initCancelState(stepdownToken);
     _markKilledExecutor->startup();
     _retryingCancelableOpCtxFactory.emplace(
-        abortToken,
+        _cancelState->getAbortOrStepdownToken(),
         _markKilledExecutor,
         resharding::kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern);
 
     return ExecutorFuture<void>(**executor)
-        .then([this, executor, abortToken] { return _startMetrics(executor, abortToken); })
-        .then([this, executor, abortToken, telemetryCtx = telemetryCtx->clone()]() mutable {
+        .then([this, executor] { return _startMetrics(executor); })
+        .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
             auto span = _startSpan(
                 telemetryCtx, "ReshardingRecipientService::_runUntilStrictConsistencyOrErrored");
-            return _runUntilStrictConsistencyOrErrored(executor, abortToken, telemetryCtx);
+            return _runUntilStrictConsistencyOrErrored(executor, telemetryCtx);
         })
-        .then([this, executor, abortToken, telemetryCtx = telemetryCtx->clone()]() mutable {
+        .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
             auto span = _startSpan(
                 telemetryCtx, "ReshardingRecipientService::_notifyCoordinatorAndAwaitDecision");
-            return _notifyCoordinatorAndAwaitDecision(executor, abortToken);
+            return _notifyCoordinatorAndAwaitDecision(executor);
         })
         .onCompletion(
-            [this, executor, stepdownToken, abortToken, telemetryCtx = telemetryCtx->clone()](
-                Status status) mutable {
+            [this, executor, telemetryCtx = telemetryCtx->clone()](Status status) mutable {
                 _retryingCancelableOpCtxFactory.emplace(
-                    stepdownToken,
+                    _cancelState->getStepdownToken(),
                     _markKilledExecutor,
                     resharding::kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern);
-                if (stepdownToken.isCanceled()) {
+                if (_cancelState->isSteppingDown()) {
                     // Propagate any errors from the recipient stepping down.
-                    return ExecutorFuture<bool>(**executor, status);
+                    return ExecutorFuture<void>(**executor, status);
                 }
 
-                if (!status.isOK() && !abortToken.isCanceled()) {
+                if (!status.isOK() && !_cancelState->isAbortedOrSteppingDown()) {
                     // Propagate any errors from the recipient failing to notify the coordinator.
-                    return ExecutorFuture<bool>(**executor, status);
+                    return ExecutorFuture<void>(**executor, status);
                 }
 
-                return ExecutorFuture(**executor, abortToken.isCanceled());
+                return ExecutorFuture(**executor);
             })
-        .then([this, executor, stepdownToken](bool aborted) {
-            return _finishReshardingOperation(executor, stepdownToken, aborted);
-        })
-        .onError([this, stepdownToken](Status status) {
-            if (stepdownToken.isCanceled()) {
+        .then([this, executor]() { return _finishReshardingOperation(executor); })
+        .onError([this](Status status) {
+            if (_cancelState->isSteppingDown()) {
                 // The operation will continue on a new RecipientStateMachine.
                 return status;
             }
@@ -737,11 +706,11 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
         // Instance is removed when the donor state document tied to the instance is deleted. It is
         // necessary to use shared_from_this() to extend the lifetime so the all earlier code can
         // safely finish executing.
-        .onCompletion([this, self = shared_from_this(), stepdownToken](Status status) {
+        .onCompletion([this, self = shared_from_this()](Status status) {
             // On stepdown or shutdown, the _scopedExecutor may have already been shut down.
             // Everything in this function runs on the instance's cleanup executor, and will
             // execute regardless of any work on _scopedExecutor ever running.
-            return _runMandatoryCleanup(status, stepdownToken);
+            return _runMandatoryCleanup(status);
         })
         .semi();
 }
@@ -851,7 +820,6 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancellationToken& abortToken,
         const CancelableOperationContextFactory& factory) {
     if (_recipientCtx.getState() > RecipientStateEnum::kAwaitingFetchTimestamp) {
         if (!inPotentialAbortScenario(_recipientCtx.getState())) {
@@ -863,7 +831,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         return ExecutorFuture(**executor);
     }
 
-    return future_util::withCancellation(_allDonorsPreparedToDonate.getFuture(), abortToken)
+    return future_util::withCancellation(_allDonorsPreparedToDonate.getFuture(),
+                                         _cancelState->getAbortOrStepdownToken())
         .thenRunOn(**executor)
         .then([this, executor, &factory](
                   ReshardingRecipientService::RecipientStateMachine::CloneDetails cloneDetails) {
@@ -879,8 +848,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
             _metrics->setDocumentsToProcessCounts(cloneDetails.approxDocumentsToCopy,
                                                   cloneDetails.approxBytesToCopy);
         })
-        .then([this, &factory, abortToken] {
-            return resharding::waitForMajority(abortToken, factory);
+        .then([this, &factory] {
+            return resharding::waitForMajority(_cancelState->getAbortOrStepdownToken(), factory);
         })
         .thenRunOn(**executor)
         .then([this] {
@@ -1010,7 +979,6 @@ void ReshardingRecipientService::RecipientStateMachine::
 void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationStarted(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken,
     const CancelableOperationContextFactory& factory) {
     const bool cloningDone =
         _recipientCtx.getState() > RecipientStateEnum::kCloning || _skipCloning;
@@ -1037,7 +1005,7 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
             dataReplication
                 ->runUntilStrictlyConsistent(**executor,
                                              _recipientService->getInstanceCleanupExecutor(),
-                                             abortToken,
+                                             _cancelState->getAbortOrStepdownToken(),
                                              factory,
                                              txnCloneTime.value())
                 .share();
@@ -1053,7 +1021,6 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
 
 void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStreamsMonitor(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken,
     const CancelableOperationContextFactory& factory) {
     if (!_metadata.getPerformVerification() || _skipCloningAndApplying ||
         inPotentialAbortScenario(_recipientCtx.getState()) ||
@@ -1091,8 +1058,10 @@ void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStr
 
     _changeStreamsMonitorQuiesced =
         _changeStreamsMonitor
-            ->startMonitoring(
-                **executor, _recipientService->getInstanceCleanupExecutor(), abortToken, factory)
+            ->startMonitoring(**executor,
+                              _recipientService->getInstanceCleanupExecutor(),
+                              _cancelState->getAbortOrStepdownToken(),
+                              factory)
             .share();
     _changeStreamsMonitorStarted.emplaceValue();
 }
@@ -1100,7 +1069,6 @@ void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStr
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_awaitChangeStreamsMonitorCompleted(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken,
     const CancelableOperationContextFactory& factory) {
     if (!_metadata.getPerformVerification() || _skipCloningAndApplying ||
         inPotentialAbortScenario(_recipientCtx.getState()) ||
@@ -1109,7 +1077,8 @@ ReshardingRecipientService::RecipientStateMachine::_awaitChangeStreamsMonitorCom
     }
 
     invariant(_changeStreamsMonitor);
-    return future_util::withCancellation(_changeStreamsMonitor->awaitFinalChangeEvent(), abortToken)
+    return future_util::withCancellation(_changeStreamsMonitor->awaitFinalChangeEvent(),
+                                         _cancelState->getAbortOrStepdownToken())
         .thenRunOn(**executor)
         .onCompletion([this](Status status) {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -1131,7 +1100,6 @@ ReshardingRecipientService::RecipientStateMachine::_awaitChangeStreamsMonitorCom
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToBuildingIndex(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken,
     const CancelableOperationContextFactory& factory) {
     if (_recipientCtx.getState() > RecipientStateEnum::kCloning) {
         return ExecutorFuture(**executor);
@@ -1144,7 +1112,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToBuildin
 
     if (!_skipCloningAndApplying) {
         auto opCtx = factory.makeOperationContext(&cc());
-        _ensureDataReplicationStarted(opCtx.get(), executor, abortToken, factory);
+        _ensureDataReplicationStarted(opCtx.get(), executor, factory);
     }
 
     reshardingRecipientFailsAfterTransitionToCloning.execute([&](const BSONObj& data) {
@@ -1157,14 +1125,15 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToBuildin
         reshardingPauseRecipientDuringCloning.pauseWhileSet(opCtx.get());
     }
 
-    auto cloningFuture = [this, abortToken] {
+    auto cloningFuture = [this] {
         if (_skipCloningAndApplying) {
             LOGV2(9110901,
                   "Skip cloning documents since this recipient shard is not going to own any "
                   "chunks for the collection after resharding");
             return SemiFuture<void>();
         }
-        return future_util::withCancellation(_dataReplication->awaitCloningDone(), abortToken);
+        return future_util::withCancellation(_dataReplication->awaitCloningDone(),
+                                             _cancelState->getAbortOrStepdownToken());
     }();
 
     return std::move(cloningFuture).thenRunOn(**executor).then([this, &factory] {
@@ -1175,7 +1144,6 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToBuildin
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToApplying(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken,
     const CancelableOperationContextFactory& factory) {
     if (_recipientCtx.getState() > RecipientStateEnum::kBuildingIndex) {
         return ExecutorFuture(**executor);
@@ -1183,7 +1151,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
 
     if (!_skipCloningAndApplying) {
         auto opCtx = factory.makeOperationContext(&cc());
-        _ensureDataReplicationStarted(opCtx.get(), executor, abortToken, factory);
+        _ensureDataReplicationStarted(opCtx.get(), executor, factory);
     }
 
     {
@@ -1235,7 +1203,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
             }
             return indexSpecs;
         })
-        .then([this, executor, abortToken, &factory](const std::vector<BSONObj>& indexSpecs) {
+        .then([this, executor, &factory](const std::vector<BSONObj>& indexSpecs) {
             // The index builds in resharding use the "votingMembers" commit quorum. Making each
             // recipient wait for the cloning to have replicated to all voting nodes before building
             // indexes can help reduce the chance of the nodes not being able to catch up later on
@@ -1248,17 +1216,17 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                 return future_util::withCancellation(
                            resharding::waitForReplicationOnVotingMembers(
                                **executor,
-                               abortToken,
+                               _cancelState->getAbortOrStepdownToken(),
                                factory,
                                getMaxReplicationLagSecondsBeforeBuildingIndexes),
-                           abortToken)
+                           _cancelState->getAbortOrStepdownToken())
                     .thenRunOn(**executor)
                     .then([indexSpecs] { return indexSpecs; });
             }
 
             return ExecutorFuture(**executor, indexSpecs);
         })
-        .then([this, executor, abortToken, &factory](const std::vector<BSONObj>& indexSpecs) {
+        .then([this, executor, &factory](const std::vector<BSONObj>& indexSpecs) {
             return future_util::withCancellation(
                        [this, &factory, &indexSpecs] {
                            // Build all the indexes.
@@ -1322,7 +1290,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                                return uassertStatusOK(indexBuildFuture);
                            }
                        }(),
-                       abortToken)
+                       _cancelState->getAbortOrStepdownToken())
                 .thenRunOn(**executor)
                 .then([this, &factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
                     if (auto opCtx = factory.makeOperationContext(&cc());
@@ -1349,8 +1317,8 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                     _transitionToApplying(factory);
                 });
         })
-        .onCompletion([this, executor, abortToken](Status status) {
-            if (abortToken.isCanceled()) {
+        .onCompletion([this, executor](Status status) {
+            if (_cancelState->isAbortedOrSteppingDown()) {
                 return ExecutorFuture<void>(**executor, status);
             }
 
@@ -1365,7 +1333,6 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancellationToken& abortToken,
         const CancelableOperationContextFactory& factory) {
     if (_recipientCtx.getState() > RecipientStateEnum::kApplying) {
         return ExecutorFuture<void>(**executor, Status::OK());
@@ -1373,12 +1340,12 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
 
     if (!_skipCloningAndApplying) {
         auto opCtx = factory.makeOperationContext(&cc());
-        _ensureDataReplicationStarted(opCtx.get(), executor, abortToken, factory);
+        _ensureDataReplicationStarted(opCtx.get(), executor, factory);
     }
 
     auto opCtx = factory.makeOperationContext(&cc());
     return _updateCoordinator(opCtx.get(), executor, factory)
-        .then([this, abortToken] {
+        .then([this] {
             if (_skipCloningAndApplying) {
                 LOGV2(9110902,
                       "Skip fetching and applying oplog entries since this recipient shard is not "
@@ -1386,7 +1353,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
 
                 reshardingPauseRecipientBeforeWaitingForCriticalSection.pauseWhileSet();
                 return future_util::withCancellation(
-                    _coordinatorHasEngagedCriticalSection.getFuture(), abortToken);
+                    _coordinatorHasEngagedCriticalSection.getFuture(),
+                    _cancelState->getAbortOrStepdownToken());
             }
 
             {
@@ -1394,7 +1362,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                 reshardingPauseRecipientDuringOplogApplication.pauseWhileSet(opCtx.get());
             }
             return future_util::withCancellation(_dataReplication->awaitStrictlyConsistent(),
-                                                 abortToken);
+                                                 _cancelState->getAbortOrStepdownToken());
         })
         .then([this, &factory] {
             if (_skipCloningAndApplying) {
@@ -1481,12 +1449,12 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollections(
-    bool aborted, const CancelableOperationContextFactory& factory) {
+    const CancelableOperationContextFactory& factory) {
     auto opCtx = factory.makeOperationContext(&cc());
     resharding::data_copy::ensureOplogCollectionsDropped(
         opCtx.get(), _metadata.getReshardingUUID(), _metadata.getSourceUUID(), _donorShards);
 
-    if (aborted) {
+    if (_cancelState->isAbortedOrSteppingDown() && !_cancelState->isSteppingDown()) {
         {
             // We need to do this even though the feature flag is not on because the resharding can
             // be aborted by setFCV downgrade, when the FCV is already in downgrading and the
@@ -1603,12 +1571,12 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToError(
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToDone(
-    bool aborted, const CancelableOperationContextFactory& factory) {
+    const CancelableOperationContextFactory& factory) {
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kDone);
-    if (aborted) {
+    if (_cancelState->isAbortedOrSteppingDown() && !_cancelState->isSteppingDown()) {
         resharding::emplaceTruncatedAbortReasonIfExists(newRecipientCtx,
-                                                        resharding::coordinatorAbortedError());
+                                                        resharding::kCoordinatorAbortedError);
     }
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
 }
@@ -1849,7 +1817,7 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument(
-    bool aborted, const CancelableOperationContextFactory& factory) {
+    const CancelableOperationContextFactory& factory) {
     auto opCtx = factory.makeOperationContext(&cc());
 
     const auto& nss = NamespaceString::kRecipientReshardingOperationsNamespace;
@@ -1885,21 +1853,18 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_startMetrics(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_metrics->mustRestoreExternallyTrackedRecipientFields(_recipientCtx.getState())) {
-        return _restoreMetricsWithRetry(executor, abortToken);
+        return _restoreMetricsWithRetry(executor);
     }
 
     return ExecutorFuture<void>(**executor);
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_restoreMetricsWithRetry(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     return _retryingCancelableOpCtxFactory
-        ->withAutomaticRetry(
-            [this, executor, abortToken](const auto& factory) { _restoreMetrics(factory); })
+        ->withAutomaticRetry([this, executor](const auto& factory) { _restoreMetrics(factory); })
         .onTransientError([](const Status& status) {
             LOGV2(
                 5992700, "Transient error while restoring metrics", "error"_attr = redact(status));
@@ -1910,7 +1875,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_restore
                   "error"_attr = redact(status));
         })
         .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, abortToken);
+        .on(**executor, _cancelState->getAbortOrStepdownToken());
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
@@ -2099,33 +2064,28 @@ void ReshardingRecipientService::RecipientStateMachine::_updateContextMetrics(
     _metrics->updateRecipientCtx(_recipientCtx);
 }
 
-CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortSource(
+void ReshardingRecipientService::RecipientStateMachine::_initCancelState(
     const CancellationToken& stepdownToken) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _abortSource = CancellationSource(stepdownToken);
+        _cancelState = std::make_unique<primary_only_service_helpers::CancelState>(stepdownToken);
     }
 
     if (_recipientCtx.getState() == RecipientStateEnum::kDone && _recipientCtx.getAbortReason()) {
         // A recipient in state kDone with an abortReason is indication that the coordinator
-        // has persisted the decision and called abort on all participants. Canceling the
-        // _abortSource to avoid repeating the future chain.
-        _abortSource->cancel();
+        // has persisted the decision and called abort on all participants. Abort the
+        // _cancelState to avoid repeating the future chain.
+        _cancelState->abort();
     }
 
     if (auto future = _coordinatorHasDecisionPersisted.getFuture(); future.isReady()) {
         if (auto status = future.getNoThrow(); !status.isOK()) {
-            // onReshardingFieldsChanges() missed canceling _abortSource because
-            // _initAbortSource() hadn't been called yet. We used an error status stored in
-            // _coordinatorHasDecisionPersisted as an indication that an abort had been
-            // received. Canceling _abortSource immediately allows callers to use the returned
-            // abortToken as a definitive means of checking whether the operation has been
-            // aborted.
-            _abortSource->cancel();
+            // An abort was signaled (via _coordinatorHasDecisionPersisted error)
+            // before _cancelState was initialized. Now that _cancelState exists, abort it to
+            // ensure the abortToken reflects the true state and any future chains are canceled.
+            _cancelState->abort();
         }
     }
-
-    return _abortSource->token();
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_tryFetchBuildIndexMetrics(
@@ -2221,28 +2181,26 @@ ReshardingRecipientService::RecipientStateMachine::_tryFetchCloningMetrics(
 }
 
 void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancelled) {
-    auto abortSource = [&]() -> boost::optional<CancellationSource> {
+    auto cancelStateInitialized = [&] {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _userCanceled.emplace(isUserCancelled);
         if (_dataReplication) {
             _dataReplication->shutdown();
         }
 
-        if (_abortSource) {
-            return _abortSource;
-        } else {
-            // run() hasn't been called, notify the operation should be aborted by setting an
-            // error. Abort is allowed to be retried, so setError only if it has not yet been
-            // done before.
-            auto status = Status{ErrorCodes::ReshardCollectionAborted, "aborted"};
-            ensureFulfilledPromise(lk, _coordinatorHasEngagedCriticalSection, status);
-            ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted, status);
-            return boost::none;
-        }
+        return _cancelState != nullptr;
     }();
 
-    if (abortSource) {
-        abortSource->cancel();
+    if (cancelStateInitialized) {
+        _cancelState->abort();
+    }
+
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        ensureFulfilledPromise(
+            lk, _coordinatorHasEngagedCriticalSection, resharding::kCoordinatorAbortedError);
+        ensureFulfilledPromise(
+            lk, _coordinatorHasDecisionPersisted, resharding::kCoordinatorAbortedError);
     }
 }
 
