@@ -39,9 +39,11 @@ class TestGenerateExcludeYaml(unittest.TestCase):
                     return_value=latest) as mock_read_yaml:
 
                 output = os.path.join(self._tmpdir.name, EXCLUDE_TAGS_FILE)
-                under_test.generate_exclude_yaml(old_bin_version=old_bin_version, output=output,
-                                                 expansions_file=EXPANSIONS_FILE,
-                                                 logger=MagicMock())
+                under_test.generate_exclude_yaml(
+                    old_bin_version=old_bin_version,
+                    output=output,
+                    logger=MagicMock(),
+                )
 
                 mock_read_yaml.assert_called_once()
                 mock_multiversion_methods[
