@@ -739,6 +739,20 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         FeatureCompatibilityVersion::addTransitionFromLatestToLastContinuous();
     }
 
+    // The default value for this parameter in the IDL file is 500, which causes performance issues
+    // if we are operating on a lower FCV. Evaluate if we need to change it.
+    // Do not make any change if the user has overridden the default:
+    if (!storageGlobalParams.internalInsertMaxBatchSizeOverridden.load()) {
+        const auto& snapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        // If we are using an FCV without the vectored inserts feature, change the batch size back
+        // to the prior default.
+        if (!snapshot.isVersionInitialized() ||
+            !repl::feature_flags::gReplicateVectoredInsertsTransactionally.isEnabledOnVersion(
+                snapshot.getVersion())) {
+            internalInsertMaxBatchSize.store(kDefaultInternalInsertMaxBatchSizeFcv70);
+        }
+    }
+
     if (gFlowControlEnabled.load()) {
         LOGV2(20536, "Flow Control is enabled on this deployment");
     }

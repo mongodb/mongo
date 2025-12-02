@@ -80,6 +80,11 @@ void StorageDirectoryPerDbParameter::append(OperationContext* opCtx,
 }
 
 
+Status onUpdateInternalInsertMaxBatchSize(int newBatchSize) {
+    storageGlobalParams.internalInsertMaxBatchSizeOverridden.store(true);
+    return Status::OK();
+}
+
 /**
  * The directory where the mongod instance stores its data.
  */

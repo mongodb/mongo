@@ -119,7 +119,6 @@
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_parameter_insert_max_batch_size.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
@@ -779,7 +778,7 @@ bool handleGroupedInserts(OperationContext* opCtx,
 
     size_t bytesInBatch = 0;
     std::vector<InsertStatement> batch;
-    const size_t maxBatchSize = getInternalInsertMaxBatchSize();
+    const size_t maxBatchSize = internalInsertMaxBatchSize.load();
     const size_t maxBatchBytes = write_ops::insertVectorMaxBytes;
     batch.reserve(std::min(numOps, maxBatchSize));
 

@@ -49,7 +49,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_parameter_insert_max_batch_size.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -196,7 +195,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                 record = cursor->seekExact(beginBatchId);
             }
             WriteUnitOfWork wunit(opCtx);
-            for (int i = 0; record && i < getInternalInsertMaxBatchSize(); i++) {
+            for (int i = 0; record && i < internalInsertMaxBatchSize.load(); i++) {
                 auto& id = record->id;
                 RecordData& data = record->data;
                 // We retain decimal data when repairing database even if decimal is disabled.

@@ -295,7 +295,6 @@ mongo_cc_library(
         "//src/mongo/db:query_exec",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
-        "//src/mongo/db:server_parameter_insert_max_batch_size",
         "//src/mongo/db:service_context",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",

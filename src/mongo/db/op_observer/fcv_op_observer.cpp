@@ -54,6 +54,8 @@
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_killer.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/logv2/attribute_storage.h"
@@ -95,6 +97,16 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     const auto newFcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     newFcvSnapshot.logFCVWithContext("setFCV"_sd);
     FeatureCompatibilityVersion::updateMinWireVersion(opCtx);
+
+
+    if (!storageGlobalParams.internalInsertMaxBatchSizeOverridden.load()) {
+        if (!repl::feature_flags::gReplicateVectoredInsertsTransactionally.isEnabledOnVersion(
+                newVersion)) {
+            internalInsertMaxBatchSize.store(kDefaultInternalInsertMaxBatchSizeFcv70);
+        } else {
+            internalInsertMaxBatchSize.store(kDefaultInternalInsertMaxBatchSizeFcv80);
+        }
+    }
 
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.
     if (newFcvSnapshot.isGreaterThanOrEqualTo(multiversion::GenericFCV::kLatest) ||

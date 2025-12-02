@@ -126,7 +126,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db:server_parameter_insert_max_batch_size",
         "//src/mongo/db:shard_role",
         "//src/mongo/db/catalog:index_repair",
         "//src/mongo/db/catalog:multi_index_block",

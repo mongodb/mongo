@@ -2355,7 +2355,6 @@ mongo_cc_unit_test(
         "//src/mongo/db:record_id_test.cpp",
         "//src/mongo/db:resource_yielder_test.cpp",
         "//src/mongo/db:server_options_test.cpp",
-        "//src/mongo/db:server_parameter_insert_max_batch_size_test.cpp",
         "//src/mongo/db:service_liaison_mock.cpp",
         "//src/mongo/db:shard_id_test.cpp",
         "//src/mongo/db:shard_role_test.cpp",
@@ -2389,7 +2388,6 @@ mongo_cc_unit_test(
         "mongo_unittest_seventh_group",
     ],
     deps = [
-        "server_parameter_insert_max_batch_size",
         ":commands_test_example_idl",
         ":keys_collection_document_idl",
         ":snapshot_window_options_idl",
@@ -3063,18 +3061,6 @@ mongo_idl_library(
         "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/db/sorter:sorter_idl",
         "//src/mongo/idl:idl_parser",
-    ],
-)
-
-mongo_cc_library(
-    name = "server_parameter_insert_max_batch_size",
-    srcs = [
-        "server_parameter_insert_max_batch_size.cpp",
-    ],
-    deps = [
-        "server_base",
-        "//src/mongo/db/repl:repl_server_parameters_idl",
-        "//src/mongo/db/storage:storage_options",
     ],
 )
 

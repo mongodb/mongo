@@ -116,6 +116,7 @@
 #include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern.h"
@@ -829,7 +830,31 @@ private:
             _upgradeConfigSettingsSchema(opCtx, requestedVersion);
             _initializePlacementHistory(opCtx, requestedVersion);
         }
+
+        _setInternalInsertMaxBatchSize(opCtx, requestedVersion);
     }
+
+    void _setInternalInsertMaxBatchSize(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        // If the user has set the parameter, do not change their value.
+        if (storageGlobalParams.internalInsertMaxBatchSizeOverridden.load())
+            return;
+        // If the parameter set to the default value, change it if the
+        // replicateVectoredInsertsTransactionally is enabled on one FCV but not the other, to the
+        // value appropriate to the status of that feature (higher batch size if it is enabled,
+        // lower if it is not).
+        const auto& [originalVersion, _] = getTransitionFCVFromAndTo(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion());
+        if (repl::feature_flags::gReplicateVectoredInsertsTransactionally
+                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            internalInsertMaxBatchSize.store(kDefaultInternalInsertMaxBatchSizeFcv80);
+        } else if (repl::feature_flags::gReplicateVectoredInsertsTransactionally
+                       .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                                     originalVersion)) {
+            internalInsertMaxBatchSize.store(kDefaultInternalInsertMaxBatchSizeFcv70);
+        }
+    }
+
 
     void _upgradeConfigSettingsSchema(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
@@ -1483,6 +1508,7 @@ private:
         } else {
             _updateAuditConfigOnDowngrade(opCtx, requestedVersion);
         }
+        _setInternalInsertMaxBatchSize(opCtx, requestedVersion);
     }
 
     void _dropInternalShardingIndexCatalogCollection(

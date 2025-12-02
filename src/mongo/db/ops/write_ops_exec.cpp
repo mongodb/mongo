@@ -118,7 +118,6 @@
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_parameter_insert_max_batch_size.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -1228,7 +1227,7 @@ WriteResult performInserts(OperationContext* opCtx,
     size_t nextOpIndex = 0;
     size_t bytesInBatch = 0;
     std::vector<InsertStatement> batch;
-    const size_t maxBatchSize = getInternalInsertMaxBatchSize();
+    const size_t maxBatchSize = internalInsertMaxBatchSize.load();
     const size_t maxBatchBytes = write_ops::insertVectorMaxBytes;
     batch.reserve(std::min(wholeOp.getDocuments().size(), maxBatchSize));
 

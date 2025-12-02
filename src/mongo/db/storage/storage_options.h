@@ -32,6 +32,7 @@
 #include <atomic>
 #include <string>
 
+#include "mongo/base/status.h"
 #include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
 
@@ -138,8 +139,14 @@ struct StorageGlobalParams {
 
     // Test-only option. Disables table logging.
     bool forceDisableTableLogging = false;
+
+    AtomicWord<bool> internalInsertMaxBatchSizeOverridden = false;
 };
 
 extern StorageGlobalParams storageGlobalParams;
+
+const int kDefaultInternalInsertMaxBatchSizeFcv80 = 500;
+const int kDefaultInternalInsertMaxBatchSizeFcv70 = 64;
+Status onUpdateInternalInsertMaxBatchSize(int newBatchSize);
 
 }  // namespace mongo
