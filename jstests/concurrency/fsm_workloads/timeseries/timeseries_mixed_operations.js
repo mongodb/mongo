@@ -74,7 +74,11 @@ export const $config = (function () {
         },
 
         deleteAllBuckets: function deleteAllBuckets(db, collName) {
-            assert.commandWorked(db[this.collNameForRawOps].remove({}, this.rawOperationSpec));
+            // TODO(SERVER-114488): Remove allowed error code once v9.0 is last LTS.
+            assert.commandWorkedOrFailedWithCode(
+                db[this.collNameForRawOps].remove({}, this.rawOperationSpec),
+                10685100,
+            );
         },
     };
 
@@ -88,6 +92,13 @@ export const $config = (function () {
                 },
             }),
         );
+
+        // Await replication so that timeseries collection and view creation info has propagated
+        // though the cluster before the actual test starts.
+        // TODO(SERVER-114488): Remove this once v9.0 is last LTS.
+        if (cluster.isReplication()) {
+            cluster.awaitReplication();
+        }
     }
 
     const standardTransition = {
