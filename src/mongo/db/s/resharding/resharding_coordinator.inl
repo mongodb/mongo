@@ -48,6 +48,7 @@
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/request_types/commit_reshard_collection_gen.h"
@@ -510,12 +511,18 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                                VersionContext::getDecoration(opCtx.get()),
                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                            // V2 change stream readers expect to see an op entry concerning the
-                           // commit before this materializes into the global catalog. (Multiple
-                           // copies of this event notification are acceptable)
+                           // commit before this materializes into the global catalog (multiple
+                           // copies of this event notification are acceptable).
                            _generateCommitNotificationForChangeStreams(
                                opCtx.get(),
                                executor,
                                ChangeStreamCommitNotificationMode::BeforeWriteOnCatalog);
+                           // Change stream readers also require that the metadata about the
+                           // resharded collection gets later persisted on the global catalog
+                           // with a timestamp that is strictly bigger than the cluster time
+                           // of this notification.
+                           // Bump the related vector clock element to enforce the constraint.
+                           VectorClockMutable::get(opCtx.get())->tickClusterTime(1);
                        }
                    })
                    .then(

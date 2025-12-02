@@ -1139,7 +1139,7 @@ function testReshardCollection() {
 
     // Timestamps in the config.placementHistory doc and the op entries produceed by the shard
     // match the expected ordering.
-    assert(timestampCmp(reshardCommitOpEntry.ts, finalCollPlacementInfo.timestamp) <= 0);
+    assert(timestampCmp(reshardCommitOpEntry.ts, finalCollPlacementInfo.timestamp) < 0);
     assert(timestampCmp(finalCollPlacementInfo.timestamp, collPlacementChangeEntry.ts) <= 0);
 }
 

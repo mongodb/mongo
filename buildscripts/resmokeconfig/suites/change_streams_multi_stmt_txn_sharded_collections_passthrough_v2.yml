@@ -12,8 +12,7 @@ selector:
     # This test exercises the internal behavior of $changeStream v1 and is not compatible with v2.
     - jstests/change_streams/create_event_from_chunk_migration.js
 
-    # TODO: SERVER-113247 Ensure placementHistory entries are recorded with the right timestamp.
-    - jstests/change_streams/reshard_collection_event.js
+    # TODO: SERVER-114511 re-enable this test.
     - jstests/change_streams/migrate_last_chunk_from_shard_event.js
 
     # TODO:SERVER-113140 Report resumeToken for change streams when batchSize is 0.
