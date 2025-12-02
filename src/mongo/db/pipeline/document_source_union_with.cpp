@@ -324,6 +324,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
             // context of the unionWith '_pipeline' as part of DocumentSourceUnionWith constructor.
             // Attach query settings to the '_pipeline->getContext()' by copying them from the
             // parent query ExpressionContext.
+            _pipeline->getContext()->initializeReferencedSystemVariables();
             _pipeline->getContext()->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
 
             LOGV2_DEBUG(9497002,
@@ -508,6 +509,7 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             // NOTE: this is done here, as opposed to at the beginning of the serialize() method
             // because serialize() is called when generating query shape, however, at that
             // moment no query settings are present in the parent context.
+            _pipeline->getContext()->initializeReferencedSystemVariables();
             _pipeline->getContext()->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
 
             return pExpCtx->getMongoProcessInterface()->preparePipelineAndExplain(ownedPipeline,
