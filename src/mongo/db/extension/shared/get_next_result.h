@@ -175,11 +175,6 @@ private:
 enum class GetNextCode { kAdvanced, kEOF, kPauseExecution };
 
 /**
- * GetNextRequestType contains all possible ::MongoExtensionGetNextRequestType values.
- */
-enum class GetNextRequestType { kNone, kDocumentOnly, kMetadataOnly, kDocumentAndMetadata };
-
-/**
  * ExtensionGetNextResult contains methods to set the state of the ExtensionGetNextResult to
  * reflect that of an advanced, paused execution, or eof state. Wrapper for a getNext() result
  * that maps to an ExtensionGetNextResult.
@@ -187,75 +182,24 @@ enum class GetNextRequestType { kNone, kDocumentOnly, kMetadataOnly, kDocumentAn
 struct ExtensionGetNextResult {
     GetNextCode code{GetNextCode::kEOF};
     boost::optional<ExtensionBSONObj> resultDocument{boost::none};
-    GetNextRequestType requestType{GetNextRequestType::kDocumentOnly};
-
-    // Converts a MongoExtensionGetNextRequestType into a GetNextRequestType. Static function for
-    // testing purposes.
-    static inline GetNextRequestType fromApiRequestType(
-        ::MongoExtensionGetNextRequestType apiRequestType) {
-        switch (apiRequestType) {
-            case ::MongoExtensionGetNextRequestType::kNone:
-                return GetNextRequestType::kNone;
-            case ::MongoExtensionGetNextRequestType::kDocumentOnly:
-                return GetNextRequestType::kDocumentOnly;
-            case ::MongoExtensionGetNextRequestType::kMetadataOnly:
-                return GetNextRequestType::kMetadataOnly;
-            case ::MongoExtensionGetNextRequestType::kDocumentAndMetadata:
-                return GetNextRequestType::kDocumentAndMetadata;
-            default:
-                tasserted(11357807,
-                          str::stream()
-                              << "Invalid ::MongoExtensionGetNextRequestType" << apiRequestType);
-        }
-    }
-
-    // Converts a GetNextRequestType into a MongoExtensionGetNextRequestType. Static function for
-    // testing purposes.
-    static inline ::MongoExtensionGetNextRequestType setApiRequestType(
-        GetNextRequestType extensionRequestType) {
-        switch (extensionRequestType) {
-            case GetNextRequestType::kNone:
-                return ::MongoExtensionGetNextRequestType::kNone;
-            case GetNextRequestType::kDocumentOnly:
-                return ::MongoExtensionGetNextRequestType::kDocumentOnly;
-            case GetNextRequestType::kMetadataOnly:
-                return ::MongoExtensionGetNextRequestType::kMetadataOnly;
-            case GetNextRequestType::kDocumentAndMetadata:
-                return ::MongoExtensionGetNextRequestType::kDocumentAndMetadata;
-            default:
-                tasserted(11357808,
-                          str::stream() << "Invalid GetNextRequestType: "
-                                        << static_cast<int>(extensionRequestType));
-        }
-    }
 
     // Make an "advanced" ExtensionGetNextResult with the provided result document.
     static ExtensionGetNextResult advanced(ExtensionBSONObj&& extBsonObj) {
-        // TODO SERVER-113905: Update this factory function to accommodate both document and
-        // metadata.
         return {.code = GetNextCode::kAdvanced, .resultDocument = std::move(extBsonObj)};
     }
 
     static ExtensionGetNextResult pauseExecution() {
-        return {GetNextCode::kPauseExecution};
+        return {.code = GetNextCode::kPauseExecution};
     }
 
     static ExtensionGetNextResult eof() {
-        return {GetNextCode::kEOF};
+        return {.code = GetNextCode::kEOF};
     }
 
     static ExtensionGetNextResult makeAdvancedFromApiResult(
         ::MongoExtensionGetNextResult& apiResult) {
-        switch (apiResult.requestType) {
-            case kDocumentOnly:
-                return ExtensionGetNextResult::advanced(
-                    ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument));
-            default:
-                break;
-        }
-        // TODO SERVER-113905: we only support returning document for now. Later, we should only
-        // support returning both document and metadata.
-        MONGO_UNREACHABLE_TASSERT(11357803);
+        return ExtensionGetNextResult::advanced(
+            ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument));
     };
 
     /**
@@ -282,7 +226,6 @@ struct ExtensionGetNextResult {
                           str::stream()
                               << "Invalid MongoExtensionGetNextResultCode: " << apiResult.code);
         }
-        result.requestType = fromApiRequestType(apiResult.requestType);
         return result;
     }
 
@@ -329,34 +272,23 @@ struct ExtensionGetNextResult {
                 tasserted(10956804,
                           str::stream() << "Invalid GetNextCode: " << static_cast<int>(code));
         }
-        apiResult.requestType = setApiRequestType(requestType);
     }
 
 private:
     // Internal helper for populating an output ::MongoExtensionGetNextResult.
     void _toAdvancedApiResult(::MongoExtensionGetNextResult& outputResult) {
-        switch (outputResult.requestType) {
-            case kDocumentOnly:
-                tassert(
-                    10956801,
-                    "If the ExtensionGetNextResult code is kAdvanced, then ExtensionGetNextResult "
-                    "should have a result to return.",
-                    resultDocument.has_value());
-                resultDocument->toByteContainer(outputResult.resultDocument);
-                // TODO SERVER-113905, once we support metadata, we should update these switch
-                // statements to support returning both document and metadata.
-                break;
-            default:
-                MONGO_UNREACHABLE_TASSERT(11357801);
-                break;
-        }
+        tassert(10956801,
+                "If the ExtensionGetNextResult code is kAdvanced, then ExtensionGetNextResult "
+                "should have a result to return.",
+                resultDocument.has_value());
+        resultDocument->toByteContainer(outputResult.resultDocument);
     }
 };
 
-inline ::MongoExtensionGetNextResult createDefaultExtensionGetNext(
-    ::MongoExtensionGetNextRequestType requestType) {
-    return {.code = ::MongoExtensionGetNextResultCode::kEOF,
-            .resultDocument = createEmptyByteContainer(),
-            .requestType = requestType};
+inline ::MongoExtensionGetNextResult createDefaultExtensionGetNext() {
+    return {
+        .code = ::MongoExtensionGetNextResultCode::kEOF,
+        .resultDocument = createEmptyByteContainer(),
+    };
 }
 }  // namespace mongo::extension

@@ -226,8 +226,7 @@ TEST(HostExecAggStageTest, ValidateCachedGetNextResultRequestDocument) {
     auto bsonResult = BSON("meow" << "santiago");
     exec::agg::GetNextResult hostResult{Document{bsonResult}};
     host_connector::CachedGetNextResult cachedResult(std::move(hostResult));
-    ::MongoExtensionGetNextResult extensionGetNext =
-        createDefaultExtensionGetNext(::MongoExtensionGetNextRequestType::kDocumentOnly);
+    ::MongoExtensionGetNextResult extensionGetNext = createDefaultExtensionGetNext();
     cachedResult.getAsExtensionNextResult(extensionGetNext);
     ASSERT_EQ(kByteView, extensionGetNext.resultDocument.type);
     ASSERT_BSONOBJ_EQ(bsonResult, bsonObjFromByteView(extensionGetNext.resultDocument.bytes.view));

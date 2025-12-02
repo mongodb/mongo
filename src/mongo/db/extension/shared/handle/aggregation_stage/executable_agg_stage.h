@@ -43,10 +43,8 @@ public:
         : OwnedHandle<::MongoExtensionExecAggStage>(execAggStage) {
         _assertValidVTable();
     }
-    // TODO SERVER-113905: once we support metadata, we should only support returning both
-    // document and metadata.
-    ExtensionGetNextResult getNext(MongoExtensionQueryExecutionContext* execCtxPtr,
-                                   ::MongoExtensionGetNextRequestType requestType = kDocumentOnly);
+
+    ExtensionGetNextResult getNext(MongoExtensionQueryExecutionContext* execCtxPtr);
 
     std::string_view getName() const;
 
@@ -84,10 +82,8 @@ public:
         : UnownedHandle<::MongoExtensionExecAggStage>(execAggStage) {
         _assertValidVTable();
     }
-    // TODO SERVER-113905: once we support metadata, we should only support returning both
-    // document and metadata.
-    ExtensionGetNextResult getNext(MongoExtensionQueryExecutionContext* execCtxPtr,
-                                   ::MongoExtensionGetNextRequestType requestType = kDocumentOnly);
+
+    ExtensionGetNextResult getNext(MongoExtensionQueryExecutionContext* execCtxPtr);
 
     std::string_view getName() const;
 

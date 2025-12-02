@@ -391,8 +391,7 @@ DEATH_TEST_F(AggStageDeathTest, InvalidExtensionGetNextResultEOF, "10956805") {
 DEATH_TEST_F(AggStageDeathTest, InvalidMongoExtensionGetNextResultCode, "10956803") {
     ::MongoExtensionGetNextResult result = {.code =
                                                 static_cast<::MongoExtensionGetNextResultCode>(10),
-                                            .resultDocument = createEmptyByteContainer(),
-                                            .requestType = kDocumentOnly};
+                                            .resultDocument = createEmptyByteContainer()};
     [[maybe_unused]] auto converted = extension::ExtensionGetNextResult::makeFromApiResult(result);
 };
 
@@ -402,34 +401,6 @@ DEATH_TEST_F(AggStageDeathTest, InvalidGetNextCode, "10956804") {
 
     auto handle = extension::ExecAggStageHandle{invalidExtensionExecAggStageGetNextCode};
     [[maybe_unused]] auto getNext = handle.getNext(_execCtx.get());
-};
-
-DEATH_TEST_F(AggStageDeathTest, ExtensionGetNextResultAdvanceInvalidRequestTypeNone, "11357803") {
-    ::MongoExtensionGetNextResult result = {.code = ::MongoExtensionGetNextResultCode::kAdvanced,
-                                            .resultDocument = createEmptyByteContainer(),
-                                            .requestType = kNone};
-    [[maybe_unused]] auto converted =
-        extension::ExtensionGetNextResult::makeAdvancedFromApiResult(result);
-};
-
-DEATH_TEST_F(AggStageDeathTest,
-             ExtensionGetNextResultAdvanceInvalidRequestTypeMetadata,
-             "11357803") {
-    ::MongoExtensionGetNextResult result = {.code = ::MongoExtensionGetNextResultCode::kAdvanced,
-                                            .resultDocument = createEmptyByteContainer(),
-                                            .requestType = kMetadataOnly};
-    [[maybe_unused]] auto converted =
-        extension::ExtensionGetNextResult::makeAdvancedFromApiResult(result);
-};
-
-DEATH_TEST_F(AggStageDeathTest,
-             ExtensionGetNextResultAdvanceInvalidRequestTypeDocumentAndMetadata,
-             "11357803") {
-    ::MongoExtensionGetNextResult result = {.code = ::MongoExtensionGetNextResultCode::kAdvanced,
-                                            .resultDocument = createEmptyByteContainer(),
-                                            .requestType = kDocumentAndMetadata};
-    [[maybe_unused]] auto converted =
-        extension::ExtensionGetNextResult::makeAdvancedFromApiResult(result);
 };
 
 class TestLogicalStageCompileWithInvalidExtensionExecAggStageAdvancedState
@@ -701,44 +672,6 @@ DEATH_TEST_F(AggStageDeathTest, GetSourceOnSourceStageFails, "10957208") {
 
     // Calling getSource on a source stage should fail.
     [[maybe_unused]] auto source = sourceStage._getSource();
-}
-
-DEATH_TEST_F(AggStageDeathTest, CachedGetNextResultRequestMetadataFails, "11357800") {
-    auto bsonResult = BSON("meow" << "santiago");
-    exec::agg::GetNextResult hostResult((Document(bsonResult)));
-    host_connector::CachedGetNextResult cachedResult(std::move(hostResult));
-
-    ::MongoExtensionGetNextResult extensionGetNext =
-        createDefaultExtensionGetNext(::MongoExtensionGetNextRequestType::kMetadataOnly);
-    cachedResult.getAsExtensionNextResult(extensionGetNext);
-}
-
-DEATH_TEST_F(AggStageDeathTest, CachedGetNextResultRequestDocumentAndMetadataFails, "11357800") {
-    auto bsonResult = BSON("meow" << "santiago");
-    exec::agg::GetNextResult hostResult((Document(bsonResult)));
-    host_connector::CachedGetNextResult cachedResult(std::move(hostResult));
-    ::MongoExtensionGetNextResult extensionGetNext =
-        createDefaultExtensionGetNext(::MongoExtensionGetNextRequestType::kDocumentAndMetadata);
-    cachedResult.getAsExtensionNextResult(extensionGetNext);
-}
-
-DEATH_TEST_F(AggStageDeathTest, CachedGetNextResultRequestNoneFails, "11357800") {
-    auto bsonResult = BSON("meow" << "santiago");
-    exec::agg::GetNextResult hostResult((Document(bsonResult)));
-    host_connector::CachedGetNextResult cachedResult(std::move(hostResult));
-    ::MongoExtensionGetNextResult extensionGetNext =
-        createDefaultExtensionGetNext(::MongoExtensionGetNextRequestType::kNone);
-    cachedResult.getAsExtensionNextResult(extensionGetNext);
-}
-
-DEATH_TEST_F(AggStageDeathTest, FromApiRequestTypeInvalidValueFails, "11357807") {
-    extension::ExtensionGetNextResult::fromApiRequestType(
-        static_cast<::MongoExtensionGetNextRequestType>(999));
-}
-
-DEATH_TEST_F(AggStageDeathTest, SetApiRequestTypeInvalidValueFails, "11357808") {
-    extension::ExtensionGetNextResult::setApiRequestType(
-        static_cast<extension::GetNextRequestType>(999));
 }
 
 }  // namespace

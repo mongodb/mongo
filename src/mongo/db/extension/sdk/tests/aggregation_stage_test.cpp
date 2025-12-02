@@ -847,8 +847,6 @@ public:
 
     ExtensionGetNextResult getNext(const QueryExecutionContextHandle& execCtx,
                                    MongoExtensionExecAggStage* execAggStage) override {
-        // TODO SERVER-113905: once we support metadata, we should only support returning both
-        // document and metadata.
         return extension::ExtensionGetNextResult::eof();
     }
 
@@ -908,8 +906,7 @@ TEST_F(AggStageTest, ValidExecAggStageVTableGetNextSucceeds) {
 TEST_F(AggStageTest, ValidateStructStateAfterConvertingStructToGetNextResult) {
     ::MongoExtensionGetNextResult result = {.code =
                                                 static_cast<::MongoExtensionGetNextResultCode>(10),
-                                            .resultDocument = createEmptyByteContainer(),
-                                            .requestType = kDocumentOnly};
+                                            .resultDocument = createEmptyByteContainer()};
     ASSERT_THROWS_WITH_CHECK(
         [&] {
             [[maybe_unused]] auto converted =
@@ -952,8 +949,6 @@ public:
     extension::ExtensionGetNextResult getNext(
         const extension::sdk::QueryExecutionContextHandle& execCtx,
         MongoExtensionExecAggStage* execAggStage) override {
-        // TODO SERVER-113905: once we support metadata, we should only support returning both
-        // document and metadata.
         auto metrics = execCtx.getMetrics(execAggStage);
         metrics.update(MongoExtensionByteView{nullptr, 0});
 

@@ -462,8 +462,7 @@ private:
 class ExecAggStageBase {
 public:
     virtual ~ExecAggStageBase() = default;
-    // TODO SERVER-113905: once we support metadata, we should only support returning both
-    // document and metadata.
+
     virtual ExtensionGetNextResult getNext(const QueryExecutionContextHandle& execCtx,
                                            ::MongoExtensionExecAggStage* execStage) = 0;
 
