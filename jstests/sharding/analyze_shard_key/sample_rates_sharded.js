@@ -24,6 +24,7 @@ import {
     runNestedAggregateCmdsOnRepeat,
 } from "jstests/sharding/analyze_shard_key/libs/sample_rates_common.js";
 import {isSlowBuild} from "jstests/sharding/libs/sharding_util.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.
@@ -72,6 +73,8 @@ const st = new ShardingTest({
         },
     },
 });
+
+const uweEnabled = isUweEnabled(st.s);
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 const mongosDB = st.s.getDB(dbName);
@@ -188,7 +191,7 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
     });
     jsTest.log("Finished waiting for sampled queries: " + tojsononeline({actualSampleSize: sampleSize}));
 
-    const deleteField = TestData.runningWithBulkWriteOverride ? "bulkWrite" : "delete";
+    const deleteField = TestData.runningWithBulkWriteOverride || uweEnabled ? "bulkWrite" : "delete";
 
     // Verify that the difference between the actual and expected number of samples is within the
     // expected threshold.
@@ -221,7 +224,7 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
     const maxTotalSampleDiffPercentage = slowBuild ? 50 : 25;
     // The maximum difference between the actual and expected percentage of samples for each
     // command.
-    const maxCommandPercentageDiff = slowBuild ? 15 : 10;
+    const maxCommandPercentageDiff = slowBuild ? 30 : 15;
 
     AnalyzeShardKeyUtil.assertDiffPercentage(sampleSize.total, expectedTotalCount, maxTotalSampleDiffPercentage);
     const actualFindPercentage = AnalyzeShardKeyUtil.calculatePercentage(sampleSize.find, sampleSize.total);

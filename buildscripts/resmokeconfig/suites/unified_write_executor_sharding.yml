@@ -10,6 +10,9 @@ selector:
     - jstests/sharding/analyze_shard_key/list_sampled_queries.js
     - jstests/sharding/analyze_shard_key/read_and_write_distribution.js
     - jstests/sharding/analyze_shard_key/sample_rates_bulk_write_multi_namespaces.js
+    - jstests/sharding/analyze_shard_key/sample_rates_sharded.js
+    - jstests/sharding/analyze_shard_key/sample_write_queries_unsharded.js
+    - jstests/sharding/analyze_shard_key/sample_write_queries_sharded.js
     # - jstests/sharding/applyOps_multiple_namespaces.js
     - jstests/sharding/batched_writes_with_id_without_shard_key_basic.js
     - jstests/sharding/batched_writes_with_id_without_shard_key_stale_config.js
