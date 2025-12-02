@@ -45,11 +45,27 @@ function runBasicJoinTest(pipeline) {
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
         const noJoinOptResults = coll.aggregate(pipeline).toArray();
 
-        subSection("With bottom-up plan enumeration");
+        subSection("With bottom-up plan enumeration (left-deep)");
         assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinReorderMode: "bottomUp"}));
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalJoinReorderMode: "bottomUp",
+                internalJoinPlanTreeShape: "leftDeep",
+            }),
+        );
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
-        const bottomUpResults = coll.aggregate(pipeline).toArray();
+        const bottomUpLeftDeepResults = coll.aggregate(pipeline).toArray();
+
+        subSection("With bottom-up plan enumeration (right-deep)");
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinPlanTreeShape: "rightDeep"}));
+        outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
+        const bottomUpRightDeepResults = coll.aggregate(pipeline).toArray();
+
+        subSection("With bottom-up plan enumeration (zig-zag)");
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinPlanTreeShape: "zigZag"}));
+        outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
+        const bottomUpZigZagResults = coll.aggregate(pipeline).toArray();
 
         subSection("With random order, seed 44, nested loop joins");
         assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinReorderMode: "random"}));
@@ -77,8 +93,16 @@ function runBasicJoinTest(pipeline) {
 
         // Validate that all execution modes return the same results.
         assert(
-            _resultSetsEqualUnordered(noJoinOptResults, bottomUpResults),
-            "Results differ between no join opt and bottom-up join enumeration",
+            _resultSetsEqualUnordered(noJoinOptResults, bottomUpLeftDeepResults),
+            "Results differ between no join opt and bottom-up left-deep join enumeration",
+        );
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, bottomUpRightDeepResults),
+            "Results differ between no join opt and bottom-up right-deep join enumeration",
+        );
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, bottomUpZigZagResults),
+            "Results differ between no join opt and bottom-up zig-zag join enumeration",
         );
         assert(
             _resultSetsEqualUnordered(noJoinOptResults, seed44NLJResults),
@@ -101,6 +125,7 @@ function runBasicJoinTest(pipeline) {
         assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
         assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinReorderDefaultToHashJoin: false}));
         assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinReorderMode: "bottomUp"}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinPlanTreeShape: "zigZag"}));
     }
 }
 

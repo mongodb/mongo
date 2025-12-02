@@ -95,6 +95,14 @@ enums:
             kBottomUp: "bottomUp"
             kRandom: "random"
 
+    JoinPlanTreeShape:
+        description: "Enum for possible join plan shapes."
+        type: string
+        values:
+            kLeftDeep: "leftDeep"
+            kRightDeep: "rightDeep"
+            kZigZag: "zigZag"
+
 structs:
     InternalQueryCutoffForSampleFromRandomCursorStorage:
         description: "A specification for the 'internalQueryCutoffForSampleFromRandomCursor' cluster-wide configuration parameter type."
@@ -545,6 +553,16 @@ server_parameters:
             data: synchronized_value<JoinReorderModeEnum>
         default:
             expr: JoinReorderModeEnum::kBottomUp
+        redact: false
+
+    internalJoinPlanTreeShape:
+        description: "Picks which tree shape to use for bottom-up join enumeration (when enabled)."
+        set_at: [startup, runtime]
+        cpp_class:
+            name: JoinPlanTreeShape
+            data: synchronized_value<JoinPlanTreeShapeEnum>
+        default:
+            expr: JoinPlanTreeShapeEnum::kZigZag
         redact: false
 
     internalQueryMaxPipelineRewrites:

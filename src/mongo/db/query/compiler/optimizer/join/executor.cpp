@@ -48,6 +48,19 @@
 
 namespace mongo::join_ordering {
 namespace {
+PlanTreeShape getPlanTreeShape(JoinPlanTreeShapeEnum shape) {
+    switch (shape) {
+        case JoinPlanTreeShapeEnum::kLeftDeep:
+            return PlanTreeShape::LEFT_DEEP;
+        case JoinPlanTreeShapeEnum::kRightDeep:
+            return PlanTreeShape::RIGHT_DEEP;
+        case JoinPlanTreeShapeEnum::kZigZag:
+            return PlanTreeShape::ZIG_ZAG;
+        default:
+            MONGO_UNREACHABLE_TASSERT(11336914);
+    }
+}
+
 bool anySecondaryNamespacesDontExist(const MultipleCollectionAccessor& mca) {
     auto colls = mca.getSecondaryCollectionAcquisitions();
     return std::any_of(
@@ -153,8 +166,11 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     switch (qkc.getJoinReorderMode()) {
         case JoinReorderModeEnum::kBottomUp:
             // Optimize join order using bottom-up Sellinger-style algorithm.
-            reordered = constructSolutionBottomUp(
-                std::move(accessPlans.solns), model.graph, model.resolvedPaths, mca);
+            reordered = constructSolutionBottomUp(std::move(accessPlans.solns),
+                                                  model.graph,
+                                                  model.resolvedPaths,
+                                                  mca,
+                                                  getPlanTreeShape(qkc.getJoinPlanTreeShape()));
             break;
         case JoinReorderModeEnum::kRandom:
             // Randomly reorder joins.

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 #include "mongo/db/query/compiler/optimizer/join/solution_storage.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 
@@ -69,7 +70,8 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(
 ReorderedJoinSolution constructSolutionBottomUp(QuerySolutionMap solns,
                                                 const join_ordering::JoinGraph& joinGraph,
                                                 const std::vector<ResolvedPath>& resolvedPaths,
-                                                const MultipleCollectionAccessor& catalog);
+                                                const MultipleCollectionAccessor& catalog,
+                                                PlanTreeShape shape);
 
 /**
  * Returns true if the given join predicates can be satisfied by an "index probe" (RHS of INLJ) on

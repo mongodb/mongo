@@ -453,11 +453,12 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(
 ReorderedJoinSolution constructSolutionBottomUp(QuerySolutionMap solns,
                                                 const join_ordering::JoinGraph& joinGraph,
                                                 const std::vector<ResolvedPath>& resolvedPaths,
-                                                const MultipleCollectionAccessor& catalog) {
+                                                const MultipleCollectionAccessor& catalog,
+                                                PlanTreeShape shape) {
     PlanEnumeratorContext peCtx(joinGraph, solns);
     ReorderContext rCtx(joinGraph, resolvedPaths);
 
-    peCtx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
+    peCtx.enumerateJoinSubsets(shape);
     auto bestPlanNodeId = peCtx.getBestFinalPlan();
 
     // Build QSN based on best plan.

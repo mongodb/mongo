@@ -81,6 +81,9 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
     _joinReorderMode = ServerParameterSet::getNodeParameterSet()
                            ->get<JoinReorderMode>("internalJoinReorderMode")
                            ->_data.get();
+    _joinPlanTreeShape = ServerParameterSet::getNodeParameterSet()
+                             ->get<JoinPlanTreeShape>("internalJoinPlanTreeShape")
+                             ->_data.get();
 }
 
 QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
@@ -113,6 +116,10 @@ bool QueryKnobConfiguration::getRandomJoinReorderDefaultToHashJoin() const {
 
 JoinReorderModeEnum QueryKnobConfiguration::getJoinReorderMode() const {
     return _joinReorderMode;
+}
+
+JoinPlanTreeShapeEnum QueryKnobConfiguration::getJoinPlanTreeShape() const {
+    return _joinPlanTreeShape;
 }
 
 double QueryKnobConfiguration::getSamplingMarginOfError() const {
