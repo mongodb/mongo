@@ -595,11 +595,11 @@ std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState() {
 }
 
 ResolvedViewAggExState::ResolvedViewAggExState(AggExState&& baseState,
-                                               const AggCatalogState& aggCatalogStage,
+                                               const AggCatalogState& aggCatalogState,
                                                const ViewDefinition& view)
     : AggExState(std::move(baseState)),
       _originalAggReqDerivatives(std::move(_aggReqDerivatives)),
-      _resolvedView(uassertStatusOK(aggCatalogStage.resolveView(
+      _resolvedView(uassertStatusOK(aggCatalogState.resolveView(
           _opCtx,
           _originalAggReqDerivatives->request.getNamespace(),
           view.timeseries() ? _originalAggReqDerivatives->request.getCollation() : boost::none))),
@@ -773,6 +773,17 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
     }
 
     return expCtx;
+}
+
+BSONObj AggCatalogState::getShardKey() const {
+    if (lockAcquired() && getMainCollectionOrView().isCollection()) {
+        const auto& mainCollShardingDescription =
+            getMainCollectionOrView().getCollection().getShardingDescription();
+        if (mainCollShardingDescription.isSharded()) {
+            return mainCollShardingDescription.getShardKeyPattern().toBSON();
+        }
+    }
+    return BSONObj();
 }
 
 void AggCatalogState::validate() const {

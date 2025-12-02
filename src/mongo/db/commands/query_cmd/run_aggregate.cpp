@@ -863,6 +863,9 @@ Status runAggregateOnView(std::unique_ptr<ResolvedViewAggExState> resolvedViewAg
         // transition into the router role for it.
         const ScopedStashShardRole scopedUnsetShardRole{opCtx, resolvedViewNss};
 
+        // Promote to shared_ptr because routeWithRoutingContext may invoke this callback
+        // multiple times. We need a reusable owning handle to the same execution state.
+        // TODO SERVER-114574 Change AggExState to be passed by unique_ptr throughout.
         std::shared_ptr<ResolvedViewAggExState> aggExState = std::move(resolvedViewAggExState);
         sharding::router::CollectionRouter router(opCtx->getServiceContext(), resolvedViewNss);
         status = router.routeWithRoutingContext(
@@ -1175,23 +1178,6 @@ Status _runAggregate(std::shared_ptr<AggExState> aggExState, rpc::ReplyBuilderIn
     // Acquire any catalog locks needed by the pipeline, and create catalog-dependent state.
     std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
-    BSONObj shardKey = BSONObj();
-    if (aggCatalogState->lockAcquired() &&
-        aggCatalogState->getMainCollectionOrView().isCollection()) {
-        const auto& mainCollShardingDescription =
-            aggCatalogState->getMainCollectionOrView().getCollection().getShardingDescription();
-        if (mainCollShardingDescription.isSharded()) {
-            shardKey = mainCollShardingDescription.getShardKeyPattern().toBSON();
-        }
-    }
-    // Create an RAII object that prints the collection's shard key in the case of a tassert
-    // or crash.
-    ScopedDebugInfo shardKeyDiagnostics("ShardKeyDiagnostics",
-                                        diagnostic_printers::ShardKeyDiagnosticPrinter{shardKey});
-
-    boost::optional<AutoStatsTracker> statsTracker;
-    aggCatalogState->getStatsTrackerIfNeeded(statsTracker);
-
     // If this is a view, we must resolve the view, then recursively call runAggregate from
     // runAggregateOnView.
     if (aggCatalogState->lockAcquired() && aggCatalogState->getMainCollectionOrView().isView()) {
@@ -1216,6 +1202,15 @@ Status _runAggregate(std::shared_ptr<AggExState> aggExState, rpc::ReplyBuilderIn
                 std::move(resolvedViewAggExState.getValue()), std::move(aggCatalogState), result);
         }
     }
+
+    // Create an RAII object that prints the collection's shard key in the case of a tassert or
+    // crash.
+    ScopedDebugInfo shardKeyDiagnostics(
+        "ShardKeyDiagnostics",
+        diagnostic_printers::ShardKeyDiagnosticPrinter{aggCatalogState->getShardKey()});
+
+    boost::optional<AutoStatsTracker> statsTracker;
+    aggCatalogState->getStatsTrackerIfNeeded(statsTracker);
 
     boost::intrusive_ptr<ExpressionContext> expCtx = aggCatalogState->createExpressionContext();
 

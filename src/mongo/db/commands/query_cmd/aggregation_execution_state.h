@@ -537,6 +537,8 @@ public:
      */
     boost::intrusive_ptr<ExpressionContext> createExpressionContext();
 
+    BSONObj getShardKey() const;
+
     virtual ~AggCatalogState() {}
 
 protected:
