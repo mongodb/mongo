@@ -30,15 +30,17 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
+
 /**
  * Functions to call before and after blocking on the network layer so that resources may be given
  * up so that "sub operations" running on the same node may use them. For example, a node may want
  * to check in its session before waiting on the network so that a sub-operation may check it out
  * and use it. This is important for preventing deadlocks.
  */
-class ResourceYielder {
+class MONGO_MOD_OPEN ResourceYielder {
 public:
     virtual ~ResourceYielder() = default;
 
@@ -70,9 +72,9 @@ public:
  * error will be thrown.
  */
 template <typename Func>
-std::invoke_result_t<Func> runWithYielding(OperationContext* opCtx,
-                                           ResourceYielder* yielder,
-                                           Func fn) {
+MONGO_MOD_PUBLIC std::invoke_result_t<Func> runWithYielding(OperationContext* opCtx,
+                                                            ResourceYielder* yielder,
+                                                            Func fn) {
     if (yielder) {
         yielder->yield(opCtx);
     }
@@ -90,6 +92,6 @@ std::invoke_result_t<Func> runWithYielding(OperationContext* opCtx,
     }
 
     return uassertStatusOK(sw);
-};
+}
 
 }  // namespace mongo

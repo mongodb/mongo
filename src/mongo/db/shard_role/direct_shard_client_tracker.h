@@ -32,13 +32,14 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 /**
  * Tracks the number of external clients on the shard port of a mongod.
  */
-class DirectShardClientTracker {
+class MONGO_MOD_PUBLIC DirectShardClientTracker {
     DirectShardClientTracker(const DirectShardClientTracker&) = delete;
     DirectShardClientTracker& operator=(const DirectShardClientTracker&) = delete;
 

@@ -111,7 +111,7 @@ mongo_cc_library(
         "internal_transactions_test_command_s.cpp",
         "s_read_write_concern_defaults_server_status.cpp",
         ":cluster_fsync_unlock_cmd_gen",
-        "//src/mongo/db/global_catalog/ddl:cluster_collection_mod_cmd.cpp",
+        "//src/mongo/db/global_catalog/ddl:cluster_collmod_cmd.cpp",
         "//src/mongo/db/global_catalog/ddl:cluster_convert_to_capped_cmd.cpp",
         "//src/mongo/db/global_catalog/ddl:cluster_create_cmd.cpp",
         "//src/mongo/db/global_catalog/ddl:cluster_create_indexes_cmd.cpp",

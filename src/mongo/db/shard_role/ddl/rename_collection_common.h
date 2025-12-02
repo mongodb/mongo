@@ -30,19 +30,16 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/client.h"
 #include "mongo/db/shard_role/ddl/rename_collection_gen.h"
-
-#include <string>
+#include "mongo/util/modules.h"
 
 namespace mongo {
-
-class Client;
-
 namespace rename_collection {
 
-Status checkAuthForRenameCollectionCommand(Client* client, const RenameCollectionCommand& request);
+MONGO_MOD_PARENT_PRIVATE Status
+checkAuthForRenameCollectionCommand(Client* client, const RenameCollectionCommand& request);
 
 }  // namespace rename_collection
 }  // namespace mongo

@@ -31,6 +31,7 @@
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -39,7 +40,7 @@ namespace mongo {
  * time. It is based on the given temporary resharding collection chunk manager, which cannot change
  * and therefore it cannot be stale.
  */
-class PostReshardingCollectionPlacement {
+class MONGO_MOD_PUBLIC PostReshardingCollectionPlacement {
 public:
     PostReshardingCollectionPlacement(OperationContext* opCtx,
                                       const ScopedCollectionDescription& collectionDescription);
@@ -60,9 +61,9 @@ public:
     // Returns the post-resharding placement given the extracted shard key.
     const ShardId& getReshardingDestinedRecipientFromShardKey(const BSONObj& reshardingKey) const;
 
-
 private:
     boost::optional<ShardKeyPattern> _reshardingKeyPattern;
     boost::optional<ChunkManager> _tmpReshardingCollectionChunkManager;
 };
+
 }  // namespace mongo

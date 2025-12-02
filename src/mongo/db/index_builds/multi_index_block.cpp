@@ -514,8 +514,9 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     const boost::optional<RecordId>& resumeAfterRecordId) {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     // TODO SERVER-109542: Use regular ShardRole acquisitions for read.
-    boost::optional<CollectionAcquisition> collection = acquireLocalCollectionNoConsistentCatalog(
-        opCtx, nssOrUUID, AcquisitionPrerequisites::kUnreplicatedWrite, MODE_IX);
+    boost::optional<CollectionAcquisition> collection =
+        shard_role_nocheck::acquireLocalCollectionNoConsistentCatalog(
+            opCtx, nssOrUUID, AcquisitionPrerequisites::kUnreplicatedWrite, MODE_IX);
     tassert(7683100, "Expected collection to exist", collection->exists());
 
     // This is stable under the collection lock. If the index build had been aborted, this opCtx
@@ -622,7 +623,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                           shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource()),
                       "error"_attr = ex);
 
-        collection = acquireLocalCollectionNoConsistentCatalog(
+        collection = shard_role_nocheck::acquireLocalCollectionNoConsistentCatalog(
             opCtx, nssOrUUID, AcquisitionPrerequisites::kUnreplicatedWrite, MODE_IX);
         tassert(7683101, "Expected collection to exist", collection->exists());
 

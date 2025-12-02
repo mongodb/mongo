@@ -32,14 +32,14 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <memory>
-#include <string>
 
 namespace mongo {
 
-class ReplicaSetDDLHook {
+class MONGO_MOD_PRIVATE ReplicaSetDDLHook {
 public:
     virtual ~ReplicaSetDDLHook() = default;
     virtual StringData getName() const = 0;
@@ -47,7 +47,7 @@ public:
     virtual void onEndDDL(OperationContext* opCtx, const std::vector<NamespaceString>& nss) = 0;
 };
 
-class ReplicaSetDDLTracker {
+class MONGO_MOD_PUBLIC ReplicaSetDDLTracker {
 public:
     ReplicaSetDDLTracker(const ReplicaSetDDLTracker&) = delete;
     ReplicaSetDDLTracker& operator=(const ReplicaSetDDLTracker&) = delete;

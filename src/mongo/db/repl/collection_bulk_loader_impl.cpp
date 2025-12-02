@@ -88,8 +88,8 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(ServiceContext::UniqueClient 
                                                    const NamespaceString& nss)
     : _client{std::move(client)},
       _opCtx{std::move(opCtx)},
-      _acquisition(
-          acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(_opCtx.get(), nss, MODE_X)),
+      _acquisition(shard_role_nocheck::acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
+          _opCtx.get(), nss, MODE_X)),
       _nss{nss},
       _idIndexBlock(std::make_unique<MultiIndexBlock>()),
       _secondaryIndexesBlock(std::make_unique<MultiIndexBlock>()) {

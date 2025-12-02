@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class ListCollectionsFilter {
+class MONGO_MOD_PUBLIC ListCollectionsFilter {
     ListCollectionsFilter(const ListCollectionsFilter&) = delete;
     ListCollectionsFilter& operator=(const ListCollectionsFilter&) = delete;
 

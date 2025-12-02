@@ -36,7 +36,6 @@
 #include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/util/future.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/string_map.h"
 

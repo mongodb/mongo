@@ -34,12 +34,11 @@
 #include "mongo/db/shard_role/resource_yielder.h"
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
-
-#include <memory>
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class ResourceYielderFactory {
+class MONGO_MOD_OPEN ResourceYielderFactory {
 public:
     virtual ~ResourceYielderFactory() = default;
 
@@ -52,7 +51,7 @@ public:
                                                   StringData cmdName) const = 0;
 };
 
-class ShardResourceYielderFactory : public ResourceYielderFactory {
+class MONGO_MOD_FILE_PRIVATE ShardResourceYielderFactory : public ResourceYielderFactory {
 public:
     std::unique_ptr<ResourceYielder> make(OperationContext* opCtx,
                                           StringData cmdName) const override {
@@ -64,7 +63,7 @@ public:
     }
 };
 
-class RouterResourceYielderFactory : public ResourceYielderFactory {
+class MONGO_MOD_PUBLIC RouterResourceYielderFactory : public ResourceYielderFactory {
 public:
     std::unique_ptr<ResourceYielder> make(OperationContext* opCtx,
                                           StringData cmdName) const override {
@@ -72,7 +71,7 @@ public:
     }
 };
 
-inline void ResourceYielderFactory::initialize(ServiceContext* svcCtx) {
+MONGO_MOD_PUBLIC inline void ResourceYielderFactory::initialize(ServiceContext* svcCtx) {
     if (auto svc = svcCtx->getService(ClusterRole::ShardServer)) {
         ResourceYielderFactory::set(*svc, std::make_unique<ShardResourceYielderFactory>());
     }

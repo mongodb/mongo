@@ -48,8 +48,7 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
-
-namespace list_databases {
+namespace MONGO_MOD_PRIVATE list_databases {
 
 constexpr auto kName = "name"_sd;
 
@@ -137,5 +136,5 @@ int64_t setReplyItems(OperationContext* opCtx,
     return totalSize;
 }
 
-}  // namespace list_databases
+}  // namespace MONGO_MOD_PRIVATE list_databases
 }  // namespace mongo

@@ -65,7 +65,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/coll_mod_gen.h"
-#include "mongo/db/shard_role/ddl/coll_mod_reply_validation.h"
 #include "mongo/db/shard_role/ddl/drop_database_gen.h"
 #include "mongo/db/shard_role/ddl/drop_gen.h"
 #include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"

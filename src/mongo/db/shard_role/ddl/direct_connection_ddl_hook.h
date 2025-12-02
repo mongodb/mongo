@@ -36,12 +36,13 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
 namespace mongo {
 
-class DirectConnectionDDLHook : public ReplicaSetDDLHook {
+class MONGO_MOD_PUBLIC DirectConnectionDDLHook : public ReplicaSetDDLHook {
 public:
     inline static const std::string kDirectConnectionDDLHookName = "DirectConnectionDDLHook";
 

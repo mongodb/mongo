@@ -63,14 +63,10 @@
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -1578,7 +1574,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsMaybeLockFree(
     }
 }
 
-CollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
+CollectionAcquisition shard_role_nocheck::acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
     OperationContext* opCtx, const NamespaceString& nss, LockMode mode) {
     tassert(10566706,
             "Cannot use acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss on "
@@ -1626,7 +1622,7 @@ CollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
     return CollectionAcquisition(txnResources, acquiredCollection);
 }
 
-CollectionAcquisition acquireLocalCollectionNoConsistentCatalog(
+CollectionAcquisition shard_role_nocheck::acquireLocalCollectionNoConsistentCatalog(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
     AcquisitionPrerequisites::OperationType operationType,

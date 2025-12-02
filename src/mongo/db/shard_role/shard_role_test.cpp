@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -570,16 +569,18 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithoutSpecifyingPlacementVersion) {
 }
 
 TEST_F(ShardRoleTest, AcquireLocalCatalogOnlyWithPotentialDataLossUnsharded) {
-    auto acquisition = acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
-        operationContext(), nssUnshardedCollection1, MODE_IX);
+    auto acquisition =
+        shard_role_nocheck::acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
+            operationContext(), nssUnshardedCollection1, MODE_IX);
 
     ASSERT_EQ(nssUnshardedCollection1, acquisition.nss());
     ASSERT_EQ(nssUnshardedCollection1, acquisition.getCollectionPtr()->ns());
 }
 
 TEST_F(ShardRoleTest, AcquireLocalCatalogOnlyWithPotentialDataLossSharded) {
-    auto acquisition = acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
-        operationContext(), nssShardedCollection1, MODE_IX);
+    auto acquisition =
+        shard_role_nocheck::acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
+            operationContext(), nssShardedCollection1, MODE_IX);
 
     ASSERT_EQ(nssShardedCollection1, acquisition.nss());
     ASSERT_EQ(nssShardedCollection1, acquisition.getCollectionPtr()->ns());
@@ -589,8 +590,9 @@ using ShardRoleTestDeathTest = ShardRoleTest;
 DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
                    AcquireLocalCatalogOnlyWithPotentialDataLossForbiddenToAccessDescription,
                    "Tripwire assertion.*10566704") {
-    auto acquisition = acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
-        operationContext(), nssUnshardedCollection1, MODE_IX);
+    auto acquisition =
+        shard_role_nocheck::acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
+            operationContext(), nssUnshardedCollection1, MODE_IX);
 
     (void)acquisition.getShardingDescription();
 }
@@ -598,8 +600,9 @@ DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
 DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
                    AcquireLocalCatalogOnlyWithPotentialDataLossForbiddenToAccessFilter,
                    "Tripwire assertion.*7740800") {
-    auto acquisition = acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
-        operationContext(), nssUnshardedCollection1, MODE_IX);
+    auto acquisition =
+        shard_role_nocheck::acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
+            operationContext(), nssUnshardedCollection1, MODE_IX);
 
     (void)acquisition.getShardingFilter();
 }

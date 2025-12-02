@@ -32,7 +32,9 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/global_catalog/type_collection.h"
+        - "mongo/db/shard_role/ddl/create_command_validation.h"
         - "mongo/db/versioning_protocol/shard_version.h"
+    mod_visibility: public
 
 imports:
     - "mongo/db/shard_role/ddl/create.idl"

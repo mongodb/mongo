@@ -33,8 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_role.h"
-
-#include <memory>
+#include "mongo/util/modules.h"
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/inlined_vector.h>
@@ -47,7 +46,7 @@ namespace mongo {
 /**
  * Anything under the shard_role_mock is meant to be used in testing.
  */
-namespace shard_role_mock {
+namespace MONGO_MOD_PUBLIC shard_role_mock {
 
 /**
  * Given an already acquired Collection instance from the catalog, register the collection as
@@ -64,6 +63,5 @@ CollectionAcquisition acquireCollectionMocked(OperationContext* opCtx,
 CollectionAcquisition acquireCollectionMocked(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               ConsistentCollection collection);
-}  // namespace shard_role_mock
-
+}  // namespace MONGO_MOD_PUBLIC shard_role_mock
 }  // namespace mongo

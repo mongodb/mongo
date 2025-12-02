@@ -28,6 +28,7 @@
 
 global:
     cpp_namespace: "mongo"
+    mod_visibility: public
 
 imports:
     - "mongo/db/auth/action_type.idl"

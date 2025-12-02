@@ -27,6 +27,9 @@
 #
 global:
     cpp_namespace: "mongo"
+    # TODO (SERVER-114537): Uncomment the mod_visibility below and tag the respective command
+    # definitions as 'open'
+    # mod_visibility: public
 
 imports:
     - "mongo/db/auth/access_checks.idl"

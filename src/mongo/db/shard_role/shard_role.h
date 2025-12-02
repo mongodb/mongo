@@ -45,13 +45,12 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/views/view.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
-#include <type_traits>
 #include <utility>
 #include <variant>
-#include <vector>
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/inlined_vector.h>
@@ -65,7 +64,7 @@ namespace mongo {
  * Structure used to declare all the prerequisites that the catalog needs to meet in order for an
  * acquisition of a namespace to succeed.
  */
-struct CollectionOrViewAcquisitionRequest {
+struct MONGO_MOD_PUBLIC CollectionOrViewAcquisitionRequest {
     /**
      * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
      * relationship between NSS and UUID.
@@ -135,7 +134,7 @@ struct CollectionOrViewAcquisitionRequest {
     Date_t lockAcquisitionDeadline;
 };
 
-struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest {
+struct MONGO_MOD_PUBLIC CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest {
     /**
      * Overload, which acquires a collection by NSS or DB/UUID, without imposing an expected
      * relationship between NSS and UUID.
@@ -199,7 +198,7 @@ class CollectionOrViewAcquisition;
  * This class cannot be transferred to other threads/OperationContext since the pointed to resources
  * lifetime would be held and manipulated by another thread.
  */
-class CollectionAcquisition {
+class MONGO_MOD_PUBLIC CollectionAcquisition {
 public:
     explicit CollectionAcquisition(CollectionOrViewAcquisition&& other);
 
@@ -272,7 +271,7 @@ private:
  * This class cannot be transferred to other threads/OperationContext since the pointed to resources
  * lifetime would be held and manipulated by another thread.
  */
-class ViewAcquisition {
+class MONGO_MOD_PUBLIC ViewAcquisition {
 public:
     ViewAcquisition(shard_role_details::TransactionResources& txnResources,
                     const shard_role_details::AcquiredView& acquiredView);
@@ -297,7 +296,7 @@ private:
     const shard_role_details::AcquiredView* _acquiredView;
 };
 
-class CollectionOrViewAcquisition {
+class MONGO_MOD_PUBLIC CollectionOrViewAcquisition {
 public:
     CollectionOrViewAcquisition(CollectionAcquisition&& collection)
         : _collectionOrViewAcquisition(std::move(collection)) {}
@@ -366,25 +365,28 @@ private:
 // Most acquisitions are on a single collection and are only of size 1.
 static constexpr auto kDefaultAcquisitionContainerSize = 1;
 
-using NamespaceStringOrUUIDRequests =
+using NamespaceStringOrUUIDRequests MONGO_MOD_PUBLIC =
     absl::InlinedVector<NamespaceStringOrUUID, kDefaultAcquisitionContainerSize>;
-using CollectionOrViewAcquisitionRequests =
+using CollectionOrViewAcquisitionRequests MONGO_MOD_PUBLIC =
     absl::InlinedVector<CollectionOrViewAcquisitionRequest, kDefaultAcquisitionContainerSize>;
-using CollectionAcquisitionRequests =
+using CollectionAcquisitionRequests MONGO_MOD_PUBLIC =
     absl::InlinedVector<CollectionAcquisitionRequest, kDefaultAcquisitionContainerSize>;
-using CollectionAcquisitions =
+using CollectionAcquisitions MONGO_MOD_PUBLIC =
     absl::InlinedVector<CollectionAcquisition, kDefaultAcquisitionContainerSize>;
-using CollectionOrViewAcquisitions =
+using CollectionOrViewAcquisitions MONGO_MOD_PUBLIC =
     absl::InlinedVector<CollectionOrViewAcquisition, kDefaultAcquisitionContainerSize>;
-using CollectionAcquisitionMap = absl::flat_hash_map<NamespaceString, CollectionAcquisition>;
-using CollectionOrViewAcquisitionMap =
+
+using CollectionAcquisitionMap MONGO_MOD_PUBLIC =
+    absl::flat_hash_map<NamespaceString, CollectionAcquisition>;
+using CollectionOrViewAcquisitionMap MONGO_MOD_PUBLIC =
     absl::flat_hash_map<NamespaceString, CollectionOrViewAcquisition>;
 
 /**
  * Helpers functions that convert a vector of acquisitions into a map.
  */
-CollectionAcquisitionMap makeAcquisitionMap(CollectionAcquisitions acquisitions);
-CollectionOrViewAcquisitionMap makeAcquisitionMap(CollectionOrViewAcquisitions acquisitions);
+MONGO_MOD_PUBLIC CollectionAcquisitionMap makeAcquisitionMap(CollectionAcquisitions acquisitions);
+MONGO_MOD_PUBLIC CollectionOrViewAcquisitionMap
+makeAcquisitionMap(CollectionOrViewAcquisitions acquisitions);
 
 /**
  * Takes into account the specified namespace acquisition requests and if they can be satisfied,
@@ -393,22 +395,21 @@ CollectionOrViewAcquisitionMap makeAcquisitionMap(CollectionOrViewAcquisitions a
  * This method will acquire and 2-phase hold all the necessary hierarchical locks (Global, DB and
  * Collection).
  */
-CollectionAcquisition acquireCollection(OperationContext* opCtx,
-                                        CollectionAcquisitionRequest acquisitionRequest,
-                                        LockMode mode);
+MONGO_MOD_PUBLIC CollectionAcquisition acquireCollection(
+    OperationContext* opCtx, CollectionAcquisitionRequest acquisitionRequest, LockMode mode);
 
-CollectionAcquisitions acquireCollections(OperationContext* opCtx,
-                                          const CollectionAcquisitionRequests& acquisitionRequests,
-                                          LockMode mode);
+MONGO_MOD_PUBLIC CollectionAcquisitions
+acquireCollections(OperationContext* opCtx,
+                   const CollectionAcquisitionRequests& acquisitionRequests,
+                   LockMode mode);
 
-CollectionOrViewAcquisition acquireCollectionOrView(
+MONGO_MOD_PUBLIC CollectionOrViewAcquisition acquireCollectionOrView(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest, LockMode mode);
 
-CollectionOrViewAcquisitions acquireCollectionsOrViews(
-    OperationContext* opCtx,
-    const CollectionOrViewAcquisitionRequests& acquisitionRequests,
-    LockMode mode);
-
+MONGO_MOD_PUBLIC CollectionOrViewAcquisitions
+acquireCollectionsOrViews(OperationContext* opCtx,
+                          const CollectionOrViewAcquisitionRequests& acquisitionRequests,
+                          LockMode mode);
 
 /**
  * Same semantics as `acquireCollectionsOrViews` above, but will not acquire or hold any of the
@@ -418,39 +419,17 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
  *    * The global lock is not write locked.
  *    * No storage transaction is already open, or if it is, it has to be for a lock free operation.
  */
-CollectionAcquisition acquireCollectionMaybeLockFree(
+MONGO_MOD_PUBLIC CollectionAcquisition acquireCollectionMaybeLockFree(
     OperationContext* opCtx, CollectionAcquisitionRequest acquisitionRequest);
 
-CollectionAcquisitions acquireCollectionsMaybeLockFree(
+MONGO_MOD_PUBLIC CollectionAcquisitions acquireCollectionsMaybeLockFree(
     OperationContext* opCtx, const CollectionAcquisitionRequests& acquisitionRequests);
 
-CollectionOrViewAcquisition acquireCollectionOrViewMaybeLockFree(
+MONGO_MOD_PUBLIC CollectionOrViewAcquisition acquireCollectionOrViewMaybeLockFree(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest);
 
-CollectionOrViewAcquisitions acquireCollectionsOrViewsMaybeLockFree(
+MONGO_MOD_PUBLIC CollectionOrViewAcquisitions acquireCollectionsOrViewsMaybeLockFree(
     OperationContext* opCtx, const CollectionOrViewAcquisitionRequests& acquisitionRequests);
-
-/**
- * Please read the comments on AcquisitionPrerequisites::kLocalCatalogOnlyWithPotentialDataLoss for
- * more information on the semantics of this acquisition.
- */
-CollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
-    OperationContext* opCtx, const NamespaceString& nss, LockMode mode);
-
-/**
- * Acquire a collection but without establishing consistent catalog with the read timestamp - it
- * will present the latest catalog, which might not be the one corresponding to the read timestamp.
- * This acquisition is sharding-unaware, meaning it will present the collection as unsharded, and
- * will allow reading from orphaned documents.
- *
- * IMPORTANT: To be used only by IndexBuildsCoordinator.
- * TODO SERVER-109542: Remove this.
- */
-CollectionAcquisition acquireLocalCollectionNoConsistentCatalog(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    AcquisitionPrerequisites::OperationType operationType,
-    LockMode lockMode);
 
 /**
  * This utility is what allows modifications to the local catalog part of an acquisition for a
@@ -468,7 +447,7 @@ CollectionAcquisition acquireLocalCollectionNoConsistentCatalog(
  * example) do not conflict with placement changes (e.g. movePrimary). This is currently implemented
  * at a higher level through the usage of DB/Collection X-locks.
  */
-class ScopedLocalCatalogWriteFence {
+class MONGO_MOD_PUBLIC ScopedLocalCatalogWriteFence {
 public:
     ScopedLocalCatalogWriteFence(OperationContext* opCtx, CollectionAcquisition* acquisition);
 
@@ -490,7 +469,7 @@ private:
  * `yieldTransactionResources`. Must never be destroyed without having been restored and the
  * transaction resources properly committed/aborted, or disposed of.
  */
-struct YieldedTransactionResources {
+struct MONGO_MOD_PUBLIC YieldedTransactionResources {
     YieldedTransactionResources(YieldedTransactionResources&&) = default;
     YieldedTransactionResources& operator=(YieldedTransactionResources&&) = default;
 
@@ -510,16 +489,18 @@ struct YieldedTransactionResources {
     shard_role_details::TransactionResources::State _originalState;
 };
 
-class PreparedForYieldToken {
+class MONGO_MOD_PUBLIC PreparedForYieldToken {
     PreparedForYieldToken() = default;
     friend PreparedForYieldToken prepareForYieldingTransactionResources(OperationContext* opCtx);
 };
+
 /**
  * This method does some preparatory work for yielding the transaction resources. This is necessary
  * before proceeding to abandon the snapshot since holding stale CollectionPtr references is
  * disallowed.
  */
-PreparedForYieldToken prepareForYieldingTransactionResources(OperationContext* opCtx);
+MONGO_MOD_PUBLIC PreparedForYieldToken
+prepareForYieldingTransactionResources(OperationContext* opCtx);
 
 /**
  * This method puts the TransactionResources associated with the current OpCtx into the yielded
@@ -532,11 +513,12 @@ PreparedForYieldToken prepareForYieldingTransactionResources(OperationContext* o
  * It is not always allowed to yield the transaction resources and it is the caller's responsibility
  * to verify a yield can be performed by calling Locker::canSaveLockState().
  */
-YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx);
-YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx,
-                                                                          PreparedForYieldToken);
+MONGO_MOD_PUBLIC YieldedTransactionResources
+yieldTransactionResourcesFromOperationContext(OperationContext* opCtx);
+MONGO_MOD_PUBLIC YieldedTransactionResources
+yieldTransactionResourcesFromOperationContext(OperationContext* opCtx, PreparedForYieldToken);
 
-void restoreTransactionResourcesToOperationContext(
+MONGO_MOD_PUBLIC void restoreTransactionResourcesToOperationContext(
     OperationContext* opCtx, YieldedTransactionResources yieldedResourcesHolder);
 
 /**
@@ -547,7 +529,7 @@ void restoreTransactionResourcesToOperationContext(
  * take care of restoring the TransactionResources onto the operation and stash them back once it
  * goes out of scope.
  */
-struct StashedTransactionResources {
+struct MONGO_MOD_PUBLIC StashedTransactionResources {
     StashedTransactionResources() = default;
 
     StashedTransactionResources(
@@ -582,9 +564,8 @@ struct StashedTransactionResources {
  * Interface for supporting storing/releasing of stashed transaction resources.
  * See ClientCursor for example implementation.
  */
-class TransactionResourcesStasher {
+class MONGO_MOD_OPEN TransactionResourcesStasher {
 public:
-    TransactionResourcesStasher() = default;
     virtual ~TransactionResourcesStasher() = default;
 
     /**
@@ -598,7 +579,7 @@ public:
     virtual void stashTransactionResources(StashedTransactionResources resources) = 0;
 };
 
-class StashTransactionResourcesForDBDirect {
+class MONGO_MOD_PUBLIC StashTransactionResourcesForDBDirect {
 public:
     StashTransactionResourcesForDBDirect(OperationContext* opCtx);
     ~StashTransactionResourcesForDBDirect();
@@ -612,8 +593,8 @@ private:
  * This method puts the TransactionResources associated with the current OpCtx into the stashed
  * state and then detaches them from the OpCtx, moving their ownership to the given cursor.
  */
-void stashTransactionResourcesFromOperationContext(OperationContext* opCtx,
-                                                   TransactionResourcesStasher* stasher);
+MONGO_MOD_PUBLIC void stashTransactionResourcesFromOperationContext(
+    OperationContext* opCtx, TransactionResourcesStasher* stasher);
 
 /**
  * An RAII class that handles restoration of the TransactionResources onto the OperationContext from
@@ -624,7 +605,7 @@ void stashTransactionResourcesFromOperationContext(OperationContext* opCtx,
  * state. If the operation has failed and the resources have to be released the user must
  * dismissRestoredResources() in order to release them and not stash them into the stasher.
  */
-class HandleTransactionResourcesFromStasher {
+class MONGO_MOD_PUBLIC HandleTransactionResourcesFromStasher {
 public:
     HandleTransactionResourcesFromStasher(OperationContext* opCtx,
                                           TransactionResourcesStasher* stasher);
@@ -661,7 +642,7 @@ private:
  * - In case not called, this class will assume the transaction has aborted and will restore the
  * TransactionResources as FAILED, leaving them unlocked.
  */
-class StashTransactionResourcesForMultiDocumentTransaction {
+class MONGO_MOD_PUBLIC StashTransactionResourcesForMultiDocumentTransaction {
 public:
     StashTransactionResourcesForMultiDocumentTransaction(OperationContext* opCtx);
     ~StashTransactionResourcesForMultiDocumentTransaction();
@@ -676,9 +657,9 @@ private:
     bool _stashed = false;
 };
 
-
 namespace shard_role_details {
-class SnapshotAttempt {
+
+class MONGO_MOD_FILE_PRIVATE SnapshotAttempt {
 public:
     SnapshotAttempt(OperationContext* opCtx,
                     const NamespaceStringOrUUIDRequests& acquisitionRequests)
@@ -708,15 +689,16 @@ private:
  * Checks that, when in multi-document transaction, local catalog stashed by the transaction and the
  * CollectionPtr it obtained are valid to be used for a request that attached
  */
-void checkLocalCatalogIsValidForUntrackedShardVersion(OperationContext* opCtx,
-                                                      const CollectionCatalog& stashedCatalog,
-                                                      const CollectionPtr& collectionPtr,
-                                                      const NamespaceString& nss);
+MONGO_MOD_PRIVATE void checkLocalCatalogIsValidForUntrackedShardVersion(
+    OperationContext* opCtx,
+    const CollectionCatalog& stashedCatalog,
+    const CollectionPtr& collectionPtr,
+    const NamespaceString& nss);
 
 /*
  * Check that the collection uuid on the sharding catalog and the local catalog match.
  */
-void checkShardingAndLocalCatalogCollectionUUIDMatch(
+MONGO_MOD_PRIVATE void checkShardingAndLocalCatalogCollectionUUIDMatch(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardVersion& requestedShardVersion,
@@ -730,15 +712,41 @@ void checkShardingAndLocalCatalogCollectionUUIDMatch(
  */
 namespace shard_role_nocheck {
 
+/**
+ * Please read the comments on AcquisitionPrerequisites::kLocalCatalogOnlyWithPotentialDataLoss for
+ * more information on the semantics of this acquisition.
+ */
+MONGO_MOD_USE_REPLACEMENT(acquireCollection)
+CollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
+    OperationContext* opCtx, const NamespaceString& nss, LockMode mode);
+
+/**
+ * Acquire a collection but without establishing consistent catalog with the read timestamp - it
+ * will present the latest catalog, which might not be the one corresponding to the read timestamp.
+ * This acquisition is sharding-unaware, meaning it will present the collection as unsharded, and
+ * will allow reading from orphaned documents.
+ *
+ * IMPORTANT: To be used only by IndexBuildsCoordinator.
+ * TODO SERVER-109542: Remove this.
+ */
+MONGO_MOD_USE_REPLACEMENT(acquireCollection)
+CollectionAcquisition acquireLocalCollectionNoConsistentCatalog(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    AcquisitionPrerequisites::OperationType operationType,
+    LockMode lockMode);
+
 /*
-Resolve the collection namespace without acquiring a collection. These helpers do not lock the
-namespace or provide shard version checks. They only make sense to run quick prechecks
-before executing code that will eventually acquire the collections.
-**/
+ * Resolve the collection namespace without acquiring a collection. These helpers do not lock the
+ * namespace or provide shard version checks. They only make sense to run quick prechecks before
+ * executing code that will eventually acquire the collections.
+ */
+MONGO_MOD_USE_REPLACEMENT(acquireCollection)
 NamespaceString resolveNssWithoutAcquisition(OperationContext* opCtx,
                                              const DatabaseName& dbName,
                                              const UUID& uuid);
 
+MONGO_MOD_USE_REPLACEMENT(acquireCollection)
 boost::optional<NamespaceString> lookupNssWithoutAcquisition(OperationContext* opCtx,
                                                              const UUID& uuid);
 
