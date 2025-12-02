@@ -16,6 +16,22 @@ buildvariants:
       - devprod_coverity
     tasks:
       - name: publish-sast-report
+
+  - name: test-release-sbom
+    activate: false
+    display_name: "Test Release SBOM Upload"
+    # The build variant is aimed for publish-augmented-sbom task testing.
+    # For end-to-end tests:
+    ## - Create new test branch from 10gen/mongo
+    ## - Change SilkBomb branch argument to the new test branch in the task.
+    ## - Cleanup results in DependencyTracker.
+    # Note: The task may use "Admin Only" variables, so patch runs may only succeed for Evergreen Project admins
+    allowed_requesters: ["patch"]
+    tags: ["assigned_to_jira_team_platsec_server"]
+    run_on: ubuntu2404-small
+    modules:
+      - devprod_coverity
+    tasks:
       - name: publish-augmented-sbom
 
   - name: upload-sbom-if-changed
@@ -35,8 +51,8 @@ buildvariants:
     display_name: "Generate SBOM files and create PR"
     # Don't run as part of patch builds
     patchable: false
-    # Run at 6 am UTC daily
-    cron: "0 6 * * *"
+    # Run at 6 am UTC Mon-Fri
+    cron: "0 6 * * 1-5"
     run_on: rhel92-small
     expansions:
       ENDOR_NAMESPACE: mongodb.10gen

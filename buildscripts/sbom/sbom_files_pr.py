@@ -3,16 +3,22 @@
 
 import argparse
 import os
+import re
 import time
 
-from github import Github, Repository
-from github.GithubException import GithubException
-from github.GithubIntegration import GithubIntegration
+from github import (
+    GithubException,
+    GithubIntegration,
+    Github,
+    Repository,
+)
 
 SBOM_FILES = ["sbom.json", "README.third_party.md"]
 
+# pylint: disable=C0103
 
-def get_repository(github_owner, github_repo, app_id, _private_key):
+
+def get_repository(github_owner, github_repo, app_id, _private_key) -> Repository.Repository:
     """Gets the mongo github repository."""
     app = GithubIntegration(int(app_id), _private_key)
     installation = app.get_repo_installation(github_owner, github_repo)
@@ -22,34 +28,34 @@ def get_repository(github_owner, github_repo, app_id, _private_key):
     return _repo
 
 
-def create_branch(base_branch, new_branch) -> None:
-    """Creates a new branch."""
+def create_branch(base_branch, new_branch, _repo) -> None:
+    """Create a new branch or get existing branch."""
+    print(f"Attempting to create branch '{new_branch}' with base branch '{base_branch}'.")
+    ref = f"refs/heads/{new_branch}"
     try:
-        assert repo is not None
-        print(f"Attempting to create branch '{new_branch}' with base branch '{base_branch}'.")
-        base_repo_branch = repo.get_branch(base_branch)
-        ref = f"refs/heads/{new_branch}"
-        repo.create_git_ref(ref=ref, sha=base_repo_branch.commit.sha)
-        print("Created branch.")
+        base_repo_branch = _repo.get_branch(base_branch)
+        sha = base_repo_branch.commit.sha
+        _repo.create_git_ref(ref=ref, sha=sha)
+        print(f"Created branch '{new_branch}', ref: {ref}, sha: {sha}")
     except GithubException as ex:
         if ex.status == 422:
-            print("Branch already exists. Continuing...")
+            print(f"Branch {new_branch} already exists, ref: {ref}")
         else:
             raise
 
 
-def read_text_file(_file_path: str) -> str:
+def read_text_file(file_path_str: str) -> str:
     """Read a text file and return as string."""
+    content = ""
     try:
-        with open(_file_path, "r", encoding="utf-8") as _file:
+        with open(file_path_str, "r", encoding="utf-8") as _file:
             content = _file.read()
-        return content
     except FileNotFoundError:
-        print(f"ERROR: The file '{_file_path}' was not found.")
-        return f"ERROR: The file '{_file_path}' was not found."
-    except Exception as err:
-        print(f"An error occurred: {err}")
-        return f"An error occurred: {err}"
+        print(f"ERROR: The file '{file_path_str}' was not found.")
+        return f"ERROR: The file '{file_path_str}' was not found."
+    except Exception as ex:
+        print(f"An error occurred: {ex}")
+    return content
 
 
 if __name__ == "__main__":
@@ -88,66 +94,87 @@ if __name__ == "__main__":
                    args.private_key[-29:])
 
     repo = get_repository(args.github_owner, args.github_repo, args.app_id, private_key)
-    assert isinstance(repo, Repository.Repository)
-    assert repo is not None
-    print("Repo: ", repo)
+    print("repo: ", repo)
 
-    PR_NEEDED = False
+    HAS_UPDATE = False
 
     for file_path in SBOM_FILES:
         original_file = repo.get_contents(file_path, ref=f"refs/heads/{args.base_branch}")
         assert not isinstance(original_file, list)
+        print("original_file: ", original_file)
         original_content = original_file.decoded_content.decode()
         try:
             with open(file_path, "r", encoding="utf-8") as file:
-                NEW_CONTENT = file.read()
+                new_content = file.read()
         except FileNotFoundError:
             print("Error: file '%s' not found.", file_path)
-            NEW_CONTENT = ""
-        # compare strings without whitespace
-        if "".join(NEW_CONTENT.split()) != "".join(original_content.split()):
-            create_branch(args.base_branch, args.new_branch)
+            new_content = original_content
+
+        # Compare content with removed Endor Labs version to avoid triggering a new SBOM on only that change
+        PATTERN = r'{"name":"EndorLabsInc","version":".*"}'
+        REPL = r'{"name":"EndorLabsInc","version":""}'
+        original_content_compare = re.sub(PATTERN, REPL, "".join(original_content.split()))
+        new_content_compare = re.sub(PATTERN, REPL, "".join(new_content.split()))
+
+        if original_content_compare != new_content_compare:
+            create_branch(args.base_branch, args.new_branch, repo)
             original_file_new_branch = repo.get_contents(file_path,
                                                          ref=f"refs/heads/{args.new_branch}")
+            print("original_file_new_branch: ", original_file_new_branch)
 
             print("New file is different from original file.")
             print("repo.update_file:")
             print(f"  message: Updating '{file_path}'")
-            print(f"  path: '{file_path}'")
+            print("  path: ", file_path)
             assert not isinstance(original_file_new_branch, list)
-            print(f"  sha: {original_file_new_branch.sha}")
-            print(f"  content: '{NEW_CONTENT:.256}'")
-            print(f"  branch: {args.new_branch}")
+            print("  sha: ", original_file_new_branch.sha)
+            print("  content:")
+            print(new_content[:128])
+            print("...[truncated]...")
+            print(new_content[-128:])
+            print("  branch: ", args.new_branch)
             time.sleep(10)  # Wait to reduce chance of 409 errors
             update_file_result = repo.update_file(
                 message=f"Updating '{file_path}'",
                 path=file_path,
                 sha=original_file_new_branch.sha,
-                content=NEW_CONTENT,
+                content=new_content,
                 branch=args.new_branch,
             )
-            print("Results:")
-            print("  commit: ", update_file_result["commit"])
+            print("update_file_result: ", update_file_result)
+            commit = update_file_result.get("commit")
+            print("commit: ", commit)
 
-            PR_NEEDED = True
+            HAS_UPDATE = True
 
-    if PR_NEEDED:
-        PR_BODY = "Automated PR updating SBOM and related files."
+    if HAS_UPDATE:
+        # Get open PR or create new PR
+        pull_requests = repo.get_pulls(state="open", head=f"{args.github_owner}:{args.new_branch}",
+                                       base=args.base_branch)
+        if pull_requests.totalCount:
+            pull_request = pull_requests[0]
+            print("pull_request: ", pull_request)
+        else:
+            pr_body = "Automated PR updating SBOM and related files."
+            print("Creating PR:")
+            print(f" title={args.pr_title}")
+            print(f" head={args.new_branch}")
+            print(f" base={args.base_branch}")
+            print(f" body={pr_body}")
+
+            pull_request = repo.create_pull(
+                title=args.pr_title,
+                head=args.new_branch,
+                base=args.base_branch,
+                body=pr_body,
+            )
+            print("pull_request: ", pull_request)
+
         if args.saved_warnings:
-            PR_BODY += "\n\nThe following warnings were output by the SBOM generation script:\n"
-            PR_BODY += read_text_file(args.saved_warnings)
-
-        print("Creating PR:")
-        print(f"base={args.base_branch}")
-        print(f"head={args.new_branch}")
-        print(f"title={args.pr_title}")
-        print(f"body={PR_BODY}")
-
-        repo.create_pull(
-            base=args.base_branch,
-            head=args.new_branch,
-            title=args.pr_title,
-            body=PR_BODY,
-        )
+            pr_comment = "The following warnings were output by the SBOM generation script:\n"
+            if os.path.isfile(args.saved_warnings):
+                pr_comment += read_text_file(args.saved_warnings)
+            comment = pull_request.create_issue_comment(pr_comment)
+            print("Added PR comment: ", comment)
     else:
         print(f"Files '{SBOM_FILES}' have not changed. Skipping PR.")
