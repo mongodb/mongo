@@ -826,7 +826,7 @@ void executeExplain(const AggExState& aggExState,
  *
  * On success, fills out 'result' with the command response.
  */
-Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result);
+Status _runAggregate(std::shared_ptr<AggExState> aggExState, rpc::ReplyBuilderInterface* result);
 
 /**
  * Resolve the view by finding the underlying collection and stitching the view pipelines and this
@@ -834,27 +834,27 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
  * which will re-acquire locks on the underlying collection. (The lock must be released because
  * recursively acquiring locks on the database will prohibit yielding.)
  */
-Status runAggregateOnView(ResolvedViewAggExState& resolvedViewAggExState,
+Status runAggregateOnView(std::unique_ptr<ResolvedViewAggExState> resolvedViewAggExState,
                           std::unique_ptr<AggCatalogState> aggCatalogState,
                           rpc::ReplyBuilderInterface* result) {
     uassert(ErrorCodes::CommandNotSupportedOnView,
             "mapReduce on a view is not supported",
-            !resolvedViewAggExState.getRequest().getIsMapReduceCommand());
+            !resolvedViewAggExState->getRequest().getIsMapReduceCommand());
 
     // Resolved view will be available after view has been set on AggregationExecutionState
-    auto resolvedView = resolvedViewAggExState.getResolvedView();
+    auto resolvedView = resolvedViewAggExState->getResolvedView();
 
     // With the view & collation resolved, we can relinquish locks.
     aggCatalogState->relinquishResources();
 
-    OperationContext* opCtx = resolvedViewAggExState.getOpCtx();
-    auto& originalNss = resolvedViewAggExState.getOriginalNss();
+    OperationContext* opCtx = resolvedViewAggExState->getOpCtx();
+    auto& originalNss = resolvedViewAggExState->getOriginalNss();
 
     auto status{Status::OK()};
     if (!OperationShardingState::get(opCtx).shouldBeTreatedAsFromRouter(opCtx)) {
         // Non sharding-aware operation.
         // Run the translated query on the view on this node.
-        status = _runAggregate(resolvedViewAggExState, result);
+        status = _runAggregate(std::move(resolvedViewAggExState), result);
     } else {
         // Sharding-aware operation.
         const auto& resolvedViewNss = resolvedView.getNamespace();
@@ -863,6 +863,7 @@ Status runAggregateOnView(ResolvedViewAggExState& resolvedViewAggExState,
         // transition into the router role for it.
         const ScopedStashShardRole scopedUnsetShardRole{opCtx, resolvedViewNss};
 
+        std::shared_ptr<ResolvedViewAggExState> aggExState = std::move(resolvedViewAggExState);
         sharding::router::CollectionRouter router(opCtx->getServiceContext(), resolvedViewNss);
         status = router.routeWithRoutingContext(
             opCtx, "runAggregateOnView", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
@@ -871,7 +872,7 @@ Status runAggregateOnView(ResolvedViewAggExState& resolvedViewAggExState,
                 // Setup the opCtx's OperationShardingState with the expected placement versions for
                 // the underlying collection. Use the same 'placementConflictTime' from the original
                 // request, if present.
-                const auto scopedShardRole = resolvedViewAggExState.setShardRole(cri);
+                const auto scopedShardRole = aggExState->setShardRole(cri);
 
                 // Mark routing table as validated as we have entered the shard role for a local
                 // read.
@@ -880,7 +881,7 @@ Status runAggregateOnView(ResolvedViewAggExState& resolvedViewAggExState,
                 // If the underlying collection is unsharded and is located on this shard, then we
                 // can execute the view aggregation locally. Otherwise, we need to kick-back to the
                 // router.
-                if (!resolvedViewAggExState.canReadUnderlyingCollectionLocally(cri)) {
+                if (!aggExState->canReadUnderlyingCollectionLocally(cri)) {
                     // Cannot execute the resolved aggregation locally. The router must do it.
                     //
                     // Before throwing the kick-back exception, validate the routing table
@@ -903,7 +904,7 @@ Status runAggregateOnView(ResolvedViewAggExState& resolvedViewAggExState,
                 }
 
                 // Run the resolved aggregation locally.
-                return _runAggregate(resolvedViewAggExState, result);
+                return _runAggregate(aggExState, result);
             });
     }
 
@@ -1151,14 +1152,15 @@ StatusWith<std::unique_ptr<Pipeline>> preparePipeline(
     return std::move(pipeline);
 }
 
-Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result) {
+// TODO SERVER-114574 Pass AggExState by unique_ptr instead of shared_ptr.
+Status _runAggregate(std::shared_ptr<AggExState> aggExState, rpc::ReplyBuilderInterface* result) {
     // Perform the validation checks on the request and its derivatives before proceeding.
-    aggExState.performValidationChecks();
+    aggExState->performValidationChecks();
 
     // If we are running a retryable write without shard key, check if the write was applied on this
     // shard, and if so, return early with an empty cursor with $_wasStatementExecuted
     // set to true.
-    if (checkRetryableWriteAlreadyApplied(aggExState, result)) {
+    if (checkRetryableWriteAlreadyApplied(*aggExState, result)) {
         return Status::OK();
     }
 
@@ -1168,10 +1170,10 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     // replication rollback, which at the storage layer waits for all cursors to be closed under the
     // global MODE_X lock, after having sent interrupt signals to read operations. This operation
     // must never hold open storage cursors while ignoring interrupt.
-    InterruptibleLockGuard interruptibleLockAcquisition(aggExState.getOpCtx());
+    InterruptibleLockGuard interruptibleLockAcquisition(aggExState->getOpCtx());
 
     // Acquire any catalog locks needed by the pipeline, and create catalog-dependent state.
-    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState.createAggCatalogState();
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
     BSONObj shardKey = BSONObj();
     if (aggCatalogState->lockAcquired() &&
@@ -1200,18 +1202,18 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         const auto& view = aggCatalogState->getMainCollectionOrView().getView();
 
         bool shouldViewBeExpanded =
-            !aggExState.startsWithCollStats() || view.getViewDefinition().timeseries();
+            !aggExState->startsWithCollStats() || view.getViewDefinition().timeseries();
         if (shouldViewBeExpanded) {
             // "Convert" aggExState into resolvedViewAggExState. Note that this will make the
             // initial aggExState object unusable.
             auto resolvedViewAggExState =
-                ResolvedViewAggExState::create(std::move(aggExState), aggCatalogState);
+                ResolvedViewAggExState::create(std::move(aggExState), *aggCatalogState);
             if (!resolvedViewAggExState.isOK()) {
                 return resolvedViewAggExState.getStatus();
             }
 
             return runAggregateOnView(
-                *resolvedViewAggExState.getValue(), std::move(aggCatalogState), result);
+                std::move(resolvedViewAggExState.getValue()), std::move(aggCatalogState), result);
         }
     }
 
@@ -1226,7 +1228,7 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     // registering query stats, rewriting the pipeline to support queryable encryption, and
     // optimizing and rewriting the pipeline if necessary.
     StatusWith<std::unique_ptr<Pipeline>> swPipeline =
-        preparePipeline(aggExState, *aggCatalogState, expCtx);
+        preparePipeline(*aggExState, *aggCatalogState, expCtx);
     if (!swPipeline.isOK()) {
         return swPipeline.getStatus();
     }
@@ -1235,7 +1237,7 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     auto pipeline = std::move(swPipeline.getValue());
 
     auto swResForJoin = join_ordering::getJoinReorderedExecutor(
-        aggCatalogState->getCollections(), *pipeline, aggExState.getOpCtx(), expCtx);
+        aggCatalogState->getCollections(), *pipeline, aggExState->getOpCtx(), expCtx);
     if (swResForJoin.isOK()) {
         /**
          * We are careful to keep the AggJoinModel alive for the entirety of this function scope.
@@ -1263,7 +1265,7 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
             };
 
         // Attach pipeline suffix to SBE executor for join-reordered prefix of the pipeline.
-        execs = prepareExecutorsForPipeline(aggExState,
+        execs = prepareExecutorsForPipeline(*aggExState,
                                             *aggCatalogState,
                                             std::move(resForJoin.model.suffix),
                                             std::move(resForJoin.executor),
@@ -1271,7 +1273,7 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
                                             {} /* additionalExecutors */,
                                             false /* hasGeoNear */);
     } else {
-        execs = prepareExecutors(aggExState, *aggCatalogState, std::move(pipeline));
+        execs = prepareExecutors(*aggExState, *aggCatalogState, std::move(pipeline));
     }
 
     // Dispose of the statsTracker to update stats for Top and CurOp.
@@ -1280,9 +1282,9 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     // Having released the collection lock, we can now begin to fetch results from the pipeline.
     // If both explain and cursor are specified, explain wins.
     if (expCtx->getExplain()) {
-        executeExplain(aggExState, *aggCatalogState, expCtx, execs[0].get(), result);
+        executeExplain(*aggExState, *aggCatalogState, expCtx, execs[0].get(), result);
     } else {
-        executeUntilFirstBatch(aggExState, *aggCatalogState, expCtx, execs, result);
+        executeUntilFirstBatch(*aggExState, *aggCatalogState, expCtx, execs, result);
     }
 
     return Status::OK();
@@ -1301,12 +1303,13 @@ Status runAggregate(
     rpc::ReplyBuilderInterface* result,
     const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
         usedExternalDataSources) {
-    AggExState aggExState(
+    std::shared_ptr<AggExState> aggExState = std::make_shared<AggExState>(
         opCtx, request, liteParsedPipeline, cmdObj, privileges, usedExternalDataSources, verbosity);
 
     // NOTE: It's possible this aggExState will be unusable by the time _runAggregate returns.
-    // TODO SERVER-93536 Clarify ownership of aggExState.
-    Status status = _runAggregate(aggExState, result);
+    // TODO SERVER-114574 Ownership semantics here will be more clear once we pass AggExState by
+    // unique_ptr.
+    Status status = _runAggregate(std::move(aggExState), result);
 
     // The aggregation pipeline may change the namespace of the curop and we need to set it back to
     // the original namespace to correctly report command stats. One example when the namespace can
