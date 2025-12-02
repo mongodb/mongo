@@ -126,7 +126,7 @@ protected:
     void tearDown() override {
         _skipUpdatingCardinalityParamFP->setMode(FailPoint::off);
         _skipBlockingDDLCoordinatorsDuringAddAndRemoveShardFP->setMode(FailPoint::off);
-        TransactionCoordinatorService::get(operationContext())->interrupt();
+        TransactionCoordinatorService::get(operationContext())->interruptForStepDown();
         ConfigServerTestFixture::tearDown();
     }
 

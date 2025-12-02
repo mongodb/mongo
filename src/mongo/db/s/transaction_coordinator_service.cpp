@@ -363,7 +363,7 @@ void TransactionCoordinatorService::initializeIfNeeded(OperationContext* opCtx,
     }
 }
 
-void TransactionCoordinatorService::interrupt() {
+void TransactionCoordinatorService::interruptForStepDown() {
     std::vector<std::shared_ptr<TransactionCoordinator>> coordinatorsToCancel;
 
     {
@@ -380,11 +380,11 @@ void TransactionCoordinatorService::interrupt() {
     }
 
     if (_catalogAndSchedulerToCleanup) {
-        _catalogAndSchedulerToCleanup->interrupt();
+        _catalogAndSchedulerToCleanup->interruptForStepDown();
     }
 
     for (auto& ptr : coordinatorsToCancel) {
-        ptr->cancel();
+        ptr->cancelForStepDown();
     }
 }
 
@@ -393,7 +393,7 @@ void TransactionCoordinatorService::shutdown() {
         stdx::lock_guard lg(_mutex);
         _isShuttingDown = true;
     }
-    interrupt();
+    interruptForStepDown();
     _joinAndCleanup();
 }
 
@@ -426,7 +426,7 @@ void TransactionCoordinatorService::_joinAndCleanup() {
     schedulerToCleanup->join();
 }
 
-void TransactionCoordinatorService::CatalogAndScheduler::interrupt() {
+void TransactionCoordinatorService::CatalogAndScheduler::interruptForStepDown() {
     scheduler.shutdown({ErrorCodes::TransactionCoordinatorSteppingDown,
                         "Transaction coordinator service stepping down"});
     catalog.onStepDown();

@@ -166,7 +166,7 @@ public:
      * `WaitForMajority` invocations under this coordinator. typically invoked only by the
      * TransactionCoordinatorService during stepdown.
      */
-    void cancel();
+    void cancelForStepDown();
 
     TxnRetryCounter getTxnRetryCounterForTest() const {
         return *_txnNumberAndRetryCounter.getTxnRetryCounter();
@@ -261,8 +261,8 @@ private:
     // The deadline for the TransactionCoordinator to reach a decision
     Date_t _deadline;
 
-    // The cancellation source for WaitForMajority.
-    CancellationSource _cancellationSource;
+    // The onStepDown cancellation source for WaitForMajority.
+    CancellationSource _waitForMajorityCancellationSourceOnStepDown;
 };
 
 }  // namespace mongo

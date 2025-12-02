@@ -839,13 +839,13 @@ void ShardingInitializationMongoD::onStepDown() {
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         PeriodicShardedIndexConsistencyChecker::get(opCtx).onStepDown();
-        TransactionCoordinatorService::get(opCtx)->interrupt();
+        TransactionCoordinatorService::get(opCtx)->interruptForStepDown();
     }
 
     if (ShardingState::get(opCtx)->enabled()) {
         if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             // Called earlier for config servers.
-            TransactionCoordinatorService::get(opCtx)->interrupt();
+            TransactionCoordinatorService::get(opCtx)->interruptForStepDown();
         }
 
         FilteringMetadataCache::get(opCtx)->onStepDown();

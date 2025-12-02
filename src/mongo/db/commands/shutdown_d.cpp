@@ -93,7 +93,7 @@ Status stepDownForShutdown(OperationContext* opCtx,
 
         // Even if the ReplicationCoordinator failed to step down, ensure we still interrupt the
         // TransactionCoordinatorService (see SERVER-45009).
-        TransactionCoordinatorService::get(opCtx)->interrupt();
+        TransactionCoordinatorService::get(opCtx)->interruptForStepDown();
     }
     return Status::OK();
 }

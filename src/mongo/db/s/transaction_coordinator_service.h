@@ -132,7 +132,7 @@ public:
      * Interrupts the scheduler and marks the coordinator catalog as stepping down, which triggers
      * all the coordinators to stop.
      */
-    void interrupt();
+    void interruptForStepDown();
 
     /**
      * Shuts down this service. This will no longer be usable once shutdown is called.
@@ -149,7 +149,7 @@ protected:
     struct CatalogAndScheduler {
         CatalogAndScheduler(ServiceContext* service) : scheduler(service) {}
 
-        void interrupt();
+        void interruptForStepDown();
         void join();
 
         txn::AsyncWorkScheduler scheduler;

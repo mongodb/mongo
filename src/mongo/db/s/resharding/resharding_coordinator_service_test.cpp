@@ -400,7 +400,7 @@ public:
     void tearDown() override {
         globalFailPointRegistry().disableAllFailpoints();
 
-        TransactionCoordinatorService::get(operationContext())->interrupt();
+        TransactionCoordinatorService::get(operationContext())->interruptForStepDown();
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ConfigServerTestFixture::tearDown();
         _registry->onShutdown();

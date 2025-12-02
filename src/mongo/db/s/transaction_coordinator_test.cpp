@@ -73,6 +73,7 @@
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -1569,6 +1570,48 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesEndOfTransactionOplogEntry) 
     ASSERT_EQ(o2.type(), BSONType::object);
     ASSERT_BSONOBJ_EQ(o2.Obj(), expectedO2);
 }
+
+TEST_F(TransactionCoordinatorTest,
+       CoordinatorTerminatedWithUnexpectedErrorBeforeDurablyWritingDecision) {
+    // Create the coordinator.
+    auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        operationContext(), _lsid, _txnNumberAndRetryCounter, std::move(aws), Date_t::max());
+    coordinator->start(operationContext());
+
+    // Wait until the coordinator is writing the participant list.
+    FailPointEnableBlock fp("hangBeforeWaitingForParticipantListWriteConcern");
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
+
+    // Shut down the coordinator's AWS with unexpected error.
+    killClientOpCtx(getServiceContext(),
+                    "hangBeforeWaitingForParticipantListWriteConcern",
+                    ErrorCodes::InternalError);
+
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+    ASSERT_THROWS_CODE(coordinator->onCompletion().get(), DBException, ErrorCodes::InternalError);
+    coordinator->shutdown();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+}
+
+DEATH_TEST_REGEX_F(TransactionCoordinatorTest,
+                   CoordinatorTerminatedWithUnexpectedErrorAfterDurablyWritingDecision,
+                   "Fatal assertion.*11353000") {
+    // Create the coordinator.
+    auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
+    auto awsPtr = aws.get();
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        operationContext(), _lsid, _txnNumberAndRetryCounter, std::move(aws), Date_t::max());
+    coordinator->start(operationContext());
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
+    assertPrepareSentAndRespondWithRetryableError();
+
+    // Shut down the coordinator's AWS with unexpected error while waiting on prepare response.
+    awsPtr->shutdown({ErrorCodes::InternalError, "dummy"});
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+    coordinator->onCompletion().get();
+}
+
 
 class TransactionCoordinatorMetricsTest : public TransactionCoordinatorTestBase {
 protected:
