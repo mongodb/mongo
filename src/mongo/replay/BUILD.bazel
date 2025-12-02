@@ -57,6 +57,7 @@ mongo_cc_unit_test(
         "replay_command_executor_test.cpp",
         "replay_command_test.cpp",
         "replay_test_server.cpp",
+        "session_handler_test.cpp",
         "session_scheduler_test.cpp",
         "session_simulator_test.cpp",
         "test_packet.cpp",

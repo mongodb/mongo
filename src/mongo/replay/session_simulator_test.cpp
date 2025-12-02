@@ -29,47 +29,35 @@
 
 #include "mongo/replay/session_simulator.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/traffic_reader.h"
-#include "mongo/db/traffic_recorder.h"
+#include "mongo/bson/json.h"
 #include "mongo/replay/mini_mock.h"
 #include "mongo/replay/performance_reporter.h"
+#include "mongo/replay/rawop_document.h"
+#include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_command_executor.h"
 #include "mongo/replay/replay_test_server.h"
+#include "mongo/replay/session_scheduler.h"
 #include "mongo/replay/test_packet.h"
-#include "mongo/replay/traffic_recording_iterator.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/uuid.h"
+#include "mongo/util/synchronized_value.h"
+#include "mongo/util/time_support.h"
 
 #include <chrono>
 #include <memory>
-
-#include <boost/filesystem/path.hpp>
+#include <ratio>
 
 namespace mongo {
 
-using namespace std::chrono_literals;
-
-static const std::string fakeResponse = R"([{
-    "_id": "681cb423980b72695075137f",
-    "name": "Alice",
-    "age": 30,
-    "city": "New York"}])";
-
 class TestSessionSimulator : public SessionSimulator {
 public:
-    using SessionSimulator::SessionSimulator;
-
-    TestSessionSimulator(PacketSource source,
-                         std::chrono::steady_clock::time_point startTime,
-                         StringData uri)
-        : SessionSimulator(std::move(source),
-                           0 /* sessionID */,
-                           startTime,
-                           std::string(uri),
-                           std::make_unique<ReplayCommandExecutor>(),
-                           std::make_unique<PerformanceReporter>(uri, "test.bin")) {}
+    TestSessionSimulator()
+        : SessionSimulator(std::make_unique<ReplayCommandExecutor>(),
+                           std::make_unique<SessionScheduler>(),
+                           std::make_unique<PerformanceReporter>("test.bin")) {}
 
     std::chrono::steady_clock::time_point now() const override {
         auto handle = nowHook.synchronize();
@@ -79,6 +67,11 @@ public:
     void sleepFor(std::chrono::steady_clock::duration duration) const override {
         auto handle = sleepHook.synchronize();
         (*handle)(duration);
+    }
+
+    ~TestSessionSimulator() override {
+        // Halt all worker threads, before mock functions are destroyed.
+        shutdown();
     }
 
     using NowMockFunction = MiniMockFunction<std::chrono::steady_clock::time_point>;
@@ -97,177 +90,133 @@ auto operator+(const MongoDur& mongoDuration,
                const std::chrono::duration<Rep, Period>& nonMongoDuration) {
     return mongoDuration + mongo::duration_cast<MongoDur>(nonMongoDuration);
 }
-
-class TestPackets {
-public:
-    struct Args {
-        std::chrono::seconds offset;
-        TestReaderPacket packet;
-    };
-
-    TestPackets& operator+=(Args&& args) {
-        args.packet.offset = mongo::duration_cast<Microseconds>(args.offset);
-        packets.push_back(std::move(args.packet));
-        return *this;
-    }
-
-    operator PacketSource() const;
-
-    const auto& operator[](size_t idx) {
-        return packets[idx];
-    }
-
-    Date_t recordingStartTime = Date_t::now();
-    std::vector<TestReaderPacket> packets;
-};
-
-TrafficRecordingPacket toOwned(const TrafficReaderPacket& packet) {
-    Message ownedMessage;
-    ownedMessage.setData(
-        packet.message.getNetworkOp(), packet.message.data(), packet.message.dataLen());
-
-    return {
-        .eventType = packet.eventType,
-        .id = packet.id,
-        .session = std::string(packet.session),
-        .offset = packet.offset,
-        .order = packet.order,
-        .message = std::move(ownedMessage),
-    };
-}
-
-class TestFiles : public FileSet {
-public:
-    TestFiles(std::vector<TestReaderPacket> packets) {
-        PacketWriter writer;
-        const boost::filesystem::path filename = UUID::gen().toString() + ".bin";
-        writer.open(filename);
-
-        for (const auto& packet : packets) {
-            writer.writePacket(toOwned(packet));
-        }
-
-        writer.close();
-
-        files = {std::make_shared<boost::iostreams::mapped_file_source>(filename.string())};
-    }
-    /**
-     * Acquire (read only) memory mapped access to the file at `index`.
-     *
-     * If the file is already mapped, shared access will be provided to the same map;
-     * it will not be blindly re-mapped.
-     */
-    std::shared_ptr<boost::iostreams::mapped_file_source> get(size_t index) override {
-        if (index >= files.size()) {
-            return nullptr;
-        }
-        return files[index];
-    }
-
-    /**
-     * Check if this FileSet contains any files.
-     */
-    bool empty() const override {
-        return files.empty();
-    }
-
-    std::vector<std::shared_ptr<boost::iostreams::mapped_file_source>> files;
-};
-
-TestPackets::operator PacketSource() const {
-    return PacketSource(std::make_shared<TestFiles>(packets));
-}
-
 TEST(SessionSimulatorTest, TestSimpleCommandNoWait) {
-    ReplayTestServer server{{"find"}, {fakeResponse}};
 
     auto packet = TestReaderPacket::find(BSON("name" << "Alice"));
 
-    auto replayStartTime = std::chrono::steady_clock::now();
-
-    TestPackets packets;
-
-    // Simulate a find command occurring 1 second into the recording.
-    packets += {1s, TestReaderPacket::find(BSON("name" << "Alice"))};
+    std::string jsonStr = R"([{
+    "_id": "681cb423980b72695075137f",
+    "name": "Alice",
+    "age": 30,
+    "city": "New York"}])";
+    ReplayTestServer server{{"find"}, {jsonStr}};
 
     // test simulator scoped in order to complete all the tasks.
     {
-        TestSessionSimulator sessionSimulator{
-            packets, replayStartTime, server.getConnectionString()};
+        TestSessionSimulator sessionSimulator;
 
-        // TODO SERVER-105627: First command will start session, and will call now() to
-        // delay until the correct time. SessionStart events will explicitly do this.
-        sessionSimulator.nowHook->ret(replayStartTime + 1s);
+        // connect to server with time
+        const auto uri = server.getConnectionString();
+        auto begin = std::chrono::steady_clock::now();
+        auto eventOffset = Microseconds(0);
+        // For the next call to now(), report the timestamp the replay started at.
+        sessionSimulator.nowHook->ret(begin);
 
-        // Initially report "now" as the exact time the find request needs to be issued.
-        sessionSimulator.nowHook->ret(replayStartTime + 1s);
-        // Don't expect any call to sleepFor.
+        // Recording and session both start "now".
+        sessionSimulator.start(uri, begin, eventOffset);
 
-        sessionSimulator.run();
+        using namespace std::chrono_literals;
+        eventOffset += Duration<std::milli>(1000);
+        packet.offset = eventOffset;
+        ReplayCommand command{packet};
+        // For the next call to now(), report the replay is 1s in - the same time the find should be
+        // issued at.
+        sessionSimulator.nowHook->ret(begin + 1s);
+        sessionSimulator.run(command, eventOffset);
     }
+
+    BSONObj response = fromjson(jsonStr);
+    ASSERT_TRUE(server.checkResponse("find", response));
 }
 
 TEST(SessionSimulatorTest, TestSimpleCommandWait) {
-    ReplayTestServer server{{"find"}, {fakeResponse}};
+    auto packet = TestReaderPacket::find(BSON("name" << "Alice"));
 
-    auto replayStartTime = std::chrono::steady_clock::now();
-
-    TestPackets packets;
-
-    // Simulate a find command occurring 2 second into the recording.
-    packets += {2s, TestReaderPacket::find(BSON("name" << "Alice"))};
-
-    // Simulate another command, 3 seconds later (total offset of 5s into the recording).
-    packets += {5s, TestReaderPacket::find(BSON("name" << "Alice"))};
+    std::string jsonStr = R"([{
+    "_id": "681cb423980b72695075137f",
+    "name": "Alice",
+    "age": 30,
+    "city": "New York"}])";
+    ReplayTestServer server{{"find"}, {jsonStr}};
 
     // test simulator scoped in order to complete all the tasks.
     {
-        TestSessionSimulator sessionSimulator{
-            packets, replayStartTime, server.getConnectionString()};
+        TestSessionSimulator sessionSimulator;
 
-        // First find
+        // connect to server with time
+        const auto uri = server.getConnectionString();
+        auto begin = std::chrono::steady_clock::now();
 
-        // Initially report "now" as the recording start time.
-        sessionSimulator.nowHook->ret(replayStartTime);
-        // Expect the simulator to try sleep for 2s.
+        using namespace std::chrono_literals;
+
+        // The session start occurred two seconds into the recording.
+        auto eventOffset = Duration<std::milli>(2000);  // 2 seconds into the recording
+
+        // For the first call to now() return the same timepoint the replay started at.
+        sessionSimulator.nowHook->ret(begin);
+        // Expect the simulator to try sleep for 2 seconds.
         sessionSimulator.sleepHook->expect(2s);
 
-        // Second find
+        sessionSimulator.start(uri, begin, eventOffset);
 
-        // Report "now" as if immediately after sleeping for the previous command.
-        sessionSimulator.nowHook->ret(replayStartTime + 2s);
-        // Expect the simulator to try sleep for the remaining 3s to reach the target offset time.
+
+        // Issue a find request at 5s into the recording
+        eventOffset = Duration<std::milli>(5000);
+        packet.offset = eventOffset;
+        ReplayCommand command{packet};
+
+        // Report "now" as if time has advanced to when the session started.
+        sessionSimulator.nowHook->ret(begin + 2s);
+        // Simulator should attempt to sleep the remaining time to when the
+        // find request was issued.
         sessionSimulator.sleepHook->expect(3s);
 
-        sessionSimulator.run();
+        sessionSimulator.run(command, eventOffset);
     }
+
+    BSONObj response = fromjson(jsonStr);
+    ASSERT_TRUE(server.checkResponse("find", response));
 }
 
 TEST(SessionSimulatorTest, TestSimpleCommandNoWaitTimeInThePast) {
-    ReplayTestServer server{{"find"}, {fakeResponse}};
-    auto replayStartTime = std::chrono::steady_clock::now();
+    // Simulate a real scenario where time is in the past. No wait should happen.
+    auto packet = TestReaderPacket::find(BSON("name" << "Alice"));
 
-    TestPackets packets;
-
-    // Simulate a find command occurring 1 second into the recording.
-    packets += {1s, TestReaderPacket::find(BSON("name" << "Alice"))};
-
+    std::string jsonStr = R"([{
+    "_id": "681cb423980b72695075137f",
+    "name": "Alice",
+    "age": 30,
+    "city": "New York"}])";
+    ReplayTestServer server{{"find"}, {jsonStr}};
 
     // test simulator scoped in order to complete all the tasks.
     {
-        TestSessionSimulator sessionSimulator{
-            packets, replayStartTime, server.getConnectionString()};
+        TestSessionSimulator sessionSimulator;
 
-        // TODO SERVER-105627: First command will start session, and will call now() to
-        // delay until the correct time. SessionStart events will explicitly do this.
-        sessionSimulator.nowHook->ret(replayStartTime + 10s);
+        // connect to server with time
+        const auto uri = server.getConnectionString();
+        auto begin = stdx::chrono::steady_clock::now();
+        using namespace std::chrono_literals;
+        auto eventOffset =
+            Duration<std::milli>(1000);  // A session started one second into the recording
 
-        // Initially report "now" as _later than_ the command should have run.
-        sessionSimulator.nowHook->ret(replayStartTime + 10s);
-        // Don't expect any call to sleepFor.
+        // Pretend the replay is actually *10* seconds into the replay.
+        // That means it is now "late" starting this session, so should not sleep.
+        sessionSimulator.nowHook->ret(begin + 10s);
 
-        sessionSimulator.run();
+        sessionSimulator.start(uri, begin, eventOffset);
+
+        eventOffset = Duration<std::milli>(2000);
+        packet.offset = eventOffset;
+        ReplayCommand command{packet};
+
+        // Replay is also "late" trying to replay this find, so should not sleep.
+        sessionSimulator.nowHook->ret(begin + 10s);
+        sessionSimulator.run(command, eventOffset);
     }
+
+    BSONObj response = fromjson(jsonStr);
+    ASSERT_TRUE(server.checkResponse("find", response));
 }
 
 }  // namespace mongo

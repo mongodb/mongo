@@ -31,15 +31,12 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util.h"
 
-#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <string>
+#include <sstream>
 
-#include <absl/time/time.h>
 #include <boost/filesystem/operations.hpp>
-#include <boost/optional/optional.hpp>
 #include <boost/program_options.hpp>
 #include <boost/program_options/errors.hpp>
 #include <boost/program_options/options_description.hpp>
@@ -57,9 +54,6 @@ std::vector<ReplayConfig> ConfigHandler::parse(int argc, char** argv) {
     auto mongodbTarget = "URI of the shadow mongod/s";
     auto configFilePath = "Path to the config file";
     auto enablePerfRecording = "Enable/Disable perf recording specifying file name";
-    auto graceTime =
-        "Delay replay to allow time for session initialization before the first event for that "
-        "session";
 
     namespace po = boost::program_options;
 
@@ -71,8 +65,7 @@ std::vector<ReplayConfig> ConfigHandler::parse(int argc, char** argv) {
         ("input,i", po::value<std::string>(), recordingPath)
         ("target,t", po::value<std::string>(), mongodbTarget)
         ("config,c", po::value<std::string>(), configFilePath)
-        ("perf,p", po::value<std::string>()->default_value(""), enablePerfRecording)
-        ("graceTime,a", po::value<std::string>()->default_value("5s"), graceTime);
+        ("perf,p", po::value<std::string>()->default_value(""), enablePerfRecording);
     // clang-format on
 
     // Parse the program options
@@ -137,15 +130,6 @@ std::vector<ReplayConfig> ConfigHandler::parse(int argc, char** argv) {
     uassert(ErrorCodes::ReplayClientConfigurationError, "target URI is empty", !uri.empty());
     config.mongoURI = uri;
     config.enablePerformanceRecording = vm["perf"].as<std::string>();
-
-    absl::Duration dur;
-    uassert(ErrorCodes::ReplayClientConfigurationError,
-            "Invalid graceTime",
-            absl::ParseDuration(vm["graceTime"].as<std::string>(), &dur));
-    uassert(ErrorCodes::ReplayClientConfigurationError,
-            "Invalid graceTime",
-            dur >= absl::ZeroDuration());
-    config.sessionPreInitTime = absl::ToChronoSeconds(dur);
     return {config};
 }
 
@@ -176,20 +160,6 @@ std::vector<ReplayConfig> ConfigHandler::parseMultipleInstanceConfig(const std::
         json config;
         configFile >> config;
 
-        boost::optional<std::chrono::seconds> graceTime;
-
-        if (config.contains("graceTime")) {
-            absl::Duration dur;
-            uassert(ErrorCodes::ReplayClientConfigurationError,
-                    "Invalid graceTime",
-                    absl::ParseDuration(config["graceTime"].get<std::string>(), &dur));
-
-            uassert(ErrorCodes::ReplayClientConfigurationError,
-                    "Invalid graceTime",
-                    dur >= absl::ZeroDuration());
-            graceTime = absl::ToChronoSeconds(dur);
-        }
-
         uassert(ErrorCodes::ReplayClientConfigurationError,
                 "'recordings' key is missing",
                 config.contains("recordings"));
@@ -204,9 +174,6 @@ std::vector<ReplayConfig> ConfigHandler::parseMultipleInstanceConfig(const std::
             std::string filePath = recording["path"].get<std::string>();
             std::string targetUri = recording["uri"].get<std::string>();
             ReplayConfig replayConfig = {filePath, targetUri};
-            if (graceTime) {
-                replayConfig.sessionPreInitTime = *graceTime;
-            }
             configurations.push_back(std::move(replayConfig));
         }
 

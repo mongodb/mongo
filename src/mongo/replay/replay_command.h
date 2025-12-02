@@ -92,6 +92,6 @@ private:
     TrafficReaderPacket _packet;
 };
 
-std::pair<Microseconds, uint64_t> extractOffsetAndSessionFromCommand(const ReplayCommand& command);
+std::pair<Microseconds, int64_t> extractOffsetAndSessionFromCommand(const ReplayCommand& command);
 
 }  // namespace mongo

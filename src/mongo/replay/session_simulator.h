@@ -33,16 +33,18 @@
  * dispatches requests to the contained ReplayCommandExecutor.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/replay/performance_reporter.h"
-#include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_command_executor.h"
-#include "mongo/replay/traffic_recording_iterator.h"
+#include "mongo/replay/session_scheduler.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 #include <chrono>
-#include <exception>
 #include <memory>
-#include <stop_token>
+
 namespace mongo {
 
 /**
@@ -62,26 +64,29 @@ namespace mongo {
  * design as simple as possible. Performance is not very important in this case, however
  * SessionSimulator is not supposed to be thrown away and reconstructed constantly.
  */
-
-using PacketSource = RecordingSetIterator;
-
-class SessionSimulator : public std::enable_shared_from_this<SessionSimulator> {
+class SessionSimulator {
 public:
-    SessionSimulator(PacketSource source,
-                     uint64_t sessionID,
-                     std::chrono::steady_clock::time_point globalStartTime,
-                     std::string uri,
-                     std::unique_ptr<ReplayCommandExecutor>,
+    SessionSimulator(std::unique_ptr<ReplayCommandExecutor>,
+                     std::unique_ptr<SessionScheduler>,
                      std::unique_ptr<PerformanceReporter>);
-    virtual ~SessionSimulator() = default;
+    virtual ~SessionSimulator();
 
-    void run(std::stop_token stopToken = {});
+    void start(StringData uri,
+               std::chrono::steady_clock::time_point replayStartTime,
+               const Microseconds& eventOffset);
+    void stop(const Microseconds& sessionEndOffset);
+    void run(const ReplayCommand&, const Microseconds& commandOffset);
 
 protected:
-    void start();
-    void stop();
-    void runCommand(const ReplayCommand&) const;
+    /**
+     * Halt all work, and join any spawned threads.
+     *
+     * Optional, only required if simulator must be halted before destruction.
+     * (e.g., subclass needs to halt threads before destruction).
+     */
+    void shutdown();
 
+private:
     virtual std::chrono::steady_clock::time_point now() const;
     virtual void sleepFor(std::chrono::steady_clock::duration duration) const;
     void waitIfNeeded(Microseconds) const;
@@ -91,11 +96,8 @@ protected:
     // Derived from steady_clock not system_clock as the replay should
     // not be affected by clock manipulation (e.g., by NTP).
     std::chrono::steady_clock::time_point _replayStartTime;
-
-    std::string _uri;
-    PacketSource _source;
-    uint64_t _sessionID;
     std::unique_ptr<ReplayCommandExecutor> _commandExecutor;
+    std::unique_ptr<SessionScheduler> _sessionScheduler;
     std::unique_ptr<PerformanceReporter> _perfReporter;
 };
 

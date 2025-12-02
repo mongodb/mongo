@@ -29,23 +29,25 @@
 
 #include "mongo/replay/replay_client.h"
 
-#include "mongo/logv2/log.h"
+#include "mongo/db/query/util/stop_token.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_config.h"
 #include "mongo/replay/session_handler.h"
 #include "mongo/replay/traffic_recording_iterator.h"
+#include "mongo/transport/asio/asio_session_manager.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/duration.h"
+#include "mongo/util/version.h"
 
-#include <chrono>
 #include <condition_variable>
 #include <exception>
 #include <memory>
 #include <mutex>
-#include <stop_token>
 #include <string>
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 
@@ -156,7 +158,7 @@ private:
     }
 
 
-    std::stop_source stop;
+    mongo::stop_source stop;
 
     std::mutex lock;
     std::condition_variable cv;  // NOLINT
@@ -164,12 +166,32 @@ private:
     std::exception_ptr exception = nullptr;
 };
 
+// We don't want to replay all the commands we find in the recording file. Mainly we want to skip:
+// 1. legacy commands. Everything that is marked legacy, won't be replayable.
+// 2. Responses (cursor). These will be the result of some query like find and aggregate.
+// 3. n/ok commands. These are just responses.
+// 4. isWritablePrimary/isMaster. These are mostly diagnostic commands that we don't want.
+// NOLINTNEXTLINE needs audit
+static std::unordered_set<std::string> forbiddenKeywords{"legacy",
+                                                         "cursor",
+                                                         "endSessions",
+                                                         "ok",
+                                                         "isWritablePrimary",
+                                                         "n",
+                                                         "isMaster",
+                                                         "ismaster",
+                                                         "stopTrafficRecording"};
+
+bool isReplayable(const std::string& commandType) {
+    return !commandType.empty() && !forbiddenKeywords.contains(commandType);
+}
+
 /**
  * Consumes a collection of recording files from a _single_ node.
  *
  * Handles creation of threads to replay individual sessions contained within.
  */
-void recordingDispatcher(std::stop_token stop, const ReplayConfig& replayConfig) {
+void recordingDispatcher(mongo::stop_token stop, const ReplayConfig& replayConfig) {
     std::shared_ptr<FileSet> files;
     try {
         files = FileSet::from_directory(replayConfig.recordingPath);
@@ -178,77 +200,41 @@ void recordingDispatcher(std::stop_token stop, const ReplayConfig& replayConfig)
     }
 
     try {
-        /**
-         * Begin reading the provided recording, searching for session starts.
-         *
-         * Upon finding a session start, spawn a new thread to manage that session.
-         * That thread will replay further events for that session at the appropriate time.
-         *
-         */
         auto iter = RecordingSetIterator(files);
 
         if (iter == end(iter)) {
             // There are no events in the recording.
-            LOGV2_INFO(10893009, "Empty or invalid recording - exiting");
             return;
         }
 
-        // State for sessions will be constructed a little "earlier" than the time
-        // at which the session needs to start, to avoid initial delays from e.g.,
-        // spawning the thread.
-        const auto timePadding = replayConfig.sessionPreInitTime;
+        // create a new session handler for mananging the recording.
+        SessionHandler sessionHandler{replayConfig.mongoURI,
+                                      replayConfig.enablePerformanceRecording};
 
-        // Plan the replay to start a small time into the future, so sessions can be
-        // constructed ready to replay at the "correct" time.
-        const auto replayStartTime = std::chrono::steady_clock::now() + timePadding;
-
-        // create a new session handler for managing the recording.
-        SessionHandler sessionHandler{
-            replayConfig.mongoURI, replayStartTime, replayConfig.enablePerformanceRecording};
-
-        auto sc = std::stop_callback(stop, [&] { sessionHandler.stopAllSessions(); });
-
-        LOGV2_INFO(10893005, "Replay starting");
-
-
-        for (; iter != end(iter); ++iter) {
-            // Read ahead by a small time window to find session starts, to initialize session
-            // state with a small grace period before the first event for that session needs to be
-            // processed.
-            // Reading too far (or unlimited) ahead would needlessly create session state before
-            // it is needed, wasting resources.
-            auto nextEventTS = replayStartTime + iter->offset.toSystemDuration() - timePadding;
-
-            if (!sessionHandler.waitUntil(nextEventTS)) {
-                // Didn't reach the expected time; a session failed or stop was requested by the
-                // caller.
-                break;
+        for (const auto& packet : iter) {
+            if (stop.stop_requested()) {
+                return;
             }
-
-            ReplayCommand command{*iter};
+            ReplayCommand command{packet};
+            if (!isReplayable(command.parseOpType())) {
+                continue;
+            }
             if (command.isSessionStart()) {
-                sessionHandler.createSession(command.fetchRequestSessionId(), iter);
+                // will associated the URI to a session task and run all the commands associated
+                // with this session id.
+                const auto& [offset, sessionId] = extractOffsetAndSessionFromCommand(command);
+                sessionHandler.onSessionStart(offset, sessionId);
+            } else if (command.isSessionEnd()) {
+                // stop commad will reset the complete the simulation and reset the connection.
+                sessionHandler.onSessionStop(command);
+            } else {
+                // must be a runnable command.
+                sessionHandler.onBsonCommand(command);
             }
         }
-
-        // All sessions seen in the recording have been created, and are independently replaying
-        // in dedicated threads.
-        LOGV2_INFO(10893006, "All sessions initialized");
-
-        // Wait for all the sessions to complete.
-        sessionHandler.waitForRunningSessions();
-
-        sessionHandler.rethrowIfSessionFailed();
-
-    } catch (DBException& e) {
-        LOGV2_INFO(10893010, "Replay failed", "exception"_attr = e.what());
-        e.addContext("Session replay failed");
-        throw;
     } catch (const std::exception& e) {
-        LOGV2_INFO(10893007, "Replay failed", "exception"_attr = e.what());
-        throw;
+        tasserted(ErrorCodes::ReplayClientInternalError, e.what());
     }
-    LOGV2_INFO(10893008, "Replay completed");
 }
 
 void ReplayClient::replayRecording(const ReplayConfigs& configs) {
