@@ -51,4 +51,52 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(coll.deleteMany({"meta": {$eq: "a"}}));
     assert.eq(2, coll.find({"meta": "a"}).toArray().length);
     assert.eq(0, coll.find({"meta": "b"}).toArray().length);
+
+    // populate three closed buckets
+    docs = [
+        {_id: 2, time: ISODate("2020-11-26T00:20:00.000Z"), meta: "a", x: 20},
+        {_id: 3, time: ISODate("2020-11-26T00:30:00.000Z"), meta: "a", x: 30},
+    ];
+    assert.commandWorked(insert(coll, docs), "failed to insert docs: " + tojson(docs));
+    getTimeseriesCollForRawOps(coll).findAndModify({
+        query: {"meta": "a"},
+        update: {$set: {"control.closed": true}},
+        ...kRawOperationSpec,
+    });
+    docs = [
+        {_id: 4, time: ISODate("2020-11-26T00:40:00.000Z"), meta: "a", x: 40},
+        {_id: 5, time: ISODate("2020-11-26T00:50:00.000Z"), meta: "a", x: 50},
+    ];
+    assert.commandWorked(insert(coll, docs), "failed to insert docs: " + tojson(docs));
+    getTimeseriesCollForRawOps(coll).findAndModify({
+        query: {"meta": "a"},
+        update: {$set: {"control.closed": true}},
+        ...kRawOperationSpec,
+    });
+    assert.eq(6, coll.find({"meta": "a"}).toArray().length);
+    assert.eq(0, coll.find({"meta": "b"}).toArray().length);
+
+    // should delete the bucket in rawData mode
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).deleteOne(
+            {
+                "meta": "a",
+            },
+            kRawOperationSpec,
+        ),
+    );
+    assert.eq(4, coll.find({"meta": "a"}).toArray().length);
+    assert.eq(1, coll.stats().timeseries.bucketCount, coll.stats().timeseries);
+    assert.eq(0, coll.find({"meta": "b"}).toArray().length);
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).deleteMany(
+            {
+                "meta": "a",
+            },
+            kRawOperationSpec,
+        ),
+    );
+    assert.eq(0, coll.find({"meta": "a"}).toArray().length);
+    assert.eq(0, coll.stats().timeseries.bucketCount);
+    assert.eq(0, coll.find({"meta": "b"}).toArray().length);
 });
