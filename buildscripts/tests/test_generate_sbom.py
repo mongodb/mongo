@@ -1,15 +1,19 @@
+#!/usr/bin/env python3
+"""
+Tests for buildscripts/sbom/*.py
+"""
+
+import json
 import logging
+import os
 import sys
 import unittest
 
-sys.path.append(".")
+sys.path.append("buildscripts/sbom")
 
-from buildscripts.sbom.config import (
-    get_semver_from_release_version,
-    is_valid_purl,
-    regex_semver,
-)
+from buildscripts.sbom.config import get_semver_from_release_version, regex_semver
 from buildscripts.sbom.endorctl_utils import EndorCtl
+from buildscripts.sbom.generate_sbom import is_valid_purl
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
@@ -174,6 +178,46 @@ class TestConfigRegex(unittest.TestCase):
         for purl in invalid_purls:
             with self.subTest(purl=purl):
                 self.assertFalse(is_valid_purl(purl), f"Expected '{purl}' to be invalid")
+
+
+__unittest = True
+
+
+class TestMetadataFile(unittest.TestCase):
+    TEST_DIR = os.path.join("buildscripts", "sbom")
+    VERSION_TAG = "{{VERSION}}"
+
+    def read_sbom_json_file(self, file_path: str) -> dict:
+        """Load a JSON SBOM file (schema is not validated)"""
+        with open(file_path, "r", encoding="utf-8") as input_json:
+            sbom_json = input_json.read()
+        return json.loads(sbom_json)
+
+    def test_metadata_sbom_version_tags(self):
+        sbom_metadata_file = os.path.join(self.TEST_DIR, "metadata.cdx.json")
+        print(sbom_metadata_file)
+        meta_bom = self.read_sbom_json_file(sbom_metadata_file)
+        for component in meta_bom["components"]:
+            with self.subTest(component=component):
+                properties = []
+                properties.append(component["bom-ref"])
+                properties.append(component["version"])
+                if "purl" in component:
+                    properties.append(component["purl"])
+                if "cpe" in component:
+                    properties.append(component["cpe"])
+                # make sure component has a minimum of bom-ref, version and at least one of purl or cpe
+                self.assertGreater(
+                    len(properties),
+                    2,
+                    f"Component must have a minimum of bom-ref, version and at least one of purl or cpe. {properties}",
+                )
+                # make sure all properites either have version tag or no version tags
+                self.assertTrue(
+                    all(self.VERSION_TAG in p for p in properties)
+                    or all(self.VERSION_TAG not in p for p in properties),
+                    f"Component must have version tag '{self.VERSION_TAG}' in all or none of bom-ref, version and purl and/or cpe. {properties})",
+                )
 
 
 if __name__ == "__main__":

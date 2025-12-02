@@ -39,7 +39,7 @@ a notice will be included in
 | [Intel® Decimal Floating-Point Math Library]         | BSD-3-Clause                      | 2.0.1                                    |                      | ✗                               |
 | [JSON Schema Store]                                  | Apache-2.0                        | 6847cfc3a17a04a7664474212db50c627e1e3408 |                      |                                 |
 | [JSON-Schema-Test-Suite]                             | MIT                               | 728066f9c5c258ba3b1804a22a5b998f2ec77ec0 |                      |                                 |
-| [libmongocrypt]                                      | Apache-2.0                        | 1.8.3                                    | ✗                    | ✗                               |
+| [libmongocrypt]                                      | Apache-2.0                        | 1.8.4                                    | ✗                    | ✗                               |
 | [librdkafka - The Apache Kafka C/C++ library]        | BSD-2-Clause                      | 2.0.2-RC2                                |                      | ✗                               |
 | [LibTomCrypt]                                        | Unlicense                         | 1.18.2                                   | ✗                    | ✗                               |
 | [libunwind]                                          | MIT                               | 1.8.1                                    |                      | ✗                               |
@@ -51,16 +51,16 @@ a notice will be included in
 | [Protobuf]                                           | BSD-3-Clause                      | v25.0                                    |                      | ✗                               |
 | [pypi/ocspbuilder]                                   | MIT                               | 0.10.2                                   |                      |                                 |
 | [pypi/ocspresponder]                                 | Apache-2.0                        | 0.5.0                                    |                      |                                 |
-| [re2]                                                | BSD-3-Clause                      | 2024-02-01                               |                      | ✗                               |
+| [re2]                                                | BSD-3-Clause                      | 2023-11-01                               |                      | ✗                               |
 | [S2 Geometry Library]                                | Apache-2.0                        | a25c502bda9d7e0274b9e2b7825fbddf13cc0306 | ✗                    | ✗                               |
 | [SafeInt]                                            | MIT                               | 3.0.26                                   |                      | ✗                               |
 | [snappy]                                             | BSD-3-Clause                      | 1.1.10                                   | ✗                    | ✗                               |
 | [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                      | 1.0.0                                    | ✗                    | ✗                               |
 | [tcmalloc]                                           | Apache-2.0                        | f3b20f9a07e175c5d897df7b49d9830d4efa6110 |                      | ✗                               |
-| [timelib]                                            | MIT                               | b7e3db4b43ec45235eeacf80b197de43d3c1d114 |                      | ✗                               |
+| [timelib]                                            | MIT                               | 2022.10                                  |                      | ✗                               |
 | [Unicode Character Database]                         | Unicode-DFS-2016                  | 8.0.0                                    | ✗                    | ✗                               |
 | [valgrind.h]                                         | BSD-4-Clause                      | 093bef43d69236287ccc748591c9560a71181b0a |                      | ✗                               |
-| [WiredTiger]                                         | GPL-2.0-only OR GPL-3.0-only      | d9b6f2e23e30183a47c1f8016fa20e6a8a02c3e6 | ✗                    | ✗                               |
+| [WiredTiger]                                         | GPL-2.0-only OR GPL-3.0-only      | 11.3.0                                   | ✗                    | ✗                               |
 | [yaml-cpp]                                           | MIT                               | 0.6.3                                    |                      | ✗                               |
 | [zlib]                                               | Zlib                              | 1.3.1                                    | ✗                    | ✗                               |
 | [Zstandard (zstd)]                                   | BSD-3-Clause OR GPL-2.0-only      | 1.5.5                                    | ✗                    | ✗                               |
@@ -83,7 +83,7 @@ a notice will be included in
 [S2 Geometry Library]: https://github.com/google/s2geometry.git
 [SafeInt]: https://github.com/dcleblanc/safeint.git
 [Snowball Stemming Algorithms (libstemmer)]: http://github.com/snowballstem/snowball.git
-[Unicode Character Database]: http://www.unicode.org/versions/enumeratedversions.html
+[Unicode Character Database]: https://www.unicode.org/Public/8.0.0/
 [WiredTiger]: https://github.com/wiredtiger/wiredtiger.git
 [Zstandard (zstd)]: https://github.com/facebook/zstd.git
 [benchmark]: https://github.com/google/benchmark.git
@@ -97,8 +97,8 @@ a notice will be included in
 [librdkafka - The Apache Kafka C/C++ library]: https://github.com/confluentinc/librdkafka.git
 [libunwind]: https://github.com/libunwind/libunwind.git
 [linenoise]: https://github.com/antirez/linenoise
-[pypi/ocspbuilder]: https://github.com/wbond/ocspbuilder
-[pypi/ocspresponder]: https://github.com/threema-ch/ocspresponder
+[pypi/ocspbuilder]: https://pypi.org/project/ocspbuilder/
+[pypi/ocspresponder]: https://pypi.org/project/ocspresponder/
 [re2]: https://github.com/google/re2.git
 [snappy]: https://github.com/google/tcmalloc.git
 [tcmalloc]: https://github.com/google/tcmalloc.git

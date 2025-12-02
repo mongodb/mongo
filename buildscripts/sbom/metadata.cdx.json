@@ -74,6 +74,7 @@
       "group": "google.opensource",
       "name": "Abseil Common Libraries (C++)",
       "version": "{{VERSION}}",
+      "description": "Abseil is an open-source collection of C++ code (compliant to C++17) designed to augment the C++ standard library.",
       "licenses": [
         {
           "license": {
@@ -122,6 +123,7 @@
       "group": "arximboldi",
       "name": "immer",
       "version": "{{VERSION}}",
+      "description": "Postmodern immutable and persistent data structures for C++ — value semantics at scale",
       "licenses": [
         {
           "license": {
@@ -163,6 +165,7 @@
       "group": "chriskohlhoff",
       "name": "Asio C++ Library",
       "version": "{{VERSION}}",
+      "description": "Asio is a cross-platform C++ library for network and low-level I/O programming that provides developers with a consistent asynchronous model using a modern C++ approach.",
       "licenses": [
         {
           "license": {
@@ -210,6 +213,7 @@
       "group": "google.opensource",
       "name": "benchmark",
       "version": "{{VERSION}}",
+      "description": "A microbenchmark support library",
       "licenses": [
         {
           "license": {
@@ -286,10 +290,6 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/boost/scripts/import.sh"
         }
       ],
       "evidence": {
@@ -323,7 +323,7 @@
         }
       ],
       "copyright": "Copyright (c) 2007 - 2023 Daniel Stenberg with many contributors, see AUTHORS file.",
-      "cpe": "cpe:2.3:a:c-ares:c-ares:1.27.0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:c-ares:c-ares:{{VERSION}}:*:*:*:*:*:*:*",
       "purl": "pkg:github/c-ares/c-ares@{{VERSION}}",
       "externalReferences": [
         {
@@ -481,6 +481,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/timelib/scripts/import.sh"
+        },
+        {
+          "name": "generate_sbom:priority_version_source",
+          "value": "import_script"
         }
       ],
       "evidence": {
@@ -640,6 +644,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/re2/scripts/import.sh"
+        },
+        {
+          "name": "generate_sbom:priority_version_source",
+          "value": "import_script"
         }
       ],
       "evidence": {
@@ -1102,6 +1110,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/libmongocrypt/import.sh"
+        },
+        {
+          "name": "generate_sbom:priority_version_source",
+          "value": "import_script"
         }
       ],
       "evidence": {
@@ -1123,6 +1135,7 @@
       "group": "confluentinc",
       "name": "librdkafka - The Apache Kafka C/C++ library",
       "version": "{{VERSION}}",
+      "description": "The Apache Kafka C/C++ library",
       "licenses": [
         {
           "license": {
@@ -1285,6 +1298,12 @@
       ],
       "copyright": "Copyright (c) 2010-2014, Salvatore Sanfilippo <antirez at gmail dot com>. Copyright (c) 2010-2013, Pieter Noordhuis <pcnoordhuis at gmail dot com>. All rights reserved.",
       "purl": "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
+      "externalReferences": [
+        {
+          "url": "https://github.com/antirez/linenoise",
+          "type": "distribution"
+        }
+      ],
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -1293,10 +1312,6 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
-        },
-        {
-          "name": "info_link",
-          "value": "https://github.com/antirez/linenoise"
         }
       ],
       "evidence": {
@@ -1323,6 +1338,7 @@
       "author": "MongoDB, Inc.",
       "group": "mongodb",
       "name": "MongoDB C Driver",
+      "description": "The Official MongoDB driver for C language",
       "version": "{{VERSION}}",
       "licenses": [
         {
@@ -1376,6 +1392,7 @@
       "group": "mozilla",
       "name": "Mozilla Firefox ESR",
       "version": "{{VERSION}}",
+      "description": "The C++-only SpiderMonkey component of FireFox ESR used by MongoDB.",
       "licenses": [
         {
           "license": {
@@ -1432,6 +1449,12 @@
       ],
       "copyright": "Copyright (c) 2015-2018 Will Bond <will@wbond.net>",
       "purl": "pkg:pypi/ocspbuilder@0.10.2",
+      "externalReferences": [
+        {
+          "url": "https://pypi.org/project/ocspbuilder/",
+          "type": "distribution"
+        }
+      ],
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -1440,10 +1463,6 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
-        },
-        {
-          "name": "info_link",
-          "value": "https://github.com/wbond/ocspbuilder"
         }
       ],
       "evidence": {
@@ -1478,6 +1497,12 @@
       ],
       "copyright": "Copyright 2016 Threema GmbH",
       "purl": "pkg:pypi/ocspresponder@0.5.0",
+      "externalReferences": [
+        {
+          "url": "https://pypi.org/project/ocspresponder/",
+          "type": "distribution"
+        }
+      ],
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -1486,10 +1511,6 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
-        },
-        {
-          "name": "info_link",
-          "value": "https://github.com/threema-ch/ocspresponder"
         }
       ],
       "evidence": {
@@ -1574,7 +1595,7 @@
         }
       ],
       "copyright": "Copyright 2008 Google Inc. Copyright 2023 Google LLC. All rights reserved.",
-      "cpe": "cpe:2.3:a:google:protobuf:4.25.0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:google:protobuf:{{VERSION}}:*:*:*:*:*:*:*",
       "purl": "pkg:github/protocolbuffers/protobuf@{{VERSION}}",
       "externalReferences": [
         {
@@ -1711,6 +1732,7 @@
       "group": "aappleby",
       "name": "MurmurHash3",
       "version": "a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
+      "description": "MurmurHash is a non-cryptographic hash function suitable for general hash-based lookup.",
       "licenses": [
         {
           "license": {
@@ -1891,6 +1913,12 @@
       ],
       "copyright": "Copyright \u00a9 1991–2015 Unicode, Inc",
       "purl": "pkg:generic/unicode-org/unicode@8.0.0?repository_url=https%3A%2F%2Fwww.unicode.org%2FPublic%2F8.0.0%2F",
+      "externalReferences": [
+        {
+          "url": "https://www.unicode.org/Public/8.0.0/",
+          "type": "distribution"
+        }
+      ],
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -1899,10 +1927,6 @@
         {
           "name": "emits_persisted_data",
           "value": "true"
-        },
-        {
-          "name": "info_link",
-          "value": "http://www.unicode.org/versions/enumeratedversions.html"
         }
       ],
       "evidence": {

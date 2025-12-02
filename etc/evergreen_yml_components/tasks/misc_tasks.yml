@@ -1333,7 +1333,7 @@ tasks:
           - "--endorctl-path=${workdir}/endorctl"
           - "--config-path=${workdir}/.endorctl"
           - "--namespace=${ENDOR_NAMESPACE}"
-          - "--save-warnings=${workdir}/warnings-generate_sbom.txt"
+          - "--save-warnings=${workdir}/generate_sbom_py_warnings.txt"
     - command: subprocess.exec
       display_name: Generate third-party readme file
       params:
@@ -1354,9 +1354,9 @@ tasks:
           - "--github-owner=${github_org}"
           - "--github-repo=${github_repo}"
           - "--base-branch=${branch_name}"
-          - "--new-branch=SERVER-111072/sbom_update_${revision}"
-          - "--pr-title=SERVER-111072 Auto-generated SBOM files [${branch_name}] ${revision}"
-          - "--saved-warnings=${workdir}/warnings-generate_sbom.txt"
+          - "--new-branch=SERVER-111072/sbom_update_${branch_name}"
+          - "--pr-title=SERVER-111072 Auto-generated SBOM files [${branch_name}]"
+          - "--saved-warnings=${workdir}/generate_sbom_py_warnings.txt"
 
 - name: upload_sbom_via_silkbomb_if_changed
   allowed_requesters: ["commit"]

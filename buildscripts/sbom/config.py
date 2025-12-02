@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """generate_sbom.py config. Operational configuration values stored separately from the core code."""
 
-import json
 import logging
 import re
 
@@ -50,56 +49,6 @@ endor_components_rename = [
     ["pkg:generic/github.com/", "pkg:github/"],
     ["pkg:c/github.com/", "pkg:github/"],
 ]
-
-# ################ PURL Validation ################
-REGEX_STR_PURL_OPTIONAL = (  # Optional Version (any chars except ? @ #)
-    r"(?:@[^?@#]*)?"
-    # Optional Qualifiers (any chars except @ #)
-    r"(?:\?[^@#]*)?"
-    # Optional Subpath (any chars)
-    r"(?:#.*)?$"
-)
-
-REGEX_PURL = {
-    # deb PURL. https://github.com/package-url/purl-spec/blob/main/types-doc/deb-definition.md
-    "deb": re.compile(
-        r"^pkg:deb/"  # Scheme and type
-        # Namespace (organization/user), letters must be lowercase
-        r"(debian|ubuntu)+"
-        r"/"
-        r"[a-z0-9._-]+" + REGEX_STR_PURL_OPTIONAL  # Name
-    ),
-    # Generic PURL. https://github.com/package-url/purl-spec/blob/main/types-doc/generic-definition.md
-    "generic": re.compile(
-        r"^pkg:generic/"  # Scheme and type
-        r"([a-zA-Z0-9._-]+/)?"  # Optional namespace segment
-        r"[a-zA-Z0-9._-]+" + REGEX_STR_PURL_OPTIONAL  # Name (required)
-    ),
-    # GitHub PURL. https://github.com/package-url/purl-spec/blob/main/types-doc/github-definition.md
-    "github": re.compile(
-        r"^pkg:github/"  # Scheme and type
-        # Namespace (organization/user), letters must be lowercase
-        r"[a-z0-9-]+"
-        r"/"
-        r"[a-z0-9._-]+" + REGEX_STR_PURL_OPTIONAL  # Name (repository)
-    ),
-    # PyPI PURL. https://github.com/package-url/purl-spec/blob/main/types-doc/pypi-definition.md
-    "pypi": re.compile(
-        r"^pkg:pypi/"  # Scheme and type
-        r"[a-z0-9_-]+"  # Name, letters must be lowercase, dashes, underscore
-        + REGEX_STR_PURL_OPTIONAL
-    ),
-}
-
-
-def is_valid_purl(purl: str) -> bool:
-    """Validate a GitHub or Generic PURL"""
-    for purl_type, regex in REGEX_PURL.items():
-        if regex.match(purl):
-            logger.debug(f"PURL: {purl} matched PURL type '{purl_type}' regex '{regex.pattern}'")
-            return True
-    return False
-
 
 # ################ Version Transformation ################
 
@@ -150,17 +99,26 @@ def get_semver_from_release_version(release_ver: str) -> str:
 # region special component use-case functions
 
 
-def get_version_from_wiredtiger_import_data(file_path: str) -> str:
-    """Get the info in the 'import.data' file saved in the wiredtiger folder"""
+def get_version_from_wiredtiger_release_info(wt_dir: str) -> str:
+    """Get version from 'RELEASE_INFO' file in the wiredtiger folder"""
+
+    import os
+
+    v = {}
     try:
-        with open(file_path, "r") as input_json:
-            import_data = input_json.read()
-        result = json.loads(import_data)
+        for l in open(os.path.join(wt_dir, "RELEASE_INFO"), "r", encoding="utf-8"):
+            if re.match(r"WIREDTIGER_VERSION_(?:MAJOR|MINOR|PATCH)=", l):
+                exec(l, v)
+        wt_ver = "%d.%d.%d" % (
+            v["WIREDTIGER_VERSION_MAJOR"],
+            v["WIREDTIGER_VERSION_MINOR"],
+            v["WIREDTIGER_VERSION_PATCH"],
+        )
+        return wt_ver
     except Exception as e:
-        logger.error(f"Error loading JSON file from {file_path}")
+        logger.error(f"Error loading file from {wt_dir}")
         logger.error(e)
         return None
-    return result.get("commit")
 
 
 def get_version_sasl_from_workspace(file_path: str) -> str:
@@ -204,11 +162,11 @@ def process_component_special_cases(
         occurrences = component.get("evidence", {}).get("occurrences", [])
         if occurrences:
             location = occurrences[0].get("location")
-            versions["import_script"] = get_version_from_wiredtiger_import_data(
-                f"{repo_root}/{location}/import.data"
+            versions["import_script"] = get_version_from_wiredtiger_release_info(
+                f"{repo_root}/{location}"
             )
             logger.info(
-                f"VERSION SPECIAL CASE: {component_key}: Found version '{versions['import_script']}' in 'import.data' file"
+                f"VERSION SPECIAL CASE: {component_key}: Found version '{versions['import_script']}' in 'RELEASE_INFO' file"
             )
 
 # endregion special component use-case functions
