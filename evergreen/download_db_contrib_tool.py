@@ -12,7 +12,7 @@ sys.path.append(str(mongo_path))
 from buildscripts.s3_binary.download import download_s3_binary
 from buildscripts.util.expansions import get_expansion
 
-DB_CONTRIB_TOOL_VERSION = "v2.0.1"
+DB_CONTRIB_TOOL_VERSION = "v2.1.0"
 RELEASE_URL = (
     f"https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/{DB_CONTRIB_TOOL_VERSION}/"
 )
