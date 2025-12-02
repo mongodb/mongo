@@ -195,9 +195,6 @@ void ScanStageBase::debugPrintShared(std::vector<DebugPrinter::Block>& ret) cons
     bool first = true;
     ret.emplace_back(DebugPrinter::Block("[`"));
     if (_state->recordSlot) {
-        if (!first) {
-            ret.emplace_back(DebugPrinter::Block("`,"));
-        }
         DebugPrinter::addIdentifier(ret, _state->recordSlot.value());
         ret.emplace_back("=");
         DebugPrinter::addKeyword(ret, "record");
