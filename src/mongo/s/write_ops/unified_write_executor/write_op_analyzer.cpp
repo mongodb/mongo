@@ -84,13 +84,13 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     }
 
     tassert(10346500, "Expected write to affect at least one shard", !tr.endpoints.empty());
-    const bool isShardedTimeseries = targeter.isTrackedTimeSeriesNamespace();
+    const bool isTimeseries = targeter.isTrackedTimeSeriesNamespace();
     const bool isUpdate = op.getType() == WriteType::kUpdate;
     const bool isRetryableWrite = opCtx->isRetryableWrite();
     const bool inTxn = static_cast<bool>(TransactionRouter::get(opCtx));
     const bool isRawData = isRawDataOperation(opCtx);
     const bool isTimeseriesRetryableUpdateOp =
-        isShardedTimeseries && isUpdate && isRetryableWrite && !inTxn && !isRawData;
+        isTimeseries && isUpdate && isRetryableWrite && !inTxn && !isRawData;
     // We consider the request to be on the main namespace of a viewful timeseries collection when
     // the underlying CRI is a non-viewless timeseries entry and the client request is on the main
     // namespace not the buckets namespace.
@@ -106,9 +106,9 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     const bool isMultiWriteBlockingMigrations =
         (isUpdate || isDelete) && isMultiWrite && enableMultiWriteBlockingMigrations;
 
-    if (isShardedTimeseries && op.isFindAndModify()) {
+    if (isTimeseries && op.isFindAndModify()) {
         uassert(ErrorCodes::InvalidOptions,
-                "Cannot perform findAndModify with sort on a sharded timeseries collection",
+                "Cannot perform findAndModify with sort on a timeseries collection",
                 !op.getSort() || isRawDataOperation(opCtx));
     }
 
