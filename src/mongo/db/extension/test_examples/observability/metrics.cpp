@@ -132,6 +132,10 @@ public:
     std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
         return std::make_unique<MetricsExecAggStage>();
     }
+
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
+    }
 };
 
 class MetricsAstNode : public sdk::AggStageAstNode {

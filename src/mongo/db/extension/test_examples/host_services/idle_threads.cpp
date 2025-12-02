@@ -77,6 +77,10 @@ public:
     std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
         return std::make_unique<IdleThreadsExecAggStage>();
     }
+
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
+    }
 };
 
 class IdleThreadsAstNode : public sdk::AggStageAstNode {

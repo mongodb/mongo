@@ -148,6 +148,10 @@ public:
         return std::make_unique<MetricsExecAggStage>(_algorithm);
     }
 
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
+    }
+
 private:
     std::string _algorithm;
 };

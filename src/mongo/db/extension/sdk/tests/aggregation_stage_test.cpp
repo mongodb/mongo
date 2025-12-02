@@ -468,6 +468,10 @@ public:
         return nullptr;
     }
 
+    std::unique_ptr<DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
+    }
+
     static inline std::unique_ptr<extension::sdk::LogicalAggStage> make() {
         return std::make_unique<SimpleSerializationLogicalStage>();
     }
@@ -1338,6 +1342,81 @@ TEST_F(AggStageTest, TestEmptyDistributedPlanLogic) {
         auto sortPattern = handle.getSortPattern();
         ASSERT_BSONOBJ_EQ(BSONObj(), sortPattern);
     }
+}
+
+/**
+ * MergeOnlyDistributedPlanLogic is a DPL implementation that always runs on the merge pipeline.
+ * It returns nullptr for shards pipeline, indicating the stage must run exclusively on the
+ * merging node.
+ */
+class MergeOnlyDistributedPlanLogic : public sdk::DistributedPlanLogicBase {
+public:
+    std::unique_ptr<sdk::DPLArrayContainer> getShardsPipeline() const override {
+        // Return nullptr to indicate this stage must run exclusively on the merging node.
+        return nullptr;
+    }
+
+    std::unique_ptr<sdk::DPLArrayContainer> getMergingPipeline() const override {
+        std::vector<extension::VariantDPLHandle> elements;
+        elements.emplace_back(extension::LogicalAggStageHandle{
+            new sdk::ExtensionLogicalAggStage(shared_test_stages::CountingLogicalStage::make())});
+        return std::make_unique<sdk::DPLArrayContainer>(std::move(elements));
+    }
+
+    BSONObj getSortPattern() const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<sdk::DistributedPlanLogicBase> make() {
+        return std::make_unique<MergeOnlyDistributedPlanLogic>();
+    }
+};
+
+/**
+ * MergeOnlyLogicalStage must always run on the merge pipeline. It cannot run on shards.
+ */
+class MergeOnlyLogicalStage : public sdk::LogicalAggStage {
+public:
+    static constexpr StringData kStageName = "$mergeOnly";
+
+    BSONObj serialize() const override {
+        return BSON(std::string(kStageName) << "serializedForExecution");
+    }
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSON(std::string(kStageName) << "explain");
+    }
+
+    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
+        return shared_test_stages::TransformExecAggStage::make();
+    }
+
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return MergeOnlyDistributedPlanLogic::make();
+    }
+
+    static inline std::unique_ptr<sdk::LogicalAggStage> make() {
+        return std::make_unique<MergeOnlyLogicalStage>();
+    }
+};
+
+TEST_F(AggStageTest, TestMergeOnlyDistributedPlanLogic) {
+    auto logicalStageHandle =
+        LogicalAggStageHandle(new sdk::ExtensionLogicalAggStage(MergeOnlyLogicalStage::make()));
+
+    auto dpl = logicalStageHandle.getDistributedPlanLogic();
+    // Confirm that the dpl is valid; it must run on the merge pipeline.
+    ASSERT_TRUE(dpl.isValid());
+
+    // Verify shards pipeline is empty; it cannot fully run on shards.
+    auto shardsPipeline = dpl.getShardsPipeline();
+    ASSERT_EQ(shardsPipeline.size(), 0U);
+
+
+    // Verify merging pipeline has one MergeOnlyLogicalStage.
+    auto mergingPipeline = dpl.getMergingPipeline();
+    ASSERT_EQ(mergingPipeline.size(), 1U);
+    ASSERT_TRUE(std::holds_alternative<LogicalAggStageHandle>(mergingPipeline[0]));
 }
 
 }  // namespace

@@ -380,6 +380,17 @@ typedef struct MongoExtensionLogicalAggStageVTable {
     MongoExtensionStatus* (*compile)(const MongoExtensionLogicalAggStage* logicalStage,
                                      struct MongoExtensionExecAggStage** output);
 
+    /**
+     * Populates the output with an extension stage's DistributedPlanLogic, which specifies how
+     * results from shards should be merged in a sharded cluster. If a stage can run fully in
+     * parallel on the shards, the output pointer is not populated and is left as a nullptr.
+     *
+     * Ownership of the MongoExtensionDistributedPlanLogic is transferred to the caller.
+     */
+    MongoExtensionStatus* (*get_distributed_plan_logic)(
+        const MongoExtensionLogicalAggStage* logicalStage,
+        struct MongoExtensionDistributedPlanLogic** output);
+
 } MongoExtensionLogicalAggStageVTable;
 
 /**
@@ -500,6 +511,11 @@ typedef struct MongoExtensionDPLArrayContainerVTable {
                                       MongoExtensionDPLArray* array);
 } MongoExtensionDPLArrayContainerVTable;
 
+/**
+ * MongoExtensionDistributedPlanLogic is an abstraction representing the information needed to
+ * execute this stage on a distributed collection. It describes how a pipeline should be split for
+ * sharded execution.
+ */
 typedef struct MongoExtensionDistributedPlanLogic {
     const struct MongoExtensionDistributedPlanLogicVTable* const vtable;
 } MongoExtensionDistributedPlanLogic;

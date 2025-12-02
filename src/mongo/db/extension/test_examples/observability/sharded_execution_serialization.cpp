@@ -74,6 +74,10 @@ public:
     std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
         return std::make_unique<ShardedExecutionExecAggStage>();
     }
+
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
+    }
 };
 
 class ShardedExecutionSerializationAstNode : public sdk::AggStageAstNode {

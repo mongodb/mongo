@@ -37,6 +37,8 @@
 
 namespace mongo::extension {
 
+class DistributedPlanLogicHandle;
+
 /**
  * LogicalAggStageHandle is an owned handle wrapper around a
  * MongoExtensionLogicalAggStage.
@@ -60,12 +62,21 @@ public:
      */
     ExecAggStageHandle compile() const;
 
+    /**
+     * Returns the distributed plan logic for this stage if it requires specific sharding logic. If
+     * a stage can run fully in parallel on the shards, the returned handle is invalid.
+     */
+    DistributedPlanLogicHandle getDistributedPlanLogic() const;
+
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(
             11173703, "ExtensionLogicalAggStage 'serialize' is null", vtable.serialize != nullptr);
         tassert(11239401, "ExtensionLogicalAggStage 'explain' is null", vtable.explain != nullptr);
         tassert(10957200, "ExtensionLogicalAggStage 'compile' is null", vtable.compile != nullptr);
+        tassert(10917600,
+                "ExtensionLogicalAggStage 'get_distributed_plan_logic' is null",
+                vtable.get_distributed_plan_logic != nullptr);
     }
 };
 }  // namespace mongo::extension

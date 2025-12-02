@@ -73,6 +73,9 @@ public:
     std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
         return std::make_unique<ExecStageType>(_name, _arguments);
     }
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
+    }
 
 protected:
     const mongo::BSONObj _arguments;

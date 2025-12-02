@@ -92,6 +92,10 @@ public:
         return std::make_unique<ShapifyExecAggStage>();
     }
 
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
+    }
+
 private:
     BSONObj _input;
 };

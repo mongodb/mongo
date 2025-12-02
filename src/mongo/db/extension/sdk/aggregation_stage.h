@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/assert_util.h"
+#include "mongo/db/extension/sdk/distributed_plan_logic.h"
 #include "mongo/db/extension/sdk/operation_metrics_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
 #include "mongo/db/extension/sdk/raii_vector_to_abi_array.h"
@@ -60,6 +61,7 @@ extern template void raiiVectorToAbiArray<VariantDPLHandle>(
  * expose it to the host as a ExtensionLogicalAggStage.
  */
 class ExecAggStageBase;
+class DistributedPlanLogicBase;
 class LogicalAggStage {
 public:
     LogicalAggStage() = default;
@@ -68,6 +70,7 @@ public:
     virtual BSONObj serialize() const = 0;
     virtual BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const = 0;
     virtual std::unique_ptr<ExecAggStageBase> compile() const = 0;
+    virtual std::unique_ptr<DistributedPlanLogicBase> getDistributedPlanLogic() const = 0;
 };
 
 /**
@@ -137,10 +140,27 @@ private:
         const ::MongoExtensionLogicalAggStage* extLogicalStage,
         ::MongoExtensionExecAggStage** output) noexcept;
 
-    static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {.destroy = &_extDestroy,
-                                                                     .serialize = &_extSerialize,
-                                                                     .explain = &_extExplain,
-                                                                     .compile = &_extCompile};
+    static ::MongoExtensionStatus* _extGetDistributedPlanLogic(
+        const ::MongoExtensionLogicalAggStage* extLogicalStage,
+        ::MongoExtensionDistributedPlanLogic** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            *output = nullptr;
+
+            const auto& impl =
+                static_cast<const ExtensionLogicalAggStage*>(extLogicalStage)->getImpl();
+
+            if (auto dpl = impl.getDistributedPlanLogic()) {
+                *output = new ExtensionDistributedPlanLogicAdapter(std::move(dpl));
+            }
+        });
+    }
+
+    static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
+        .destroy = &_extDestroy,
+        .serialize = &_extSerialize,
+        .explain = &_extExplain,
+        .compile = &_extCompile,
+        .get_distributed_plan_logic = &_extGetDistributedPlanLogic};
     std::unique_ptr<LogicalAggStage> _stage;
 };
 

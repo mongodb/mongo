@@ -118,6 +118,10 @@ public:
         return std::make_unique<InterruptTestExecAggStage>(_uassertOn);
     }
 
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
+    }
+
 private:
     int _uassertOn;
 };

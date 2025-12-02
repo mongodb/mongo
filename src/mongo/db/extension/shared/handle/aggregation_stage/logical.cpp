@@ -30,6 +30,7 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 
@@ -86,6 +87,14 @@ ExecAggStageHandle LogicalAggStageHandle::compile() const {
     invokeCAndConvertStatusToException([&]() { return vtable().compile(get(), &execAggStage); });
 
     return ExecAggStageHandle(execAggStage);
+}
+
+DistributedPlanLogicHandle LogicalAggStageHandle::getDistributedPlanLogic() const {
+    ::MongoExtensionDistributedPlanLogic* dpl{nullptr};
+    invokeCAndConvertStatusToException(
+        [&]() { return vtable().get_distributed_plan_logic(get(), &dpl); });
+
+    return DistributedPlanLogicHandle(dpl);
 }
 
 }  // namespace mongo::extension

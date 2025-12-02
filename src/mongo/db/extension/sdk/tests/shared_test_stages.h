@@ -100,6 +100,10 @@ public:
     static inline std::unique_ptr<sdk::LogicalAggStage> make() {
         return std::make_unique<TransformLogicalAggStage>();
     }
+
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
+    }
 };
 
 class TransformAggStageAstNode : public sdk::AggStageAstNode {
@@ -219,6 +223,10 @@ public:
 
     std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
         return FruitsAsDocumentsExecAggStage::make();
+    }
+
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
     }
 };
 
@@ -347,6 +355,10 @@ public:
     std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
         return AddFruitsToDocumentsExecAggStage::make();
     }
+
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
+    }
 };
 
 class AddFruitsToDocumentsAggStageAstNode : public sdk::AggStageAstNode {
@@ -466,6 +478,10 @@ public:
 
     std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
         return std::make_unique<ValidExtensionExecAggStage>();
+    }
+
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
     }
 
     static inline std::unique_ptr<extension::sdk::LogicalAggStage> make() {
@@ -1115,6 +1131,10 @@ public:
 
     std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
         return std::make_unique<TransformExecAggStage>();
+    }
+
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
     }
 
     static inline std::unique_ptr<sdk::LogicalAggStage> make() {
