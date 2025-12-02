@@ -36,7 +36,7 @@ selector:
     - jstests/sharding/query/out_merge/**/*.js
     # - jstests/sharding/query/update/update_shard_key_bulk_write.js
     # - jstests/sharding/query/update_delete_many_metrics.js
-    # - jstests/sharding/read_write_concern_defaults_application.js
+    - jstests/sharding/read_write_concern_defaults_application.js
     - jstests/sharding/retryable_update_one_by_id_chunk_migration.js
     - jstests/sharding/retryable_upsert_single_write_shard.js
     - jstests/sharding/retryable_write_error_labels.js
