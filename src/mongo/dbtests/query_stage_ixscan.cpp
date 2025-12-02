@@ -147,7 +147,7 @@ public:
 
     IndexScan* createIndexScanSimpleRange(BSONObj startKey, BSONObj endKey) {
         const IndexCatalog* catalog = _collection->getCollectionPtr()->getIndexCatalog();
-        std::vector<const IndexDescriptor*> indexes;
+        std::vector<const IndexCatalogEntry*> indexes;
         catalog->findIndexesByKeyPattern(
             &_opCtx, BSON("x" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
@@ -173,7 +173,7 @@ public:
                                bool dedup = false,
                                MatchExpression* filter = nullptr) {
         const IndexCatalog* catalog = _collection->getCollectionPtr()->getIndexCatalog();
-        std::vector<const IndexDescriptor*> indexes;
+        std::vector<const IndexCatalogEntry*> indexes;
         catalog->findIndexesByKeyPattern(
             &_opCtx, BSON("x" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_EQ(indexes.size(), 1U);

@@ -150,15 +150,14 @@ public:
         textOr.addChild(std::move(childStage));
 
         // Register the index.
-        const IndexDescriptor* indexDescriptor = getIndexDescriptor(indexName);
-        WorkingSetRegisteredIndexId indexId =
-            _ws.registerIndexIdent(indexDescriptor->getEntry()->getIdent());
+        const auto indexEntry = getIndexEntry(indexName);
+        WorkingSetRegisteredIndexId indexId = _ws.registerIndexIdent(indexEntry->getIdent());
 
         WorkingSetID wsid = _ws.allocate();
         WorkingSetMember* member = _ws.get(wsid);
         member->recordId = recordId;
         member->keyData.push_back(
-            IndexKeyDatum(indexDescriptor->keyPattern(),
+            IndexKeyDatum(indexEntry->descriptor()->keyPattern(),
                           BSON("" << 1 << "" << term << "" << score << ""
                                   << "english"),
                           indexId,
@@ -171,7 +170,7 @@ public:
         stagePtr.enqueueAdvanced(wsid);
     }
 
-    const IndexDescriptor* getIndexDescriptor(StringData name) {
+    const IndexCatalogEntry* getIndexEntry(StringData name) {
         return acquireCollForRead(kNss).getCollectionPtr()->getIndexCatalog()->findIndexByName(
             _opCtx.get(), name);
     }

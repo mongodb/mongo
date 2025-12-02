@@ -92,8 +92,8 @@ public:
         ASSERT_OK(createIndex(&_opCtx, ns(), obj));
     }
 
-    const IndexDescriptor* getIndex(const BSONObj& obj, const CollectionAcquisition& coll) {
-        std::vector<const IndexDescriptor*> indexes;
+    const IndexCatalogEntry* getIndex(const BSONObj& obj, const CollectionAcquisition& coll) {
+        std::vector<const IndexCatalogEntry*> indexes;
         coll.getCollectionPtr()->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, obj, IndexCatalog::InclusionPolicy::kReady, &indexes);
         return indexes.empty() ? nullptr : indexes[0];
@@ -101,8 +101,8 @@ public:
 
     IndexScanParams makeIndexScanParams(OperationContext* opCtx,
                                         const CollectionAcquisition& collection,
-                                        const IndexDescriptor* descriptor) {
-        IndexScanParams params(opCtx, collection.getCollectionPtr(), descriptor);
+                                        const IndexCatalogEntry* entry) {
+        IndexScanParams params(opCtx, collection.getCollectionPtr(), entry);
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = objWithMinKey(1);
         params.bounds.endKey = objWithMaxKey(1);

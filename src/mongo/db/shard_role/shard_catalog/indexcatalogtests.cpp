@@ -165,9 +165,9 @@ public:
                                                   << static_cast<int>(kIndexVersion)
                                                   << "expireAfterSeconds" << 5)));
 
-        const IndexDescriptor* desc = indexCatalog(&opCtx)->findIndexByName(&opCtx, indexName);
-        ASSERT(desc);
-        ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
+        auto entry = indexCatalog(&opCtx)->findIndexByName(&opCtx, indexName);
+        ASSERT(entry);
+        ASSERT_EQUALS(5, entry->descriptor()->infoObj()["expireAfterSeconds"].numberLong());
 
         // Change value of "expireAfterSeconds" on disk. This will update the metadata for the
         // Collection but not propagate the change to the IndexCatalog
@@ -181,8 +181,8 @@ public:
         }
 
         // Confirm that the index catalog does not yet know of the change.
-        desc = indexCatalog(&opCtx)->findIndexByName(&opCtx, indexName);
-        ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
+        entry = indexCatalog(&opCtx)->findIndexByName(&opCtx, indexName);
+        ASSERT_EQUALS(5, entry->descriptor()->infoObj()["expireAfterSeconds"].numberLong());
 
         {
             AutoGetCollection autoColl(&opCtx, _nss, MODE_X);
@@ -190,13 +190,13 @@ public:
 
             // Notify the catalog of the change.
             WriteUnitOfWork wuow(&opCtx);
-            desc = coll.getWritableCollection(&opCtx)->getIndexCatalog()->refreshEntry(
-                &opCtx, coll.getWritableCollection(&opCtx), desc, CreateIndexEntryFlags::kIsReady);
+            entry = coll.getWritableCollection(&opCtx)->getIndexCatalog()->refreshEntry(
+                &opCtx, coll.getWritableCollection(&opCtx), entry, CreateIndexEntryFlags::kIsReady);
             wuow.commit();
         }
 
         // Test that the catalog reflects the change.
-        ASSERT_EQUALS(10, desc->infoObj()["expireAfterSeconds"].numberLong());
+        ASSERT_EQUALS(10, entry->descriptor()->infoObj()["expireAfterSeconds"].numberLong());
     }
 };
 

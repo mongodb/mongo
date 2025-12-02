@@ -181,10 +181,10 @@ size_t getNumIndexEntries(OperationContext* opCtx,
 
     auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     const IndexCatalog* catalog = coll->getIndexCatalog();
-    auto desc = catalog->findIndexByName(opCtx, idxName, IndexCatalog::InclusionPolicy::kReady);
+    auto entry = catalog->findIndexByName(opCtx, idxName, IndexCatalog::InclusionPolicy::kReady);
 
-    if (desc) {
-        auto iam = catalog->getEntry(desc)->accessMethod()->asSortedData();
+    if (entry) {
+        auto iam = entry->accessMethod()->asSortedData();
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
         auto cursor = iam->newCursor(opCtx, ru);
         for (auto kv = cursor->next(ru); kv; kv = cursor->next(ru)) {

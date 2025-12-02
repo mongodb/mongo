@@ -117,19 +117,19 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 const IndexScanNode* ixn = static_cast<const IndexScanNode*>(root);
 
                 invariant(collectionPtr);
-                auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
+                auto entry = collectionPtr->getIndexCatalog()->findIndexByName(
                     _opCtx, ixn->index.identifier.catalogName);
                 tassert(8862202,
                         str::stream() << "Index descriptor not found. Namespace: "
                                       << collectionPtr->ns().toStringForErrorMsg()
                                       << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
                                       << ", IndexEntry: " << ixn->index.toString(),
-                        descriptor);
+                        entry);
 
                 // We use the node's internal name, keyPattern and multikey details here. For
                 // $** indexes, these may differ from the information recorded in the index's
                 // descriptor.
-                IndexScanParams params{descriptor,
+                IndexScanParams params{entry,
                                        ixn->index.identifier.catalogName,
                                        ixn->index.keyPattern,
                                        ixn->index.multikeyPaths,
@@ -288,9 +288,8 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 params.addDistMeta = node->addDistMeta;
 
                 invariant(collectionPtr);
-                const IndexDescriptor* twoDIndex =
-                    collectionPtr->getIndexCatalog()->findIndexByName(
-                        _opCtx, node->index.identifier.catalogName);
+                const auto twoDIndex = collectionPtr->getIndexCatalog()->findIndexByName(
+                    _opCtx, node->index.identifier.catalogName);
                 invariant(twoDIndex);
 
                 return std::make_unique<GeoNear2DStage>(
@@ -307,7 +306,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 params.addDistMeta = node->addDistMeta;
 
                 invariant(collectionPtr);
-                const IndexDescriptor* s2Index = collectionPtr->getIndexCatalog()->findIndexByName(
+                const auto s2Index = collectionPtr->getIndexCatalog()->findIndexByName(
                     _opCtx, node->index.identifier.catalogName);
                 invariant(s2Index);
 
@@ -332,19 +331,18 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 tassert(5432200, "collection object is not provided", collectionPtr);
                 auto catalog = collectionPtr->getIndexCatalog();
                 tassert(5432201, "index catalog is unavailable", catalog);
-                auto desc = catalog->findIndexByName(_opCtx, node->index.identifier.catalogName);
+                auto entry = catalog->findIndexByName(_opCtx, node->index.identifier.catalogName);
                 tassert(5432202,
                         str::stream() << "no index named '" << node->index.identifier.catalogName
                                       << "' found in catalog",
-                        desc);
-                auto fam =
-                    static_cast<const FTSAccessMethod*>(catalog->getEntry(desc)->accessMethod());
+                        entry);
+                auto fam = static_cast<const FTSAccessMethod*>(entry->accessMethod());
                 tassert(5432203, "access method for index is not defined", fam);
 
                 // We assume here that node->ftsQuery is an FTSQueryImpl, not an FTSQueryNoop.
                 // In practice, this means that it is illegal to use the StageBuilder on a
                 // QuerySolution created by planning a query that contains "no-op" expressions.
-                TextMatchParams params{desc,
+                TextMatchParams params{entry->descriptor(),
                                        fam->getSpec(),
                                        node->indexPrefix,
                                        static_cast<const FTSQueryImpl&>(*node->ftsQuery)};

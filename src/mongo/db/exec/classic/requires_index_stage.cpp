@@ -40,13 +40,14 @@ namespace mongo {
 RequiresIndexStage::RequiresIndexStage(const char* stageType,
                                        ExpressionContext* expCtx,
                                        CollectionAcquisition collection,
-                                       const IndexDescriptor* indexDescriptor,
+                                       const IndexCatalogEntry* indexEntry,
                                        WorkingSet* workingSet)
     : RequiresCollectionStage(stageType, expCtx, collection),
-      _indexIdent(indexDescriptor->getEntry()->getIdent()),
-      _indexName(indexDescriptor->indexName()),
-      _entry(indexDescriptor->getEntry()),
+      _entry(indexEntry),
+      _indexIdent(_entry->getIdent()),
+      _indexName(_entry->descriptor()->indexName()),
       _workingSetIndexId(workingSet->registerIndexIdent(_indexIdent)) {}
+
 
 void RequiresIndexStage::doSaveStateRequiresCollection() {
     doSaveStateRequiresIndex();
@@ -56,18 +57,18 @@ void RequiresIndexStage::doSaveStateRequiresCollection() {
 }
 
 void RequiresIndexStage::doRestoreStateRequiresCollection() {
-    auto desc = collectionPtr()->getIndexCatalog()->findIndexByIdent(
-        expCtx()->getOperationContext(), _indexIdent);
+    const auto indexCatalog = collectionPtr()->getIndexCatalog();
+    auto indexEntry = indexCatalog->findIndexByIdent(expCtx()->getOperationContext(), _indexIdent);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
-            desc);
+            indexEntry);
 
     // Re-obtain the index entry pointer that was set to null during yield preparation. It is safe
     // to access the index entry when the query is active, as its validity is protected by at least
     // MODE_IS collection locks; or, in the case of lock-free reads, its lifetime is managed by the
     // CollectionCatalog stashed on the RecoveryUnit snapshot, which is kept alive until the query
     // yields.
-    _entry = desc->getEntry();
+    _entry = indexEntry;
 
     doRestoreStateRequiresIndex();
 }

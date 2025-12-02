@@ -116,13 +116,13 @@ BSONObj _rehydrateKey(const BSONObj& keyPattern, const BSONObj& indexKey) {
 
 }  // namespace
 
-IndexInfo::IndexInfo(const IndexDescriptor& descriptor)
-    : indexName(descriptor.indexName()),
-      keyPattern(descriptor.keyPattern()),
-      indexNameHash(hash(descriptor.indexName())),
-      ord(Ordering::make(descriptor.keyPattern())),
-      unique(descriptor.unique()),
-      accessMethod(descriptor.getEntry()->accessMethod()) {}
+IndexInfo::IndexInfo(const IndexCatalogEntry& entry)
+    : indexName(entry.descriptor()->indexName()),
+      keyPattern(entry.descriptor()->keyPattern()),
+      indexNameHash(hash(entry.descriptor()->indexName())),
+      ord(Ordering::make(entry.descriptor()->keyPattern())),
+      unique(entry.descriptor()->unique()),
+      accessMethod(entry.accessMethod()) {}
 
 IndexConsistency::IndexConsistency(OperationContext* opCtx,
                                    CollectionValidation::ValidateState* validateState,
@@ -142,9 +142,9 @@ KeyStringIndexConsistency::KeyStringIndexConsistency(
     const size_t numHashBuckets)
     : IndexConsistency(opCtx, validateState, numHashBuckets) {
     for (const auto& indexIdent : _validateState->getIndexIdents()) {
-        const IndexDescriptor* descriptor =
+        const auto entry =
             validateState->getCollection()->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
-        _indexesInfo.emplace(descriptor->indexName(), IndexInfo(*descriptor));
+        _indexesInfo.emplace(entry->descriptor()->indexName(), IndexInfo(*entry));
     }
 }
 
@@ -207,9 +207,8 @@ void KeyStringIndexConsistency::repairIndexEntries(OperationContext* opCtx,
         const KeyFormat keyFormat = _validateState->getCollection()->getRecordStore()->keyFormat();
 
         const std::string& indexName = it->first.first->indexName;
-        const IndexDescriptor* descriptor =
+        const auto entry =
             _validateState->getCollection()->getIndexCatalog()->findIndexByName(opCtx, indexName);
-        const IndexCatalogEntry* entry = descriptor->getEntry();
         int64_t numInserted = index_repair::repairMissingIndexEntry(opCtx,
                                                                     entry,
                                                                     ks,
@@ -884,7 +883,7 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
             writeConflictRetry(opCtx, "setIndexAsMultikey", coll->ns(), [&] {
                 WriteUnitOfWork wuow(opCtx);
                 coll->getIndexCatalog()->setMultikeyPaths(
-                    opCtx, coll, descriptor, *multikeyMetadataKeys, *documentMultikeyPaths);
+                    opCtx, coll, index, *multikeyMetadataKeys, *documentMultikeyPaths);
                 wuow.commit();
             });
 
@@ -920,7 +919,7 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                 writeConflictRetry(opCtx, "increaseMultikeyPathCoverage", coll->ns(), [&] {
                     WriteUnitOfWork wuow(opCtx);
                     coll->getIndexCatalog()->setMultikeyPaths(
-                        opCtx, coll, descriptor, *multikeyMetadataKeys, *documentMultikeyPaths);
+                        opCtx, coll, index, *multikeyMetadataKeys, *documentMultikeyPaths);
                     wuow.commit();
                 });
 

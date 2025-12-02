@@ -195,7 +195,7 @@ unique_ptr<PlanStage> getIxScanPlan(ExpressionContext* expCtx,
                                     const CollectionAcquisition& coll,
                                     WorkingSet* sharedWs,
                                     int desiredFooValue) {
-    std::vector<const IndexDescriptor*> indexes;
+    std::vector<const IndexCatalogEntry*> indexes;
     coll.getCollectionPtr()->getIndexCatalog()->findIndexesByKeyPattern(
         expCtx->getOperationContext(),
         BSON("foo" << 1),

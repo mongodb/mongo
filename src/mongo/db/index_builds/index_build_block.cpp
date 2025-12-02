@@ -280,12 +280,10 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
 
 const IndexCatalogEntry* IndexBuildBlock::getEntry(OperationContext* opCtx,
                                                    const CollectionPtr& collection) const {
-    auto descriptor = collection->getIndexCatalog()->findIndexByName(
+    return collection->getIndexCatalog()->findIndexByName(
         opCtx,
         getIndexName(),
         IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
-
-    return descriptor->getEntry();
 }
 
 IndexCatalogEntry* IndexBuildBlock::getWritableEntry(OperationContext* opCtx,

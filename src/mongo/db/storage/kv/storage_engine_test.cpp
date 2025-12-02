@@ -1140,10 +1140,8 @@ TEST_F(StorageEngineTest, IdentMissingForNonReadyIndex) {
     auto collection =
         CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), ns);
     ASSERT(collection);
-    auto indexDesc = collection->getIndexCatalog()->findIndexByName(
+    auto indexEntry = collection->getIndexCatalog()->findIndexByName(
         opCtx.get(), indexName, IndexCatalog::InclusionPolicy::kUnfinished);
-    ASSERT(indexDesc);
-    auto indexEntry = indexDesc->getEntry();
     ASSERT(indexEntry);
     // Even though the index was rebuilt it's not ready due to that it's waiting for commit quorum
     ASSERT_FALSE(indexEntry->isReady());

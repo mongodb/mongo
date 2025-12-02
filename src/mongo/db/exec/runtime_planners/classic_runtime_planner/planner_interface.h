@@ -129,7 +129,7 @@ private:
  */
 class IdHackPlanner final : public ClassicPlannerInterface {
 public:
-    IdHackPlanner(PlannerData plannerData, const IndexDescriptor* descriptor);
+    IdHackPlanner(PlannerData plannerData, const IndexCatalogEntry* entry);
 
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;

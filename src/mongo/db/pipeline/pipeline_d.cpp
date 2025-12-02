@@ -200,19 +200,20 @@ std::unique_ptr<FindCommandRequest> createFindCommand(
 boost::optional<StringData> extractGeoNearFieldFromIndexesByType(OperationContext* opCtx,
                                                                  const CollectionPtr& collection,
                                                                  const string indexType) {
-    std::vector<const IndexDescriptor*> idxs;
+    std::vector<const IndexCatalogEntry*> idxs;
     const IndexDescriptor* idxToUse = nullptr;
     collection->getIndexCatalog()->findIndexByType(opCtx, indexType, idxs);
-    for (auto it = idxs.begin(); it != idxs.end(); it++) {
+    for (const auto entry : idxs) {
+        const auto desc = entry->descriptor();
         // Ignore hidden indexes, which are indexes that users have explicitly marked as should be
         // ignored/hidden from the query planner.
-        if (!(*it)->hidden()) {
+        if (!desc->hidden()) {
             uassert(ErrorCodes::IndexNotFound,
                     str::stream() << "There is more than one " << indexType << " index on "
                                   << collection->ns().toStringForErrorMsg()
                                   << "; unsure which to use for $geoNear",
                     !idxToUse);
-            idxToUse = *it;
+            idxToUse = desc;
         }
     }
 

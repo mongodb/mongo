@@ -246,9 +246,8 @@ TEST_F(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) 
 
     AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
     const auto& coll = *autoColl;
-    auto indexDescriptor = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
-    auto indexAccessMethod =
-        coll->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
+    auto indexEntry = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    auto indexAccessMethod = indexEntry->accessMethod()->asSortedData();
 
     key_string::HeapBuilder keyString1(
         key_string::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(1));
@@ -262,8 +261,8 @@ TEST_F(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) 
     const auto initDuplicateKeyErrors =
         SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-    auto status = indexAccessMethod->insertKeys(
-        opCtx, ru, coll, indexDescriptor->getEntry(), keys, options, {}, &numInserted);
+    auto status =
+        indexAccessMethod->insertKeys(opCtx, ru, coll, indexEntry, keys, options, {}, &numInserted);
     ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
     ASSERT_EQ(numInserted, 0);
     ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
@@ -272,7 +271,7 @@ TEST_F(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) 
     // Skips the check on duplicates when constraints are not enforced.
     opCtx->setEnforceConstraints(false);
     ASSERT_OK(indexAccessMethod->insertKeys(
-        opCtx, ru, coll, indexDescriptor->getEntry(), keys, options, {}, &numInserted));
+        opCtx, ru, coll, indexEntry, keys, options, {}, &numInserted));
     ASSERT_EQ(numInserted, 2);
     ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
               initDuplicateKeyErrors + 1);
@@ -290,9 +289,8 @@ TEST_F(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
 
     AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
     const auto& coll = *autoColl;
-    auto indexDescriptor = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
-    auto indexAccessMethod =
-        coll->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
+    auto indexEntry = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    auto indexAccessMethod = indexEntry->accessMethod()->asSortedData();
 
     key_string::HeapBuilder keyString1(
         key_string::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(1));
@@ -306,8 +304,8 @@ TEST_F(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
     const auto initDuplicateKeyErrors =
         SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest();
     // Disallows new duplicates in a regular index and rejects the insert.
-    auto status = indexAccessMethod->insertKeys(
-        opCtx, ru, coll, indexDescriptor->getEntry(), keys, options, {}, &numInserted);
+    auto status =
+        indexAccessMethod->insertKeys(opCtx, ru, coll, indexEntry, keys, options, {}, &numInserted);
     ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
     ASSERT_EQ(numInserted, 0);
     ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
@@ -327,9 +325,8 @@ TEST_F(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
 
     AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
     const auto& coll = *autoColl;
-    auto indexDescriptor = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
-    auto indexAccessMethod =
-        coll->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
+    auto indexEntry = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    auto indexAccessMethod = indexEntry->accessMethod()->asSortedData();
 
     key_string::HeapBuilder keyString1(
         key_string::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(1));
@@ -350,16 +347,16 @@ TEST_F(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
         SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest();
     // Inserts two keys.
     ASSERT_OK(indexAccessMethod->insertKeys(
-        opCtx, ru, coll, indexDescriptor->getEntry(), key1, options, {}, &numInserted));
+        opCtx, ru, coll, indexEntry, key1, options, {}, &numInserted));
     ASSERT_EQ(numInserted, 1);
     ASSERT_OK(indexAccessMethod->insertKeys(
-        opCtx, ru, coll, indexDescriptor->getEntry(), key2_old, options, {}, &numInserted));
+        opCtx, ru, coll, indexEntry, key2_old, options, {}, &numInserted));
     ASSERT_EQ(numInserted, 1);
     ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(), initDuplicateKeyErrors);
 
     // Disallows new duplicates in a regular index and rejects the update.
-    auto status = indexAccessMethod->doUpdate(
-        opCtx, ru, coll, indexDescriptor->getEntry(), ticket, &numInserted, &numDeleted);
+    auto status =
+        indexAccessMethod->doUpdate(opCtx, ru, coll, indexEntry, ticket, &numInserted, &numDeleted);
     ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
     ASSERT_EQ(numInserted, 0);
     ASSERT_EQ(numDeleted, 0);

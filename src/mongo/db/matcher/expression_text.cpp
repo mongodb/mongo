@@ -85,7 +85,7 @@ const FTSAccessMethod* validateFTSIndex(OperationContext* opCtx, const Namespace
                           << nss.toStringForErrorMsg() << "')",
             collectionPtr);
 
-    std::vector<const IndexDescriptor*> idxMatches;
+    std::vector<const IndexCatalogEntry*> idxMatches;
     collectionPtr->getIndexCatalog()->findIndexByType(opCtx, IndexNames::TEXT, idxMatches);
 
     uassert(ErrorCodes::IndexNotFound, "text index required for $text query", !idxMatches.empty());
@@ -93,9 +93,8 @@ const FTSAccessMethod* validateFTSIndex(OperationContext* opCtx, const Namespace
             "more than one text index found for $text query",
             idxMatches.size() < 2);
 
-    const IndexDescriptor* index = idxMatches[0];
-    const FTSAccessMethod* fam = static_cast<const FTSAccessMethod*>(
-        collectionPtr->getIndexCatalog()->getEntry(index)->accessMethod());
+    const auto* index = idxMatches[0];
+    const FTSAccessMethod* fam = static_cast<const FTSAccessMethod*>(index->accessMethod());
     invariant(fam);
     return fam;
 }

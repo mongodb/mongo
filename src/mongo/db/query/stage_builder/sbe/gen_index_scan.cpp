@@ -860,15 +860,14 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanImpl(StageBuilderState& stat
 
     const auto& keyPattern = ixn->index.keyPattern;
     auto indexName = ixn->index.identifier.catalogName;
-    auto descriptor = collection->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
+    auto entry = collection->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
     tassert(5483200,
             str::stream() << "failed to find index in catalog named: "
                           << ixn->index.identifier.catalogName,
-            descriptor);
+            entry);
 
     // Find the IndexAccessMethod which corresponds to the 'indexName'.
-    auto accessMethod =
-        collection->getIndexCatalog()->getEntry(descriptor)->accessMethod()->asSortedData();
+    auto accessMethod = entry->accessMethod()->asSortedData();
     auto intervals =
         makeIntervalsFromIndexBounds(ixn->bounds,
                                      ixn->direction == 1,
@@ -1023,14 +1022,14 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
     const auto& keyPattern = ixn->index.keyPattern;
     const bool forward = ixn->direction == 1;
     auto indexName = ixn->index.identifier.catalogName;
-    auto descriptor = collection->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
+    auto entry = collection->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
     tassert(6335101,
             str::stream() << "failed to find index in catalog named: "
                           << ixn->index.identifier.catalogName,
-            descriptor);
+            entry);
 
     // Find the IndexAccessMethod which corresponds to the 'indexName'.
-    auto accessMethod = descriptor->getEntry()->accessMethod()->asSortedData();
+    auto accessMethod = entry->accessMethod()->asSortedData();
 
     SbStage stage;
     ParameterizedIndexScanSlots parameterizedScanSlots;

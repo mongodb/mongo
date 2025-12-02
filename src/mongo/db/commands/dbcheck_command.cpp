@@ -996,7 +996,7 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
             batchStats->finishedIndexCheck = true;
             return indexSW.getStatus();
         }
-        auto index = indexSW.getValue();
+        auto index = indexSW.getValue()->descriptor();
 
         // Set the batchStats key pattern and index spec for logging. This should be set already if
         // we ran reverse lookup, but we set it here in case we skipped reverse lookup.
@@ -1203,16 +1203,17 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         return indexSW.getStatus();
     }
 
-    auto index = indexSW.getValue();
+    auto indexCatalogEntry = indexSW.getValue();
+    const auto indexDesc = indexCatalogEntry->descriptor();
     // TODO (SERVER-83074): Enable special indexes in dbcheck.
-    if (index->getAccessMethodName() != IndexNames::BTREE &&
-        index->getAccessMethodName() != IndexNames::HASHED) {
+    if (indexDesc->getAccessMethodName() != IndexNames::BTREE &&
+        indexDesc->getAccessMethodName() != IndexNames::HASHED) {
         LOGV2_DEBUG(8033901,
                     3,
                     "Skip checking unsupported index.",
                     "collection"_attr = _info.nss,
                     "uuid"_attr = _info.uuid,
-                    "indexName"_attr = index->indexName());
+                    "indexName"_attr = indexDesc->indexName());
 
         status = Status(ErrorCodes::IndexOptionsConflict,
                         str::stream() << "index type is not supported, indexName: " << indexName
@@ -1226,8 +1227,8 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
 
 
     // Set the index spec and keyPattern in batchStats for use in logging later.
-    batchStats.keyPattern = index->keyPattern();
-    batchStats.indexSpec = index->infoObj();
+    batchStats.keyPattern = indexDesc->keyPattern();
+    batchStats.indexSpec = indexDesc->infoObj();
 
     // TODO SERVER-79846: Add testing for progress meter
     // {
@@ -1241,8 +1242,6 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     // }
 
     // Set up index cursor.
-    const IndexCatalogEntry* indexCatalogEntry =
-        collection.get()->getIndexCatalog()->getEntry(index);
     const auto iam = indexCatalogEntry->accessMethod()->asSortedData();
     const auto ordering = iam->getSortedDataInterface()->getOrdering();
     const key_string::Version version = iam->getSortedDataInterface()->getKeyStringVersion();
@@ -1275,7 +1274,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         auto snapshotFirstKeyWithoutRecordId =
             snapshotFirstKeyWithRecordId->getViewWithoutRecordId();
         snapshotFirstKeyStringBsonRehydrated = key_string::rehydrateKey(
-            index->keyPattern(),
+            indexDesc->keyPattern(),
             _keyStringToBsonSafeHelper(snapshotFirstKeyWithRecordId.get(), ordering));
 
         // Seek for snapshotFirstKeyWithoutRecordId.
@@ -1302,7 +1301,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
 
         if (currIndexKeyWithRecordId) {
             snapshotFirstKeyStringBsonRehydrated = key_string::rehydrateKey(
-                index->keyPattern(),
+                indexDesc->keyPattern(),
                 _keyStringToBsonSafeHelper(currIndexKeyWithRecordId->keyString, ordering));
         }
     }
@@ -1316,7 +1315,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
                     3,
                     "could not find any keys in index",
                     "endPosition"_attr =
-                        key_string::rehydrateKey(index->keyPattern(), indexCursorEndKey),
+                        key_string::rehydrateKey(indexDesc->keyPattern(), indexCursorEndKey),
                     "snapshotFirstKeyStringBson"_attr = snapshotFirstKeyStringBsonRehydrated,
                     "indexName"_attr = indexName,
                     logAttrs(_info.nss),
@@ -1356,10 +1355,9 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
                            collection,
                            currIndexKeyWithRecordId.get(),
                            currKeyStringBson,
-                           index,
                            iam,
                            indexCatalogEntry,
-                           index->infoObj());
+                           indexDesc->infoObj());
         } else {
             LOGV2_DEBUG(7971700, 3, "Skipping reverse lookup for extra index keys dbcheck");
         }
@@ -1383,7 +1381,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         // next snapshot's starting key.
         finishSnapshot = _shouldEndCatalogSnapshotOrBatch(opCtx,
                                                           collection,
-                                                          index->keyPattern(),
+                                                          indexDesc->keyPattern(),
                                                           currKeyStringWithRecordId,
                                                           currKeyStringBson,
                                                           numKeysInSnapshot,
@@ -1546,10 +1544,10 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
                                const CollectionPtr& collection,
                                const KeyStringEntry& keyStringEntryWithRecordId,
                                const BSONObj& keyStringBson,
-                               const IndexDescriptor* indexDescriptor,
                                const SortedDataIndexAccessMethod* iam,
                                const IndexCatalogEntry* indexCatalogEntry,
                                const BSONObj& indexSpec) {
+    const auto indexDescriptor = indexCatalogEntry->descriptor();
     auto seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
         opCtx, collection->getRecordStore(), &_info.dataThrottle);
 
@@ -2054,26 +2052,25 @@ StatusWith<std::unique_ptr<DbCheckAcquisition>> DbChecker::_acquireDBCheckLocks(
     return std::move(acquisition);
 }
 
-StatusWith<const IndexDescriptor*> DbChecker::_acquireIndex(OperationContext* opCtx,
-                                                            const CollectionPtr& collection,
-                                                            StringData indexName) {
+StatusWith<const IndexCatalogEntry*> DbChecker::_acquireIndex(OperationContext* opCtx,
+                                                              const CollectionPtr& collection,
+                                                              StringData indexName) {
     if (indexName == IndexConstants::kIdIndexName && collection->isClustered()) {
         Status status = Status(ErrorCodes::DbCheckAttemptOnClusteredCollectionIdIndex,
                                str::stream() << "Clustered collection doesn't have an _id index.");
         return status;
     }
 
-    const IndexDescriptor* index =
-        collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    const auto indexEntry = collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
 
-    if (!index) {
+    if (!indexEntry) {
         auto status = Status(ErrorCodes::IndexNotFound,
                              str::stream() << "cannot find index " << indexName << " for ns "
                                            << _info.nss.toStringForErrorMsg() << " and uuid "
                                            << _info.uuid.toString());
         return status;
     }
-    return index;
+    return indexEntry;
 }
 
 std::pair<bool, boost::optional<UUID>> DbChecker::_shouldLogOplogBatch(DbCheckOplogBatch& batch) {

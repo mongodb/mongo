@@ -189,7 +189,7 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
 
     // Checks for duplicates for the 'applyOps' command.
     if (mode && *mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
-        auto duplicateRecords = scanIndexForDuplicates(opCtx, idx);
+        auto duplicateRecords = scanIndexForDuplicates(opCtx, writableColl, idx);
         if (!duplicateRecords.empty()) {
             uassertStatusOK(buildConvertUniqueErrorStatus(opCtx, writableColl, duplicateRecords));
         }
@@ -313,7 +313,8 @@ void processCollModIndexRequest(OperationContext* opCtx,
 
     // Notify the index catalog that the definition of this index changed. This will invalidate the
     // local idx pointer. On rollback of this WUOW, the local var idx pointer will be valid again.
-    writableColl->getIndexCatalog()->refreshEntry(opCtx, writableColl, idx, flags);
+    auto entry = writableColl->getIndexCatalog()->findIndexByName(opCtx, idx->indexName());
+    writableColl->getIndexCatalog()->refreshEntry(opCtx, writableColl, entry, flags);
 
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [oldExpireSecs,
@@ -359,8 +360,9 @@ void processCollModIndexRequest(OperationContext* opCtx,
 }
 
 std::vector<std::vector<RecordId>> scanIndexForDuplicates(OperationContext* opCtx,
+                                                          const Collection* coll,
                                                           const IndexDescriptor* idx) {
-    auto entry = idx->getEntry();
+    auto entry = coll->getIndexCatalog()->findIndexByName(opCtx, idx->indexName());
     auto accessMethod = entry->accessMethod()->asSortedData();
 
     // Scans index for duplicates, comparing consecutive index entries.

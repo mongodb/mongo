@@ -263,7 +263,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
         auto indexCursor =
             std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle);
         _indexCursors.emplace(desc->indexName(), std::move(indexCursor));
-        _indexIdents.push_back(desc->getEntry()->getIdent());
+        _indexIdents.push_back(entry->getIdent());
     }
 
     // Because SeekableRecordCursors don't have a method to reset to the start, we save and then

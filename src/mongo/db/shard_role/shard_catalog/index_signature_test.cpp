@@ -85,8 +85,8 @@ public:
         }
         wuow.commit();
         // Find the index entry and return it.
-        return indexCatalog->getEntry(indexCatalog->findIndexByName(
-            opCtx(), spec.getStringField(IndexDescriptor::kIndexNameFieldName)));
+        return indexCatalog->findIndexByName(
+            opCtx(), spec.getStringField(IndexDescriptor::kIndexNameFieldName));
     }
 
     std::unique_ptr<IndexDescriptor> makeIndexDescriptor(BSONObj spec) {
@@ -375,7 +375,7 @@ TEST_F(IndexSignatureTest,
     const std::string wildcardIndexIdent = wildcardIndex->getIdent();
 
     auto getWildcardIndex = [&]() -> const IndexCatalogEntry* {
-        return coll()->getIndexCatalog()->findIndexByIdent(opCtx(), wildcardIndexIdent)->getEntry();
+        return coll()->getIndexCatalog()->findIndexByIdent(opCtx(), wildcardIndexIdent);
     };
 
     // Verifies that another wildcard index with empty wildcardProjection compares identical
@@ -402,7 +402,7 @@ TEST_F(IndexSignatureTest,
     const std::string wcProjAIndexIdent = wcProjAIndex->getIdent();
 
     auto getWcProjAIndex = [&]() -> const IndexCatalogEntry* {
-        return coll()->getIndexCatalog()->findIndexByIdent(opCtx(), wcProjAIndexIdent)->getEntry();
+        return coll()->getIndexCatalog()->findIndexByIdent(opCtx(), wcProjAIndexIdent);
     };
 
     // Verifies that an index with the same value for 'wildcardProjection' option as the
@@ -489,7 +489,7 @@ TEST_F(IndexSignatureTest,
     const std::string wildcardIndexIdent = wildcardIndex->getIdent();
 
     auto getWildcardIndex = [&]() -> const IndexCatalogEntry* {
-        return coll()->getIndexCatalog()->findIndexByIdent(opCtx(), wildcardIndexIdent)->getEntry();
+        return coll()->getIndexCatalog()->findIndexByIdent(opCtx(), wildcardIndexIdent);
     };
 
     // Verifies that an index with the same value for 'wildcardProjection' option as the

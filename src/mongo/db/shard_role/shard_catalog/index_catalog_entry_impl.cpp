@@ -101,7 +101,6 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
       _shouldValidateDocument(false),
       _indexOffset(invariantStatusOK(
           collection->checkMetaDataForIndex(_descriptor.indexName(), _descriptor.infoObj()))) {
-    _descriptor._entry = this;
     _isReady = collection->isIndexReady(_descriptor.indexName());
 
     // For time-series collections, we need to check that the indexed metric fields do not have
@@ -274,7 +273,7 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
             accessMethod()->asSortedData()->insertKeys(opCtx,
                                                        *shard_role_details::getRecoveryUnit(opCtx),
                                                        collection,
-                                                       _descriptor.getEntry(),
+                                                       this,
                                                        multikeyMetadataKeys,
                                                        {},
                                                        {},
@@ -559,9 +558,7 @@ private:
 class WithDifferentIndexDescriptorEntry : public IndexCatalogEntry {
 public:
     WithDifferentIndexDescriptorEntry(IndexDescriptor descriptor, const IndexCatalogEntry* entry)
-        : IndexCatalogEntry(), _original(entry), _indexDescriptor(std::move(descriptor)) {
-        _indexDescriptor.setEntry(this);
-    }
+        : IndexCatalogEntry(), _original(entry), _indexDescriptor(std::move(descriptor)) {}
 
     const std::string& getIdent() const final {
         return _original->getIdent();

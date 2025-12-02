@@ -158,7 +158,7 @@ Status verifySystemIndexes(OperationContext* opCtx, BSONObjBuilder* startupTimeE
             invariant(indexCatalog);
 
             // Make sure the old unique index from v2.4 on system.users doesn't exist.
-            std::vector<const IndexDescriptor*> indexes;
+            std::vector<const IndexCatalogEntry*> indexes;
             indexCatalog->findIndexesByKeyPattern(
                 opCtx, v1SystemUsersKeyPattern, IndexCatalog::InclusionPolicy::kReady, &indexes);
 
@@ -196,7 +196,7 @@ Status verifySystemIndexes(OperationContext* opCtx, BSONObjBuilder* startupTimeE
             const IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);
 
-            std::vector<const IndexDescriptor*> indexes;
+            std::vector<const IndexCatalogEntry*> indexes;
             indexCatalog->findIndexesByKeyPattern(
                 opCtx, v3SystemRolesKeyPattern, IndexCatalog::InclusionPolicy::kReady, &indexes);
             if (indexes.empty()) {

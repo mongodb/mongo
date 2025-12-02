@@ -798,14 +798,17 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
             // Use index scan.
             auto indexCatalog = collection.getCollectionPtr()->getIndexCatalog();
             invariant(indexCatalog);
-            const IndexDescriptor* indexDescriptor = indexCatalog->findIndexByName(
+            const auto indexEntry = indexCatalog->findIndexByName(
                 opCtx, *indexName, IndexCatalog::InclusionPolicy::kReady);
-            if (!indexDescriptor) {
+            if (!indexEntry) {
                 return Result(ErrorCodes::IndexNotFound,
                               str::stream()
                                   << "Index not found, ns:" << nsOrUUID.toStringForErrorMsg()
                                   << ", index: " << *indexName);
             }
+
+            const auto indexDescriptor = indexEntry->descriptor();
+
             if (indexDescriptor->isPartial()) {
                 return Result(ErrorCodes::IndexOptionsConflict,
                               str::stream()
@@ -827,7 +830,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
             planExecutor = isFind
                 ? InternalPlanner::indexScan(opCtx,
                                              collection,
-                                             indexDescriptor,
+                                             indexEntry,
                                              bounds.first,
                                              bounds.second,
                                              boundInclusion,
@@ -837,7 +840,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                 : InternalPlanner::deleteWithIndexScan(opCtx,
                                                        collection,
                                                        makeDeleteStageParamsForDeleteDocuments(),
-                                                       indexDescriptor,
+                                                       indexEntry,
                                                        bounds.first,
                                                        bounds.second,
                                                        boundInclusion,

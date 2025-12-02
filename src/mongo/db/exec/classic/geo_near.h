@@ -83,7 +83,7 @@ public:
                    ExpressionContext* expCtx,
                    WorkingSet* workingSet,
                    CollectionAcquisition collection,
-                   const IndexDescriptor* twoDIndex);
+                   const IndexCatalogEntry* twoDIndex);
 
 protected:
     std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
@@ -106,14 +106,14 @@ private:
 
         PlanStage::StageState work(ExpressionContext* expCtx,
                                    WorkingSet* workingSet,
-                                   const IndexDescriptor* twoDIndex,
+                                   const IndexCatalogEntry* twoDIndex,
                                    WorkingSetID* out,
                                    double* estimatedDistance);
 
     private:
         void buildIndexScan(ExpressionContext* expCtx,
                             WorkingSet* workingSet,
-                            const IndexDescriptor* twoDIndex);
+                            const IndexCatalogEntry* twoDIndex);
 
         const CollectionAcquisition* _collection;  // Points to the internal stage _collection.
         PlanStage::Children* _children;    // Points to PlanStage::_children in the NearStage.
@@ -151,7 +151,7 @@ public:
                          ExpressionContext* expCtx,
                          WorkingSet* workingSet,
                          CollectionAcquisition collection,
-                         const IndexDescriptor* s2Index);
+                         const IndexCatalogEntry* s2Index);
 
 protected:
     std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
@@ -177,14 +177,14 @@ private:
         // Return IS_EOF is such document exists and set the estimated distance to the nearest doc.
         PlanStage::StageState work(ExpressionContext* expCtx,
                                    WorkingSet* workingSet,
-                                   const IndexDescriptor* s2Index,
+                                   const IndexCatalogEntry* s2Index,
                                    WorkingSetID* out,
                                    double* estimatedDistance);
 
     private:
         void buildIndexScan(ExpressionContext* expCtx,
                             WorkingSet* workingSet,
-                            const IndexDescriptor* s2Index);
+                            const IndexCatalogEntry* s2Index);
 
         const CollectionAcquisition* _collection;  // Points to the internal stage _collection
         PlanStage::Children* _children;    // Points to PlanStage::_children in the NearStage.

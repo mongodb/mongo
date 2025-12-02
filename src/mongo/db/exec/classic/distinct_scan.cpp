@@ -66,7 +66,7 @@ DistinctScan::DistinctScan(ExpressionContext* expCtx,
                            WorkingSet* workingSet,
                            std::unique_ptr<ShardFiltererImpl> shardFilterer,
                            bool needsFetch)
-    : RequiresIndexStage(kStageType, expCtx, collection, params.indexDescriptor, workingSet),
+    : RequiresIndexStage(kStageType, expCtx, collection, params.indexEntry, workingSet),
       _workingSet(workingSet),
       _keyPattern(std::move(params.keyPattern)),
       _scanDirection(params.scanDirection),
@@ -77,14 +77,15 @@ DistinctScan::DistinctScan(ExpressionContext* expCtx,
       _needsFetch(needsFetch) {
     _specificStats.keyPattern = _keyPattern;
     _specificStats.indexName = params.name;
-    _specificStats.indexVersion = static_cast<int>(params.indexDescriptor->version());
+    _specificStats.indexVersion = static_cast<int>(indexDescriptor()->version());
     _specificStats.isMultiKey = params.isMultiKey;
     _specificStats.multiKeyPaths = params.multikeyPaths;
-    _specificStats.isUnique = params.indexDescriptor->unique();
-    _specificStats.isSparse = params.indexDescriptor->isSparse();
-    _specificStats.isPartial = params.indexDescriptor->isPartial();
+    _specificStats.isUnique = indexDescriptor()->unique();
+    _specificStats.isSparse = indexDescriptor()->isSparse();
+    _specificStats.isPartial = indexDescriptor()->isPartial();
     _specificStats.direction = _scanDirection;
-    _specificStats.collation = params.indexDescriptor->infoObj()
+    _specificStats.collation = indexDescriptor()
+                                   ->infoObj()
                                    .getObjectField(IndexDescriptor::kCollationFieldName)
                                    .getOwned();
     _specificStats.isShardFiltering = _shardFilterer != nullptr;

@@ -490,10 +490,8 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
         AutoGetCollection autoColl(opCtx, kNss, MODE_IX);
 
         auto indexCatalog = autoColl->getIndexCatalog();
-        auto descriptor = indexCatalog->findIndexByName(opCtx, "a_1");
-        ASSERT(descriptor) << "Cannot find a_1 in index catalog";
-        auto entry = indexCatalog->getEntry(descriptor);
-        ASSERT(entry) << "Cannot look up index catalog entry for index a_1";
+        auto entry = indexCatalog->findIndexByName(opCtx, "a_1");
+        ASSERT(entry) << "Cannot find a_1 in index catalog";
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 

@@ -196,10 +196,10 @@ protected:
         // checks, which made it possible for 'expireAfterSeconds' to be persisted in the catalog
         // with values incompatible with int32.
         assertDurableIndexSpec(nss, spec);
-        const IndexDescriptor* desc = coll(opCtx(), nss)
-                                          ->getIndexCatalog()
-                                          ->findIndexByName(opCtx(), spec.getStringField("name"));
-        ASSERT_BSONOBJ_EQ(spec, desc->toBSON());
+        const auto entry = coll(opCtx(), nss)
+                               ->getIndexCatalog()
+                               ->findIndexByName(opCtx(), spec.getStringField("name"));
+        ASSERT_BSONOBJ_EQ(spec, entry->descriptor()->toBSON());
     }
 
     void createIndex(const NamespaceString& nss,

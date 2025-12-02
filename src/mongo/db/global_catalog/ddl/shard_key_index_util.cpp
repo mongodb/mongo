@@ -66,7 +66,7 @@ boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(
         return ShardKeyIndex(clusteredIndexSpec);
     }
 
-    const IndexDescriptor* best = nullptr;
+    const IndexCatalogEntry* best = nullptr;
 
     auto indexIterator = indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
     while (indexIterator->more()) {
@@ -84,10 +84,10 @@ boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(
         if (isCompatibleWithShardKey(
                 opCtx, collection, indexEntry, shardKey, requireSingleKey, errMsg)) {
             if (!indexEntry->isMultikey(opCtx, collection)) {
-                return ShardKeyIndex(indexDescriptor);
+                return ShardKeyIndex(indexEntry);
             }
 
-            best = indexDescriptor;
+            best = indexEntry;
         }
     }
 
@@ -100,21 +100,19 @@ boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(
 
 }  // namespace
 
-ShardKeyIndex::ShardKeyIndex(const IndexDescriptor* indexDescriptor)
-    : _indexDescriptor(indexDescriptor) {
+ShardKeyIndex::ShardKeyIndex(const IndexCatalogEntry* indexEntry) : _indexEntry(indexEntry) {
     tassert(6012300,
-            "The indexDescriptor for ShardKeyIndex(const IndexDescriptor* indexDescripto) must not "
+            "The indexEntry for ShardKeyIndex(const IndexCatalogEntry* indexEntry) must not "
             "be a nullptr",
-            indexDescriptor != nullptr);
+            indexEntry != nullptr);
 }
 
 ShardKeyIndex::ShardKeyIndex(const ClusteredIndexSpec& clusteredIndexSpec)
-    : _indexDescriptor(nullptr),
-      _clusteredIndexKeyPattern(clusteredIndexSpec.getKey().getOwned()) {}
+    : _indexEntry(nullptr), _clusteredIndexKeyPattern(clusteredIndexSpec.getKey().getOwned()) {}
 
 const BSONObj& ShardKeyIndex::keyPattern() const {
-    if (_indexDescriptor != nullptr) {
-        return _indexDescriptor->keyPattern();
+    if (_indexEntry != nullptr) {
+        return _indexEntry->descriptor()->keyPattern();
     }
     return _clusteredIndexKeyPattern;
 }
@@ -227,7 +225,8 @@ bool isLastNonHiddenRangedShardKeyIndex(OperationContext* opCtx,
     const auto index = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
     if (!index ||
         !isCompatibleWithShardKey(
-            opCtx, collection, index->getEntry(), shardKey, false /* requireSingleKey */)) {
+
+            opCtx, collection, index, shardKey, false /* requireSingleKey */)) {
         return false;
     }
 

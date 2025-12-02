@@ -192,14 +192,14 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
             const StringData indexIdent = workingSet->retrieveIndexIdent(memberKey.indexId);
-            auto desc = collection->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
-            invariant(desc,
+            auto entry = collection->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
+            invariant(entry,
                       str::stream() << "Index entry not found for index with ident " << indexIdent
                                     << " on collection " << collection->ns().toStringForErrorMsg());
-            auto* iam = desc->getEntry()->accessMethod()->asSortedData();
+            auto* iam = entry->accessMethod()->asSortedData();
             iam->getKeys(opCtx,
                          collection,
-                         desc->getEntry(),
+                         entry,
                          pool,
                          member->doc.value().toBson(),
                          InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,

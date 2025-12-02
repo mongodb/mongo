@@ -159,9 +159,9 @@ bool Helpers::findById(OperationContext* opCtx,
     }
 
     const IndexCatalog* catalog = collection->getIndexCatalog();
-    const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
+    const auto entry = catalog->findIdIndex(opCtx);
 
-    if (!desc) {
+    if (!entry) {
         if (clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
             Snapshotted<BSONObj> doc;
             if (collection->findDoc(opCtx,
@@ -176,7 +176,6 @@ bool Helpers::findById(OperationContext* opCtx,
         return false;
     }
 
-    const IndexCatalogEntry* entry = catalog->getEntry(desc);
     // TODO(SERVER-103399): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     auto recordId = entry->accessMethod()->asSortedData()->findSingle(
         opCtx,
@@ -195,16 +194,15 @@ RecordId Helpers::findById(OperationContext* opCtx,
                            const BSONObj& idquery) {
     MONGO_verify(collection);
     const IndexCatalog* catalog = collection->getIndexCatalog();
-    const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
-    if (!desc && clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
+    const auto entry = catalog->findIdIndex(opCtx);
+    if (!entry && clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
         // There is no explicit IndexDescriptor for _id on a collection clustered by _id. However,
         // the RecordId can be constructed directly from the input.
         return record_id_helpers::keyForObj(
             IndexBoundsBuilder::objFromElement(idquery["_id"], collection->getDefaultCollator()));
     }
 
-    uassert(13430, "no _id index", desc);
-    const IndexCatalogEntry* entry = catalog->getEntry(desc);
+    uassert(13430, "no _id index", entry);
     return entry->accessMethod()->asSortedData()->findSingle(
         opCtx,
         *shard_role_details::getRecoveryUnit(opCtx),

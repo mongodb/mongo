@@ -61,29 +61,34 @@ class IndexDescriptor;
 class WorkingSet;
 
 struct DistinctParams {
-    DistinctParams(const IndexDescriptor* descriptor,
+    DistinctParams(const IndexCatalogEntry* entry,
                    std::string indexName,
                    BSONObj keyPattern,
                    MultikeyPaths multikeyPaths,
                    bool multikey)
-        : indexDescriptor(descriptor),
+        : indexEntry(entry),
           name(std::move(indexName)),
           keyPattern(std::move(keyPattern)),
           multikeyPaths(std::move(multikeyPaths)),
           isMultiKey(multikey) {
-        tassert(11051642, "Expecting Index Descriptor.", indexDescriptor);
+        tassert(11051642, "Expecting Index Entry.", indexEntry);
     }
 
     DistinctParams(OperationContext* opCtx,
                    const CollectionPtr& collection,
-                   const IndexDescriptor* descriptor)
-        : DistinctParams(descriptor,
-                         descriptor->indexName(),
-                         descriptor->keyPattern(),
-                         descriptor->getEntry()->getMultikeyPaths(opCtx, collection),
-                         descriptor->getEntry()->isMultikey(opCtx, collection)) {}
+                   const IndexCatalogEntry* entry)
+        : DistinctParams(
+              entry,
+              entry->descriptor()->indexName(),
+              entry->descriptor()->keyPattern(),
+              [&]() {
+                  MultikeyPaths paths;
+                  collection->isIndexMultikey(opCtx, entry->descriptor()->indexName(), &paths);
+                  return paths;
+              }(),
+              collection->isIndexMultikey(opCtx, entry->descriptor()->indexName(), nullptr)) {}
 
-    const IndexDescriptor* indexDescriptor;
+    const IndexCatalogEntry* indexEntry;
     std::string name;
 
     BSONObj keyPattern;

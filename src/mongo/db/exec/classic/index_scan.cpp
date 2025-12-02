@@ -68,7 +68,7 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
                      IndexScanParams params,
                      WorkingSet* workingSet,
                      const MatchExpression* filter)
-    : RequiresIndexStage(kStageType, expCtx, collection, params.indexDescriptor, workingSet),
+    : RequiresIndexStage(kStageType, expCtx, collection, params.indexEntry, workingSet),
       _workingSet(workingSet),
       _keyPattern(params.keyPattern.getOwned()),
       _bounds(std::move(params.bounds)),
@@ -86,11 +86,12 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
     _specificStats.keyPattern = _keyPattern;
     _specificStats.isMultiKey = params.isMultiKey;
     _specificStats.multiKeyPaths = params.multikeyPaths;
-    _specificStats.isUnique = params.indexDescriptor->unique();
-    _specificStats.isSparse = params.indexDescriptor->isSparse();
-    _specificStats.isPartial = params.indexDescriptor->isPartial();
-    _specificStats.indexVersion = static_cast<int>(params.indexDescriptor->version());
-    _specificStats.collation = params.indexDescriptor->infoObj()
+    _specificStats.isUnique = indexDescriptor()->unique();
+    _specificStats.isSparse = indexDescriptor()->isSparse();
+    _specificStats.isPartial = indexDescriptor()->isPartial();
+    _specificStats.indexVersion = static_cast<int>(indexDescriptor()->version());
+    _specificStats.collation = indexDescriptor()
+                                   ->infoObj()
                                    .getObjectField(IndexDescriptor::kCollationFieldName)
                                    .getOwned();
 }

@@ -646,7 +646,6 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
                                                       Collection* collection,
                                                       IndexDescriptor&& descriptor,
                                                       CreateIndexEntryFlags flags) {
-    invariant(!descriptor.getEntry());
     dassert(!findIndexByName(opCtx, descriptor.indexName(), InclusionPolicy::kAll));
 
     Status status = _isSpecOk(opCtx, CollectionPtr(collection), descriptor.infoObj());
@@ -1141,11 +1140,11 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(
 
     {
         // Check whether an index with the specified candidate name already exists in the catalog.
-        const IndexDescriptor* desc = findIndexByName(opCtx, name, inclusionPolicy);
+        const auto entry = findIndexByName(opCtx, name, inclusionPolicy);
 
-        if (desc) {
+        if (entry) {
             // Index already exists with same name. Check whether the options are the same as well.
-            auto entry = getEntry(desc);
+            auto desc = entry->descriptor();
             IndexDescriptor candidate(_getAccessMethodName(key), spec);
             auto indexComparison = [&] {
                 if (allowedFieldNames) {
@@ -1203,10 +1202,10 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(
 
     {
         // No index with the candidate name exists. Check for an index with conflicting options.
-        const IndexDescriptor* desc =
-            findIndexByKeyPatternAndOptions(opCtx, key, spec, inclusionPolicy);
+        const auto entry = findIndexByKeyPatternAndOptions(opCtx, key, spec, inclusionPolicy);
 
-        if (desc) {
+        if (entry) {
+            const auto desc = entry->descriptor();
             LOGV2_DEBUG(20353,
                         2,
                         "Index already exists with a different name",
@@ -1216,7 +1215,6 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(
             // Index already exists with a different name. Check whether the options are identical.
             // We will return an error in either case, but this check allows us to generate a more
             // informative error message.
-            auto entry = getEntry(desc);
 
             IndexDescriptor candidate(_getAccessMethodName(key), spec);
             auto indexComparison = [&] {
@@ -1265,13 +1263,13 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(
     // Collections should only have one text index.
     std::string pluginName = IndexNames::findPluginName(key);
     if (pluginName == IndexNames::TEXT) {
-        std::vector<const IndexDescriptor*> textIndexes;
+        std::vector<const IndexCatalogEntry*> textIndexes;
         findIndexByType(opCtx, IndexNames::TEXT, textIndexes, inclusionPolicy);
         if (textIndexes.size() > 0) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "only one text index per collection allowed, "
                                         << "found existing text index \""
-                                        << textIndexes[0]->indexName() << "\"");
+                                        << textIndexes[0]->descriptor()->indexName() << "\"");
         }
     }
     return Status::OK();
@@ -1295,8 +1293,8 @@ BSONObj IndexCatalogImpl::getDefaultIdIndexSpec(const CollectionPtr& collection)
 
 void IndexCatalogImpl::dropIndexes(OperationContext* opCtx,
                                    Collection* collection,
-                                   std::function<bool(const IndexDescriptor*)> matchFn,
-                                   std::function<void(const IndexDescriptor*)> onDropFn) {
+                                   std::function<bool(const IndexCatalogEntry*)> matchFn,
+                                   std::function<void(const IndexCatalogEntry*)> onDropFn) {
     uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
             str::stream() << "cannot perform operation: an index build is currently running",
             !haveAnyIndexesInProgress());
@@ -1310,8 +1308,9 @@ void IndexCatalogImpl::dropIndexes(OperationContext* opCtx,
         auto ii = getIndexIterator(InclusionPolicy::kAll);
         while (ii->more()) {
             seen++;
-            const IndexDescriptor* desc = ii->next()->descriptor();
-            if (matchFn(desc)) {
+            const auto entry = ii->next();
+            const auto desc = entry->descriptor();
+            if (matchFn(entry)) {
                 indexNamesToDrop.push_back(desc->indexName());
             } else {
                 didExclude = true;
@@ -1333,7 +1332,7 @@ void IndexCatalogImpl::dropIndexes(OperationContext* opCtx,
         // If the onDrop function creates an oplog entry, it should run first so that the drop is
         // timestamped at the same optime.
         if (onDropFn) {
-            onDropFn(writableEntry->descriptor());
+            onDropFn(writableEntry);
         }
         invariant(dropIndexEntry(opCtx, collection, writableEntry));
     }
@@ -1358,16 +1357,16 @@ void IndexCatalogImpl::dropIndexes(OperationContext* opCtx,
 void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
                                       Collection* collection,
                                       bool includingIdIndex,
-                                      std::function<void(const IndexDescriptor*)> onDropFn) {
+                                      std::function<void(const IndexCatalogEntry*)> onDropFn) {
     dropIndexes(
         opCtx,
         collection,
-        [includingIdIndex](const IndexDescriptor* indexDescriptor) {
+        [includingIdIndex](const IndexCatalogEntry* indexDescriptor) {
             if (includingIdIndex) {
                 return true;
             }
 
-            return !indexDescriptor->isIdIndex();
+            return !indexDescriptor->descriptor()->isIdIndex();
         },
         onDropFn);
 }
@@ -1380,9 +1379,9 @@ Status IndexCatalogImpl::truncateAllIndexes(OperationContext* opCtx, Collection*
 
     auto it = getIndexIterator(IndexCatalog::InclusionPolicy::kAll);
     while (it->more()) {
-        const IndexDescriptor* desc = it->next()->descriptor();
-        auto status = desc->getEntry()->accessMethod()->truncate(
-            opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        const auto entry = it->next();
+        auto status =
+            entry->accessMethod()->truncate(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
         if (!status.isOK())
             return status;
     }
@@ -1521,10 +1520,9 @@ void IndexCatalogImpl::_deleteIndexFromDisk(OperationContext* opCtx,
 
 void IndexCatalogImpl::setMultikeyPaths(OperationContext* const opCtx,
                                         const CollectionPtr& coll,
-                                        const IndexDescriptor* desc,
+                                        const IndexCatalogEntry* entry,
                                         const KeyStringSet& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths) const {
-    const IndexCatalogEntry* entry = desc->getEntry();
     invariant(entry);
     entry->setMultikey(opCtx, coll, multikeyMetadataKeys, multikeyPaths);
 };
@@ -1555,23 +1553,24 @@ bool IndexCatalogImpl::haveIdIndex(OperationContext* opCtx) const {
     return findIdIndex(opCtx) != nullptr;
 }
 
-const IndexDescriptor* IndexCatalogImpl::findIdIndex(OperationContext* opCtx) const {
+const IndexCatalogEntry* IndexCatalogImpl::findIdIndex(OperationContext* opCtx) const {
     return _readyIndexes.getIdIndex();
 }
 
-const IndexDescriptor* IndexCatalogImpl::findIndexByName(OperationContext* opCtx,
-                                                         StringData name,
-                                                         InclusionPolicy inclusionPolicy) const {
+const IndexCatalogEntry* IndexCatalogImpl::findIndexByName(OperationContext* opCtx,
+                                                           StringData name,
+                                                           InclusionPolicy inclusionPolicy) const {
     auto ii = getIndexIterator(inclusionPolicy);
     while (ii->more()) {
-        const IndexDescriptor* desc = ii->next()->descriptor();
+        const auto entry = ii->next();
+        const auto desc = entry->descriptor();
         if (desc->indexName() == name)
-            return desc;
+            return entry;
     }
     return nullptr;
 }
 
-const IndexDescriptor* IndexCatalogImpl::findIndexByKeyPatternAndOptions(
+const IndexCatalogEntry* IndexCatalogImpl::findIndexByKeyPatternAndOptions(
     OperationContext* opCtx,
     const BSONObj& key,
     const BSONObj& indexSpec,
@@ -1582,56 +1581,53 @@ const IndexDescriptor* IndexCatalogImpl::findIndexByKeyPatternAndOptions(
         const auto* entry = ii->next();
         if (needle.compareIndexOptions(opCtx, {}, entry) !=
             IndexDescriptor::Comparison::kDifferent) {
-            return entry->descriptor();
+            return entry;
         }
     }
     return nullptr;
 }  // namespace mongo
 
-void IndexCatalogImpl::findIndexesByKeyPattern(OperationContext* opCtx,
-                                               const BSONObj& key,
-                                               InclusionPolicy inclusionPolicy,
-                                               std::vector<const IndexDescriptor*>* matches) const {
+void IndexCatalogImpl::findIndexesByKeyPattern(
+    OperationContext* opCtx,
+    const BSONObj& key,
+    InclusionPolicy inclusionPolicy,
+    std::vector<const IndexCatalogEntry*>* matches) const {
     invariant(matches);
     auto ii = getIndexIterator(inclusionPolicy);
     while (ii->more()) {
-        const IndexDescriptor* desc = ii->next()->descriptor();
+        const auto entry = ii->next();
+        const auto desc = entry->descriptor();
         if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() == key)) {
-            matches->push_back(desc);
+            matches->push_back(entry);
         }
     }
 }
 
 void IndexCatalogImpl::findIndexByType(OperationContext* opCtx,
                                        const std::string& type,
-                                       std::vector<const IndexDescriptor*>& matches,
+                                       std::vector<const IndexCatalogEntry*>& matches,
                                        InclusionPolicy inclusionPolicy) const {
     auto ii = getIndexIterator(inclusionPolicy);
     while (ii->more()) {
-        const IndexDescriptor* desc = ii->next()->descriptor();
+        const auto entry = ii->next();
+        const auto desc = entry->descriptor();
         if (IndexNames::findPluginName(desc->keyPattern()) == type) {
-            matches.push_back(desc);
+            matches.push_back(entry);
         }
     }
 }
 
-const IndexDescriptor* IndexCatalogImpl::findIndexByIdent(OperationContext* opCtx,
-                                                          StringData ident,
-                                                          InclusionPolicy inclusionPolicy) const {
+const IndexCatalogEntry* IndexCatalogImpl::findIndexByIdent(OperationContext* opCtx,
+                                                            StringData ident,
+                                                            InclusionPolicy inclusionPolicy) const {
     auto ii = getIndexIterator(inclusionPolicy);
     while (ii->more()) {
         const IndexCatalogEntry* entry = ii->next();
         if (ident == entry->getIdent()) {
-            return entry->descriptor();
+            return entry;
         }
     }
     return nullptr;
-}
-
-const IndexCatalogEntry* IndexCatalogImpl::getEntry(const IndexDescriptor* desc) const {
-    const IndexCatalogEntry* entry = desc->getEntry();
-    massert(17357, "cannot find index entry", entry);
-    return entry;
 }
 
 IndexCatalogEntry* IndexCatalogImpl::getWritableEntryByName(OperationContext* opCtx,
@@ -1649,13 +1645,13 @@ IndexCatalogEntry* IndexCatalogImpl::getWritableEntryByKeyPatternAndOptions(
         findIndexByKeyPatternAndOptions(opCtx, key, indexSpec, inclusionPolicy));
 }
 
-IndexCatalogEntry* IndexCatalogImpl::_getWritableEntry(const IndexDescriptor* descriptor) {
-    if (!descriptor) {
+IndexCatalogEntry* IndexCatalogImpl::_getWritableEntry(const IndexCatalogEntry* entry) {
+    if (!entry) {
         return nullptr;
     }
 
     auto getWritableEntry = [&](auto& container) -> IndexCatalogEntry* {
-        std::shared_ptr<const IndexCatalogEntry> oldEntry = container.release(descriptor);
+        std::shared_ptr<const IndexCatalogEntry> oldEntry = container.release(entry->descriptor());
         invariant(oldEntry);
 
         // This collection instance already uniquely owns this IndexCatalogEntry, return it.
@@ -1668,18 +1664,17 @@ IndexCatalogEntry* IndexCatalogImpl::_getWritableEntry(const IndexDescriptor* de
         std::shared_ptr<IndexCatalogEntryImpl> writableEntry =
             std::make_shared<IndexCatalogEntryImpl>(
                 *static_cast<const IndexCatalogEntryImpl*>(oldEntry.get()));
-        writableEntry->descriptor()->setEntry(writableEntry.get());
         IndexCatalogEntry* entryToReturn = writableEntry.get();
         container.add(std::move(writableEntry));
         return entryToReturn;
     };
 
-    if (descriptor->getEntry()->isReady()) {
+    if (entry->isReady()) {
         _indexUpdateIdentifier.reset();
         IndexCatalogEntry* result = getWritableEntry(_readyIndexes);
         _rebuildIndexUpdateIdentifier();
         return result;
-    } else if (!descriptor->getEntry()->isFrozen()) {
+    } else if (!entry->isFrozen()) {
         _indexUpdateIdentifier.reset();
         IndexCatalogEntry* result = getWritableEntry(_buildingIndexes);
         _rebuildIndexUpdateIdentifier();
@@ -1687,11 +1682,6 @@ IndexCatalogEntry* IndexCatalogImpl::_getWritableEntry(const IndexDescriptor* de
     } else {
         return getWritableEntry(_frozenIndexes);
     }
-}
-
-std::shared_ptr<const IndexCatalogEntry> IndexCatalogImpl::getEntryShared(
-    const IndexDescriptor* indexDescriptor) const {
-    return indexDescriptor->getEntry()->shared_from_this();
 }
 
 std::vector<std::shared_ptr<const IndexCatalogEntry>> IndexCatalogImpl::getEntriesShared(
@@ -1726,19 +1716,20 @@ std::vector<std::shared_ptr<const IndexCatalogEntry>> IndexCatalogImpl::getEntri
     return allIndexes;
 }
 
-const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
-                                                      Collection* collection,
-                                                      const IndexDescriptor* oldDesc,
-                                                      CreateIndexEntryFlags flags) {
+const IndexCatalogEntry* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
+                                                        Collection* collection,
+                                                        const IndexCatalogEntry* oldEntry,
+                                                        CreateIndexEntryFlags flags) {
     invariant(_buildingIndexes.size() == 0);
 
+    const auto oldDesc = oldEntry->descriptor();
     const std::string indexName = oldDesc->indexName();
     invariant(collection->isIndexReady(indexName));
 
     // Delete the IndexCatalogEntry that owns this descriptor. After deletion, 'oldDesc' is invalid
     // and should not be dereferenced. Also, invalidate the index from the
     // CollectionIndexUsageTrackerDecoration (shared state among Collection instances).
-    IndexCatalogEntry* writableEntry = _getWritableEntry(oldDesc);
+    IndexCatalogEntry* writableEntry = _getWritableEntry(oldEntry);
     invariant(writableEntry);
     std::shared_ptr<const IndexCatalogEntry> deletedEntry =
         _readyIndexes.release(writableEntry->descriptor());
@@ -1764,8 +1755,8 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     // Last rebuild index data for CollectionQueryInfo for this Collection.
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
 
-    // Return the new descriptor.
-    return newEntry->descriptor();
+    // Return the new entry.
+    return newEntry;
 }
 
 // ---------------------------

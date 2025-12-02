@@ -329,7 +329,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
     OperationContext* opCtx,
     const CollectionAcquisition& coll,
-    const IndexDescriptor* descriptor,
+    const IndexCatalogEntry* indexEntry,
     const BSONObj& startKey,
     const BSONObj& endKey,
     BoundInclusion boundInclusion,
@@ -340,7 +340,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
     auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(coll.nss()).build();
 
     std::unique_ptr<PlanStage> root = _indexScan(
-        expCtx, ws.get(), coll, descriptor, startKey, endKey, boundInclusion, direction, options);
+        expCtx, ws.get(), coll, indexEntry, startKey, endKey, boundInclusion, direction, options);
 
     auto executor = plan_executor_factory::make(expCtx,
                                                 std::move(ws),
@@ -357,7 +357,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     OperationContext* opCtx,
     CollectionAcquisition coll,
     std::unique_ptr<DeleteStageParams> params,
-    const IndexDescriptor* descriptor,
+    const IndexCatalogEntry* indexEntry,
     const BSONObj& startKey,
     const BSONObj& endKey,
     BoundInclusion boundInclusion,
@@ -373,7 +373,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     std::unique_ptr<PlanStage> root = _indexScan(expCtx,
                                                  ws.get(),
                                                  coll,
-                                                 descriptor,
+                                                 indexEntry,
                                                  startKey,
                                                  endKey,
                                                  boundInclusion,
@@ -405,10 +405,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::shardKeyIn
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     Direction direction,
     int options) {
-    if (shardKeyIdx.descriptor() != nullptr) {
+    if (shardKeyIdx.indexEntry() != nullptr) {
         return indexScan(opCtx,
                          collection,
-                         shardKeyIdx.descriptor(),
+                         shardKeyIdx.indexEntry(),
                          startKey,
                          endKey,
                          boundInclusion,
@@ -438,11 +438,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
     Direction direction) {
-    if (shardKeyIdx.descriptor()) {
+    if (shardKeyIdx.indexEntry()) {
         return deleteWithIndexScan(opCtx,
                                    coll,
                                    std::move(params),
-                                   shardKeyIdx.descriptor(),
+                                   shardKeyIdx.indexEntry(),
                                    startKey,
                                    endKey,
                                    boundInclusion,
@@ -482,7 +482,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
     OperationContext* opCtx,
     CollectionAcquisition collection,
     const UpdateStageParams& params,
-    const IndexDescriptor* descriptor,
+    const IndexCatalogEntry* indexEntry,
     const BSONObj& key,
     PlanYieldPolicy::YieldPolicy yieldPolicy) {
     const auto& collectionPtr = collection.getCollectionPtr();
@@ -492,7 +492,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
     auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionPtr->ns()).build();
 
     auto idHackStage =
-        std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), collection, descriptor);
+        std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), collection, indexEntry);
 
     const bool isUpsert = params.request->isUpsert();
     auto root = (isUpsert ? std::make_unique<UpsertStage>(
@@ -527,24 +527,24 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     WorkingSet* ws,
     const CollectionAcquisition& coll,
-    const IndexDescriptor* descriptor,
+    const IndexCatalogEntry* indexEntry,
     const BSONObj& startKey,
     const BSONObj& endKey,
     BoundInclusion boundInclusion,
     Direction direction,
     int options) {
-    tassert(11321317, "descriptor must not be null", descriptor);
+    tassert(11321317, "entry must not be null", indexEntry);
     tassert(10415301, "InternalPlanner::_indexScan expected collection to exist", coll.exists());
     const auto& collectionPtr = coll.getCollectionPtr();
 
-    IndexScanParams params(expCtx->getOperationContext(), collectionPtr, descriptor);
+    IndexScanParams params(expCtx->getOperationContext(), collectionPtr, indexEntry);
     params.direction = direction;
     params.bounds.isSimpleRange = true;
     params.bounds.startKey = startKey;
     params.bounds.endKey = endKey;
     params.bounds.boundInclusion = boundInclusion;
-    params.shouldDedup =
-        descriptor->getEntry()->isMultikey(expCtx->getOperationContext(), collectionPtr);
+    params.shouldDedup = collectionPtr->isIndexMultikey(
+        expCtx->getOperationContext(), indexEntry->descriptor()->indexName(), nullptr);
 
     std::unique_ptr<PlanStage> root =
         std::make_unique<IndexScan>(expCtx.get(), coll, std::move(params), ws, nullptr);

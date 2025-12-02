@@ -756,8 +756,8 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
         metrics.setType(MonotonicityTypeEnum::kUnknown);
         return metrics;
     }
-    // Non-clustered indexes always have an associated IndexDescriptor.
-    invariant(index->descriptor());
+    // Non-clustered indexes always have an associated IndexCatalogEntry.
+    invariant(index->indexEntry());
 
     std::vector<int64_t> recordIds;
     bool scannedMultipleShardKeys = false;
@@ -788,7 +788,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
     KeyPattern indexKeyPattern(index->keyPattern());
     auto exec = InternalPlanner::indexScan(opCtx,
                                            collection,
-                                           index->descriptor(),
+                                           index->indexEntry(),
                                            indexKeyPattern.globalMin(),
                                            indexKeyPattern.globalMax(),
                                            BoundInclusion::kExcludeBothStartAndEndKeys,

@@ -80,6 +80,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
  * Scans index to returns up to 16MB of RecordIds of duplicates.
  */
 std::vector<std::vector<RecordId>> scanIndexForDuplicates(OperationContext* opCtx,
+                                                          const Collection* coll,
                                                           const IndexDescriptor* idx);
 
 /**

@@ -55,13 +55,13 @@
 
 namespace mongo {
 
-class IndexDescriptor;
+class IndexCatalogEntry;
 
 /**
  * Contains all the index information and stats throughout the validation.
  */
 struct IndexInfo {
-    IndexInfo(const IndexDescriptor& descriptor);
+    IndexInfo(const IndexCatalogEntry& descriptor);
     // Index name.
     const std::string indexName;
     // Contains the indexes key pattern.

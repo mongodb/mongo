@@ -204,18 +204,18 @@ StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opC
                                                            const Collection* collection,
                                                            StringData ident) {
     // First check the index catalog of the existing collection for the index entry.
-    auto latestEntry = [&]() -> std::shared_ptr<const IndexCatalogEntry> {
+    auto latestEntry = [&]() -> std::shared_ptr<Ident> {
         if (!collection)
             return nullptr;
 
-        auto desc = collection->getIndexCatalog()->findIndexByIdent(opCtx, ident);
-        if (!desc)
+        auto entry = collection->getIndexCatalog()->findIndexByIdent(opCtx, ident);
+        if (!entry)
             return nullptr;
-        return collection->getIndexCatalog()->getEntryShared(desc);
+        return entry->getSharedIdent();
     }();
 
     if (latestEntry) {
-        return latestEntry->getSharedIdent();
+        return latestEntry;
     }
 
     // The index ident is expired, but it could still be drop pending. Mark it as in use if

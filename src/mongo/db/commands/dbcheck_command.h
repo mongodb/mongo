@@ -286,7 +286,6 @@ private:
                         const CollectionPtr& collection,
                         const KeyStringEntry& keyStringEntryWithRecordId,
                         const BSONObj& keyStringBson,
-                        const IndexDescriptor* indexDescriptor,
                         const SortedDataIndexAccessMethod* iam,
                         const IndexCatalogEntry* indexCatalogEntry,
                         const BSONObj& indexSpec);
@@ -305,9 +304,9 @@ private:
     StatusWith<std::unique_ptr<DbCheckAcquisition>> _acquireDBCheckLocks(
         OperationContext* opCtx, const NamespaceString& nss);
 
-    StatusWith<const IndexDescriptor*> _acquireIndex(OperationContext* opCtx,
-                                                     const CollectionPtr& collection,
-                                                     StringData indexName);
+    StatusWith<const IndexCatalogEntry*> _acquireIndex(OperationContext* opCtx,
+                                                       const CollectionPtr& collection,
+                                                       StringData indexName);
 
     std::pair<bool, boost::optional<UUID>> _shouldLogOplogBatch(DbCheckOplogBatch& batch);
 

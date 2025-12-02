@@ -1002,8 +1002,8 @@ public:
 
         // Replace a correct index entry with a bad one and check it's invalid.
         const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
-        auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-        auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
+        auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
+        auto iam = entry->accessMethod()->asSortedData();
 
         {
             beginTransaction();
@@ -1018,7 +1018,7 @@ public:
             iam->getKeys(
                 &_opCtx,
                 coll(),
-                descriptor->getEntry(),
+                entry,
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -1030,14 +1030,14 @@ public:
 
             auto removeStatus = iam->removeKeys(&_opCtx,
                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
-                                                descriptor->getEntry(),
+                                                entry,
                                                 {keys.begin(), keys.end()},
                                                 options,
                                                 &numDeleted);
             auto insertStatus = iam->insert(&_opCtx,
                                             pooledBuilder,
                                             coll(),
-                                            descriptor->getEntry(),
+                                            entry,
                                             {{id1, timestampToUse, &badKey}},
                                             options,
                                             &numInserted);
@@ -1146,8 +1146,8 @@ public:
         const RecordId recordId(record_id_helpers::reservedIdFor(
             record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
         const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
-        auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-        auto accessMethod = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
+        auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
+        auto accessMethod = entry->accessMethod()->asSortedData();
         auto sortedDataInterface = accessMethod->getSortedDataInterface();
         {
             beginTransaction();
@@ -1264,8 +1264,8 @@ public:
 
         lockDb(MODE_X);
         const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
-        auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-        auto accessMethod = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
+        auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
+        auto accessMethod = entry->accessMethod()->asSortedData();
         auto sortedDataInterface = accessMethod->getSortedDataInterface();
 
         // Removing a multikey metadata path for a path included in the projection causes validate
@@ -1429,8 +1429,8 @@ public:
             lockDb(MODE_X);
 
             const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
-            auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
+            auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
+            auto iam = entry->accessMethod()->asSortedData();
 
             beginTransaction();
             int64_t numDeleted;
@@ -1442,7 +1442,7 @@ public:
             iam->getKeys(
                 &_opCtx,
                 coll(),
-                descriptor->getEntry(),
+                entry,
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -1453,7 +1453,7 @@ public:
                 rid);
             auto removeStatus = iam->removeKeys(&_opCtx,
                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
-                                                descriptor->getEntry(),
+                                                entry,
                                                 {keys.begin(), keys.end()},
                                                 options,
                                                 &numDeleted);
@@ -1808,8 +1808,8 @@ public:
             lockDb(MODE_X);
 
             const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
-            auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
+            auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
+            auto iam = entry->accessMethod()->asSortedData();
 
             beginTransaction();
             int64_t numDeleted;
@@ -1821,7 +1821,7 @@ public:
             iam->getKeys(
                 &_opCtx,
                 coll(),
-                descriptor->getEntry(),
+                entry,
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -1832,7 +1832,7 @@ public:
                 rid);
             auto removeStatus = iam->removeKeys(&_opCtx,
                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
-                                                descriptor->getEntry(),
+                                                entry,
                                                 {keys.begin(), keys.end()},
                                                 options,
                                                 &numDeleted);
@@ -2159,8 +2159,7 @@ public:
             // Insert the key on _id.
             {
                 auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
-                auto descriptor = indexCatalog->findIdIndex(&_opCtx);
-                auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
+                auto entry = indexCatalog->findIdIndex(&_opCtx);
                 IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
                                               entry->getIdent());
                 indexBuildInfo.setInternalIdents(*storageEngine,
@@ -2436,8 +2435,7 @@ public:
             // Insert the key on _id.
             {
                 auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
-                auto descriptor = indexCatalog->findIdIndex(&_opCtx);
-                auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
+                auto entry = indexCatalog->findIdIndex(&_opCtx);
                 auto iam = entry->accessMethod()->asSortedData();
                 IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
                                               entry->getIdent());
@@ -2704,8 +2702,8 @@ public:
             options.dupsAllowed = true;
 
             {
-                auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexNameB);
-                auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
+                auto entry = indexCatalog->findIndexByName(&_opCtx, indexNameB);
+                auto iam = entry->accessMethod()->asSortedData();
 
                 beginTransaction();
                 int64_t numDeleted;
@@ -2715,7 +2713,7 @@ public:
                 iam->getKeys(
                     &_opCtx,
                     coll(),
-                    descriptor->getEntry(),
+                    entry,
                     pooledBuilder,
                     actualKey,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -2726,7 +2724,7 @@ public:
                     rid1);
                 auto removeStatus = iam->removeKeys(&_opCtx,
                                                     *shard_role_details::getRecoveryUnit(&_opCtx),
-                                                    descriptor->getEntry(),
+                                                    entry,
                                                     {keys.begin(), keys.end()},
                                                     options,
                                                     &numDeleted);
@@ -2769,8 +2767,7 @@ public:
             // Insert the key on _id.
             {
                 auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
-                auto descriptor = indexCatalog->findIdIndex(&_opCtx);
-                auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
+                auto entry = indexCatalog->findIdIndex(&_opCtx);
                 auto iam = entry->accessMethod()->asSortedData();
                 IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
                                               entry->getIdent());
@@ -2825,8 +2822,7 @@ public:
             // Insert the key on b.
             {
                 auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
-                auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexNameB);
-                auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
+                auto entry = indexCatalog->findIndexByName(&_opCtx, indexNameB);
                 auto iam = entry->accessMethod()->asSortedData();
                 IndexBuildInfo indexBuildInfo(indexSpecB, entry->getIdent());
                 indexBuildInfo.setInternalIdents(*storageEngine,
@@ -3058,8 +3054,8 @@ public:
         {
             lockDb(MODE_X);
             const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
-            auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
+            auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
+            auto iam = entry->accessMethod()->asSortedData();
             InsertDeleteOptions options;
             options.dupsAllowed = true;
 
@@ -3070,7 +3066,7 @@ public:
                 iam->getKeys(
                     &_opCtx,
                     coll(),
-                    descriptor->getEntry(),
+                    entry,
                     pooledBuilder,
                     doc,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3084,7 +3080,7 @@ public:
                 int64_t numDeleted;
                 auto removeStatus = iam->removeKeys(&_opCtx,
                                                     *shard_role_details::getRecoveryUnit(&_opCtx),
-                                                    descriptor->getEntry(),
+                                                    entry,
                                                     {keys.begin(), keys.end()},
                                                     options,
                                                     &numDeleted);
@@ -3265,8 +3261,8 @@ public:
 
             const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
             const std::string indexName = "a";
-            auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
+            auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
+            auto iam = entry->accessMethod()->asSortedData();
 
             beginTransaction();
             int64_t numDeleted;
@@ -3278,7 +3274,7 @@ public:
             iam->getKeys(
                 &_opCtx,
                 coll(),
-                descriptor->getEntry(),
+                entry,
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3289,7 +3285,7 @@ public:
                 rid);
             auto removeStatus = iam->removeKeys(&_opCtx,
                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
-                                                descriptor->getEntry(),
+                                                entry,
                                                 {keys.begin(), keys.end()},
                                                 options,
                                                 &numDeleted);
@@ -3307,8 +3303,8 @@ public:
 
             const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
             const std::string indexName = "b";
-            auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
+            auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
+            auto iam = entry->accessMethod()->asSortedData();
 
             beginTransaction();
             int64_t numDeleted;
@@ -3320,7 +3316,7 @@ public:
             iam->getKeys(
                 &_opCtx,
                 coll(),
-                descriptor->getEntry(),
+                entry,
                 pooledBuilder,
                 actualKey,
                 InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3331,7 +3327,7 @@ public:
                 rid);
             auto removeStatus = iam->removeKeys(&_opCtx,
                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
-                                                descriptor->getEntry(),
+                                                entry,
                                                 {keys.begin(), keys.end()},
                                                 options,
                                                 &numDeleted);
@@ -3430,8 +3426,7 @@ public:
             // Insert the key on _id.
             {
                 auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
-                auto descriptor = indexCatalog->findIdIndex(&_opCtx);
-                auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
+                auto entry = indexCatalog->findIdIndex(&_opCtx);
                 auto iam = entry->accessMethod()->asSortedData();
                 IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
                                               entry->getIdent());
@@ -3486,8 +3481,7 @@ public:
             // Insert the key on "a".
             {
                 auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
-                auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-                auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
+                auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
                 auto iam = entry->accessMethod()->asSortedData();
                 IndexBuildInfo indexBuildInfo(indexSpec, entry->getIdent());
                 indexBuildInfo.setInternalIdents(*storageEngine,
@@ -3850,8 +3844,8 @@ public:
         {
             lockDb(MODE_X);
             const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
-            auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
+            auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
+            auto iam = entry->accessMethod()->asSortedData();
             InsertDeleteOptions options;
             options.dupsAllowed = true;
 
@@ -3862,7 +3856,7 @@ public:
                 iam->getKeys(
                     &_opCtx,
                     coll(),
-                    descriptor->getEntry(),
+                    entry,
                     pooledBuilder,
                     doc,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3876,7 +3870,7 @@ public:
                 int64_t numDeleted;
                 auto removeStatus = iam->removeKeys(&_opCtx,
                                                     *shard_role_details::getRecoveryUnit(&_opCtx),
-                                                    descriptor->getEntry(),
+                                                    entry,
                                                     {keys.begin(), keys.end()},
                                                     options,
                                                     &numDeleted);
@@ -3907,7 +3901,7 @@ public:
                 iam->getKeys(
                     &_opCtx,
                     coll(),
-                    descriptor->getEntry(),
+                    entry,
                     pooledBuilder,
                     mkDoc,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -3928,7 +3922,7 @@ public:
                 auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(&_opCtx,
                                                                           ru,
                                                                           coll(),
-                                                                          descriptor->getEntry(),
+                                                                          entry,
                                                                           {*keysIterator},
                                                                           {},
                                                                           MultikeyPaths{},
@@ -3943,7 +3937,7 @@ public:
                 insertStatus = iam->insertKeysAndUpdateMultikeyPaths(&_opCtx,
                                                                      ru,
                                                                      coll(),
-                                                                     descriptor->getEntry(),
+                                                                     entry,
                                                                      {*keysIterator},
                                                                      {},
                                                                      MultikeyPaths{},
@@ -4089,8 +4083,8 @@ public:
             lockDb(MODE_X);
 
             const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
-            auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
+            auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
+            auto iam = entry->accessMethod()->asSortedData();
             InsertDeleteOptions options;
             options.dupsAllowed = true;
 
@@ -4102,7 +4096,7 @@ public:
                 iam->getKeys(
                     &_opCtx,
                     coll(),
-                    descriptor->getEntry(),
+                    entry,
                     pooledBuilder,
                     doc1,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -4116,7 +4110,7 @@ public:
                 int64_t numDeleted;
                 auto removeStatus = iam->removeKeys(&_opCtx,
                                                     *shard_role_details::getRecoveryUnit(&_opCtx),
-                                                    descriptor->getEntry(),
+                                                    entry,
                                                     {keys.begin(), keys.end()},
                                                     options,
                                                     &numDeleted);
@@ -4148,7 +4142,7 @@ public:
                 iam->getKeys(
                     &_opCtx,
                     coll(),
-                    descriptor->getEntry(),
+                    entry,
                     pooledBuilder,
                     doc2,
                     InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -4164,7 +4158,7 @@ public:
                     &_opCtx,
                     *shard_role_details::getRecoveryUnit(&_opCtx),
                     coll(),
-                    descriptor->getEntry(),
+                    entry,
                     keys,
                     {},
                     oldMultikeyPaths,
@@ -4309,15 +4303,15 @@ public:
         }
 
         // Reload the index from the modified catalog.
-        const IndexDescriptor* descriptor = nullptr;
+        const IndexCatalogEntry* entry = nullptr;
         {
             beginTransaction();
             auto writableCatalog = writer.getWritableCollection(&_opCtx)->getIndexCatalog();
-            descriptor = writableCatalog->findIndexByName(&_opCtx, indexName);
-            descriptor = writableCatalog->refreshEntry(&_opCtx,
-                                                       writer.getWritableCollection(&_opCtx),
-                                                       descriptor,
-                                                       CreateIndexEntryFlags::kIsReady);
+            entry = writableCatalog->findIndexByName(&_opCtx, indexName);
+            entry = writableCatalog->refreshEntry(&_opCtx,
+                                                  writer.getWritableCollection(&_opCtx),
+                                                  entry,
+                                                  CreateIndexEntryFlags::kIsReady);
             commitTransaction();
         }
 
@@ -4334,10 +4328,9 @@ public:
             commitTransaction();
         }
 
-        auto catalogEntry = coll()->getIndexCatalog()->getEntry(descriptor);
         auto expectedPathsBefore = MultikeyPaths{};
-        ASSERT(catalogEntry->isMultikey(&_opCtx, coll()));
-        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx, coll()) == expectedPathsBefore);
+        ASSERT(entry->isMultikey(&_opCtx, coll()));
+        ASSERT(entry->getMultikeyPaths(&_opCtx, coll()) == expectedPathsBefore);
 
         releaseDb();
         ensureValidateWorked();
@@ -4373,8 +4366,8 @@ public:
         }
 
         auto expectedPathsAfter = MultikeyPaths{{0}, {}};
-        ASSERT(catalogEntry->isMultikey(&_opCtx, coll()));
-        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx, coll()) == expectedPathsAfter);
+        ASSERT(entry->isMultikey(&_opCtx, coll()));
+        ASSERT(entry->getMultikeyPaths(&_opCtx, coll()) == expectedPathsAfter);
 
         // Confirm validate does not make changes when run a second time.
         {
@@ -4406,8 +4399,8 @@ public:
             dumpOnErrorGuard.dismiss();
         }
 
-        ASSERT(catalogEntry->isMultikey(&_opCtx, coll()));
-        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx, coll()) == expectedPathsAfter);
+        ASSERT(entry->isMultikey(&_opCtx, coll()));
+        ASSERT(entry->getMultikeyPaths(&_opCtx, coll()) == expectedPathsAfter);
     }
 };
 
@@ -4707,8 +4700,7 @@ public:
             // Insert the key on "a".
             {
                 auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
-                auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-                auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
+                auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
                 auto iam = entry->accessMethod()->asSortedData();
                 IndexBuildInfo indexBuildInfo(indexSpec, entry->getIdent());
                 indexBuildInfo.setInternalIdents(*storageEngine,

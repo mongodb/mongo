@@ -412,7 +412,7 @@ TEST_F(CreateIndexForApplyOpsTest, GeneratesNewIdentIfNone) {
     auto index =
         collection.getCollectionPtr()->getIndexCatalog()->findIndexByName(opCtx.get(), "a_1");
     ASSERT(index);
-    ASSERT(index->getEntry()->getIdent().starts_with("index-"));
+    ASSERT(index->getIdent().starts_with("index-"));
 }
 
 TEST_F(CreateIndexForApplyOpsTest, UsesIdentIfSpecified) {
@@ -438,7 +438,7 @@ TEST_F(CreateIndexForApplyOpsTest, UsesIdentIfSpecified) {
     ASSERT(catalog->findIndexByIdent(opCtx.get(), ident));
     auto index = catalog->findIndexByName(opCtx.get(), "a_1");
     ASSERT(index);
-    ASSERT_EQ(index->getEntry()->getIdent(), ident);
+    ASSERT_EQ(index->getIdent(), ident);
 }
 
 TEST_F(CreateIndexForApplyOpsTest, MetadataValidation) {

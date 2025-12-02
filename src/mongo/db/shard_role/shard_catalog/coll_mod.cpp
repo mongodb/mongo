@@ -305,31 +305,33 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
             }
         }
         if (!indexName.empty()) {
-            cmrIndex->idx = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
-            if (!cmrIndex->idx) {
+            const auto indexEntry = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+            if (!indexEntry) {
                 return {ErrorCodes::IndexNotFound,
                         str::stream() << "cannot find index " << indexName << " for ns "
                                       << nss.toStringForErrorMsg()};
             }
+            cmrIndex->idx = indexEntry->descriptor();
         } else {
-            std::vector<const IndexDescriptor*> indexes;
+            std::vector<const IndexCatalogEntry*> indexes;
             coll->getIndexCatalog()->findIndexesByKeyPattern(
                 opCtx, keyPattern, IndexCatalog::InclusionPolicy::kReady, &indexes);
 
             if (indexes.size() > 1) {
                 return {ErrorCodes::AmbiguousIndexKeyPattern,
-                        str::stream() << "index keyPattern " << keyPattern << " matches "
-                                      << indexes.size() << " indexes,"
-                                      << " must use index name. "
-                                      << "Conflicting indexes:" << indexes[0]->infoObj() << ", "
-                                      << indexes[1]->infoObj()};
+                        str::stream()
+                            << "index keyPattern " << keyPattern << " matches " << indexes.size()
+                            << " indexes,"
+                            << " must use index name. "
+                            << "Conflicting indexes:" << indexes[0]->descriptor()->infoObj() << ", "
+                            << indexes[1]->descriptor()->infoObj()};
             } else if (indexes.empty()) {
                 return {ErrorCodes::IndexNotFound,
                         str::stream() << "cannot find index " << keyPattern << " for ns "
                                       << nss.toStringForErrorMsg()};
             }
 
-            cmrIndex->idx = indexes[0];
+            cmrIndex->idx = indexes[0]->descriptor();
         }
 
         if (cmdIndex.getExpireAfterSeconds()) {
@@ -735,7 +737,7 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     }
 
     // Throws exception if index contains duplicates.
-    auto violatingRecords = scanIndexForDuplicates(opCtx, cmr.indexRequest.idx);
+    auto violatingRecords = scanIndexForDuplicates(opCtx, (*coll).get(), cmr.indexRequest.idx);
     if (!violatingRecords.empty()) {
         uassertStatusOK(buildConvertUniqueErrorStatus(opCtx, (*coll).get(), violatingRecords));
     }
@@ -770,7 +772,7 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(
     }
     const auto& cmr = statusW.getValue().first;
     auto idx = cmr.indexRequest.idx;
-    auto violatingRecords = scanIndexForDuplicates(opCtx, idx);
+    auto violatingRecords = scanIndexForDuplicates(opCtx, (*coll).get(), idx);
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangAfterCollModIndexUniqueFullIndexScan,
@@ -1065,13 +1067,13 @@ Status _collModInternal(OperationContext* opCtx,
         std::vector<std::string> indexesWithInvalidOptions =
             writableColl->repairInvalidIndexOptions(opCtx, removeDeprecatedFields);
         for (const auto& indexWithInvalidOptions : indexesWithInvalidOptions) {
-            const IndexDescriptor* desc =
+            const auto entry =
                 writableColl->getIndexCatalog()->findIndexByName(opCtx, indexWithInvalidOptions);
-            invariant(desc);
+            invariant(entry);
 
             // Notify the index catalog that the definition of this index changed.
             writableColl->getIndexCatalog()->refreshEntry(
-                opCtx, writableColl, desc, CreateIndexEntryFlags::kIsReady);
+                opCtx, writableColl, entry, CreateIndexEntryFlags::kIsReady);
         }
 
         // Only observe non-view collMods, as view operations are observed as operations on the

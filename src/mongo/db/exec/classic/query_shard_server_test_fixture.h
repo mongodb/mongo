@@ -84,7 +84,7 @@ public:
     /**
      * Get the index descriptor for the provided 'index'. Asserts if index isn't found.
      */
-    const IndexDescriptor& getIndexDescriptor(const CollectionPtr& coll, StringData indexName);
+    const IndexCatalogEntry& getIndexEntry(const CollectionPtr& coll, StringData indexName);
 
     /**
      * A helper struct used to initialize the chunk map for the current test.

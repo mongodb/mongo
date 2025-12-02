@@ -89,12 +89,12 @@ public:
 
     void add(std::shared_ptr<const IndexCatalogEntry>&& entry) {
         if (entry->descriptor()->isIdIndex()) {
-            _cachedIdIndex = entry->descriptor();
+            _cachedIdIndex = entry.get();
         }
         IndexCatalogEntryContainer::add(std::move(entry));
     }
 
-    const IndexDescriptor* getIdIndex() const {
+    const IndexCatalogEntry* getIdIndex() const {
         return _cachedIdIndex;
     }
 
@@ -104,7 +104,7 @@ public:
 
 private:
     // Pointer to the ready _id index, if it exists. Should be kept in sync with _entries.
-    const IndexDescriptor* _cachedIdIndex{nullptr};
+    const IndexCatalogEntry* _cachedIdIndex{nullptr};
 };
 
 /**
@@ -143,13 +143,13 @@ public:
 
     BSONObj getDefaultIdIndexSpec(const CollectionPtr& collection) const override;
 
-    const IndexDescriptor* findIdIndex(OperationContext* opCtx) const override;
+    const IndexCatalogEntry* findIdIndex(OperationContext* opCtx) const override;
 
-    const IndexDescriptor* findIndexByName(OperationContext* opCtx,
-                                           StringData name,
-                                           InclusionPolicy inclusionPolicy) const override;
+    const IndexCatalogEntry* findIndexByName(OperationContext* opCtx,
+                                             StringData name,
+                                             InclusionPolicy inclusionPolicy) const override;
 
-    const IndexDescriptor* findIndexByKeyPatternAndOptions(
+    const IndexCatalogEntry* findIndexByKeyPatternAndOptions(
         OperationContext* opCtx,
         const BSONObj& key,
         const BSONObj& indexSpec,
@@ -158,23 +158,21 @@ public:
     void findIndexesByKeyPattern(OperationContext* opCtx,
                                  const BSONObj& key,
                                  InclusionPolicy inclusionPolicy,
-                                 std::vector<const IndexDescriptor*>* matches) const override;
+                                 std::vector<const IndexCatalogEntry*>* matches) const override;
 
     void findIndexByType(OperationContext* opCtx,
                          const std::string& type,
-                         std::vector<const IndexDescriptor*>& matches,
+                         std::vector<const IndexCatalogEntry*>& matches,
                          InclusionPolicy inclusionPolicy) const override;
 
-    const IndexDescriptor* findIndexByIdent(OperationContext* opCtx,
-                                            StringData ident,
-                                            InclusionPolicy inclusionPolicy) const override;
+    const IndexCatalogEntry* findIndexByIdent(OperationContext* opCtx,
+                                              StringData ident,
+                                              InclusionPolicy inclusionPolicy) const override;
 
-    const IndexDescriptor* refreshEntry(OperationContext* opCtx,
-                                        Collection* collection,
-                                        const IndexDescriptor* oldDesc,
-                                        CreateIndexEntryFlags flags) override;
-
-    const IndexCatalogEntry* getEntry(const IndexDescriptor* desc) const override;
+    const IndexCatalogEntry* refreshEntry(OperationContext* opCtx,
+                                          Collection* collection,
+                                          const IndexCatalogEntry* oldDesc,
+                                          CreateIndexEntryFlags flags) override;
 
     IndexCatalogEntry* getWritableEntryByName(OperationContext* opCtx,
                                               StringData name,
@@ -185,8 +183,6 @@ public:
         const BSONObj& key,
         const BSONObj& indexSpec,
         InclusionPolicy inclusionPolicy) override;
-
-    std::shared_ptr<const IndexCatalogEntry> getEntryShared(const IndexDescriptor*) const override;
 
     std::vector<std::shared_ptr<const IndexCatalogEntry>> getEntriesShared(
         InclusionPolicy inclusionPolicy) const override;
@@ -223,13 +219,13 @@ public:
 
     void dropIndexes(OperationContext* opCtx,
                      Collection* collection,
-                     std::function<bool(const IndexDescriptor*)> matchFn,
-                     std::function<void(const IndexDescriptor*)> onDropFn) override;
+                     std::function<bool(const IndexCatalogEntry*)> matchFn,
+                     std::function<void(const IndexCatalogEntry*)> onDropFn) override;
 
     void dropAllIndexes(OperationContext* opCtx,
                         Collection* collection,
                         bool includingIdIndex,
-                        std::function<void(const IndexDescriptor*)> onDropFn) override;
+                        std::function<void(const IndexCatalogEntry*)> onDropFn) override;
 
     Status truncateAllIndexes(OperationContext* opCtx, Collection* collection) override;
 
@@ -257,7 +253,7 @@ public:
 
     void setMultikeyPaths(OperationContext* opCtx,
                           const CollectionPtr& coll,
-                          const IndexDescriptor* desc,
+                          const IndexCatalogEntry* desc,
                           const KeyStringSet& multikeyMetadataKeys,
                           const MultikeyPaths& multikeyPaths) const override;
 
@@ -419,7 +415,7 @@ private:
      * to this function. Any previous IndexCatalogEntry/IndexDescriptor pointers that were returned
      * may be invalidated.
      */
-    IndexCatalogEntry* _getWritableEntry(const IndexDescriptor* descriptor);
+    IndexCatalogEntry* _getWritableEntry(const IndexCatalogEntry* descriptor);
 
     /**
      * Removes the entry from the container which holds it. Exactly one of the three containers must

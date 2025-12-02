@@ -164,8 +164,8 @@ public:
     unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeIndexScanExec(
         Database* db, const CollectionAcquisition& coll, BSONObj& indexSpec, int start, int end) {
         // Build the index scan stage.
-        auto descriptor = getIndex(db, indexSpec);
-        IndexScanParams ixparams(&_opCtx, coll.getCollectionPtr(), descriptor);
+        auto entry = getIndex(db, indexSpec);
+        IndexScanParams ixparams(&_opCtx, coll.getCollectionPtr(), entry);
         ixparams.bounds.isSimpleRange = true;
         ixparams.bounds.startKey = BSON("" << start);
         ixparams.bounds.endKey = BSON("" << end);
@@ -201,11 +201,11 @@ protected:
         ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build();
 
 private:
-    const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
+    const IndexCatalogEntry* getIndex(Database* db, const BSONObj& obj) {
         // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
         CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss));
-        std::vector<const IndexDescriptor*> indexes;
+        std::vector<const IndexCatalogEntry*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, obj, IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_LTE(indexes.size(), 1U);

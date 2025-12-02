@@ -248,7 +248,7 @@ GeoNear2DStage::DensityEstimator::DensityEstimator(const CollectionAcquisition* 
 // Initialize the internal states
 void GeoNear2DStage::DensityEstimator::buildIndexScan(ExpressionContext* expCtx,
                                                       WorkingSet* workingSet,
-                                                      const IndexDescriptor* twoDIndex) {
+                                                      const IndexCatalogEntry* twoDIndex) {
     // Scan bounds on 2D indexes are only over the 2D field - other bounds aren't applicable.
     // This is handled in query planning.
     IndexScanParams scanParams(
@@ -290,7 +290,7 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(ExpressionContext* expCtx,
 // from the nearest document.
 PlanStage::StageState GeoNear2DStage::DensityEstimator::work(ExpressionContext* expCtx,
                                                              WorkingSet* workingSet,
-                                                             const IndexDescriptor* twoDIndex,
+                                                             const IndexCatalogEntry* twoDIndex,
                                                              WorkingSetID* out,
                                                              double* estimatedDistance) {
     if (!_indexScan) {
@@ -373,7 +373,7 @@ PlanStage::StageState GeoNear2DStage::initialize(OperationContext* opCtx,
 
     double estimatedDistance;
     PlanStage::StageState state =
-        _densityEstimator->work(expCtx(), workingSet, indexDescriptor(), out, &estimatedDistance);
+        _densityEstimator->work(expCtx(), workingSet, indexEntry(), out, &estimatedDistance);
 
     if (state == PlanStage::IS_EOF) {
         // 2d index only works with legacy points as centroid. $nearSphere will project
@@ -412,7 +412,7 @@ GeoNear2DStage::GeoNear2DStage(const GeoNearParams& nearParams,
                                ExpressionContext* expCtx,
                                WorkingSet* workingSet,
                                CollectionAcquisition collection,
-                               const IndexDescriptor* twoDIndex)
+                               const IndexCatalogEntry* twoDIndex)
     : NearStage(expCtx,
                 kTwoDIndexNearStage.c_str(),
                 STAGE_GEO_NEAR_2D,
@@ -420,12 +420,12 @@ GeoNear2DStage::GeoNear2DStage(const GeoNearParams& nearParams,
                 collection,
                 twoDIndex),
       _nearParams(nearParams),
-      _fullBounds(twoDDistanceBounds(nearParams, twoDIndex)),
+      _fullBounds(twoDDistanceBounds(nearParams, twoDIndex->descriptor())),
       _currBounds(_fullBounds.center(), -1, _fullBounds.getInner()),
       _boundsIncrement(0.0) {
-    _specificStats.keyPattern = twoDIndex->keyPattern();
-    _specificStats.indexName = twoDIndex->indexName();
-    _specificStats.indexVersion = static_cast<int>(twoDIndex->version());
+    _specificStats.keyPattern = twoDIndex->descriptor()->keyPattern();
+    _specificStats.indexName = twoDIndex->descriptor()->indexName();
+    _specificStats.indexVersion = static_cast<int>(twoDIndex->descriptor()->version());
 }
 
 
@@ -569,7 +569,7 @@ std::unique_ptr<NearStage::CoveredInterval> GeoNear2DStage::nextInterval(Operati
 
     // Scan bounds on 2D indexes are only over the 2D field - other bounds aren't applicable.
     // This is handled in query planning.
-    IndexScanParams scanParams(opCtx, collectionPtr(), indexDescriptor());
+    IndexScanParams scanParams(opCtx, collectionPtr(), indexEntry());
 
     // This does force us to do our own deduping of results.
     scanParams.bounds = _nearParams.baseBounds;
@@ -655,7 +655,7 @@ GeoNear2DSphereStage::GeoNear2DSphereStage(const GeoNearParams& nearParams,
                                            ExpressionContext* expCtx,
                                            WorkingSet* workingSet,
                                            CollectionAcquisition collection,
-                                           const IndexDescriptor* s2Index)
+                                           const IndexCatalogEntry* s2Index)
     : NearStage(expCtx,
                 kS2IndexNearStage.c_str(),
                 STAGE_GEO_NEAR_2DSPHERE,
@@ -666,16 +666,17 @@ GeoNear2DSphereStage::GeoNear2DSphereStage(const GeoNearParams& nearParams,
       _fullBounds(geoNearDistanceBounds(*nearParams.nearQuery)),
       _currBounds(_fullBounds.center(), -1, _fullBounds.getInner()),
       _boundsIncrement(0.0) {
-    _specificStats.keyPattern = s2Index->keyPattern();
-    _specificStats.indexName = s2Index->indexName();
-    _specificStats.indexVersion = static_cast<int>(s2Index->version());
+    _specificStats.keyPattern = s2Index->descriptor()->keyPattern();
+    _specificStats.indexName = s2Index->descriptor()->indexName();
+    _specificStats.indexVersion = static_cast<int>(s2Index->descriptor()->version());
 
     // initialize2dsphereParams() does not require the collator during the GEO_NEAR_2DSPHERE stage.
     // It only requires the collator for index key generation. For query execution,
     // _nearParams.baseBounds should have collator-generated comparison keys in place of raw
     // strings, and _nearParams.filter should have the collator.
     const CollatorInterface* collator = nullptr;
-    index2dsphere::initialize2dsphereParams(s2Index->infoObj(), collator, &_indexParams);
+    index2dsphere::initialize2dsphereParams(
+        s2Index->descriptor()->infoObj(), collator, &_indexParams);
 }
 
 namespace {
@@ -754,14 +755,14 @@ GeoNear2DSphereStage::DensityEstimator::DensityEstimator(const CollectionAcquisi
 // Setup the index scan stage for neighbors at this level.
 void GeoNear2DSphereStage::DensityEstimator::buildIndexScan(ExpressionContext* expCtx,
                                                             WorkingSet* workingSet,
-                                                            const IndexDescriptor* s2Index) {
+                                                            const IndexCatalogEntry* s2Index) {
     IndexScanParams scanParams(
         expCtx->getOperationContext(), _collection->getCollectionPtr(), s2Index);
     scanParams.bounds = _nearParams->baseBounds;
 
     // Because the planner doesn't yet set up 2D index bounds, do it ourselves here
     const string s2Field = _nearParams->nearQuery->field;
-    const int s2FieldPosition = getFieldPosition(s2Index, s2Field);
+    const int s2FieldPosition = getFieldPosition(s2Index->descriptor(), s2Field);
     fassert(28677, s2FieldPosition >= 0);
     OrderedIntervalList* coveredIntervals = &scanParams.bounds.fields[s2FieldPosition];
     coveredIntervals->intervals.clear();
@@ -785,7 +786,7 @@ void GeoNear2DSphereStage::DensityEstimator::buildIndexScan(ExpressionContext* e
 
 PlanStage::StageState GeoNear2DSphereStage::DensityEstimator::work(ExpressionContext* expCtx,
                                                                    WorkingSet* workingSet,
-                                                                   const IndexDescriptor* s2Index,
+                                                                   const IndexCatalogEntry* s2Index,
                                                                    WorkingSetID* out,
                                                                    double* estimatedDistance) {
     if (!_indexScan) {
@@ -871,7 +872,7 @@ PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* opCtx,
 
     double estimatedDistance;
     PlanStage::StageState state =
-        _densityEstimator->work(expCtx(), workingSet, indexDescriptor(), out, &estimatedDistance);
+        _densityEstimator->work(expCtx(), workingSet, indexEntry(), out, &estimatedDistance);
 
     if (state == IS_EOF) {
         // We find a document in 4 neighbors at current level, but didn't at previous level.
@@ -925,7 +926,7 @@ std::unique_ptr<NearStage::CoveredInterval> GeoNear2DSphereStage::nextInterval(
     // Setup the covering region and stages for this interval
     //
 
-    IndexScanParams scanParams(opCtx, collectionPtr(), indexDescriptor());
+    IndexScanParams scanParams(opCtx, collectionPtr(), indexEntry());
 
     // This does force us to do our own deduping of results.
     scanParams.bounds = _nearParams.baseBounds;

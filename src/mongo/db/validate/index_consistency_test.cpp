@@ -70,9 +70,8 @@ void clearCollection(OperationContext* opCtx, const CollectionPtr& coll) {
 // entries.
 void clearIndexOfEntriesFoundInCollection(OperationContext* opCtx,
                                           CollectionWriter& coll,
-                                          const IndexDescriptor* descriptor) {
-    IndexCatalog* indexCatalog = coll.getWritableCollection(opCtx)->getIndexCatalog();
-    auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
+                                          const IndexCatalogEntry* entry) {
+    auto iam = entry->accessMethod()->asSortedData();
     auto cursor = coll->getCursor(opCtx);
     for (auto record = cursor->next(); record; record = cursor->next()) {
         SharedBufferFragmentBuilder pooledBuilder(
@@ -81,7 +80,7 @@ void clearIndexOfEntriesFoundInCollection(OperationContext* opCtx,
         KeyStringSet keys;
         iam->getKeys(opCtx,
                      coll.get(),
-                     descriptor->getEntry(),
+                     entry,
                      pooledBuilder,
                      record->data.toBson(),
                      InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
@@ -92,7 +91,7 @@ void clearIndexOfEntriesFoundInCollection(OperationContext* opCtx,
                      record->id);
         ASSERT_OK(iam->removeKeys(opCtx,
                                   *shard_role_details::getRecoveryUnit(opCtx),
-                                  descriptor->getEntry(),
+                                  entry,
                                   std::move(keys),
                                   InsertDeleteOptions{.dupsAllowed = true},
                                   &numDeleted));

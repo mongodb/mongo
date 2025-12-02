@@ -103,8 +103,8 @@ public:
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, ns()));
     }
 
-    const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-        std::vector<const IndexDescriptor*> indexes;
+    const IndexCatalogEntry* getIndex(Database* db, const BSONObj& obj) {
+        std::vector<const IndexCatalogEntry*> indexes;
         getCollection()->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, obj, IndexCatalog::InclusionPolicy::kReady, &indexes);
         return indexes.empty() ? nullptr : indexes[0];
@@ -112,8 +112,8 @@ public:
 
     CountScanParams makeCountScanParams(OperationContext* opCtx,
                                         const CollectionAcquisition& collection,
-                                        const IndexDescriptor* descriptor) {
-        return {opCtx, collection.getCollectionPtr(), descriptor};
+                                        const IndexCatalogEntry* entry) {
+        return {opCtx, collection.getCollectionPtr(), entry};
     }
 
     static NamespaceString ns() {

@@ -97,7 +97,7 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
     _coll.acquireCollection(_opCtx, _dbName, _collUuid);
 
     auto indexCatalog = _coll.getPtr()->getIndexCatalog();
-    auto indexDesc = indexCatalog->findIndexByName(_opCtx, _indexName);
+    auto indexEntry = indexCatalog->findIndexByName(_opCtx, _indexName);
 
     // TODO SERVER-87437: Using a uassert below is a temporary fix. The long term fix will rely on
     // using <UUID, minValidSnapshot> pair for caching plans on non-standalone deployments.
@@ -107,10 +107,10 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
     uassert(4938500,
             str::stream() << "could not find index named '" << _indexName << "' in collection '"
                           << _coll.getCollName()->toStringForErrorMsg() << "'",
-            indexDesc);
+            indexEntry);
 
-    _uniqueIndex = indexDesc->unique();
-    _entry = indexCatalog->getEntry(indexDesc);
+    _uniqueIndex = indexEntry->descriptor()->unique();
+    _entry = indexEntry;
     tassert(4938503,
             str::stream() << "expected IndexCatalogEntry for index named: " << _indexName,
             static_cast<bool>(_entry));
@@ -189,17 +189,17 @@ void IndexScanStageBase::restoreCollectionAndIndex() {
     tassert(7566700, "Expected ident to be a string", value::isString(identTag));
 
     auto indexIdent = value::getStringView(identTag, identVal);
-    auto desc = _coll.getPtr()->getIndexCatalog()->findIndexByIdent(_opCtx, indexIdent);
+    auto indexEntry = _coll.getPtr()->getIndexCatalog()->findIndexByIdent(_opCtx, indexIdent);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
-            desc);
+            indexEntry);
 
     // Re-obtain the index entry pointer that was set to null during yield preparation. It is safe
     // to access the index entry when the query is active, as its validity is protected by at least
     // MODE_IS collection locks; or, in the case of lock-free reads, its lifetime is managed by the
     // CollectionCatalog stashed on the RecoveryUnit snapshot, which is kept alive until the query
     // yields.
-    _entry = desc->getEntry();
+    _entry = indexEntry;
 }
 
 void IndexScanStageBase::doRestoreState() {

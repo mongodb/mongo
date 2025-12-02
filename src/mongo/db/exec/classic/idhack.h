@@ -61,13 +61,13 @@ public:
                 CanonicalQuery* query,
                 WorkingSet* ws,
                 CollectionAcquisition collection,
-                const IndexDescriptor* descriptor);
+                const IndexCatalogEntry* entry);
 
     IDHackStage(ExpressionContext* expCtx,
                 const BSONObj& key,
                 WorkingSet* ws,
                 CollectionAcquisition collection,
-                const IndexDescriptor* descriptor);
+                const IndexCatalogEntry* entry);
 
     ~IDHackStage() override;
 

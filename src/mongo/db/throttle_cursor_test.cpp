@@ -136,8 +136,7 @@ Date_t ThrottleCursorTest::getTime() {
 }
 
 SortedDataInterfaceThrottleCursor ThrottleCursorTest::getIdIndex(const CollectionPtr& coll) {
-    const IndexDescriptor* idDesc = coll->getIndexCatalog()->findIdIndex(operationContext());
-    const IndexCatalogEntry* idEntry = coll->getIndexCatalog()->getEntry(idDesc);
+    const auto idEntry = coll->getIndexCatalog()->findIdIndex(operationContext());
     auto iam = idEntry->accessMethod()->asSortedData();
 
     return SortedDataInterfaceThrottleCursor(operationContext(), iam, _dataThrottle.get());

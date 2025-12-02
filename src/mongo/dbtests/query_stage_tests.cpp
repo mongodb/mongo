@@ -134,7 +134,7 @@ public:
         return count;
     }
 
-    const IndexDescriptor* getIndex(const BSONObj& obj) {
+    const IndexCatalogEntry* getIndex(const BSONObj& obj) {
         const auto collection = acquireCollection(
             &_opCtx,
             CollectionAcquisitionRequest(NamespaceString::createNamespaceString_forTest(ns()),
@@ -142,14 +142,13 @@ public:
                                          repl::ReadConcernArgs::get(&_opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
-        std::vector<const IndexDescriptor*> indexes;
+        std::vector<const IndexCatalogEntry*> indexes;
         collection.getCollectionPtr()->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, obj, IndexCatalog::InclusionPolicy::kReady, &indexes);
         return indexes.empty() ? nullptr : indexes[0];
     }
 
-    IndexScanParams makeIndexScanParams(OperationContext* opCtx,
-                                        const IndexDescriptor* descriptor) {
+    IndexScanParams makeIndexScanParams(OperationContext* opCtx, const IndexCatalogEntry* entry) {
         const auto collection = acquireCollection(
             &_opCtx,
             CollectionAcquisitionRequest(NamespaceString::createNamespaceString_forTest(ns()),
@@ -157,7 +156,7 @@ public:
                                          repl::ReadConcernArgs::get(&_opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
-        IndexScanParams params(opCtx, collection.getCollectionPtr(), descriptor);
+        IndexScanParams params(opCtx, collection.getCollectionPtr(), entry);
         params.bounds.isSimpleRange = true;
         params.bounds.endKey = BSONObj();
         params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;

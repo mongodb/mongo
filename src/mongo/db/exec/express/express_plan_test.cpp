@@ -258,18 +258,14 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
         indexSpec, "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
     const CollectionPtr& collectionPtr = collection.getCollectionPtr();
 
-    auto indexDescriptor =
+    auto indexEntry =
         collectionPtr->getIndexCatalog()->findIndexByName(operationContext(), indexName);
 
     IteratorStats iteratorStats;
     auto filter = fromjson("{a: 5}");
     CollatorInterface* collator = nullptr;
     LookupViaUserIndex<FetchFromCollectionCallback> iterator(
-        filter.firstElement(),
-        indexDescriptor->getEntry()->getIdent(),
-        std::string{indexName},
-        collator,
-        nullptr);
+        filter.firstElement(), indexEntry->getIdent(), std::string{indexName}, collator, nullptr);
     iterator.open(operationContext(), collection, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
@@ -299,18 +295,14 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
         indexSpec, "{_id: 0, a: 'II'}"_sd, "{_id: 1, a: 'III'}"_sd, "{_id: 2, a: 'V'}"_sd);
     const CollectionPtr& collectionPtr = collection.getCollectionPtr();
 
-    auto indexDescriptor =
+    auto indexEntry =
         collectionPtr->getIndexCatalog()->findIndexByName(operationContext(), indexName);
-    auto collator = indexDescriptor->getEntry()->getCollator();
+    auto collator = indexEntry->getCollator();
 
     IteratorStats iteratorStats;
     auto filter = fromjson("{a: 'iii'}");
     LookupViaUserIndex<FetchFromCollectionCallback> iterator(
-        filter.firstElement(),
-        indexDescriptor->getEntry()->getIdent(),
-        std::string{indexName},
-        collator,
-        nullptr);
+        filter.firstElement(), indexEntry->getIdent(), std::string{indexName}, collator, nullptr);
     iterator.open(operationContext(), collection, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
@@ -337,18 +329,14 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
         indexSpec, "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
     const CollectionPtr& collectionPtr = collection.getCollectionPtr();
 
-    auto indexDescriptor =
+    auto indexEntry =
         collectionPtr->getIndexCatalog()->findIndexByName(operationContext(), indexName);
 
     IteratorStats iteratorStats;
     auto filter = fromjson("{a: 7}");
     CollatorInterface* collator = nullptr;
     LookupViaUserIndex<FetchFromCollectionCallback> iterator(
-        filter.firstElement(),
-        indexDescriptor->getEntry()->getIdent(),
-        std::string{indexName},
-        collator,
-        nullptr);
+        filter.firstElement(), indexEntry->getIdent(), std::string{indexName}, collator, nullptr);
     iterator.open(operationContext(), collection, &iteratorStats);
 
     // Any number of repeated calls to 'consumeOne()' should return an 'Exhausted' result without
@@ -381,7 +369,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithCoveredProjection) {
                                                                "{_id: 2, a: 8, b: 9, c: 10}"_sd);
     const CollectionPtr& collectionPtr = collection.getCollectionPtr();
 
-    auto indexDescriptor =
+    auto indexEntry =
         collectionPtr->getIndexCatalog()->findIndexByName(operationContext(), indexName);
 
     IteratorStats iteratorStats;
@@ -391,7 +379,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithCoveredProjection) {
     auto projection = parseProjection(operationContext(), fromjson("{_id: 0, a: 1, c: 1}"));
 
     LookupViaUserIndex<CreateDocumentFromIndexKey> iterator(filter.firstElement(),
-                                                            indexDescriptor->getEntry()->getIdent(),
+                                                            indexEntry->getIdent(),
                                                             std::string{indexName},
                                                             collator,
                                                             &projection);

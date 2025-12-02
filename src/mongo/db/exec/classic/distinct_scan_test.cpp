@@ -96,10 +96,10 @@ public:
             CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kRead),
             MODE_IS);
         const CollectionPtr& collPtr = coll.getCollectionPtr();
-        const auto& idxDesc = getIndexDescriptor(collPtr, "some_index");
+        const auto& idxEntry = getIndexEntry(collPtr, "some_index");
 
         // Set-up DistinctParams for a full distinct scan on the first field in the index.
-        DistinctParams params{opCtx, collPtr, &idxDesc};
+        DistinctParams params{opCtx, collPtr, &idxEntry};
         params.scanDirection = testParams.scanDirection;
         params.fieldNo = testParams.fieldNo;
         params.bounds = std::move(testParams.bounds);

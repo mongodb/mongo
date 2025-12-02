@@ -1459,10 +1459,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
     uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
 
     const auto collAcq = acquireCollForRead(_opCtx, nss);
-    auto wildcardIndexDescriptor =
-        collAcq.getCollectionPtr()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
-    const IndexCatalogEntry* entry =
-        collAcq.getCollectionPtr()->getIndexCatalog()->getEntry(wildcardIndexDescriptor);
+    auto entry = collAcq.getCollectionPtr()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
     {
         // Verify that, even though op2 was applied first, the multikey state is observed in all
         // WiredTiger transactions that can contain the data written by op1.
@@ -1555,10 +1552,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
     uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
 
     const auto collAcq = acquireCollForRead(_opCtx, nss);
-    auto wildcardIndexDescriptor =
-        collAcq.getCollectionPtr()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
-    const IndexCatalogEntry* entry =
-        collAcq.getCollectionPtr()->getIndexCatalog()->getEntry(wildcardIndexDescriptor);
+    auto entry = collAcq.getCollectionPtr()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
     {
         // Verify that, even though op2 was applied first, the multikey state is observed in all
         // WiredTiger transactions that can contain the data written by op1.
@@ -2663,10 +2657,10 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
         }
 
         auto indexCatalog = collection->getIndexCatalog();
-        buildingIndex = indexCatalog->getEntry(indexCatalog->findIndexByName(
+        buildingIndex = indexCatalog->findIndexByName(
             _opCtx,
             "a_1_b_1",
-            IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished));
+            IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
         ASSERT(buildingIndex);
 
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, nss));

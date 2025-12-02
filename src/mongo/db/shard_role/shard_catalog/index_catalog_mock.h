@@ -81,58 +81,54 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    const IndexDescriptor* findIdIndex(OperationContext*) const override {
+    const IndexCatalogEntry* findIdIndex(OperationContext*) const override {
         MONGO_UNREACHABLE;
     }
 
     // Note that the inclusion policy is currently ignored for this mock implementation (all added
     // indexes are considered).
-    const IndexDescriptor* findIndexByName(OperationContext*,
-                                           StringData name,
-                                           InclusionPolicy) const override {
+    const IndexCatalogEntry* findIndexByName(OperationContext*,
+                                             StringData name,
+                                             InclusionPolicy) const override {
         for (const auto& entry : _indexEntries) {
             if (entry->descriptor()->indexName() == name) {
-                return entry->descriptor();
+                return entry.get();
             }
         }
         return nullptr;
     }
 
-    const IndexDescriptor* findIndexByKeyPatternAndOptions(OperationContext*,
-                                                           const BSONObj&,
-                                                           const BSONObj&,
-                                                           InclusionPolicy) const override {
+    const IndexCatalogEntry* findIndexByKeyPatternAndOptions(OperationContext*,
+                                                             const BSONObj&,
+                                                             const BSONObj&,
+                                                             InclusionPolicy) const override {
         MONGO_UNREACHABLE;
     }
 
     void findIndexesByKeyPattern(OperationContext*,
                                  const BSONObj&,
                                  InclusionPolicy,
-                                 std::vector<const IndexDescriptor*>*) const override {
+                                 std::vector<const IndexCatalogEntry*>*) const override {
         MONGO_UNREACHABLE;
     }
 
     void findIndexByType(OperationContext*,
                          const std::string&,
-                         std::vector<const IndexDescriptor*>&,
+                         std::vector<const IndexCatalogEntry*>&,
                          InclusionPolicy) const override {
         MONGO_UNREACHABLE;
     }
 
-    const IndexDescriptor* findIndexByIdent(OperationContext*,
-                                            StringData,
-                                            InclusionPolicy) const override {
+    const IndexCatalogEntry* findIndexByIdent(OperationContext*,
+                                              StringData,
+                                              InclusionPolicy) const override {
         MONGO_UNREACHABLE;
     }
 
-    const IndexDescriptor* refreshEntry(OperationContext*,
-                                        Collection*,
-                                        const IndexDescriptor*,
-                                        CreateIndexEntryFlags) override {
-        MONGO_UNREACHABLE;
-    }
-
-    const IndexCatalogEntry* getEntry(const IndexDescriptor*) const override {
+    const IndexCatalogEntry* refreshEntry(OperationContext*,
+                                          Collection*,
+                                          const IndexCatalogEntry*,
+                                          CreateIndexEntryFlags) override {
         MONGO_UNREACHABLE;
     }
 
@@ -146,10 +142,6 @@ public:
                                                               const BSONObj&,
                                                               const BSONObj&,
                                                               InclusionPolicy) override {
-        MONGO_UNREACHABLE;
-    }
-
-    std::shared_ptr<const IndexCatalogEntry> getEntryShared(const IndexDescriptor*) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -224,15 +216,15 @@ public:
 
     void dropIndexes(OperationContext*,
                      Collection*,
-                     std::function<bool(const IndexDescriptor*)>,
-                     std::function<void(const IndexDescriptor*)>) override {
+                     std::function<bool(const IndexCatalogEntry*)>,
+                     std::function<void(const IndexCatalogEntry*)>) override {
         MONGO_UNREACHABLE;
     }
 
     void dropAllIndexes(OperationContext*,
                         Collection*,
                         bool,
-                        std::function<void(const IndexDescriptor*)>) override {
+                        std::function<void(const IndexCatalogEntry*)>) override {
         MONGO_UNREACHABLE;
     }
 
@@ -260,7 +252,7 @@ public:
 
     void setMultikeyPaths(OperationContext*,
                           const CollectionPtr&,
-                          const IndexDescriptor*,
+                          const IndexCatalogEntry*,
                           const KeyStringSet&,
                           const MultikeyPaths&) const override {
         MONGO_UNREACHABLE;

@@ -152,7 +152,7 @@ protected:
         // Verify whether or not the index has been marked as multikey.
         ASSERT_EQ(
             expectIndexIsMultikey,
-            getIndexDesc(collectionPtr, indexName)->getEntry()->isMultikey(opCtx(), collectionPtr));
+            getIndexCatalogEntry(collectionPtr, indexName)->isMultikey(opCtx(), collectionPtr));
 
         // Obtain a cursor over the index, and confirm that the keys are present in order.
         auto indexCursor = getIndexCursor(collectionPtr, indexName);
@@ -282,14 +282,9 @@ protected:
         return docs;
     }
 
-    const IndexDescriptor* getIndexDesc(const CollectionPtr& collection,
-                                        const StringData indexName) {
-        return collection->getIndexCatalog()->findIndexByName(opCtx(), indexName);
-    }
-
     const IndexCatalogEntry* getIndexCatalogEntry(const CollectionPtr& collection,
                                                   const StringData indexName) {
-        return collection->getIndexCatalog()->getEntry(getIndexDesc(collection, indexName));
+        return collection->getIndexCatalog()->findIndexByName(opCtx(), indexName);
     }
 
     std::unique_ptr<SortedDataInterface::Cursor> getIndexCursor(const CollectionPtr& collection,

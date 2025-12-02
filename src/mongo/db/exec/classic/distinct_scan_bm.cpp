@@ -181,7 +181,7 @@ public:
             CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kRead),
             MODE_IS);
         const CollectionPtr& collPtr = _coll->getCollectionPtr();
-        const auto& idxDesc = getIndexDescriptor(collPtr, "some_index");
+        const auto& idxDesc = getIndexEntry(collPtr, "some_index");
 
         // Set-up DistinctParams for a full distinct scan on the first field in the index.
         _params = DistinctParams{opCtx, collPtr, &idxDesc};

@@ -64,8 +64,8 @@ protected:
             operationContext(), writer.getWritableCollection(operationContext()), spec));
         wuow.commit();
 
-        return indexCatalog->getEntry(indexCatalog->findIndexByName(
-            operationContext(), spec.getStringField(IndexDescriptor::kIndexNameFieldName)));
+        return indexCatalog->findIndexByName(
+            operationContext(), spec.getStringField(IndexDescriptor::kIndexNameFieldName));
     }
 
     std::unique_ptr<IndexBuildInterceptor> createIndexBuildInterceptor(BSONObj spec) {
@@ -171,7 +171,7 @@ protected:
         return contents;
     }
 
-    const IndexDescriptor* getIndexDescriptor(const std::string& indexName) {
+    const IndexCatalogEntry* getIndexEntry(const std::string& indexName) {
         return _coll.get()->getIndexCatalog()->findIndexByName(operationContext(), indexName);
     }
 
@@ -194,7 +194,7 @@ private:
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
     auto interceptor = createIndexBuildInterceptor(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
-    const IndexDescriptor* desc = getIndexDescriptor("a_1");
+    const auto entry = getIndexEntry("a_1");
 
     key_string::HeapBuilder ksBuilder(key_string::Version::kLatestVersion);
     ksBuilder.appendNumberLong(10);
@@ -203,7 +203,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
     WriteUnitOfWork wuow(operationContext());
     int64_t numKeys = 0;
     ASSERT_OK(interceptor->sideWrite(operationContext(),
-                                     desc->getEntry(),
+                                     entry,
                                      {keyString},
                                      {},
                                      {},
@@ -298,15 +298,14 @@ TEST_F(IndexBuilderInterceptorTest,
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTable) {
     auto interceptor =
         createIndexBuildInterceptor(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
-    const IndexDescriptor* desc = getIndexDescriptor("a_1");
+    const auto entry = getIndexEntry("a_1");
 
     key_string::HeapBuilder ksBuilder(key_string::Version::kLatestVersion);
     ksBuilder.appendNumberLong(10);
     key_string::Value keyString(ksBuilder.release());
 
     WriteUnitOfWork wuow(operationContext());
-    ASSERT_OK(interceptor->recordDuplicateKey(
-        operationContext(), *_coll.get(), desc->getEntry(), keyString));
+    ASSERT_OK(interceptor->recordDuplicateKey(operationContext(), *_coll.get(), entry, keyString));
     wuow.commit();
 
     key_string::View keyStringView(keyString);
@@ -322,15 +321,14 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTablePrimar
         "featureFlagPrimaryDrivenIndexBuilds", true);
     auto interceptor =
         createIndexBuildInterceptor(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
-    const IndexDescriptor* desc = getIndexDescriptor("a_1");
+    const auto entry = getIndexEntry("a_1");
 
     key_string::HeapBuilder ksBuilder(key_string::Version::kLatestVersion);
     ksBuilder.appendNumberLong(10);
     key_string::Value keyString(ksBuilder.release());
 
     WriteUnitOfWork wuow(operationContext());
-    ASSERT_OK(interceptor->recordDuplicateKey(
-        operationContext(), *_coll.get(), desc->getEntry(), keyString));
+    ASSERT_OK(interceptor->recordDuplicateKey(operationContext(), *_coll.get(), entry, keyString));
     wuow.commit();
 
     key_string::View keyStringView(keyString);

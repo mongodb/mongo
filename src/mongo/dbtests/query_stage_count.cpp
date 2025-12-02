@@ -255,14 +255,14 @@ public:
 
     IndexScan* createIndexScan(MatchExpression* expr, WorkingSet* ws) {
         const IndexCatalog* catalog = _coll->getCollectionPtr()->getIndexCatalog();
-        std::vector<const IndexDescriptor*> indexes;
+        std::vector<const IndexCatalogEntry*> indexes;
         catalog->findIndexesByKeyPattern(
             &_opCtx, BSON("x" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
-        auto descriptor = indexes[0];
+        auto entry = indexes[0];
 
         // We are not testing indexing here so use maximal bounds
-        IndexScanParams params(&_opCtx, _coll->getCollectionPtr(), descriptor);
+        IndexScanParams params(&_opCtx, _coll->getCollectionPtr(), entry);
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = BSON("" << 0);
         params.bounds.endKey = BSON("" << kDocuments + 1);

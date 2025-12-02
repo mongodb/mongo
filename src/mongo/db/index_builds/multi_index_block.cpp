@@ -1006,11 +1006,8 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                 }
 
                 return {&collection.getCollectionPtr(),
-                        collection.getCollectionPtr()
-                            ->getIndexCatalog()
-                            ->findIndexByIdent(
-                                opCtx, indexIdent, IndexCatalog::InclusionPolicy::kUnfinished)
-                            ->getEntry()};
+                        collection.getCollectionPtr()->getIndexCatalog()->findIndexByIdent(
+                            opCtx, indexIdent, IndexCatalog::InclusionPolicy::kUnfinished)};
             };
 
             Status status = _indexes[i].bulk->commit(

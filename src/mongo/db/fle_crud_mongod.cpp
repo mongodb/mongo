@@ -571,22 +571,22 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
             // collection
             auto indexCatalog = collectionPtr->getIndexCatalog();
 
-            const IndexDescriptor* indexDescriptor = indexCatalog->findIndexByName(
+            const auto indexEntry = indexCatalog->findIndexByName(
                 opCtx, IndexConstants::kIdIndexName, IndexCatalog::InclusionPolicy::kReady);
-            if (!indexDescriptor) {
+            if (!indexEntry) {
                 uasserted(ErrorCodes::IndexNotFound,
                           str::stream() << "Index not found, ns:" << toStringForLogging(nsOrUUID)
                                         << ", index: " << IndexConstants::kIdIndexName);
             }
 
-            if (indexDescriptor->isPartial()) {
+            if (indexEntry->descriptor()->isPartial()) {
                 uasserted(ErrorCodes::IndexOptionsConflict,
                           str::stream() << "Partial index is not allowed for this operation, ns:"
                                         << toStringForLogging(nsOrUUID)
                                         << ", index: " << IndexConstants::kIdIndexName);
             }
 
-            auto indexCatalogEntry = indexDescriptor->getEntry()->shared_from_this();
+            auto indexCatalogEntry = indexEntry->shared_from_this();
 
             auto sdi = indexCatalogEntry->accessMethod()->asSortedData();
             auto indexCursor =

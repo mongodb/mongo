@@ -489,10 +489,9 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
         uassert(ErrorCodes::IndexNotFound,
                 "Could not find entry in IndexCatalog for index " + indexName,
                 idx);
-        auto entry = idxCatalog->getEntry(idx);
-        doc["spec"] = Value(idx->infoObj());
+        doc["spec"] = Value(idx->descriptor()->infoObj());
 
-        if (!entry->isReady()) {
+        if (!idx->isReady()) {
             doc["building"] = Value(true);
         }
 

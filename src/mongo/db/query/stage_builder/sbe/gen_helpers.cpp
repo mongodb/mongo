@@ -238,8 +238,8 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
             // If 'entryMap' doesn't contain an entry for 'indexIdent', create one.
             if (it == entryMap.end()) {
                 auto indexCatalog = collection->getIndexCatalog();
-                auto indexDesc = indexCatalog->findIndexByIdent(opCtx, indexIdent);
-                auto entry = indexDesc ? indexDesc->getEntry() : nullptr;
+                auto entry = indexCatalog->findIndexByIdent(opCtx, indexIdent);
+                auto indexDesc = entry ? entry->descriptor() : nullptr;
 
                 // Throw an error if we can't get the IndexDescriptor or the IndexCatalogEntry
                 // (or if the index is dropped).

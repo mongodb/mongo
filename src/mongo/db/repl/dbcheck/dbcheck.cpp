@@ -370,13 +370,13 @@ DbCheckHasher::DbCheckHasher(
     if (!indexName) {
         if (!collectionPtr->isClustered()) {
             // Get the _id index.
-            const IndexDescriptor* desc = collectionPtr->getIndexCatalog()->findIdIndex(opCtx);
-            uassert(ErrorCodes::IndexNotFound, "dbCheck needs _id index", desc);
+            const auto entry = collectionPtr->getIndexCatalog()->findIdIndex(opCtx);
+            uassert(ErrorCodes::IndexNotFound, "dbCheck needs _id index", entry);
 
             // Set up a simple index scan on that.
             _exec = InternalPlanner::indexScan(opCtx,
                                                acquisition.collection(),
-                                               desc,
+                                               entry,
                                                start,
                                                end,
                                                BoundInclusion::kIncludeEndKeyOnly,
@@ -452,10 +452,8 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
     invariant(_indexName);
     StringData indexName = _indexName.get();
     // We should have already checked for if the index exists at this timestamp.
-    const IndexDescriptor* indexDescriptor =
-        collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
-    const IndexCatalogEntry* indexCatalogEntry =
-        collection->getIndexCatalog()->getEntry(indexDescriptor);
+    const auto indexCatalogEntry = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    const auto indexDescriptor = indexCatalogEntry->descriptor();
     const auto iam = indexCatalogEntry->accessMethod()->asSortedData();
     const auto ordering = iam->getSortedDataInterface()->getOrdering();
     const key_string::Version keyStringVersion =
@@ -1025,17 +1023,17 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
         // TODO SERVER-78399: Clean up this check once feature flag is removed.
         const boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters =
             entry.getSecondaryIndexCheckParameters();
-        const IndexDescriptor* indexDescriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
+        auto indexEntry = collection->getIndexCatalog()->findIdIndex(opCtx);
         if (secondaryIndexCheckParameters) {
             mongo::DbCheckValidationModeEnum validateMode =
                 secondaryIndexCheckParameters.get().getValidateMode();
             switch (validateMode) {
                 case mongo::DbCheckValidationModeEnum::extraIndexKeysCheck: {
                     StringData indexName = secondaryIndexCheckParameters.get().getSecondaryIndex();
-                    indexDescriptor =
+                    indexEntry =
                         collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
 
-                    if (!indexDescriptor) {
+                    if (!indexEntry) {
                         std::string msg = "cannot find index " + indexName + " for ns " +
                             entry.getNss().toStringForErrorMsg();
                         const auto logEntry =
@@ -1132,6 +1130,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
         auto hasherLastKeyChecked = hasher->lastKeySeen();
         auto batchStartForLogging = batchStart;
         auto batchEndForLogging = batchEnd;
+        const auto indexDescriptor = indexEntry ? indexEntry->descriptor() : nullptr;
+
         if (indexDescriptor) {
             // TODO (SERVER-61796): Handle cases where the _id index doesn't exist. We should still
             // log with a rehydrated index key.

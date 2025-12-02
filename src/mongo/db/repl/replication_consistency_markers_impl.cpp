@@ -287,13 +287,12 @@ Status ReplicationConsistencyMarkersImpl::_upsertOplogTruncateAfterPointDocument
             if (!_oplogTruncateRecordId) {
                 auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);
 
-                const IndexCatalogEntry* entry = collection->getIndexCatalog()->getEntry(idIndex);
-                auto indexAccess = entry->accessMethod()->asSortedData();
+                auto indexAccess = idIndex->accessMethod()->asSortedData();
 
                 auto recordId = indexAccess->findSingle(opCtx,
                                                         *shard_role_details::getRecoveryUnit(opCtx),
                                                         collection,
-                                                        entry,
+                                                        idIndex,
                                                         kOplogTruncateAfterPointId);
 
                 if (recordId.isNull()) {

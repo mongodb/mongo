@@ -106,7 +106,7 @@ protected:
               StageType type,
               WorkingSet* workingSet,
               CollectionAcquisition collection,
-              const IndexDescriptor* indexDescriptor);
+              const IndexCatalogEntry* indexEntry);
 
     //
     // Methods implemented for specific search functionality

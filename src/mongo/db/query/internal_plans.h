@@ -62,7 +62,7 @@ namespace mongo {
 class BSONObj;
 class Collection;
 class CollectionPtr;
-class IndexDescriptor;
+class IndexCatalogEntry;
 class OperationContext;
 class PlanStage;
 class CollectionAcquisition;
@@ -170,7 +170,7 @@ public:
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> indexScan(
         OperationContext* opCtx,
         const CollectionAcquisition& collection,
-        const IndexDescriptor* descriptor,
+        const IndexCatalogEntry* descriptor,
         const BSONObj& startKey,
         const BSONObj& endKey,
         BoundInclusion boundInclusion,
@@ -186,7 +186,7 @@ public:
         OperationContext* opCtx,
         CollectionAcquisition collection,
         std::unique_ptr<DeleteStageParams> params,
-        const IndexDescriptor* descriptor,
+        const IndexCatalogEntry* descriptor,
         const BSONObj& startKey,
         const BSONObj& endKey,
         BoundInclusion boundInclusion,
@@ -235,7 +235,7 @@ public:
         OperationContext* opCtx,
         CollectionAcquisition collection,
         const UpdateStageParams& params,
-        const IndexDescriptor* descriptor,
+        const IndexCatalogEntry* descriptor,
         const BSONObj& key,
         PlanYieldPolicy::YieldPolicy yieldPolicy);
 
@@ -270,7 +270,7 @@ private:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         WorkingSet* ws,
         const CollectionAcquisition& collection,
-        const IndexDescriptor* descriptor,
+        const IndexCatalogEntry* descriptor,
         const BSONObj& startKey,
         const BSONObj& endKey,
         BoundInclusion boundInclusion,

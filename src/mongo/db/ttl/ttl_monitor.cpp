@@ -199,11 +199,11 @@ RecordIdBound makeCollScanEndBound(const CollectionPtr& collection, Date_t expir
     return RecordIdBound(record_id_helpers::keyForDate(expirationDate));
 }
 
-const IndexDescriptor* getValidTTLIndex(OperationContext* opCtx,
-                                        TTLCollectionCache* ttlCollectionCache,
-                                        const CollectionPtr& collection,
-                                        const BSONObj& spec,
-                                        std::string indexName) {
+const IndexCatalogEntry* getValidTTLIndex(OperationContext* opCtx,
+                                          TTLCollectionCache* ttlCollectionCache,
+                                          const CollectionPtr& collection,
+                                          const BSONObj& spec,
+                                          std::string indexName) {
     if (!spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
         ttlCollectionCache->deregisterTTLIndexByName(collection->uuid(), indexName);
         return nullptr;
@@ -213,13 +213,14 @@ const IndexDescriptor* getValidTTLIndex(OperationContext* opCtx,
         return nullptr;
     }
 
-    const IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
-    if (!desc) {
+    const auto entry = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    if (!entry) {
         LOGV2_DEBUG(22535, 1, "index not found; skipping ttl job", "index"_attr = spec);
         return nullptr;
     }
 
-    if (IndexType::INDEX_BTREE != IndexNames::nameToType(desc->getAccessMethodName())) {
+    if (IndexType::INDEX_BTREE !=
+        IndexNames::nameToType(entry->descriptor()->getAccessMethodName())) {
         LOGV2_ERROR(22541,
                     "special index can't be used as a TTL index, skipping TTL job",
                     "index"_attr = spec);
@@ -238,7 +239,7 @@ const IndexDescriptor* getValidTTLIndex(OperationContext* opCtx,
         return nullptr;
     }
 
-    return desc;
+    return entry;
 }
 
 }  // namespace
@@ -555,12 +556,12 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
     }
 
     BSONObj spec = collectionPtr->getIndexSpec(indexName);
-    const IndexDescriptor* desc =
-        getValidTTLIndex(opCtx, ttlCollectionCache, collectionPtr, spec, indexName);
-
-    if (!desc) {
+    const auto entry = getValidTTLIndex(opCtx, ttlCollectionCache, collectionPtr, spec, indexName);
+    if (!entry) {
         return false;
     }
+
+    const auto desc = entry->descriptor();
 
     LOGV2_DEBUG(22533,
                 1,
@@ -608,7 +609,7 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
     auto exec = InternalPlanner::deleteWithIndexScan(opCtx,
                                                      collection,
                                                      std::move(params),
-                                                     desc,
+                                                     entry,
                                                      startKey,
                                                      endKey,
                                                      BoundInclusion::kIncludeBothStartAndEndKeys,

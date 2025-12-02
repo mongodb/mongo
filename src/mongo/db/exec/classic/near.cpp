@@ -46,8 +46,8 @@ NearStage::NearStage(ExpressionContext* expCtx,
                      StageType type,
                      WorkingSet* workingSet,
                      CollectionAcquisition collection,
-                     const IndexDescriptor* indexDescriptor)
-    : RequiresIndexStage(typeName, expCtx, collection, indexDescriptor, workingSet),
+                     const IndexCatalogEntry* indexEntry)
+    : RequiresIndexStage(typeName, expCtx, collection, indexEntry, workingSet),
       _workingSet(workingSet),
       _searchState(SearchState::Initializing),
       _seenDocuments(expCtx),

@@ -110,7 +110,7 @@ protected:
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     boost::optional<CollectionAcquisition> _coll;
-    const IndexDescriptor* _mockGeoIndex;
+    const IndexCatalogEntry* _mockGeoIndex;
 };
 
 /**
@@ -131,13 +131,9 @@ public:
     MockNearStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   WorkingSet* workingSet,
                   const CollectionAcquisition& coll,
-                  const IndexDescriptor* indexDescriptor)
-        : NearStage(expCtx.get(),
-                    "MOCK_DISTANCE_SEARCH_STAGE",
-                    STAGE_UNKNOWN,
-                    workingSet,
-                    coll,
-                    indexDescriptor),
+                  const IndexCatalogEntry* entry)
+        : NearStage(
+              expCtx.get(), "MOCK_DISTANCE_SEARCH_STAGE", STAGE_UNKNOWN, workingSet, coll, entry),
           _pos(0) {}
 
     void addInterval(std::vector<BSONObj> data, double min, double max) {

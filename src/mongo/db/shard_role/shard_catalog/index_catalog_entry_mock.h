@@ -49,9 +49,7 @@ public:
                           bool isFrozen,
                           const MatchExpression* filter = nullptr,
                           const CollatorInterface* collator = nullptr)
-        : _descriptor(descriptor), _ident(ident), _filter(filter), _collator(collator) {
-        _descriptor.setEntry(this);
-    }
+        : _descriptor(descriptor), _ident(ident), _filter(filter), _collator(collator) {}
 
     const std::string& getIdent() const final {
         return _ident;

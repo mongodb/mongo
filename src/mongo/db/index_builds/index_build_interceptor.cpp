@@ -317,11 +317,8 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
             // After yielding, the latest instance of the collection is fetched and can be different
             // from the collection instance prior to yielding. For this reason we need to refresh
             // the index entry pointer.
-            indexCatalogEntry = coll->getIndexCatalog()
-                                    ->findIndexByIdent(opCtx,
-                                                       indexIdent,
-                                                       IndexCatalog::InclusionPolicy::kUnfinished)
-                                    ->getEntry();
+            indexCatalogEntry = coll->getIndexCatalog()->findIndexByIdent(
+                opCtx, indexIdent, IndexCatalog::InclusionPolicy::kUnfinished);
         }
 
         {

@@ -59,12 +59,12 @@ namespace mongo {
 class WorkingSet;
 
 struct IndexScanParams {
-    IndexScanParams(const IndexDescriptor* descriptor,
+    IndexScanParams(const IndexCatalogEntry* entry,
                     std::string indexName,
                     BSONObj keyPattern,
                     MultikeyPaths multikeyPaths,
                     bool multikey)
-        : indexDescriptor(descriptor),
+        : indexEntry(entry),
           name(std::move(indexName)),
           keyPattern(std::move(keyPattern)),
           multikeyPaths(std::move(multikeyPaths)),
@@ -72,14 +72,19 @@ struct IndexScanParams {
 
     IndexScanParams(OperationContext* opCtx,
                     const CollectionPtr& collection,
-                    const IndexDescriptor* descriptor)
-        : IndexScanParams(descriptor,
-                          descriptor->indexName(),
-                          descriptor->keyPattern(),
-                          descriptor->getEntry()->getMultikeyPaths(opCtx, collection),
-                          descriptor->getEntry()->isMultikey(opCtx, collection)) {}
+                    const IndexCatalogEntry* entry)
+        : IndexScanParams(
+              entry,
+              entry->descriptor()->indexName(),
+              entry->descriptor()->keyPattern(),
+              [&]() {
+                  MultikeyPaths paths;
+                  collection->isIndexMultikey(opCtx, entry->descriptor()->indexName(), &paths);
+                  return paths;
+              }(),
+              collection->isIndexMultikey(opCtx, entry->descriptor()->indexName(), nullptr)) {}
 
-    const IndexDescriptor* indexDescriptor;
+    const IndexCatalogEntry* indexEntry;
 
     std::string name;
 

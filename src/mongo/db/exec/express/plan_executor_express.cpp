@@ -619,7 +619,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
     boost::optional<ScopedCollectionFilter> collectionFilter,
     bool returnOwnedBson) {
     const auto& [index, coversProjection] = indexForExpressEquality;
-    auto indexDescriptor = coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(
+    const auto indexEntry = coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(
         opCtx, index.identifier.catalogName);
     tassert(8884404,
             fmt::format("Attempt to build plan for nonexistent index -- namespace: {}, "
@@ -627,7 +627,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
                         coll.getCollectionPtr()->ns().toStringForErrorMsg(),
                         cq->toStringShortForErrorMsg(),
                         index.toString()),
-            indexDescriptor);
+            indexEntry);
 
     const CollatorInterface* collator = cq->getCollator();
     const projection_ast::Projection* projection = cq->getProj();
@@ -639,7 +639,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
         return makeExpressExecutor(
             opCtx,
             express::LookupViaUserIndex<FetchCallback>(queryFilter,
-                                                       indexDescriptor->getEntry()->getIdent(),
+                                                       indexEntry->getIdent(),
                                                        index.identifier.catalogName,
                                                        collator,
                                                        projection),

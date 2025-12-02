@@ -124,7 +124,7 @@ Status checkReplState(OperationContext* opCtx, const CollectionPtr& collPtr) {
 StatusWith<const IndexDescriptor*> getDescriptorByKeyPattern(OperationContext* opCtx,
                                                              const IndexCatalog* indexCatalog,
                                                              const BSONObj& keyPattern) {
-    std::vector<const IndexDescriptor*> indexes;
+    std::vector<const IndexCatalogEntry*> indexes;
     indexCatalog->findIndexesByKeyPattern(
         opCtx, keyPattern, IndexCatalog::InclusionPolicy::kAll, &indexes);
     if (indexes.empty()) {
@@ -132,13 +132,14 @@ StatusWith<const IndexDescriptor*> getDescriptorByKeyPattern(OperationContext* o
                       str::stream() << "can't find index with key: " << keyPattern);
     } else if (indexes.size() > 1) {
         return Status(ErrorCodes::AmbiguousIndexKeyPattern,
-                      str::stream() << indexes.size() << " indexes found for key: " << keyPattern
-                                    << ", identify by name instead."
-                                    << " Conflicting indexes: " << indexes[0]->infoObj() << ", "
-                                    << indexes[1]->infoObj());
+                      str::stream()
+                          << indexes.size() << " indexes found for key: " << keyPattern
+                          << ", identify by name instead."
+                          << " Conflicting indexes: " << indexes[0]->descriptor()->infoObj() << ", "
+                          << indexes[1]->descriptor()->infoObj());
     }
 
-    const IndexDescriptor* desc = indexes[0];
+    const IndexDescriptor* desc = indexes[0]->descriptor();
     if (desc->isIdIndex()) {
         return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
     }
@@ -326,8 +327,8 @@ void dropReadyIndexes(OperationContext* opCtx,
             indexCatalog->dropIndexes(
                 opCtx,
                 collection,
-                [&](const IndexDescriptor* desc) {
-                    if (desc->isIdIndex()) {
+                [&](const IndexCatalogEntry* entry) {
+                    if (entry->descriptor()->isIdIndex()) {
                         return false;
                     }
                     // Allow users to drop the hashed index for any index that is compatible with
@@ -340,7 +341,7 @@ void dropReadyIndexes(OperationContext* opCtx,
                         skipDroppingHashedShardKeyIndex || !shardKey.isHashedPattern();
                     if (isCompatibleWithShardKey(opCtx,
                                                  CollectionPtr(collection),
-                                                 desc->getEntry(),
+                                                 entry,
                                                  shardKey.toBSON(),
                                                  false /* requiresSingleKey */) &&
                         skipDropIndex) {
@@ -349,7 +350,8 @@ void dropReadyIndexes(OperationContext* opCtx,
 
                     return true;
                 },
-                [opCtx, collection](const IndexDescriptor* desc) {
+                [opCtx, collection](const IndexCatalogEntry* entry) {
+                    const auto desc = entry->descriptor();
                     opCtx->getServiceContext()->getOpObserver()->onDropIndex(opCtx,
                                                                              collection->ns(),
                                                                              collection->uuid(),
@@ -360,12 +362,13 @@ void dropReadyIndexes(OperationContext* opCtx,
             reply->setMsg("non-_id indexes and non-shard key indexes dropped for collection"_sd);
         } else {
             indexCatalog->dropAllIndexes(
-                opCtx, collection, false, [opCtx, collection](const IndexDescriptor* desc) {
-                    opCtx->getServiceContext()->getOpObserver()->onDropIndex(opCtx,
-                                                                             collection->ns(),
-                                                                             collection->uuid(),
-                                                                             desc->indexName(),
-                                                                             desc->infoObj());
+                opCtx, collection, false, [opCtx, collection](const IndexCatalogEntry* entry) {
+                    opCtx->getServiceContext()->getOpObserver()->onDropIndex(
+                        opCtx,
+                        collection->ns(),
+                        collection->uuid(),
+                        entry->descriptor()->indexName(),
+                        entry->descriptor()->infoObj());
                 });
 
             reply->setMsg("non-_id indexes dropped for collection"_sd);
@@ -482,14 +485,13 @@ Status validateDropIndexes(OperationContext* opCtx,
         indexBuildsCoord->hasIndexBuilder(opCtx, collAcq.uuid(), {indexNames});
 
     for (const auto& indexName : indexNames) {
-        auto indexDescriptor =
+        auto entry =
             indexCatalog->findIndexByName(opCtx, indexName, IndexCatalog::InclusionPolicy::kAll);
 
-        if (!indexDescriptor) {
+        if (!entry) {
             continue;  // Skip non-existent indexes
         }
 
-        auto entry = indexCatalog->getEntry(indexDescriptor);
         if (entry->descriptor()->isIdIndex()) {
             return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
         }

@@ -75,7 +75,7 @@ namespace {
 RecordId find(OperationContext* opCtx,
               const CollectionPtr& systemViews,
               const NamespaceString& viewName) {
-    const IndexCatalogEntry* entry = systemViews->getIndexCatalog()->findIdIndex(opCtx)->getEntry();
+    const auto entry = systemViews->getIndexCatalog()->findIdIndex(opCtx);
     return entry->accessMethod()->asSortedData()->findSingle(
         opCtx,
         *shard_role_details::getRecoveryUnit(opCtx),

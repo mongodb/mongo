@@ -57,29 +57,34 @@ namespace mongo {
 class WorkingSet;
 
 struct CountScanParams {
-    CountScanParams(const IndexDescriptor* descriptor,
+    CountScanParams(const IndexCatalogEntry* entry,
                     std::string indexName,
                     BSONObj keyPattern,
                     MultikeyPaths multikeyPaths,
                     bool multikey)
-        : indexDescriptor(descriptor),
+        : indexEntry(entry),
           name(std::move(indexName)),
           keyPattern(std::move(keyPattern)),
           multikeyPaths(std::move(multikeyPaths)),
           isMultiKey(multikey) {
-        tassert(11051649, "Expecting non-null index descriptor", descriptor);
+        tassert(11051649, "Expecting non-null index entry", entry);
     }
 
     CountScanParams(OperationContext* opCtx,
                     const CollectionPtr& collection,
-                    const IndexDescriptor* descriptor)
-        : CountScanParams(descriptor,
-                          descriptor->indexName(),
-                          descriptor->keyPattern(),
-                          descriptor->getEntry()->getMultikeyPaths(opCtx, collection),
-                          descriptor->getEntry()->isMultikey(opCtx, collection)) {}
+                    const IndexCatalogEntry* entry)
+        : CountScanParams(
+              entry,
+              entry->descriptor()->indexName(),
+              entry->descriptor()->keyPattern(),
+              [&]() {
+                  MultikeyPaths paths;
+                  collection->isIndexMultikey(opCtx, entry->descriptor()->indexName(), &paths);
+                  return paths;
+              }(),
+              collection->isIndexMultikey(opCtx, entry->descriptor()->indexName(), nullptr)) {}
 
-    const IndexDescriptor* indexDescriptor;
+    const IndexCatalogEntry* indexEntry;
     std::string name;
 
     BSONObj keyPattern;

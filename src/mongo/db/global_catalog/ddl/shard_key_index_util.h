@@ -54,16 +54,17 @@ public:
      * are. Either the 'index' is a clustered index and '_clusteredIndexKeyPattern' is
      * non-empty, or '_indexDescriptor' is non-null and a standard index exists.
      */
-    ShardKeyIndex(const IndexDescriptor* indexDescriptor);
+    ShardKeyIndex(const IndexCatalogEntry* indexEntry);
     ShardKeyIndex(const ClusteredIndexSpec& clusteredIndexSpec);
 
     const BSONObj& keyPattern() const;
-    const IndexDescriptor* descriptor() const {
-        return _indexDescriptor;
+
+    const IndexCatalogEntry* indexEntry() const {
+        return _indexEntry;
     }
 
 private:
-    const IndexDescriptor* _indexDescriptor;
+    const IndexCatalogEntry* _indexEntry;
 
     // Stores the keyPattern when the index is a clustered index and there is no
     // IndexDescriptor. Empty otherwise.

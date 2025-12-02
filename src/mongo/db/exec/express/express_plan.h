@@ -412,10 +412,10 @@ private:
     static const IndexCatalogEntry* getIndexCatalogEntryForIdIndex(OperationContext* opCtx,
                                                                    const Collection& collection) {
         const IndexCatalog* catalog = collection.getIndexCatalog();
-        const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
-        tassert(8884401, "Missing _id index on non-clustered collection", desc);
+        const auto entry = catalog->findIdIndex(opCtx);
+        tassert(8884401, "Missing _id index on non-clustered collection", entry);
 
-        return catalog->getEntry(desc);
+        return entry;
     }
 
     BSONObj _queryFilter;  // Owned BSON.
@@ -734,12 +734,12 @@ private:
                                                                      const std::string& indexIdent,
                                                                      const std::string& indexName) {
         const IndexCatalog* catalog = collection.getIndexCatalog();
-        const IndexDescriptor* desc = catalog->findIndexByIdent(opCtx, indexIdent);
+        const auto entry = catalog->findIndexByIdent(opCtx, indexIdent);
         uassert(ErrorCodes::QueryPlanKilled,
                 fmt::format("query plan killed :: index {} dropped", indexName),
-                desc);
+                entry);
 
-        return catalog->getEntry(desc);
+        return entry;
     }
 
     BSONElement _filterValue;  // Unowned BSON.

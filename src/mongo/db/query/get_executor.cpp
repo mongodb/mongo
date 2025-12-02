@@ -681,8 +681,8 @@ private:
             return nullptr;
         }
 
-        const IndexDescriptor* descriptor = mainCollection->getIndexCatalog()->findIdIndex(_opCtx);
-        if (!descriptor) {
+        const auto indexEntry = mainCollection->getIndexCatalog()->findIdIndex(_opCtx);
+        if (!indexEntry) {
             return nullptr;
         }
 
@@ -694,7 +694,7 @@ private:
         fastPathQueryCounters.incrementIdHackQueryCounter();
         auto result = releaseResult();
         result->runtimePlanner =
-            std::make_unique<crp_classic::IdHackPlanner>(makePlannerData(), descriptor);
+            std::make_unique<crp_classic::IdHackPlanner>(makePlannerData(), indexEntry);
         return result;
     }
 

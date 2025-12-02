@@ -310,7 +310,7 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
 
     auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);
     if (idIndex) {
-        b.append("idIndex", idIndex->infoObj());
+        b.append("idIndex", idIndex->descriptor()->infoObj());
     }
 
     return b.obj();

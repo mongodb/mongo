@@ -767,15 +767,13 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> buildIndexJoinLookupForeignSid
     const auto foreignCollUUID = foreignColl->uuid();
     const auto& foreignCollDbName = foreignColl->ns().dbName();
     const auto& indexName = index.identifier.catalogName;
-    const auto indexDescriptor =
-        foreignColl->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
+    const auto indexEntry = foreignColl->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
     tassert(6447401,
             str::stream() << "Index " << indexName
                           << " is unexpectedly missing for $lookup index join",
-            indexDescriptor);
+            indexEntry);
 
-    const auto indexAccessMethod =
-        foreignColl->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
+    const auto indexAccessMethod = indexEntry->accessMethod()->asSortedData();
     const auto indexVersion = indexAccessMethod->getSortedDataInterface()->getKeyStringVersion();
     const auto indexOrdering = indexAccessMethod->getSortedDataInterface()->getOrdering();
 

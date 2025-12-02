@@ -153,7 +153,7 @@ public:
         const CollectionPtr& collPtr = collection.getCollectionPtr();
 
         // Set up the distinct stage.
-        std::vector<const IndexDescriptor*> indexes;
+        std::vector<const IndexCatalogEntry*> indexes;
         collPtr->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, BSON("a" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
@@ -219,7 +219,7 @@ public:
         const auto coll = acquireCollForRead(&_opCtx, nss);
 
         // Set up the distinct stage.
-        std::vector<const IndexDescriptor*> indexes;
+        std::vector<const IndexCatalogEntry*> indexes;
         coll.getCollectionPtr()->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, BSON("a" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         MONGO_verify(indexes.size() == 1);
@@ -285,7 +285,7 @@ public:
 
         const auto coll = acquireCollForRead(&_opCtx, nss);
 
-        std::vector<const IndexDescriptor*> indices;
+        std::vector<const IndexCatalogEntry*> indices;
         coll.getCollectionPtr()->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, BSON("a" << 1 << "b" << 1), IndexCatalog::InclusionPolicy::kReady, &indices);
         ASSERT_EQ(1U, indices.size());

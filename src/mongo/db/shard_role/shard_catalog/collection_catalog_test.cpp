@@ -1692,11 +1692,11 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithIndex) {
     ASSERT_NE(coll.get(), latestColl);
     ASSERT_EQ(coll->getSharedIdent(), latestColl->getSharedIdent());
 
-    auto indexDescPast = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
-    auto indexDescLatest = latestColl->getIndexCatalog()->findIndexByName(newOpCtx.get(), "x_1");
-    ASSERT_BSONOBJ_EQ(indexDescPast->infoObj(), indexDescLatest->infoObj());
-    ASSERT_EQ(coll->getIndexCatalog()->getEntryShared(indexDescPast)->getSharedIdent(),
-              latestColl->getIndexCatalog()->getEntryShared(indexDescLatest)->getSharedIdent());
+    auto indexEntryPast = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
+    auto indexEntryLatest = latestColl->getIndexCatalog()->findIndexByName(newOpCtx.get(), "x_1");
+    ASSERT_BSONOBJ_EQ(indexEntryPast->descriptor()->infoObj(),
+                      indexEntryLatest->descriptor()->infoObj());
+    ASSERT_EQ(indexEntryPast->getSharedIdent(), indexEntryLatest->getSharedIdent());
 }
 
 TEST_F(CollectionCatalogTimestampTest, OpenLatestCollectionWithIndex) {
@@ -1729,11 +1729,11 @@ TEST_F(CollectionCatalogTimestampTest, OpenLatestCollectionWithIndex) {
     // Ensure the idents are shared between the collection and index instances.
     ASSERT_EQ(coll->getSharedIdent(), currentColl->getSharedIdent());
 
-    auto indexDesc = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
-    auto indexDescCurrent = currentColl->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
-    ASSERT_BSONOBJ_EQ(indexDesc->infoObj(), indexDescCurrent->infoObj());
-    ASSERT_EQ(coll->getIndexCatalog()->getEntryShared(indexDesc)->getSharedIdent(),
-              currentColl->getIndexCatalog()->getEntryShared(indexDescCurrent)->getSharedIdent());
+    auto indexEntry = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
+    auto indexEntryCurrent = currentColl->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
+    ASSERT_BSONOBJ_EQ(indexEntry->descriptor()->infoObj(),
+                      indexEntryCurrent->descriptor()->infoObj());
+    ASSERT_EQ(indexEntry->getSharedIdent(), indexEntryCurrent->getSharedIdent());
 }
 
 TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithDropPendingIndex) {
@@ -1761,8 +1761,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithDropPendingIndex
     {
         auto latestColl =
             CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
-        auto desc = latestColl->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
-        index = latestColl->getIndexCatalog()->getEntryShared(desc);
+        auto entry = latestColl->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
+        index = entry->shared_from_this();
     }
 
     dropIndex(opCtx.get(), nss, "x_1", dropIndexTs);
@@ -1786,12 +1786,11 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithDropPendingIndex
         CollectionCatalog::get(newOpCtx.get())->lookupCollectionByNamespace(newOpCtx.get(), nss);
     ASSERT_NE(coll.get(), latestColl);
 
-    auto indexDescX = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
-    auto indexDescY = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "y_1");
+    auto indexEntryX = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
+    auto indexEntryY = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "y_1");
 
-    auto indexEntryX = coll->getIndexCatalog()->getEntryShared(indexDescX);
     auto indexEntryXIdent = indexEntryX->getSharedIdent();
-    auto indexEntryYIdent = coll->getIndexCatalog()->getEntryShared(indexDescY)->getSharedIdent();
+    auto indexEntryYIdent = indexEntryY->getSharedIdent();
 
     // Check use_count(). 2 in the unit test, 1 in the opened collection.
     ASSERT_EQ(3, indexEntryXIdent.use_count());
@@ -1840,8 +1839,8 @@ TEST_F(CollectionCatalogTimestampTest,
     std::shared_ptr<const IndexCatalogEntry> index = [&] {
         auto latestColl =
             CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
-        auto desc = latestColl->getIndexCatalog()->findIndexByName(opCtx.get(), zIndexName);
-        return latestColl->getIndexCatalog()->getEntryShared(desc);
+        auto entry = latestColl->getIndexCatalog()->findIndexByName(opCtx.get(), zIndexName);
+        return entry->shared_from_this();
     }();
 
     dropIndex(opCtx.get(), nss, yIndexName, dropYIndexTs);
@@ -1880,8 +1879,7 @@ TEST_F(CollectionCatalogTimestampTest,
 
     ASSERT_NE(coll.get(), latestColl);
 
-    auto indexDescZ = coll->getIndexCatalog()->findIndexByName(opCtx.get(), zIndexName);
-    auto indexEntryZ = coll->getIndexCatalog()->getEntryShared(indexDescZ);
+    auto indexEntryZ = coll->getIndexCatalog()->findIndexByName(opCtx.get(), zIndexName);
     auto indexEntryZIsMultikey = indexEntryZ->isMultikey(newOpCtx.get(), CollectionPtr(coll));
 
     ASSERT_FALSE(indexEntryZIsMultikey);
@@ -3487,9 +3485,8 @@ TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
     ASSERT_EQ(1, latestColl->getIndexCatalog()->numIndexesTotal());
     ASSERT_EQ(0, latestColl->getIndexCatalog()->numIndexesReady());
     ASSERT_EQ(1, latestColl->getIndexCatalog()->numIndexesInProgress());
-    const IndexDescriptor* desc = latestColl->getIndexCatalog()->findIndexByName(
+    const auto entry = latestColl->getIndexCatalog()->findIndexByName(
         newOpCtx.get(), "x_1", IndexCatalog::InclusionPolicy::kUnfinished);
-    const IndexCatalogEntry* entry = latestColl->getIndexCatalog()->getEntry(desc);
     ASSERT(!entry->isReady());
 
     {
@@ -3500,7 +3497,7 @@ TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
         auto writableColl = writer.getWritableCollection(opCtx.get());
         auto writableEntry = writableColl->getIndexCatalog()->getWritableEntryByName(
             opCtx.get(), "x_1", IndexCatalog::InclusionPolicy::kUnfinished);
-        ASSERT_NOT_EQUALS(desc, writableEntry->descriptor());
+        ASSERT_NOT_EQUALS(entry->descriptor(), writableEntry->descriptor());
         writableColl->getIndexCatalog()->indexBuildSuccess(
             opCtx.get(), writableColl, writableEntry);
         ASSERT(writableEntry->isReady());

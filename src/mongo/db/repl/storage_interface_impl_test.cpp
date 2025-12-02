@@ -189,9 +189,8 @@ TimestampedBSONObj makeOplogEntry(OpTime opTime) {
  */
 int64_t getIndexKeyCount(OperationContext* opCtx,
                          const IndexCatalog* cat,
-                         const IndexDescriptor* desc) {
-    return cat->getEntry(desc)->accessMethod()->numKeys(
-        opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+                         const IndexCatalogEntry* entry) {
+    return entry->accessMethod()->numKeys(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
 }
 
 std::vector<InsertStatement> transformInserts(std::vector<BSONObj> docs) {
@@ -612,8 +611,8 @@ TEST_F(StorageInterfaceImplTest, CreateCollectionWithIDIndexCommits) {
     const auto& collPtr = coll.getCollectionPtr();
     ASSERT_EQ(collPtr->getRecordStore()->numRecords(), 2LL);
     auto collIdxCat = collPtr->getIndexCatalog();
-    auto idIdxDesc = collIdxCat->findIdIndex(opCtx);
-    auto count = getIndexKeyCount(opCtx, collIdxCat, idIdxDesc);
+    auto idIdxEntry = collIdxCat->findIdIndex(opCtx);
+    auto count = getIndexKeyCount(opCtx, collIdxCat, idIdxEntry);
     ASSERT_EQ(count, 2LL);
 }
 
@@ -3450,7 +3449,7 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeySucceeds) {
     ASSERT_TRUE(coll.exists());
     const auto& collPtr = coll.getCollectionPtr();
     auto indexCatalog = collPtr->getIndexCatalog();
-    auto entry = indexCatalog->findIndexByName(opCtx, indexName)->getEntry();
+    auto entry = indexCatalog->findIndexByName(opCtx, indexName);
     ASSERT(entry->isMultikey(opCtx, collPtr));
     ASSERT(paths == entry->getMultikeyPaths(opCtx, collPtr));
 }
