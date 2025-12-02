@@ -102,7 +102,7 @@ export function verifyCommonFTDCParameters(adminDb, isEnabled) {
     // Verify the defaults are as we documented them
     assert.eq(getparam("diagnosticDataCollectionEnabled"), isEnabled);
     assert.eq(getparam("diagnosticDataCollectionPeriodMillis"), 1000);
-    assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 250);
+    assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 500);
     assert.eq(getparam("diagnosticDataCollectionFileSizeMB"), 10);
     assert.eq(getparam("diagnosticDataCollectionSamplesPerChunk"), 300);
     assert.eq(getparam("diagnosticDataCollectionSamplesPerInterimUpdate"), 10);
