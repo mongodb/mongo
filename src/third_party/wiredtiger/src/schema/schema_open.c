@@ -636,9 +636,6 @@ __schema_open_layered_ingest(WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered
     ingest_btree = (WT_BTREE *)session->dhandle->handle;
     layered->ingest_btree_id = ingest_btree->id;
 
-    /* Flag the ingest btree as participating in automatic garbage collection */
-    F_SET(ingest_btree, WT_BTREE_GARBAGE_COLLECT);
-
     WT_RET(__wt_session_release_dhandle(session));
     return (0);
 }

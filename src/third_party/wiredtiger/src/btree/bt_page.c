@@ -1299,6 +1299,9 @@ int
 __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type, uint32_t alloc_entries, bool alloc_refs,
   WT_PAGE **pagep, uint32_t flags)
 {
+    WT_BTREE *btree;
+    WT_CACHE *cache;
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_PAGE *page;
     WT_PAGE_INDEX *pindex;
@@ -1308,6 +1311,9 @@ __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type, uint32_t alloc_entries, 
 
     WT_UNUSED(flags);
 
+    btree = S2BT(session);
+    conn = S2C(session);
+    cache = conn->cache;
     *pagep = NULL;
     page = NULL;
 
@@ -1336,7 +1342,7 @@ __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type, uint32_t alloc_entries, 
     }
 
     /* Allocate the structure that holds the disaggregated information for the page. */
-    if (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED)) {
+    if (F_ISSET(btree, WT_BTREE_DISAGGREGATED)) {
         size += sizeof(WT_PAGE_DISAGG_INFO);
         WT_RET(__wt_calloc(session, 1, size, &page));
         page->disagg_info =
@@ -1390,8 +1396,14 @@ err:
 
     /* Increment the cache statistics. */
     __wt_cache_page_inmem_incr(session, page, size, false);
-    (void)__wt_atomic_add_uint64(&S2C(session)->cache->pages_inmem, 1);
-    page->cache_create_gen = __wt_atomic_load_uint64_relaxed(&S2C(session)->evict->evict_pass_gen);
+    (void)__wt_atomic_add_uint64(&cache->pages_inmem, 1);
+    if (__wt_conn_is_disagg(session)) {
+        if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+            (void)__wt_atomic_add_uint64(&cache->pages_inmem_ingest, 1);
+        else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+            (void)__wt_atomic_add_uint64(&cache->pages_inmem_stable, 1);
+    }
+    page->cache_create_gen = __wt_atomic_load_uint64_relaxed(&conn->evict->evict_pass_gen);
 
     *pagep = page;
     return (0);

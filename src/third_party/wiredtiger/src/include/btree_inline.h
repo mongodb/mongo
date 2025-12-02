@@ -388,14 +388,28 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size,
     if (size == 0)
         return;
 
+    bool is_disagg = __wt_conn_is_disagg(session);
+
     /*
      * Always increase the size in sequence of cache, btree, and page as we may race with other
      * threads that are trying to decrease the sizes concurrently.
      */
     (void)__wt_atomic_add_uint64(&cache->bytes_inmem, size);
+    if (is_disagg) {
+        if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+            (void)__wt_atomic_add_uint64(&cache->bytes_inmem_ingest, size);
+        else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+            (void)__wt_atomic_add_uint64(&cache->bytes_inmem_stable, size);
+    }
     (void)__wt_atomic_add_uint64(&btree->bytes_inmem, size);
     if (WT_PAGE_IS_INTERNAL(page)) {
         (void)__wt_atomic_add_uint64(&cache->bytes_internal, size);
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                (void)__wt_atomic_add_uint64(&cache->bytes_internal_ingest, size);
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                (void)__wt_atomic_add_uint64(&cache->bytes_internal_stable, size);
+        }
         (void)__wt_atomic_add_uint64(&btree->bytes_internal, size);
     }
     (void)__wt_atomic_add_size(&page->memory_footprint, size);
@@ -404,15 +418,33 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size,
         __txn_incr_bytes_dirty(session, size, new_update);
         if (!WT_PAGE_IS_INTERNAL(page)) {
             (void)__wt_atomic_add_uint64(&cache->bytes_updates, size);
+            if (is_disagg) {
+                if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                    (void)__wt_atomic_add_uint64(&cache->bytes_updates_ingest, size);
+                else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                    (void)__wt_atomic_add_uint64(&cache->bytes_updates_stable, size);
+            }
             (void)__wt_atomic_add_uint64(&btree->bytes_updates, size);
             (void)__wt_atomic_add_uint64(&page->modify->bytes_updates, size);
         }
         if (__wt_page_is_modified(page)) {
             if (WT_PAGE_IS_INTERNAL(page)) {
                 (void)__wt_atomic_add_uint64(&cache->bytes_dirty_intl, size);
+                if (is_disagg) {
+                    if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                        (void)__wt_atomic_add_uint64(&cache->bytes_dirty_intl_ingest, size);
+                    else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                        (void)__wt_atomic_add_uint64(&cache->bytes_dirty_intl_stable, size);
+                }
                 (void)__wt_atomic_add_uint64(&btree->bytes_dirty_intl, size);
             } else {
                 (void)__wt_atomic_add_uint64(&cache->bytes_dirty_leaf, size);
+                if (is_disagg) {
+                    if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                        (void)__wt_atomic_add_uint64(&cache->bytes_dirty_leaf_ingest, size);
+                    else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                        (void)__wt_atomic_add_uint64(&cache->bytes_dirty_leaf_stable, size);
+                }
                 (void)__wt_atomic_add_uint64(&btree->bytes_dirty_leaf, size);
             }
             (void)__wt_atomic_add_uint64(&page->modify->bytes_dirty, size);
@@ -518,16 +550,34 @@ __wt_cache_page_byte_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t 
     if (i == 5)
         return;
 
+    bool is_disagg = __wt_conn_is_disagg(session);
+
     if (WT_PAGE_IS_INTERNAL(page)) {
         __wt_cache_decr_check_uint64(
           session, &btree->bytes_dirty_intl, decr, "WT_BTREE.bytes_dirty_intl");
         __wt_cache_decr_check_uint64(
           session, &cache->bytes_dirty_intl, decr, "WT_CACHE.bytes_dirty_intl");
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                __wt_cache_decr_check_uint64(session, &cache->bytes_dirty_intl_ingest, decr,
+                  "WT_CACHE.bytes_dirty_intl_ingest");
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                __wt_cache_decr_check_uint64(session, &cache->bytes_dirty_intl_stable, decr,
+                  "WT_CACHE.bytes_dirty_intl_stable");
+        }
     } else {
         __wt_cache_decr_check_uint64(
           session, &btree->bytes_dirty_leaf, decr, "WT_BTREE.bytes_dirty_leaf");
         __wt_cache_decr_check_uint64(
           session, &cache->bytes_dirty_leaf, decr, "WT_CACHE.bytes_dirty_leaf");
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                __wt_cache_decr_check_uint64(session, &cache->bytes_dirty_leaf_ingest, decr,
+                  "WT_CACHE.bytes_dirty_leaf_ingest");
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                __wt_cache_decr_check_uint64(session, &cache->bytes_dirty_leaf_stable, decr,
+                  "WT_CACHE.bytes_dirty_leaf_stable");
+        }
     }
 }
 
@@ -562,6 +612,14 @@ __wt_cache_page_byte_updates_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_
 
     __wt_cache_decr_check_uint64(session, &btree->bytes_updates, decr, "WT_BTREE.bytes_updates");
     __wt_cache_decr_check_uint64(session, &cache->bytes_updates, decr, "WT_CACHE.bytes_updates");
+    if (__wt_conn_is_disagg(session)) {
+        if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+            __wt_cache_decr_check_uint64(
+              session, &cache->bytes_updates_ingest, decr, "WT_CACHE.bytes_updates_ingest");
+        else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+            __wt_cache_decr_check_uint64(
+              session, &cache->bytes_updates_stable, decr, "WT_CACHE.bytes_updates_ingest");
+    }
 }
 /*
  * __wt_cache_page_inmem_decr --
@@ -572,9 +630,11 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
     WT_BTREE *btree;
     WT_CACHE *cache;
+    bool is_disagg;
 
     btree = S2BT(session);
     cache = S2C(session)->cache;
+    is_disagg = __wt_conn_is_disagg(session);
 
     WT_ASSERT(session, size < WT_EXABYTE);
 
@@ -585,6 +645,14 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
     __wt_cache_decr_check_size(session, &page->memory_footprint, size, "WT_PAGE.memory_footprint");
     __wt_cache_decr_check_uint64(session, &btree->bytes_inmem, size, "WT_BTREE.bytes_inmem");
     __wt_cache_decr_check_uint64(session, &cache->bytes_inmem, size, "WT_CACHE.bytes_inmem");
+    if (is_disagg) {
+        if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+            __wt_cache_decr_check_uint64(
+              session, &cache->bytes_inmem_ingest, size, "WT_CACHE.bytes_inmem_ingest");
+        else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+            __wt_cache_decr_check_uint64(
+              session, &cache->bytes_inmem_stable, size, "WT_CACHE.bytes_inmem_stable");
+    }
     if (page->modify != NULL && !WT_PAGE_IS_INTERNAL(page))
         __wt_cache_page_byte_updates_decr(session, page, size);
     if (__wt_page_is_modified(page))
@@ -595,6 +663,14 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
           session, &btree->bytes_internal, size, "WT_BTREE.bytes_internal");
         __wt_cache_decr_check_uint64(
           session, &cache->bytes_internal, size, "WT_CACHE.bytes_internal");
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                __wt_cache_decr_check_uint64(
+                  session, &cache->bytes_internal_ingest, size, "WT_CACHE.bytes_internal_ingest");
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                __wt_cache_decr_check_uint64(
+                  session, &cache->bytes_internal_stable, size, "WT_CACHE.bytes_internal_stable");
+        }
     }
 }
 
@@ -607,9 +683,11 @@ __wt_cache_dirty_incr_size(WT_SESSION_IMPL *session, size_t size, bool is_intern
 {
     WT_BTREE *btree;
     WT_CACHE *cache;
+    bool is_disagg;
 
     btree = S2BT(session);
     cache = S2C(session)->cache;
+    is_disagg = __wt_conn_is_disagg(session);
 
     /*
      * Always increase the size in sequence of cache, btree, and page as we may race with other
@@ -620,10 +698,28 @@ __wt_cache_dirty_incr_size(WT_SESSION_IMPL *session, size_t size, bool is_intern
     if (is_internal) {
         (void)__wt_atomic_add_uint64(&cache->pages_dirty_intl, 1);
         (void)__wt_atomic_add_uint64(&cache->bytes_dirty_intl, size);
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT)) {
+                (void)__wt_atomic_add_uint64(&cache->pages_dirty_intl_ingest, 1);
+                (void)__wt_atomic_add_uint64(&cache->bytes_dirty_intl_ingest, size);
+            } else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED)) {
+                (void)__wt_atomic_add_uint64(&cache->pages_dirty_intl_stable, 1);
+                (void)__wt_atomic_add_uint64(&cache->bytes_dirty_intl_stable, size);
+            }
+        }
         (void)__wt_atomic_add_uint64(&btree->bytes_dirty_intl, size);
     } else {
         (void)__wt_atomic_add_uint64(&cache->pages_dirty_leaf, 1);
         (void)__wt_atomic_add_uint64(&cache->bytes_dirty_leaf, size);
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT)) {
+                (void)__wt_atomic_add_uint64(&cache->pages_dirty_leaf_ingest, 1);
+                (void)__wt_atomic_add_uint64(&cache->bytes_dirty_leaf_ingest, size);
+            } else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED)) {
+                (void)__wt_atomic_add_uint64(&cache->pages_dirty_leaf_stable, 1);
+                (void)__wt_atomic_add_uint64(&cache->bytes_dirty_leaf_stable, size);
+            }
+        }
         (void)__wt_atomic_add_uint64(&btree->bytes_dirty_leaf, size);
     }
 }
@@ -637,9 +733,11 @@ __wt_cache_dirty_decr_size(WT_SESSION_IMPL *session, size_t size, bool is_intern
 {
     WT_BTREE *btree;
     WT_CACHE *cache;
+    bool is_disagg;
 
     btree = S2BT(session);
     cache = S2C(session)->cache;
+    is_disagg = __wt_conn_is_disagg(session);
 
     /*
      * Always increase the size in sequence of cache, btree, and page as we may race with other
@@ -654,12 +752,38 @@ __wt_cache_dirty_decr_size(WT_SESSION_IMPL *session, size_t size, bool is_intern
           session, &btree->bytes_dirty_intl, size, "WT_BTREE.bytes_dirty_intl");
         __wt_cache_decr_check_uint64(
           session, &cache->bytes_dirty_intl, size, "WT_CACHE.bytes_dirty_intl");
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT)) {
+                __wt_cache_decr_check_uint64(
+                  session, &cache->pages_dirty_intl_ingest, 1, "dirty internal ingest page count");
+                __wt_cache_decr_check_uint64(session, &cache->bytes_dirty_intl_ingest, size,
+                  "WT_CACHE.bytes_dirty_intl_ingest");
+            } else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED)) {
+                __wt_cache_decr_check_uint64(
+                  session, &cache->pages_dirty_intl_stable, 1, "dirty internal stable page count");
+                __wt_cache_decr_check_uint64(session, &cache->bytes_dirty_intl_stable, size,
+                  "WT_CACHE.bytes_dirty_intl_stable");
+            }
+        }
     } else {
         __wt_cache_decr_check_uint64(session, &cache->pages_dirty_leaf, 1, "dirty leaf page count");
         __wt_cache_decr_check_uint64(
           session, &btree->bytes_dirty_leaf, size, "WT_BTREE.bytes_dirty_leaf");
         __wt_cache_decr_check_uint64(
           session, &cache->bytes_dirty_leaf, size, "WT_CACHE.bytes_dirty_leaf");
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT)) {
+                __wt_cache_decr_check_uint64(
+                  session, &cache->pages_dirty_leaf_ingest, 1, "dirty leaf ingest page count");
+                __wt_cache_decr_check_uint64(session, &cache->bytes_dirty_leaf_ingest, size,
+                  "WT_CACHE.bytes_dirty_leaf_ingest");
+            } else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED)) {
+                __wt_cache_decr_check_uint64(
+                  session, &cache->pages_dirty_leaf_stable, 1, "dirty leaf stable page count");
+                __wt_cache_decr_check_uint64(session, &cache->bytes_dirty_leaf_stable, size,
+                  "WT_CACHE.bytes_dirty_leaf_stable");
+            }
+        }
     }
 }
 
@@ -670,16 +794,37 @@ __wt_cache_dirty_decr_size(WT_SESSION_IMPL *session, size_t size, bool is_intern
 static WT_INLINE void
 __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+    WT_BTREE *btree;
     WT_CACHE *cache;
     WT_PAGE_MODIFY *modify;
+    bool is_disagg;
 
+    btree = S2BT(session);
     cache = S2C(session)->cache;
+    is_disagg = __wt_conn_is_disagg(session);
 
-    if (WT_PAGE_IS_INTERNAL(page))
+    if (WT_PAGE_IS_INTERNAL(page)) {
         __wt_cache_decr_check_uint64(
           session, &cache->pages_dirty_intl, 1, "dirty internal page count");
-    else
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                __wt_cache_decr_check_uint64(
+                  session, &cache->pages_dirty_intl_ingest, 1, "dirty internal ingest page count");
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                __wt_cache_decr_check_uint64(
+                  session, &cache->pages_dirty_intl_stable, 1, "dirty internal stable page count");
+        }
+    } else {
         __wt_cache_decr_check_uint64(session, &cache->pages_dirty_leaf, 1, "dirty leaf page count");
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                __wt_cache_decr_check_uint64(
+                  session, &cache->pages_dirty_leaf_ingest, 1, "dirty leaf ingest page count");
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                __wt_cache_decr_check_uint64(
+                  session, &cache->pages_dirty_leaf_stable, 1, "dirty leaf stable page count");
+        }
+    }
 
     modify = page->modify;
     if (modify != NULL && modify->bytes_dirty != 0)
@@ -693,16 +838,37 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 static WT_INLINE void
 __wt_cache_page_image_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+    WT_BTREE *btree;
     WT_CACHE *cache;
+    bool is_disagg;
 
+    btree = S2BT(session);
     cache = S2C(session)->cache;
+    is_disagg = __wt_conn_is_disagg(session);
 
-    if (WT_PAGE_IS_INTERNAL(page))
+    if (WT_PAGE_IS_INTERNAL(page)) {
         __wt_cache_decr_check_uint64(
           session, &cache->bytes_image_intl, page->dsk->mem_size, "WT_CACHE.bytes_image");
-    else
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                __wt_cache_decr_check_uint64(session, &cache->bytes_image_intl_ingest,
+                  page->dsk->mem_size, "WT_CACHE.bytes_intl_image_ingest");
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                __wt_cache_decr_check_uint64(session, &cache->bytes_image_intl_stable,
+                  page->dsk->mem_size, "WT_CACHE.bytes_intl_image_stable");
+        }
+    } else {
         __wt_cache_decr_check_uint64(
           session, &cache->bytes_image_leaf, page->dsk->mem_size, "WT_CACHE.bytes_image");
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                __wt_cache_decr_check_uint64(session, &cache->bytes_image_leaf_ingest,
+                  page->dsk->mem_size, "WT_CACHE.bytes_leaf_image_ingest");
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                __wt_cache_decr_check_uint64(session, &cache->bytes_image_leaf_stable,
+                  page->dsk->mem_size, "WT_CACHE.bytes_leaf_image_stable");
+        }
+    }
 }
 
 /*
@@ -712,13 +878,31 @@ __wt_cache_page_image_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 static WT_INLINE void
 __wt_cache_page_image_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+    WT_BTREE *btree;
     WT_CACHE *cache;
+    bool is_disagg;
 
+    btree = S2BT(session);
     cache = S2C(session)->cache;
-    if (WT_PAGE_IS_INTERNAL(page))
+    is_disagg = __wt_conn_is_disagg(session);
+
+    if (WT_PAGE_IS_INTERNAL(page)) {
         (void)__wt_atomic_add_uint64(&cache->bytes_image_intl, page->dsk->mem_size);
-    else
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                (void)__wt_atomic_add_uint64(&cache->bytes_image_intl_ingest, page->dsk->mem_size);
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                (void)__wt_atomic_add_uint64(&cache->bytes_image_intl_stable, page->dsk->mem_size);
+        }
+    } else {
         (void)__wt_atomic_add_uint64(&cache->bytes_image_leaf, page->dsk->mem_size);
+        if (is_disagg) {
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+                (void)__wt_atomic_add_uint64(&cache->bytes_image_leaf_ingest, page->dsk->mem_size);
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                (void)__wt_atomic_add_uint64(&cache->bytes_image_leaf_stable, page->dsk->mem_size);
+        }
+    }
 }
 
 /*

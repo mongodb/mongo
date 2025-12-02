@@ -491,6 +491,7 @@ struct __wt_cursor_version {
     /* Don't show the user any keys from before this time. */
     wt_timestamp_t start_timestamp;
 
+    /* Location. */
 #define WT_CURVERSION_UPDATE_CHAIN 0
 #define WT_CURVERSION_DISK_IMAGE 1
 #define WT_CURVERSION_HISTORY_STORE 2

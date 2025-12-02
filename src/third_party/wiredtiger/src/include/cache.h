@@ -50,15 +50,29 @@ struct __wt_cache {
      */
 
     wt_shared uint64_t bytes_dirty_intl; /* Bytes/pages currently dirty */
+    wt_shared uint64_t bytes_dirty_intl_ingest;
+    wt_shared uint64_t bytes_dirty_intl_stable;
     wt_shared uint64_t bytes_dirty_leaf;
+    wt_shared uint64_t bytes_dirty_leaf_ingest;
+    wt_shared uint64_t bytes_dirty_leaf_stable;
     wt_shared uint64_t bytes_dirty_total;
-    wt_shared uint64_t bytes_evict;         /* Bytes/pages discarded by eviction */
-    wt_shared uint64_t bytes_image_intl;    /* Bytes of disk images (internal) */
-    wt_shared uint64_t bytes_image_leaf;    /* Bytes of disk images (leaf) */
-    wt_shared uint64_t bytes_inmem;         /* Bytes/pages in memory */
-    wt_shared uint64_t bytes_internal;      /* Bytes of internal pages */
-    wt_shared uint64_t bytes_read;          /* Bytes read into memory */
-    wt_shared uint64_t bytes_updates;       /* Bytes of updates to pages */
+    wt_shared uint64_t bytes_evict;      /* Bytes/pages discarded by eviction */
+    wt_shared uint64_t bytes_image_intl; /* Bytes of disk images (internal) */
+    wt_shared uint64_t bytes_image_intl_ingest;
+    wt_shared uint64_t bytes_image_intl_stable;
+    wt_shared uint64_t bytes_image_leaf; /* Bytes of disk images (leaf) */
+    wt_shared uint64_t bytes_image_leaf_ingest;
+    wt_shared uint64_t bytes_image_leaf_stable;
+    wt_shared uint64_t bytes_inmem; /* Bytes/pages in memory */
+    wt_shared uint64_t bytes_inmem_ingest;
+    wt_shared uint64_t bytes_inmem_stable;
+    wt_shared uint64_t bytes_internal; /* Bytes of internal pages */
+    wt_shared uint64_t bytes_internal_ingest;
+    wt_shared uint64_t bytes_internal_stable;
+    wt_shared uint64_t bytes_read;    /* Bytes read into memory */
+    wt_shared uint64_t bytes_updates; /* Bytes of updates to pages */
+    wt_shared uint64_t bytes_updates_ingest;
+    wt_shared uint64_t bytes_updates_stable;
     wt_shared uint64_t bytes_delta_updates; /* Bytes of updates reconstructed from deltas */
     wt_shared uint64_t bytes_written;
 
@@ -73,9 +87,17 @@ struct __wt_cache {
     wt_shared uint64_t bytes_hs_updates; /* History store bytes inmem updates */
 
     wt_shared uint64_t pages_dirty_intl;
+    wt_shared uint64_t pages_dirty_intl_ingest;
+    wt_shared uint64_t pages_dirty_intl_stable;
     wt_shared uint64_t pages_dirty_leaf;
+    wt_shared uint64_t pages_dirty_leaf_ingest;
+    wt_shared uint64_t pages_dirty_leaf_stable;
     wt_shared uint64_t pages_evicted;
+    wt_shared uint64_t pages_evicted_ingest;
+    wt_shared uint64_t pages_evicted_stable;
     wt_shared uint64_t pages_inmem;
+    wt_shared uint64_t pages_inmem_ingest;
+    wt_shared uint64_t pages_inmem_stable;
 
     u_int overhead_pct; /* Cache percent adjustment */
 

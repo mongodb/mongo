@@ -8,7 +8,12 @@
 
 #include "wt_internal.h"
 
+/*
+ * Format: txn ID, start ts, start durable ts, stop txn ID, stop ts, stop durable ts, type, prepare,
+ * flags, location, value.
+ */
 #define WT_CURVERSION_METADATA_FORMAT WT_UNCHECKED_STRING(QQQQQQBBBB)
+
 /*
  * __curversion_set_key --
  *     WT_CURSOR->set_key implementation for version cursors.
@@ -582,9 +587,9 @@ skip_on_page:
                 goto done;
 
             /*
-             * TODO: for history store, it is hard to determine if the stop durable timestamp is
-             * from a tombstone or the previous full value. Always return the value for now if its
-             * stop durable timestamp is larger than the end timestamp.
+             * FIXME-WT-16136: for history store, it is hard to determine if the stop durable
+             * timestamp is from a tombstone or the previous full value. Always return the value for
+             * now if its stop durable timestamp is larger than the end timestamp.
              */
             if (twp->stop_ts == WT_TS_MAX &&
               twp->durable_start_ts <= version_cursor->start_timestamp)

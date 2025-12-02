@@ -473,7 +473,7 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
      * the duration of this function.
      */
     name = session->dhandle->name;
-    session->dhandle = NULL;
+    WT_DHANDLE_CLEAR(session);
 
     if ((ret = __wt_session_get_dhandle(session, name, NULL, NULL, 0)) != 0)
         return (ret == EBUSY ? 0 : ret);
@@ -1411,7 +1411,7 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      * bother restoring the handle since it doesn't make sense to carry a handle across a
      * checkpoint.
      */
-    session->dhandle = NULL;
+    WT_DHANDLE_CLEAR(session);
 
     /*
      * We have to update the system information before we release the snapshot. Drop the system
@@ -1621,7 +1621,7 @@ err:
          * bother restoring the handle since it doesn't make sense to carry a handle across a
          * checkpoint.
          */
-        session->dhandle = NULL;
+        WT_DHANDLE_CLEAR(session);
         WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_ROLLBACK);
         WT_TRET(__wt_txn_rollback(session, NULL, false));
     }

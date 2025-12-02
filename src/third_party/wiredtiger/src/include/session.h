@@ -137,6 +137,7 @@ struct __wt_session_impl {
     u_int api_call_counter;        /* Depth of api calls */
 
     wt_shared WT_DATA_HANDLE *dhandle; /* Current data handle */
+    WT_DHANDLE_CLEAR_LOG dhandle_clear_log;
     WT_BUCKET_STORAGE *bucket_storage; /* Current bucket storage and file system */
 
     /*

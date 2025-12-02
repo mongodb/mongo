@@ -9,6 +9,26 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_dhandle_clear_add --
+ *     Add an entry to the session's log of dhandle clear operations.
+ */
+void
+__wt_dhandle_clear_add(WT_DHANDLE_CLEAR_LOG *log, const char *file, const char *func, int line)
+{
+    WT_DHANDLE_CLEAR_EVENT *entry;
+
+    entry = &log->log[log->tail];
+    entry->file = file;
+    entry->func = func;
+    entry->line = line;
+
+    log->count++;
+    log->tail = (log->tail + 1) % WT_CLEAR_EVENT_MAX;
+    if (log->head == log->tail)
+        log->head = (log->head + 1) % WT_CLEAR_EVENT_MAX;
+}
+
+/*
  * __session_dhandle_readlock --
  *     Acquire read lock for the session's current dhandle.
  */
@@ -339,7 +359,7 @@ __wt_session_release_dhandle_v2(WT_SESSION_IMPL *session, bool check_visibility)
             WT_WITH_DHANDLE(session, dhandle, __session_dhandle_readunlock(session));
     }
 
-    session->dhandle = NULL;
+    WT_DHANDLE_CLEAR(session);
     return (ret);
 }
 
@@ -888,7 +908,7 @@ __session_get_dhandle(WT_SESSION_IMPL *session, const char *uri, const char *che
      */
     if ((ret = __session_add_dhandle(session)) != 0) {
         WT_DHANDLE_RELEASE(session->dhandle);
-        session->dhandle = NULL;
+        WT_DHANDLE_CLEAR(session);
     }
 
     return (ret);

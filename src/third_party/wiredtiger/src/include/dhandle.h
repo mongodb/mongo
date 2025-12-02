@@ -21,6 +21,33 @@
 
 #define WT_WITH_BTREE(s, b, e) WT_WITH_DHANDLE(s, (b)->dhandle, e)
 
+/* The number of dhandle clears we want to record. */
+#define WT_CLEAR_EVENT_MAX 10
+
+/*
+ * Information a single line of code that cleared a dhandle. This is primarily a debugging aid.
+ */
+struct __wt_dhandle_clear_event {
+    const char *file; /* The file where the error occurred. */
+    const char *func; /* The function where the error occurred. */
+    int line;         /* The line number. */
+};
+
+/* The log itself. A circular buffer of clear events. */
+struct __wt_dhandle_clear_log {
+    int count;
+    int head;
+    int tail;
+    WT_DHANDLE_CLEAR_EVENT log[WT_CLEAR_EVENT_MAX];
+};
+
+/* Centralized place to clear handles, to enable tracking. */
+#define WT_DHANDLE_CLEAR(s)                                                                       \
+    do {                                                                                          \
+        (s)->dhandle = NULL;                                                                      \
+        __wt_dhandle_clear_add(&(s)->dhandle_clear_log, __FILE__, __PRETTY_FUNCTION__, __LINE__); \
+    } while (0)
+
 /* Call a function without the caller's data handle, restore afterwards. */
 #define WT_WITHOUT_DHANDLE(s, e) WT_WITH_DHANDLE(s, NULL, e)
 

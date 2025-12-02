@@ -189,6 +189,10 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
         btree->evict_disabled_open = true;
     }
 
+    /* A btree cannot be both an ingest btree and a stable btree. */
+    WT_ASSERT(session,
+      !F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT) || !F_ISSET(btree, WT_BTREE_DISAGGREGATED));
+
     if (0) {
 err:
         WT_TRET(__wt_btree_close(session));
@@ -500,14 +504,20 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
      * Detect if the btree is disaggregated. FIXME-WT-14721: the file extension check should be
      * replaced with something more robust.
      */
-    WT_RET(__wt_config_gets(session, cfg, "block_manager", &cval));
-    if (strstr(btree->dhandle->name, ".wt_stable") != NULL || WT_CONFIG_LIT_MATCH("disagg", cval)) {
-        F_SET(btree, WT_BTREE_DISAGGREGATED);
+    if (strstr(btree->dhandle->name, ".wt_ingest") != NULL)
+        /* Flag the ingest btree as participating in automatic garbage collection */
+        F_SET(btree, WT_BTREE_GARBAGE_COLLECT);
+    else {
+        WT_RET(__wt_config_gets(session, cfg, "block_manager", &cval));
+        if (strstr(btree->dhandle->name, ".wt_stable") != NULL ||
+          WT_CONFIG_LIT_MATCH("disagg", cval)) {
+            F_SET(btree, WT_BTREE_DISAGGREGATED);
 
-        WT_RET(__btree_setup_page_log(session, btree));
+            WT_RET(__btree_setup_page_log(session, btree));
 
-        /* A page log service and a storage source cannot both be enabled. */
-        WT_ASSERT(session, btree->page_log == NULL || btree->bstorage == NULL);
+            /* A page log service and a storage source cannot both be enabled. */
+            WT_ASSERT(session, btree->page_log == NULL || btree->bstorage == NULL);
+        }
     }
 
     /* Page sizes */

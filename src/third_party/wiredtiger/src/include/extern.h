@@ -1697,6 +1697,8 @@ extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
 extern void __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst);
 extern void __wt_debug_crash(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
+extern void __wt_dhandle_clear_add(
+  WT_DHANDLE_CLEAR_LOG *log, const char *file, const char *func, int line);
 extern void __wt_encrypt_size(
   WT_SESSION_IMPL *session, WT_KEYED_ENCRYPTOR *kencryptor, size_t incoming_size, size_t *sizep);
 extern void __wt_err_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
@@ -2314,7 +2316,15 @@ static WT_INLINE uint64_t __wt_cache_bytes_delta_updates(WT_CACHE *cache)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE uint64_t __wt_cache_bytes_image(WT_CACHE *cache)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_bytes_image_ingest(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_bytes_image_stable(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE uint64_t __wt_cache_bytes_inuse(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_bytes_inuse_ingest(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_bytes_inuse_stable(WT_CACHE *cache)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE uint64_t __wt_cache_bytes_other(WT_CACHE *cache)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -2322,13 +2332,33 @@ static WT_INLINE uint64_t __wt_cache_bytes_plus_overhead(WT_CACHE *cache, uint64
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE uint64_t __wt_cache_bytes_updates(WT_CACHE *cache)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_bytes_updates_ingest(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_bytes_updates_stable(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE uint64_t __wt_cache_dirty_intl_inuse(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_dirty_intl_inuse_ingest(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_dirty_intl_inuse_stable(WT_CACHE *cache)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE uint64_t __wt_cache_dirty_inuse(WT_CACHE *cache)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_dirty_inuse_ingest(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_dirty_inuse_stable(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE uint64_t __wt_cache_dirty_leaf_inuse(WT_CACHE *cache)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_dirty_leaf_inuse_ingest(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_dirty_leaf_inuse_stable(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE uint64_t __wt_cache_pages_inuse(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_pages_inuse_ingest(WT_CACHE *cache)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE uint64_t __wt_cache_pages_inuse_stable(WT_CACHE *cache)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE uint64_t __wt_cell_rle(WT_CELL_UNPACK_KV *unpack)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

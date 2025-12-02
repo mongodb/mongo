@@ -1551,7 +1551,7 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
         ret = __wt_bad_object_type(session, uri);
 
 err:
-    session->dhandle = NULL;
+    WT_DHANDLE_CLEAR(session);
     if (clear_import_flag)
         F_CLR(session, WT_SESSION_IMPORT);
 

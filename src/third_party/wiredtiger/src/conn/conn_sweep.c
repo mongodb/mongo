@@ -42,7 +42,7 @@ __sweep_file_dhandle_check_and_reset_tod(WT_SESSION_IMPL *session, WT_DATA_HANDL
          */
         if (ret == 0) {
             dhandle->timeofdeath = 0;
-            session->dhandle = NULL;
+            WT_DHANDLE_CLEAR(session);
             return (WT_ERROR_LOG_ADD(ret));
         }
     }

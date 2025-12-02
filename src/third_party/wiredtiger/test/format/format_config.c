@@ -1543,6 +1543,13 @@ config_disagg_storage(void)
     else
         g.disagg_leader = strcmp(mode, "leader") == 0;
 
+    /* FIXME WT-15189 For non-leader modes, random cursors are problematic. */
+    if (strcmp(mode, "leader") != 0) {
+        if (config_explicit(NULL, "ops.random_cursor"))
+            WARN("%s", "turning off ops.random_cursor to work with disagg non-leader modes");
+        config_off(NULL, "ops.random_cursor");
+    }
+
     /* Disaggregated storage requires timestamps. */
     config_off(NULL, "transaction.implicit");
     config_single(NULL, "transaction.timestamps=on", true);
@@ -1641,10 +1648,8 @@ config_transaction(void)
     }
     /* FIXME-WT-15565 Write prepared truncate operation to disk. */
     if (GV(PRECISE_CHECKPOINT) && GV(OPS_PREPARE)) {
-        if (config_explicit(NULL, "ops.truncate")) {
-            WARN("%s" PRIu32,
-              "turning off ops.truncate to work with ops.prepare and precise checkpoint");
-        }
+        if (config_explicit(NULL, "ops.truncate"))
+            WARN("%s", "turning off ops.truncate to work with ops.prepare and precise checkpoint");
         config_off(NULL, "ops.truncate");
     }
 

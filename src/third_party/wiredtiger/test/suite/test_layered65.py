@@ -35,18 +35,21 @@ from wiredtiger import stat
 #    Test garbage collection ensures that prepared updates and aborted
 #    prepared updates are not removed if the rollback timestamps are newer than
 #    the checkpoint timestamp of the stable table.
+@wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
 class test_layered65(wttest.WiredTigerTestCase):
     base_config = 'statistics=(all),precise_checkpoint=true,preserve_prepared=true,'
     conn_config = base_config + 'disaggregated=(role="leader")'
     conn_config_follower = base_config + 'disaggregated=(role="follower")'
 
-    create_session_config = 'key_format=i,value_format=S'
-
-    uri = "layered:test_layered65"
+    table_type = [
+        ('layered', dict(prefix='layered:', create_session_config='key_format=i,value_format=S')),
+        ('table', dict(prefix='table:', create_session_config='key_format=i,value_format=S,block_manager=disagg,type=layered')),
+    ]
+    table_name = "test_layered65"
 
     disagg_storages = gen_disagg_storages('test_layered65', disagg_only = True)
-    scenarios = make_scenarios(disagg_storages)
+    scenarios = make_scenarios(disagg_storages, table_type)
 
     session_follow = None
     conn_follow = None
@@ -57,19 +60,20 @@ class test_layered65(wttest.WiredTigerTestCase):
         self.session_follow = self.conn_follow.open_session()
 
     def test_prepared_insert(self):
+        uri = self.prefix + self.table_name
         self.create_follower()
-        self.session.create(self.uri, self.create_session_config)
-        self.session_follow.create(self.uri, self.create_session_config)
+        self.session.create(uri, self.create_session_config)
+        self.session_follow.create(uri, self.create_session_config)
 
         # Insert a committed update.
         self.session.begin_transaction()
-        cursor = self.session.open_cursor(self.uri)
+        cursor = self.session.open_cursor(uri)
         cursor[1] = "value1"
         self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
         # Insert the committed update on follower.
         self.session_follow.begin_transaction()
-        cursor_follow = self.session_follow.open_cursor(self.uri)
+        cursor_follow = self.session_follow.open_cursor(uri)
         cursor_follow[1] = "value1"
         self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
@@ -97,30 +101,31 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         # Evict the data.
         session_follow2 = self.conn_follow.open_session("debug=(release_evict_page)")
-        evict_cursor = session_follow2.open_cursor(self.uri)
+        evict_cursor = session_follow2.open_cursor(uri)
         evict_cursor.set_key(1)
         evict_cursor.search()
         evict_cursor.close()
 
-        stat_cursor = session_follow2.open_cursor('statistics:' + self.uri)
+        stat_cursor = session_follow2.open_cursor('statistics:' + uri)
         garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
         # Only the committed update can be garbage collected.
         self.assertEqual(garbage_collected, 1)
 
     def test_prepared_insert_rollback(self):
+        uri = self.prefix + self.table_name
         self.create_follower()
-        self.session.create(self.uri, self.create_session_config)
-        self.session_follow.create(self.uri, self.create_session_config)
+        self.session.create(uri, self.create_session_config)
+        self.session_follow.create(uri, self.create_session_config)
 
         # Insert a committed update.
         self.session.begin_transaction()
-        cursor = self.session.open_cursor(self.uri)
+        cursor = self.session.open_cursor(uri)
         cursor[1] = "value1"
         self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
         # Insert the committed update on follower.
         self.session_follow.begin_transaction()
-        cursor_follow = self.session_follow.open_cursor(self.uri)
+        cursor_follow = self.session_follow.open_cursor(uri)
         cursor_follow[1] = "value1"
         self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
@@ -152,12 +157,12 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         # Evict the data.
         session_follow2 = self.conn_follow.open_session("debug=(release_evict_page)")
-        evict_cursor = session_follow2.open_cursor(self.uri)
+        evict_cursor = session_follow2.open_cursor(uri)
         evict_cursor.set_key(1)
         evict_cursor.search()
         evict_cursor.close()
 
-        stat_cursor = self.session_follow.open_cursor('statistics:' + self.uri)
+        stat_cursor = self.session_follow.open_cursor('statistics:' + uri)
         garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
         # Only the committed update can be garbage collected.
         self.assertEqual(garbage_collected, 1)
@@ -165,13 +170,13 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         # Insert another committed update.
         self.session.begin_transaction()
-        cursor = self.session.open_cursor(self.uri)
+        cursor = self.session.open_cursor(uri)
         cursor[3] = "value1"
         self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(40)}")
 
         # Insert the committed update on follower.
         self.session_follow.begin_transaction()
-        cursor_follow = self.session_follow.open_cursor(self.uri)
+        cursor_follow = self.session_follow.open_cursor(uri)
         cursor_follow[3] = "value1"
         self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(40)}")
         cursor_follow.close()
@@ -187,43 +192,44 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         # Evict the data.
         session_follow2 = self.conn_follow.open_session("debug=(release_evict_page)")
-        evict_cursor = session_follow2.open_cursor(self.uri)
+        evict_cursor = session_follow2.open_cursor(uri)
         evict_cursor.set_key(3)
         evict_cursor.search()
         evict_cursor.close()
 
-        stat_cursor = self.session_follow.open_cursor('statistics:' + self.uri)
+        stat_cursor = self.session_follow.open_cursor('statistics:' + uri)
         garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
         # The aborted prepared update is garbage collected.
         self.assertEqual(garbage_collected, 2)
         stat_cursor.close()
 
     def test_prepared_update(self):
+        uri = self.prefix + self.table_name
         self.create_follower()
-        self.session.create(self.uri, self.create_session_config)
-        self.session_follow.create(self.uri, self.create_session_config)
+        self.session.create(uri, self.create_session_config)
+        self.session_follow.create(uri, self.create_session_config)
 
         # Insert a committed update.
         self.session.begin_transaction()
-        cursor = self.session.open_cursor(self.uri)
+        cursor = self.session.open_cursor(uri)
         cursor[1] = "value1"
         self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
         # Insert the committed update on follower.
         self.session_follow.begin_transaction()
-        cursor_follow = self.session_follow.open_cursor(self.uri)
+        cursor_follow = self.session_follow.open_cursor(uri)
         cursor_follow[1] = "value1"
         self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
         # Insert another committed update.
         self.session.begin_transaction()
-        cursor = self.session.open_cursor(self.uri)
+        cursor = self.session.open_cursor(uri)
         cursor[2] = "value1"
         self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
         # Insert the committed update on follower.
         self.session_follow.begin_transaction()
-        cursor_follow = self.session_follow.open_cursor(self.uri)
+        cursor_follow = self.session_follow.open_cursor(uri)
         cursor_follow[2] = "value1"
         self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
@@ -233,7 +239,7 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         # Evict the data.
         session_follow2 = self.conn_follow.open_session("debug=(release_evict_page)")
-        evict_cursor = session_follow2.open_cursor(self.uri)
+        evict_cursor = session_follow2.open_cursor(uri)
         evict_cursor.set_key(1)
         evict_cursor.search()
         evict_cursor.close()
@@ -262,12 +268,12 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         # Evict the data.
         session_follow2 = self.conn_follow.open_session("debug=(release_evict_page)")
-        evict_cursor = session_follow2.open_cursor(self.uri)
+        evict_cursor = session_follow2.open_cursor(uri)
         evict_cursor.set_key(1)
         evict_cursor.search()
         evict_cursor.close()
 
-        stat_cursor = session_follow2.open_cursor('statistics:' + self.uri)
+        stat_cursor = session_follow2.open_cursor('statistics:' + uri)
         garbage_collected_update_chain = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
         # The keys are garbaged collected from the disk image.
         self.assertEqual(garbage_collected_update_chain, 0)
@@ -277,31 +283,32 @@ class test_layered65(wttest.WiredTigerTestCase):
         self.assertEqual(garbage_collected_disk_image, 2)
 
     def test_prepared_update_rollback(self):
+        uri = self.prefix + self.table_name
         self.create_follower()
-        self.session.create(self.uri, self.create_session_config)
-        self.session_follow.create(self.uri, self.create_session_config)
+        self.session.create(uri, self.create_session_config)
+        self.session_follow.create(uri, self.create_session_config)
 
         # Insert a committed update.
         self.session.begin_transaction()
-        cursor = self.session.open_cursor(self.uri)
+        cursor = self.session.open_cursor(uri)
         cursor[1] = "value1"
         self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
         # Insert the committed update on follower.
         self.session_follow.begin_transaction()
-        cursor_follow = self.session_follow.open_cursor(self.uri)
+        cursor_follow = self.session_follow.open_cursor(uri)
         cursor_follow[1] = "value1"
         self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
         # Insert another committed update.
         self.session.begin_transaction()
-        cursor = self.session.open_cursor(self.uri)
+        cursor = self.session.open_cursor(uri)
         cursor[2] = "value1"
         self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
         # Insert the committed update on follower.
         self.session_follow.begin_transaction()
-        cursor_follow = self.session_follow.open_cursor(self.uri)
+        cursor_follow = self.session_follow.open_cursor(uri)
         cursor_follow[2] = "value1"
         self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(10)}")
 
@@ -311,7 +318,7 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         # Evict the data.
         session_follow2 = self.conn_follow.open_session("debug=(release_evict_page)")
-        evict_cursor = session_follow2.open_cursor(self.uri)
+        evict_cursor = session_follow2.open_cursor(uri)
         evict_cursor.set_key(1)
         evict_cursor.search()
         evict_cursor.close()
@@ -344,12 +351,12 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         # Evict the data.
         session_follow2 = self.conn_follow.open_session("debug=(release_evict_page)")
-        evict_cursor = session_follow2.open_cursor(self.uri)
+        evict_cursor = session_follow2.open_cursor(uri)
         evict_cursor.set_key(1)
         evict_cursor.search()
         evict_cursor.close()
 
-        stat_cursor = self.session_follow.open_cursor('statistics:' + self.uri)
+        stat_cursor = self.session_follow.open_cursor('statistics:' + uri)
         garbage_collected_update_chain = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
         # The keys are garbaged collected from the disk image.
         self.assertEqual(garbage_collected_update_chain, 0)
@@ -361,13 +368,13 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         # Insert another committed update.
         self.session.begin_transaction()
-        cursor = self.session.open_cursor(self.uri)
+        cursor = self.session.open_cursor(uri)
         cursor[3] = "value1"
         self.session.commit_transaction(f"commit_timestamp={self.timestamp_str(40)}")
 
         # Insert the committed update on follower.
         self.session_follow.begin_transaction()
-        cursor_follow = self.session_follow.open_cursor(self.uri)
+        cursor_follow = self.session_follow.open_cursor(uri)
         cursor_follow[3] = "value1"
         self.session_follow.commit_transaction(f"commit_timestamp={self.timestamp_str(40)}")
         cursor_follow.close()
@@ -383,12 +390,12 @@ class test_layered65(wttest.WiredTigerTestCase):
 
         # Evict the data.
         session_follow2 = self.conn_follow.open_session("debug=(release_evict_page)")
-        evict_cursor = session_follow2.open_cursor(self.uri)
+        evict_cursor = session_follow2.open_cursor(uri)
         evict_cursor.set_key(3)
         evict_cursor.search()
         evict_cursor.close()
 
-        stat_cursor = self.session_follow.open_cursor('statistics:' + self.uri)
+        stat_cursor = self.session_follow.open_cursor('statistics:' + uri)
         garbage_collected_update_chain = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
         # The aborted prepared update is garbage collected.
         self.assertEqual(garbage_collected_update_chain, 1)

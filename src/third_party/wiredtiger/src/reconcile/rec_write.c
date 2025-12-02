@@ -342,7 +342,7 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
          * been reached.
          */
         WT_ASSERT(session,
-          !WT_DELTA_ENABLED_FOR_PAGE(session, page->type) || F_ISSET(r, WT_REC_EMPTY_DELTA) ||
+          !WT_BUILD_DELTA_LEAF(session, r) || F_ISSET(r, WT_REC_EMPTY_DELTA) ||
             page->disagg_info->block_meta.page_id == WT_BLOCK_INVALID_PAGE_ID ||
             page->disagg_info->block_meta.delta_count == conn->page_delta.max_consecutive_delta);
         /*
