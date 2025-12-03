@@ -115,6 +115,9 @@ filters:
   - "database_versioning_all_commands.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "mongos_exhausts_stale_config_retries.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "read_write_concern_defaults_application.js":
     approvers:
       - 10gen/server-catalog-and-routing

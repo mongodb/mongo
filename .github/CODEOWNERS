@@ -1621,6 +1621,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/incompatible_shard_key_indexes.js @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 /jstests/sharding/**/all_commands_direct_shard_connection_auth.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/database_versioning_all_commands.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/**/mongos_exhausts_stale_config_retries.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/read_write_concern_defaults_application.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/safe_secondary_reads_drop_recreate.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/safe_secondary_reads_single_migration_waitForDelete.js @10gen/server-catalog-and-routing @svc-auto-approve-bot

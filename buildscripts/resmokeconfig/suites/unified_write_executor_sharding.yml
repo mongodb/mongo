@@ -22,6 +22,7 @@ selector:
     - jstests/sharding/deleteOne_with_id_without_shard_key_basic.js
     - jstests/sharding/deleteOne_with_id_without_shard_key_stale_config.js
     - jstests/sharding/internal_txns/**/*.js
+    - jstests/sharding/mongos_exhausts_stale_config_retries.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_sharded.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_sharded_addl_crud_ops.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_timeseries.js
