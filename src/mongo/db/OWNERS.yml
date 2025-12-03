@@ -1,5 +1,9 @@
 version: 1.0.0
 filters:
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/server-programmability
+      - 10gen/server-networking-observability
   - "api_parameters*":
     approvers:
       - 10gen/query-optimization
@@ -8,7 +12,7 @@ filters:
       - 10gen/server-programmability
   - "baton.*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/server-programmability
   - "cancelable_operation_context*":
     approvers:
       - 10gen/server-programmability
@@ -44,7 +48,7 @@ filters:
       - 10gen/server-networking-and-observability
   - "default_baton*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/server-programmability
   - "diagnostic_printers_test.cpp":
     approvers:
       - 10gen/query-integration-observability

@@ -1790,9 +1790,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/crypto/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/OWNERS.yml
+/src/mongo/db/**/OWNERS.yml @10gen/server-networking-observability @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/api_parameters* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/**/basic_types.* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/db/**/baton.* @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/mongo/db/**/baton.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/cancelable_operation_context* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/client.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/client_context_test.* @10gen/server-programmability @svc-auto-approve-bot
@@ -1804,7 +1805,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/command_can_run_here* @10gen/server-replication-reviewers @svc-auto-approve-bot
 /src/mongo/db/**/connection_health_metrics_parameter.idl @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/dbmessage* @10gen/server-networking-and-observability @svc-auto-approve-bot
-/src/mongo/db/**/default_baton* @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/mongo/db/**/default_baton* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/diagnostic_printers_test.cpp @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/**/keypattern.h @10gen/query-execution @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/**/error_labels* @10gen/server-programmability @svc-auto-approve-bot
