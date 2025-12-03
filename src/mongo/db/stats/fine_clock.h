@@ -32,7 +32,8 @@
 #ifndef DB_STATS_FINE_CLOCK_HEADER
 #define DB_STATS_FINE_CLOCK_HEADER
 
-#include <ctime>  // struct timespec
+#include <cstdint>  // uint64_t
+#include <ctime>    // struct timespec
 
 namespace mongo {
 

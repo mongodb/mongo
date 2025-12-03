@@ -36,6 +36,8 @@
 #include <functional>
 #include <type_traits>
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
 /**
  * During the runtime planning phase this tracker is used to track the progress of the work done

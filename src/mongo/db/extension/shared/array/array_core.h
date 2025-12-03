@@ -29,6 +29,8 @@
 #pragma once
 #include "mongo/db/extension/public/api.h"
 
+#include <utility>  // std::declval
+
 namespace mongo::extension {
 
 // Trait maps ABI array element type to its RAII vector element type.

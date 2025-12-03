@@ -29,7 +29,10 @@
 
 #pragma once
 
+#include "mongo/base/data_type_endian.h"
 #include "mongo/util/modules.h"
+
+#include <cstdint>  // uint8_t
 
 namespace mongo {
 namespace sbe {

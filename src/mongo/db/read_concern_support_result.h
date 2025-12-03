@@ -32,6 +32,8 @@
 #include "mongo/base/status.h"
 #include "mongo/util/modules.h"
 
+#include <boost/optional/optional.hpp>
+
 namespace MONGO_MOD_PUB mongo {
 
 /**
