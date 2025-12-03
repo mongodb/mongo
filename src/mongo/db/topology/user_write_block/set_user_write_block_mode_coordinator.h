@@ -41,6 +41,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -48,7 +49,7 @@
 
 namespace mongo {
 
-class SetUserWriteBlockModeCoordinator
+class MONGO_MOD_PARENT_PRIVATE SetUserWriteBlockModeCoordinator
     : public ConfigsvrCoordinatorImpl<SetUserWriteBlockModeCoordinatorDocument,
                                       SetUserWriteBlockModeCoordinatorPhaseEnum> {
 public:

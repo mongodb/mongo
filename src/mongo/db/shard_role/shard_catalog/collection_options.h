@@ -39,6 +39,7 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
@@ -54,7 +55,7 @@ namespace mongo {
 class CollatorFactoryInterface;
 class CreateCommand;
 
-struct CollectionOptions {
+struct MONGO_MOD_NEEDS_REPLACEMENT CollectionOptions {
     /**
      * Returns true if the options indicate the namespace is a view.
      */
@@ -181,6 +182,7 @@ struct CollectionOptions {
     bool recordIdsReplicated = false;
 };
 
-Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceString& ns);
+MONGO_MOD_PRIVATE Status
+validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceString& ns);
 
 }  // namespace mongo

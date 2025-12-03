@@ -35,6 +35,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <shared_mutex>
@@ -50,7 +51,7 @@ namespace mongo {
  * Implementations perform recovery or refresh actions for sharding metadata for a given collection
  * when stale metadata exceptions are encountered.
  */
-class StaleShardCollectionMetadataHandler {
+class MONGO_MOD_PRIVATE StaleShardCollectionMetadataHandler {
 public:
     /**
      * Handles a StaleConfig error by recovering the sharding metadata for the specified collection.
@@ -78,7 +79,7 @@ public:
  * this reason, it must always be accessed through ScopedCollectionShardingState  helper classes,
  * which acquire the appropriate read locks to protect against concurrent modifications.
  */
-class CollectionShardingState {
+class MONGO_MOD_NEEDS_REPLACEMENT CollectionShardingState {
 public:
     CollectionShardingState() = default;
     virtual ~CollectionShardingState() = default;
@@ -265,7 +266,7 @@ public:
  * Singleton factory to instantiate CollectionShardingState objects specific to the type of instance
  * which is running.
  */
-class CollectionShardingStateFactory {
+class MONGO_MOD_NEEDS_REPLACEMENT CollectionShardingStateFactory {
     CollectionShardingStateFactory(const CollectionShardingStateFactory&) = delete;
     CollectionShardingStateFactory& operator=(const CollectionShardingStateFactory&) = delete;
 

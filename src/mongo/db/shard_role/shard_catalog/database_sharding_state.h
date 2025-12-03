@@ -32,6 +32,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/util/modules.h"
 
 #include <shared_mutex>
 #include <vector>
@@ -45,7 +46,7 @@ namespace mongo {
  * Implementations perform recovery or refresh actions for sharding metadata for a given database
  * when stale metadata exceptions are encountered.
  */
-class StaleShardDatabaseMetadataHandler {
+class MONGO_MOD_PRIVATE StaleShardDatabaseMetadataHandler {
 public:
     /**
      * Handles a StaleDbVersion error by recovering the sharding metadata for the specified
@@ -65,7 +66,7 @@ public:
  * SYNCHRONIZATION: Some methods might require holding a database level lock, so be sure to check
  * the function-level comments for details.
  */
-class DatabaseShardingState {
+class MONGO_MOD_NEEDS_REPLACEMENT DatabaseShardingState {
     DatabaseShardingState(const DatabaseShardingState&) = delete;
     DatabaseShardingState& operator=(const DatabaseShardingState&) = delete;
 
@@ -156,7 +157,7 @@ public:
  * Singleton factory to instantiate DatabaseShardingState objects specific to the type of instance
  * which is running.
  */
-class DatabaseShardingStateFactory {
+class MONGO_MOD_NEEDS_REPLACEMENT DatabaseShardingStateFactory {
     DatabaseShardingStateFactory(const DatabaseShardingStateFactory&) = delete;
     DatabaseShardingStateFactory& operator=(const DatabaseShardingStateFactory&) = delete;
 

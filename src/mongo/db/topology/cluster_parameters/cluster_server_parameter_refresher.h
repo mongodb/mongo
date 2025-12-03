@@ -35,6 +35,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/version/releases.h"
 
@@ -48,7 +49,7 @@ namespace mongo {
  * Runs a background job on mongos only that periodically refreshes its in-memory cache of cluster
  * server parameters with updated values from the config servers.
  */
-class ClusterServerParameterRefresher {
+class MONGO_MOD_NEEDS_REPLACEMENT ClusterServerParameterRefresher {
 public:
     static ClusterServerParameterRefresher* get(OperationContext* opCtx);
     static ClusterServerParameterRefresher* get(ServiceContext* serviceCtx);
@@ -98,8 +99,9 @@ private:
     std::unique_ptr<SharedPromise<void>> _refreshPromise;
 };
 
-Status clusterServerParameterRefreshIntervalSecsNotify(const int& newValue);
+MONGO_MOD_PRIVATE Status clusterServerParameterRefreshIntervalSecsNotify(const int& newValue);
 
+MONGO_MOD_PRIVATE
 std::pair<multiversion::FeatureCompatibilityVersion, TenantIdMap<StringMap<BSONObj>>>
 getFCVAndClusterParametersFromConfigServer();
 

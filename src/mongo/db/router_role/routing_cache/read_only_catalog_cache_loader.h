@@ -45,7 +45,7 @@ namespace mongo {
  * return, rather than invariant, so this class can be plugged into the shard server for read-only
  * mode, where persistence should not be attempted.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ReadOnlyCatalogCacheLoader final
+class MONGO_MOD_PARENT_PRIVATE ReadOnlyCatalogCacheLoader final
     : public ShardServerCatalogCacheLoader {
 public:
     ReadOnlyCatalogCacheLoader() = default;

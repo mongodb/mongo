@@ -36,7 +36,7 @@
 #include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <boost/move/utility_core.hpp>
@@ -50,7 +50,7 @@ namespace mongo {
  * the specified collection. This indicates to the underlying storage system that the caller has
  * performed 'routing', in the sense that it is aware of what data is located on this node.
  */
-class ScopedSetShardRole {
+class MONGO_MOD_NEEDS_REPLACEMENT ScopedSetShardRole {
 public:
     ScopedSetShardRole(OperationContext* opCtx,
                        NamespaceString nss,
@@ -71,7 +71,7 @@ private:
 
 // Stashes the shard role for the given namespace.
 // DON'T USE unless you understand very well what you're doing.
-class ScopedStashShardRole {
+class MONGO_MOD_NEEDS_REPLACEMENT ScopedStashShardRole {
 public:
     ScopedStashShardRole(OperationContext* opCtx, const NamespaceString& nss);
 
@@ -93,7 +93,7 @@ private:
  *
  * The metadata for a particular operation can be retrieved using the get() method.
  */
-class OperationShardingState {
+class MONGO_MOD_NEEDS_REPLACEMENT OperationShardingState {
     OperationShardingState(const OperationShardingState&) = delete;
     OperationShardingState& operator=(const OperationShardingState&) = delete;
 
@@ -265,7 +265,7 @@ private:
     bool _bypassCheckAllShardRoleAcquisitionsVersioned{false};
 };
 
-class BypassCheckAllShardRoleAcquisitionsVersioned {
+class MONGO_MOD_PRIVATE BypassCheckAllShardRoleAcquisitionsVersioned {
 public:
     BypassCheckAllShardRoleAcquisitionsVersioned(OperationContext* opCtx) : _opCtx(opCtx) {
         OperationShardingState::get(opCtx).setBypassCheckAllShardRoleAcquisitionsVersioned(true);

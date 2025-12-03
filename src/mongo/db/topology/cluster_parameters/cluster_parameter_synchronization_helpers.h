@@ -34,36 +34,39 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace cluster_parameters {
 
-void validateParameter(BSONObj doc, const boost::optional<TenantId>& tenantId);
+MONGO_MOD_PRIVATE void validateParameter(BSONObj doc, const boost::optional<TenantId>& tenantId);
 
-void updateParameter(OperationContext* opCtx,
-                     BSONObj doc,
-                     StringData mode,
-                     const boost::optional<TenantId>& tenantId);
+MONGO_MOD_PRIVATE void updateParameter(OperationContext* opCtx,
+                                       BSONObj doc,
+                                       StringData mode,
+                                       const boost::optional<TenantId>& tenantId);
 
-void clearParameter(OperationContext* opCtx,
-                    StringData id,
-                    const boost::optional<TenantId>& tenantId);
+MONGO_MOD_PRIVATE void clearParameter(OperationContext* opCtx,
+                                      StringData id,
+                                      const boost::optional<TenantId>& tenantId);
 
-void clearAllTenantParameters(OperationContext* opCtx, const boost::optional<TenantId>& tenantId);
+MONGO_MOD_PRIVATE void clearAllTenantParameters(OperationContext* opCtx,
+                                                const boost::optional<TenantId>& tenantId);
 
 /**
  * Used to initialize in-memory cluster parameter state based on the on-disk contents after startup
  * recovery or initial sync is complete.
  */
-void initializeAllTenantParametersFromCollection(OperationContext* opCtx, const Collection& coll);
+MONGO_MOD_NEEDS_REPLACEMENT void initializeAllTenantParametersFromCollection(
+    OperationContext* opCtx, const Collection& coll);
 
 /**
  * Used on rollback. Updates settings which are present and clears settings which are not.
  */
-void resynchronizeAllTenantParametersFromCollection(OperationContext* opCtx,
-                                                    const Collection& coll);
+MONGO_MOD_PRIVATE void resynchronizeAllTenantParametersFromCollection(OperationContext* opCtx,
+                                                                      const Collection& coll);
 
 }  // namespace cluster_parameters
 }  // namespace mongo

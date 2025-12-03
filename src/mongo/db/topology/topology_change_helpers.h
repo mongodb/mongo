@@ -54,6 +54,7 @@
 #include "mongo/db/topology/remove_shard_draining_progress_gen.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/modules.h"
 
 #include <climits>
 
@@ -246,10 +247,10 @@ TenantIdMap<std::vector<BSONObj>> getClusterParametersLocally(OperationContext* 
  * Runs a count with the given query against the localConfigShard. Returns the result of that count
  * and throws any error that occurs while running this command.
  */
-long long runCountCommandOnConfig(OperationContext* opCtx,
-                                  std::shared_ptr<Shard> localConfigShard,
-                                  const NamespaceString& nss,
-                                  BSONObj query);
+MONGO_MOD_PARENT_PRIVATE long long runCountCommandOnConfig(OperationContext* opCtx,
+                                                           std::shared_ptr<Shard> localConfigShard,
+                                                           const NamespaceString& nss,
+                                                           BSONObj query);
 
 struct DrainingShardUsage {
     bool isFullyDrained() const {

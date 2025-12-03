@@ -34,9 +34,10 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/topology/remove_shard_commit_coordinator_document_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
-class RemoveShardCommitCoordinator final
+class MONGO_MOD_PARENT_PRIVATE RemoveShardCommitCoordinator final
     : public RecoverableShardingDDLCoordinator<RemoveShardCommitCoordinatorDocument,
                                                RemoveShardCommitCoordinatorPhaseEnum> {
 public:

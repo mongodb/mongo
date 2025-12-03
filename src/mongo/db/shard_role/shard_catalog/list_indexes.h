@@ -33,6 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 
@@ -42,14 +43,16 @@ namespace mongo {
  * Corresponds to flags passed to listIndexes which specify additional information to be returned
  * for each index. BuildUUID = includeBuildUUIDs flag IndexBuildInfo = includeIndexBuildInfo flag
  */
-enum class ListIndexesInclude { kNothing, kBuildUUID, kIndexBuildInfo };
+enum class MONGO_MOD_NEEDS_REPLACEMENT ListIndexesInclude { kNothing, kBuildUUID, kIndexBuildInfo };
 
-std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
-                                       const CollectionAcquisition& collectionAcquisition,
-                                       ListIndexesInclude additionalInclude);
+MONGO_MOD_PRIVATE std::vector<BSONObj> listIndexesInLock(
+    OperationContext* opCtx,
+    const CollectionAcquisition& collectionAcquisition,
+    ListIndexesInclude additionalInclude);
 
-std::vector<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
-                                                   const NamespaceStringOrUUID& nss,
-                                                   ListIndexesInclude additionalInclude);
+MONGO_MOD_NEEDS_REPLACEMENT std::vector<BSONObj> listIndexesEmptyListIfMissing(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nss,
+    ListIndexesInclude additionalInclude);
 
 }  // namespace mongo

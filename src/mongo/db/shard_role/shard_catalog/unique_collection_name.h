@@ -34,6 +34,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -49,9 +50,8 @@ namespace mongo {
  *
  * The database must be locked in MODE_IX when calling this function.
  */
-StatusWith<NamespaceString> makeUniqueCollectionName(OperationContext* opCtx,
-                                                     const DatabaseName& dbName,
-                                                     StringData collectionNameModel);
+MONGO_MOD_PRIVATE StatusWith<NamespaceString> makeUniqueCollectionName(
+    OperationContext* opCtx, const DatabaseName& dbName, StringData collectionNameModel);
 
 /**
  * Generates a random collection name suitable for creating a temporary collection. Does not check
@@ -62,8 +62,7 @@ StatusWith<NamespaceString> makeUniqueCollectionName(OperationContext* opCtx,
  *
  * Throws FailedToParse if 'collectionNameModel' does not contain any percent signs.
  */
-StatusWith<NamespaceString> generateRandomCollectionName(OperationContext* opCtx,
-                                                         const DatabaseName& dbName,
-                                                         StringData collectionNameModel);
+MONGO_MOD_NEEDS_REPLACEMENT StatusWith<NamespaceString> generateRandomCollectionName(
+    OperationContext* opCtx, const DatabaseName& dbName, StringData collectionNameModel);
 
 }  // namespace mongo

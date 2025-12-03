@@ -39,6 +39,7 @@
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 
@@ -51,7 +52,7 @@ namespace mongo {
  * See the comments for DatabaseShardingState for more information on how this class fits in the
  * sharding architecture.
  */
-class DatabaseShardingRuntime : public DatabaseShardingState {
+class MONGO_MOD_PARENT_PRIVATE DatabaseShardingRuntime : public DatabaseShardingState {
     DatabaseShardingRuntime(const DatabaseShardingRuntime&) = delete;
     DatabaseShardingRuntime& operator=(const DatabaseShardingRuntime&) = delete;
 
@@ -266,7 +267,7 @@ private:
  * metadata, or not hold the critical section to read it. Usages of this class should be minimal and
  * properly justified.
  */
-class [[nodiscard]] BypassDatabaseMetadataAccess {
+class MONGO_MOD_PARENT_PRIVATE [[nodiscard]] BypassDatabaseMetadataAccess {
 public:
     enum class Type { kReadOnly, kWriteOnly, kReadAndWrite };
 

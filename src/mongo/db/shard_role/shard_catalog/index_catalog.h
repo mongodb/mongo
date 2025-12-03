@@ -46,6 +46,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <functional>
@@ -65,7 +66,7 @@ class IndexDescriptor;
 
 struct InsertDeleteOptions;
 
-struct BsonRecord {
+struct MONGO_MOD_NEEDS_REPLACEMENT BsonRecord {
     RecordId id;
     Timestamp ts;
     const BSONObj* docPtr;
@@ -77,9 +78,9 @@ struct BsonRecord {
  * WiredTiger to do blind unindexing for efficacy. When set to 'On', disables blind deletes and
  * forces recordid-matching for unindex operations.
  */
-enum class CheckRecordId { Off, On };
+enum class MONGO_MOD_NEEDS_REPLACEMENT CheckRecordId { Off, On };
 
-enum class CreateIndexEntryFlags : int {
+enum class MONGO_MOD_PRIVATE CreateIndexEntryFlags : int {
     kNone = 0x0,
     /**
      * kInitFromDisk avoids registering a change to undo this operation when set to true. You
@@ -112,11 +113,12 @@ enum class CreateIndexEntryFlags : int {
     kForceUpdateMetadata = 0x10,
 };
 
-inline bool operator&(CreateIndexEntryFlags lhs, CreateIndexEntryFlags rhs) {
+MONGO_MOD_PRIVATE inline bool operator&(CreateIndexEntryFlags lhs, CreateIndexEntryFlags rhs) {
     return (static_cast<int>(lhs) & static_cast<int>(rhs)) != 0;
 }
 
-inline CreateIndexEntryFlags operator|(CreateIndexEntryFlags lhs, CreateIndexEntryFlags rhs) {
+MONGO_MOD_PRIVATE inline CreateIndexEntryFlags operator|(CreateIndexEntryFlags lhs,
+                                                         CreateIndexEntryFlags rhs) {
     return CreateIndexEntryFlags(static_cast<int>(lhs) | static_cast<int>(rhs));
 }
 
@@ -138,7 +140,7 @@ inline CreateIndexEntryFlags operator|(CreateIndexEntryFlags lhs, CreateIndexEnt
  *     int numIndexesReady();
  *     int numIndexesInProgress();
  */
-class IndexCatalog {
+class MONGO_MOD_NEEDS_REPLACEMENT IndexCatalog {
 public:
     class IndexIterator {
     public:
@@ -575,14 +577,15 @@ public:
                           const BSONObj& indexSpec) const;
 };
 
-inline IndexCatalog::InclusionPolicy operator|(IndexCatalog::InclusionPolicy lhs,
-                                               IndexCatalog::InclusionPolicy rhs) {
+MONGO_MOD_NEEDS_REPLACEMENT inline IndexCatalog::InclusionPolicy operator|(
+    IndexCatalog::InclusionPolicy lhs, IndexCatalog::InclusionPolicy rhs) {
     return static_cast<IndexCatalog::InclusionPolicy>(
         static_cast<std::underlying_type_t<IndexCatalog::InclusionPolicy>>(lhs) |
         static_cast<std::underlying_type_t<IndexCatalog::InclusionPolicy>>(rhs));
 }
 
-inline bool operator&(IndexCatalog::InclusionPolicy lhs, IndexCatalog::InclusionPolicy rhs) {
+MONGO_MOD_PRIVATE inline bool operator&(IndexCatalog::InclusionPolicy lhs,
+                                        IndexCatalog::InclusionPolicy rhs) {
     return static_cast<std::underlying_type_t<IndexCatalog::InclusionPolicy>>(lhs) &
         static_cast<std::underlying_type_t<IndexCatalog::InclusionPolicy>>(rhs);
 }

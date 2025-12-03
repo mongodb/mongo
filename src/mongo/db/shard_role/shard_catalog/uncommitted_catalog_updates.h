@@ -39,6 +39,7 @@
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -54,7 +55,7 @@ namespace mongo {
 /**
  * Decoration on Snapshot to store cloned Collections until they are committed or rolled back.
  */
-class UncommittedCatalogUpdates {
+class MONGO_MOD_NEEDS_REPLACEMENT UncommittedCatalogUpdates {
 public:
     struct Entry {
         enum class Action {
@@ -306,7 +307,7 @@ private:
  * Decoration on Snapshot to store Collections instantiated from durable catalog data. Lifetime tied
  * to Snapshot lifetime.
  */
-class OpenedCollections {
+class MONGO_MOD_PRIVATE OpenedCollections {
 public:
     static OpenedCollections& get(OperationContext* opCtx);
 

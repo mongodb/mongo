@@ -33,13 +33,14 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 /**
  * Indicates that a chunk of a collection was moved from one shard to another.
  */
-struct MoveChunkControlEvent {
+struct MONGO_MOD_NEEDS_REPLACEMENT MoveChunkControlEvent {
     static constexpr auto opType = "moveChunk"_sd;
 
     static MoveChunkControlEvent createFromDocument(const Document& event);
@@ -55,7 +56,7 @@ struct MoveChunkControlEvent {
 /**
  * Indicates that a database got assigned a new primary shard.
  */
-struct MovePrimaryControlEvent {
+struct MONGO_MOD_PRIVATE MovePrimaryControlEvent {
     static constexpr auto opType = "movePrimary"_sd;
 
     static MovePrimaryControlEvent createFromDocument(const Document& event);
@@ -74,7 +75,7 @@ struct MovePrimaryControlEvent {
  * 2. changes in permitted change stream reader operation mode - for example, that the change stream
  * v2 reader cannot operate anymore, and so on.
  */
-struct NamespacePlacementChangedControlEvent {
+struct MONGO_MOD_PRIVATE NamespacePlacementChangedControlEvent {
     static constexpr auto opType = "namespacePlacementChanged"_sd;
 
     static NamespacePlacementChangedControlEvent createFromDocument(const Document& event);
@@ -89,7 +90,7 @@ struct NamespacePlacementChangedControlEvent {
  * Indicates that a new database has been created. The control event corresponds to 'insert' into
  * 'config.databases' collection.
  */
-struct DatabaseCreatedControlEvent {
+struct MONGO_MOD_PRIVATE DatabaseCreatedControlEvent {
     static constexpr auto opType = "insert"_sd;
 
     static DatabaseCreatedControlEvent createFromDocument(const Document& event);
@@ -110,5 +111,5 @@ using ControlEvent = std::variant<MoveChunkControlEvent,
  * on the 'DocumentSourceChangeStream::kOperationTypeField'. Throwns exception in case it was unable
  * to create the corresponding control event.
  */
-ControlEvent parseControlEvent(const Document& changeEvent);
+MONGO_MOD_PRIVATE ControlEvent parseControlEvent(const Document& changeEvent);
 }  // namespace mongo

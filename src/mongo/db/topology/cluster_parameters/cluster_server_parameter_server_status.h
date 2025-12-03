@@ -30,10 +30,11 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class ClusterServerParameterServerStatus {
+class MONGO_MOD_PARENT_PRIVATE ClusterServerParameterServerStatus {
 public:
     static constexpr auto kClusterParameterFieldName = "clusterParameters";
 

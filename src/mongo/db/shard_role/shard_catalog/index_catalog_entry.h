@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -56,7 +57,8 @@ class MatchExpression;
 class OperationContext;
 class UpdateIndexData;
 
-class IndexCatalogEntry : public std::enable_shared_from_this<IndexCatalogEntry> {
+class MONGO_MOD_NEEDS_REPLACEMENT IndexCatalogEntry
+    : public std::enable_shared_from_this<IndexCatalogEntry> {
 public:
     IndexCatalogEntry() = default;
     virtual ~IndexCatalogEntry() = default;
@@ -175,7 +177,7 @@ public:
         IndexDescriptor descriptor) const = 0;
 };
 
-class IndexCatalogEntryContainer {
+class MONGO_MOD_PRIVATE IndexCatalogEntryContainer {
 public:
     using const_iterator = std::vector<std::shared_ptr<const IndexCatalogEntry>>::const_iterator;
     using iterator = std::vector<std::shared_ptr<const IndexCatalogEntry>>::const_iterator;

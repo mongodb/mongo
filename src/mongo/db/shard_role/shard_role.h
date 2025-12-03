@@ -45,7 +45,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/views/view.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -363,7 +363,7 @@ private:
 };
 
 // Most acquisitions are on a single collection and are only of size 1.
-static constexpr auto kDefaultAcquisitionContainerSize = 1;
+MONGO_MOD_PRIVATE static constexpr auto kDefaultAcquisitionContainerSize = 1;
 
 using NamespaceStringOrUUIDRequests MONGO_MOD_PUBLIC =
     absl::InlinedVector<NamespaceStringOrUUID, kDefaultAcquisitionContainerSize>;
@@ -489,10 +489,9 @@ struct MONGO_MOD_PUBLIC YieldedTransactionResources {
     shard_role_details::TransactionResources::State _originalState;
 };
 
-class MONGO_MOD_PUBLIC PreparedForYieldToken {
-    PreparedForYieldToken() = default;
-    friend PreparedForYieldToken prepareForYieldingTransactionResources(OperationContext* opCtx);
-};
+// Forward declared so the function declaration (with MONGO_MOD_PUBLIC) appears before the class's
+// friend declaration, which cannot be annotated.
+class PreparedForYieldToken;
 
 /**
  * This method does some preparatory work for yielding the transaction resources. This is necessary
@@ -501,6 +500,11 @@ class MONGO_MOD_PUBLIC PreparedForYieldToken {
  */
 MONGO_MOD_PUBLIC PreparedForYieldToken
 prepareForYieldingTransactionResources(OperationContext* opCtx);
+
+class MONGO_MOD_PUBLIC PreparedForYieldToken {
+    PreparedForYieldToken() = default;
+    friend PreparedForYieldToken prepareForYieldingTransactionResources(OperationContext* opCtx);
+};
 
 /**
  * This method puts the TransactionResources associated with the current OpCtx into the yielded

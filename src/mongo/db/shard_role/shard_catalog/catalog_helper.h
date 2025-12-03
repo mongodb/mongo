@@ -34,6 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <functional>
@@ -41,15 +42,15 @@
 
 namespace mongo::catalog_helper {
 
-extern FailPoint setAutoGetCollectionWait;
+MONGO_MOD_PRIVATE extern FailPoint setAutoGetCollectionWait;
 
-extern StorageEngine::TimestampMonitor::TimestampListener
+MONGO_MOD_NEEDS_REPLACEMENT extern StorageEngine::TimestampMonitor::TimestampListener
     kCollectionCatalogCleanupTimestampListener;
 
 /**
  * Executes the provided callback on the 'setAutoGetCollectionWait' FailPoint.
  */
-static void setAutoGetCollectionWaitFailpointExecute(
+MONGO_MOD_PRIVATE static void setAutoGetCollectionWaitFailpointExecute(
     const std::function<void(const BSONObj&)>& callback) {
     setAutoGetCollectionWait.execute(callback);
 }

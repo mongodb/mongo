@@ -36,6 +36,7 @@
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 

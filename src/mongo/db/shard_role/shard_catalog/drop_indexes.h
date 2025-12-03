@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/ddl/drop_indexes_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
@@ -63,28 +64,29 @@ using IndexArgument = std::variant<std::string, std::vector<std::string>, mongo:
  *
  * TODO SERVER-102344 remove the forceRawDataMode once 9.0 becomes last LTS
  */
-DropIndexesReply dropIndexes(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             const boost::optional<UUID>& expectedUUID,
-                             const IndexArgument& index,
-                             bool forceRawDataMode = false);
+MONGO_MOD_PRIVATE DropIndexesReply dropIndexes(OperationContext* opCtx,
+                                               const NamespaceString& nss,
+                                               const boost::optional<UUID>& expectedUUID,
+                                               const IndexArgument& index,
+                                               bool forceRawDataMode = false);
 
 /**
  * Performs a dry-run validation of dropping indexes without actually dropping them.
  * Validates all the same constraints and throws the same errors as dropIndexes would.
  */
-DropIndexesReply dropIndexesDryRun(OperationContext* opCtx,
-                                   const NamespaceString& origNss,
-                                   const boost::optional<UUID>& expectedUUID,
-                                   const IndexArgument& origIndexArgument,
-                                   const boost::optional<BSONObj>& shardKeyPattern,
-                                   bool forceRawDataMode = false);
+MONGO_MOD_PARENT_PRIVATE DropIndexesReply
+dropIndexesDryRun(OperationContext* opCtx,
+                  const NamespaceString& origNss,
+                  const boost::optional<UUID>& expectedUUID,
+                  const IndexArgument& origIndexArgument,
+                  const boost::optional<BSONObj>& shardKeyPattern,
+                  bool forceRawDataMode = false);
 
 /**
  * Same behaviour as "dropIndexes" but only drops ready indexes.
  */
-Status dropIndexesForApplyOps(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const BSONObj& cmdObj);
+MONGO_MOD_NEEDS_REPLACEMENT Status dropIndexesForApplyOps(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          const BSONObj& cmdObj);
 
 }  // namespace mongo

@@ -36,9 +36,10 @@
 #include "mongo/db/topology/add_shard_coordinator_document_gen.h"
 #include "mongo/db/topology/topology_change_helpers.h"
 #include "mongo/s/sharding_task_executor.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
-class AddShardCoordinator final
+class MONGO_MOD_PARENT_PRIVATE AddShardCoordinator final
     : public RecoverableShardingDDLCoordinator<AddShardCoordinatorDocument,
                                                AddShardCoordinatorPhaseEnum> {
 public:

@@ -46,6 +46,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -68,11 +69,11 @@ namespace mongo {
 
 namespace shard_registry_stats {
 
-extern Counter64& blockedOpsGauge;
+MONGO_MOD_PRIVATE extern Counter64& blockedOpsGauge;
 
 }  // namespace shard_registry_stats
 
-class ShardRegistryData {
+class MONGO_MOD_PRIVATE ShardRegistryData {
 public:
     using ShardMap = stdx::unordered_map<ShardId, std::shared_ptr<Shard>, ShardId::Hasher>;
 
@@ -206,7 +207,7 @@ private:
  * registry discovers an updated connection string for another shard via a replica set topology
  * change, it will persist that update to `config.shards`.
  */
-class ShardRegistry {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardRegistry {
     ShardRegistry(const ShardRegistry&) = delete;
     ShardRegistry& operator=(const ShardRegistry&) = delete;
 

@@ -47,6 +47,7 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>

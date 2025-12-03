@@ -43,6 +43,7 @@
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>

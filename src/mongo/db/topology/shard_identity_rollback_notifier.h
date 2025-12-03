@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 
 namespace mongo {
 
@@ -50,7 +52,7 @@ class ServiceContext;
  * an OpObserver detecting that the document was deleted, and didRollbackHappen is only called on
  * exiting rollback, and there can only be one of those things happening at any given time.
  */
-class ShardIdentityRollbackNotifier {
+class MONGO_MOD_PARENT_PRIVATE ShardIdentityRollbackNotifier {
     ShardIdentityRollbackNotifier(const ShardIdentityRollbackNotifier&) = delete;
     ShardIdentityRollbackNotifier& operator=(const ShardIdentityRollbackNotifier&) = delete;
 

@@ -42,6 +42,7 @@
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -62,27 +63,25 @@ namespace durable_catalog {
  * Scans the persisted catalog until an entry is found matching 'nss'. If present, returns a parsed
  * version of the catalog entry.
  */
-boost::optional<CatalogEntry> scanForCatalogEntryByNss(OperationContext* opCtx,
-                                                       const NamespaceString& nss,
-                                                       const MDBCatalog* mdbCatalog);
+MONGO_MOD_PRIVATE boost::optional<CatalogEntry> scanForCatalogEntryByNss(
+    OperationContext* opCtx, const NamespaceString& nss, const MDBCatalog* mdbCatalog);
 
 /**
  * Scans the persisted catalog until an entry is found matching 'uuid'. If present, returns a parsed
  * version of the catalog entry.
  */
-boost::optional<CatalogEntry> scanForCatalogEntryByUUID(OperationContext* opCtx,
-                                                        const UUID& uuid,
-                                                        const MDBCatalog* mdbCatalog);
+MONGO_MOD_PRIVATE boost::optional<CatalogEntry> scanForCatalogEntryByUUID(
+    OperationContext* opCtx, const UUID& uuid, const MDBCatalog* mdbCatalog);
 
 /**
  * Parses the _mdb_catalog entry object at `catalogId` to common types. Returns boost::none if it
  * doesn't exist or if the entry is the feature document.
  */
-boost::optional<CatalogEntry> getParsedCatalogEntry(OperationContext* opCtx,
-                                                    const RecordId& catalogId,
-                                                    const MDBCatalog* mdbCatalog);
+MONGO_MOD_NEEDS_REPLACEMENT boost::optional<CatalogEntry> getParsedCatalogEntry(
+    OperationContext* opCtx, const RecordId& catalogId, const MDBCatalog* mdbCatalog);
 
-boost::optional<CatalogEntry> parseCatalogEntry(const RecordId& catalogId, const BSONObj& obj);
+MONGO_MOD_NEEDS_REPLACEMENT boost::optional<CatalogEntry> parseCatalogEntry(
+    const RecordId& catalogId, const BSONObj& obj);
 
 /**
  * Updates the catalog entry for the collection 'nss' with the fields specified in 'md'. If
@@ -93,29 +92,30 @@ boost::optional<CatalogEntry> parseCatalogEntry(const RecordId& catalogId, const
  * given object. If not, `idxIdents` must already contain idents for all indexes in the metadata.
  * Any idents for indexes not present in the metadata will be discarded.
  */
-void putMetaData(OperationContext* opCtx,
-                 const RecordId& catalogId,
-                 durable_catalog::CatalogEntryMetaData& md,
-                 MDBCatalog* mdbCatalog,
-                 boost::optional<BSONObj> indexIdents = boost::none);
+MONGO_MOD_NEEDS_REPLACEMENT void putMetaData(OperationContext* opCtx,
+                                             const RecordId& catalogId,
+                                             durable_catalog::CatalogEntryMetaData& md,
+                                             MDBCatalog* mdbCatalog,
+                                             boost::optional<BSONObj> indexIdents = boost::none);
 
 /**
  * Persists a new collection in the catalog. The caller takes ownership of the newly created
  * RecordStore for the collection.
  */
-StatusWith<std::unique_ptr<RecordStore>> createCollection(OperationContext* opCtx,
-                                                          const RecordId& catalogId,
-                                                          const NamespaceString& nss,
-                                                          const std::string& ident,
-                                                          const CollectionOptions& options,
-                                                          MDBCatalog* mdbCatalog);
+MONGO_MOD_PRIVATE StatusWith<std::unique_ptr<RecordStore>> createCollection(
+    OperationContext* opCtx,
+    const RecordId& catalogId,
+    const NamespaceString& nss,
+    const std::string& ident,
+    const CollectionOptions& options,
+    MDBCatalog* mdbCatalog);
 
-Status createIndex(OperationContext* opCtx,
-                   const RecordId& catalogId,
-                   const NamespaceString& nss,
-                   const CollectionOptions& collectionOptions,
-                   const IndexConfig& indexConfig,
-                   StringData ident);
+MONGO_MOD_PRIVATE Status createIndex(OperationContext* opCtx,
+                                     const RecordId& catalogId,
+                                     const NamespaceString& nss,
+                                     const CollectionOptions& collectionOptions,
+                                     const IndexConfig& indexConfig,
+                                     StringData ident);
 
 /**
  * Import a collection by inserting the given metadata into the durable catalog and instructing
@@ -132,27 +132,28 @@ Status createIndex(OperationContext* opCtx,
  *
  * The collection must be locked in MODE_X when calling this function.
  */
-struct ImportResult {
+struct MONGO_MOD_NEEDS_REPLACEMENT ImportResult {
     ImportResult(RecordId catalogId, std::unique_ptr<RecordStore> rs, UUID uuid)
         : catalogId(std::move(catalogId)), rs(std::move(rs)), uuid(uuid) {}
     RecordId catalogId;
     std::unique_ptr<RecordStore> rs;
     UUID uuid;
 };
-StatusWith<ImportResult> importCollection(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          const BSONObj& metadata,
-                                          const BSONObj& storageMetadata,
-                                          bool generateNewUUID,
-                                          MDBCatalog* mdbCatalog,
-                                          bool panicOnCorruptWtMetadata = true,
-                                          bool repair = false);
+MONGO_MOD_NEEDS_REPLACEMENT StatusWith<ImportResult> importCollection(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& metadata,
+    const BSONObj& storageMetadata,
+    bool generateNewUUID,
+    MDBCatalog* mdbCatalog,
+    bool panicOnCorruptWtMetadata = true,
+    bool repair = false);
 
-Status renameCollection(OperationContext* opCtx,
-                        const RecordId& catalogId,
-                        const NamespaceString& toNss,
-                        durable_catalog::CatalogEntryMetaData& md,
-                        MDBCatalog* mdbCatalog);
+MONGO_MOD_PRIVATE Status renameCollection(OperationContext* opCtx,
+                                          const RecordId& catalogId,
+                                          const NamespaceString& toNss,
+                                          durable_catalog::CatalogEntryMetaData& md,
+                                          MDBCatalog* mdbCatalog);
 
 /**
  * Deletes the persisted collection catalog entry identified by 'catalogId'.
@@ -160,26 +161,29 @@ Status renameCollection(OperationContext* opCtx,
  * Expects (invariants) that all of the index catalog entries have been removed already via
  * removeIndex.
  */
-Status dropCollection(OperationContext* opCtx, const RecordId& catalogId, MDBCatalog* mdbCatalog);
+MONGO_MOD_PRIVATE Status dropCollection(OperationContext* opCtx,
+                                        const RecordId& catalogId,
+                                        MDBCatalog* mdbCatalog);
 
 /**
  * Drops the provided ident and recreates it as empty for use in resuming an index build.
  */
-Status dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          const CollectionOptions& options,
-                                          const IndexConfig& indexConfig,
-                                          StringData ident);
+MONGO_MOD_NEEDS_REPLACEMENT Status
+dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const CollectionOptions& options,
+                                   const IndexConfig& indexConfig,
+                                   StringData ident);
 
-void getReadyIndexes(OperationContext* opCtx,
-                     RecordId catalogId,
-                     StringSet* names,
-                     const MDBCatalog* mdbCatalog);
+MONGO_MOD_PRIVATE void getReadyIndexes(OperationContext* opCtx,
+                                       RecordId catalogId,
+                                       StringSet* names,
+                                       const MDBCatalog* mdbCatalog);
 
-bool isIndexPresent(OperationContext* opCtx,
-                    const RecordId& catalogId,
-                    StringData indexName,
-                    const MDBCatalog* mdbCatalog);
+MONGO_MOD_PRIVATE bool isIndexPresent(OperationContext* opCtx,
+                                      const RecordId& catalogId,
+                                      StringData indexName,
+                                      const MDBCatalog* mdbCatalog);
 
 /**
  * Holds functions for internal use from within the 'durable_catalog'. Exposed externally for
@@ -190,13 +194,14 @@ namespace internal {
  * Generates 'durable_catalog::CatalogEntryMetaData' from 'collectionOptions'. Assumes it is for a
  * new collection without no indexes present.
  */
-durable_catalog::CatalogEntryMetaData createMetaDataForNewCollection(
+MONGO_MOD_NEEDS_REPLACEMENT durable_catalog::CatalogEntryMetaData createMetaDataForNewCollection(
     const NamespaceString& nss, const CollectionOptions& collectionOptions);
 
-BSONObj buildRawMDBCatalogEntry(const std::string& ident,
-                                const BSONObj& idxIdent,
-                                const durable_catalog::CatalogEntryMetaData& md,
-                                const NamespaceString& nss);
+MONGO_MOD_NEEDS_REPLACEMENT BSONObj
+buildRawMDBCatalogEntry(const std::string& ident,
+                        const BSONObj& idxIdent,
+                        const durable_catalog::CatalogEntryMetaData& md,
+                        const NamespaceString& nss);
 
 }  // namespace internal
 

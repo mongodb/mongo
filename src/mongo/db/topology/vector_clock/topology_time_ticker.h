@@ -34,6 +34,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <vector>
@@ -50,7 +51,7 @@ namespace mongo {
  * Since the tick points represent non-majority committed changes, this class has to handle what
  * happens on rollback.
  */
-class TopologyTimeTicker {
+class MONGO_MOD_PARENT_PRIVATE TopologyTimeTicker {
 public:
     TopologyTimeTicker() = default;
 
