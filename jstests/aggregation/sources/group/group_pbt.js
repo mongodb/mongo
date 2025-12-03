@@ -3,7 +3,6 @@
  *
  * @tags: [
  * query_intensive_pbt,
- * requires_timeseries,
  * # Runs queries that may return many results, requiring getmores.
  * requires_getmore,
  * # This test runs commands that are not allowed with security token: setParameter.
@@ -46,4 +45,4 @@ testProperty(
     numRuns,
 );
 
-// TODO SERVER-103381 implement time-series PBT testing.
+// TODO SERVER-83072 add a new time-series PBT test once $group array bug is fixed.

@@ -7,8 +7,6 @@
  * requires_getmore,
  * # This test runs commands that are not allowed with security token: setParameter.
  * not_allowed_with_signed_security_token,
- * # Time series collections do not support indexing array values in measurement fields.
- * exclude_from_timeseries_crud_passthrough,
  * ]
  */
 
@@ -28,7 +26,7 @@ import {
 } from "jstests/libs/property_test_helpers/models/query_models.js";
 
 if (isSlowBuild(db)) {
-    jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
+    jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
 

@@ -11,8 +11,6 @@
  * not_allowed_with_signed_security_token,
  * # Multiversion tests rediscover an issue where a buggy optimization omits $sortKey when required.
  * requires_fcv_83,
- * # Time series collections do not support indexing array values in measurement fields.
- * exclude_from_timeseries_crud_passthrough,
  * ]
  */
 
@@ -34,10 +32,11 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {getDatasetModel} from "jstests/libs/property_test_helpers/models/document_models.js";
 
 if (isSlowBuild(db)) {
-    jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
+    jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
 
+const isTimeseriesTestSuite = TestData.isTimeseriesTestSuite || false;
 const numRuns = 20;
 const numQueriesPerRun = 40;
 
@@ -62,9 +61,11 @@ const allowedStages = [
 // Generate queries without collation and then we will append it later.
 const aggModel = getQueryAndOptionsModel({allowCollation: false, allowedStages: allowedStages});
 
-function makeCollationWorkloadModel(isTS) {
+function makeCollationWorkloadModel() {
     // Generate indexes without collation and then we will append it later.
-    const indexArb = isTS ? getTimeSeriesIndexModel({allowCollation: false}) : getIndexModel({allowCollation: false});
+    const indexArb = isTimeseriesTestSuite
+        ? getTimeSeriesIndexModel({allowCollation: false})
+        : getIndexModel({allowCollation: false});
 
     return fc
         .record({
@@ -87,11 +88,11 @@ function makeCollationWorkloadModel(isTS) {
                 "pipeline": query.pipeline,
                 "options": Object.assign({}, query.options, {collation: sharedCollation}),
             }));
-            return {collSpec: {isTS: isTS, docs, indexes: indexesWithCollation}, queries: queriesWithCollation};
+            return {
+                collSpec: {isTS: isTimeseriesTestSuite, docs, indexes: indexesWithCollation},
+                queries: queriesWithCollation,
+            };
         });
 }
 
-testProperty(correctnessProperty, {controlColl, experimentColl}, makeCollationWorkloadModel(false), numRuns);
-
-// TODO SERVER-103381 implement time-series PBT testing.
-// testProperty(correctnessProperty, {controlColl, experimentColl}, makeCollationWorkloadModel(true), numRuns);
+testProperty(correctnessProperty, {controlColl, experimentColl}, makeCollationWorkloadModel(), numRuns);

@@ -7,14 +7,15 @@ import {getIndexModel, getTimeSeriesIndexModel} from "jstests/libs/property_test
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 export function getCollectionModel({isTS = false, indexesModel, docsModel} = {}) {
+    const isTSCollection = TestData.isTimeseriesTestSuite || isTS;
     // If no documents model or index model is provided, assume the default.
     if (!docsModel) {
         docsModel = getDatasetModel();
     }
     if (!indexesModel) {
-        const indexModel = isTS ? getTimeSeriesIndexModel() : getIndexModel();
+        const indexModel = isTSCollection ? getTimeSeriesIndexModel() : getIndexModel();
         indexesModel = fc.array(indexModel, {minLength: 0, maxLength: 15, size: "+2"});
     }
 
-    return fc.record({isTS: fc.constant(isTS), docs: docsModel, indexes: indexesModel});
+    return fc.record({isTS: fc.constant(isTSCollection), docs: docsModel, indexes: indexesModel});
 }

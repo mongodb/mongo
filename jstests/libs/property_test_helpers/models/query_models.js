@@ -87,8 +87,10 @@ export const skipArb = fc.record({$skip: fc.integer({min: 1, max: 5})});
  *       when a deterministic bag is required.
  * The output is in order from simplest agg stages to most complex, for minimization.
  */
-function getAllowedStages(allowOrs, deterministicBag, allowCollation) {
+function getAllowedStages(allowOrs, deterministicBag) {
     let allowedStages = [];
+    // TODO SERVER-83072 remove 'isTimeseriesTestSuite' once $group timeseries array bug is fixed.
+    const isTimeseriesTestSuite = TestData.isTimeseriesTestSuite || false;
     if (deterministicBag) {
         allowedStages = [
             simpleProjectArb,
@@ -97,7 +99,6 @@ function getAllowedStages(allowOrs, deterministicBag, allowCollation) {
             computedProjectArb,
             addFieldsVarArb,
             getSortArb(),
-            groupArb,
         ];
     } else {
         // If we don't require a deterministic bag, we can allow $skip and $limit anywhere.
@@ -110,8 +111,10 @@ function getAllowedStages(allowOrs, deterministicBag, allowCollation) {
             computedProjectArb,
             addFieldsVarArb,
             getSortArb(),
-            groupArb,
         ];
+    }
+    if (!isTimeseriesTestSuite) {
+        allowedStages.push(groupArb);
     }
     return allowedStages;
 }

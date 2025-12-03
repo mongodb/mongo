@@ -7,15 +7,12 @@
  * # This test runs commands that are not allowed with security token: setParameter.
  * not_allowed_with_signed_security_token,
  * config_shard_incompatible,
- * requires_timeseries,
  * # Incompatible with setParameter
  * does_not_support_stepdowns,
  * # Runs queries that may return many results, requiring getmores
  * requires_getmore,
  * # Some query knobs may not exist on older versions.
  * multiversion_incompatible,
- * # Time series collections do not support indexing array values in measurement fields.
- * exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
@@ -27,7 +24,7 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {createQueriesWithKnobsSetAreSameAsControlCollScanProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 
 if (isSlowBuild(db)) {
-    jsTestLog("Exiting early because debug is on, opt is off, or a sanitizer is enabled.");
+    jsTest.log.info("Exiting early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
 
@@ -37,11 +34,11 @@ const numQueriesPerRun = 50;
 const controlColl = db.query_knob_correctness_pbt_control;
 const experimentColl = db.query_knob_correctness_pbt_experiment;
 
-function getWorkloadModel(isTS, aggModel) {
+function getWorkloadModel() {
     return fc
         .record({
-            collSpec: getCollectionModel({isTS}),
-            queries: fc.array(aggModel, {minLength: 1, maxLength: numQueriesPerRun}),
+            collSpec: getCollectionModel(),
+            queries: fc.array(getQueryAndOptionsModel(), {minLength: 1, maxLength: numQueriesPerRun}),
             knobToVal: queryKnobsModel,
         })
         .map(({collSpec, queries, knobToVal}) => {
@@ -52,25 +49,4 @@ function getWorkloadModel(isTS, aggModel) {
 const knobCorrectnessProperty = createQueriesWithKnobsSetAreSameAsControlCollScanProperty(controlColl, experimentColl);
 
 // Test with a regular collection.
-testProperty(
-    knobCorrectnessProperty,
-    {controlColl, experimentColl},
-    getWorkloadModel(false /* isTS */, getQueryAndOptionsModel()),
-    numRuns,
-);
-
-// TODO SERVER-103381 re-enable timeseries PBT testing.
-// Test with a TS collection.
-// TODO SERVER-83072 re-enable $group in this test, by removing the filter below.
-// const tsAggModel = getQueryAndOptionsModel().filter(query => {
-//     for (const stage of query) {
-//         if (Object.keys(stage).includes('$group')) {
-//             return false;
-//         }
-//     }
-//     return true;
-// });
-// testProperty(queriesWithKnobsSetAreSameAsControlCollScan,
-//              {controlColl, experimentColl},
-//              getWorkloadModel(true /* isTS */, tsAggModel),
-//              numRuns);
+testProperty(knobCorrectnessProperty, {controlColl, experimentColl}, getWorkloadModel(), numRuns);

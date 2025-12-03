@@ -16,7 +16,6 @@
  *
  * @tags: [
  * query_intensive_pbt,
- * requires_timeseries,
  * assumes_no_implicit_collection_creation_on_get_collection,
  * # Runs queries that may return many results, requiring getmores.
  * requires_getmore,
@@ -34,7 +33,7 @@ import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analy
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 if (isSlowBuild(db)) {
-    jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
+    jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
 
@@ -98,5 +97,3 @@ testProperty(correctnessProperty, {controlColl, experimentColl}, getWorkloadMode
 // Assert that the number of plans that used the index for the sort is >= 80%
 assert.gt(totalNumPlans, 0);
 assert.gte(numPlansUsedIndex / totalNumPlans, 0.8, {numPlansUsedIndex, totalNumPlans});
-
-// TODO SERVER-103381 implement time-series PBT testing.

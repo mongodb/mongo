@@ -5,7 +5,6 @@
  *
  * @tags: [
  *   query_intensive_pbt,
- *   requires_timeseries,
  *   assumes_standalone_mongod,
  *   # Plan cache state is node-local and will not get migrated alongside user data
  *   assumes_balancer_off,
@@ -66,9 +65,3 @@ testProperty(
     makeWorkloadModel({collModel: getCollectionModel({isTS: false}), aggModel, numQueriesPerRun}),
     numRuns,
 );
-// TODO SERVER-103381 re-enable time-series PBT testing
-// testProperty(
-//     identicalQueryCreatesAtMostOneCacheEntry,
-//     {experimentColl},
-//     makeWorkloadModel({collModel: getCollectionModel({isTS: true}), aggModel, numQueriesPerRun}),
-//     numRuns);

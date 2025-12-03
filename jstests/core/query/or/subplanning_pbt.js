@@ -6,14 +6,11 @@
  * query_intensive_pbt,
  * # This test runs commands that are not allowed with security token: setParameter.
  * not_allowed_with_signed_security_token,
- * requires_timeseries,
  * assumes_no_implicit_collection_creation_on_get_collection,
  * # Incompatible with setParameter
  * does_not_support_stepdowns,
  * # Runs queries that may return many results, requiring getmores
  * requires_getmore,
- * # Time series collections do not support indexing array values in measurement fields.
- * exclude_from_timeseries_crud_passthrough,
  * ]
  */
 import {createCacheCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
@@ -26,7 +23,7 @@ import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 if (isSlowBuild(db)) {
-    jsTestLog("Exiting early because debug is on, opt is off, or a sanitizer is enabled.");
+    jsTest.log.info("Exiting early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
 
@@ -79,19 +76,3 @@ testProperty(
     makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
     numRuns,
 );
-
-// // TODO SERVER-103381 re-enable PBT testing for time-series
-// // Test with a TS collection.
-// TODO SERVER-83072 re-enable $group in this test, by removing the filter below.
-// const tsAggModel = aggModel.filter(query => {
-//     for (const stage of query) {
-//         if (Object.keys(stage).includes('$group')) {
-//             return false;
-//         }
-//     }
-//     return true;
-// });
-// testProperty(correctnessProperty,
-//              {controlColl, experimentColl},
-//              makeWorkloadModel({collModel: getCollectionModel(), aggModel: tsAggModel,
-//              numQueriesPerRun}), numRuns);
