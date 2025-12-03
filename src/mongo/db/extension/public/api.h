@@ -355,6 +355,11 @@ typedef struct MongoExtensionLogicalAggStageVTable {
     void (*destroy)(MongoExtensionLogicalAggStage* logicalStage);
 
     /**
+     * Returns a MongoExtensionByteView containing the name of the associated aggregation stage.
+     */
+    MongoExtensionByteView (*get_name)(const MongoExtensionLogicalAggStage* logicalStage);
+
+    /**
      * Serialize `logicalStage` to be potentially sent across the wire to other execution nodes.
      */
     MongoExtensionStatus* (*serialize)(const MongoExtensionLogicalAggStage* logicalStage,
@@ -536,8 +541,10 @@ typedef struct MongoExtensionDistributedPlanLogicVTable {
      * returned as a nullptr.
      *
      * Note: This is currently restricted to only a single shardsStage for parity with the
-     * DistributedPlanLogic shardsStage. If in the future an extension stage may return more than
-     * one shardsStage, we will remove that restriction and modify DistributedPlanLogic.
+     * DistributedPlanLogic shardsStage. This single shardsStage must be fully expanded (i.e. not a
+     * desugar stage) so that it can be converted to a single DocumentSource. If in the future an
+     * extension stage may return more than one shardsStage, we will remove that restriction and
+     * modify DistributedPlanLogic.
      */
     MongoExtensionStatus* (*get_shards_pipeline)(
         MongoExtensionDistributedPlanLogic* distributedPlanLogic,

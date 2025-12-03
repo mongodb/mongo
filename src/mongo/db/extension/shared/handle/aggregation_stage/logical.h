@@ -50,6 +50,8 @@ public:
         _assertValidVTable();
     }
 
+    StringData getName() const;
+
     BSONObj serialize() const;
 
     /**
@@ -70,6 +72,8 @@ public:
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(
+            11420603, "ExtensionLogicalAggStage 'get_name' is null", vtable.get_name != nullptr);
         tassert(
             11173703, "ExtensionLogicalAggStage 'serialize' is null", vtable.serialize != nullptr);
         tassert(11239401, "ExtensionLogicalAggStage 'explain' is null", vtable.explain != nullptr);

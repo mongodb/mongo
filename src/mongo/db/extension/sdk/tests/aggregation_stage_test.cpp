@@ -453,7 +453,7 @@ public:
     static constexpr StringData kStageName = "$simpleSerialization";
     static constexpr StringData kStageSpec = "mongodb";
 
-    SimpleSerializationLogicalStage() {}
+    SimpleSerializationLogicalStage() : LogicalAggStage(toStdStringViewForInterop(kStageName)) {}
 
     BSONObj serialize() const override {
         return BSON(kStageName << kStageSpec);
@@ -1094,6 +1094,8 @@ TEST_F(AggStageTest, TestValidExecAggStageFromCompiledLogicalAggStage) {
 
 class TestSourceLogicalAggStage : public shared_test_stages::FruitsAsDocumentsLogicalAggStage {
 public:
+    TestSourceLogicalAggStage() : shared_test_stages::FruitsAsDocumentsLogicalAggStage() {}
+
     static inline std::unique_ptr<extension::sdk::LogicalAggStage> make() {
         return std::make_unique<TestSourceLogicalAggStage>();
     }
@@ -1416,6 +1418,8 @@ public:
 class MergeOnlyLogicalStage : public sdk::LogicalAggStage {
 public:
     static constexpr StringData kStageName = "$mergeOnly";
+
+    MergeOnlyLogicalStage() : sdk::LogicalAggStage(toStdStringViewForInterop(kStageName)) {}
 
     BSONObj serialize() const override {
         return BSON(std::string(kStageName) << "serializedForExecution");

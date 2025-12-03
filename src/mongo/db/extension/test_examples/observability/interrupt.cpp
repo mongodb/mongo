@@ -108,7 +108,8 @@ private:
 
 class InterruptTestLogicalStage : public sdk::LogicalAggStage {
 public:
-    InterruptTestLogicalStage(int uassertOn) : _uassertOn(uassertOn) {};
+    InterruptTestLogicalStage(int uassertOn)
+        : sdk::LogicalAggStage(kInterruptTestStageName), _uassertOn(uassertOn) {}
 
     BSONObj serialize() const override {
         return BSON(kInterruptTestStageName << BSONObj());

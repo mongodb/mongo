@@ -82,7 +82,7 @@ public:
 
 class ShapifyLogicalStage : public sdk::LogicalAggStage {
 public:
-    ShapifyLogicalStage(BSONObj input) : _input(input) {}
+    ShapifyLogicalStage(BSONObj input) : sdk::LogicalAggStage(kShapifyStageName), _input(input) {}
 
     BSONObj serialize() const override {
         return BSON(kShapifyStageName << _input);

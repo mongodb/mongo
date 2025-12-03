@@ -173,11 +173,6 @@ const char* DocumentSourceExtension::getSourceName() const {
     return _stageName.c_str();
 }
 
-boost::optional<DocumentSource::DistributedPlanLogic>
-DocumentSourceExtension::distributedPlanLogic() {
-    return boost::none;
-}
-
 StageConstraints DocumentSourceExtension::constraints(PipelineSplitState pipeState) const {
     // Default constraints for extension stages.
     //

@@ -47,23 +47,30 @@ public:
     Value serialize(const SerializationOptions& opts) const override;
 
     std::list<boost::intrusive_ptr<DocumentSource>> expand() const {
-        return expandImpl(getExpCtx(), _parseNode);
+        return expandParseNode(getExpCtx(), _parseNode);
     }
+
+    // Recursive helper for expand().
+    static std::list<boost::intrusive_ptr<DocumentSource>> expandParseNode(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const AggStageParseNodeHandle& parseNodeHandle);
 
     static const Id& id;
 
     Id getId() const override;
+
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+        tasserted(11420600,
+                  "distributedPlanLogic() should not be called on "
+                  "DocumentSourceExtensionExpandable. Expandable stages should have been desugared "
+                  "to Optimizable stages before calling distributedPlanLogic()");
+    }
 
     // Define how to desugar a DocumentSourceExtensionExpandable.
     static Desugarer::StageExpander stageExpander;
 
 private:
     const AggStageParseNodeHandle _parseNode;
-
-    // Recursive helper for expand().
-    static std::list<boost::intrusive_ptr<DocumentSource>> expandImpl(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const AggStageParseNodeHandle& parseNodeHandle);
 
     DocumentSourceExtensionExpandable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       BSONObj rawStage,

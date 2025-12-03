@@ -64,13 +64,22 @@ class ExecAggStageBase;
 class DistributedPlanLogicBase;
 class LogicalAggStage {
 public:
-    LogicalAggStage() = default;
     virtual ~LogicalAggStage() = default;
+
+    std::string_view getName() const {
+        return _name;
+    }
 
     virtual BSONObj serialize() const = 0;
     virtual BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const = 0;
     virtual std::unique_ptr<ExecAggStageBase> compile() const = 0;
     virtual std::unique_ptr<DistributedPlanLogicBase> getDistributedPlanLogic() const = 0;
+
+protected:
+    LogicalAggStage() = delete;  // No default constructor.
+    explicit LogicalAggStage(std::string_view name) : _name(name) {}
+
+    const std::string _name;
 };
 
 /**
@@ -106,6 +115,12 @@ public:
 private:
     static void _extDestroy(::MongoExtensionLogicalAggStage* extlogicalStage) noexcept {
         delete static_cast<ExtensionLogicalAggStage*>(extlogicalStage);
+    }
+
+    static ::MongoExtensionByteView _extGetName(
+        const ::MongoExtensionLogicalAggStage* logicalStage) noexcept {
+        return stringViewAsByteView(
+            static_cast<const ExtensionLogicalAggStage*>(logicalStage)->getImpl().getName());
     }
 
     static MongoExtensionStatus* _extSerialize(
@@ -157,6 +172,7 @@ private:
 
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
         .destroy = &_extDestroy,
+        .get_name = &_extGetName,
         .serialize = &_extSerialize,
         .explain = &_extExplain,
         .compile = &_extCompile,

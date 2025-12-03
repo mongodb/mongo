@@ -230,8 +230,6 @@ public:
 
     const char* getSourceName() const override;
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override;
-
     void addVariableRefs(std::set<Variables::Id>* refs) const override {}
 
     StageConstraints constraints(PipelineSplitState pipeState) const override;

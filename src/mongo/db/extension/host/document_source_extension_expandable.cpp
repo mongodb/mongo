@@ -41,7 +41,7 @@ namespace mongo::extension::host {
 
 ALLOCATE_DOCUMENT_SOURCE_ID(extensionExpandable, DocumentSourceExtensionExpandable::id);
 
-std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceExtensionExpandable::expandImpl(
+std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceExtensionExpandable::expandParseNode(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const AggStageParseNodeHandle& parseNodeHandle) {
     std::list<boost::intrusive_ptr<DocumentSource>> outExpanded;
@@ -54,7 +54,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceExtensionExpandabl
             outExpanded.splice(outExpanded.end(), DocumentSource::parse(expCtx, bsonSpec));
         },
         [&](const AggStageParseNodeHandle& handle) {
-            std::list<boost::intrusive_ptr<DocumentSource>> children = expandImpl(expCtx, handle);
+            std::list<boost::intrusive_ptr<DocumentSource>> children =
+                expandParseNode(expCtx, handle);
             outExpanded.splice(outExpanded.end(), children);
         },
         [&](const HostAggStageAstNode& hostAst) {

@@ -65,7 +65,7 @@ template <typename ExecStageType>
 class TestLogicalStage : public sdk::LogicalAggStage {
 public:
     TestLogicalStage(std::string_view stageName, const mongo::BSONObj& arguments)
-        : _arguments(arguments.getOwned()), _name(stageName) {}
+        : sdk::LogicalAggStage(stageName), _arguments(arguments.getOwned()) {}
 
     mongo::BSONObj serialize() const override {
         return BSON(_name << _arguments);
@@ -82,7 +82,6 @@ public:
 
 protected:
     const mongo::BSONObj _arguments;
-    const std::string _name;
 };
 
 /**

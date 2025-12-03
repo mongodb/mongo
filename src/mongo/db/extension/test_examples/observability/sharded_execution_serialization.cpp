@@ -65,7 +65,8 @@ class ShardedExecutionSerializationLogicalStage : public sdk::LogicalAggStage {
 public:
     static constexpr StringData kShardedAssertFlagFieldName = "assertFlag";
 
-    ShardedExecutionSerializationLogicalStage() : sdk::LogicalAggStage() {}
+    ShardedExecutionSerializationLogicalStage()
+        : sdk::LogicalAggStage(kShardedExecutionSerializationStageName) {}
 
     BSONObj serialize() const override {
         return BSON("$shardedExecutionSerialization" << BSON(kShardedAssertFlagFieldName << true));

@@ -119,7 +119,7 @@ public:
 
 class MetricsLogicalStage : public sdk::LogicalAggStage {
 public:
-    MetricsLogicalStage() = default;
+    MetricsLogicalStage() : sdk::LogicalAggStage(kMetricsStageName) {}
 
     BSONObj serialize() const override {
         return BSON(kMetricsStageName << BSONObj());

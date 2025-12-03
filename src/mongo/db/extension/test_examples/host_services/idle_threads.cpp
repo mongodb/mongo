@@ -47,7 +47,7 @@ DEFAULT_EXEC_STAGE(IdleThreads);
 
 class IdleThreadsLogicalStage : public sdk::LogicalAggStage {
 public:
-    IdleThreadsLogicalStage() : sdk::LogicalAggStage() {}
+    IdleThreadsLogicalStage() : sdk::LogicalAggStage(kIdleThreadsStageName) {}
 
     BSONObj serialize() const override {
         return BSON(kIdleThreadsStageName << BSONObj());

@@ -37,6 +37,11 @@
 
 namespace mongo::extension {
 
+StringData LogicalAggStageHandle::getName() const {
+    auto stringView = byteViewAsStringView(vtable().get_name(get()));
+    return StringData{stringView.data(), stringView.size()};
+}
+
 BSONObj LogicalAggStageHandle::serialize() const {
     ::MongoExtensionByteBuf* buf;
     invokeCAndConvertStatusToException([&]() { return vtable().serialize(get(), &buf); });

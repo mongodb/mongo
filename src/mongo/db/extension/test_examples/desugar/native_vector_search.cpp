@@ -138,7 +138,8 @@ private:
 
 class MetricsLogicalStage : public sdk::LogicalAggStage {
 public:
-    MetricsLogicalStage(const std::string& algorithm) : _algorithm(algorithm) {};
+    MetricsLogicalStage(const std::string& algorithm)
+        : sdk::LogicalAggStage(kMetricsStageName), _algorithm(algorithm) {}
 
     BSONObj serialize() const override {
         return BSON(kMetricsStageName << BSONObj());

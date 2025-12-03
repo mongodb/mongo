@@ -30,6 +30,7 @@
 
 #include "mongo/db/extension/host/document_source_extension.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 
 namespace mongo::extension::host {
@@ -45,6 +46,14 @@ public:
             new DocumentSourceExtensionOptimizable(expCtx, std::move(astNode)));
     }
 
+    // Construction from a logical stage handle. Used when creating DocumentSources from DPL
+    // logical stage handles.
+    static boost::intrusive_ptr<DocumentSourceExtensionOptimizable> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, LogicalAggStageHandle logicalStage) {
+        return boost::intrusive_ptr<DocumentSourceExtensionOptimizable>(
+            new DocumentSourceExtensionOptimizable(expCtx, std::move(logicalStage)));
+    }
+
     Value serialize(const SerializationOptions& opts) const override;
 
     StageConstraints constraints(PipelineSplitState pipeState) const override;
@@ -54,10 +63,16 @@ public:
     Id getId() const override;
 
     const MongoExtensionStaticProperties& getStaticProperties() const {
-        return _properties;
+        tassert(11420604,
+                "Static properties are not available. This stage was likely created from a "
+                "LogicalAggStageHandle without an AST node",
+                _properties.has_value());
+        return _properties.get();
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const override;
+
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() override;
 
     // Wrapper around the LogicalAggStageHandle::compile() method. Returns an ExecAggStageHandle.
     ExecAggStageHandle compile() {
@@ -65,7 +80,7 @@ public:
     }
 
 protected:
-    const MongoExtensionStaticProperties _properties;
+    const boost::optional<MongoExtensionStaticProperties> _properties;
     const LogicalAggStageHandle _logicalStage;
 
     DocumentSourceExtensionOptimizable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -73,6 +88,12 @@ protected:
         : DocumentSourceExtension(astNode.getName(), expCtx),
           _properties(astNode.getProperties()),
           _logicalStage(astNode.bind()) {}
+
+    DocumentSourceExtensionOptimizable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                       LogicalAggStageHandle logicalStage)
+        : DocumentSourceExtension(logicalStage.getName(), expCtx),
+          _properties(boost::none),
+          _logicalStage(std::move(logicalStage)) {}
 };
 
 }  // namespace mongo::extension::host

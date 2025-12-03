@@ -29,6 +29,8 @@
 
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 
+#include "mongo/db/extension/host/document_source_extension_expandable.h"
+
 namespace mongo::extension::host {
 
 ALLOCATE_DOCUMENT_SOURCE_ID(extensionOptimizable, DocumentSourceExtensionOptimizable::id);
@@ -52,14 +54,16 @@ StageConstraints DocumentSourceExtensionOptimizable::constraints(
     // Default properties if unset
     auto constraints = DocumentSourceExtension::constraints(pipeState);
 
+    const auto& properties = getStaticProperties();
+
     // Apply potential overrides from static properties.
-    if (!_properties.getRequiresInputDocSource()) {
+    if (!properties.getRequiresInputDocSource()) {
         constraints.setConstraintsForNoInputSources();
     }
-    if (auto pos = static_properties_util::toPositionRequirement(_properties.getPosition())) {
+    if (auto pos = static_properties_util::toPositionRequirement(properties.getPosition())) {
         constraints.requiredPosition = *pos;
     }
-    if (auto host = static_properties_util::toHostTypeRequirement(_properties.getHostType())) {
+    if (auto host = static_properties_util::toHostTypeRequirement(properties.getHostType())) {
         constraints.hostRequirement = *host;
     }
 
@@ -98,6 +102,70 @@ DepsTracker::State DocumentSourceExtensionOptimizable::getDependencies(DepsTrack
 
     // Retain entire metadata and do not optimize, as it may be needed by the extension.
     return DepsTracker::State::NOT_SUPPORTED;
+}
+
+boost::optional<DocumentSource::DistributedPlanLogic>
+DocumentSourceExtensionOptimizable::distributedPlanLogic() {
+    auto dplHandle = _logicalStage.getDistributedPlanLogic();
+
+    if (!dplHandle.isValid()) {
+        return boost::none;
+    }
+
+    // Convert the returned VariantDPLHandle to a list of DocumentSources.
+    const auto convertDPLHandleToDocumentSources = [&](VariantDPLHandle& handle) {
+        return std::visit(
+            OverloadedVisitor{
+                [&](AggStageParseNodeHandle& dplElement) {
+                    if (HostAggStageParseNode::isHostAllocated(*dplElement.get())) {
+                        // Host-allocated: parse the host-allocated parse node.
+                        const auto& hostParse =
+                            *static_cast<const HostAggStageParseNode*>(dplElement.get());
+                        return DocumentSource::parse(getExpCtx(), hostParse.getBsonSpec());
+                    } else {
+                        // Extension-allocated: expand the parse node.
+                        return DocumentSourceExtensionExpandable::expandParseNode(getExpCtx(),
+                                                                                  dplElement);
+                    }
+                },
+                [&](LogicalAggStageHandle& dplElement) {
+                    // Create a DocumentSource directly from the logical stage handle.
+                    return std::list<boost::intrusive_ptr<DocumentSource>>{
+                        DocumentSourceExtensionOptimizable::create(getExpCtx(),
+                                                                   std::move(dplElement))};
+                }},
+            handle);
+    };
+
+    DistributedPlanLogic logic;
+
+    // Convert shardsPipeline.
+    auto shardsPipeline = dplHandle.getShardsPipeline();
+    if (!shardsPipeline.empty()) {
+        tassert(11420601,
+                "Shards pipeline must have exactly one element per API specification",
+                shardsPipeline.size() == 1);
+        auto shardsStages = convertDPLHandleToDocumentSources(shardsPipeline[0]);
+        tassert(11420602,
+                "Single shardsStage must expand to exactly one DocumentSource",
+                shardsStages.size() == 1);
+        logic.shardsStage = shardsStages.front();
+    }
+
+    // Convert mergingPipeline.
+    auto mergingPipeline = dplHandle.getMergingPipeline();
+    for (auto& handle : mergingPipeline) {
+        auto stages = convertDPLHandleToDocumentSources(handle);
+        logic.mergingStages.splice(logic.mergingStages.end(), stages);
+    }
+
+    // Convert sortPattern.
+    const auto sortPattern = dplHandle.getSortPattern();
+    if (!sortPattern.isEmpty()) {
+        logic.mergeSortPattern = sortPattern.getOwned();
+    }
+
+    return logic;
 }
 
 }  // namespace mongo::extension::host

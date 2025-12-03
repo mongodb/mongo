@@ -233,4 +233,60 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 
     ASSERT_THROWS_CODE(optimizable->getDependencies(&deps), AssertionException, 17308);
 }
+
+TEST_F(DocumentSourceExtensionOptimizableTest, distributedPlanLogicReturnsNoneWhenNoDPL) {
+    // TransformLogicalAggStage returns nullptr for getDistributedPlanLogic(), which should result
+    // in boost::none being returned.
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::TransformAggStageAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    auto dpl = optimizable->distributedPlanLogic();
+    ASSERT_FALSE(dpl.has_value());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, distributedPlanLogicWithMergeOnlyStage) {
+    // Create a stage that returns DPL with merge-only stages containing all three types of
+    // VariantDPLHandle.
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::MergeOnlyDPLAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    auto dpl = optimizable->distributedPlanLogic();
+    ASSERT_TRUE(dpl.has_value());
+
+    const auto& logic = dpl.get();
+
+    // Verify shards pipeline is empty (nullptr).
+    ASSERT_EQ(logic.shardsStage, nullptr);
+
+    // Verify merging pipeline has three stages, one for each type of VariantDPLHandle.
+    ASSERT_EQ(logic.mergingStages.size(), 3U);
+
+    // Verify the first stage is from a host-defined parse node ($match).
+    auto firstStageIt = logic.mergingStages.begin();
+    ASSERT_NE(*firstStageIt, nullptr);
+    ASSERT_EQ(std::string((*firstStageIt)->getSourceName()), "$match");
+
+    // Verify the second stage is from an extension-defined parse node ($transformStage).
+    auto secondStageIt = std::next(firstStageIt);
+    ASSERT_NE(*secondStageIt, nullptr);
+    ASSERT_EQ(std::string((*secondStageIt)->getSourceName()),
+              sdk::shared_test_stages::TransformAggStageDescriptor::kStageName);
+
+    // Verify the third stage is from a logical stage handle ($transformStage).
+    auto thirdStageIt = std::next(secondStageIt);
+    ASSERT_NE(*thirdStageIt, nullptr);
+    ASSERT_EQ(std::string((*thirdStageIt)->getSourceName()),
+              sdk::shared_test_stages::TransformAggStageDescriptor::kStageName);
+
+    // Verify sort pattern is empty.
+    ASSERT_FALSE(logic.mergeSortPattern.has_value());
+}
 }  // namespace mongo::extension

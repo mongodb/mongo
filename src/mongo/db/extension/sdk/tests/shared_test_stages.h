@@ -87,7 +87,7 @@ public:
 
 class TransformLogicalAggStage : public sdk::LogicalAggStage {
 public:
-    TransformLogicalAggStage() {}
+    TransformLogicalAggStage() : sdk::LogicalAggStage(kTransformName) {}
 
     BSONObj serialize() const override {
         return BSON(std::string(kTransformName) << "serializedForExecution");
@@ -221,6 +221,8 @@ private:
 
 class FruitsAsDocumentsLogicalAggStage : public sdk::LogicalAggStage {
 public:
+    FruitsAsDocumentsLogicalAggStage() : sdk::LogicalAggStage(kSourceName) {}
+
     BSONObj serialize() const override {
         return BSON(std::string(kSourceName) << "serializedForExecution");
     }
@@ -356,6 +358,8 @@ private:
 
 class AddFruitsToDocumentsLogicalAggStage : public sdk::LogicalAggStage {
 public:
+    AddFruitsToDocumentsLogicalAggStage() : sdk::LogicalAggStage(kTransformName) {}
+
     BSONObj serialize() const override {
         return BSON(std::string(kTransformName) << "serializedForExecution");
     }
@@ -486,6 +490,8 @@ class TestLogicalStageCompile : public LogicalAggStage {
 public:
     static constexpr StringData kStageName = "$testCompile";
     static constexpr StringData kStageSpec = "mongodb";
+
+    TestLogicalStageCompile() : LogicalAggStage(toStdStringViewForInterop(kStageName)) {}
 
     BSONObj serialize() const override {
         return BSON(kStageName << kStageSpec);
@@ -1132,7 +1138,7 @@ class CountingLogicalStage final : public sdk::LogicalAggStage {
 public:
     static int alive;
 
-    CountingLogicalStage() {
+    CountingLogicalStage() : sdk::LogicalAggStage(kCountingName) {
         ++alive;
     }
 
@@ -1349,6 +1355,89 @@ public:
     host_connector::HostOperationMetricsHandle* getMetrics(
         const std::string& stageName, const UnownedExecAggStageHandle& execStage) const override {
         return nullptr;
+    }
+};
+
+static constexpr std::string_view kMergeOnlyDPLStageName = "$mergeOnlyDPL";
+
+/**
+ * MergeOnlyDPLDistributedPlanLogic is a DPL implementation that returns merge-only stages
+ * containing all three types of VariantDPLHandle: host-defined parse node, extension-defined
+ * parse node, and logical stage.
+ */
+class MergeOnlyDPLDistributedPlanLogic : public sdk::DistributedPlanLogicBase {
+public:
+    std::unique_ptr<sdk::DPLArrayContainer> getShardsPipeline() const override {
+        // Return nullptr to indicate this stage must run exclusively on the merging node.
+        return nullptr;
+    }
+
+    std::unique_ptr<sdk::DPLArrayContainer> getMergingPipeline() const override {
+        std::vector<VariantDPLHandle> elements;
+        // Host-defined parse node.
+        elements.emplace_back(new host::HostAggStageParseNode(
+            TransformHostParseNode::make(BSON("$match" << BSON("a" << 1)))));
+        // Extension-defined parse node.
+        elements.emplace_back(
+            new sdk::ExtensionAggStageParseNode(std::make_unique<TransformAggStageParseNode>()));
+        // Logical stage handle.
+        elements.emplace_back(extension::LogicalAggStageHandle{
+            new sdk::ExtensionLogicalAggStage(TransformLogicalAggStage::make())});
+
+        return std::make_unique<sdk::DPLArrayContainer>(std::move(elements));
+    }
+
+    BSONObj getSortPattern() const override {
+        return BSONObj();
+    }
+
+    static inline std::unique_ptr<sdk::DistributedPlanLogicBase> make() {
+        return std::make_unique<MergeOnlyDPLDistributedPlanLogic>();
+    }
+};
+
+/**
+ * MergeOnlyDPLLogicalStage is a logical stage that returns DPL with merge-only stages
+ * containing all three types of VariantDPLHandle.
+ */
+class MergeOnlyDPLLogicalStage : public sdk::LogicalAggStage {
+public:
+    MergeOnlyDPLLogicalStage() : sdk::LogicalAggStage(kMergeOnlyDPLStageName) {}
+
+    BSONObj serialize() const override {
+        return BSON(std::string(kMergeOnlyDPLStageName) << "serializedForExecution");
+    }
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
+
+    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
+        return TransformExecAggStage::make();
+    }
+
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return MergeOnlyDPLDistributedPlanLogic::make();
+    }
+
+    static inline std::unique_ptr<sdk::LogicalAggStage> make() {
+        return std::make_unique<MergeOnlyDPLLogicalStage>();
+    }
+};
+
+/**
+ * MergeOnlyDPLAstNode is an AST node that binds to MergeOnlyDPLLogicalStage.
+ */
+class MergeOnlyDPLAstNode : public sdk::AggStageAstNode {
+public:
+    MergeOnlyDPLAstNode() : sdk::AggStageAstNode(kMergeOnlyDPLStageName) {}
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return MergeOnlyDPLLogicalStage::make();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<MergeOnlyDPLAstNode>();
     }
 };
 
