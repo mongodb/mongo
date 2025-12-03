@@ -1532,6 +1532,12 @@ struct Pages : public Table<Pages> {
          WHERE delta = 1 AND discarded = 0;)",
     };
 
+    /*
+     * 'pages' table requires user configuration parameters, therefore SQL config statements created
+     * at runtime when configuration is available.
+     */
+    std::vector<std::string> config_statements;
+
     ~Pages() = default;
     Pages(Config &cfg, std::shared_mutex &store_access, const std::filesystem::path &home,
       uint64_t table_id)
@@ -1546,28 +1552,28 @@ struct Pages : public Table<Pages> {
     auto
     conn_config() -> std::ranges::view auto
     {
-        const uint64_t MMAP_SIZE = config.mmap_size_mb * 1_MB;
-        const uint64_t PAGE_SIZE = 16_KB;
-        const uint64_t CACHE_PAGES = (config.cache_size_mb * 1_MB) / PAGE_SIZE;
+        if (config_statements.empty()) {
+            /*
+             * Uses memory mapping instead of read/write calls when the database is < mmap_size in
+             * bytes.
+             */
+            const uint64_t MMAP_SIZE = config.mmap_size_mb * 1_MB;
+            config_statements.push_back(std::format("PRAGMA mmap_size = {};", MMAP_SIZE));
 
-        const static std::string config_statements[] = {
-          /*
-           * Uses memory mapping instead of read/write calls when the database is < mmap_size in
-           * bytes.
-           */
-          std::format("PRAGMA mmap_size = {};", MMAP_SIZE),
+            /*
+             * Increase page size to 16KB (default is 4KB). This improves performance for tables
+             * with BLOBs.
+             */
+            const uint64_t PAGE_SIZE = 16_KB;
+            config_statements.push_back(std::format("PRAGMA page_size = {};", PAGE_SIZE));
 
-          /*
-           * Increase page size to 16KB (default is 4KB). This improves performance for tables with
-           * BLOBs.
-           */
-          std::format("PRAGMA page_size = {};", PAGE_SIZE),
-
-          /*
-           * Set cache size as configured. Cache size is specified in megabytes. Convert to number
-           * of pages.
-           */
-          std::format("PRAGMA cache_size = {};", CACHE_PAGES)};
+            /*
+             * Set cache size as configured. Cache size is specified in megabytes. Convert to number
+             * of pages.
+             */
+            const uint64_t CACHE_PAGES = (config.cache_size_mb * 1_MB) / PAGE_SIZE;
+            config_statements.push_back(std::format("PRAGMA cache_size = {};", CACHE_PAGES));
+        }
 
         return std::views::all(config_statements);
     }
