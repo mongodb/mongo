@@ -925,6 +925,7 @@ mongo_cc_library(
         "//src/mongo/db/query:query_planner",
         "//src/mongo/db/query/client_cursor",
         "//src/mongo/db/query/compiler/ce/exact:exact_cardinality_interface",
+        "//src/mongo/db/query/compiler/ce/sampling:ce_multikey_dotted_path_support",
         "//src/mongo/db/query/compiler/ce/sampling:sampling_estimator_interface",
         "//src/mongo/db/query/compiler/ce/sampling:sampling_math",
         "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",

@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/query/compiler/ce/histogram/histogram_common.h"
+#include "mongo/db/query/compiler/ce/sampling/ce_multikey_dotted_path_support.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
@@ -167,6 +167,78 @@ public:
         return _sampleSize;
     }
 
+    /**
+     * For each document in a given sample, this helper calculates the number of
+     * index keys which satisfy 'bounds', which may be >1 in the case of multi-key
+     * indexes, and calls the given callback.
+     * 'skipDuplicateMatches' is used when estimating the number of matching RIDs
+     * which can be 0 or 1 per document.
+     */
+    template <typename T>
+    static void forNumberKeysMatch(const IndexBounds& bounds,
+                                   const std::vector<BSONObj>& sample,
+                                   const T& callback,
+                                   bool skipDuplicateMatches = false)
+    requires std::invocable<T, size_t>
+    {
+        // TODO(SERVER-114758) Refactor skipDuplicateMatches=false into a
+        // separate public method that calls an internal one.
+        using BSONElementSet =
+            absl::flat_hash_set<BSONElement,
+                                BSONComparatorInterfaceBase<BSONElement>::Hasher,
+                                BSONComparatorInterfaceBase<BSONElement>::EqualTo>;
+
+        if (sample.size() == 0) {
+            return;
+        }
+        const auto bsonElmComparator =
+            BSONElementComparator(BSONElementComparator::FieldNamesMode::kIgnore, nullptr);
+        const auto hasher = BSONComparatorInterfaceBase<BSONElement>::Hasher(&bsonElmComparator);
+        const auto equalTo = BSONComparatorInterfaceBase<BSONElement>::EqualTo(&bsonElmComparator);
+        std::vector<MultiKeyDottedPathIterator> iterators;
+        // TODO(SERVER-114759) Optimize non-multikey indices
+        std::transform(
+            bounds.fields.begin(),
+            bounds.fields.end(),
+            std::back_inserter(iterators),
+            [&](auto&& oil) { return MultiKeyDottedPathIterator(&sample[0], oil.name); });
+        BSONElementSet elemSet(0, hasher, equalTo);
+
+        // TODO(SERVER-114756): We can be more clever with retrieving the fields
+        // by iterating the object and processing the fields in
+        // the order they appear in the document.
+        for (size_t sampleIdx = 0; sampleIdx < sample.size(); sampleIdx++) {
+            size_t count = 1;
+
+            for (size_t fieldIdx = 0; fieldIdx < iterators.size() && count > 0; fieldIdx++) {
+                auto&& it = iterators[fieldIdx];
+                const auto& oil = bounds.fields[fieldIdx];
+                it.resetObj(&sample[sampleIdx]);
+                elemSet.clear();
+
+                auto [element, isLast] = it.nextElement();
+                size_t elementCount = 0;
+                while (true) {
+                    if (elemSet.insert(element).second) {
+                        elementCount += matches(oil, element);
+                        if (elementCount > 0 && skipDuplicateMatches) {
+                            break;
+                        }
+                    }
+                    if (isLast) {
+                        break;
+                    }
+                    std::tie(element, isLast) = it.nextElement();
+                }
+                if (elementCount != 1) {
+                    count = elementCount;
+                }
+            }
+
+            callback(count);
+        }
+    }
+
 protected:
     /*
      * This helper creates a CanonicalQuery for the sampling plan. This CanonicalQuery is “empty”
@@ -190,12 +262,6 @@ protected:
     static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci, double marginOfError);
 
     /**
-     * This helper generates all index keys from the given BSONObj for a hypothetical index on the
-     * fields referenced in 'bounds'. The keys will have empty field names.
-     */
-    static std::vector<BSONObj> getIndexKeys(const IndexBounds& bounds, const BSONObj& doc);
-
-    /**
      * This helper checks if an element is within the given Interval.
      */
     static bool matches(const Interval& interval, BSONElement val);
@@ -206,23 +272,27 @@ protected:
     static bool matches(const OrderedIntervalList& oil, BSONElement val);
 
     /**
-     * This helper checks if an index key falls into the index bounds by checking each of the
-     * element/field in the index key.
+     * This helper calls the given callback for each document
+     * in a given vector that matches the given bounds.
      */
-    bool doesKeyMatchBounds(const IndexBounds& bounds, const BSONObj& key) const;
-
-    /**
-     * This helper calculates the number of index keys fall into 'bounds'. 'skipDuplicateMatches' is
-     * used when the helper is used to check if a document matches the bounds.
-     */
-    size_t numberKeysMatch(const IndexBounds& bounds,
-                           const BSONObj& doc,
-                           bool skipDuplicateMatches = false) const;
-
-    /**
-     * This helper checks if a document matches the given bounds.
-     */
-    bool doesDocumentMatchBounds(const IndexBounds& bounds, const BSONObj& doc) const;
+    template <typename T>
+    static void forDocumentsMatchingBounds(const IndexBounds& bounds,
+                                           const std::vector<BSONObj>& docs,
+                                           const T& callback)
+    requires std::invocable<T, const BSONObj&>
+    {
+        size_t idx = 0;
+        forNumberKeysMatch(
+            bounds,
+            docs,
+            [&](size_t matchCnt) {
+                if (matchCnt > 0) {
+                    callback(docs[idx]);
+                }
+                idx++;
+            },
+            true /*skipDuplicateMatches*/);
+    }
 
     // The sample is stored in memory for estimating the cardinality of all predicates of one query
     // request. The sample will be freed on destruction of the SamplingEstimator instance or when a

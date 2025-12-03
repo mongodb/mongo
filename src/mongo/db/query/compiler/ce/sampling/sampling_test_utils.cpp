@@ -596,4 +596,14 @@ IndexBounds getIndexBounds(const QueryConfiguration& queryConfig,
     }
     return bounds;
 }
+
+size_t numberKeysMatch(const IndexBounds& bounds,
+                       const BSONObj& document,
+                       bool skipDuplicateMatches) {
+    size_t count = 0;
+    SamplingEstimatorImpl::forNumberKeysMatch(
+        bounds, {document}, [&](size_t cnt) { count += cnt; }, skipDuplicateMatches);
+    return count;
+}
+
 }  // namespace mongo::ce
