@@ -29,22 +29,14 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/matcher/extensions_callback.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
-#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/update/update_driver.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <map>
@@ -56,53 +48,33 @@
 
 namespace MONGO_MOD_PUBLIC mongo {
 
-class CanonicalQuery;
 class ExtensionsCallbackNoop;
 class ExtensionsCallbackReal;
-class OperationContext;
 class UpdateRequest;
 
-namespace impl {
+template <typename T, typename... Ts>
+requires std::is_same_v<T, ExtensionsCallbackNoop> || std::is_same_v<T, ExtensionsCallbackReal>
+std::unique_ptr<ExtensionsCallback> makeExtensionsCallback(Ts&&... args) {
+    return std::make_unique<T>(std::forward<Ts>(args)...);
+}
 
 /**
- * Note: this class is the base class for ParsedUpdate and ParsedUpdateForMongos. Their only
- * difference is that ParsedUpdateForMongos uses the ExtensionsCallbackNoop and on the other hand,
- * ParsedUpdate uses ExtensionsCallbackReal. The reason for this is that ExtensionsCallbackReal is
- * available only on the mongod. This difference does not need to be exposed through the interface
- * and can be hidden in the implementation.
- *
+ * Get the YieldPolicy, adjusted for GodMode.
  */
-class ParsedUpdateBase {
-    ParsedUpdateBase(const ParsedUpdateBase&) = delete;
-    ParsedUpdateBase& operator=(const ParsedUpdateBase&) = delete;
+PlanYieldPolicy::YieldPolicy getUpdateYieldPolicy(const UpdateRequest* request);
 
-public:
-    /**
-     * Constructs a parsed update.
-     *
-     * The objects pointed to by "request" must stay in scope for the life of the constructed
-     * ParsedUpdate.
-     */
-    ParsedUpdateBase(OperationContext* opCtx,
-                     const UpdateRequest* request,
-                     std::unique_ptr<const ExtensionsCallback> extensionsCallback,
-                     const CollectionPtr& collection,
-                     bool forgoOpCounterIncrements = false,
-                     bool isRequestToTimeseries = false);
 
-    /**
-     * Parses the update request to a canonical query and an update driver. On success, the
-     * parsed update can be used to create a PlanExecutor for this update.
-     */
-    Status parseRequest();
-
-    /**
-     * As an optimization, we do not create a canonical query if the predicate is a simple
-     * _id equality. This method can be used to force full parsing to a canonical query,
-     * as a fallback if the idhack path is not available (e.g. no _id index).
-     */
-    Status parseQueryToCQ();
-
+/**
+ * ParsedUpdate is a struct that holds the parsed query and update from an UpdateRequest. It is
+ * produced by parsed_update_command::parse().
+ *
+ * - The query part is parsed into a ParsedFindCommand, which at this stage is not yet optimized
+ *   and has not undergone timeseries transformation.
+ * - The update part is parsed into an UpdateDriver.
+ *
+ * ParsedUpdate is later consumed by CanonicalUpdate::make(), which constructs a CanonicalUpdate.
+ */
+struct MONGO_MOD_PUBLIC ParsedUpdate {
     /**
      * Get the raw request.
      */
@@ -120,171 +92,47 @@ public:
     const UpdateDriver* getDriver() const;
 
     /**
-     * Get the YieldPolicy, adjusted for GodMode.
-     */
-    PlanYieldPolicy::YieldPolicy yieldPolicy() const;
-
-    /**
-     * As an optimization, we don't create a canonical query for updates with simple _id
+     * As an optimization, we don't create a parsed find command for updates with simple _id
      * queries. Use this method to determine whether or not we actually parsed the query.
      */
-    bool hasParsedQuery() const;
+    bool hasParsedFindCommand() const;
 
-    /**
-     * Returns a const pointer to the canonical query. Requires that hasParsedQuery() is true.
-     */
-    const CanonicalQuery* getParsedQuery() const {
-        tassert(11052008, "Expected CanonicalQuery to exist", _canonicalQuery);
-        return _canonicalQuery.get();
+    inline PlanYieldPolicy::YieldPolicy yieldPolicy() const {
+        return getUpdateYieldPolicy(request);
     }
 
-    /**
-     * Releases ownership of the canonical query to the caller.
-     */
-    std::unique_ptr<CanonicalQuery> releaseParsedQuery();
-
-    /**
-     * Never returns nullptr.
-     */
-    boost::intrusive_ptr<ExpressionContext> expCtx() const {
-        return _expCtx;
-    }
-
-    /**
-     * Releases the ownership of the residual MatchExpression.
-     *
-     * Note: see _timeseriesUpdateQueryExprs._bucketMatchExpr for more details.
-     */
-    std::unique_ptr<MatchExpression> releaseResidualExpr() {
-        return _timeseriesUpdateQueryExprs ? std::move(_timeseriesUpdateQueryExprs->_residualExpr)
-                                           : nullptr;
-    }
-
-    /**
-     * Releases the ownership of the original MatchExpression.
-     */
-    std::unique_ptr<MatchExpression> releaseOriginalExpr() {
-        return std::move(_originalExpr);
-    }
-
-    /**
-     * Returns true when we are performing multi updates using a residual predicate on a time-series
-     * collection or when performing singleton updates on a time-series collection.
-     */
-    bool isEligibleForArbitraryTimeseriesUpdate() const;
-
-    bool isRequestToTimeseries() const {
-        return _isRequestToTimeseries;
-    }
-
-private:
-    /**
-     * Parses the query portion of the update request.
-     */
-    Status parseQuery();
-
-    /**
-     * Parses the update-descriptor portion of the update request.
-     */
-    void parseUpdate();
-
-    /**
-     * Handles splitting and/or translating the timeseries query predicate, if applicable. Must be
-     * called before parsing the query and update.
-     */
-    void maybeTranslateTimeseriesUpdate();
-
-    /**
-     * Adds closed bucket filtering to query for timeseries multi-updates
-     */
-    std::unique_ptr<MatchExpression> getClosedBucketFilteredExpr();
-
-    // Unowned pointer to the transactional context.
-    OperationContext* _opCtx;
-
-    // Unowned pointer to the request object to process.
-    const UpdateRequest* const _request;
+    // Unowned pointer to the request object to process. The pointer must outlive this object.
+    const UpdateRequest* request;
 
     // The array filters for the parsed update. Owned here.
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> _arrayFilters;
-
-    boost::intrusive_ptr<ExpressionContext> _expCtx;
+    std::unique_ptr<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>> arrayFilters;
 
     // Driver for processing updates on matched documents.
-    UpdateDriver _driver;
+    std::unique_ptr<UpdateDriver> driver;
 
     // Requested update modifications on matched documents.
-    std::unique_ptr<write_ops::UpdateModification> _modification;
+    std::unique_ptr<write_ops::UpdateModification> modification;
 
     // Parsed query object, or NULL if the query proves to be an id hack query.
-    std::unique_ptr<CanonicalQuery> _canonicalQuery;
+    std::unique_ptr<ParsedFindCommand> parsedFind;
 
     // Reference to an extensions callback used when parsing to a canonical query.
-    std::unique_ptr<const ExtensionsCallback> _extensionsCallback;
-
-    // Reference to the collection this update is being performed on.
-    const CollectionPtr& _collection;
-
-    // Contains the residual expression and the bucket-level expression that should be pushed down
-    // to the bucket collection.
-    std::unique_ptr<TimeseriesWritesQueryExprs> _timeseriesUpdateQueryExprs;
-
-    // The original, complete and untranslated write query expression.
-    std::unique_ptr<MatchExpression> _originalExpr = nullptr;
-
-    const bool _isRequestToTimeseries;
+    std::unique_ptr<const ExtensionsCallback> extensionsCallback;
 };
 
-template <typename T, typename... Ts>
-requires std::is_same_v<T, ExtensionsCallbackNoop> || std::is_same_v<T, ExtensionsCallbackReal>
-std::unique_ptr<ExtensionsCallback> makeExtensionsCallback(Ts&&... args) {
-    return std::make_unique<T>(std::forward<Ts>(args)...);
-}
-
-}  // namespace impl
+namespace parsed_update_command {
 
 /**
- * This class takes a pointer to an UpdateRequest, and converts that request into a parsed form
- * via the parseRequest() method. A ParsedUpdate can then be used to get information about the
- * update, or to retrieve an upsert document.
+ * Parses the update request and returns ParsedUpdate.
  *
- * No locks need to be held during parsing.
- *
- * The query part of the update is parsed to a CanonicalQuery, and the update part is parsed
- * using the UpdateDriver.
- *
- * ParsedUpdateForMongos is a ParsedUpdate that can be used in mongos.
+ * Note: As ExtensionsCallbackReal is available only on the mongod, mongos will pass an
+ * ExtensionsCallbackNoop for parameter 'extensionsCallback' while mongod would use
+ * ExtensionsCallbackReal.
  */
-class ParsedUpdateForMongos : public impl::ParsedUpdateBase {
-public:
-    ParsedUpdateForMongos(OperationContext* opCtx, const UpdateRequest* request)
-        : ParsedUpdateBase(opCtx,
-                           request,
-                           impl::makeExtensionsCallback<ExtensionsCallbackNoop>(),
-                           CollectionPtr::null) {}
-};
+StatusWith<ParsedUpdate> parse(boost::intrusive_ptr<ExpressionContext> expCtx,
+                               const UpdateRequest* request,
+                               std::unique_ptr<const ExtensionsCallback> extensionsCallback);
 
-/**
- * This class takes a pointer to an UpdateRequest, and converts that request into a parsed form
- * via the parseRequest() method. A ParsedUpdate can then be used to retrieve a PlanExecutor
- * capable of executing the update.
- *
- * It is invalid to request that the UpdateStage return the prior or newly-updated version of a
- * document during a multi-update. It is also invalid to request that a ProjectionStage be
- * applied to the UpdateStage if the UpdateStage would not return any document.
- *
- * The query part of the update is parsed to a CanonicalQuery, and the update part is parsed
- * using the UpdateDriver.
- *
- * ParsedUpdate is a ParsedUpdate that can be used in mongod.
- */
-class MONGO_MOD_PUBLIC ParsedUpdate : public impl::ParsedUpdateBase {
-public:
-    ParsedUpdate(OperationContext* opCtx,
-                 const UpdateRequest* request,
-                 const CollectionPtr& collection,
-                 bool forgoOpCounterIncrements = false,
-                 bool isRequestToTimeseries = false);
-};
+}  // namespace parsed_update_command
 
 }  // namespace MONGO_MOD_PUBLIC mongo

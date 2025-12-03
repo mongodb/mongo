@@ -418,7 +418,7 @@ mongo_cc_library(
     ],
     deps = [
         ":sharding_router_api",
-        "//src/mongo/db/query/write_ops:parsed_update",
+        "//src/mongo/db/query/write_ops:canonical_update_and_delete",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/timeseries/write_ops:timeseries_write_ops_utils",
         "//src/mongo/db/transaction:transaction_api",

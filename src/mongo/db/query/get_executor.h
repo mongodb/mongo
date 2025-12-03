@@ -47,8 +47,8 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/write_ops/canonical_update.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
-#include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
@@ -197,7 +197,7 @@ MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
     boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**
- * Get a PlanExecutor for an update operation. 'parsedUpdate' describes the query predicate
+ * Get a PlanExecutor for an update operation. 'canonicalUpdate' describes the query predicate
  * and update modifiers. The caller must hold the appropriate MODE_X or MODE_IX locks prior
  * to calling this function, and must not release these locks until after the returned
  * PlanExecutor is deleted.
@@ -207,7 +207,7 @@ MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
  * If the delete operation is executed in explain mode, the 'verbosity' parameter should be
  * set to the requested verbosity level, or boost::none otherwise.
  *
- * The returned PlanExecutor will used the YieldPolicy returned by parsedUpdate->yieldPolicy().
+ * The returned PlanExecutor will used the YieldPolicy returned by canonicalUpdate->yieldPolicy().
  *
  * Does not take ownership of its arguments.
  *
@@ -219,7 +219,7 @@ MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
 MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
     CollectionAcquisition coll,
-    ParsedUpdate* parsedUpdate,
+    CanonicalUpdate* canonicalUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**

@@ -37,7 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/write_ops/parsed_update.h"
+#include "mongo/db/query/write_ops/canonical_update.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -98,13 +98,27 @@ UpdateResult update(OperationContext* opCtx,
             fmt::format("Expected collection {} to exist for an upsert operation", nsString.coll()),
             coll.exists() || !request.isUpsert());
 
+    auto [collatorToUse, expCtxCollationMatchesDefault] =
+        resolveCollator(opCtx, request.getCollation(), coll.getCollectionPtr());
+
+    auto expCtx = ExpressionContextBuilder{}
+                      .fromRequest(opCtx, request)
+                      .collator(std::move(collatorToUse))
+                      .collationMatchesDefault(expCtxCollationMatchesDefault)
+                      .build();
+
     // Parse the update, get an executor for it, run the executor, get stats out.
-    ParsedUpdate parsedUpdate(opCtx, &request, coll.getCollectionPtr());
-    uassertStatusOK(parsedUpdate.parseRequest());
+    auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
+        expCtx,
+        &request,
+        makeExtensionsCallback<ExtensionsCallbackReal>(opCtx, &request.getNsString())));
+
+    auto canonicalUpdate = uassertStatusOK(
+        CanonicalUpdate::make(expCtx, std::move(parsedUpdate), coll.getCollectionPtr()));
 
     OpDebug* const nullOpDebug = nullptr;
     auto exec = uassertStatusOK(
-        getExecutorUpdate(nullOpDebug, coll, &parsedUpdate, boost::none /* verbosity */));
+        getExecutorUpdate(nullOpDebug, coll, canonicalUpdate.get(), boost::none /* verbosity */));
 
     PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
     BSONObj image;

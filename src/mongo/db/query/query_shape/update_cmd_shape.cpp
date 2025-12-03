@@ -46,9 +46,8 @@ namespace mongo::query_shape {
 namespace {
 
 BSONObj shapifyQuery(const ParsedUpdate& parsedUpdate, const SerializationOptions& opts) {
-    tassert(11034203, "query is required to be parsed", parsedUpdate.hasParsedQuery());
-    auto cq = parsedUpdate.getParsedQuery();
-    auto matchExpr = cq->getPrimaryMatchExpression();
+    tassert(11034203, "query is required to be parsed", parsedUpdate.hasParsedFindCommand());
+    auto matchExpr = parsedUpdate.parsedFind->filter.get();
     return matchExpr ? matchExpr->serialize(opts) : BSONObj{};
 }
 
@@ -213,11 +212,10 @@ void UpdateCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
         updateRequest.setLetParameters(_components.let.shapifiedLet);
     }
 
-    ParsedUpdate parsedUpdate(opCtx,
-                              &updateRequest,
-                              CollectionPtr::null /*CollectionPtr*/,
-                              false /*forgoOpCounterIncrements*/);
-    uassertStatusOK(parsedUpdate.parseRequest());
+    auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
+        expCtx,
+        &updateRequest,
+        makeExtensionsCallback<ExtensionsCallbackReal>(opCtx, &updateRequest.getNsString())));
 
     UpdateCmdShapeComponents{parsedUpdate, _components.let, opts}.appendTo(bob, opts, expCtx);
 }

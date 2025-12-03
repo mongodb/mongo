@@ -68,9 +68,14 @@ public:
                 request.setLetParameters(*updateRequest.getLet());
             }
 
-            ParsedUpdate parsedUpdate(
-                _operationContext.get(), &request, CollectionPtr::null, false);
-            ASSERT_OK(parsedUpdate.parseRequest());
+            _expCtx = makeBlankExpressionContext(
+                _operationContext.get(), updateRequest.getNamespace(), updateRequest.getLet());
+
+            auto parsedUpdate = uassertStatusOK(
+                parsed_update_command::parse(_expCtx,
+                                             &request,
+                                             makeExtensionsCallback<ExtensionsCallbackReal>(
+                                                 _operationContext.get(), &request.getNsString())));
             shapes.emplace_back(updateRequest, parsedUpdate, _expCtx);
         }
         return shapes;
@@ -775,13 +780,13 @@ TEST_F(UpdateCmdShapeTest, BatchReplacementUpdateShape) {
             "q": {
                 "$and": [
                     {
-                        "y": {
-                            "$eq": "?string"
+                        "x": {
+                            "$gt": "?number"
                         }
                     },
                     {
-                        "x": {
-                            "$gt": "?number"
+                        "y": {
+                            "$eq": "?string"
                         }
                     }
                 ]

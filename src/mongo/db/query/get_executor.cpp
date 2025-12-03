@@ -1774,15 +1774,15 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
     CollectionAcquisition coll,
-    ParsedUpdate* parsedUpdate,
+    CanonicalUpdate* canonicalUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     const auto& collectionPtr = coll.getCollectionPtr();
 
-    auto expCtx = parsedUpdate->expCtx();
+    auto expCtx = canonicalUpdate->expCtx();
     OperationContext* opCtx = expCtx->getOperationContext();
 
-    const UpdateRequest* request = parsedUpdate->getRequest();
-    UpdateDriver* driver = parsedUpdate->getDriver();
+    const UpdateRequest* request = canonicalUpdate->getRequest();
+    UpdateDriver* driver = canonicalUpdate->getDriver();
 
     const NamespaceString& nss = request->getNamespaceString();
 
@@ -1806,11 +1806,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                                     << nss.toStringForErrorMsg());
     }
 
-    const auto policy = parsedUpdate->yieldPolicy();
+    const auto policy = canonicalUpdate->yieldPolicy();
 
     auto documentCounter = [&] {
-        if (parsedUpdate->isRequestToTimeseries() &&
-            !parsedUpdate->isEligibleForArbitraryTimeseriesUpdate()) {
+        if (canonicalUpdate->isRequestToTimeseries() &&
+            !canonicalUpdate->isEligibleForArbitraryTimeseriesUpdate()) {
             return timeseries::numMeasurementsForBucketCounter(
                 collectionPtr->getTimeseriesOptions()->getTimeField());
         }
@@ -1844,9 +1844,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
             nss);
     }
 
-    if (!parsedUpdate->hasParsedQuery()) {
+    if (!canonicalUpdate->hasParsedQuery()) {
         // Only consider using the idhack if no hint was provided.
-        if (request->getHint().isEmpty()) {
+        if (!canonicalUpdate->isEligibleForArbitraryTimeseriesUpdate() &&
+            request->getHint().isEmpty()) {
             // This is the idhack fast-path for getting a PlanExecutor without doing the work
             // to create a CanonicalQuery.
             const BSONObj& unparsedQuery = request->getQuery();
@@ -1865,7 +1866,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                     LOGV2_DEBUG(83759, 2, "Using Express", "query"_attr = redact(unparsedQuery));
 
                     return makeExpressExecutorForUpdate(
-                        opCtx, coll, parsedUpdate, false /* return owned BSON */);
+                        opCtx, coll, canonicalUpdate, false /* return owned BSON */);
 
                 } else if (idIndexDesc) {
                     LOGV2_DEBUG(20930, 2, "Using idhack", "query"_attr = redact(unparsedQuery));
@@ -1883,7 +1884,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
         // If we're here then we don't have a parsed query, but we're also not eligible for
         // the idhack fast path. We need to force canonicalization now.
-        Status cqStatus = parsedUpdate->parseQueryToCQ();
+        Status cqStatus = canonicalUpdate->parseQueryToCQ();
         if (!cqStatus.isOK()) {
             return cqStatus;
         }
@@ -1892,7 +1893,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     // This is the regular path for when we have a CanonicalQuery.
     UpdateStageParams updateStageParams(request, driver, opDebug, std::move(documentCounter));
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-    std::unique_ptr<CanonicalQuery> cq(parsedUpdate->releaseParsedQuery());
+    std::unique_ptr<CanonicalQuery> cq(canonicalUpdate->releaseParsedQuery());
 
     std::unique_ptr<projection_ast::Projection> projection;
     if (!request->getProj().isEmpty()) {
@@ -1936,7 +1937,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     auto result = uassertStatusOK(helper.prepare());
     setOpDebugPlanCacheInfo(opCtx, result->planCacheInfo());
     result->runtimePlanner->addUpdateStage(
-        parsedUpdate, projection.get(), std::move(updateStageParams));
+        canonicalUpdate, projection.get(), std::move(updateStageParams));
     if (auto status = result->runtimePlanner->plan(); !status.isOK()) {
         return status;
     }

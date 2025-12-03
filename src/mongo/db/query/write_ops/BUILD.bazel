@@ -24,14 +24,15 @@ mongo_cc_library(
 mongo_cc_library(
     name = "parsed_update",
     srcs = [
+        "parsed_update.cpp",
         "parsed_update_array_filters.cpp",
-        "parsed_update_base.cpp",
     ],
     deps = [
         "//src/mongo/db:disk_use_options_idl",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/matcher:expressions_mongod_only",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/db/update:update_driver",
@@ -39,10 +40,10 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "parsed_update_and_delete",
+    name = "canonical_update_and_delete",
     srcs = [
+        "canonical_update.cpp",
         "parsed_delete.cpp",
-        "parsed_update.cpp",
         "update_result.cpp",
     ],
     deps = [

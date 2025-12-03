@@ -151,15 +151,15 @@ void ClassicPlannerInterface::addDeleteStage(ParsedDelete* parsedDelete,
     }
 }
 
-void ClassicPlannerInterface::addUpdateStage(ParsedUpdate* parsedUpdate,
+void ClassicPlannerInterface::addUpdateStage(CanonicalUpdate* canonicalUpdate,
                                              projection_ast::Projection* projection,
                                              UpdateStageParams updateStageParams) {
     invariant(_state == kNotInitialized);
     invariant(collections().hasMainCollection());
-    const auto& request = parsedUpdate->getRequest();
+    const auto& request = canonicalUpdate->getRequest();
     const bool isUpsert = updateStageParams.request->isUpsert();
     const auto timeseriesOptions = collections().getMainCollection()->getTimeseriesOptions();
-    if (parsedUpdate->isEligibleForArbitraryTimeseriesUpdate()) {
+    if (canonicalUpdate->isEligibleForArbitraryTimeseriesUpdate()) {
         if (request->isMulti()) {
             // If this is a multi-update, we need to spool the data before beginning to apply
             // updates, in order to avoid the Halloween problem.
@@ -173,8 +173,8 @@ void ClassicPlannerInterface::addUpdateStage(ParsedUpdate* parsedUpdate,
                 std::move(_root),
                 collections().getMainCollectionAcquisition(),
                 timeseries::BucketUnpacker(*timeseriesOptions),
-                parsedUpdate->releaseResidualExpr(),
-                parsedUpdate->releaseOriginalExpr(),
+                canonicalUpdate->releaseResidualExpr(),
+                canonicalUpdate->releaseOriginalExpr(),
                 *request);
         } else {
             _root = std::make_unique<TimeseriesModifyStage>(
@@ -184,8 +184,8 @@ void ClassicPlannerInterface::addUpdateStage(ParsedUpdate* parsedUpdate,
                 std::move(_root),
                 collections().getMainCollectionAcquisition(),
                 timeseries::BucketUnpacker(*timeseriesOptions),
-                parsedUpdate->releaseResidualExpr(),
-                parsedUpdate->releaseOriginalExpr());
+                canonicalUpdate->releaseResidualExpr(),
+                canonicalUpdate->releaseOriginalExpr());
         }
     } else if (isUpsert) {
         _root = std::make_unique<UpsertStage>(cq()->getExpCtxRaw(),

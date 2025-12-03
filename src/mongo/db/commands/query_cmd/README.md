@@ -214,9 +214,11 @@ Insert, Delete, Update, and FindAndModify are all parsed by IDL as described abo
 
 Inserts are internally [represented](https://github.com/mongodb/mongo/blob/65b9efd4861b9f0d61f8b29843d29febcba91bcb/src/mongo/db/commands/query_cmd/bulk_write.idl#L324) as a `BulkWriteCommandRequest` which contains an array of `BulkWriteInsertOp`s. No query optimization is needed for inserts beyond parsing, since insert is a write-only operation.
 
-`DeleteRequest`s are passed into a `ParsedDelete` constructor and `UpdateRequest`s are passed to a `ParsedUpdate` constructor. Both of these constructors will in turn pass the request to [`parseWriteQueryToCQ()`](https://github.com/mongodb/mongo/blob/65b9efd4861b9f0d61f8b29843d29febcba91bcb/src/mongo/db/query/write_ops/parsed_writes_common.h#L84). This function parses the `filter` component of the write query as if it were a `FindCommandRequest`, and the result is a `CanonicalQuery`, just as it is with `find`.
+`DeleteRequest`s are passed into a `ParsedDelete` constructor which will pass the request to [`parseWriteQueryToCQ()`](https://github.com/mongodb/mongo/blob/65b9efd4861b9f0d61f8b29843d29febcba91bcb/src/mongo/db/query/write_ops/parsed_writes_common.h#L84). This function parses the `filter` component of the write query as if it were a `FindCommandRequest`, and the result is a `CanonicalQuery`, just as it is with `find`.
 
-`FindAndModifyCommandRequest`s can contain both find and update/delete syntax. For this reason, the query portion is entirely delegated to the `find` query parser. The update or delete portion is translated into a `ParsedUpdate` or `ParsedDelete`, each of which uses the corresponding codepath henceforth.
+`UpdateRequest`s are passed to `parsed_update_command::parse()`, which parses them into `ParsedUpdate` objects. `parsed_update_command::parse()` uses `parseWriteQueryToParsedFindCommand()`, which shares the same parsing flow as `parseWriteQueryToCQ()`. However, the difference is that it generates a pre-optimized `ParsedFindCommand`, allowing other components to access the pre-optimized parsed structure from `ParsedUpdate`. Subsequently, the `ParsedUpdate` objects are passed to `CanonicalUpdate::make()`, which constructs a `CanonicalUpdate` consisting of a `CanonicalQuery`.
+
+`FindAndModifyCommandRequest`s can contain both find and update/delete syntax. For this reason, the query portion is entirely delegated to the `find` query parser. The update or delete portion is translated into a `CanonicalUpdate` or `ParsedDelete`, each of which uses the corresponding codepath henceforth.
 
 ```mermaid
 ---
@@ -240,8 +242,8 @@ flowchart LR
     n31 --> n32["BulkWriteCommandRequest"] & n34["DeleteRequest"] & n35["UpdateRequest"] & n39["FindAndModifyCommandRequest"]
     n32 --o n33["BulkWriteInsertOp"]
     n34 --> n36["ParsedDelete"]
-    n39 --> n37["ParsedUpdate"] & n36
-    n35 --> n37
+    n39 & n35 -- "parsed_update_command::parse()" --> n37["ParsedUpdate"]
+    n39 --> n36
     n36 -- "parseWriteQueryToCQ()" --> n11
     n37 -- "parseWriteQueryToCQ()" --> n11
 

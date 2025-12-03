@@ -53,8 +53,12 @@ static constexpr auto collectionType = query_shape::CollectionType::kCollection;
 
 class UpdateKeyTest : public ServiceContextTest {
 public:
+    void setUp() override {
+        _opCtx = makeOperationContext();
+    }
+
     std::vector<std::unique_ptr<const Key>> makeUpdateKeys(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, StringData cmd) {
+        const boost::intrusive_ptr<ExpressionContext>&, StringData cmd) {
         auto ucr = UpdateCommandRequest::parseOwned(fromjson(cmd));
 
         std::vector<std::unique_ptr<const Key>> keys;
@@ -64,10 +68,13 @@ public:
             if (ucr.getLet()) {
                 request.setLetParameters(*ucr.getLet());
             }
+            auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), request).build();
 
-            ParsedUpdate parsedUpdate(
-                expCtx->getOperationContext(), &request, CollectionPtr::null, false);
-            ASSERT_OK(parsedUpdate.parseRequest());
+            auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
+                expCtx,
+                &request,
+                makeExtensionsCallback<ExtensionsCallbackReal>(expCtx->getOperationContext(),
+                                                               &request.getNsString())));
             auto shape = std::make_unique<query_shape::UpdateCmdShape>(ucr, parsedUpdate, expCtx);
 
             auto key = std::make_unique<UpdateKey>(expCtx,
@@ -86,6 +93,13 @@ public:
         ASSERT_EQ(keys.size(), 1);
         return std::move(keys.front());
     }
+
+private:
+    OperationContext* opCtx() {
+        return _opCtx.get();
+    }
+
+    ServiceContext::UniqueOperationContext _opCtx;
 };
 
 TEST_F(UpdateKeyTest, ReplacementUpdateCmdComponents) {

@@ -115,8 +115,17 @@ bool requiresOriginalQuery(OperationContext* opCtx,
                            const boost::optional<BSONObj>& query = boost::none,
                            const boost::optional<BSONObj>& projection = boost::none) {
     if (updateRequest) {
-        ParsedUpdateForMongos parsedUpdate(opCtx, &updateRequest.get());
-        uassertStatusOK(parsedUpdate.parseRequest());
+        auto [collatorToUse, expCtxCollationMatchesDefault] =
+            resolveCollator(opCtx, updateRequest->getCollation(), CollectionPtr::null);
+
+        auto expCtx = ExpressionContextBuilder{}
+                          .fromRequest(opCtx, updateRequest.get())
+                          .collator(std::move(collatorToUse))
+                          .collationMatchesDefault(expCtxCollationMatchesDefault)
+                          .build();
+
+        auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
+            expCtx, &updateRequest.get(), makeExtensionsCallback<ExtensionsCallbackNoop>()));
         if (parsedUpdate.getDriver()->needMatchDetails()) {
             return true;
         }

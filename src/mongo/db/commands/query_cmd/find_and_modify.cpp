@@ -57,10 +57,10 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/write_ops/canonical_update.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/insert.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
-#include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/update_result.h"
@@ -468,18 +468,34 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                                                                  &updateRequest);
         }
 
-        ParsedUpdate parsedUpdate(opCtx,
-                                  &updateRequest,
-                                  collection.getCollectionPtr(),
-                                  false /*forgoOpCounterIncrements*/,
-                                  isTimeseriesLogicalRequest);
-        uassertStatusOK(parsedUpdate.parseRequest());
+        auto [collatorToUse, expCtxCollationMatchesDefault] =
+            resolveCollator(opCtx, updateRequest.getCollation(), collection.getCollectionPtr());
+
+        auto expCtx =
+            ExpressionContextBuilder{}
+                .fromRequest(opCtx, updateRequest)
+                .collator(std::move(collatorToUse))
+                .collationMatchesDefault(expCtxCollationMatchesDefault)
+                .requiresTimeseriesExtendedRangeSupport(
+                    isTimeseriesLogicalRequest && collection.getCollectionPtr() &&
+                    collection.getCollectionPtr()->getRequiresTimeseriesExtendedRangeSupport())
+                .build();
+
+        auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
+            expCtx,
+            &updateRequest,
+            makeExtensionsCallback<ExtensionsCallbackReal>(opCtx, &updateRequest.getNsString())));
+
+        auto canonicalUpdate = uassertStatusOK(CanonicalUpdate::make(expCtx,
+                                                                     std::move(parsedUpdate),
+                                                                     collection.getCollectionPtr(),
+                                                                     isTimeseriesLogicalRequest));
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
             ->checkShardVersionOrThrow(opCtx);
 
-        const auto exec =
-            uassertStatusOK(getExecutorUpdate(opDebug, collection, &parsedUpdate, verbosity));
+        const auto exec = uassertStatusOK(
+            getExecutorUpdate(opDebug, collection, canonicalUpdate.get(), verbosity));
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(

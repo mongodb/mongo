@@ -118,12 +118,10 @@ void runBenchmark(BSONObj predicate,
     mongo::UpdateRequest updateRequest(updateOp);
     updateRequest.setNamespaceString(expCtx->getNamespaceString());
 
-    ParsedUpdate parsedUpdate(opCtx.get(),
-                              &updateRequest,
-                              CollectionPtr::null,
-                              false /*forgoOpCounterIncrements*/,
-                              false);
-    uassertStatusOK(parsedUpdate.parseRequest());
+    auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
+        expCtx,
+        &updateRequest,
+        makeExtensionsCallback<ExtensionsCallbackReal>(opCtx.get(), &updateRequest.getNsString())));
 
     // Run the benchmark.
     for (auto keepRunning : state) {

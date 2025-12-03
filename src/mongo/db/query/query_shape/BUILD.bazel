@@ -51,7 +51,7 @@ mongo_cc_library(
     deps = [
         ":query_shape_common",
         "//src/mongo:base",
-        "//src/mongo/db/query/write_ops:parsed_update_and_delete",
+        "//src/mongo/db/query/write_ops:canonical_update_and_delete",
     ],
 )
 

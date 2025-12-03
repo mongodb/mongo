@@ -44,6 +44,7 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/write_ops/canonical_update.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
@@ -52,6 +53,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/resource_yielder.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -111,22 +113,33 @@ std::pair<BSONObj, BSONObj> generateUpsertDocument(
     const UUID& collectionUUID,
     boost::optional<TimeseriesOptions> timeseriesOptions,
     const StringDataComparator* comparator) {
+    auto [collatorToUse, expCtxCollationMatchesDefault] =
+        resolveCollator(opCtx, updateRequest.getCollation(), CollectionPtr::null);
+
+    auto expCtx = ExpressionContextBuilder{}
+                      .fromRequest(opCtx, updateRequest)
+                      .collator(std::move(collatorToUse))
+                      .collationMatchesDefault(expCtxCollationMatchesDefault)
+                      .build();
+
     // We are only using this to parse the query for producing the upsert document.
-    ParsedUpdateForMongos parsedUpdate(opCtx, &updateRequest);
-    uassertStatusOK(parsedUpdate.parseRequest());
+    auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
+        expCtx, &updateRequest, makeExtensionsCallback<ExtensionsCallbackNoop>()));
+
+    auto canonicalUpdate = uassertStatusOK(CanonicalUpdate::make(expCtx, std::move(parsedUpdate)));
 
     const CanonicalQuery* canonicalQuery =
-        parsedUpdate.hasParsedQuery() ? parsedUpdate.getParsedQuery() : nullptr;
+        canonicalUpdate->hasParsedQuery() ? canonicalUpdate->getParsedQuery() : nullptr;
     FieldRefSet immutablePaths;
     immutablePaths.insert(&idFieldRef);
     update::produceDocumentForUpsert(opCtx,
                                      &updateRequest,
-                                     parsedUpdate.getDriver(),
+                                     canonicalUpdate->getDriver(),
                                      canonicalQuery,
                                      immutablePaths,
-                                     parsedUpdate.getDriver()->getDocument());
+                                     canonicalUpdate->getDriver()->getDocument());
 
-    auto upsertDoc = parsedUpdate.getDriver()->getDocument().getObject();
+    auto upsertDoc = canonicalUpdate->getDriver()->getDocument().getObject();
     if (!timeseriesOptions) {
         return {upsertDoc, BSONObj()};
     }
