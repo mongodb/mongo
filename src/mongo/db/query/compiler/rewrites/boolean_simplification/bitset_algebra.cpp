@@ -216,6 +216,13 @@ bool operator==(const BitsetTerm& lhs, const BitsetTerm& rhs) {
     return lhs.predicates == rhs.predicates && lhs.mask == rhs.mask;
 }
 
+bool operator<(const BitsetTerm& lhs, const BitsetTerm& rhs) {
+    if (lhs.mask != rhs.mask) {
+        return lhs.mask < rhs.mask;
+    }
+    return lhs.predicates < rhs.predicates;
+}
+
 std::ostream& operator<<(std::ostream& os, const BitsetTerm& term) {
     os << '(' << term.predicates << ", " << term.mask << ")";
     return os;

@@ -146,8 +146,8 @@ TEST(FindPrimeImplicantsTest, Test6) {
     };
 
     Maxterm expectedMaxterm{
-        Minterm{"000", "101"},
         Minterm{"000", "011"},
+        Minterm{"000", "101"},
         Minterm{"010", "110"},
         Minterm{"100", "110"},
         Minterm{"011", "011"},
@@ -155,8 +155,8 @@ TEST(FindPrimeImplicantsTest, Test6) {
     };
 
     std::vector<CoveredOriginalMinterms> expectedCoveredMinterms{
-        CoveredOriginalMinterms{"000011"},
         CoveredOriginalMinterms{"000101"},
+        CoveredOriginalMinterms{"000011"},
         CoveredOriginalMinterms{"001010"},
         CoveredOriginalMinterms{"010100"},
         CoveredOriginalMinterms{"101000"},
