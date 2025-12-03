@@ -314,6 +314,7 @@ executor:
         defaultClientMaxRetryAttempts: 16
         defaultClientBaseBackoffMillis: 10
         defaultClientMaxBackoffMillis: 1000
+        shardRetryTokenBucketCapacity: 1073741823
     mongod_options:
       set_parameters:
         defaultClientMaxRetryAttempts: 16
@@ -335,6 +336,7 @@ executor:
         numInitialSyncAttempts: 16
         numInitialSyncOplogFindAttempts: 16
         coordinateCommitReturnImmediatelyAfterPersistingDecision: true
+        shardRetryTokenBucketCapacity: 1073741823
         failpoint.failIngressRequestRateLimiting:
           mode:
             activationProbability: 0.25

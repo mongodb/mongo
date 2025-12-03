@@ -97,6 +97,7 @@ executor:
         defaultClientMaxRetryAttempts: 16
         defaultClientBaseBackoffMillis: 10
         defaultClientMaxBackoffMillis: 1000
+        shardRetryTokenBucketCapacity: 1073741823
     mongod_options:
       set_parameters:
         enableTestCommands: 1
@@ -105,6 +106,7 @@ executor:
         defaultClientMaxRetryAttempts: 16
         defaultClientBaseBackoffMillis: 10
         defaultClientMaxBackoffMillis: 1000
+        shardRetryTokenBucketCapacity: 1073741823
         failpoint.failIngressRequestRateLimiting:
           mode:
             activationProbability: 0.25
