@@ -75,9 +75,9 @@ TEST_F(TopServiceContextTest, IncludesEmptyBucketsJustForTotalTime) {
     BSONObj workingTime = workingTimeBuilder.done();
 
     ASSERT_EQ(totalTime["reads"]["ops"].Long(), 1);
-    ASSERT_GT(totalTime["reads"]["histogram"].Array().size(), 1);
+    ASSERT_GT(totalTime["reads"]["histogram"].Obj().nFields(), 1);
     ASSERT_EQ(workingTime["reads"]["ops"].Long(), 1);
-    ASSERT_EQ(workingTime["reads"]["histogram"].Array().size(), 1);
+    ASSERT_EQ(workingTime["reads"]["histogram"].Obj().nFields(), 1);
 }
 
 }  // namespace

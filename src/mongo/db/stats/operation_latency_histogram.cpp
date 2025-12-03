@@ -39,7 +39,7 @@
 
 namespace mongo {
 namespace {
-const std::array<uint64_t, operation_latency_histogram_details::kMaxBuckets> kLowerBounds = {
+constexpr std::array<uint64_t, operation_latency_histogram_details::kMaxBuckets> kLowerBounds = {
     0,             // 0x00000000000
     2,             // 0x00000000002
     4,             // 0x00000000004
@@ -92,6 +92,20 @@ const std::array<uint64_t, operation_latency_histogram_details::kMaxBuckets> kLo
     549755813888,  // 0x08000000000
     1099511627776  // 0x10000000000
 };
+
+// Returns a string representation of the ith lower bound.
+StringData bucketName(size_t i) {
+    static const std::vector<std::string> kBucketNames = []() {
+        std::vector<std::string> bucketNames;
+        bucketNames.reserve(kLowerBounds.size());
+        for (uint64_t lowerBound : kLowerBounds) {
+            bucketNames.push_back(absl::StrFormat("%1.2eμs_count", lowerBound));
+        }
+        return bucketNames;
+    }();
+    tassert(11456500, "Bucket index out of bounds", i < kBucketNames.size());
+    return kBucketNames[i];
+}
 
 // Computes the log base 2 of value, and checks for cases of split buckets.
 size_t getBucket(uint64_t value) {
@@ -170,11 +184,10 @@ void appendHistogram(const HistogramDataType& data,
     const uint64_t slowMicros = static_cast<uint64_t>(serverGlobalParams.slowMS.load()) * 1000;
     const bool filterBuckets = slowMSBucketsOnly && slowMicros >= 0;
 
-    uint64_t filteredCount = 0;
-    uint64_t lowestFilteredBound = 0;
-
     if (includeHistograms) {
-        BSONArrayBuilder arrayBuilder(histogramBuilder.subarrayStart("histogram"));
+        uint64_t filteredCount = 0;
+        int lowestFilteredBoundIndex = -1;
+        BSONObjBuilder countBuilder(histogramBuilder.subobjStart("histogram"));
         for (size_t i = 0; i < operation_latency_histogram_details::kMaxBuckets; i++) {
             const auto bucketValue = [&] {
                 if constexpr (std::is_same_v<HistogramDataType,
@@ -190,32 +203,28 @@ void appendHistogram(const HistogramDataType& data,
             }
 
             if (filterBuckets && kLowerBounds[i] >= slowMicros) {
-                if (lowestFilteredBound == 0) {
-                    lowestFilteredBound = kLowerBounds[i];
+                if (lowestFilteredBoundIndex == -1) {
+                    lowestFilteredBoundIndex = i;
                 }
 
                 filteredCount += bucketValue;
                 continue;
             }
-
-            BSONObjBuilder entryBuilder(arrayBuilder.subobjStart());
-            entryBuilder.append("micros", static_cast<long long>(kLowerBounds[i]));
-            entryBuilder.append("count", static_cast<long long>(bucketValue));
-            entryBuilder.doneFast();
+            countBuilder.append(bucketName(i), static_cast<long long>(bucketValue));
         }
 
         // Append final bucket only if it contains values to minimize data in FTDC. Final bucket
         // is aggregate of all buckets >= slowMS with bucket labeled as minimum latency of
         // bucket. `includeEmptyBuckets` means that all buckets should be present even if they have
-        // no entries, and this is true for the final bucket as well.
-        if (filterBuckets && (filteredCount > 0 || includeEmptyBuckets)) {
-            BSONObjBuilder entryBuilder(arrayBuilder.subobjStart());
-            entryBuilder.append("micros", static_cast<long long>(lowestFilteredBound));
-            entryBuilder.append("count", static_cast<long long>(filteredCount));
-            entryBuilder.doneFast();
+        // no entries, and this is true for the final bucket as well. Note that we check if
+        // lowestFilteredBoundIndex because if the slowMS threshold is too high there may be no
+        // buckets above it.
+        if (filterBuckets && lowestFilteredBoundIndex > 0 &&
+            (filteredCount > 0 || includeEmptyBuckets)) {
+            countBuilder.append(bucketName(lowestFilteredBoundIndex),
+                                static_cast<long long>(filteredCount));
         }
-
-        arrayBuilder.doneFast();
+        countBuilder.doneFast();
     }
 
     uint64_t latency, ops, queryableEncryptionLatencyMicros;
