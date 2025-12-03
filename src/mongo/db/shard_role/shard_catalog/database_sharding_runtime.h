@@ -140,6 +140,16 @@ public:
     }
 
     /**
+     * Checks that the database is not currently in a critical section, which would indicate active
+     * metadata changes (e.g. movePrimary).
+     *
+     * Throws `StaleDbRoutingVersion` if the critical section is acquired, using `receivedVersion`
+     * to construct the exception.
+     */
+    void checkCriticalSectionOrThrow(OperationContext* opCtx,
+                                     const DatabaseVersion& receivedVersion) const;
+
+    /**
      * Sets this node's cached database info.
      */
     void setDbMetadata(OperationContext* opCtx, const DatabaseType& dbMetadata);

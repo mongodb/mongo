@@ -154,21 +154,23 @@ void DatabaseShardingRuntime::checkDbVersionOrThrow(OperationContext* opCtx) con
     }
 }
 
+void DatabaseShardingRuntime::checkCriticalSectionOrThrow(
+    OperationContext* opCtx, const DatabaseVersion& receivedVersion) const {
+    const auto critSecSignal =
+        getCriticalSectionSignal(shard_role_details::getLocker(opCtx)->isWriteLocked()
+                                     ? ShardingMigrationCriticalSection::kWrite
+                                     : ShardingMigrationCriticalSection::kRead);
+
+    uassert(StaleDbRoutingVersion(_dbName, receivedVersion, boost::none, critSecSignal),
+            str::stream() << "The critical section for the database "
+                          << _dbName.toStringForErrorMsg()
+                          << " is acquired with reason: " << getCriticalSectionReason(),
+            !critSecSignal);
+}
+
 void DatabaseShardingRuntime::checkDbVersionOrThrow(OperationContext* opCtx,
                                                     const DatabaseVersion& receivedVersion) const {
-    {
-        const auto critSecSignal =
-            getCriticalSectionSignal(shard_role_details::getLocker(opCtx)->isWriteLocked()
-                                         ? ShardingMigrationCriticalSection::kWrite
-                                         : ShardingMigrationCriticalSection::kRead);
-        const auto optCritSecReason = getCriticalSectionReason();
-
-        uassert(StaleDbRoutingVersion(_dbName, receivedVersion, boost::none, critSecSignal),
-                str::stream() << "The critical section for the database "
-                              << _dbName.toStringForErrorMsg()
-                              << " is acquired with reason: " << getCriticalSectionReason(),
-                !critSecSignal);
-    }
+    checkCriticalSectionOrThrow(opCtx, receivedVersion);
 
     uassert(StaleDbRoutingVersion(_dbName, receivedVersion, boost::none),
             str::stream() << "No cached info for the database " << _dbName.toStringForErrorMsg(),

@@ -746,6 +746,39 @@ TEST_F(MetadataConsistencyTest, FindMatchingDurableDatabaseMetadataInWrongShard)
         MetadataInconsistencyTypeEnum::kMisplacedDatabaseMetadataInShardCatalog, inconsistencies);
 }
 
+TEST_F(MetadataConsistencyTest, CheckDatabaseMetadataConsistency_CriticalSection) {
+    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
+        "featureFlagShardAuthoritativeDbMetadataDDL", true);
+    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+        "featureFlagShardAuthoritativeDbMetadataCRUD", true);
+
+    // Use the same database metadata for the global catalog and the shard catalog.
+    Timestamp dbTimestamp{1, 0};
+    DatabaseVersion dbVersion{_dbUuid, dbTimestamp};
+    DatabaseType dbInGlobalCatalog{_dbName, kMyShardName, dbVersion};
+    DBDirectClient client(operationContext());
+    client.insert(NamespaceString::kConfigShardCatalogDatabasesNamespace,
+                  dbInGlobalCatalog.toBSON());
+
+    // Mock that the critical section is acquired in the DSS.
+    {
+        AutoGetDb autoDb(operationContext(), _dbName, MODE_IX);
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(operationContext(), _dbName);
+        scopedDsr->enterCriticalSectionCatchUpPhase(BSON("reason" << "test"));
+        scopedDsr->enterCriticalSectionCommitPhase(BSON("reason" << "test"));
+    }
+
+
+    // Validate that throws in case the critical section is acquired by another thread.
+    ASSERT_THROWS_CODE(metadata_consistency_util::checkDatabaseMetadataConsistency(
+                           operationContext(), dbInGlobalCatalog),
+                       AssertionException,
+                       ErrorCodes::StaleDbVersion);
+
+    auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(operationContext(), _dbName);
+    scopedDsr->exitCriticalSectionNoChecks();
+}
+
 TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShard) {
     RAIIServerParameterControllerForTest featureFlagControllerForDDL(
         "featureFlagShardAuthoritativeDbMetadataDDL", true);

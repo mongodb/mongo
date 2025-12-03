@@ -667,6 +667,13 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCa
 
     const auto dbVersion = [&]() {
         const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, dbName);
+
+        // Ensure we do not access the DSS if a concurrent DDL operation (e.g., dropDatabase) is
+        // holding the critical section. This race condition can occur if this command is sent by a
+        // stale primary while the real primary commits changes to the catalog. Accessing the DSS
+        // during a critical section violates the contract and triggers an assertion.
+        scopedDsr->checkCriticalSectionOrThrow(opCtx, dbVersionInGlobalCatalog);
+
         return scopedDsr->getDbVersion(opCtx);
     }();
 
@@ -721,38 +728,40 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCa
         return inconsistencies;
     }
 
+    DatabaseType dbInShardCatalog;
     try {
-        auto dbInShardCatalog =
+        dbInShardCatalog =
             DatabaseType::parse(cursor->nextSafe().getOwned(), IDLParserContext("DatabaseType"));
-
-        auto shardInLocalCatalog = dbInShardCatalog.getPrimary();
-        if (shardInLocalCatalog != primaryShard) {
-            inconsistencies.emplace_back(makeInconsistency(
-                MetadataInconsistencyTypeEnum::kMisplacedDatabaseMetadataInShardCatalog,
-                MisplacedDatabaseMetadataInShardCatalogDetails{
-                    dbName, primaryShard, shardInLocalCatalog}));
-        }
-
-        auto dbVersionInShardCatalog = dbInShardCatalog.getVersion();
-        if (dbVersionInGlobalCatalog != dbVersionInShardCatalog) {
-            inconsistencies.emplace_back(makeInconsistency(
-                MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardCatalog,
-                InconsistentDatabaseVersionInShardCatalogDetails{
-                    dbName, primaryShard, dbVersionInGlobalCatalog, dbVersionInShardCatalog}));
-        }
-
-        auto cacheInconsistencies = checkDatabaseMetadataConsistencyInShardCatalogCache(
-            opCtx, dbName, dbVersionInGlobalCatalog, dbVersionInShardCatalog, primaryShard);
-
-        inconsistencies.insert(inconsistencies.end(),
-                               std::make_move_iterator(cacheInconsistencies.begin()),
-                               std::make_move_iterator(cacheInconsistencies.end()));
-    } catch (const AssertionException&) {
+    } catch (const DBException&) {
         inconsistencies.emplace_back(
             makeInconsistency(MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog,
                               MissingDatabaseMetadataInShardCatalogDetails{
                                   dbName, primaryShard, dbVersionInGlobalCatalog}));
+        return inconsistencies;
     }
+
+    auto shardInLocalCatalog = dbInShardCatalog.getPrimary();
+    if (shardInLocalCatalog != primaryShard) {
+        inconsistencies.emplace_back(makeInconsistency(
+            MetadataInconsistencyTypeEnum::kMisplacedDatabaseMetadataInShardCatalog,
+            MisplacedDatabaseMetadataInShardCatalogDetails{
+                dbName, primaryShard, shardInLocalCatalog}));
+    }
+
+    auto dbVersionInShardCatalog = dbInShardCatalog.getVersion();
+    if (dbVersionInGlobalCatalog != dbVersionInShardCatalog) {
+        inconsistencies.emplace_back(makeInconsistency(
+            MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardCatalog,
+            InconsistentDatabaseVersionInShardCatalogDetails{
+                dbName, primaryShard, dbVersionInGlobalCatalog, dbVersionInShardCatalog}));
+    }
+
+    auto cacheInconsistencies = checkDatabaseMetadataConsistencyInShardCatalogCache(
+        opCtx, dbName, dbVersionInGlobalCatalog, dbVersionInShardCatalog, primaryShard);
+
+    inconsistencies.insert(inconsistencies.end(),
+                           std::make_move_iterator(cacheInconsistencies.begin()),
+                           std::make_move_iterator(cacheInconsistencies.end()));
 
     tassert(9980501,
             "Found duplicated database metadata in the shard catalog with the same _id value",
