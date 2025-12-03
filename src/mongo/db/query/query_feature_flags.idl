@@ -309,3 +309,10 @@ feature_flags:
         fcv_gated: false
         default: true
         incremental_rollout_phase: rollout
+
+    featureFlagPathArrayness:
+        description: "Feature flag to enable tracking of path arrayness."
+        cpp_varname: gFeatureFlagPathArrayness
+        fcv_gated: false
+        default: false
+        incremental_rollout_phase: in_development
