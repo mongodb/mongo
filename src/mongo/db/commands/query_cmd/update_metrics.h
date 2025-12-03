@@ -34,6 +34,7 @@
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /**

@@ -33,6 +33,7 @@
 #include "mongo/db/query/client_cursor/generic_cursor_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 

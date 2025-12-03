@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

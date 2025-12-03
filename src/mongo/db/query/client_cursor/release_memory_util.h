@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

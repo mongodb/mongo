@@ -36,6 +36,7 @@
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/kill_cursors_gen.h"
 #include "mongo/db/read_concern_support_result.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

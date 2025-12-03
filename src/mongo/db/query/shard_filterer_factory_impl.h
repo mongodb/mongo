@@ -36,6 +36,7 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
