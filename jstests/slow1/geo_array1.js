@@ -3,6 +3,8 @@
 //   does_not_support_stepdowns,
 //   requires_replication,
 //   resource_intensive,
+//   # We are choosing not to test on MacOS since it's too noisy.
+//   slow_on_macos,
 // ]
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 

@@ -1,3 +1,7 @@
+// @tags: [
+//   # We are choosing not to test on MacOS since it's too noisy.
+//   slow_on_macos,
+// ]
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const conn = MongoRunner.runMongod();

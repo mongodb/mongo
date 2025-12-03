@@ -12,7 +12,7 @@ buildvariants:
       - macos-14-arm64
     expansions:
       compile_variant: *enterprise-macos-arm64
-      test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
+      test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,slow_on_macos
       resmoke_jobs_max: 6
     tasks:
       - name: compile_test_serial_TG

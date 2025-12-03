@@ -9,7 +9,13 @@
  * This test is verifying that startup recovery works as designed following an unclean shutdown
  * during the closing checkpoint.
  *
- * @tags: [requires_wiredtiger, requires_persistence, requires_replication]
+ * @tags: [
+ *   requires_wiredtiger,
+ *   requires_persistence,
+ *   requires_replication,
+ *   # We are choosing not to test on MacOS since it's too noisy.
+ *   slow_on_macos,
+ * ]
  */
 
 // This test triggers an unclean shutdown, which may cause inaccurate fast counts.

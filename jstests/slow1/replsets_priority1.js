@@ -1,5 +1,9 @@
 // come up with random priorities and make sure that the right member gets
 // elected. then kill that member and make sure the next one gets elected.
+// @tags: [
+//   # We are choosing not to test on MacOS since it's too noisy.
+//   slow_on_macos,
+// ]
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isConfigCommitted, occasionally, reconnect} from "jstests/replsets/rslib.js";

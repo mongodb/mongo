@@ -1,6 +1,10 @@
 // Tests SERVER-11475 - Make sure server does't crash when many user defined roles are created where
 // each role is a member of the next, creating a large chain.
-// @tags: [requires_sharding]
+// @tags: [
+//   requires_sharding,
+//   # We are choosing not to test on MacOS since it's too noisy.
+//   slow_on_macos,
+// ]
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

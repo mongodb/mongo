@@ -1,7 +1,10 @@
 /**
  * Runs initial sync on a node with many databases.
  *
- * @tags: [incompatible_with_macos]
+ * @tags: [
+ *   # We are choosing not to test on MacOS since it's too noisy.
+ *   slow_on_macos
+ * ]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
