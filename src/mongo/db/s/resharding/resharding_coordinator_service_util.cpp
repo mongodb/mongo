@@ -830,7 +830,7 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
         updatedCoordinatorDoc.setState(CoordinatorStateEnum::kQuiesced);
         updatedCoordinatorDoc.setQuiescePeriodEnd(
             opCtx->fastClockSource().now() +
-            Milliseconds(resharding::gReshardingCoordinatorQuiescePeriodMillis));
+            Milliseconds(resharding::gReshardingCoordinatorQuiescePeriodMillis.load()));
     } else {
         updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
     }

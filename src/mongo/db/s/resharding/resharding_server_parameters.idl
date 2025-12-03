@@ -395,8 +395,8 @@ server_parameters:
             the coordinator, after it completes or aborts, to allow a user to reconnect to it and
             retrieve the result. This applies only to resharding operations where the user
             provided a reshardingUUID; if no UUID is provided there is no quiesce period.
-        set_at: startup
-        cpp_vartype: int
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
         cpp_varname: gReshardingCoordinatorQuiescePeriodMillis
         default:
             expr: 15 * 60 * 1000
