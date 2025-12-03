@@ -317,7 +317,8 @@ protected:
                                               const RecordId&,
                                               const RecordData&,
                                               const char* damageSource,
-                                              const DamageVector&) override;
+                                              const DamageVector&,
+                                              const SeekableRecordCursor*) override;
 
     Status _truncate(OperationContext*, RecoveryUnit&) override;
 
@@ -574,6 +575,14 @@ public:
                                 RecoveryUnit& ru,
                                 const WiredTigerRecordStore& rs,
                                 bool forward);
+    WT_CURSOR* get() const {
+        tassert(10522600, "unexpected null cursor", _cursor);
+        return _cursor->get();
+    }
+
+    WT_CURSOR* operator->() const {
+        return get();
+    }
 };
 
 /**

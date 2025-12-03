@@ -250,7 +250,8 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
                                             recordId,
                                             oldRecordData,
                                             damageSource,
-                                            damageVector);
+                                            damageVector,
+                                            nullptr /*cursor*/);
         ASSERT_TRUE(newDoc.isOK());
         oldRecordData = newDoc.getValue().getOwned();
         ASSERT_EQ(std::memcmp(oldRecordData.data(), "234", 3), 0);
@@ -267,7 +268,8 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
                                           recordId,
                                           oldRecordData,
                                           damageSource,
-                                          damageVector)
+                                          damageVector,
+                                          nullptr /*cursor*/)
                         .isOK());
         ASSERT_EQ(getDataSize(), 5);
         txn.commit();

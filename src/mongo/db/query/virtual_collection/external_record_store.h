@@ -167,7 +167,8 @@ public:
                                              const RecordId& loc,
                                              const RecordData& oldRec,
                                              const char* damageSource,
-                                             const DamageVector& damages) final {
+                                             const DamageVector& damages,
+                                             const SeekableRecordCursor* cursor) final {
         unimplementedTasserted();
         return {ErrorCodes::Error::UnknownError, "Unknown error"};
     }

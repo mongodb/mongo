@@ -312,7 +312,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
                     diff.has_value() ? &*diff : collection_internal::kUpdateAllIndexes,
                     &indexesAffected,
                     _params.opDebug,
-                    &args));
+                    &args,
+                    nullptr /*cursor*/));
                 invariant(oldObj.snapshotId() ==
                           shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId());
                 wunit.commit();

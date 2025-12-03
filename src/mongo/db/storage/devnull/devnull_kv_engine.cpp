@@ -230,7 +230,8 @@ private:
                                               const RecordId& loc,
                                               const RecordData& oldRec,
                                               const char* damageSource,
-                                              const DamageVector& damages) override {
+                                              const DamageVector& damages,
+                                              const SeekableRecordCursor* cursor) override {
         MONGO_UNREACHABLE;
     }
 

@@ -765,7 +765,8 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
                                               const BSONObj* opDiff,
                                               bool* indexesAffected,
                                               OpDebug* opDebug,
-                                              CollectionUpdateArgs* args) {
+                                              CollectionUpdateArgs* args,
+                                              const SeekableRecordCursor* cursor) {
     dassert(
         shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_IX));
     invariant(oldDoc.snapshotId() == shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId());
@@ -803,7 +804,8 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
                                                         loc,
                                                         oldRecordData,
                                                         damageSource,
-                                                        damages);
+                                                        damages,
+                                                        cursor);
     if (!recordData.isOK())
         return recordData.getStatus();
     BSONObj newDoc = std::move(recordData.getValue()).releaseToBson().getOwned();

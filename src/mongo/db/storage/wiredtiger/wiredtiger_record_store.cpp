@@ -885,12 +885,14 @@ bool WiredTigerRecordStore::updateWithDamagesSupported() const {
     return !_forceUpdateWithFullDocument;
 }
 
-StatusWith<RecordData> WiredTigerRecordStore::_updateWithDamages(OperationContext* opCtx,
-                                                                 RecoveryUnit& ru,
-                                                                 const RecordId& id,
-                                                                 const RecordData& oldRec,
-                                                                 const char* damageSource,
-                                                                 const DamageVector& damages) {
+StatusWith<RecordData> WiredTigerRecordStore::_updateWithDamages(
+    OperationContext* opCtx,
+    RecoveryUnit& ru,
+    const RecordId& id,
+    const RecordData& oldRec,
+    const char* damageSource,
+    const DamageVector& damages,
+    const SeekableRecordCursor* cursor) {
     const int nentries = damages.size();
     DamageVector::const_iterator where = damages.begin();
     const DamageVector::const_iterator end = damages.cend();
@@ -904,14 +906,23 @@ StatusWith<RecordData> WiredTigerRecordStore::_updateWithDamages(OperationContex
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
-    auto cursorParams = getWiredTigerCursorParams(wtRu, tableId(), /*allowOverwrite=*/true);
-    WiredTigerCursor curwrap(std::move(cursorParams), getURI(), *wtRu.getSession());
-
-    wtRu.assertInActiveTxn();
-    WT_CURSOR* c = curwrap.get();
-    invariant(c);
+    WT_CURSOR* c = nullptr;
+    boost::optional<WiredTigerCursor> curwrap;
     CursorKey key = makeCursorKey(id, keyFormat());
-    setKey(c, &key);
+    if (!cursor) {
+        auto cursorParams = getWiredTigerCursorParams(wtRu, tableId(), /*allowOverwrite=*/true);
+        curwrap.emplace(std::move(cursorParams), getURI(), *wtRu.getSession());
+        wtRu.assertInActiveTxn();
+        c = curwrap->get();
+        setKey(c, &key);
+    } else {
+        // Make sure the cursor is already positioned.
+        const WiredTigerRecordStoreCursor* wtC =
+            reinterpret_cast<const WiredTigerRecordStoreCursor*>(cursor);
+        c = wtC->get();
+        tassert(10522601, "expected nonnull underlying cursor", c);
+        tassert(10522602, "expected cursor to be positioned", getKey(c, keyFormat()) == id);
+    }
 
     // The test harness calls us with empty damage vectors which WiredTiger doesn't allow.
     if (nentries == 0)

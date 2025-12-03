@@ -339,7 +339,8 @@ TEST(RecordStoreTest, UpdateInPlace1) {
                                       loc,
                                       s1Rec,
                                       damageSource,
-                                      dv);
+                                      dv,
+                                      nullptr /*cursor*/);
             ASSERT_OK(newRecStatus.getStatus());
             ASSERT_EQUALS(s2, newRecStatus.getValue().data());
             txn.commit();

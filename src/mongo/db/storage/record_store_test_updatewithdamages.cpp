@@ -40,6 +40,7 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_calculator.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/shared_buffer.h"
 
@@ -53,7 +54,7 @@ namespace mongo {
 namespace {
 
 // Insert a record and try to perform an in-place update on it.
-TEST(RecordStoreTest, UpdateWithDamages) {
+void updateWithDamages(bool usePreexistingCursor, bool positionCursorCorrectly) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -81,8 +82,28 @@ TEST(RecordStoreTest, UpdateWithDamages) {
             txn.commit();
         }
     }
+    RecordId loc2;
+    if (!positionCursorCorrectly) {
+        const RecordData rec(data.c_str(), data.size() + 1);
+        {
+            ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+            {
+                StorageWriteTransaction txn(ru);
+                StatusWith<RecordId> res =
+                    rs->insertRecord(opCtx.get(),
+                                     *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                     rec.data(),
+                                     rec.size(),
+                                     Timestamp());
+                ASSERT_OK(res.getStatus());
+                loc2 = res.getValue();
+                txn.commit();
+            }
+        }
+    }
 
-    ASSERT_EQUALS(1, rs->numRecords());
+    ASSERT_EQUALS((1 + !positionCursorCorrectly), rs->numRecords());
 
     std::string modifiedData = "11101000";
     {
@@ -104,9 +125,25 @@ TEST(RecordStoreTest, UpdateWithDamages) {
             dv[2].targetSize = 3;
 
             StorageWriteTransaction txn(ru);
-            auto newRecStatus = rs->updateWithDamages(opCtx.get(), ru, loc, rec, data.c_str(), dv);
-            ASSERT_OK(newRecStatus.getStatus());
-            ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
+
+            if (!usePreexistingCursor) {
+                auto newRecStatus = rs->updateWithDamages(
+                    opCtx.get(), ru, loc, rec, data.c_str(), dv, nullptr /*cursor*/);
+                ASSERT_OK(newRecStatus.getStatus());
+                ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
+            } else if (positionCursorCorrectly) {
+                auto cursor = rs->getCursor(opCtx.get(), ru);
+                cursor->seekExact(loc);
+                auto newRecStatus = rs->updateWithDamages(
+                    opCtx.get(), ru, loc, rec, data.c_str(), dv, cursor.get());
+                ASSERT_OK(newRecStatus.getStatus());
+                ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
+            } else {
+                auto cursor = rs->getCursor(opCtx.get(), ru);
+                cursor->seekExact(loc2);
+                auto newRecStatus = rs->updateWithDamages(
+                    opCtx.get(), ru, loc, rec, data.c_str(), dv, cursor.get());
+            }
             txn.commit();
         }
     }
@@ -121,9 +158,19 @@ TEST(RecordStoreTest, UpdateWithDamages) {
     }
 }
 
+TEST(RecordStoreTest, UpdateWithDamages) {
+    for (bool usePreexistingCursor : {false, true}) {
+        updateWithDamages(usePreexistingCursor, true /*positionCursorCorrectly*/);
+    }
+}
+
+DEATH_TEST(RecordStoreDeathTest, ErrorNotPositioned, "expected cursor to be positioned") {
+    updateWithDamages(true /*usePreexistingCursor*/, false /*positionCursorCorrectly*/);
+}
+
 // Insert a record and try to perform an in-place update on it with a DamageVector
 // containing overlapping DamageEvents.
-TEST(RecordStoreTest, UpdateWithOverlappingDamageEvents) {
+void updateWithOverlappingDamageEvents(bool usePreexistingCursor) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -170,9 +217,19 @@ TEST(RecordStoreTest, UpdateWithOverlappingDamageEvents) {
             dv[1].targetSize = 5;
 
             StorageWriteTransaction txn(ru);
-            auto newRecStatus = rs->updateWithDamages(opCtx.get(), ru, loc, rec, data.c_str(), dv);
-            ASSERT_OK(newRecStatus.getStatus());
-            ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
+            if (!usePreexistingCursor) {
+                auto newRecStatus = rs->updateWithDamages(
+                    opCtx.get(), ru, loc, rec, data.c_str(), dv, nullptr /*cursor*/);
+                ASSERT_OK(newRecStatus.getStatus());
+                ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
+            } else {
+                auto cursor = rs->getCursor(opCtx.get(), ru);
+                cursor->seekExact(loc);
+                auto newRecStatus = rs->updateWithDamages(
+                    opCtx.get(), ru, loc, rec, data.c_str(), dv, cursor.get());
+                ASSERT_OK(newRecStatus.getStatus());
+                ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
+            }
             txn.commit();
         }
     }
@@ -187,10 +244,16 @@ TEST(RecordStoreTest, UpdateWithOverlappingDamageEvents) {
     }
 }
 
+TEST(RecordStoreTest, UpdateWithOverlappingDamageEvents) {
+    for (bool usePreexistingCursor : {false, true}) {
+        updateWithOverlappingDamageEvents(usePreexistingCursor);
+    }
+}
+
 // Insert a record and try to perform an in-place update on it with a DamageVector
 // containing overlapping DamageEvents. The changes should be applied in the order
 // specified by the DamageVector, and not -- for instance -- by the targetOffset.
-TEST(RecordStoreTest, UpdateWithOverlappingDamageEventsReversed) {
+void updateWithOverlappingDamageEventsReversed(bool usePreexistingCursor) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -237,9 +300,19 @@ TEST(RecordStoreTest, UpdateWithOverlappingDamageEventsReversed) {
             dv[1].targetSize = 5;
 
             StorageWriteTransaction txn(ru);
-            auto newRecStatus = rs->updateWithDamages(opCtx.get(), ru, loc, rec, data.c_str(), dv);
-            ASSERT_OK(newRecStatus.getStatus());
-            ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
+            if (!usePreexistingCursor) {
+                auto newRecStatus = rs->updateWithDamages(
+                    opCtx.get(), ru, loc, rec, data.c_str(), dv, nullptr /*cursor*/);
+                ASSERT_OK(newRecStatus.getStatus());
+                ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
+            } else {
+                auto cursor = rs->getCursor(opCtx.get(), ru);
+                cursor->seekExact(loc);
+                auto newRecStatus = rs->updateWithDamages(
+                    opCtx.get(), ru, loc, rec, data.c_str(), dv, cursor.get());
+                ASSERT_OK(newRecStatus.getStatus());
+                ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
+            }
             txn.commit();
         }
     }
@@ -254,8 +327,14 @@ TEST(RecordStoreTest, UpdateWithOverlappingDamageEventsReversed) {
     }
 }
 
+TEST(RecordStoreTest, UpdateWithOverlappingDamageEventsReversed) {
+    for (bool usePreexistingCursor : {false, true}) {
+        updateWithOverlappingDamageEventsReversed(usePreexistingCursor);
+    }
+}
+
 // Insert a record and try to call updateWithDamages() with an empty DamageVector.
-TEST(RecordStoreTest, UpdateWithNoDamages) {
+void updateWithNoDamages(bool usePreexistingCursor) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -293,9 +372,19 @@ TEST(RecordStoreTest, UpdateWithNoDamages) {
             DamageVector dv;
 
             StorageWriteTransaction txn(ru);
-            auto newRecStatus = rs->updateWithDamages(opCtx.get(), ru, loc, rec, "", dv);
-            ASSERT_OK(newRecStatus.getStatus());
-            ASSERT_EQUALS(data, newRecStatus.getValue().data());
+            if (!usePreexistingCursor) {
+                auto newRecStatus =
+                    rs->updateWithDamages(opCtx.get(), ru, loc, rec, "", dv, nullptr /*cursor*/);
+                ASSERT_OK(newRecStatus.getStatus());
+                ASSERT_EQUALS(data, newRecStatus.getValue().data());
+            } else {
+                auto cursor = rs->getCursor(opCtx.get(), ru);
+                cursor->seekExact(loc);
+                auto newRecStatus =
+                    rs->updateWithDamages(opCtx.get(), ru, loc, rec, "", dv, cursor.get());
+                ASSERT_OK(newRecStatus.getStatus());
+                ASSERT_EQUALS(data, newRecStatus.getValue().data());
+            }
             txn.commit();
         }
     }
@@ -310,8 +399,14 @@ TEST(RecordStoreTest, UpdateWithNoDamages) {
     }
 }
 
+TEST(RecordStoreTest, UpdateWithNoDamages) {
+    for (bool usePreexistingCursor : {false, true}) {
+        updateWithNoDamages(usePreexistingCursor);
+    }
+}
+
 // Insert a record and try to perform inserts and updates on it.
-TEST(RecordStoreTest, UpdateWithDamagesScalar) {
+void updateWithDamagesScalar(bool usePreexistingCursor) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -357,10 +452,19 @@ TEST(RecordStoreTest, UpdateWithDamagesScalar) {
             auto diffOutput = doc_diff::computeOplogDiff(obj0, obj1, 0);
             ASSERT(diffOutput);
             auto [_, damageSource, damages] = doc_diff::computeDamages(obj0, *diffOutput, false);
-            auto newRecStatus1 =
-                rs->updateWithDamages(opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages);
-            ASSERT_OK(newRecStatus1.getStatus());
-            ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
+            if (!usePreexistingCursor) {
+                auto newRecStatus1 = rs->updateWithDamages(
+                    opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages, nullptr /*cursor*/);
+                ASSERT_OK(newRecStatus1.getStatus());
+                ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
+            } else {
+                auto cursor = rs->getCursor(opCtx.get(), ru);
+                cursor->seekExact(loc);
+                auto newRecStatus1 = rs->updateWithDamages(
+                    opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages, cursor.get());
+                ASSERT_OK(newRecStatus1.getStatus());
+                ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
+            }
             txn.commit();
         }
     }
@@ -381,14 +485,29 @@ TEST(RecordStoreTest, UpdateWithDamagesScalar) {
             auto diffOutput = doc_diff::computeOplogDiff(obj1, obj2, 0);
             ASSERT(diffOutput);
             auto [_, damageSource, damages] = doc_diff::computeDamages(obj1, *diffOutput, false);
-            auto newRecStatus2 = rs->updateWithDamages(opCtx.get(),
-                                                       ru,
-                                                       loc,
-                                                       rs->dataFor(opCtx.get(), ru, loc),
-                                                       damageSource.get(),
-                                                       damages);
-            ASSERT_OK(newRecStatus2.getStatus());
-            ASSERT(obj2.binaryEqual(newRecStatus2.getValue().toBson()));
+            if (!usePreexistingCursor) {
+                auto newRecStatus2 = rs->updateWithDamages(opCtx.get(),
+                                                           ru,
+                                                           loc,
+                                                           rs->dataFor(opCtx.get(), ru, loc),
+                                                           damageSource.get(),
+                                                           damages,
+                                                           nullptr /*cursor*/);
+                ASSERT_OK(newRecStatus2.getStatus());
+                ASSERT(obj2.binaryEqual(newRecStatus2.getValue().toBson()));
+            } else {
+                auto cursor = rs->getCursor(opCtx.get(), ru);
+                cursor->seekExact(loc);
+                auto newRecStatus2 = rs->updateWithDamages(opCtx.get(),
+                                                           ru,
+                                                           loc,
+                                                           rs->dataFor(opCtx.get(), ru, loc),
+                                                           damageSource.get(),
+                                                           damages,
+                                                           cursor.get());
+                ASSERT_OK(newRecStatus2.getStatus());
+                ASSERT(obj2.binaryEqual(newRecStatus2.getValue().toBson()));
+            }
             txn.commit();
         }
     }
@@ -401,8 +520,14 @@ TEST(RecordStoreTest, UpdateWithDamagesScalar) {
     }
 }
 
+TEST(RecordStoreTest, UpdateWithDamagesScalar) {
+    for (bool usePreexistingCursor : {false, true}) {
+        updateWithDamagesScalar(usePreexistingCursor);
+    }
+}
+
 // Insert a record with nested documents and try to perform updates on it.
-TEST(RecordStoreTest, UpdateWithDamagesNested) {
+void updateWithDamagesNested(bool usePreexistingCursor) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -455,10 +580,19 @@ TEST(RecordStoreTest, UpdateWithDamagesNested) {
             auto diffOutput = doc_diff::computeOplogDiff(obj0, obj1, 0);
             ASSERT(diffOutput);
             auto [_, damageSource, damages] = doc_diff::computeDamages(obj0, *diffOutput, true);
-            auto newRecStatus1 =
-                rs->updateWithDamages(opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages);
-            ASSERT_OK(newRecStatus1.getStatus());
-            ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
+            if (!usePreexistingCursor) {
+                auto newRecStatus1 = rs->updateWithDamages(
+                    opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages, nullptr /*cursor*/);
+                ASSERT_OK(newRecStatus1.getStatus());
+                ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
+            } else {
+                auto cursor = rs->getCursor(opCtx.get(), ru);
+                cursor->seekExact(loc);
+                auto newRecStatus1 = rs->updateWithDamages(
+                    opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages, cursor.get());
+                ASSERT_OK(newRecStatus1.getStatus());
+                ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
+            }
             txn.commit();
         }
     }
@@ -471,8 +605,14 @@ TEST(RecordStoreTest, UpdateWithDamagesNested) {
     }
 }
 
+TEST(RecordStoreTest, UpdateWithDamagesNested) {
+    for (bool usePreexistingCursor : {false, true}) {
+        updateWithDamagesNested(usePreexistingCursor);
+    }
+}
+
 // Insert a record with nested arrays and try to perform updates on it.
-TEST(RecordStoreTest, UpdateWithDamagesArray) {
+void updateWithDamagesArray(bool usePreexistingCursor) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -518,10 +658,19 @@ TEST(RecordStoreTest, UpdateWithDamagesArray) {
             auto diffOutput = doc_diff::computeOplogDiff(obj0, obj1, 0);
             ASSERT(diffOutput);
             auto [_, damageSource, damages] = doc_diff::computeDamages(obj0, *diffOutput, true);
-            auto newRecStatus1 =
-                rs->updateWithDamages(opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages);
-            ASSERT_OK(newRecStatus1.getStatus());
-            ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
+            if (!usePreexistingCursor) {
+                auto newRecStatus1 = rs->updateWithDamages(
+                    opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages, nullptr /*cursor*/);
+                ASSERT_OK(newRecStatus1.getStatus());
+                ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
+            } else {
+                auto cursor = rs->getCursor(opCtx.get(), ru);
+                cursor->seekExact(loc);
+                auto newRecStatus1 = rs->updateWithDamages(
+                    opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages, cursor.get());
+                ASSERT_OK(newRecStatus1.getStatus());
+                ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
+            }
             txn.commit();
         }
     }
@@ -531,6 +680,12 @@ TEST(RecordStoreTest, UpdateWithDamagesArray) {
         ASSERT(obj1.binaryEqual(
             rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
                 .toBson()));
+    }
+}
+
+TEST(RecordStoreTest, UpdateWithDamagesArray) {
+    for (bool usePreexistingCursor : {false, true}) {
+        updateWithDamagesArray(usePreexistingCursor);
     }
 }
 

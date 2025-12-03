@@ -3273,7 +3273,8 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
                                                            collection_internal::kUpdateNoIndexes,
                                                            nullptr /* indexesAffected */,
                                                            nullptr /* opDebug */,
-                                                           &args);
+                                                           &args,
+                                                           nullptr /*cursor*/);
         wuow.commit();
         ASSERT_OK(statusWith.getStatus());
     }

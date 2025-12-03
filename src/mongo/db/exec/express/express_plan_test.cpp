@@ -138,12 +138,15 @@ public:
 static std::pair<PlanProgress, BSONObj> iterateAndExpectDocument(
     OperationContext* opCtx, auto& iterator, PlanProgress continuationReturnValue = Ready()) {
     boost::optional<BSONObj> producedObj;
-    auto result = iterator.consumeOne(
-        opCtx, [&](const CollectionAcquisition, RecordId, Snapshotted<BSONObj> obj) {
-            ASSERT(!bool(producedObj));
-            producedObj.emplace(std::move(obj.value()));
-            return std::move(continuationReturnValue);
-        });
+    auto result = iterator.consumeOne(opCtx,
+                                      [&](const CollectionAcquisition,
+                                          RecordId,
+                                          Snapshotted<BSONObj> obj,
+                                          const SeekableRecordCursor*) {
+                                          ASSERT(!bool(producedObj));
+                                          producedObj.emplace(std::move(obj.value()));
+                                          return std::move(continuationReturnValue);
+                                      });
     ASSERT(bool(producedObj));
     return {std::move(result), std::move(*producedObj)};
 }
@@ -152,9 +155,9 @@ static std::pair<PlanProgress, BSONObj> iterateAndExpectDocument(
 // not produce an output document).
 static PlanProgress iterateButExpectNoDocument(OperationContext* opCtx, auto& iterator) {
     return iterator.consumeOne(
-        opCtx, [](const CollectionAcquisition, RecordId, Snapshotted<BSONObj>) -> PlanProgress {
-            MONGO_UNREACHABLE;
-        });
+        opCtx,
+        [](const CollectionAcquisition, RecordId, Snapshotted<BSONObj>, const SeekableRecordCursor*)
+            -> PlanProgress { MONGO_UNREACHABLE; });
 }
 
 TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithMatchingQuery) {

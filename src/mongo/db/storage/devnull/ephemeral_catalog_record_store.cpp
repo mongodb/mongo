@@ -420,7 +420,8 @@ StatusWith<RecordData> EphemeralForTestRecordStore::_updateWithDamages(
     const RecordId& loc,
     const RecordData& oldRec,
     const char* damageSource,
-    const DamageVector& damages) {
+    const DamageVector& damages,
+    const SeekableRecordCursor* cursor) {
 
     stdx::lock_guard<stdx::recursive_mutex> lock(_data->mutex);
 

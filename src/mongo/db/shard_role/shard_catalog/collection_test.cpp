@@ -422,7 +422,8 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
                                                            collection_internal::kUpdateAllIndexes,
                                                            nullptr /* indexesAffected */,
                                                            nullptr /* opDebug */,
-                                                           &args);
+                                                           &args,
+                                                           nullptr /*cursor*/);
         ASSERT_OK(newDocStatus);
         ASSERT_BSONOBJ_EQ(newDoc, newDocStatus.getValue());
         wuow.commit();

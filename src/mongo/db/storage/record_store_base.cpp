@@ -135,9 +135,10 @@ StatusWith<RecordData> RecordStoreBase::updateWithDamages(OperationContext* opCt
                                                           const RecordId& id,
                                                           const RecordData& data,
                                                           const char* damageSource,
-                                                          const DamageVector& damages) {
+                                                          const DamageVector& damages,
+                                                          const SeekableRecordCursor* cursor) {
     validateWriteAllowed(opCtx);
-    return _updateWithDamages(opCtx, ru, id, data, damageSource, damages);
+    return _updateWithDamages(opCtx, ru, id, data, damageSource, damages, cursor);
 }
 
 Status RecordStoreBase::truncate(OperationContext* opCtx, RecoveryUnit& ru) {

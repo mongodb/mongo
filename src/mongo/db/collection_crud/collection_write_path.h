@@ -146,7 +146,8 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
                                               const BSONObj* opDiff,
                                               bool* indexesAffected,
                                               OpDebug* opDebug,
-                                              CollectionUpdateArgs* args);
+                                              CollectionUpdateArgs* args,
+                                              const SeekableRecordCursor* cursor);
 
 /**
  * Deletes the document with the given RecordId from the collection. For a description of the

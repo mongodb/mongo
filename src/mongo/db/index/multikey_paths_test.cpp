@@ -338,7 +338,8 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdateWithDamages) {
                 collection_internal::kUpdateAllIndexes,
                 nullptr /* indexesAffected */,
                 opDebug,
-                &args);
+                &args,
+                nullptr /*cursor*/);
             ASSERT_TRUE(newDocResult.getValue().woCompare(newDoc) == 0);
             ASSERT_TRUE(newDocResult.isOK());
             wuow.commit();

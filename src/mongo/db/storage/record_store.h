@@ -506,6 +506,9 @@ public:
      * to copy and apply byte-level changes to the data. Behavior is undefined for calling this on a
      * non-existant loc.
      *
+     * 'cursor' is an optional parameter. If nonnull, 'cursor' must already be positioned on the
+     * record ID we intend to update. This avoids an unnecessary seek.
+     *
      * @return the updated version of the record. If unowned data is returned, then it is valid
      * until the next modification of this Record or the lock on the collection has been released.
      */
@@ -514,7 +517,8 @@ public:
                                                      const RecordId&,
                                                      const RecordData&,
                                                      const char* damageSource,
-                                                     const DamageVector&) = 0;
+                                                     const DamageVector&,
+                                                     const SeekableRecordCursor*) = 0;
 
     /**
      * Prints any storage engine provided metadata for the record with 'recordId'.
