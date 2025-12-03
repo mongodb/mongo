@@ -48,9 +48,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
-namespace exec {
-namespace agg {
+namespace mongo::exec::agg {
 
 /**
  * This class handles the execution part of the sort aggregation stage and is part of the execution
@@ -73,7 +71,7 @@ public:
 
     bool isPopulated() {
         return _populated;
-    };
+    }
 
     /**
      * Loads a document to be sorted. This can be used to sort a stream of documents that are not
@@ -190,14 +188,12 @@ private:
     // Used only if _timeSorter is present.
     SortStats _timeSorterStats;
 
+    // Whether to include metadata including the sort key in the output documents from this stage.
+    const bool _outputSortKeyMetadata = false;
+
     // Used in timeSorterPeek() to avoid calling getNext() on an exhausted pSource.
     bool _timeSorterInputEOF = false;
 
     bool _populated = false;
-
-    // Whether to include metadata including the sort key in the output documents from this stage.
-    bool _outputSortKeyMetadata = false;
 };
-}  // namespace agg
-}  // namespace exec
-}  // namespace mongo
+}  // namespace mongo::exec::agg

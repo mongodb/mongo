@@ -48,8 +48,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceSortToStageFn(
                                                 sortDS->_outputSortKeyMetadata);
 }
 
-namespace exec {
-namespace agg {
+namespace exec::agg {
 
 REGISTER_AGG_STAGE_MAPPING(sort, DocumentSourceSort::id, documentSourceSortToStageFn)
 
@@ -76,7 +75,7 @@ SortStage::SortStage(StringData stageName,
     if (_timeSorter) {
         _timeSorterStats = _sortExecutor->stats();
     }
-};
+}
 
 bool SortStage::usedDisk() const {
     return isBoundedSortStage() ? _timeSorter->stats().spilledRanges() > 0
@@ -288,12 +287,10 @@ GetNextResult SortStage::populate() {
 void SortStage::loadDocument(Document&& doc) {
     invariant(!_populated);
 
-    Value sortKey;
-    Document docForSorter;
     // We always need to extract the sort key if we've reached this point. If the query system had
     // already computed the sort key we'd have split the pipeline there, would be merging presorted
     // documents, and wouldn't use this method.
-    std::tie(sortKey, docForSorter) = extractSortKey(std::move(doc));
+    auto [sortKey, docForSorter] = extractSortKey(std::move(doc));
     _sortExecutor->add(sortKey, docForSorter);
 }
 
@@ -347,6 +344,5 @@ std::pair<Value, Document> SortStage::extractSortKey(Document&& doc) const {
     }
 }
 
-}  // namespace agg
-}  // namespace exec
+}  // namespace exec::agg
 }  // namespace mongo
