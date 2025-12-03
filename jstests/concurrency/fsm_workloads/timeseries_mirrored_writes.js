@@ -12,6 +12,7 @@
  *   requires_fcv_80,
  *   # TODO SERVER-89825 remove the tag once the related ticket is fixed.
  *   assumes_balancer_off,
+ *   requires_getmore,
  * ]
  */
 

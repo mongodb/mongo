@@ -12,6 +12,8 @@
  *  # Changing the query stats parameters messes with the query stats test which expects to see
  *  # query stats results.
  *  incompatible_with_concurrency_simultaneous,
+ *  requires_getmore,
+ *  uses_getmore_outside_of_transaction,
  * ]
  *
  */

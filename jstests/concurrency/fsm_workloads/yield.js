@@ -3,6 +3,8 @@
  *
  * Designed to execute queries and make them yield as much as possible while also updating and
  * removing documents that they operate on.
+ * 
+ * @tags: [requires_getmore]
  */
 
 export const $config = (function() {

@@ -6,6 +6,8 @@
  * is dropped.
  *
  * This workload was designed to reproduce SERVER-24761.
+ * 
+ * @tags: [requires_getmore]
  */
 import {
     assertWorkedOrFailedHandleTxnErrors

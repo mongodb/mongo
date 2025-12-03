@@ -85,6 +85,7 @@ selector:
     - jstests/aggregation/sources/merge/on_fields_validation.js
     - jstests/aggregation/bugs/server10530.js
     - jstests/aggregation/range.js
+    - jstests/aggregation/bugs/substr.js
 
     # These tests run larger aggregations that can take a long time and can repeatedly get interrupted by config transitions.
     - jstests/aggregation/query_limits_test.js

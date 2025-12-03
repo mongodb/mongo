@@ -4,7 +4,8 @@
 //     assumes_no_implicit_collection_creation_after_drop,
 //     # Asserts on the output of listIndexes.
 //     assumes_no_implicit_index_creation,
-//     requires_getmore
+//     requires_getmore,
+//     uses_getmore_outside_of_transaction
 // ]
 
 // Basic functional tests for the listIndexes command.

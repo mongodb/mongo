@@ -6,6 +6,7 @@
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   requires_capped,
+ *   requires_getmore,
  *   no_selinux,
  *   # This test contains assertions for the hostname that operations run on.
  *   tenant_migration_incompatible,

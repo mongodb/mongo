@@ -10,7 +10,8 @@
  *    # production (see SERVER-97215 for more information)
  *    command_not_supported_in_serverless,
  *    # listCollections is tested, so the test cannot run with garbage in config databases
- *    injected_catalog_metadata_incompatible
+ *    injected_catalog_metadata_incompatible,
+ *    requires_getmore,
  * ]
  */
 

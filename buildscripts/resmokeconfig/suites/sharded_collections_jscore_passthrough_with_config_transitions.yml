@@ -191,7 +191,6 @@ selector:
   - requires_profiling
   # Capped collections cannot be sharded
   - requires_capped
-
   # The following tags are excluded specifically for this suite.
   - config_shard_incompatible
   # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
@@ -201,6 +200,9 @@ selector:
   # This suite performs balancing of unsharded collection in background using moveCollection that
   # changes collections UUID
   - assumes_stable_collection_uuid
+  # This suite executes random moveCollections in the background that cause open cursors on the
+  # collection to be killed.
+  - requires_getmore
 
 executor:
   archive:

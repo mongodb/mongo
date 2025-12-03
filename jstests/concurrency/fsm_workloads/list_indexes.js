@@ -3,6 +3,8 @@
  *
  * Checks that the listIndexes command can tolerate concurrent modifications to the
  * index catalog.
+ *  
+ * @tags: [requires_getmore, uses_getmore_outside_of_transaction]
  */
 export const $config = (function() {
     var states = (function() {

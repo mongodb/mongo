@@ -13,6 +13,10 @@ const commandsToRetry = new Set([
     "unshardCollection",
 ]);
 
+// Commands known not to work with migrations so tests can fail immediately with a clear error.
+const kDisallowedCommandsInsideTxns = [];
+const kDisallowedCommandsOutsideTxns = ["getMore"];
+
 const kTimeout = 10 * 60 * 1000;
 const kInterval = 50;  // milliseconds
 
@@ -30,6 +34,18 @@ function hasConflictingMigrationpInProgress(res) {
 function runCommandWithMigrationRetries(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
+    }
+
+    const inTransaction = commandObj.hasOwnProperty("autocommit");
+    const disallowedCommands =
+        inTransaction ? kDisallowedCommandsInsideTxns : kDisallowedCommandsOutsideTxns;
+
+    if (disallowedCommands.includes(commandName)) {
+        throw new Error(`Cowardly refusing to run command ${
+            (inTransaction
+                 ? "inside"
+                 : "outside")} of transaction with random moveCollection in the backgorund ${
+            tojson(commandObj)}`);
     }
 
     let res;

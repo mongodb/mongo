@@ -9,6 +9,8 @@
  *   does_not_support_transactions,
  *   does_not_support_stepdowns,
  *   uses_curop_agg_stage,
+ *   requires_getmore,
+ *   uses_getmore_outside_of_transaction,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

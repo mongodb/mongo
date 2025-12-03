@@ -3,6 +3,10 @@
  *
  * Runs an aggregation with a $match that returns half the documents followed
  * by a $sort on a field containing a random float.
+ * @tags: [
+ *   requires_getmore,
+ *   uses_getmore_outside_of_transaction,
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/agg_base.js";
