@@ -348,7 +348,7 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
         try {
             const auto entry = it.next(opCtx);
 
-            auto stmtIds = entry.getStatementIds();
+            const auto& stmtIds = entry.getStatementIds();
 
             if (isInternalSessionForRetryableWrite(lsid) ||
                 entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
@@ -1155,7 +1155,7 @@ void TransactionParticipant::Participant::beginOrContinue(
         txnNumberAndRetryCounter.setTxnRetryCounter(0);
     }
 
-    // If the request conatined startTransaction, we should always choose to start the transaction.
+    // If the request contained startTransaction, we should always choose to start the transaction.
     // If the request contained startOrContinueTransaction, we should always choose to start the
     // transaction unless the txnNumber and retryCounter are equal to the active txnNumber and
     // retryCounter. In this case, we must decide whether we should start or continue the
@@ -3573,13 +3573,13 @@ TransactionParticipant::Participant::checkStatementExecutedAndFetchOplogEntry(
             std::vector<repl::OplogEntry> innerEntries;
             repl::ApplyOps::extractOperationsTo(entry, entry.getEntry().toBSON(), &innerEntries);
             for (const auto& innerEntry : innerEntries) {
-                auto stmtIds = innerEntry.getStatementIds();
+                const auto& stmtIds = innerEntry.getStatementIds();
                 if (std::find(stmtIds.begin(), stmtIds.end(), stmtId) != stmtIds.end()) {
                     return innerEntry;
                 }
             }
         } else {
-            auto stmtIds = entry.getStatementIds();
+            const auto& stmtIds = entry.getStatementIds();
             invariant(!stmtIds.empty());
             if (std::find(stmtIds.begin(), stmtIds.end(), stmtId) != stmtIds.end()) {
                 return entry;

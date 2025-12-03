@@ -115,7 +115,7 @@ void TransactionOperations::packTransactionStatementsForApplyOps(
     for (auto stmtIter = stmtBegin; stmtIter != stmtEnd; stmtIter++) {
         const auto& stmt = *stmtIter;
         opsArray.append(*operationsIter++);
-        const auto stmtIds = stmt.getStatementIds();
+        const auto& stmtIds = stmt.getStatementIds();
         stmtIdsWritten->insert(stmtIdsWritten->end(), stmtIds.begin(), stmtIds.end());
         stmt.extractPrePostImageForTransaction(imageToWrite);
     }
