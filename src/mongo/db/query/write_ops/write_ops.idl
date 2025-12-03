@@ -37,10 +37,11 @@ imports:
     - "mongo/crypto/fle_field_schema.idl"
     - "mongo/db/auth/access_checks.idl"
     - "mongo/db/auth/action_type.idl"
-    - "mongo/db/session/logical_session_id.idl"
-    - "mongo/db/pipeline/legacy_runtime_constants.idl"
-    - "mongo/db/query/hint.idl"
     - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/legacy_runtime_constants.idl"
+    - "mongo/db/query/client_cursor/cursor_response.idl"
+    - "mongo/db/query/hint.idl"
+    - "mongo/db/session/logical_session_id.idl"
 
 types:
     multi_delete_bool:
@@ -145,6 +146,18 @@ structs:
                 type: IDLAnyTypeOwned
                 stability: stable
 
+    StmtQueryStatsMetrics:
+        description: "Collected metrics for a write statement."
+        fields:
+            index:
+                description: "Index of the statement in the command to which these metrics apply."
+                type: int
+                stability: stable
+            metrics:
+                description: "Metrics regarding a statement's execution."
+                type: CursorMetrics
+                stability: stable
+
     # Note that all fields in this struct must be owned to prevent memory problems during parsing
     # via write_ops.cpp helpers. See SERVER-103148 for more information.
     UpdateCommandReply:
@@ -159,6 +172,11 @@ structs:
                 type: array<Upserted>
                 optional: true
                 stability: stable
+            queryStatsMetrics:
+                description: "Metrics for those statements within the command that request them."
+                type: array<StmtQueryStatsMetrics>
+                optional: true
+                stability: internal
             nModified:
                 description: "Number of updated documents."
                 type: int
@@ -340,6 +358,10 @@ structs:
                     on its own (based on whether the command is retryable or in a transaction)."
                 type: optionalBool
                 cpp_name: allowShardKeyUpdatesWithoutFullShardKeyInQuery
+                stability: internal
+            includeQueryStatsMetrics:
+                description: "When present and true, tells shards to add metrics to response."
+                type: optionalBool
                 stability: internal
 
     DeleteOpEntry:
