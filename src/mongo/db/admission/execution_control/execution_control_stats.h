@@ -36,11 +36,13 @@
 
 #pragma once
 
-namespace mongo::admission::execution_control {
+namespace mongo {
+namespace admission {
+namespace MONGO_MOD_PUBLIC execution_control {
 /**
  * Recollect the number of operations that hold the ticket longer than a defined threshold.
  */
-class MONGO_MOD_PUBLIC DelinquencyStats {
+class DelinquencyStats {
 public:
     DelinquencyStats() = default;
     DelinquencyStats(int64_t, int64_t, int64_t);
@@ -58,7 +60,7 @@ public:
 /**
  * Recollect information about long and short operations on the server.
  */
-class MONGO_MOD_PUBLIC OperationExecutionStats {
+class OperationExecutionStats {
 public:
     OperationExecutionStats() = default;
     OperationExecutionStats(const OperationExecutionStats& other);
@@ -81,4 +83,6 @@ public:
     DelinquencyStats delinquencyStats;
 };
 
-}  // namespace mongo::admission::execution_control
+}  // namespace MONGO_MOD_PUBLIC execution_control
+}  // namespace admission
+}  // namespace mongo

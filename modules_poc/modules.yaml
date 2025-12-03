@@ -408,6 +408,7 @@ admission:
   meta:
     slack: server-workload-resilience
     jira: Workload Scheduling
+    fully_marked: true
   files:
     - src/mongo/db/admission/
     - src/mongo/db/flow_control_ticketholder*
@@ -418,6 +419,7 @@ workload_simulation:
   meta:
     slack: server-workload-resilience
     jira: Workload Scheduling
+    fully_marked: true
   files:
     - src/mongo/tools/workload_simulation/
 
