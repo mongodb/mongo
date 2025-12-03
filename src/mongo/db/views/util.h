@@ -33,12 +33,13 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/views/view.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::view_util {
 /**
  * Throws if the specified document is not a valid view definition.
  */
-void validateViewDefinitionBSON(OperationContext* opCtx,
-                                const BSONObj& viewDefinition,
-                                const DatabaseName& dbName);
+MONGO_MOD_PUBLIC void validateViewDefinitionBSON(OperationContext* opCtx,
+                                                 const BSONObj& viewDefinition,
+                                                 const DatabaseName& dbName);
 }  // namespace mongo::view_util

@@ -34,6 +34,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>
@@ -43,7 +44,7 @@ namespace mongo {
 /**
  * Represents a "view": a virtual collection defined by a query on a collection or another view.
  */
-class ViewDefinition {
+class MONGO_MOD_PUBLIC ViewDefinition {
 public:
     /**
      * In the database 'dbName', create a new view 'viewName' on the view or collection

@@ -37,6 +37,7 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -44,7 +45,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace view_catalog_helpers {
+namespace MONGO_MOD_PUBLIC view_catalog_helpers {
 
 /**
  * Exclusively returns the namespace of the underlying/backing source collection. It does not
@@ -78,5 +79,5 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      boost::optional<BSONObj> timeseriesCollator);
 
-}  // namespace view_catalog_helpers
+}  // namespace MONGO_MOD_PUBLIC view_catalog_helpers
 }  // namespace mongo

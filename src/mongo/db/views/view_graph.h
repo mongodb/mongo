@@ -33,6 +33,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <cstddef>
@@ -54,7 +55,7 @@ class ViewDefinition;
  *
  * This is owned and managed by the ViewCatalog.
  */
-class ViewGraph {
+class MONGO_MOD_PUBLIC ViewGraph {
 public:
     static const int kMaxViewDepth;
     static const int kMaxViewPipelineSizeBytes;

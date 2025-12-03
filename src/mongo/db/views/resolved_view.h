@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/version_context.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
@@ -54,7 +55,7 @@ namespace mongo {
  * Represents a resolved definition, composed of a base collection namespace and a pipeline
  * built from one or more views.
  */
-class ResolvedView final : public ErrorExtraInfo {
+class MONGO_MOD_PUBLIC ResolvedView final : public ErrorExtraInfo {
 public:
     ResolvedView(const NamespaceString& collectionNs,
                  std::vector<BSONObj> pipeline,
