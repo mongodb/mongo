@@ -2518,7 +2518,7 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }) + select({
-        "//bazel/config:build_atlas_enabled": [
+        "//bazel/config:build_atlas_required_settings": [
             "//src/mongo/db/modules/atlas/src/disagg_storage/encryption:sls_log_encryption_manager",
         ],
         "//conditions:default": [],

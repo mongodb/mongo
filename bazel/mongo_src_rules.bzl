@@ -393,7 +393,7 @@ def mongo_cc_library(
         })
     elif "modules/atlas" in native.package_name():
         target_compatible_with += select({
-            "//bazel/config:build_atlas_enabled": [],
+            "//bazel/config:build_atlas_required_settings": [],
             "//conditions:default": ["@platforms//:incompatible"],
         })
 

@@ -22,7 +22,7 @@ generate_config_header(
         },
         "//conditions:default": {},
     }) | select({
-        "//bazel/config:build_atlas_enabled": {
+        "//bazel/config:build_atlas_required_settings": {
             "MONGO_CONFIG_DISAGG_STORAGE": "1",
         },
         "//conditions:default": {},

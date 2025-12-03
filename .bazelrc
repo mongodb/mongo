@@ -489,6 +489,10 @@ common:linux --remote_executor=grpcs://sodalite.cluster.engflow.com
 common:windows --remote_executor=
 common:macos --remote_executor=
 
+# Disable atlas module by default on Windows and MacOS since Atlas is only deployed on Linux
+common:windows --//bazel/config:build_atlas=False
+common:macos --//bazel/config:build_atlas=False
+
 # Enable remote cache (also necessary for remote build execution):
 common --experimental_remote_downloader=grpcs://sodalite.cluster.engflow.com
 common --remote_cache=grpcs://sodalite.cluster.engflow.com
