@@ -61,9 +61,12 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root,
  * Factory function used to create a PlanExplainer for classic multiplanner + SBE execution. It
  * requires a pointer to a classic multiplanner stage from which a classic PlanExplainer can be
  * created.
+ * 'nss' is the NamespaceString for the main collection (the collection the original query was
+ * written against).
  */
 std::unique_ptr<PlanExplainer> make(
     sbe::PlanStage* root,
+    const NamespaceString& nss,
     const stage_builder::PlanStageData* data,
     const QuerySolution* solution,
     bool isMultiPlan,

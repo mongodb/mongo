@@ -1365,8 +1365,8 @@ struct SkipNode : public QuerySolutionNode {
 };
 
 struct GeoNear2DNode : public QuerySolutionNodeWithSortSet {
-    GeoNear2DNode(IndexEntry index)
-        : index(std::move(index)), addPointMeta(false), addDistMeta(false) {}
+    GeoNear2DNode(NamespaceString nss, IndexEntry index)
+        : nss(std::move(nss)), index(std::move(index)), addPointMeta(false), addDistMeta(false) {}
 
     ~GeoNear2DNode() override {}
 
@@ -1387,6 +1387,8 @@ struct GeoNear2DNode : public QuerySolutionNodeWithSortSet {
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
+    NamespaceString nss;
+
     // Not owned here
     const GeoNearExpression* nq;
     IndexBounds baseBounds;
@@ -1397,8 +1399,8 @@ struct GeoNear2DNode : public QuerySolutionNodeWithSortSet {
 };
 
 struct GeoNear2DSphereNode : public QuerySolutionNodeWithSortSet {
-    GeoNear2DSphereNode(IndexEntry index)
-        : index(std::move(index)), addPointMeta(false), addDistMeta(false) {}
+    GeoNear2DSphereNode(NamespaceString nss, IndexEntry index)
+        : nss(std::move(nss)), index(std::move(index)), addPointMeta(false), addDistMeta(false) {}
 
     ~GeoNear2DSphereNode() override {}
 
@@ -1418,6 +1420,8 @@ struct GeoNear2DSphereNode : public QuerySolutionNodeWithSortSet {
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
+
+    NamespaceString nss;
 
     // Not owned here
     const GeoNearExpression* nq;
@@ -1468,7 +1472,8 @@ struct ShardingFilterNode : public QuerySolutionNode {
  * *always* skip over the current key to the next key.
  */
 struct DistinctNode : public QuerySolutionNodeWithSortSet {
-    DistinctNode(IndexEntry index) : index(std::move(index)) {}
+    DistinctNode(NamespaceString nss, IndexEntry index)
+        : nss(std::move(nss)), index(std::move(index)) {}
 
     ~DistinctNode() override {}
 
@@ -1526,6 +1531,8 @@ struct DistinctNode : public QuerySolutionNodeWithSortSet {
         // that share the same plan cache key.
         QuerySolutionNode::hash(std::move(h));
     }
+
+    NamespaceString nss;
 
     IndexEntry index;
     IndexBounds bounds;

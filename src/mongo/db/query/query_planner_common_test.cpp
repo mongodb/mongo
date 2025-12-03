@@ -113,7 +113,8 @@ TEST_F(QueryPlannerCommonTest, ScanDirectionCollScan) {
 }
 
 TEST_F(QueryPlannerCommonTest, ScanDirectionDistinctScan) {
-    DistinctNode node(buildSimpleIndexEntry(fromjson("{a: 1}")));
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    DistinctNode node(testNss, buildSimpleIndexEntry(fromjson("{a: 1}")));
     OrderedIntervalList a{"a"};
     a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         BSON("" << 1 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));

@@ -66,8 +66,11 @@ plan_cache_debug_info::DebugInfo buildDebugInfo(
 /**
  * Builds "DebugInfoSBE" for storing in the SBE plan cache. Pre-computes necessary debugging
  * information to build "PlanExplainerSBE" when recoverying the cached SBE plan from the cache.
+ * 'nss' is the NamespaceString for the main collection (the collection the original query was
+ * written against).
  */
-plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution);
+plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const NamespaceString& nss,
+                                                   const QuerySolution* solution);
 
 /**
  * Updates the classic plan cache from candidates generated using classic planning, but with the

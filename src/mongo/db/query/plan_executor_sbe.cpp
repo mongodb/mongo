@@ -148,6 +148,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     }
 
     _planExplainer = plan_explainer_factory::make(_root.get(),
+                                                  _nss,
                                                   &_rootData,
                                                   querySolutionPtr,  ///< May be a nullptr.
                                                   isMultiPlan,

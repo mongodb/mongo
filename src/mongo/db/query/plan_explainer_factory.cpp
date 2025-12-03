@@ -65,6 +65,7 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root, const PlanEnumeratorExplain
 
 std::unique_ptr<PlanExplainer> make(
     sbe::PlanStage* root,
+    const NamespaceString& nss,
     const stage_builder::PlanStageData* data,
     const QuerySolution* solution,
     bool isMultiPlan,
@@ -75,7 +76,7 @@ std::unique_ptr<PlanExplainer> make(
     RemoteExplainVector* remoteExplains) {
     if (!debugInfoSBE) {
         debugInfoSBE = std::make_shared<const plan_cache_debug_info::DebugInfoSBE>(
-            plan_cache_util::buildDebugInfo(solution));
+            plan_cache_util::buildDebugInfo(nss, solution));
     }
     return std::make_unique<PlanExplainerClassicRuntimePlannerForSBE>(
         root,

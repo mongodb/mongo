@@ -1545,7 +1545,7 @@ void GeoNear2DNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> GeoNear2DNode::clone() const {
-    auto copy = std::make_unique<GeoNear2DNode>(this->index);
+    auto copy = std::make_unique<GeoNear2DNode>(this->nss, this->index);
     cloneBaseData(copy.get());
 
     copy->nq = this->nq;
@@ -1578,7 +1578,7 @@ void GeoNear2DSphereNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> GeoNear2DSphereNode::clone() const {
-    auto copy = std::make_unique<GeoNear2DSphereNode>(this->index);
+    auto copy = std::make_unique<GeoNear2DSphereNode>(this->nss, this->index);
     cloneBaseData(copy.get());
 
     copy->nq = this->nq;
@@ -1633,7 +1633,7 @@ void DistinctNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> DistinctNode::clone() const {
-    auto copy = std::make_unique<DistinctNode>(this->index);
+    auto copy = std::make_unique<DistinctNode>(this->nss, this->index);
     cloneBaseData(copy.get());
 
     copy->direction = this->direction;

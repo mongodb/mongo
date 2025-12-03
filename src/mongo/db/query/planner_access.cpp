@@ -712,7 +712,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
         bool indexIs2D = (BSONType::string == elt.type() && "2d" == elt.String());
 
         if (indexIs2D) {
-            auto ret = std::make_unique<GeoNear2DNode>(index);
+            auto ret = std::make_unique<GeoNear2DNode>(query.nss(), index);
             ret->nq = &nearExpr->getData();
             ret->baseBounds.fields.resize(index.keyPattern.nFields());
             ret->addPointMeta = query.metadataDeps()[DocumentMetadataFields::kGeoNearPoint];
@@ -720,7 +720,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
 
             return ret;
         } else {
-            auto ret = std::make_unique<GeoNear2DSphereNode>(index);
+            auto ret = std::make_unique<GeoNear2DSphereNode>(query.nss(), index);
             ret->nq = &nearExpr->getData();
             ret->baseBounds.fields.resize(index.keyPattern.nFields());
             ret->addPointMeta = query.metadataDeps()[DocumentMetadataFields::kGeoNearPoint];

@@ -173,8 +173,8 @@ void updateSbePlanCache(OperationContext* opCtx,
                         NumReads nReads,
                         const QuerySolution* soln,
                         std::unique_ptr<sbe::CachedSbePlan> cachedPlan) {
-    auto buildDebugInfoFn = [soln]() -> plan_cache_debug_info::DebugInfoSBE {
-        return buildDebugInfo(soln);
+    auto buildDebugInfoFn = [soln, nss = query.nss()]() -> plan_cache_debug_info::DebugInfoSBE {
+        return buildDebugInfo(nss, soln);
     };
     auto printCachedPlanFn = [](const sbe::CachedSbePlan& plan) {
         sbe::DebugPrinter p;
@@ -267,7 +267,7 @@ void updateSbePlanCacheWithPinnedEntry(OperationContext* opCtx,
                 canonical_query_encoder::encodeForPlanCacheCommand(query)),
             std::move(plan),
             opCtx->getServiceContext()->getPreciseClockSource()->now(),
-            buildDebugInfo(&solution),
+            buildDebugInfo(query.nss(), &solution),
             shouldOmitDiagnosticInformation);
         planCacheCounters.incrementSbeCachedPlansEvictedCounter(evictedCount);
     }
@@ -299,7 +299,8 @@ plan_cache_debug_info::DebugInfo buildDebugInfo(
     return {std::move(createdFromQuery), std::move(decision)};
 }
 
-plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution) {
+plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const NamespaceString& nss,
+                                                   const QuerySolution* solution) {
     plan_cache_debug_info::DebugInfoSBE debugInfo;
 
     if (!solution || !solution->root())
@@ -307,6 +308,11 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution
 
     std::queue<const QuerySolutionNode*> queue;
     queue.push(solution->root());
+
+    auto getStatsForNss =
+        [&](const NamespaceString& curr) -> plan_cache_debug_info::CollectionDebugInfoSBE& {
+        return (curr == nss) ? debugInfo.mainStats : debugInfo.secondaryStats[curr];
+    };
 
     // Look through the QuerySolution to collect some static stat details.
     while (!queue.empty()) {
@@ -317,64 +323,66 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution
         switch (node->getType()) {
             case STAGE_COUNT_SCAN: {
                 auto csn = static_cast<const CountScanNode*>(node);
-                debugInfo.mainStats.indexesUsed.push_back(csn->index.identifier.catalogName);
+                getStatsForNss(csn->nss).indexesUsed.push_back(csn->index.identifier.catalogName);
                 break;
             }
             case STAGE_DISTINCT_SCAN: {
                 auto dn = static_cast<const DistinctNode*>(node);
-                debugInfo.mainStats.indexesUsed.push_back(dn->index.identifier.catalogName);
+                getStatsForNss(dn->nss).indexesUsed.push_back(dn->index.identifier.catalogName);
                 break;
             }
             case STAGE_GEO_NEAR_2D: {
                 auto geo2d = static_cast<const GeoNear2DNode*>(node);
-                debugInfo.mainStats.indexesUsed.push_back(geo2d->index.identifier.catalogName);
+                getStatsForNss(geo2d->nss)
+                    .indexesUsed.push_back(geo2d->index.identifier.catalogName);
                 break;
             }
             case STAGE_GEO_NEAR_2DSPHERE: {
                 auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
-                debugInfo.mainStats.indexesUsed.push_back(
-                    geo2dsphere->index.identifier.catalogName);
+                getStatsForNss(geo2dsphere->nss)
+                    .indexesUsed.push_back(geo2dsphere->index.identifier.catalogName);
                 break;
             }
             case STAGE_IXSCAN: {
                 auto ixn = static_cast<const IndexScanNode*>(node);
-                debugInfo.mainStats.indexesUsed.push_back(ixn->index.identifier.catalogName);
+                getStatsForNss(ixn->nss).indexesUsed.push_back(ixn->index.identifier.catalogName);
                 break;
             }
             case STAGE_TEXT_MATCH: {
                 auto tn = static_cast<const TextMatchNode*>(node);
-                debugInfo.mainStats.indexesUsed.push_back(tn->index.identifier.catalogName);
+                getStatsForNss(tn->nss).indexesUsed.push_back(tn->index.identifier.catalogName);
                 break;
             }
             case STAGE_COLLSCAN: {
-                debugInfo.mainStats.collectionScans++;
                 auto csn = static_cast<const CollectionScanNode*>(node);
+                auto& stats = getStatsForNss(csn->nss);
+                stats.collectionScans++;
                 if (!csn->tailable) {
-                    debugInfo.mainStats.collectionScansNonTailable++;
+                    stats.collectionScansNonTailable++;
                 }
                 break;
             }
             case STAGE_EQ_LOOKUP: {
                 auto eln = static_cast<const EqLookupNode*>(node);
-                auto& secondaryStats = debugInfo.secondaryStats[eln->foreignCollection];
+                auto& stats = getStatsForNss(eln->foreignCollection);
                 switch (eln->lookupStrategy) {
                     case EqLookupNode::LookupStrategy::kNonExistentForeignCollection:
                     case EqLookupNode::LookupStrategy::kHashJoin:
                     case EqLookupNode::LookupStrategy::kNestedLoopJoin:
-                        secondaryStats.collectionScans++;
+                        stats.collectionScans++;
                         break;
                     case EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin: {
                         tassert(8155502,
                                 "Dynamic indexed loop join lookup should have an index entry",
                                 eln->idxEntry);
-                        secondaryStats.indexesUsed.push_back(eln->idxEntry->identifier.catalogName);
-                        secondaryStats.collectionScans++;
+                        stats.indexesUsed.push_back(eln->idxEntry->identifier.catalogName);
+                        stats.collectionScans++;
                         break;
                     }
                     case EqLookupNode::LookupStrategy::kIndexedLoopJoin: {
                         tassert(
                             6466200, "Index join lookup should have an index entry", eln->idxEntry);
-                        secondaryStats.indexesUsed.push_back(eln->idxEntry->identifier.catalogName);
+                        stats.indexesUsed.push_back(eln->idxEntry->identifier.catalogName);
                         break;
                     }
                 }

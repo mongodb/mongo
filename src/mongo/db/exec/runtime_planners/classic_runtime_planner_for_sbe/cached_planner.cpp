@@ -228,7 +228,8 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
                                                         maxReadsBeforeReplan);
 
     auto getPlanSummary = [&]() {
-        return plan_cache_util::buildDebugInfo(candidate.solution.get()).planSummary;
+        return plan_cache_util::buildDebugInfo(plannerData.cq->nss(), candidate.solution.get())
+            .planSummary;
     };
 
     if (!candidate.status.isOK()) {

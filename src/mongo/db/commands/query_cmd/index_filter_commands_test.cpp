@@ -349,9 +349,9 @@ private:
         auto decision = createDecision(nWorks);
         auto querySolution = std::make_unique<QuerySolution>();
 
-        auto buildDebugInfoFn = [soln =
-                                     querySolution.get()]() -> plan_cache_debug_info::DebugInfoSBE {
-            return plan_cache_util::buildDebugInfo(soln);
+        auto buildDebugInfoFn =
+            [nss = cq->nss(), soln = querySolution.get()]() -> plan_cache_debug_info::DebugInfoSBE {
+            return plan_cache_util::buildDebugInfo(nss, soln);
         };
         auto printCachedPlanFn = [](const sbe::CachedSbePlan& plan) {
             sbe::DebugPrinter p;

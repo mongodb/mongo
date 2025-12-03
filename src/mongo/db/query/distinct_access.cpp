@@ -281,7 +281,7 @@ std::unique_ptr<QuerySolution> constructCoveredDistinctScan(
         // 'finalizeDistinctScan()', which finalizes the plan by pushing FETCH and SHARDING_FILTER
         // stages to the distinct scan.
         auto dn = std::make_unique<DistinctNode>(
-            plannerParams.mainCollectionInfo.indexes[distinctNodeIndex]);
+            canonicalQuery.nss(), plannerParams.mainCollectionInfo.indexes[distinctNodeIndex]);
         dn->direction = 1;
         IndexBoundsBuilder::allValuesBounds(
             dn->index.keyPattern, &dn->bounds, dn->index.collator != nullptr);
@@ -616,7 +616,7 @@ bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
 
     const int direction = indexScanNode ? indexScanNode->direction : distinctScanNode->direction;
     // Make a new DistinctNode. We will swap this for the ixscan in the provided solution.
-    auto distinctNode = std::make_unique<DistinctNode>(indexEntry);
+    auto distinctNode = std::make_unique<DistinctNode>(canonicalQuery.nss(), indexEntry);
     distinctNode->direction = flipDistinctScanDirection ? -direction : direction;
     distinctNode->bounds = flipDistinctScanDirection ? indexBounds.reverse() : indexBounds;
     distinctNode->queryCollator = queryCollator;
