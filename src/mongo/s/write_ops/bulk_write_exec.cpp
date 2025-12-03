@@ -424,7 +424,11 @@ void executeWriteWithoutShardKey(
             // running errors only in which case we set an empty vector.
             auto items = std::vector<mongo::BulkWriteReplyItem>{};
             if (!bulkWriteOp.getClientRequest().getErrorsOnly()) {
-                items.push_back(BulkWriteReplyItem(0));
+                BulkWriteReplyItem item(0);
+                if (op.getType() == BulkWriteCRUDOp::OpType::kUpdate) {
+                    item.setNModified(0);
+                }
+                items.push_back(std::move(item));
             }
             bulkWriteResponse.setCursor(
                 BulkWriteCommandResponseCursor(0,  // cursorId

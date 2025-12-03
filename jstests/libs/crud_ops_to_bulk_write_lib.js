@@ -198,6 +198,8 @@ export const BulkWriteUtils = (function () {
             response.n += bulkWriteResponse.nInserted;
         } else if (cmd.ops[0].hasOwnProperty("update")) {
             response.n += bulkWriteResponse.nMatched;
+            // 'nModified' field should always exist for an update op.
+            assert(bulkWriteResponse.hasOwnProperty("nModified"), bulkWriteResponse);
             response.nModified += bulkWriteResponse.nModified;
         } else if (cmd.ops[0].hasOwnProperty("delete")) {
             response.n += bulkWriteResponse.nDeleted;
@@ -311,7 +313,9 @@ export const BulkWriteUtils = (function () {
                         resp["writeErrors"].push(writeError);
                     } else {
                         resp.n += current.n;
-                        if (current.hasOwnProperty("nModified")) {
+                        // 'nModified' field should always exist for an update op.
+                        if (resp.hasOwnProperty("nModified")) {
+                            assert(current.hasOwnProperty("nModified"), current);
                             resp.nModified += current.nModified;
                         }
                         if (current.hasOwnProperty("upserted")) {

@@ -151,6 +151,7 @@ BSONObj constructUpsertResponse(BatchedCommandResponse& writeRes,
         BulkWriteReplyItem replyItem(0);
         replyItem.setOk(1);
         replyItem.setN(writeRes.getN());
+        replyItem.setNModified(0);
         replyItem.setUpserted(upsertedId);
         BulkWriteCommandReply bulkWriteReply(
             BulkWriteCommandResponseCursor(
