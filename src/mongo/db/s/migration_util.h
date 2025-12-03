@@ -146,7 +146,7 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
  * Submits an asynchronous task to scan config.migrationCoordinators and drive each unfinished
  * migration coordination to completion.
  */
-MONGO_MOD_PUBLIC void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx);
+MONGO_MOD_PUBLIC void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx, long long term);
 
 /**
  * Instructs the recipient shard to release its critical section.

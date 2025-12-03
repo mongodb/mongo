@@ -415,6 +415,9 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                                                ChunkRange orphanRange,
                                                Date_t deadline) {
     while (true) {
+        const auto rangeDeleterService = RangeDeleterService::get(opCtx);
+        rangeDeleterService->getServiceUpFuture().get(opCtx);
+
         SharedSemiFuture<void> orphanCleanupFuture = [&]() {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             const auto self =
@@ -431,9 +434,6 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                                   "had its metadata reset"))
                     .share();
             }
-
-            const auto rangeDeleterService = RangeDeleterService::get(opCtx);
-            rangeDeleterService->getRangeDeleterServiceInitializationFuture().get(opCtx);
 
             return rangeDeleterService->getOverlappingRangeDeletionsFuture(
                 self->_metadataManager->getCollectionUuid().get(), orphanRange);

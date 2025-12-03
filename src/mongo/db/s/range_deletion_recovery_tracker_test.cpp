@@ -137,4 +137,14 @@ TEST(RangeDeletionRecoveryTracker, EndTermAfterAllJobsComplete) {
     ASSERT_EQ(future.get(), RangeDeletionRecoveryTracker::Outcome::kComplete);
 }
 
+DEATH_TEST(RangeDeletionRecoveryTracker,
+           RegisterJobAfterRecoveryCompleteAsserts,
+           "Tripwire assertion") {
+    const auto term = 0;
+    RangeDeletionRecoveryTracker tracker;
+    tracker.registerRecoveryJob(term);
+    tracker.notifyRecoveryJobComplete(term);
+    tracker.registerRecoveryJob(term);
+}
+
 }  // namespace mongo

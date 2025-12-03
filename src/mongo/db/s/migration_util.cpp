@@ -353,46 +353,62 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
     }
 }
 
-void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
-    LOGV2_DEBUG(4798510, 2, "Starting migration coordinator step-up recovery");
+void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx, long long term) {
+    LOGV2_DEBUG(4798510, 2, "Starting migration coordinator step-up recovery", "term"_attr = term);
 
-    unsigned long long unfinishedMigrationsCount = 0;
+    const auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    std::vector<ExecutorFuture<void>> recoveryFutures;
 
     PersistentTaskStore<MigrationCoordinatorDocument> store(
         NamespaceString::kMigrationCoordinatorsNamespace);
-    store.forEach(opCtx,
-                  BSONObj{},
-                  [&opCtx, &unfinishedMigrationsCount](const MigrationCoordinatorDocument& doc) {
-                      unfinishedMigrationsCount++;
-                      LOGV2_DEBUG(4798511,
-                                  3,
-                                  "Found unfinished migration on step-up",
-                                  "migrationCoordinatorDoc"_attr = redact(doc.toBSON()),
-                                  "unfinishedMigrationsCount"_attr = unfinishedMigrationsCount);
+    store.forEach(
+        opCtx,
+        BSONObj{},
+        [opCtx, term, &executor, &recoveryFutures](const MigrationCoordinatorDocument& doc) {
+            LOGV2_DEBUG(4798511,
+                        3,
+                        "Found unfinished migration on step-up",
+                        "term"_attr = term,
+                        "migrationCoordinatorDoc"_attr = redact(doc.toBSON()),
+                        "unfinishedMigrationsCount"_attr = recoveryFutures.size() + 1);
 
-                      const auto& nss = doc.getNss();
+            const auto& nss = doc.getNss();
 
-                      {
-                          AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-                          CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                              opCtx, nss)
-                              ->clearFilteringMetadata(opCtx);
-                      }
+            {
+                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
+                    ->clearFilteringMetadata(opCtx);
+            }
 
-                      asyncRecoverMigrationUntilSuccessOrStepDown(opCtx, nss)
-                          .thenRunOn(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
-                          .getAsync([](auto) {});
+            recoveryFutures.emplace_back(
+                asyncRecoverMigrationUntilSuccessOrStepDown(opCtx, nss).thenRunOn(executor));
 
-                      return true;
-                  });
+            return true;
+        });
 
     ShardingStatistics::get(opCtx).unfinishedMigrationFromPreviousPrimary.store(
-        unfinishedMigrationsCount);
+        recoveryFutures.size());
 
     LOGV2_DEBUG(4798513,
                 2,
-                "Finished migration coordinator step-up recovery",
-                "unfinishedMigrationsCount"_attr = unfinishedMigrationsCount);
+                "Finished scheduling migration coordinator step-up recovery tasks",
+                "term"_attr = term,
+                "unfinishedMigrationsCount"_attr = recoveryFutures.size());
+
+    [&executor, futures = std::move(recoveryFutures)]() mutable {
+        if (futures.empty()) {
+            return ExecutorFuture{executor};
+        }
+        return whenAll(std::move(futures)).ignoreValue().thenRunOn(executor);
+    }()
+        .onCompletion([term](const auto&) {
+            RangeDeleterService::get(getGlobalServiceContext())->notifyRecoveryJobComplete(term);
+            LOGV2_DEBUG(11420100,
+                        2,
+                        "Finished all migration coordinator step-up recovery tasks",
+                        "term"_attr = term);
+        })
+        .getAsync([](const auto&) {});
 }
 
 ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(

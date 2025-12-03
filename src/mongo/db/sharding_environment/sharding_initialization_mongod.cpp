@@ -688,6 +688,15 @@ void ShardingInitializationMongoD::onStepUpBegin(OperationContext* opCtx, long l
                 [&]() -> bool { return _isPrimary.load(); });
         });
     }
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
+        ShardingState::get(opCtx)->enabled()) {
+        // Register a recovery job with the RangeDeleterService if we will later call
+        // migrationutil::resumeMigrationCoordinationsOnStepUp() in onStepUpComplete().
+        // MigrationCoordinators may register range deletion tasks, and it's important that all
+        // tasks are recovered before any tasks are processed to avoid the issue seen in
+        // SERVER-110796.
+        RangeDeleterService::get(opCtx)->registerRecoveryJob(term);
+    }
 }
 
 void ShardingInitializationMongoD::onStepUpComplete(OperationContext* opCtx, long long term) {
@@ -759,7 +768,7 @@ void ShardingInitializationMongoD::onStepUpComplete(OperationContext* opCtx, lon
             // Note, these must be done after the configTime is recovered via
             // VectorClockMutable::recoverDirect above, because they may trigger filtering metadata
             // refreshes which should use the recovered configTime.
-            migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
+            migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx, term);
             migrationutil::resumeMigrationRecipientsOnStepUp(opCtx);
 
             const bool scheduleAsyncRefresh = true;

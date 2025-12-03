@@ -666,7 +666,7 @@ public:
         RangeDeleterService::get(opCtx)->onStartup(opCtx);
         RangeDeleterService::get(opCtx)->onStepUpBegin(opCtx, 0L);
         RangeDeleterService::get(opCtx)->onStepUpComplete(opCtx, 0L);
-        RangeDeleterService::get(opCtx)->getRangeDeleterServiceInitializationFuture().get(opCtx);
+        RangeDeleterService::get(opCtx)->getServiceUpFuture().get(opCtx);
     }
 
     void tearDown() override {

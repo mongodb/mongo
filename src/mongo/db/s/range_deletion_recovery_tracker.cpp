@@ -63,6 +63,9 @@ void RangeDeletionRecoveryTracker::registerRecoveryJob(Term term) {
     if (!state) {
         return;
     }
+    tassert(11420101,
+            "Recovery job already completed",
+            !state->recoveryCompletePromise.getFuture().isReady());
     auto& count = state->remainingJobCount;
     count = count.value_or(0) + 1;
 }

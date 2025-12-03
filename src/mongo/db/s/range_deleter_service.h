@@ -90,9 +90,11 @@ private:
     enum State { kReadyForInitialization, kInitializing, kUp, kDown };
 
     State _state{kDown};
+    // Promise which is fulfilled once initialization for the current term has completed.
+    boost::optional<SharedPromise<void>> _termInitializationPromise;
+    // Promise which is fulfilled when the state changes to kUp.
+    boost::optional<SharedPromise<void>> _serviceUpPromise;
 
-    // Future markes as ready when the state changes to "up"
-    SharedSemiFuture<void> _stepUpCompletedFuture;
     // Operation context used for initialization
     ServiceContext::UniqueOperationContext _initOpCtxHolder;
 
@@ -117,13 +119,15 @@ public:
     void registerRecoveryJob(long long term);
     void notifyRecoveryJobComplete(long long term);
 
+    enum class TaskPending { kNotPending, kPending };
+
     /*
      * Register a task on the range deleter service.
      * Returns a future that will be marked ready once the range deletion will be completed.
      *
      * In case of trying to register an already existing task, the original future will be returned.
      *
-     * A task can be registered only if the service is up (except for tasks resubmitted on step-up).
+     * A task can be registered only if the service has been initialized for this term.
      *
      * When a task is registered as `pending`, it can be unblocked by calling again the same method
      * with `pending=false`.
@@ -131,8 +135,7 @@ public:
     SharedSemiFuture<void> registerTask(
         const RangeDeletionTask& rdt,
         SemiFuture<void>&& waitForActiveQueriesToComplete = SemiFuture<void>::makeReady(),
-        bool fromResubmitOnStepUp = false,
-        bool pending = false);
+        TaskPending pending = TaskPending::kNotPending);
 
     /*
      * Deregister a task from the range deleter service and fulfill its completion promise. Returns
@@ -182,14 +185,18 @@ public:
      */
     MONGO_MOD_NEEDS_REPLACEMENT long long totalNumOfRegisteredTasks();
 
-    /* Returns a shared semi-future marked as ready once the service is initialized */
-    SharedSemiFuture<void> getRangeDeleterServiceInitializationFuture() {
-        return _stepUpCompletedFuture;
-    }
+    /* Returns a future which is fulfilled when the service is initialized for the current term. */
+    SemiFuture<void> getTermInitializationFuture();
+
+    /* Returns a future which is fulfilled when the service has reached the kUp state and is
+     * actively processing ready tasks. */
+    SemiFuture<void> getServiceUpFuture();
 
     std::unique_ptr<ReadyRangeDeletionsProcessor> _readyRangeDeletionsProcessorPtr;
 
 private:
+    SemiFuture<void> _getTermInitializationFuture(WithLock);
+
     /* Join all threads and executor and reset the in memory state of the service
      * Used for onStartUpBegin and on onShutdown
      */

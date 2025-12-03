@@ -128,7 +128,7 @@ SharedSemiFuture<void> registerAndCreatePersistentTask(
 
     // Register task as `pending` in order to block it until the persistent document is non-pending
     auto completionFuture = rds->registerTask(
-        rdt, std::move(waitForActiveQueriesToComplete), false /* fromStepUp */, true /* pending*/);
+        rdt, std::move(waitForActiveQueriesToComplete), RangeDeleterService::TaskPending::kPending);
 
     // Range deletion task will only proceed if persistent doc exists and its `pending` field
     // doesn't exist

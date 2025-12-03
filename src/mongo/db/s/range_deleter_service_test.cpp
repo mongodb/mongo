@@ -75,7 +75,7 @@ constexpr auto kStartingTerm = 0L;
 void simulateStepup(OperationContext* opCtx, long long term) {
     RangeDeleterService::get(opCtx)->onStepUpBegin(opCtx, term);
     RangeDeleterService::get(opCtx)->onStepUpComplete(opCtx, term);
-    RangeDeleterService::get(opCtx)->getRangeDeleterServiceInitializationFuture().get(opCtx);
+    RangeDeleterService::get(opCtx)->getServiceUpFuture().get(opCtx);
 }
 }  // namespace
 
@@ -326,7 +326,7 @@ TEST_F(RangeDeleterServiceTest, NoActionPossibleIfServiceIsDown) {
                                         taskWithOngoingQueries->getTask(),
                                         taskWithOngoingQueries->getOngoingQueriesFuture()),
         DBException,
-        ErrorCodes::NotYetInitialized);
+        ErrorCodes::NotWritablePrimary);
 
     ASSERT_THROWS_CODE(rds->completeTask(taskWithOngoingQueries->getTask().getCollectionUuid(),
                                          taskWithOngoingQueries->getTask().getRange()),
@@ -880,8 +880,7 @@ TEST_F(RangeDeleterServiceTest, RegisterPendingTaskAndMarkItNonPending) {
     // Register task as pending (will not be processed until someone registers it again as !pending)
     auto completionFuture = rds->registerTask(taskWithOngoingQueries->getTask(),
                                               taskWithOngoingQueries->getOngoingQueriesFuture(),
-                                              false /* from step up*/,
-                                              true /* pending */);
+                                              RangeDeleterService::TaskPending::kPending);
 
     ASSERT(!completionFuture.isReady());
 
@@ -947,17 +946,89 @@ TEST_F(RangeDeleterServiceTest, ProcessingFlagIsSetWhenRangeDeletionExecutionSta
     ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 }
 
-TEST_F(RangeDeleterServiceTest, InitializationFutureWaitsForRecovery) {
+TEST_F(RangeDeleterServiceTest, TermInitializationFutureThrowsWhenServiceDown) {
+    auto rds = RangeDeleterService::get(opCtx);
+    rds->onStepDown();
+
+    ASSERT_THROWS_CODE(
+        rds->getTermInitializationFuture(), DBException, ErrorCodes::NotWritablePrimary);
+}
+
+TEST_F(RangeDeleterServiceTest, ServiceUpFutureThrowsWhenServiceDown) {
+    auto rds = RangeDeleterService::get(opCtx);
+    rds->onStepDown();
+
+    ASSERT_THROWS_CODE(rds->getServiceUpFuture(), DBException, ErrorCodes::NotWritablePrimary);
+}
+
+TEST_F(RangeDeleterServiceTest, ServiceUpFutureFulfilledOnStepdown) {
     auto rds = RangeDeleterService::get(opCtx);
     rds->onStepDown();
     const auto term = kStartingTerm + 1;
     rds->onStepUpBegin(opCtx, term);
     rds->registerRecoveryJob(term);
     rds->onStepUpComplete(opCtx, term);
-    auto future = rds->getRangeDeleterServiceInitializationFuture();
+
+    auto future = rds->getServiceUpFuture();
     ASSERT(!future.isReady());
+
+    rds->onStepDown();
+
+    ASSERT_EQ(future.getNoThrow(opCtx).code(), ErrorCodes::PrimarySteppedDown);
+}
+
+TEST_F(RangeDeleterServiceTest, TermInitializationFutureFulfilledOnStepdown) {
+    auto rds = RangeDeleterService::get(opCtx);
+    rds->onStepDown();
+    const auto term = kStartingTerm + 1;
+    rds->onStepUpBegin(opCtx, term);
+
+    auto future = rds->getTermInitializationFuture();
+    ASSERT(!future.isReady());
+
+    rds->onStepDown();
+
+    ASSERT_EQ(future.getNoThrow(opCtx).code(), ErrorCodes::PrimarySteppedDown);
+}
+
+TEST_F(RangeDeleterServiceTest, TermInitializationReadyBeforeServiceUp) {
+    auto rds = RangeDeleterService::get(opCtx);
+    rds->onStepDown();
+    const auto term = kStartingTerm + 1;
+    rds->onStepUpBegin(opCtx, term);
+    rds->registerRecoveryJob(term);
+    rds->onStepUpComplete(opCtx, term);
+
+    auto termInitFuture = rds->getTermInitializationFuture();
+    auto serviceUpFuture = rds->getServiceUpFuture();
+
+    ASSERT_OK(termInitFuture.getNoThrow(opCtx));
+    ASSERT(!serviceUpFuture.isReady());
+
     rds->notifyRecoveryJobComplete(term);
-    ASSERT_OK(future.getNoThrow(opCtx));
+
+    ASSERT_OK(serviceUpFuture.getNoThrow(opCtx));
+}
+
+TEST_F(RangeDeleterServiceTest, RegisterTaskSucceedsDuringRecoveryPhase) {
+    auto rds = RangeDeleterService::get(opCtx);
+    rds->onStepDown();
+    const auto term = kStartingTerm + 1;
+    rds->onStepUpBegin(opCtx, term);
+    rds->registerRecoveryJob(term);
+    rds->onStepUpComplete(opCtx, term);
+
+    ASSERT_OK(rds->getTermInitializationFuture().getNoThrow());
+    ASSERT(!rds->getServiceUpFuture().isReady());
+
+    auto task = createRangeDeletionTask(uuidCollA, BSON(kShardKey << 0), BSON(kShardKey << 10));
+    auto ignore = rds->registerTask(
+        task, SemiFuture<void>::makeReady(), RangeDeleterService::TaskPending::kPending);
+
+    rds->notifyRecoveryJobComplete(term);
+    ASSERT_OK(rds->getServiceUpFuture().getNoThrow(opCtx));
+
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 }
 
 }  // namespace mongo
