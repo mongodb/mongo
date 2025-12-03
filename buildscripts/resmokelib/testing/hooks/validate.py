@@ -209,6 +209,7 @@ def validate_database(
             "checkBSONConformance": True,
             # TODO (SERVER-24266): Always enforce fast counts, once they are always accurate
             "enforceFastCount": not skipEnforceFastCountOnValidate,
+            "collHash": True,
         }
 
         # Don't run validate on view namespaces.

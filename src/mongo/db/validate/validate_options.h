@@ -126,8 +126,7 @@ public:
     bool isFullValidation() const {
         return _validateMode == ValidateMode::kForegroundFull ||
             _validateMode == ValidateMode::kForegroundFullCheckBSON ||
-            _validateMode == ValidateMode::kForegroundFullEnforceFastCount ||
-            _validateMode == ValidateMode::kCollectionHash;
+            _validateMode == ValidateMode::kForegroundFullEnforceFastCount;
     }
 
     bool isFullIndexValidation() const {

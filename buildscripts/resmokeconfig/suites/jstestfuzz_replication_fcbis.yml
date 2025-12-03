@@ -23,6 +23,7 @@ executor:
         global_vars:
           TestData:
             skipValidationOnInvalidViewDefinitions: true
+            skipEnforceFastCountOnValidate: true
   fixture:
     class: ReplicaSetFixture
     mongod_options:

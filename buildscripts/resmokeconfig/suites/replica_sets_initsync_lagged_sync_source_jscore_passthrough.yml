@@ -36,6 +36,10 @@ executor:
         nodb: ""
     - class: BackgroundInitialSync
       n: *run_hook_interval
+      shell_options:
+        global_vars:
+          TestData:
+            skipEnforceFastCountOnValidate: true
     - class: CleanEveryN
       n: *run_hook_interval
   fixture:
