@@ -80,6 +80,7 @@ selector:
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_mirror_reads.js
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_update_shard_key.js
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_write_concern_errors_unsharded.js
+    - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_write_concern_errors_sharded.js
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle_tassert_log_omit.js
 
     - jstests/sharding/migration_blocking_operation/mongos_calls_shardsvr_coordinate_multi_update_command.js
