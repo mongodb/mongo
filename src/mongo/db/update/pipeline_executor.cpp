@@ -89,7 +89,7 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
 
     _expCtx->setResolvedNamespaces(resolvedNamespaces);
     _expCtx->startExpressionCounters();
-    _pipeline = Pipeline::parse(pipeline, _expCtx);
+    _pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, _expCtx);
     _expCtx->stopExpressionCounters();
 
     // Validate the update pipeline.

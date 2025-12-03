@@ -111,8 +111,8 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
                       .build();
 
     try {
-        auto pipeline =
-            Pipeline::parse(viewDef.pipeline(), std::move(expCtx), [&](const Pipeline& pipeline) {
+        auto pipeline = Pipeline::parseFromLiteParsed(
+            liteParsedPipeline, std::move(expCtx), [&](const Pipeline& pipeline) {
                 // Validate that the view pipeline does not contain any ineligible stages.
                 const auto& sources = pipeline.getSources();
                 const auto firstPersistentStage =

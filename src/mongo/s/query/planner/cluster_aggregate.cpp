@@ -405,9 +405,9 @@ std::vector<BSONObj> patchPipelineForTimeSeriesQuery(
  */
 std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     OperationContext* opCtx,
-    const stdx::unordered_set<NamespaceString>& involvedNamespaces,
     const ClusterAggregate::Namespaces& nsStruct,
     AggregateCommandRequest& request,
+    const LiteParsedPipeline& liteParsedPipeline,
     boost::optional<CollectionRoutingInfo> cri,
     bool hasChangeStream,
     bool shouldDoFLERewrite,
@@ -440,7 +440,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
                               nsStruct.requestedNss,
                               collationObj,
                               boost::none /* uuid */,
-                              resolveInvolvedNamespaces(involvedNamespaces),
+                              resolveInvolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces()),
                               hasChangeStream,
                               verbosity,
                               collationMatchesDefault);
@@ -457,11 +457,11 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     if (resolvedView && originalRequest) {
         const auto& viewName = nsStruct.requestedNss;
         // If applicable, ensure that the resolved namespace is added to the resolvedNamespaces map
-        // on the expCtx before calling Pipeline::parse(). This is necessary for search on views as
-        // Pipeline::parse() will first check if a view exists directly on the stage specification
-        // and if none is found, will then check for the view using the expCtx. As such, it's
-        // necessary to add the resolved namespace to the expCtx prior to any call to
-        // Pipeline::parse().
+        // on the expCtx before calling parseFromLiteParsed(). This is necessary for search on views
+        // as parseFromLiteParsed() will first check if a view exists directly on the stage
+        // specification and if none is found, will then check for the view using the expCtx. As
+        // such, it's necessary to add the resolved namespace to the expCtx prior to any call to
+        // parseFromLiteParsed().
         search_helpers::checkAndSetViewOnExpCtx(
             expCtx, originalRequest->getPipeline(), *resolvedView, viewName);
 
@@ -520,7 +520,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         }
     }
 
-    auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+    auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx);
     if (cri && cri->hasRoutingTable()) {
         pipeline->validateWithCollectionMetadata(cri.get());
     }
@@ -532,7 +532,11 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // Compute QueryShapeHash and record it in CurOp.
     query_shape::DeferredQueryShape deferredShape{[&]() {
         return shape_helpers::tryMakeShape<query_shape::AggCmdShape>(
-            request, nsStruct.executionNss, involvedNamespaces, *pipeline, expCtx);
+            request,
+            nsStruct.executionNss,
+            liteParsedPipeline.getInvolvedNamespaces(),
+            *pipeline,
+            expCtx);
     }};
     auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
         return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nsStruct.executionNss);
@@ -555,10 +559,11 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
             [&]() {
                 uassertStatusOKWithContext(deferredShape->getStatus(),
                                            "Failed to compute query shape");
-                return std::make_unique<query_stats::AggKey>(expCtx,
-                                                             request,
-                                                             std::move(deferredShape->getValue()),
-                                                             std::move(involvedNamespaces));
+                return std::make_unique<query_stats::AggKey>(
+                    expCtx,
+                    request,
+                    std::move(deferredShape->getValue()),
+                    std::move(liteParsedPipeline.getInvolvedNamespaces()));
             },
             hasChangeStream);
     }
@@ -607,9 +612,9 @@ Status _parseQueryStatsAndReturnEmptyResult(
     try {
         auto pipeline =
             parsePipelineAndRegisterQueryStats(opCtx,
-                                               liteParsedPipeline.getInvolvedNamespaces(),
                                                namespaces,
                                                request,
+                                               liteParsedPipeline,
                                                boost::none /* CollectionRoutingInfo */,
                                                hasChangeStream,
                                                shouldDoFLERewrite,
@@ -746,9 +751,9 @@ Status runAggregateImpl(OperationContext* opCtx,
         [&]() -> std::tuple<std::unique_ptr<Pipeline>, boost::intrusive_ptr<ExpressionContext>> {
         auto pipeline =
             parsePipelineAndRegisterQueryStats(opCtx,
-                                               involvedNamespaces,
                                                namespaces,
                                                request,
+                                               liteParsedPipeline,
                                                cri,
                                                hasChangeStream,
                                                shouldDoFLERewrite,
