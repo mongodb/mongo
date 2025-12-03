@@ -125,8 +125,9 @@ const std::error_category& pcreCategory() noexcept {
 namespace detail {
 
 
-// Global.
-inline constexpr size_t kMaxPatternLength = 16384;
+// Maximum length of the pattern accepted by PCRE2, in bytes. The effectively usable pattern length
+// may be less than this value.
+constexpr size_t kMaxPatternLength = 32764;
 
 /** Wrapper around a pcre2_compile_context. */
 class CompileContext {
