@@ -66,6 +66,10 @@ public:
         return SamplingEstimatorImpl::matches(oil, val);
     }
 
+    static std::vector<BSONObj> getIndexKeys(const IndexBounds& bounds, const BSONObj& doc) {
+        return SamplingEstimatorImpl::getIndexKeys(bounds, doc);
+    }
+
     // Help function to compute the margin of error for the given sample size. The z parameter
     // corresponds to the confidence %.
     double marginOfError(double z) {
@@ -296,9 +300,4 @@ void printResult(DataConfiguration dataConfig,
  */
 IndexBounds getIndexBounds(const QueryConfiguration& queryConfig,
                            std::vector<std::pair<stats::SBEValue, stats::SBEValue>>& intervals);
-
-
-size_t numberKeysMatch(const IndexBounds& bounds,
-                       const BSONObj& document,
-                       bool skipDuplicateMatches = false);
 }  // namespace mongo::ce
