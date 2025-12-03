@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/query/compiler/rewrites/boolean_simplification/bitset_algebra.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -38,9 +39,10 @@
 
 namespace mongo::boolean_simplification {
 /**
- * The list of original minterms covered by a derived minterm (a.k.a. prime implicant).
+ * A bitset whose set bits correspond to those original minterms covered by a derived minterm
+ * (a.k.a. prime implicant).
  */
-using CoveredOriginalMinterms = absl::InlinedVector<uint32_t, 2>;
+using CoveredOriginalMinterms = DynamicBitset<size_t, 2>;
 
 /**
  * Represents a list of prime implicants, identified by their indices.

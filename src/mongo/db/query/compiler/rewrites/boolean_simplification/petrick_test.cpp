@@ -41,14 +41,14 @@ namespace mongo::boolean_simplification {
  * (https://en.wikipedia.org/w/index.php?title=Petrick%27s_method&oldid=1142937196) and can be found
  * in a number of publications as well.
  */
-TEST(PetrickTest, ClaassicExample) {
+TEST(PetrickTest, ClassicExample) {
     std::vector<CoveredOriginalMinterms> data{
-        {0, 1},
-        {0, 3},
-        {1, 2},
-        {3, 4},
-        {2, 5},
-        {4, 5},
+        CoveredOriginalMinterms{"000011"},
+        CoveredOriginalMinterms{"001001"},
+        CoveredOriginalMinterms{"000110"},
+        CoveredOriginalMinterms{"011000"},
+        CoveredOriginalMinterms{"100100"},
+        CoveredOriginalMinterms{"110000"},
     };
 
     std::vector<PrimeImplicantIndices> expectedResult{
@@ -65,9 +65,9 @@ TEST(PetrickTest, ClaassicExample) {
 
 TEST(PetrickTest, OneCoverage) {
     std::vector<CoveredOriginalMinterms> data{
-        {1, 2, 3},
-        {3, 4},
-        {0, 4, 5},
+        CoveredOriginalMinterms{"001110"},
+        CoveredOriginalMinterms{"011000"},
+        CoveredOriginalMinterms{"110001"},
     };
 
     std::vector<PrimeImplicantIndices> expectedResult{
@@ -80,9 +80,9 @@ TEST(PetrickTest, OneCoverage) {
 
 TEST(PetrickTest, TwoCoverages) {
     std::vector<CoveredOriginalMinterms> data{
-        {0, 1, 2},
-        {2, 3},
-        {0, 3},
+        CoveredOriginalMinterms{"0111"},
+        CoveredOriginalMinterms{"1100"},
+        CoveredOriginalMinterms{"1001"},
     };
 
     std::vector<PrimeImplicantIndices> expectedResult{
@@ -96,10 +96,10 @@ TEST(PetrickTest, TwoCoverages) {
 
 TEST(PetrickTest, NoSimplifications) {
     std::vector<CoveredOriginalMinterms> data{
-        {0},
-        {1},
-        {2},
-        {3},
+        CoveredOriginalMinterms{"0001"},
+        CoveredOriginalMinterms{"0010"},
+        CoveredOriginalMinterms{"0100"},
+        CoveredOriginalMinterms{"1000"},
     };
 
     std::vector<PrimeImplicantIndices> expectedResult{
@@ -112,12 +112,12 @@ TEST(PetrickTest, NoSimplifications) {
 
 TEST(PetrickTest, ManyEssentialsWithSimplifications) {
     std::vector<CoveredOriginalMinterms> data{
-        {0, 1, 2},
-        {2, 3},
-        {0, 3},
-        {4},
-        {5},
-        {6},
+        CoveredOriginalMinterms{"0000111"},
+        CoveredOriginalMinterms{"0001100"},
+        CoveredOriginalMinterms{"0001001"},
+        CoveredOriginalMinterms{"0010000"},
+        CoveredOriginalMinterms{"0100000"},
+        CoveredOriginalMinterms{"1000000"},
     };
 
     std::vector<PrimeImplicantIndices> expectedResult{
@@ -130,15 +130,13 @@ TEST(PetrickTest, ManyEssentialsWithSimplifications) {
 }
 
 TEST(PetrickTest, ReorderingMultipleEssentialsWithSimplifications) {
-    std::vector<CoveredOriginalMinterms> data{
-        {0},
-        {1, 2, 3},
-        {3, 6},
-        {3, 4, 5},
-        {1, 3, 4},
-        {4, 6},
-        {3, 4},
-    };
+    std::vector<CoveredOriginalMinterms> data{CoveredOriginalMinterms{"0000001"},
+                                              CoveredOriginalMinterms{"0001110"},
+                                              CoveredOriginalMinterms{"1001000"},
+                                              CoveredOriginalMinterms{"0111000"},
+                                              CoveredOriginalMinterms{"0011010"},
+                                              CoveredOriginalMinterms{"1010000"},
+                                              CoveredOriginalMinterms{"0011000"}};
 
     std::vector<PrimeImplicantIndices> expectedResult{
         {0, 1, 2, 3},
@@ -151,7 +149,7 @@ TEST(PetrickTest, ReorderingMultipleEssentialsWithSimplifications) {
 
 TEST(PetrickTest, OneMinterm) {
     std::vector<CoveredOriginalMinterms> data{
-        {0},
+        CoveredOriginalMinterms{"1"},
     };
 
     std::vector<PrimeImplicantIndices> expectedResult{

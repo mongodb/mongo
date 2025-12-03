@@ -37,7 +37,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
-#include <memory>
 
 namespace mongo::boolean_simplification {
 namespace {
@@ -50,9 +49,10 @@ struct MintermData {
 
     Minterm minterm;
 
-    // List of indices of original input minterms which are "covered" by the current derived
-    // minterm. The original minterm is covered by all minterms which are produced
-    // by combinations of the original minterm.
+    // Bitset where each bit corresponds to the index of one original input minterm. A bit is set
+    // when its corresponding minterm is "covered" by the current derived minterm. Note that the
+    // original minterm is covered by all minterms which are produced by combinations of the
+    // original minterm.
     CoveredOriginalMinterms coveredMinterms;
 
     // Set to true for minterms which are combination of at least two other minterms.
@@ -78,7 +78,10 @@ struct QmcTable {
         table.resize(size);
 
         for (uint32_t i = 0; i < static_cast<uint32_t>(minterms.size()); ++i) {
-            insert(std::move(minterms[i]), CoveredOriginalMinterms{i});
+            // The current minterm must cover itself.
+            CoveredOriginalMinterms coveredMinterms{minterms.size()};
+            coveredMinterms.set(i);
+            insert(std::move(minterms[i]), std::move(coveredMinterms));
         }
     }
 
@@ -98,7 +101,7 @@ struct QmcTable {
         return table.size();
     }
 
-    // List of minterms origanized by number of true predicates.
+    // Table of minterms where each row has minterms with the same number of true predicates.
     std::vector<std::vector<MintermData>> table;
 };
 
@@ -125,21 +128,13 @@ QmcTable combine(QmcTable& qmc) {
                     lhs.combined = true;
                     rhs.combined = true;
 
-                    CoveredOriginalMinterms coveredMinterms{};
-                    coveredMinterms.reserve(lhs.coveredMinterms.size() +
-                                            rhs.coveredMinterms.size());
-                    std::merge(begin(lhs.coveredMinterms),
-                               end(lhs.coveredMinterms),
-                               begin(rhs.coveredMinterms),
-                               end(rhs.coveredMinterms),
-                               back_inserter(coveredMinterms));
                     // Main QMC step: Adding the new combined minterm which is a combination of two
                     // minterms which have the same masks and the number of set bits in the
                     // predicates differs by 1. Now we can use this minterm only instead of the two
                     // originals. It unsets the differing bit from the mask.
                     result.insert(Minterm{lhs.minterm.predicates & rhs.minterm.predicates,
                                           lhs.minterm.mask & ~differentBits},
-                                  std::move(coveredMinterms));
+                                  lhs.coveredMinterms | rhs.coveredMinterms);
                 }
             }
         }

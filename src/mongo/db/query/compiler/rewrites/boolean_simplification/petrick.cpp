@@ -34,7 +34,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/util/dynamic_bitset.h"
 
-#include <memory>
 #include <utility>
 
 namespace mongo::boolean_simplification {
@@ -211,7 +210,8 @@ public:
     explicit TabularPetrick(const std::vector<CoveredOriginalMinterms>& data)
         : _numberOfBits(data.size()), _essentialImplicants(PrimeImplicant(data.size())) {
         for (size_t implicantIndex = 0; implicantIndex < data.size(); ++implicantIndex) {
-            for (auto mintermIndex : data[implicantIndex]) {
+            for (auto mintermIndex = data[implicantIndex].findFirst(); mintermIndex != Bitset::npos;
+                 mintermIndex = data[implicantIndex].findNext(mintermIndex)) {
                 insert(mintermIndex, implicantIndex);
             }
         }
