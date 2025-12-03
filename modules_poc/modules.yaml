@@ -804,6 +804,7 @@ disagg_storage:
   meta:
     slack: disaggregated-storage-mongod
     jira: RSSD
+    fully_marked: true
   files:
     - src/mongo/db/modules/atlas/src/disagg_storage
 
@@ -811,6 +812,7 @@ disagg_storage.encryption:
   meta:
     slack: disagg-security-data-encryption
     jira: Server Security
+    fully_marked: true
   files:
     - src/mongo/db/modules/atlas/src/disagg_storage/encryption
 
