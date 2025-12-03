@@ -201,7 +201,7 @@ UserWritesRecoverableCriticalSectionService* UserWritesRecoverableCriticalSectio
 
 const ReplicaSetAwareServiceRegistry::Registerer<UserWritesRecoverableCriticalSectionService>
     UserWritesRecoverableCriticalSectionServiceServiceRegisterer(
-        "UserWritesRecoverableCriticalSectionService");
+        "UserWritesRecoverableCriticalSectionService", {"ShardingInitializationMongoDRegistry"});
 
 bool UserWritesRecoverableCriticalSectionService::shouldRegisterReplicaSetAwareService() const {
     return serverGlobalParams.clusterRole.has(ClusterRole::None) ||

@@ -461,7 +461,7 @@ MONGO_FAIL_POINT_DEFINE(migrationRecipientFailPostCommitRefresh);
 }  // namespace
 
 const ReplicaSetAwareServiceRegistry::Registerer<MigrationDestinationManager> mdmRegistry(
-    "MigrationDestinationManager");
+    "MigrationDestinationManager", {"ShardingInitializationMongoDRegistry"});
 
 MigrationDestinationManager::MigrationDestinationManager() = default;
 

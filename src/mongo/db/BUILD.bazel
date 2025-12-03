@@ -747,6 +747,7 @@ mongo_cc_unit_test(
         ":commands",
         ":service_context_test_fixture",
         "//src/mongo/db/commands:standalone",
+        "//src/mongo/db/sharding_environment:unittest_noop_sharding_initialization_mongod",
     ],
 )
 

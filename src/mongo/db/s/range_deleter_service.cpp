@@ -91,7 +91,8 @@ const auto rangeDeleterServiceDecorator = ServiceContext::declareDecoration<Rang
 }  // namespace
 
 const ReplicaSetAwareServiceRegistry::Registerer<RangeDeleterService>
-    rangeDeleterServiceRegistryRegisterer("RangeDeleterService");
+    rangeDeleterServiceRegistryRegisterer("RangeDeleterService",
+                                          {"ShardingInitializationMongoDRegistry"});
 
 RangeDeleterService* RangeDeleterService::get(ServiceContext* serviceContext) {
     return &rangeDeleterServiceDecorator(serviceContext);

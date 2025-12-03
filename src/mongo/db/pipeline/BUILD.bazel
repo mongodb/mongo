@@ -1044,6 +1044,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:change_stream_pre_images_collection_manager",
+        "//src/mongo/db/repl:replica_set_aware_service",
         "//src/mongo/db/shard_role",
         "//src/mongo/util:periodic_runner",
     ],

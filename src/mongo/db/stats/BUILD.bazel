@@ -204,6 +204,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/db/sharding_environment:unittest_noop_sharding_initialization_mongod",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:clock_source_mock",
     ],

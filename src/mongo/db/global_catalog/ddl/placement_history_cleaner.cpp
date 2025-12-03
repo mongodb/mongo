@@ -113,7 +113,8 @@ boost::optional<Timestamp> getEarliestOpLogTimestampAmongAllShards(OperationCont
 }  // namespace
 
 const ReplicaSetAwareServiceRegistry::Registerer<PlacementHistoryCleaner>
-    placementHistoryCleanerRegistryRegisterer("PlacementHistoryCleaner");
+    placementHistoryCleanerRegistryRegisterer("PlacementHistoryCleaner",
+                                              {"ShardingInitializationMongoDRegistry"});
 
 
 PlacementHistoryCleaner* PlacementHistoryCleaner::get(ServiceContext* serviceContext) {

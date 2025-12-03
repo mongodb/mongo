@@ -1935,6 +1935,7 @@ mongo_cc_unit_test(
         ":repl_coordinator_impl",
         ":replmocks",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/sharding_environment:unittest_noop_sharding_initialization_mongod",
         "//src/mongo/executor:network_interface_mock",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
     ],

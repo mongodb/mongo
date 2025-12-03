@@ -87,9 +87,18 @@ MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic);
 namespace {
 const auto _registryDecoration = ServiceContext::declareDecoration<PrimaryOnlyServiceRegistry>();
 
+// Services that inherit from the PrimaryOnlyService class do not have a way to specify their
+// dependencies. This is because PrimaryOnlyService acts as a container for all of them, thus all
+// instances appear as a single node in the initialization graph.
+// Some of these services are Resharding and the ConfigsvrCoordinatorService. Since those have a
+// dependency on sharding state we have to make PrimaryOnlyService also depend on it. This is fine
+// since both services are (and should) only ever used in mongod.
+//
+// TODO SERVER-114562: Move prerequisites to services that actually need them rather than making POS
+// depend on them.
 const auto _registryRegisterer =
     ReplicaSetAwareServiceRegistry::Registerer<PrimaryOnlyServiceRegistry>(
-        "PrimaryOnlyServiceRegistry");
+        "PrimaryOnlyServiceRegistry", {"ShardingInitializationMongoDRegistry"});
 
 const Status kExecutorShutdownStatus(ErrorCodes::CallbackCanceled,
                                      "PrimaryOnlyService executor shut down due to stepDown");

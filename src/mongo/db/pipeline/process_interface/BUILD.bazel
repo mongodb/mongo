@@ -98,6 +98,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/lock_manager:flow_control_ticketholder",
         "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
         "//src/mongo/db/shard_role/shard_catalog:database_holder",
+        "//src/mongo/db/stats:serveronly_stats",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/storage:backup_cursor_hooks",
         "//src/mongo/db/storage:feature_document_util",
@@ -153,6 +154,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",
+        "//src/mongo/db/sharding_environment:unittest_noop_sharding_initialization_mongod",
         "//src/mongo/db/topology/vector_clock:vector_clock_mongod",
     ],
 )

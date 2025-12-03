@@ -127,7 +127,8 @@ ShardingRecoveryService* ShardingRecoveryService::get(OperationContext* opCtx) {
 }
 
 const ReplicaSetAwareServiceRegistry::Registerer<ShardingRecoveryService>
-    shardingRecoveryServiceRegisterer("ShardingRecoveryService");
+    shardingRecoveryServiceRegisterer("ShardingRecoveryService",
+                                      {"ShardingInitializationMongoDRegistry"});
 
 void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
     OperationContext* opCtx,

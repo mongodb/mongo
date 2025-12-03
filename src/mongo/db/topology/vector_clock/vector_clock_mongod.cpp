@@ -84,7 +84,8 @@ namespace {
 const auto vectorClockMongoDDecoration = ServiceContext::declareDecoration<VectorClockMongoD>();
 
 const ReplicaSetAwareServiceRegistry::Registerer<VectorClockMongoD>
-    vectorClockMongoDServiceRegisterer("VectorClockMongoD-ReplicaSetAwareServiceRegistration");
+    vectorClockMongoDServiceRegisterer("VectorClockMongoD-ReplicaSetAwareServiceRegistration",
+                                       {"ShardingInitializationMongoDRegistry"});
 
 const ServiceContext::ConstructorActionRegisterer vectorClockMongoDRegisterer(
     "VectorClockMongoD", {"VectorClock"}, [](ServiceContext* service) {

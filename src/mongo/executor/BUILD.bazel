@@ -487,6 +487,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:task_executor_mock",
         "//src/mongo/db/repl/hello:hello_command",
         "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/db/sharding_environment:unittest_noop_sharding_initialization_mongod",
         "//src/mongo/util:clock_source_mock",
     ],
 )
