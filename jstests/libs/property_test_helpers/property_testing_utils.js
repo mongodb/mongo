@@ -54,6 +54,8 @@ const okIndexCreationErrorCodes = [
     7246200,
     7246204,
     7246208,
+    7246209,
+    7246210,
     // For partial index filters, we can sometimes go over the depth limit of the filter. It's
     // difficult to control the exact depth of the filters generated without sacrificing lots of
     // interesting cases, so instead we allow this error.

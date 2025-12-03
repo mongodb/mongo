@@ -129,14 +129,29 @@ function getHashedIndexModel(allowPartialIndexes) {
 
 // This models wildcard indexes where the wildcard field is at the top-level, like "$**" rather than
 // "a.$**". These definitions are allowed to specify a `wildcardProjection` in the index options.
-const wildcardProjectionOptionsArb = fc.record({
-    wildcardProjection: fc.uniqueArray(fieldArb, {minLength: 1, maxLength: 8}).map((fields) => {
-        const options = {};
+
+// Prefer including fields in the wildcard projection rather than excluding them.
+const wildcardProjectionIncludeExcludeArb = fc.oneof(
+    {weight: 1, arbitrary: fc.constant(0)}, // 20% chance
+    {weight: 4, arbitrary: fc.constant(1)}, // 80% chance
+);
+
+const wildcardProjectionArb = fc
+    .record({
+        fields: fc.uniqueArray(fieldArb, {minLength: 1, maxLength: 8}),
+        // use the same value throughout the projection
+        value: wildcardProjectionIncludeExcludeArb,
+    })
+    .map(({fields, value}) => {
+        const projection = {};
         for (const field of fields) {
-            options[field] = 1;
+            projection[field] = value;
         }
-        return options;
-    }),
+        return projection;
+    });
+
+const wildcardProjectionOptionsArb = fc.record({
+    wildcardProjection: wildcardProjectionArb,
 });
 
 /*
