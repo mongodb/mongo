@@ -61,6 +61,7 @@
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/query/planner/cluster_find.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 

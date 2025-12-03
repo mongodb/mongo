@@ -39,6 +39,7 @@
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

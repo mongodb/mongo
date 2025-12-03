@@ -54,6 +54,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>

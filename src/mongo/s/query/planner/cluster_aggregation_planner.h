@@ -51,6 +51,7 @@
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <functional>

@@ -44,6 +44,7 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 
@@ -55,7 +56,7 @@ class ShardId;
 /**
  * Methods for running aggregation across a sharded cluster.
  */
-class ClusterAggregate {
+class MONGO_MOD_PUBLIC ClusterAggregate {
 public:
     /**
      * Max number of retries to resolve the underlying namespace of a view.

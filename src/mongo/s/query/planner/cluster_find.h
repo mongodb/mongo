@@ -38,6 +38,7 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/getmore_command_gen.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <vector>
@@ -53,7 +54,7 @@ struct ReadPreferenceSetting;
 /**
  * Methods for running find and getMore operations across a sharded cluster.
  */
-class ClusterFind {
+class MONGO_MOD_PUBLIC ClusterFind {
 public:
     // The number of times we are willing to re-target and re-run the query after receiving a stale
     // config, snapshot, or shard not found error.

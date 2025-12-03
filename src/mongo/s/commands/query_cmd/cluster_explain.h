@@ -35,6 +35,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/s/async_requests_sender.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>

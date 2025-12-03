@@ -56,6 +56,7 @@
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/commands/strategy.h"
+#include "mongo/util/modules.h"
 
 #include <set>
 #include <string>

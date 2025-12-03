@@ -77,6 +77,7 @@
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>

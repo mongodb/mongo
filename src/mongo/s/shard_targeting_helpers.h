@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -84,10 +85,11 @@ namespace mongo {
  *
  * @return BSONElement identified element, or eoo() if none.
  */
-BSONElement getFirstFieldWithIncompatibleCollation(const BSONObj& shardKey,
-                                                   const ShardKeyPattern& shardKeyPattern,
-                                                   bool queryHasSimpleCollation,
-                                                   bool permitHashedFields);
+MONGO_MOD_PUBLIC BSONElement
+getFirstFieldWithIncompatibleCollation(const BSONObj& shardKey,
+                                       const ShardKeyPattern& shardKeyPattern,
+                                       bool queryHasSimpleCollation,
+                                       bool permitHashedFields);
 
 
 /**
