@@ -25,6 +25,17 @@ The `etc/evergreen_timeouts.yml` file allows overriding timeouts for specific ta
 
 This script reads the `etc/evergreen_timeouts.yml` file to calculate the appropriate timeout settings. Additionally, it checks historical test results for the task being run to determine if enough information is available to calculate timeouts based on past data. The script also supports more advanced methods of determining timeouts, such as applying aggressive timeout measures for tasks executed in the commit queue or on required build variants. In cases of conflict, the commit queue and required build variant limits take precedence over the previous two methods.
 
+The timeout that was calculated by the script can be retrieved from the logs:
+
+```
+[2025/11/13 15:22:28.292] [2025-11-13 13:22:28,292 - __main__ - INFO] 2025-11-13 13:22.28 Determining timeouts           cli_args=Namespace(install_dir='dist-test/bin', task='aggregation_multiversion_fuzzer_last_lts_0-linux-enterprise', suite_name='aggregation_multiversion_fuzzer_last_lts', variant='enterprise-rhel-8-64-bit-dynamic-required', project='mongodb-mongo-v7.0-staging', evg_alias='evg-alias-absent', timeout=1800, exec_timeout=0, exec_timeout_factor=1.5, outfile='task_timeout_expansions.yml', timeout_overrides_file='etc/evergreen_timeouts.yml', evg_api_config='./.evergreen.yml', evg_project_config='etc/evergreen_nightly.yml')
+...
+[2025/11/13 15:22:32.622] [2025-11-13 13:22:32,622 - __main__ - INFO] 2025-11-13 13:22.32 Using timeout from cmd line    idle_timeout_secs=1800.0
+[2025/11/13 15:22:32.622] [2025-11-13 13:22:32,622 - __main__ - INFO] 2025-11-13 13:22.32 Overriding required-builder timeout exec_timeout_secs=4800.0
+[2025/11/13 15:22:32.759] exec_timeout_secs: 4800
+[2025/11/13 15:22:32.759] timeout_secs: 1800
+```
+
 ### Compile tasks: [evergreen/generate_override_timeout.py](../../evergreen/generate_override_timeout.py)
 
 This script is used for compile tasks defined in files such as `etc/evergreen_yml_components/tasks/compile_tasks.yml` and `etc/evergreen_yml_components/tasks/compile_tasks_shared.yml`. The script reads the `etc/evergreen_timeouts.yml` file and calculates appropriate timeouts. The Evergreen function `override task timeout` then runs this script to update the timeouts accordingly.
