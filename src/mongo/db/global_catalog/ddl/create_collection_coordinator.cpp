@@ -284,8 +284,7 @@ bool isTimeseries(const boost::optional<CollectionAcquisition>& collection) {
 
 bool viewlessTimeseriesEnabled(OperationContext* opCtx) {
     return gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
-        VersionContext::getDecoration(opCtx),
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        VersionContext::getDecoration(opCtx));
 }
 
 bool shouldUseRawDataOperations(OperationContext* opCtx) {

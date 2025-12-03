@@ -320,9 +320,7 @@ public:
 
             auto createViewlessTimeseriesColl =
                 gFeatureFlagCreateViewlessTimeseriesCollections
-                    .isEnabledUseLastLTSFCVWhenUninitialized(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+                    .isEnabledUseLastLTSFCVWhenUninitialized(VersionContext::getDecoration(opCtx));
 
             CreateCommandReply reply;
 

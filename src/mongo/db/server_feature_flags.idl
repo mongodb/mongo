@@ -145,6 +145,7 @@ feature_flags:
         cpp_varname: gFeatureFlagCreateViewlessTimeseriesCollections
         default: false
         fcv_gated: true
+        check_against_fcv: operation_fcv_only
     featureFlagMarkTimeseriesEventsInOplog:
         description: >-
             Enables marking oplog entries writing to viewless timeseries collections.

@@ -66,10 +66,14 @@ public:
         : WriterStage<BSONObj>(stageName.data(), pExpCtx, std::move(outputNs)),
           _writeConcern(pExpCtx->getOperationContext()->getWriteConcern()),
           _timeseries(timeseries),
-          _mergeShardId(std::move(mergeShardId)),
-          _viewlessTimeseriesEnabled(gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
-              VersionContext::getDecoration(pExpCtx->getOperationContext()),
-              serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {};
+          _mergeShardId(std::move(mergeShardId)) {
+        // TODO(SERVER-112816): The viewless timeseries feature flag should not be checked here,
+        // since $out has no FCV stability guarantee after we release this FixedOperationFCVRegion,
+        // and we do not support long-running operations to acquiring an OFCV yet.
+        VersionContext::FixedOperationFCVRegion fixedOfcvRegion(pExpCtx->getOperationContext());
+        _viewlessTimeseriesEnabled = gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+            VersionContext::getDecoration(pExpCtx->getOperationContext()));
+    }
 
 private:
     void doDispose() override;

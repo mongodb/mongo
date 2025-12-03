@@ -389,8 +389,7 @@ Status _performCollectionCreationChecks(OperationContext* opCtx,
 
     const auto createViewlessTimeseriesColl =
         gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+            VersionContext::getDecoration(opCtx));
 
     uassert(ErrorCodes::InvalidOptions,
             "the 'validator' option cannot be set when creating viewless time-series collection",
@@ -1044,8 +1043,7 @@ Status createCollection(OperationContext* opCtx,
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
     const auto createViewlessTimeseriesColl = optionsArg.timeseries &&
         gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+            VersionContext::getDecoration(opCtx));
 
     auto options = optionsArg;
 
