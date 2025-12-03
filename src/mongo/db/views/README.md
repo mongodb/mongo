@@ -46,6 +46,7 @@ Notice that even though the view is using an `aggregate()` for us under the hood
 - [`runDistinctAsAgg()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/commands/query_cmd/distinct.cpp#L753)
 - [`runCountAsAgg()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/commands/query_cmd/count_cmd.cpp#L612)
 
+TODO SERVER-114727 Update this documentation once we're done re-factorign how view resolution works in run_aggregate.cpp.
 If an `aggregate` command is issued against a view, we call [`runAggregateOnView()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/commands/query_cmd/run_aggregate.cpp#L782). The view is then resolved by prepending the view's pipeline to the current pipeline for the query and a new call to [`runAggregate()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/commands/query_cmd/run_aggregate.cpp#L1166) is called with the final query. This joint pipeline will very likely have room for optimization (if both the view definition and aggregate command contain a `$match` stage that may be combined, for example); this is taken care of by [pipeline rewrites](../pipeline/README.md).
 
 Continuing with the first query in the previous example:
