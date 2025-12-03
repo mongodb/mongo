@@ -318,7 +318,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                                .firstElement(),
                            getExpCtx()),
                        AssertionException,
-                       16436);
+                       40324);
     ASSERT_THROWS_CODE(
         DocumentSourceUnionWith::createFromBson(
             BSON("$unionWith" << BSON("coll" << BSON("not" << "string") << "pipeline"

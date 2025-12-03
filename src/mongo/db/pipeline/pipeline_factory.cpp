@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/views/resolved_view.h"
@@ -38,7 +39,9 @@ namespace mongo::pipeline_factory {
 std::unique_ptr<Pipeline> makePipeline(const std::vector<BSONObj>& rawPipeline,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        MakePipelineOptions opts) {
-    auto pipeline = Pipeline::parse(rawPipeline, expCtx, opts.validator);
+    LiteParsedPipeline liteParsedPipeline =
+        LiteParsedPipeline(expCtx->getNamespaceString(), rawPipeline);
+    auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, opts.validator);
 
     expCtx->initializeReferencedSystemVariables();
 
@@ -89,7 +92,9 @@ std::unique_ptr<Pipeline> makePipeline(AggregateCommandRequest& aggRequest,
                                                   : opts.readConcern;
     }
 
-    auto pipeline = Pipeline::parse(aggRequest.getPipeline(), expCtx, opts.validator);
+    LiteParsedPipeline liteParsedPipeline =
+        LiteParsedPipeline(expCtx->getNamespaceString(), aggRequest.getPipeline());
+    auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, opts.validator);
     if (opts.optimize) {
         pipeline_optimization::optimizePipeline(*pipeline);
     }
