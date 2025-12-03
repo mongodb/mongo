@@ -234,8 +234,8 @@ void CommonProcessInterface::updateClientOperationTime(OperationContext* opCtx) 
     }
 }
 
-bool CommonProcessInterface::keyPatternNamesExactPaths(const BSONObj& keyPattern,
-                                                       const std::set<FieldPath>& uniqueKeyPaths) {
+bool keyPatternNamesExactPaths(const BSONObj& keyPattern,
+                               const std::set<FieldPath>& uniqueKeyPaths) {
     size_t nFieldsMatched = 0;
     for (auto&& elem : keyPattern) {
         if (!elem.isNumber()) {
@@ -247,6 +247,21 @@ bool CommonProcessInterface::keyPatternNamesExactPaths(const BSONObj& keyPattern
         ++nFieldsMatched;
     }
     return nFieldsMatched == uniqueKeyPaths.size();
+}
+
+MongoProcessInterface::SupportingUniqueIndex CommonProcessInterface::supportsUniqueKey(
+    const IndexDescriptor* indexDescriptor,
+    const CollatorInterface* indexCollator,
+    const CollatorInterface* queryCollator,
+    const std::set<FieldPath>& uniqueKeyPaths) {
+    bool supports = (indexDescriptor->unique() && !indexDescriptor->isPartial() &&
+                     keyPatternNamesExactPaths(indexDescriptor->keyPattern(), uniqueKeyPaths) &&
+                     CollatorInterface::collatorsMatch(indexCollator, queryCollator));
+    if (!supports) {
+        return MongoProcessInterface::SupportingUniqueIndex::None;
+    }
+    return indexDescriptor->isSparse() ? MongoProcessInterface::SupportingUniqueIndex::NotNullish
+                                       : MongoProcessInterface::SupportingUniqueIndex::Full;
 }
 
 std::vector<FieldPath> CommonProcessInterface::shardKeyToDocumentKeyFields(

@@ -106,34 +106,6 @@ StatusWith<std::unique_ptr<RoutingContext>> getAndValidateRoutingCtx(
     return swRoutingCtx;
 }
 
-MongoProcessInterface::SupportingUniqueIndex supportsUniqueKey(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const BSONObj& index,
-    const std::set<FieldPath>& uniqueKeyPaths) {
-    // Retrieve the collation from the index, or default to the simple collation.
-    const auto collation = uassertStatusOK(
-        CollatorFactoryInterface::get(expCtx->getOperationContext()->getServiceContext())
-            ->makeFromBSON(index.hasField(IndexDescriptor::kCollationFieldName)
-                               ? index.getObjectField(IndexDescriptor::kCollationFieldName)
-                               : CollationSpec::kSimpleSpec));
-
-    // SERVER-5335: The _id index does not report to be unique, but in fact is unique.
-    auto isIdIndex =
-        index[IndexDescriptor::kIndexNameFieldName].String() == IndexConstants::kIdIndexName;
-    bool supports =
-        (isIdIndex || index.getBoolField(IndexDescriptor::kUniqueFieldName)) &&
-        !index.hasField(IndexDescriptor::kPartialFilterExprFieldName) &&
-        CommonProcessInterface::keyPatternNamesExactPaths(
-            index.getObjectField(IndexDescriptor::kKeyPatternFieldName), uniqueKeyPaths) &&
-        CollatorInterface::collatorsMatch(collation.get(), expCtx->getCollator());
-    if (!supports) {
-        return MongoProcessInterface::SupportingUniqueIndex::None;
-    }
-    return index.getBoolField(IndexDescriptor::kSparseFieldName)
-        ? MongoProcessInterface::SupportingUniqueIndex::NotNullish
-        : MongoProcessInterface::SupportingUniqueIndex::Full;
-}
-
 }  // namespace
 
 std::unique_ptr<MongoProcessInterface::WriteSizeEstimator>
@@ -454,13 +426,23 @@ MongosProcessInterface::fieldsHaveSupportingUniqueIndex(
             uassertStatusOK(response);
 
             const auto& indexes = response.getValue().docs;
-            return std::accumulate(indexes.begin(),
-                                   indexes.end(),
-                                   SupportingUniqueIndex::None,
-                                   [&expCtx, &fieldPaths](auto result, const auto& index) {
-                                       return std::max(
-                                           result, supportsUniqueKey(expCtx, index, fieldPaths));
-                                   });
+            return std::accumulate(
+                indexes.begin(),
+                indexes.end(),
+                SupportingUniqueIndex::None,
+                [&](auto result, const auto& index) {
+                    IndexDescriptor descriptor(IndexNames::findPluginName(index.getObjectField(
+                                                   IndexDescriptor::kKeyPatternFieldName)),
+                                               index);
+                    std::unique_ptr<CollatorInterface> collator = descriptor.collation().isEmpty()
+                        ? nullptr
+                        : uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                              ->makeFromBSON(descriptor.collation()));
+                    return std::max(
+                        result,
+                        supportsUniqueKey(
+                            &descriptor, collator.get(), expCtx->getCollator(), fieldPaths));
+                });
         });
 }
 

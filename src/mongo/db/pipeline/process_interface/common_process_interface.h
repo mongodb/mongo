@@ -135,12 +135,13 @@ public:
     };
 
     /**
-     * Returns true if the field names of 'keyPattern' are exactly those in 'uniqueKeyPaths', and
-     * each of the elements of 'keyPattern' is numeric, i.e. not "text", "$**", or any other special
-     * type of index.
+     * Checks if the given index on 'nss' have properties that will guarantee that a document with
+     * non-array values for each of 'fieldPaths' will have at most one matching document in 'nss'.
      */
-    static bool keyPatternNamesExactPaths(const BSONObj& keyPattern,
-                                          const std::set<FieldPath>& uniqueKeyPaths);
+    static SupportingUniqueIndex supportsUniqueKey(const IndexDescriptor* indexDescriptor,
+                                                   const CollatorInterface* indexCollator,
+                                                   const CollatorInterface* queryCollator,
+                                                   const std::set<FieldPath>& uniqueKeyPaths);
 
     /**
      * Converts the fields from a ShardKeyPattern to a vector of FieldPaths, including the _id if
