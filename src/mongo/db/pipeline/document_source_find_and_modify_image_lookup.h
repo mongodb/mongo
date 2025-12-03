@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 
 #include <set>
 
@@ -60,7 +61,7 @@ namespace mongo {
  * the forged pre- or post-image oplog entry document for each 'applyOps' oplog entry document that
  * comes with a transaction commit timestamp will have the commit timestamp attached to it.
  */
-class DocumentSourceFindAndModifyImageLookup : public DocumentSource {
+class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceFindAndModifyImageLookup : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalFindAndModifyImageLookup"_sd;
     static constexpr StringData kIncludeCommitTransactionTimestampFieldName =

@@ -73,6 +73,7 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
@@ -109,7 +110,7 @@ class TransactionHistoryIteratorBase;
  * interface. This allows all DocumentSources to be parsed on either mongos or mongod, but only
  * executable where it makes sense.
  */
-class MongoProcessInterface {
+class MONGO_MOD_OPEN MongoProcessInterface {
 public:
     /**
      * Storage for a batch of BSON Objects to be updated in the write namespace. For each element
@@ -142,7 +143,7 @@ public:
     /**
      * Interface which estimates the size of a given write operation.
      */
-    class WriteSizeEstimator {
+    class MONGO_MOD_OPEN WriteSizeEstimator {
     public:
         virtual ~WriteSizeEstimator() = default;
 
@@ -695,7 +696,7 @@ public:
     /**
      * Used to enforce the constraint that the foreign collection must be untracked.
      */
-    class ScopedExpectUntrackedCollection {
+    class MONGO_MOD_UNFORTUNATELY_OPEN ScopedExpectUntrackedCollection {
     public:
         virtual ~ScopedExpectUntrackedCollection() = default;
     };

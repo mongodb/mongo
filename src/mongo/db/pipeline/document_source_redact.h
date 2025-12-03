@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>
@@ -51,7 +52,7 @@
 
 namespace mongo {
 
-class DocumentSourceRedact final : public DocumentSource {
+class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceRedact final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$redact"_sd;
     const char* getSourceName() const final;

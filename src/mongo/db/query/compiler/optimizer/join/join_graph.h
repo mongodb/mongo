@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
+#include "mongo/util/modules.h"
 
 /** This file introduces the join optimizer's logical model. It defines classes representing a join
  * graph and its components.

@@ -48,6 +48,7 @@
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <cstddef>
@@ -86,7 +87,7 @@ struct RewriteOnFirstDocumentResult {
  *  - Computing the group key
  *  - Accumulating values in a hash table and populating output documents.
  */
-class DocumentSourceGroupBase : public DocumentSource {
+class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceGroupBase : public DocumentSource {
 public:
     using Accumulators = std::vector<boost::intrusive_ptr<AccumulatorState>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;

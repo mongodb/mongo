@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
 /** Resolves field paths that are part of the Join Graph. The main function of the class is to

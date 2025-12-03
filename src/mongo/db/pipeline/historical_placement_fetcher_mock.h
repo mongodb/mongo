@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/historical_placement_fetcher.h"
+#include "mongo/util/modules.h"
 
 #include <deque>
 #include <type_traits>
@@ -38,7 +39,8 @@
 
 namespace mongo {
 
-class HistoricalPlacementFetcherMock : public HistoricalPlacementFetcher {
+class MONGO_MOD_UNFORTUNATELY_OPEN HistoricalPlacementFetcherMock
+    : public HistoricalPlacementFetcher {
 public:
     using TimestampOrNss = std::variant<Timestamp, boost::optional<NamespaceString>>;
     using Response = std::pair<TimestampOrNss, HistoricalPlacement>;

@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
 /** Represent an aggregation pipeline for join optimization. It takes a pipeline and parses a join

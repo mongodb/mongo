@@ -32,6 +32,7 @@
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 #include "mongo/db/query/compiler/optimizer/join/solution_storage.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
 

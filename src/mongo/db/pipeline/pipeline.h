@@ -58,6 +58,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>
@@ -80,7 +81,7 @@ using PipelineValidatorCallback = std::function<void(const Pipeline&)>;
  * A Pipeline object represents a list of DocumentSources and is responsible for optimizing the
  * pipeline.
  */
-class Pipeline {
+class MONGO_MOD_PUBLIC Pipeline {
 public:
     /**
      * The list of default supported match expression features.
@@ -507,5 +508,5 @@ private:
     bool _translatedForViewlessTimeseries{false};
 };
 
-using PipelinePtr = std::unique_ptr<Pipeline>;
+using PipelinePtr MONGO_MOD_PUBLIC = std::unique_ptr<Pipeline>;
 }  // namespace mongo

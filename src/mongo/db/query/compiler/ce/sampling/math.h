@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/compiler/ce/ce_common.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::ce {
 /**

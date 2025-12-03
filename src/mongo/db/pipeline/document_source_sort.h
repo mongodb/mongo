@@ -54,6 +54,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
@@ -71,7 +72,7 @@
 
 namespace mongo {
 
-class DocumentSourceSort final : public DocumentSource {
+class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceSort final : public DocumentSource {
 public:
     static constexpr StringData kMin = "min"_sd;
     static constexpr StringData kMax = "max"_sd;

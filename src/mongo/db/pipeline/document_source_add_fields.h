@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/util/modules.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -48,7 +49,7 @@ namespace mongo {
  *
  * This stage is also aliased as $set and functions the same way.
  */
-class DocumentSourceAddFields final {
+class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceAddFields final {
 public:
     static constexpr StringData kStageName = "$addFields"_sd;
     static constexpr StringData kAliasNameSet = "$set"_sd;  // An alternate name for this stage.

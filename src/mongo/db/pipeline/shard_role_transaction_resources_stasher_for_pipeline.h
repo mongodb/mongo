@@ -31,6 +31,7 @@
 
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -42,8 +43,9 @@ namespace mongo {
  * the TransactionResources before handing control over to the next stage in the pipeline.
  * Objects of this class are not thread-safe and therefore should not be shared across threads.
  */
-class ShardRoleTransactionResourcesStasherForPipeline : public TransactionResourcesStasher,
-                                                        public RefCountable {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardRoleTransactionResourcesStasherForPipeline
+    : public TransactionResourcesStasher,
+      public RefCountable {
 public:
     StashedTransactionResources releaseStashedTransactionResources() override {
         return std::move(_transactionResources);

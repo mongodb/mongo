@@ -32,6 +32,7 @@
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 

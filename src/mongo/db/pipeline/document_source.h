@@ -51,6 +51,7 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
@@ -207,7 +208,8 @@ namespace mongo {
     const DocumentSource::Id& constName = _dsid_##name;
 
 class DocumentSource;
-using DocumentSourceContainer = std::list<boost::intrusive_ptr<DocumentSource>>;
+using DocumentSourceContainer MONGO_MOD_UNFORTUNATELY_OPEN =
+    std::list<boost::intrusive_ptr<DocumentSource>>;
 
 class Pipeline;
 
@@ -215,7 +217,7 @@ namespace exec::agg {
 class ListMqlEntitiesStage;
 }  // namespace exec::agg
 
-class DocumentSource : public RefCountable {
+class MONGO_MOD_UNFORTUNATELY_OPEN DocumentSource : public RefCountable {
 public:
     // In general a parser returns a list of DocumentSources, to accommodate "multi-stage aliases"
     // like $bucket.
@@ -720,7 +722,7 @@ protected:
      * because the parserMap is not thread safe, so modifying it at runtime is unsafe.
      */
 
-    static void unregisterParser_forTest(const std::string& name);
+    MONGO_MOD_NEEDS_REPLACEMENT static void unregisterParser_forTest(const std::string& name);
 
 private:
     static DocumentSourceContainer parseCommon(

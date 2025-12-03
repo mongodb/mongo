@@ -49,6 +49,7 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 #include <memory>
@@ -98,7 +99,7 @@ struct UnionWithSharedState {
     VariablesParseState _variablesParseState;
 };
 
-class DocumentSourceUnionWith final : public DocumentSource {
+class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceUnionWith final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$unionWith"_sd;
 

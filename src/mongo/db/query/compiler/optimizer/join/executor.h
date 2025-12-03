@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
 

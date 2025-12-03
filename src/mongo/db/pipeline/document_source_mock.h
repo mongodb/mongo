@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 
 #include <deque>
 #include <initializer_list>
@@ -54,7 +55,7 @@ namespace mongo {
  * A mock DocumentSource which is useful for testing. In addition to re-spooling documents like
  * DocumentSourceQueue, it tracks some state about which methods have been called.
  */
-class DocumentSourceMock : public DocumentSource {
+class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceMock : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$mock"_sd;
 

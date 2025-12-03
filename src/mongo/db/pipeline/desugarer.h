@@ -29,10 +29,11 @@
 #pragma once
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class Desugarer {
+class MONGO_MOD_PUBLIC Desugarer {
 public:
     using StageExpander = std::function<DocumentSourceContainer::iterator(
         Desugarer*, DocumentSourceContainer::iterator, const DocumentSource&)>;

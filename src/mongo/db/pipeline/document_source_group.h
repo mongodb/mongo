@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
@@ -50,7 +51,7 @@ namespace mongo {
  * This class represents hash based group implementation that stores all groups until source is
  * depleted and only then starts outputing documents.
  */
-class DocumentSourceGroup final : public DocumentSourceGroupBase {
+class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceGroup final : public DocumentSourceGroupBase {
 public:
     static constexpr StringData kStageName = "$group"_sd;
 

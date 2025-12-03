@@ -35,6 +35,7 @@
 #include "mongo/db/api_parameters_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>
@@ -43,7 +44,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Decorates operation context with methods to retrieve apiVersion, apiStrict, and
@@ -159,4 +160,4 @@ private:
     bool _released = false;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

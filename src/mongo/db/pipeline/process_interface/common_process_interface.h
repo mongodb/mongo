@@ -42,6 +42,7 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -61,7 +62,7 @@ namespace mongo {
  * CommonProcessInterface provides base implementations of any MongoProcessInterface methods
  * whose code is largely identical on mongoD and mongoS.
  */
-class CommonProcessInterface : public MongoProcessInterface {
+class MONGO_MOD_PUBLIC CommonProcessInterface : public MongoProcessInterface {
 public:
     using MongoProcessInterface::MongoProcessInterface;
     ~CommonProcessInterface() override = default;

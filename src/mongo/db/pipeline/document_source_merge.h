@@ -66,6 +66,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>
@@ -86,7 +87,7 @@ namespace mongo {
  * this class must be initialized (via a constructor) with a 'MergeDescriptor', which defines a
  * a particular merge strategy for a pair of 'whenMatched' and 'whenNotMatched' merge  modes.
  */
-class DocumentSourceMerge final : public DocumentSourceWriter {
+class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceMerge final : public DocumentSourceWriter {
 public:
     static constexpr StringData kStageName = "$merge"_sd;
     static constexpr auto kDefaultWhenMatched = MergeStrategyDescriptor::WhenMatched::kMerge;

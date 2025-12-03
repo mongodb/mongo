@@ -32,6 +32,7 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>

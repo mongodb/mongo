@@ -52,6 +52,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <list>
@@ -67,7 +68,7 @@ namespace mongo {
 /**
  * Specialized version of the MongoDInterface when this node is a shard server.
  */
-class ShardServerProcessInterface final : public CommonMongodProcessInterface {
+class MONGO_MOD_PUBLIC ShardServerProcessInterface final : public CommonMongodProcessInterface {
 public:
     using CommonMongodProcessInterface::CommonMongodProcessInterface;
 

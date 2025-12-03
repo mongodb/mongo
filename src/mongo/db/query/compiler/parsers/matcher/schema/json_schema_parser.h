@@ -39,6 +39,7 @@
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/util/modules.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

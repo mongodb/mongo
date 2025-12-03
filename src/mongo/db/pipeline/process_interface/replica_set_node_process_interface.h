@@ -47,6 +47,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 #include <memory>
@@ -62,7 +63,8 @@ namespace mongo {
  * An implementation of the MongoProcessInterface used on replica set nodes when sharding is not
  * enabled.
  */
-class ReplicaSetNodeProcessInterface final : public NonShardServerProcessInterface {
+class MONGO_MOD_PUBLIC ReplicaSetNodeProcessInterface final
+    : public NonShardServerProcessInterface {
 public:
     using NonShardServerProcessInterface::NonShardServerProcessInterface;
 

@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /**
@@ -45,7 +46,7 @@ namespace mongo {
  * implementations for optimizing and adding the expression context, even if those functions do
  * nothing.
  */
-class TransformerInterface {
+class MONGO_MOD_NEEDS_REPLACEMENT TransformerInterface {
 public:
     enum class TransformerType {
         kExclusionProjection,

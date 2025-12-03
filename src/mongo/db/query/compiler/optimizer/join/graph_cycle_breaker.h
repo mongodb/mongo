@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/compiler/optimizer/join/adjacency_matrix.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
 /**
