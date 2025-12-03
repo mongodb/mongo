@@ -57,7 +57,7 @@ namespace apply_ops_command_info_details {
  */
 bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd) {
     for (const auto& elem : applyOpCmd.firstElement().Obj()) {
-        const char* opType = elem.Obj().getStringField("op").data();
+        StringData opType = elem.Obj().getStringField("op");
 
         if (opType == "i"_sd) {
             continue;
@@ -143,11 +143,11 @@ std::vector<ElementReference> getCommonElementReferences(const BSONObj& obj, uin
         // Furthermore, excluding 'o', 'nss', and 'op' from the common elements means we will always
         // catch (during the final parse) operations which do not have those fields, without the
         // necessity of doing another expensive parse.
-        if (el.fieldNameStringData() == OplogEntry::kObjectFieldName ||
-            el.fieldNameStringData() == OplogEntry::kNssFieldName ||
-            el.fieldNameStringData() == OplogEntry::kOpTypeFieldName ||
-            el.fieldNameStringData() == OplogEntry::kUpsertFieldName ||
-            el.fieldNameStringData() == OplogEntry::kMultiOpTypeFieldName)
+        StringData fieldName = el.fieldNameStringData();
+        if (fieldName == OplogEntry::kObjectFieldName || fieldName == OplogEntry::kNssFieldName ||
+            fieldName == OplogEntry::kOpTypeFieldName ||
+            fieldName == OplogEntry::kUpsertFieldName ||
+            fieldName == OplogEntry::kMultiOpTypeFieldName)
             continue;
         have.emplace_back(el, start);
     }
