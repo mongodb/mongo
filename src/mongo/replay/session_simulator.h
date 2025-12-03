@@ -40,6 +40,7 @@
 #include "mongo/replay/replay_command_executor.h"
 #include "mongo/replay/session_scheduler.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <chrono>

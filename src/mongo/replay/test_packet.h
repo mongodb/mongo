@@ -40,6 +40,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 
 #include <chrono>

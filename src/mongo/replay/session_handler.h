@@ -33,6 +33,7 @@
 #include "mongo/replay/session_simulator.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <chrono>

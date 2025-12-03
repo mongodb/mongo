@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/replay/replay_config.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>

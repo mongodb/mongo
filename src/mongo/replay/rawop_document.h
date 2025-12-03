@@ -30,6 +30,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

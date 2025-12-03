@@ -30,6 +30,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/traffic_reader.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

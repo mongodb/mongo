@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/replay/recording_reader.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <filesystem>

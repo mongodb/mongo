@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/replay/replay_config.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 class ServiceContext;
-class ReplayClient {
+class MONGO_MOD_PUBLIC ReplayClient {
 public:
     void replayRecording(const ReplayConfigs&);
     void replayRecording(const std::string& recordingFileName, const std::string& uri);
