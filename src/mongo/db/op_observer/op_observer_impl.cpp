@@ -720,8 +720,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
-            repl::ReplOperation operation;
-            operation = MutableOplogEntry::makeInsertOperation(
+            repl::ReplOperation operation = MutableOplogEntry::makeInsertOperation(
                 nss,
                 uuid,
                 iter->doc,
@@ -816,7 +815,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(lastOpTime);
         sessionTxnRecord.setLastWriteDate(lastWriteDate);
-        onWriteOpCompleted(opCtx, stmtIdsWritten, sessionTxnRecord, nss);
+        onWriteOpCompleted(opCtx, std::move(stmtIdsWritten), sessionTxnRecord, nss);
     }
 
     if (opAccumulator) {
@@ -866,8 +865,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
     OpTimeBundle opTime;
     if (inBatchedWrite) {
-        repl::ReplOperation operation;
-        operation = MutableOplogEntry::makeUpdateOperation(
+        repl::ReplOperation operation = MutableOplogEntry::makeUpdateOperation(
             nss,
             args.coll->uuid(),
             args.updateArgs->update,
@@ -1031,8 +1029,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
     OpTimeBundle opTime;
     if (inBatchedWrite) {
-        repl::ReplOperation operation;
-        operation = MutableOplogEntry::makeDeleteOperation(
+        repl::ReplOperation operation = MutableOplogEntry::makeDeleteOperation(
             nss,
             uuid,
             documentKey.getShardKeyAndId(),
