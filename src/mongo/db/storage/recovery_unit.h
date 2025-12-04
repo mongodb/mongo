@@ -429,6 +429,54 @@ public:
     }
 
     /**
+     * Sets a prepared id for the current prepared transaction. The prepared id is used to identify
+     * and recover the prepared transaction on startup recovery.
+     * Must be called after setPrepareTimestamp() if this feature is supported by the storage
+     * engine, and cannot be called after setTimestamp() or setCommitTimestamp(). This must be
+     * called inside a WUOW and may only be called once.
+     */
+    virtual void setPreparedId(uint64_t preparedId) {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "This storage engine does not support setting a prepared id for startup recovery "
+                  "of prepared transactions");
+    }
+
+    /**
+     * Returns the prepared id for the current transaction.
+     * Must be called after setPreparedId() and setPrepareTimestamp(). It cannot be called after
+     * setTimestamp() or setCommitTimestamp(). This must be called inside a WUOW.
+     */
+    virtual boost::optional<uint64_t> getPreparedId() const {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "This storage engine does not support setting a prepared id for startup recovery "
+                  "of prepared transactions.");
+    }
+
+    /**
+     * Sets a rollback timestamp for a prepared transaction. This will be the timestamp at
+     * which the rollback is visible.
+     * Must be called after setPrepareTimestamp() if this feature is supported by the storage
+     * engine, and the rollback timestamp cannot be older than the prepare timestamp. This must be
+     * called inside a WUOW and may only be called once.
+     */
+    virtual void setRollbackTimestamp(Timestamp timestamp) {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "This storage engine does not support setting a rollback timestamp for a "
+                  "prepared transaction");
+    }
+
+    /**
+     * Returns the rollback timestamp for a prepared transaction.
+     * Must be called after setRollbackTimestamp() and setPrepareTimestamp(). This must be called
+     * inside a WUOW.
+     */
+    virtual Timestamp getRollbackTimestamp() const {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "This storage engine does not support setting a rollback timestamp for a "
+                  "prepared transaction");
+    }
+
+    /**
      * MongoDB must update documents with non-decreasing timestamp values. A storage engine is
      * allowed to assert when this contract is violated. An untimestamped write is a subset of these
      * violations, which may be necessary in limited circumstances. This API can be called before a

@@ -644,6 +644,13 @@ std::vector<std::string> WiredTigerKVEngineBase::_wtGetAllIdents(WiredTigerSessi
     return all;
 }
 
+std::unique_ptr<PreparedTransactionsIterator>
+WiredTigerKVEngineBase::getUnclaimedPreparedTransactionsForStartupRecovery(
+    OperationContext* opCtx) const {
+    return std::make_unique<WiredTigerPreparedTransactionsIterator>(
+        _connection->getSession(*opCtx));
+}
+
 WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        const std::string& path,
                                        ClockSource* clockSource,

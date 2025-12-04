@@ -34,6 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/storage/compact_options.h"
+#include "mongo/db/storage/prepared_transactions_iterator.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -638,6 +639,16 @@ public:
      */
     virtual bool hasOngoingLiveRestore() {
         return false;
+    }
+
+    /**
+     * Returns an iterator that yields the prepared_id of unclaimed prepared transactions that exist
+     * in the checkpoint on startup recovery. Callers can use these prepared_ids to reclaim the
+     * prepared transactions through the storage engine.
+     */
+    virtual std::unique_ptr<PreparedTransactionsIterator>
+    getUnclaimedPreparedTransactionsForStartupRecovery(OperationContext* opCtx) const {
+        MONGO_UNREACHABLE;
     }
 };
 }  // namespace mongo

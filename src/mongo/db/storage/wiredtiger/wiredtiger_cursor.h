@@ -120,4 +120,29 @@ private:
     WiredTigerManagedSession const _session;
     WT_CURSOR* _cursor = nullptr;  // Owned
 };
+
+/**
+ * An owning object wrapper for a WT_CURSOR configured to return prepared_id for all unresolved
+ * prepared transactions in the current checkpoint that have not yet been claimed. It is used to
+ * reconstruct prepared transactions after loading the initial checkpoint as a standby.
+ */
+class WiredTigerPrepareCursor {
+public:
+    // The caller must ensure that 'session' remains alive and valid for the entire lifetime
+    // of this cursor. In practice, this usually means keeping the owning WiredTigerManagedSession
+    // alive for at least as long as the cursor.
+    WiredTigerPrepareCursor(WiredTigerSession& session);
+    ~WiredTigerPrepareCursor();
+
+    WT_CURSOR* get() const {
+        return _cursor;
+    }
+
+    WT_CURSOR* operator->() const {
+        return get();
+    }
+
+private:
+    WT_CURSOR* _cursor = nullptr;  // Owned
+};
 }  // namespace mongo

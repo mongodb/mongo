@@ -33,6 +33,7 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/execution_context.h"
@@ -193,14 +194,25 @@ void WiredTigerRecoveryUnit::prepareUnitOfWork() {
 
     auto session = getSession();
 
-    LOGV2_DEBUG(22410,
-                1,
-                "preparing transaction at time: {prepareTimestamp}",
-                "prepareTimestamp"_attr = _prepareTimestamp);
+    logv2::DynamicAttributes attrs;
+    attrs.add("prepareTimestamp", _prepareTimestamp);
+    if (_preparedId.has_value()) {
+        attrs.add("preparedId", _preparedId.value());
+    }
 
-    const std::string conf = "prepare_timestamp=" + unsignedHex(_prepareTimestamp.asULL());
+    LOGV2_DEBUG(22410, 1, "preparing transaction at time: {prepareTimestamp}", attrs);
+
+    std::stringstream conf;
+    conf << "prepare_timestamp=" << unsignedHex(_prepareTimestamp.asULL());
+
+    // The prepared_id is used to recover prepared transactions when restoring from a checkpoint.
+    if (_preparedId.has_value()) {
+        conf << ",prepared_id=" << unsignedHex(_preparedId.value());
+    }
+    std::string confStr = conf.str();
+
     // Prepare the transaction.
-    invariantWTOK(session->prepare_transaction(conf.c_str()), *session);
+    invariantWTOK(session->prepare_transaction(confStr.c_str()), *session);
     if (feature_flags::gStorageEngineInterruptibility.isEnabled()) {
         // Avoids a situation where committing or rolling back a prepared transaction hangs with
         // concurrent operations trying to read documents modified by the prepared transaction. This
@@ -391,7 +403,14 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             _session->modifyConfiguration("cache_max_wait_ms=1", "cache_max_wait_ms=0");
         }
 
-        wtRet = _session->rollback_transaction(nullptr);
+        std::string confStr;
+        const char* conf = nullptr;
+        if (!_rollbackTimestamp.isNull()) {
+            confStr = fmt::format("rollback_timestamp={}", unsignedHex(_rollbackTimestamp.asULL()));
+            conf = confStr.c_str();
+        }
+
+        wtRet = _session->rollback_transaction(conf);
 
         LOGV2_DEBUG(
             22413, 3, "WT rollback_transaction", "snapshotId"_attr = getSnapshotId().toNumber());
@@ -428,6 +447,8 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     _multiTimestampConstraintTracker = {};
     _prepareTimestamp = Timestamp();
     _durableTimestamp = Timestamp();
+    _rollbackTimestamp = Timestamp();
+    _preparedId = boost::none;
     _oplogVisibleTs = boost::none;
     _orderedCommit = true;  // Default value is true; we assume all writes are ordered.
     _noEvictionAfterCommitOrRollback = false;
@@ -821,6 +842,36 @@ void WiredTigerRecoveryUnit::clearCommitTimestamp() {
     _commitTimestamp = Timestamp();
 }
 
+void WiredTigerRecoveryUnit::setRollbackTimestamp(Timestamp timestamp) {
+    invariant(_inUnitOfWork(), toString(_getState()));
+    invariant(!_prepareTimestamp.isNull(),
+              str::stream() << "Trying to set rollback timestamp to " << timestamp.toString()
+                            << " without a prepare timestamp set");
+    invariant(timestamp >= _prepareTimestamp,
+              str::stream() << "Trying to set rollback timestamp to " << timestamp.toString()
+                            << " which is older than the prepare timestamp of "
+                            << _prepareTimestamp.toString());
+    invariant(_rollbackTimestamp.isNull(),
+              str::stream() << "Trying to set rollback timestamp to " << timestamp.toString()
+                            << ". It's already set to " << _rollbackTimestamp.toString());
+    _rollbackTimestamp = timestamp;
+}
+
+Timestamp WiredTigerRecoveryUnit::getRollbackTimestamp() const {
+    invariant(_inUnitOfWork(), toString(_getState()));
+    invariant(!_rollbackTimestamp.isNull());
+    invariant(!_prepareTimestamp.isNull(),
+              str::stream() << "Trying to get rollback timestamp of "
+                            << _rollbackTimestamp.toString()
+                            << " without setting the prepare timestamp.");
+    invariant(_rollbackTimestamp >= _prepareTimestamp,
+              str::stream() << "Trying to get rollback timestamp of "
+                            << _rollbackTimestamp.toString()
+                            << " which is older than the prepare timestamp of "
+                            << _prepareTimestamp.toString());
+    return _rollbackTimestamp;
+}
+
 void WiredTigerRecoveryUnit::setPrepareTimestamp(Timestamp timestamp) {
     invariant(_inUnitOfWork(), toString(_getState()));
     invariant(_prepareTimestamp.isNull(),
@@ -849,6 +900,38 @@ Timestamp WiredTigerRecoveryUnit::getPrepareTimestamp() const {
                             << _prepareTimestamp.toString());
 
     return _prepareTimestamp;
+}
+
+void WiredTigerRecoveryUnit::setPreparedId(uint64_t preparedId) {
+    invariant(_inUnitOfWork(), toString(_getState()));
+    invariant(!_preparedId.has_value(),
+              str::stream() << "Trying to set prepared id to " << preparedId
+                            << ". It's already set to " << _preparedId.value());
+    invariant(!_prepareTimestamp.isNull(),
+              str::stream() << "Trying to set prepared id to " << preparedId
+                            << " without setting the prepare timestamp.");
+    invariant(_commitTimestamp.isNull(),
+              str::stream() << "Commit timestamp is " << _commitTimestamp.toString()
+                            << " and trying to set prepared id of " << preparedId);
+    invariant(!_lastTimestampSet,
+              str::stream() << "Last timestamp set is " << _lastTimestampSet->toString()
+                            << " and trying to get prepared id of " << preparedId);
+    _preparedId = preparedId;
+}
+
+boost::optional<uint64_t> WiredTigerRecoveryUnit::getPreparedId() const {
+    invariant(_inUnitOfWork(), toString(_getState()));
+    invariant(_preparedId.has_value());
+    invariant(!_prepareTimestamp.isNull(),
+              str::stream() << "Trying to get prepared id of " << _preparedId.value()
+                            << " without setting the prepare timestamp.");
+    invariant(_commitTimestamp.isNull(),
+              str::stream() << "Commit timestamp is " << _commitTimestamp.toString()
+                            << " and trying to get prepare id of " << _preparedId.value());
+    invariant(!_lastTimestampSet,
+              str::stream() << "Last timestamp set is " << _lastTimestampSet->toString()
+                            << " and trying to get prepared id " << _preparedId.value());
+    return _preparedId;
 }
 
 void WiredTigerRecoveryUnit::setPrepareConflictBehavior(PrepareConflictBehavior behavior) {

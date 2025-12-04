@@ -196,6 +196,7 @@ mongo_cc_library(
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/storage:feature_document_util",
         "//src/mongo/db/storage:ident",
+        "//src/mongo/db/storage/kv:kv_engine",
     ],
 )
 
@@ -320,6 +321,7 @@ mongo_cc_library(
     ],
     deps = [
         ":record_store_base",
+        "//src/mongo/db/storage/kv:kv_engine",
     ],
 )
 
@@ -486,6 +488,15 @@ mongo_cc_library(
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/unittest",
     ],
+)
+
+mongo_cc_library(
+    name = "prepared_transactions_iterator",
+    srcs = [],
+    hdrs = [
+        "prepared_transactions_iterator.h",
+    ],
+    deps = [],
 )
 
 mongo_cc_library(

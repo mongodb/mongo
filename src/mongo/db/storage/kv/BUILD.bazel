@@ -10,6 +10,17 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "kv_engine",
+    srcs = [],
+    hdrs = [
+        "kv_engine.h",
+    ],
+    deps = [
+        "//src/mongo/db/storage:prepared_transactions_iterator",
+    ],
+)
+
+mongo_cc_library(
     name = "kv_drop_pending_ident_reaper",
     srcs = [
         "kv_drop_pending_ident_reaper.cpp",
