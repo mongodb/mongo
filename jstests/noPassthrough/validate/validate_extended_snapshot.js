@@ -34,6 +34,9 @@ rst.awaitLastOpCommitted();
 jsTest.log.info("Validate with background: true and atClusterTime should fail");
 assert.commandFailed(db.runCommand({validate: "coll", background: true, collHash: true, atClusterTime: opTime}));
 
+jsTest.log.info("Validate with atClusterTime of 0,0 should fail");
+assert.commandFailed(db.runCommand({validate: "coll", collHash: true, atClusterTime: Timestamp(0, 0)}));
+
 jsTest.log.info("Validate with atClusterTime on an unreplicated collection should fail");
 assert.commandFailed(
     primary.getDB("local").runCommand({validate: "oplog.rs", background: true, collHash: true, atClusterTime: opTime}),

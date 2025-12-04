@@ -754,6 +754,13 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
                                     << "is not supported on unreplicated collections");
         }
         timestamp = cmdObj["atClusterTime"].timestamp();
+        // Not allowed to set read timestamp to 0,0.
+        if (timestamp->isNull()) {
+            uasserted(ErrorCodes::CommandNotSupported,
+                      str::stream()
+                          << "Running the validate command with { atClusterTime: Timestamp(0,0) } "
+                          << "is not supported");
+        }
     }
     if (background) {
         // Background validation reads data from the last stable checkpoint.
