@@ -3649,7 +3649,7 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
             "my last written OpTime: {}",
             args.getLastWrittenOpTime().toString(),
             getMyLastWrittenOpTime().toString()));
-    } else if (!args.isADryRun() && _lastVote.getTerm() == args.getTerm()) {
+    } else if (!args.isADryRun() && _lastVote.getTerm() >= args.getTerm()) {
         response->setVoteGranted(false);
         response->setReason(
             fmt::format("already voted for another candidate ({}) this term ({})",

@@ -3450,6 +3450,66 @@ TEST_F(TopoCoordTest, DoNotGrantDryRunVoteWhenOpTimeIsStale) {
     ASSERT_FALSE(response.getVoteGranted());
 }
 
+TEST_F(TopoCoordTest, DoNotGrantVoteWhenAlreadyVotedInLaterElection) {
+    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
+                                          << BSON("_id" << 20 << "host" << "h2")
+                                          << BSON("_id" << 30 << "host" << "h3"))),
+                 0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
+    // set term to 1
+    ASSERT(TopologyCoordinator::UpdateTermResult::kUpdatedTerm ==
+           getTopoCoord().updateTerm(1, now()));
+    // and make sure we voted in term 1
+    ReplSetRequestVotesArgs argsForFirstVote;
+    argsForFirstVote
+        .initialize(BSON("replSetRequestVotes"
+                         << 1 << "setName" << "rs0" << "term" << 1LL << "candidateIndex" << 1LL
+                         << "configVersion" << 1LL << "configTerm" << 1LL << "lastWrittenOpTime"
+                         << BSON("ts" << Timestamp(10, 0) << "t" << 0LL) << "lastAppliedOpTime"
+                         << BSON("ts" << Timestamp(10, 0) << "t" << 0LL)))
+        .transitional_ignore();
+    ReplSetRequestVotesResponse responseForFirstVote;
+
+    getTopoCoord().processReplSetRequestVotes(argsForFirstVote, &responseForFirstVote);
+    ASSERT_EQUALS("", responseForFirstVote.getReason());
+    ASSERT_TRUE(responseForFirstVote.getVoteGranted());
+
+
+    // make sure we voted in term 2
+    ReplSetRequestVotesArgs argsForSecondVote;
+    argsForSecondVote
+        .initialize(BSON("replSetRequestVotes"
+                         << 1 << "setName" << "rs0" << "dryRun" << false << "term" << 2LL
+                         << "candidateIndex" << 1LL << "configVersion" << 1LL << "configTerm" << 2LL
+                         << "lastWrittenOpTime" << BSON("ts" << Timestamp(10, 0) << "t" << 0LL)
+                         << "lastAppliedOpTime" << BSON("ts" << Timestamp(10, 0) << "t" << 0LL)))
+        .transitional_ignore();
+    ReplSetRequestVotesResponse responseForSecondVote;
+
+    getTopoCoord().processReplSetRequestVotes(argsForSecondVote, &responseForSecondVote);
+    ASSERT_EQUALS("", responseForSecondVote.getReason());
+    ASSERT_EQUALS(1, responseForSecondVote.getTerm());
+    ASSERT_TRUE(responseForSecondVote.getVoteGranted());
+
+    // try to vote again in term 1
+    ReplSetRequestVotesArgs argsForThirdVote;
+    argsForThirdVote
+        .initialize(BSON("replSetRequestVotes"
+                         << 1 << "setName" << "rs0" << "dryRun" << false << "term" << 1LL
+                         << "candidateIndex" << 0LL << "configVersion" << 1LL << "configTerm" << 1LL
+                         << "lastWrittenOpTime" << BSON("ts" << Timestamp(10, 0) << "t" << 0LL)
+                         << "lastAppliedOpTime" << BSON("ts" << Timestamp(10, 0) << "t" << 0LL)))
+        .transitional_ignore();
+    ReplSetRequestVotesResponse responseForThirdVote;
+
+    getTopoCoord().processReplSetRequestVotes(argsForThirdVote, &responseForThirdVote);
+    ASSERT_EQUALS("already voted for another candidate (h2:27017) this term (2)",
+                  responseForThirdVote.getReason());
+    ASSERT_EQUALS(1, responseForThirdVote.getTerm());
+    ASSERT_FALSE(responseForThirdVote.getVoteGranted());
+}
+
 TEST_F(TopoCoordTest, NodeTransitionsToRemovedIfCSRSButHaveNoReadCommittedSupport) {
     ON_BLOCK_EXIT([]() { serverGlobalParams.clusterRole = ClusterRole::None; });
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
