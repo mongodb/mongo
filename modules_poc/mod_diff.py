@@ -5,7 +5,7 @@ import subprocess
 import sys
 from typing import Iterable, NoReturn
 
-from .browse import Decl, is_submodule_usage, load_decls
+from browse import Decl, is_submodule_usage, load_decls
 
 
 def perr_exit(message: str) -> NoReturn:
