@@ -698,8 +698,8 @@ typedef struct MongoExtensionByteContainer {
  */
 typedef struct MongoExtensionGetNextResult {
     MongoExtensionGetNextResultCode code;
-    MongoExtensionByteContainer resultMetadata;
     MongoExtensionByteContainer resultDocument;
+    MongoExtensionByteContainer resultMetadata;
 } MongoExtensionGetNextResult;
 
 /**

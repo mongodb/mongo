@@ -1071,24 +1071,28 @@ TEST_F(AggStageTest, TestValidExecAggStageFromCompiledLogicalAggStage) {
         auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
         ASSERT_BSONOBJ_EQ(BSON("meow" << "adithi"), getNext.resultDocument->getUnownedBSONObj());
+        ASSERT_BSONOBJ_EQ(BSON("$searchScore" << 1.0), getNext.resultMetadata->getUnownedBSONObj());
     }
 
     {
         auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kPauseExecution, getNext.code);
         ASSERT_EQ(boost::none, getNext.resultDocument);
+        ASSERT_EQ(boost::none, getNext.resultMetadata);
     }
 
     {
         auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
         ASSERT_BSONOBJ_EQ(BSON("meow" << "cedric"), getNext.resultDocument->getUnownedBSONObj());
+        ASSERT_BSONOBJ_EQ(BSON("$textScore" << 2.0), getNext.resultMetadata->getUnownedBSONObj());
     }
 
     {
         auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kEOF, getNext.code);
         ASSERT_EQ(boost::none, getNext.resultDocument);
+        ASSERT_EQ(boost::none, getNext.resultMetadata);
     }
 }
 

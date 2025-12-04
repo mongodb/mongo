@@ -839,6 +839,79 @@ public:
         return std::make_unique<EmptyRequiredPrivilegesAggStageAstNode>();
     }
 };
+
+static constexpr std::string_view kSourceName = "$invalidMetadataSource";
+class InvalidMetadataExecAggStage : public sdk::ExecAggStageSource {
+public:
+    InvalidMetadataExecAggStage() : sdk::ExecAggStageSource(kSourceName) {}
+    ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
+                                   ::MongoExtensionExecAggStage* execStage) override {
+        if (_currentIndex >= _documentsWithMetadata.size()) {
+            return ExtensionGetNextResult::eof();
+        }
+        // Note, here we can create the result as a byte view, since this stage guarantees to keep
+        // the results valid.
+        auto documentResult =
+            ExtensionBSONObj::makeAsByteView(_documentsWithMetadata[_currentIndex].first);
+        auto metadataResult =
+            ExtensionBSONObj::makeAsByteView(_documentsWithMetadata[_currentIndex++].second);
+        return ExtensionGetNextResult::advanced(std::move(documentResult),
+                                                std::move(metadataResult));
+    }
+    // Allow this to be public for visibility in unit tests.
+    UnownedExecAggStageHandle& _getSource() override {
+        return sdk::ExecAggStageSource::_getSource();
+    }
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
+    void open() override {}
+    void reopen() override {}
+    void close() override {}
+
+    static inline std::unique_ptr<sdk::ExecAggStageSource> make() {
+        return std::make_unique<InvalidMetadataExecAggStage>();
+    }
+
+private:
+    static inline const std::vector<std::pair<BSONObj, BSONObj>> _documentsWithMetadata = {
+        {BSON("_id" << 1 << "field1" << "val1"), BSON("$customScore" << 5.0)},
+        {BSON("_id" << 2 << "field2" << "val2"), BSON("searchScore" << 1.5)},
+        {BSON("_id" << 3 << "field2" << "val3"), BSON("$" << 2.0)}};
+    size_t _currentIndex = 0;
+};
+class InvalidMetadataLogicalAggStage : public sdk::LogicalAggStage {
+public:
+    InvalidMetadataLogicalAggStage() : sdk::LogicalAggStage(kSourceName) {}
+
+    BSONObj serialize() const override {
+        return BSON(std::string(kSourceName) << "serializedForExecution");
+    }
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSONObj();
+    }
+
+    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
+        return InvalidMetadataExecAggStage::make();
+    }
+
+    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
+        return nullptr;
+    }
+};
+class InvalidMetadataAstNode : public sdk::AggStageAstNode {
+public:
+    InvalidMetadataAstNode() : sdk::AggStageAstNode(kSourceName) {}
+
+    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+        return std::make_unique<InvalidMetadataLogicalAggStage>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<InvalidMetadataAstNode>();
+    }
+};
 }  // namespace
 
 TEST_F(DocumentSourceExtensionTest, TransformAstNodeWithDefaultGetPropertiesSucceeds) {
@@ -1099,33 +1172,48 @@ TEST_F(DocumentSourceExtensionTest, ShouldPropagateValidGetNextResultsForSourceE
     {
         auto next = extensionStage->getNext();
         ASSERT_TRUE(next.isAdvanced());
-        ASSERT_DOCUMENT_EQ(next.releaseDocument(),
-                           (Document{BSON("_id" << 1 << "apples" << "red")}));
+        MutableDocument md(Document{BSON("_id" << 1 << "apples" << "red")});
+        DocumentMetadataFields metadata;
+        metadata.setTextScore(5.0);
+        md.setMetadata(std::move(metadata));
+        ASSERT_DOCUMENT_EQ(next.releaseDocument(), md.freeze());
     }
     {
         auto next = extensionStage->getNext();
         ASSERT_TRUE(next.isAdvanced());
-        ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{BSON("_id" << 2 << "oranges" << 5)}));
+        MutableDocument md(Document{BSON("_id" << 2 << "oranges" << 5)});
+        DocumentMetadataFields metadata;
+        metadata.setSearchScore(1.5);
+        md.setMetadata(std::move(metadata));
+        ASSERT_DOCUMENT_EQ(next.releaseDocument(), md.freeze());
     }
     {
         auto next = extensionStage->getNext();
         ASSERT_TRUE(next.isAdvanced());
-        ASSERT_DOCUMENT_EQ(next.releaseDocument(),
-                           (Document{BSON("_id" << 3 << "bananas" << false)}));
+        MutableDocument md(Document{BSON("_id" << 3 << "bananas" << false)});
+        DocumentMetadataFields metadata;
+        metadata.setSearchScore(2.0);
+        md.setMetadata(std::move(metadata));
+        ASSERT_DOCUMENT_EQ(next.releaseDocument(), md.freeze());
     }
     {
         auto next = extensionStage->getNext();
         ASSERT_TRUE(next.isAdvanced());
-        ASSERT_DOCUMENT_EQ(
-            next.releaseDocument(),
-            (Document{BSON("_id" << 4 << "tropical fruits"
-                                 << BSON_ARRAY("rambutan" << "durian" << "lychee"))}));
+        MutableDocument md(Document{BSON("_id" << 4 << "tropical fruits"
+                                               << BSON_ARRAY("rambutan" << "durian" << "lychee"))});
+        DocumentMetadataFields metadata;
+        metadata.setTextScore(4.0);
+        md.setMetadata(std::move(metadata));
+        ASSERT_DOCUMENT_EQ(next.releaseDocument(), md.freeze());
     }
     {
         auto next = extensionStage->getNext();
         ASSERT_TRUE(next.isAdvanced());
-        ASSERT_DOCUMENT_EQ(next.releaseDocument(),
-                           (Document{BSON("_id" << 5 << "pie" << 3.14159)}));
+        MutableDocument md(Document{BSON("_id" << 5 << "pie" << 3.14159)});
+        DocumentMetadataFields metadata;
+        metadata.setSearchScore(5.0);
+        md.setMetadata(std::move(metadata));
+        ASSERT_DOCUMENT_EQ(next.releaseDocument(), md.freeze());
     }
     // Verify that the next result after all the documents have been exhausted has a status of EOF.
     auto eof = extensionStage->getNext();
@@ -1446,5 +1534,52 @@ TEST_F(DocumentSourceExtensionTest,
     }
     // Verify that the next result after all the documents have been exhausted has a status of EOF.
     ASSERT_TRUE(secondTransformStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceExtensionTest, GetNextResultsForSourceExtensionStageFailsForUnknownMetadata) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(InvalidMetadataAstNode::make());
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    auto extensionStage = exec::agg::buildStage(optimizable);
+    // Verify that error code 17308 is thrown if metadata field is unknown.
+    ASSERT_THROWS_CODE(extensionStage->getNext(), DBException, 17308);
+    // Verify that error code 11390602 is thrown if metadata field doesn't begin with $.
+    ASSERT_THROWS_CODE(extensionStage->getNext(), DBException, 11390602);
+    // Verify that error code 11390602 is thrown if metadata field has only '$' (no name).
+    ASSERT_THROWS_CODE(extensionStage->getNext(), DBException, 11390602);
+    ASSERT_TRUE(extensionStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceExtensionTest, ShouldPropagateSourceMetadata) {
+    auto sourceAstNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::FruitsAsDocumentsAstNode::make());
+    auto sourceAstHandle = AggStageAstNodeHandle(sourceAstNode);
+
+    auto sourceOptimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(sourceAstHandle));
+    auto sourceStage = exec::agg::buildStage(sourceOptimizable);
+
+    std::array<std::pair<const char*, double>, 5> expected = {
+        std::pair{"$textScore", 5.0},
+        std::pair{"$searchScore", 1.5},
+        std::pair{"$searchScore", 2.0},
+        std::pair{"$textScore", 4.0},
+        std::pair{"$searchScore", 5.0},
+    };
+
+    // Verify metadata is present on output documents.
+    for (size_t i = 0; i < 5; ++i) {
+        auto nextResult = sourceStage->getNext();
+        ASSERT_TRUE(nextResult.isAdvanced());
+        BSONObj docWithMeta = nextResult.releaseDocument().toBsonWithMetaData();
+
+        auto [fieldName, expectedVal] = expected[i];
+        ASSERT_TRUE(docWithMeta.hasField(fieldName));
+        ASSERT_EQ(expectedVal, docWithMeta.getField(fieldName).numberDouble());
+    }
+    ASSERT_TRUE(sourceStage->getNext().isEOF());
 }
 }  // namespace mongo::extension

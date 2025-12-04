@@ -182,10 +182,19 @@ enum class GetNextCode { kAdvanced, kEOF, kPauseExecution };
 struct ExtensionGetNextResult {
     GetNextCode code{GetNextCode::kEOF};
     boost::optional<ExtensionBSONObj> resultDocument{boost::none};
+    boost::optional<ExtensionBSONObj> resultMetadata{boost::none};
 
     // Make an "advanced" ExtensionGetNextResult with the provided result document.
-    static ExtensionGetNextResult advanced(ExtensionBSONObj&& extBsonObj) {
-        return {.code = GetNextCode::kAdvanced, .resultDocument = std::move(extBsonObj)};
+    static ExtensionGetNextResult advanced(ExtensionBSONObj&& extDocumentBsonObj) {
+        return {.code = GetNextCode::kAdvanced, .resultDocument = std::move(extDocumentBsonObj)};
+    }
+
+    // Make an "advanced" ExtensionGetNextResult with the provided result document and metadata.
+    static ExtensionGetNextResult advanced(ExtensionBSONObj&& extDocumentBsonObj,
+                                           ExtensionBSONObj&& extMetadataBsonObj) {
+        return {.code = GetNextCode::kAdvanced,
+                .resultDocument = std::move(extDocumentBsonObj),
+                .resultMetadata = std::move(extMetadataBsonObj)};
     }
 
     static ExtensionGetNextResult pauseExecution() {
@@ -196,11 +205,29 @@ struct ExtensionGetNextResult {
         return {.code = GetNextCode::kEOF};
     }
 
+    /*
+     * Create an ExtensionGetNextResult from the provided ::MongoExtensionGetNextResult.
+     * The function requires resultDocument and always includes it in the returned result.
+     * resultMetadata is optional — if null, the returned result contains only the document.
+     */
     static ExtensionGetNextResult makeAdvancedFromApiResult(
         ::MongoExtensionGetNextResult& apiResult) {
-        return ExtensionGetNextResult::advanced(
-            ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument));
+        return isEmptyByteContainer(apiResult.resultMetadata)
+            ? advanced(ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument))
+            : advanced(ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument),
+                       ExtensionBSONObj::makeFromByteContainer(apiResult.resultMetadata));
     };
+
+    static bool isEmptyByteContainer(const ::MongoExtensionByteContainer& container) {
+        switch (container.type) {
+            case MongoExtensionByteContainerType::kByteView:
+                return container.bytes.view.data == nullptr && container.bytes.view.len == 0;
+            case MongoExtensionByteContainerType::kByteBuf:
+                return container.bytes.buf == nullptr;
+            default:
+                MONGO_UNREACHABLE_TASSERT(11390601);
+        }
+    }
 
     /**
      * Instantiates a ExtensionGetNextResult from the provided ::MongoExtensionGetNextResult. Sets
@@ -254,6 +281,7 @@ struct ExtensionGetNextResult {
                         !resultDocument.has_value());
                 apiResult.code = ::MongoExtensionGetNextResultCode::kPauseExecution;
                 apiResult.resultDocument = createEmptyByteContainer();
+                apiResult.resultMetadata = createEmptyByteContainer();
                 break;
             }
             case GetNextCode::kEOF: {
@@ -266,6 +294,7 @@ struct ExtensionGetNextResult {
                         !resultDocument.has_value());
                 apiResult.code = ::MongoExtensionGetNextResultCode::kEOF;
                 apiResult.resultDocument = createEmptyByteContainer();
+                apiResult.resultMetadata = createEmptyByteContainer();
                 break;
             }
             default:
@@ -282,13 +311,17 @@ private:
                 "should have a result to return.",
                 resultDocument.has_value());
         resultDocument->toByteContainer(outputResult.resultDocument);
+        if (resultMetadata.has_value()) {
+            resultMetadata->toByteContainer(outputResult.resultMetadata);
+        } else {
+            outputResult.resultMetadata = createEmptyByteContainer();
+        }
     }
 };
 
 inline ::MongoExtensionGetNextResult createDefaultExtensionGetNext() {
-    return {
-        .code = ::MongoExtensionGetNextResultCode::kEOF,
-        .resultDocument = createEmptyByteContainer(),
-    };
+    return {.code = ::MongoExtensionGetNextResultCode::kEOF,
+            .resultDocument = createEmptyByteContainer(),
+            .resultMetadata = createEmptyByteContainer()};
 }
 }  // namespace mongo::extension

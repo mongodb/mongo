@@ -614,6 +614,7 @@ private:
             sdk_tassert(11357806, "The api result should be non-null", apiResult != nullptr);
             apiResult->code = ::MongoExtensionGetNextResultCode::kPauseExecution;
             apiResult->resultDocument = createEmptyByteContainer();
+            apiResult->resultMetadata = createEmptyByteContainer();
 
             QueryExecutionContextHandle execCtx{execCtxPtr};
 
