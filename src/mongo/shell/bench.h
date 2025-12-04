@@ -46,6 +46,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/timer.h"
 

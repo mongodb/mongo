@@ -37,6 +37,7 @@
 #define __LINENOISE_H
 
 #include "mongo/base/status.h"
+#include "mongo/util/modules.h"
 
 struct linenoiseCompletions;
 

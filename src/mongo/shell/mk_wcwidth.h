@@ -61,5 +61,7 @@
  * Latest version: http://www.cl.cam.ac.uk/~mgk25/ucs/wcwidth.c
  */
 
+#include "mongo/util/modules.h"
+
 extern int mk_wcwidth(int ucs);
 extern int mk_wcswidth(const int* pwcs, size_t n);

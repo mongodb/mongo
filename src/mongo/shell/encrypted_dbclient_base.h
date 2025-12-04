@@ -74,6 +74,7 @@
 #include "mongo/shell/kms_gen.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/util/lru_cache.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"

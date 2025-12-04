@@ -35,6 +35,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <set>
@@ -115,6 +116,15 @@ struct GoldenTestContextShellFailure {
 
 void closeMochaStyleTestContext(Scope& scope);
 
+std::string getURIFromArgs(const std::string& arg,
+                           const std::string& host,
+                           const std::string& port);
+
+}  // namespace shell_utils
+
+// Specifically scoped namespace for usages that are "unfortunately public"
+namespace MONGO_MOD_NEEDS_REPLACEMENT shell_utils {
+
 enum class NormalizationOpts : uint32_t {
     kResults = 0,
     // Set this bit to sort an array of results. Used in QueryTester.
@@ -166,9 +176,5 @@ BSONObj normalizeBSONObj(const BSONObj& input,
                          NormalizationOptsSet opts = NormalizationOpts::kResults);
 
 
-std::string getURIFromArgs(const std::string& arg,
-                           const std::string& host,
-                           const std::string& port);
-
-}  // namespace shell_utils
+}  // namespace MONGO_MOD_NEEDS_REPLACEMENT shell_utils
 }  // namespace mongo

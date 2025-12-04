@@ -36,6 +36,7 @@
 #include "mongo/crypto/symmetric_key.h"
 #include "mongo/shell/kms_gen.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <cstddef>
