@@ -1412,6 +1412,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/shell/OWNERS.yml
 /jstests/noPassthrough/shell/**/* @10gen/devprod-correctness @svc-auto-approve-bot
+/jstests/noPassthrough/shell/**/multi_router_basic.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/shell/js/OWNERS.yml
 /jstests/noPassthrough/shell/js/**/* @10gen/devprod-correctness @svc-auto-approve-bot
@@ -3153,6 +3154,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/shell/**/keyvault.js @10gen/server-security @svc-auto-approve-bot
 /src/mongo/shell/**/named_pipe_test_helper* @10gen/query-integration-features @svc-auto-approve-bot
 /src/mongo/shell/**/feature_compatibility_version.js @10gen/server-fcv @svc-auto-approve-bot
+/src/mongo/shell/**/*multi_router*.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/stdx/OWNERS.yml
 /src/mongo/stdx/**/* @10gen/server-programmability @svc-auto-approve-bot

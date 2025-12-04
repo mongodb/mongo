@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/devprod-correctness
+  - "multi_router_basic.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

@@ -18,3 +18,6 @@ filters:
   - "feature_compatibility_version.js":
     approvers:
       - 10gen/server-fcv
+  - "*multi_router*.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

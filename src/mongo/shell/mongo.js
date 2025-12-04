@@ -322,6 +322,35 @@ Mongo.prototype.getReadConcern = function () {
     return this._readConcernLevel;
 };
 
+// Selects whether to use a Mongo or a MultiRouterMongo based on the deployment
+// The connection can either be:
+// - A list of mongos for sharded cluster deployment
+// - A list of primary/secondary nodes for replica sets
+// - 1 node as a standalone deployment
+// - A list of end points where some might not have a listening server.
+// This factory attempts to catch cluster fixtures and define the right connections type.
+function connectionFactory(uri, apiParameters) {
+    const mongouri = new MongoURI(uri);
+    // For one end point we always fall back to Mongo.
+    if (mongouri.servers.length < 2) {
+        return new Mongo(uri, undefined /* encryptedDBClientCallback */, apiParameters);
+    }
+    // In case of multiple connection, check if setName is not "". This implies a replica-set connection.
+    if (mongouri.setName.length > 0) {
+        return new Mongo(uri, undefined /* encryptedDBClientCallback */, apiParameters);
+    } else {
+        // The Multi-Router Mongo doesn't accept that any of the listed url can't connect.
+        // On the other hand, the Mongo object connects with the first available end point.
+        // Some tests provide some fake uris to tests the Mongo object.
+        // This try-catch attempts to catch this case and falls back to the original implementation.
+        try {
+            return new MultiRouterMongo(uri, undefined /* encryptedDBClientCallback */, apiParameters);
+        } catch (e) {
+            return new Mongo(uri, undefined /* encryptedDBClientCallback */, apiParameters);
+        }
+    }
+}
+
 globalThis.connect = function (url, user, pass, apiParameters) {
     if (url instanceof MongoURI) {
         user = url.user;
@@ -375,7 +404,7 @@ globalThis.connect = function (url, user, pass, apiParameters) {
     chatty("connecting to: " + safeURL);
     let m;
     try {
-        m = new Mongo(url, undefined /* encryptedDBClientCallback */, apiParameters);
+        m = connectionFactory(url, apiParameters);
     } catch (e) {
         let dest;
         if (url.indexOf(".query.mongodb.net") != -1) {

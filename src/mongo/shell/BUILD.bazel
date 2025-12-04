@@ -255,6 +255,8 @@ MONGOJS_CPP_JSFILES = [
     "explainable.js",
     "explainable_global.js",
     "mongo.js",
+    "multi_router.js",
+    "multi_router_global.js",
     "prelude.js",
     "query.js",
     "query_global.js",

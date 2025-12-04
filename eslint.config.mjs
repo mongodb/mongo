@@ -79,6 +79,10 @@ export default [
                 removeFCVDocument: true,
                 runFeatureFlagMultiversionTest: true,
 
+                // src/mongo/shell/mongo_router_global.js
+                MultiRouterMongo: true,
+                toConnectionsList: true,
+
                 // src/mongo/shell/query_global.js
                 DBQuery: true,
                 DBCommandCursor: true,

@@ -359,6 +359,8 @@ extern const JSFile collection;
 extern const JSFile crud_api;
 extern const JSFile db;
 extern const JSFile db_global;
+extern const JSFile multi_router;
+extern const JSFile multi_router_global;
 extern const JSFile error_codes;
 extern const JSFile explain_query;
 extern const JSFile explain_query_global;
@@ -390,6 +392,7 @@ void Scope::execCoreFiles() {
     execSetup(JSFiles::utils);
     execSetup(JSFiles::utils_auth);
     execSetup(JSFiles::utils_sh);
+    execSetup(JSFiles::multi_router);
 
     // globals
     execSetup(JSFiles::bulk_api_global);
@@ -402,6 +405,7 @@ void Scope::execCoreFiles() {
     execSetup(JSFiles::utils_global);
     execSetup(JSFiles::utils_auth_global);
     execSetup(JSFiles::utils_sh_global);
+    execSetup(JSFiles::multi_router_global);
 
     // scripts
     execSetup(JSFiles::mongo);
