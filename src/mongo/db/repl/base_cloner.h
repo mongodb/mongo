@@ -201,6 +201,11 @@ protected:
         return _status;
     }
 
+    void setStatus(WithLock, Status status) {
+        invariant(!status.isOK());
+        _status = status;
+    }
+
     const HostAndPort& getSource() const {
         return _source;
     }
