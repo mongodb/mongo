@@ -1757,6 +1757,30 @@ public:
     }
 };
 
+/** CodeWScope type. */
+class CodeWScope {
+public:
+    void run() {
+        Value value(BSONCodeWScope("FOO", BSON("BAR" << 1)));
+        ASSERT_EQUALS("FOO", value.getCodeWScope().code);
+        ASSERT_BSONOBJ_EQ(BSON("BAR" << 1), value.getCodeWScope().scope);
+        ASSERT_EQUALS(BSONType::codeWScope, value.getType());
+        assertRoundTrips(value);
+    }
+};
+
+/** DBRef type. */
+class DBRef {
+public:
+    void run() {
+        Value value(BSONDBRef("FOO"_sd, OID("abcdefabcdefabcdefabcdef")));
+        ASSERT_EQUALS("FOO", value.getDBRef().ns);
+        ASSERT_EQUALS(OID("abcdefabcdefabcdefabcdef"), value.getDBRef().oid);
+        ASSERT_EQUALS(BSONType::dbRef, value.getType());
+        assertRoundTrips(value);
+    }
+};
+
 /** Undefined type. */
 class Undefined {
 public:
@@ -2834,6 +2858,8 @@ public:
         add<Value::Bool>();
         add<Value::Regex>();
         add<Value::Symbol>();
+        add<Value::CodeWScope>();
+        add<Value::DBRef>();
         add<Value::Undefined>();
         add<Value::Null>();
         add<Value::True>();

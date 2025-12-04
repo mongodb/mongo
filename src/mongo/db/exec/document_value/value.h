@@ -269,6 +269,8 @@ public:
     const char* getRegexFlags() const;
     std::string getSymbol() const;
     std::string getCode() const;
+    BSONCodeWScope getCodeWScope() const;
+    BSONDBRef getDBRef() const;
     int getInt() const;
     long long getLong() const;
     UUID getUuid() const;
@@ -565,6 +567,16 @@ inline std::string Value::getSymbol() const {
 inline std::string Value::getCode() const {
     MONGO_verify(getType() == BSONType::code);
     return std::string{_storage.getString()};
+}
+inline BSONCodeWScope Value::getCodeWScope() const {
+    MONGO_verify(getType() == BSONType::codeWScope);
+    auto codeWScope = _storage.getCodeWScope();
+    return BSONCodeWScope(codeWScope->code, codeWScope->scope);
+}
+inline BSONDBRef Value::getDBRef() const {
+    MONGO_verify(getType() == BSONType::dbRef);
+    auto dbRef = _storage.getDBRef();
+    return BSONDBRef(dbRef->ns, dbRef->oid);
 }
 
 inline int Value::getInt() const {
