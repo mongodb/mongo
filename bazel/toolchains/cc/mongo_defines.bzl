@@ -49,11 +49,8 @@ ENTERPRISE_DEFINES = select({
     "//conditions:default": [],
 })
 
-# Fortify only possibly makes sense on POSIX systems, and we know that clang is
-# not a valid combination:
-# http://lists.llvm.org/pipermail/cfe-dev/2015-November/045852.html
-GCC_OPT_DEFINES = select({
-    "//bazel/config:gcc_opt": ["_FORTIFY_SOURCE=2"],
+FORTIFY_DEFINE = select({
+    "//bazel/config:opt_on_linux": ["_FORTIFY_SOURCE=3"],
     "//conditions:default": [],
 })
 
@@ -102,7 +99,7 @@ MONGO_GLOBAL_DEFINES = (
     UNDEFINED_SANITIZER_DEFINES +
     GLIBCXX_DEBUG_DEFINES +
     TCMALLOC_DEFINES +
-    GCC_OPT_DEFINES +
+    FORTIFY_DEFINE +
     BOOST_DEFINES +
     ABSEIL_DEFINES +
     PCRE2_DEFINES +

@@ -416,6 +416,15 @@ selects.config_setting_group(
     ],
 )
 
+# opt=on || (opt=auto && !dbg)
+selects.config_setting_group(
+    name = "opt_on_linux",
+    match_all = [
+        ":opt_on",
+        "@platforms//os:linux",
+    ],
+)
+
 # opt=off || (opt=auto && dbg)
 selects.config_setting_group(
     name = "opt_off",
