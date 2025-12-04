@@ -31,7 +31,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/host_portal.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
+#include "mongo/db/extension/sdk/test_extension_factory.h"
 
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
@@ -90,8 +90,7 @@ public:
     MatchTopNStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName);
-        const auto obj = stageBson[kStageName].Obj();
+        const auto obj = sdk::validateStageDefinition(stageBson, kStageName);
 
         sdk_uassert(10956500,
                     "$matchTopN requires 'filter' object",
@@ -111,12 +110,6 @@ public:
     }
 };
 
-class MatchTopNExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        _registerStage<MatchTopNStageDescriptor>(portal);
-    }
-};
-
+DEFAULT_EXTENSION(MatchTopN)
 REGISTER_EXTENSION(MatchTopNExtension)
 DEFINE_GET_EXTENSION()

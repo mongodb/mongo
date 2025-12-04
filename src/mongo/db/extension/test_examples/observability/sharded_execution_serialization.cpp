@@ -31,53 +31,21 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
+#include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 
-inline constexpr std::string_view kShardedExecutionSerializationStageName =
-    "$shardedExecutionSerialization";
-
-class ShardedExecutionExecAggStage : public sdk::ExecAggStageTransform {
-public:
-    ShardedExecutionExecAggStage()
-        : sdk::ExecAggStageTransform(kShardedExecutionSerializationStageName) {}
-
-    mongo::extension::ExtensionGetNextResult getNext(
-        const sdk::QueryExecutionContextHandle& execCtx,
-        ::MongoExtensionExecAggStage* execStage) override {
-        return _getSource().getNext(execCtx.get());
-    }
-
-    void open() override {}
-
-    void reopen() override {}
-
-    void close() override {}
-
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSONObj();
-    }
-};
-
-class ShardedExecutionSerializationLogicalStage : public sdk::LogicalAggStage {
+class ShardedExecutionSerializationLogicalStage
+    : public sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage> {
 public:
     static constexpr StringData kShardedAssertFlagFieldName = "assertFlag";
 
-    ShardedExecutionSerializationLogicalStage()
-        : sdk::LogicalAggStage(kShardedExecutionSerializationStageName) {}
+    ShardedExecutionSerializationLogicalStage(std::string_view stageName, const BSONObj& spec)
+        : sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage>(stageName, spec) {}
 
     BSONObj serialize() const override {
-        return BSON("$shardedExecutionSerialization" << BSON(kShardedAssertFlagFieldName << true));
-    }
-
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSONObj();
-    }
-
-    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
-        return std::make_unique<ShardedExecutionExecAggStage>();
+        return BSON(_name << BSON(kShardedAssertFlagFieldName << true));
     }
 
     std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
@@ -85,37 +53,8 @@ public:
     }
 };
 
-class ShardedExecutionSerializationAstNode : public sdk::AggStageAstNode {
-public:
-    ShardedExecutionSerializationAstNode()
-        : sdk::AggStageAstNode(kShardedExecutionSerializationStageName) {}
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<ShardedExecutionSerializationLogicalStage>();
-    }
-};
-
-class ShardedExecutionSerializationParseNode : public sdk::AggStageParseNode {
-public:
-    ShardedExecutionSerializationParseNode()
-        : sdk::AggStageParseNode(kShardedExecutionSerializationStageName) {}
-
-    size_t getExpandedSize() const override {
-        return 1;
-    }
-
-    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
-        std::vector<mongo::extension::VariantNodeHandle> expanded;
-        expanded.reserve(getExpandedSize());
-        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
-            std::make_unique<ShardedExecutionSerializationAstNode>()));
-        return expanded;
-    }
-
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        return BSONObj();
-    }
-};
+DEFAULT_AST_NODE(ShardedExecutionSerialization);
+DEFAULT_PARSE_NODE(ShardedExecutionSerialization);
 
 /**
  * A test-only extension that serializes itself on mongos in such a way that when sent to mongod,
@@ -133,25 +72,17 @@ public:
     ShardedExecutionSerializationStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName);
+        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
 
-        sdk_uassert(
-            11173701,
-            "Intended assertion in sharded scenarios tripped",
-            !stageBson.getField(kStageName)
-                 .Obj()
-                 .hasField(ShardedExecutionSerializationLogicalStage::kShardedAssertFlagFieldName));
+        sdk_uassert(11173701,
+                    "Intended assertion in sharded scenarios tripped",
+                    !arguments.hasField(
+                        ShardedExecutionSerializationLogicalStage::kShardedAssertFlagFieldName));
 
-        return std::make_unique<ShardedExecutionSerializationParseNode>();
+        return std::make_unique<ShardedExecutionSerializationParseNode>(kStageName, arguments);
     }
 };
 
-class ShardedExecutionSerializationExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        _registerStage<ShardedExecutionSerializationStageDescriptor>(portal);
-    }
-};
-
+DEFAULT_EXTENSION(ShardedExecutionSerialization)
 REGISTER_EXTENSION(ShardedExecutionSerializationExtension)
 DEFINE_GET_EXTENSION()

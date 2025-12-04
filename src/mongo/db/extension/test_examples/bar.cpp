@@ -31,11 +31,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 namespace sdk = mongo::extension::sdk;
-
-DEFAULT_LOGICAL_AST_PARSE(TestBar, "$testBar")
 
 /**
  * $testBar is a no-op stage.
@@ -43,29 +41,17 @@ DEFAULT_LOGICAL_AST_PARSE(TestBar, "$testBar")
  * The stage definition must NOT be empty or it will fail to parse. The contents of the stage
  * definition can be anything, as long as it is not an empty object.
  */
-class TestBarStageDescriptor : public sdk::AggStageDescriptor {
+class BarStageDescriptor
+    : public sdk::TestStageDescriptor<"$testBar",
+                                      sdk::shared_test_stages::TransformAggStageParseNode> {
 public:
-    static inline const std::string kStageName = std::string(TestBarStageName);
-
-    TestBarStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
-
+    void validate(const mongo::BSONObj& arguments) const override {
         sdk_uassert(10785800,
                     "Failed to parse " + kStageName + ", must have at least one field",
                     !arguments.isEmpty());
-
-        return std::make_unique<TestBarParseNode>(kStageName, arguments);
     }
 };
 
-class BarExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        _registerStage<TestBarStageDescriptor>(portal);
-    }
-};
-
+DEFAULT_EXTENSION(Bar)
 REGISTER_EXTENSION(BarExtension)
 DEFINE_GET_EXTENSION()

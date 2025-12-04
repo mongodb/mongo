@@ -31,35 +31,17 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/host_portal.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 namespace sdk = mongo::extension::sdk;
-
-DEFAULT_LOGICAL_AST_PARSE(VectorSearch, "$vectorSearch")
 
 /**
  * $vectorSearch is stage used to imitate overriding the existing $vectorSearch implementation
  * with an extension stage.
  */
-class VectorSearchStageDescriptor : public sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = std::string(VectorSearchStageName);
+using VectorSearchStageDescriptor =
+    sdk::TestStageDescriptor<"$vectorSearch", sdk::shared_test_stages::TransformAggStageParseNode>;
 
-    VectorSearchStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
-
-        return std::make_unique<VectorSearchParseNode>(kStageName, arguments);
-    }
-};
-
-class VectorSearchExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        _registerStage<VectorSearchStageDescriptor>(portal);
-    }
-};
-
+DEFAULT_EXTENSION(VectorSearch)
 REGISTER_EXTENSION(VectorSearchExtension)
 DEFINE_GET_EXTENSION()

@@ -30,24 +30,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 namespace sdk = mongo::extension::sdk;
 
-DEFAULT_LOGICAL_AST_PARSE(MyStage, "$myStage")
-
-class MyStageDescriptor : public sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = std::string(MyStageStageName);
-
-    MyStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
-
-        return std::make_unique<MyStageParseNode>(kStageName, arguments);
-    }
-};
+using MyStageDescriptor =
+    sdk::TestStageDescriptor<"$myStage", sdk::shared_test_stages::TransformAggStageParseNode>;
 
 class MyExtension : public sdk::Extension {
 public:

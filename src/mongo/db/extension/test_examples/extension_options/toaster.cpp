@@ -31,7 +31,7 @@
 #include "mongo/db/extension/public/extension_agg_stage_static_properties_gen.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -40,12 +40,10 @@ struct ToasterOptions {
     inline static bool allowBagels = false;
 };
 
-STAGE_NAME(Toast, "$toast");
-
 class ToastExecStage : public sdk::ExecAggStageSource {
 public:
     ToastExecStage(std::string_view stageName, const mongo::BSONObj& arguments)
-        : sdk::ExecAggStageSource(ToastStageName), _currentSlice(0) {
+        : sdk::ExecAggStageSource(stageName), _currentSlice(0) {
         _temp = arguments["temp"].Number();
         _numSlices = [&] {
             if (auto numSlices = arguments["numSlices"]) {
@@ -111,11 +109,9 @@ DEFAULT_PARSE_NODE(Toast);
  * $toast is a source stage that requires a temperature and number of slices, like {$toast: {temp:
  * 3, numSlices: 5}}.
  */
-class ToastStageDescriptor : public sdk::TestStageDescriptor<ToastStageName, ToastParseNode> {
+class ToastStageDescriptor : public sdk::TestStageDescriptor<"$toast", ToastParseNode> {
 public:
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
-
+    void validate(const mongo::BSONObj& arguments) const override {
         sdk_uassert(11285301,
                     "expected temp input to " + kStageName,
                     arguments.hasField("temp") && arguments.getField("temp").isNumber());
@@ -129,17 +125,16 @@ public:
                         "numSlices must be >= 0",
                         numSlices.isNumber() && numSlices.Number() >= 0);
         }
-
-        return std::make_unique<ToastParseNode>(kStageName, std::move(arguments));
     }
 };
-
-DEFAULT_LOGICAL_AST_PARSE(ToastBagel, "$toastBagel")
 
 /**
  * $toastBagel is a no-op stage whose stage definition must be empty, like {$toastBagel: {}}.
  */
-using ToastBagelStageDescriptor = sdk::TestStageDescriptor<"$toastBagel", ToastBagelParseNode>;
+using ToastBagelStageDescriptor =
+    sdk::TestStageDescriptor<"$toastBagel",
+                             sdk::shared_test_stages::TransformAggStageParseNode,
+                             true /* ExpectEmptyStageDefinition */>;
 
 class ToasterExtension : public sdk::Extension {
 public:

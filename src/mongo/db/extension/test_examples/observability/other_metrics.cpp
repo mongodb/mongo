@@ -32,14 +32,11 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
 
 #include <memory>
 
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
-
-static constexpr std::string kMetricsStageName = "$otherMetrics";
 
 /**
  * Implementation of OperationMetricsBase that tracks operation metrics.
@@ -71,9 +68,10 @@ private:
     int64_t _documentCount{0};
 };
 
-class MetricsExecAggStage : public sdk::ExecAggStageTransform {
+class MetricsExecStage : public sdk::TestExecStage {
 public:
-    explicit MetricsExecAggStage() : sdk::ExecAggStageTransform(kMetricsStageName) {}
+    explicit MetricsExecStage(std::string_view stageName, mongo::BSONObj arguments)
+        : sdk::TestExecStage(stageName, arguments) {}
 
     mongo::extension::ExtensionGetNextResult getNext(
         const mongo::extension::sdk::QueryExecutionContextHandle& execCtx,
@@ -97,17 +95,6 @@ public:
             mongo::extension::ExtensionBSONObj::makeAsByteBuf(doc));
     }
 
-
-    void open() override {}
-
-    void reopen() override {}
-
-    void close() override {}
-
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSONObj();
-    }
-
     /**
      * Create metrics instance for this stage.
      * The instance will be stored on the OperationContext and accessed via execCtx.getMetrics().
@@ -117,82 +104,18 @@ public:
     }
 };
 
-class MetricsLogicalStage : public sdk::LogicalAggStage {
-public:
-    MetricsLogicalStage() : sdk::LogicalAggStage(kMetricsStageName) {}
-
-    BSONObj serialize() const override {
-        return BSON(kMetricsStageName << BSONObj());
-    }
-
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSON(kMetricsStageName << BSONObj());
-    }
-
-    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
-        return std::make_unique<MetricsExecAggStage>();
-    }
-
-    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
-        return nullptr;
-    }
-};
-
-class MetricsAstNode : public sdk::AggStageAstNode {
-public:
-    MetricsAstNode() : sdk::AggStageAstNode(kMetricsStageName) {}
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<MetricsLogicalStage>();
-    }
-};
-
-class MetricsParseNode : public sdk::AggStageParseNode {
-public:
-    MetricsParseNode() : sdk::AggStageParseNode(kMetricsStageName) {}
-
-    size_t getExpandedSize() const override {
-        return 1;
-    }
-
-    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
-        std::vector<mongo::extension::VariantNodeHandle> expanded;
-        expanded.reserve(getExpandedSize());
-        expanded.emplace_back(
-            new sdk::ExtensionAggStageAstNode(std::make_unique<MetricsAstNode>()));
-        return expanded;
-    }
-
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        return BSONObj();
-    }
-};
+DEFAULT_LOGICAL_STAGE(Metrics);
+DEFAULT_AST_NODE(Metrics);
+DEFAULT_PARSE_NODE(Metrics);
 
 /**
  * $otherMetrics aggregation stage that collects and reports operation metrics.
  *
  * Syntax: {$otherMetrics: {}}
  */
-class MetricsStageDescriptor : public sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = "$otherMetrics";
+using MetricsStageDescriptor = sdk::
+    TestStageDescriptor<"$otherMetrics", MetricsParseNode, true /* ExpectEmptyStageDefinition */>;
 
-    MetricsStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
-
-        return std::make_unique<MetricsParseNode>();
-    }
-};
-
-class MetricsExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        // Register the aggregation stage.
-        _registerStage<MetricsStageDescriptor>(portal);
-    }
-};
-
+DEFAULT_EXTENSION(Metrics)
 REGISTER_EXTENSION(MetricsExtension)
 DEFINE_GET_EXTENSION()

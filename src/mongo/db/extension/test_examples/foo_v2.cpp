@@ -30,11 +30,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 namespace sdk = mongo::extension::sdk;
-
-DEFAULT_LOGICAL_AST_PARSE(TestFoo, "$testFoo")
 
 /**
  * $testFoo is a no-op stage.
@@ -42,27 +40,11 @@ DEFAULT_LOGICAL_AST_PARSE(TestFoo, "$testFoo")
  * This file is identical to foo.cpp except this stage does _not_ fail parsing if the
  * stage definition is empty. This is used for extension upgrade/downgrade testing.
  */
-class TestFooStageDescriptor : public sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = std::string(TestFooStageName);
+using FooStageDescriptor =
+    sdk::TestStageDescriptor<"$testFoo",
+                             sdk::shared_test_stages::TransformAggStageParseNode,
+                             false /* ExpectEmptyStageDefinition */>;
 
-    TestFooStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        // Unlike foo.cpp, this will NOT fail to parse if the stage definition is not empty. Any/all
-        // fields are just quietly ignored.
-        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
-
-        return std::make_unique<TestFooParseNode>(kStageName, arguments);
-    }
-};
-
-class FooExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        _registerStage<TestFooStageDescriptor>(portal);
-    }
-};
-
+DEFAULT_EXTENSION(Foo)
 REGISTER_EXTENSION(FooExtension)
 DEFINE_GET_EXTENSION()

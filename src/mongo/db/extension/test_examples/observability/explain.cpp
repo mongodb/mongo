@@ -30,17 +30,15 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 #include <memory>
 
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 
-STAGE_NAME(Explain, "$explain");
-DEFAULT_EXEC_STAGE(Explain);
-
-class ExplainLogicalStage : public sdk::TestLogicalStage<ExplainExecStage> {
+class ExplainLogicalStage
+    : public sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage> {
 public:
     ExplainLogicalStage(std::string_view stageName, const mongo::BSONObj& spec)
         : TestLogicalStage(stageName, spec) {}
@@ -49,7 +47,7 @@ public:
         BSONObjBuilder builder;
 
         {
-            BSONObjBuilder stageBuilder = builder.subobjStart(ExplainStageName);
+            BSONObjBuilder stageBuilder = builder.subobjStart(_name);
 
             // This was validated at parse time.
             auto input = _arguments["input"].valueStringDataSafe();
@@ -68,7 +66,7 @@ public:
                 default:
                     sdk_tasserted(11239405,
                                   (str::stream() << "unknown explain verbosity provided to "
-                                                 << ExplainStageName << " stage: " << verbosity));
+                                                 << _name << " stage: " << verbosity));
             }
 
             stageBuilder.done();
@@ -88,17 +86,13 @@ DEFAULT_PARSE_NODE(Explain);
  *
  * Explain will output the input and the verbosity level.
  */
-class ExplainStageDescriptor : public sdk::TestStageDescriptor<ExplainStageName, ExplainParseNode> {
+class ExplainStageDescriptor : public sdk::TestStageDescriptor<"$explain", ExplainParseNode> {
 public:
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
-
+    void validate(const mongo::BSONObj& arguments) const override {
         sdk_uassert(
             11239403,
             (str::stream() << "input to " << kStageName << " must be a string " << arguments),
             arguments["input"] && arguments["input"].type() == mongo::BSONType::string);
-
-        return std::make_unique<ExplainParseNode>(kStageName, arguments);
     }
 };
 

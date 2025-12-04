@@ -31,7 +31,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
+#include "mongo/db/extension/sdk/test_extension_factory.h"
 
 #include <memory>
 
@@ -47,14 +47,17 @@ static constexpr std::string kInterruptTestStageName = "$interruptTest";
  * a query with this stage. When the failpoint is active and checkForInterrupt
  * is called, the operation will be marked as killed.
  */
-class InterruptTestExecAggStage : public sdk::ExecAggStageTransform {
+class InterruptTestExecStage : public sdk::TestExecStage {
 public:
     static constexpr std::string kIdField = "_id";
+    static inline const std::string kuassertOn = "uassertOn";
 
-    InterruptTestExecAggStage(int uassertOn)
-        : sdk::ExecAggStageTransform(kInterruptTestStageName),
-          _callCount(0),
-          _uassertOn(uassertOn) {}
+    InterruptTestExecStage(std::string_view stageName, BSONObj arguments)
+        : sdk::TestExecStage(stageName, arguments), _callCount(0), _uassertOn(0) {
+        if (arguments.hasField(kuassertOn) && arguments[kuassertOn].isNumber()) {
+            _uassertOn = arguments[kuassertOn].numberInt();
+        }
+    }
 
     mongo::extension::ExtensionGetNextResult getNext(
         const sdk::QueryExecutionContextHandle& execCtx,
@@ -91,83 +94,14 @@ public:
             mongo::extension::ExtensionBSONObj::makeAsByteBuf(doc));
     }
 
-    void open() override {}
-
-    void reopen() override {}
-
-    void close() override {}
-
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSONObj();
-    }
-
 private:
     int _callCount;
     int _uassertOn;
 };
 
-class InterruptTestLogicalStage : public sdk::LogicalAggStage {
-public:
-    InterruptTestLogicalStage(int uassertOn)
-        : sdk::LogicalAggStage(kInterruptTestStageName), _uassertOn(uassertOn) {}
-
-    BSONObj serialize() const override {
-        return BSON(kInterruptTestStageName << BSONObj());
-    }
-
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSON(kInterruptTestStageName << BSONObj());
-    }
-
-    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
-        return std::make_unique<InterruptTestExecAggStage>(_uassertOn);
-    }
-
-    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
-        return nullptr;
-    }
-
-private:
-    int _uassertOn;
-};
-
-class InterruptTestAstNode : public sdk::AggStageAstNode {
-public:
-    InterruptTestAstNode(int uassertOn)
-        : sdk::AggStageAstNode(kInterruptTestStageName), _uassertOn(uassertOn) {}
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<InterruptTestLogicalStage>(_uassertOn);
-    }
-
-private:
-    int _uassertOn;
-};
-
-class InterruptTestParseNode : public sdk::AggStageParseNode {
-public:
-    InterruptTestParseNode(int uassertOn)
-        : sdk::AggStageParseNode(kInterruptTestStageName), _uassertOn(uassertOn) {}
-
-    size_t getExpandedSize() const override {
-        return 1;
-    }
-
-    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
-        std::vector<mongo::extension::VariantNodeHandle> expanded;
-        expanded.reserve(getExpandedSize());
-        expanded.emplace_back(
-            new sdk::ExtensionAggStageAstNode(std::make_unique<InterruptTestAstNode>(_uassertOn)));
-        return expanded;
-    }
-
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        return BSONObj();
-    }
-
-private:
-    int _uassertOn;
-};
+DEFAULT_LOGICAL_STAGE(InterruptTest);
+DEFAULT_AST_NODE(InterruptTest);
+DEFAULT_PARSE_NODE(InterruptTest);
 
 /**
  * $interruptTest aggregation stage that calls checkForInterrupt in getNext().
@@ -184,32 +118,10 @@ private:
  *   2. Run a query: db.coll.aggregate([{$interruptTest: {}}])
  *   3. The query should fail with an interrupt error.
  */
-class InterruptTestStageDescriptor : public sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = "$interruptTest";
-    static inline const std::string kuassertOn = "uassertOn";
+using InterruptTestStageDescriptor =
+    sdk::TestStageDescriptor<"$interruptTest", InterruptTestParseNode>;
 
-    InterruptTestStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName, false /* checkEmpty */);
-
-        int docToUassertOn = 0;
-        if (stageBson[kStageName].Obj().hasField(kuassertOn)) {
-            docToUassertOn = stageBson[kStageName].Obj()[kuassertOn].numberInt();
-        }
-        return std::make_unique<InterruptTestParseNode>(docToUassertOn);
-    }
-};
-
-class InterruptTestExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        // Register the aggregation stage.
-        _registerStage<InterruptTestStageDescriptor>(portal);
-    }
-};
-
+DEFAULT_EXTENSION(InterruptTest)
 REGISTER_EXTENSION(InterruptTestExtension)
 DEFINE_GET_EXTENSION()
 

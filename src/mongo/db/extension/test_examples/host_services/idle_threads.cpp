@@ -29,8 +29,7 @@
 
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_util.h"
+#include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 #include <thread>
 
@@ -41,35 +40,12 @@
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 
-static constexpr std::string kIdleThreadsStageName = "$idleThreads";
-
-DEFAULT_EXEC_STAGE(IdleThreads);
-
-class IdleThreadsLogicalStage : public sdk::LogicalAggStage {
+class IdleThreadsAstNode
+    : public sdk::TestAstNode<sdk::shared_test_stages::TransformLogicalAggStage> {
 public:
-    IdleThreadsLogicalStage() : sdk::LogicalAggStage(kIdleThreadsStageName) {}
-
-    BSONObj serialize() const override {
-        return BSON(kIdleThreadsStageName << BSONObj());
-    }
-
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSON(kIdleThreadsStageName << BSONObj());
-    }
-
-    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
-        return std::make_unique<IdleThreadsExecStage>(kIdleThreadsStageName, BSONObj());
-    }
-
-    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
-        return nullptr;
-    }
-};
-
-class IdleThreadsAstNode : public sdk::AggStageAstNode {
-public:
-    IdleThreadsAstNode() : sdk::AggStageAstNode(kIdleThreadsStageName) {}
-
+    IdleThreadsAstNode(std::string_view stageName, BSONObj arguments)
+        : sdk::TestAstNode<sdk::shared_test_stages::TransformLogicalAggStage>(stageName,
+                                                                              arguments) {}
     /**
      * This extension will demonstrate the functionality of marking threads as idle. Given that
      * this feature is only reflected in gdb, there is no unit or e2e test. Rather, to test the
@@ -118,54 +94,16 @@ public:
         std::thread idleThread(threadFunction);
         idleThread.join();
 
-        return std::make_unique<IdleThreadsLogicalStage>();
+        return sdk::TestAstNode<sdk::shared_test_stages::TransformLogicalAggStage>::bind();
     }
 };
 
-class IdleThreadsParseNode : public sdk::AggStageParseNode {
-public:
-    IdleThreadsParseNode() : sdk::AggStageParseNode(kIdleThreadsStageName) {}
+DEFAULT_PARSE_NODE(IdleThreads);
 
-    size_t getExpandedSize() const override {
-        return 1;
-    }
+using IdleThreadsStageDescriptor = sdk::TestStageDescriptor<"$idleThreads",
+                                                            IdleThreadsParseNode,
+                                                            true /* ExpectEmptyStageDefinition */>;
 
-    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
-        std::vector<mongo::extension::VariantNodeHandle> expanded;
-        expanded.reserve(getExpandedSize());
-        expanded.emplace_back(
-            new sdk::ExtensionAggStageAstNode(std::make_unique<IdleThreadsAstNode>()));
-        return expanded;
-    }
-
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        return BSONObj();
-    }
-};
-
-class IdleThreadsStageDescriptor : public sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = std::string(kIdleThreadsStageName);
-
-    IdleThreadsStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName);
-
-        sdk_uassert(11098200,
-                    "Failed to parse " + kStageName + ", expected empty object",
-                    stageBson.getField(kStageName).Obj().isEmpty());
-
-        return std::make_unique<IdleThreadsParseNode>();
-    }
-};
-
-class IdleThreadsExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        _registerStage<IdleThreadsStageDescriptor>(portal);
-    }
-};
-
+DEFAULT_EXTENSION(IdleThreads)
 REGISTER_EXTENSION(IdleThreadsExtension)
 DEFINE_GET_EXTENSION()

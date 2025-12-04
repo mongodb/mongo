@@ -8,15 +8,6 @@ exports_files(
     ]),
 )
 
-mongo_cc_library(
-    name = "shared_test_stages",
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db/extension/host/aggregation_stage",
-        "//src/mongo/db/extension/sdk:sdk_cpp",
-    ],
-)
-
 mongo_cc_unit_test(
     name = "extension_sdk_test",
     srcs = [
@@ -30,7 +21,6 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_second_group"],
     deps = [
-        ":shared_test_stages",
         "//src/mongo:base",
         "//src/mongo/db/extension/host:extension_host",
         "//src/mongo/db/extension/host_connector/adapter:host_adapters",
@@ -52,7 +42,6 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
-        ":shared_test_stages",
         "//src/mongo:base",
         "//src/mongo/db/extension/host:extension_host",
         "//src/mongo/db/extension/host_connector/adapter:host_adapters",

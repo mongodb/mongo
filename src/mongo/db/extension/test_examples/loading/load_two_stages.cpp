@@ -28,43 +28,15 @@
  */
 
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 namespace sdk = mongo::extension::sdk;
 
-DEFAULT_LOGICAL_AST_PARSE(Foo, "$foo")
-
-class FooStageDescriptor : public mongo::extension::sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = std::string(FooStageName);
-
-    FooStageDescriptor() : mongo::extension::sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<mongo::extension::sdk::AggStageParseNode> parse(
-        mongo::BSONObj stageBson) const override {
-        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
-
-        return std::make_unique<FooParseNode>(kStageName, arguments);
-    }
-};
-
-DEFAULT_LOGICAL_AST_PARSE(Bar, "$bar")
-
-class BarStageDescriptor : public sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = std::string(BarStageName);
-
-    BarStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
-
-        return std::make_unique<BarParseNode>(kStageName, arguments);
-    }
-};
+using FooStageDescriptor =
+    sdk::TestStageDescriptor<"$foo", sdk::shared_test_stages::TransformAggStageParseNode>;
+using BarStageDescriptor =
+    sdk::TestStageDescriptor<"$bar", sdk::shared_test_stages::TransformAggStageParseNode>;
 
 class MyExtension : public sdk::Extension {
 public:

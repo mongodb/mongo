@@ -30,11 +30,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 namespace sdk = mongo::extension::sdk;
-
-DEFAULT_LOGICAL_AST_PARSE(CheckNum, "$checkNum")
 
 struct ExtensionOptions {
     inline static bool checkMax = false;
@@ -49,28 +47,22 @@ struct ExtensionOptions {
  * fail to parse. If 'checkMax' is true and the supplied num is greater than 'max', it will fail to
  * parse.
  */
-class CheckNumStageDescriptor : public sdk::AggStageDescriptor {
+class CheckNumStageDescriptor
+    : public sdk::TestStageDescriptor<"$checkNum",
+                                      sdk::shared_test_stages::TransformAggStageParseNode> {
 public:
-    static inline const std::string kStageName = std::string(CheckNumStageName);
-    CheckNumStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName);
-
-        const auto obj = stageBson.getField(kStageName).Obj();
+    void validate(const mongo::BSONObj& arguments) const override {
         sdk_uassert(10999105,
                     "Failed to parse " + kStageName + ", expected {" + kStageName +
                         ": {num: <double>}}",
-                    obj.hasField("num") && obj.getField("num").isNumber());
+                    arguments.hasField("num") && arguments.getField("num").isNumber());
 
         if (ExtensionOptions::checkMax) {
             sdk_uassert(10999106,
                         "Failed to parse " + kStageName + ", provided num is higher than max " +
                             std::to_string(ExtensionOptions::max),
-                        obj.getField("num").numberDouble() <= ExtensionOptions::max);
+                        arguments.getField("num").numberDouble() <= ExtensionOptions::max);
         }
-
-        return std::make_unique<CheckNumParseNode>(kStageName, obj);
     }
 };
 

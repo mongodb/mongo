@@ -30,7 +30,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/log_util.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -41,26 +41,23 @@ namespace sdk = mongo::extension::sdk;
  * stage will never assert on unexpected input but instead will log lines depending on
  * the level provided and the server's log level.
  */
-DEFAULT_LOGICAL_AST_PARSE(DebugLog, "$debugLog");
-
 class DebugLogStageDescriptor : public sdk::AggStageDescriptor {
 public:
-    static inline const std::string kStageName = std::string(DebugLogStageName);
+    static inline const std::string kStageName = std::string("$debugLog");
     static inline const std::string kDebugLogLevelField = "level";
     static inline const std::string kAttributesField = "attrs";
 
     DebugLogStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        sdk::validateStageDefinition(stageBson, kStageName);
+        auto bsonSpec = sdk::validateStageDefinition(stageBson, kStageName);
 
         sdk_uassert(11134101,
                     "Failed to parse " + kStageName + ", expected non-empty object",
-                    !stageBson.getField(kStageName).Obj().isEmpty());
+                    !bsonSpec.isEmpty());
 
-        mongo::BSONObj bsonSpec = stageBson.getField(kStageName).Obj();
         sdk_uassert(11134102,
-                    kStageName + " stage missing or invalid " + kDebugLogLevelField + " field.",
+                    kStageName + " stage missing or invalid " + kDebugLogLevelField + " field",
                     bsonSpec.hasElement(kDebugLogLevelField) &&
                         bsonSpec.getField(kDebugLogLevelField).isNumber());
 
@@ -86,16 +83,11 @@ public:
 
         sdk::sdk_logDebug("Test log message", 11134100, level, attrs);
 
-        return std::make_unique<DebugLogParseNode>(kStageName, bsonSpec);
+        return std::make_unique<sdk::shared_test_stages::TransformAggStageParseNode>(kStageName,
+                                                                                     bsonSpec);
     }
 };
 
-class DebugLogExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        _registerStage<DebugLogStageDescriptor>(portal);
-    }
-};
-
+DEFAULT_EXTENSION(DebugLog);
 REGISTER_EXTENSION(DebugLogExtension)
 DEFINE_GET_EXTENSION()

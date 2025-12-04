@@ -30,36 +30,20 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/test_extension_factory.h"
+#include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 namespace sdk = mongo::extension::sdk;
-
-DEFAULT_LOGICAL_AST_PARSE(TestFoo, "$testFoo")
 
 /**
  * $testFoo is a no-op stage.
  *
  * The stage definition must be empty, like {$testFoo: {}}, or it will fail to parse.
  */
-class TestFooStageDescriptor : public sdk::AggStageDescriptor {
-public:
-    static inline const std::string kStageName = std::string(TestFooStageName);
+using FooStageDescriptor =
+    sdk::TestStageDescriptor<"$testFoo",
+                             sdk::shared_test_stages::TransformAggStageParseNode,
+                             true /* ExpectEmptyStageDefinition */>;
 
-    TestFooStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        auto arguments = sdk::validateStageDefinition(stageBson, kStageName, true /* checkEmpty */);
-
-        return std::make_unique<TestFooParseNode>(kStageName, arguments);
-    }
-};
-
-class FooExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        _registerStage<TestFooStageDescriptor>(portal);
-    }
-};
-
+DEFAULT_EXTENSION(Foo)
 REGISTER_EXTENSION(FooExtension)
 DEFINE_GET_EXTENSION()

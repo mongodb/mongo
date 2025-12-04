@@ -127,8 +127,9 @@ TEST_F(DocumentSourceExtensionTest, ParseTransformSuccess) {
         parsedPipeline->serializeToBson(SerializationOptions::kDebugQueryShapeSerializeOptions);
     ASSERT_EQUALS(serializedPipeline.size(), 1u);
     // The extension is in the form of DocumentSourceExtensionExpandable at this point, which
-    // serializes to its query shape. There is no query shape for the no-op extension.
-    ASSERT_BSONOBJ_EQ(serializedPipeline[0], BSONObj());
+    // serializes to its query shape. The transform extension's query shape is just its stage
+    // definition.
+    ASSERT_BSONOBJ_EQ(serializedPipeline[0], kValidSpec);
 }
 
 TEST_F(DocumentSourceExtensionTest, ExpandToExtAst) {

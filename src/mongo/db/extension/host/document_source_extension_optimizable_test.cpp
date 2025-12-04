@@ -66,8 +66,12 @@ TEST_F(DocumentSourceExtensionOptimizableTest, transformConstructionSucceeds) {
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, stageCanSerializeForQueryExecution) {
-    auto astNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::TransformAggStageAstNode::make());
+    using sdk::shared_test_stages::TransformAggStageAstNode;
+    using sdk::shared_test_stages::TransformAggStageDescriptor;
+
+    auto arguments = BSON("serializedForExecution" << true);
+    auto astNode = new sdk::ExtensionAggStageAstNode(std::make_unique<TransformAggStageAstNode>(
+        TransformAggStageDescriptor::kStageName, arguments));
     auto astHandle = AggStageAstNodeHandle(astNode);
 
     auto optimizable =
@@ -76,8 +80,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, stageCanSerializeForQueryExecutio
     // Test that an extension can provide its own implementation of serialize, that might change
     // the raw spec provided.
     ASSERT_BSONOBJ_EQ(optimizable->serialize(SerializationOptions()).getDocument().toBson(),
-                      BSON(sdk::shared_test_stages::TransformAggStageDescriptor::kStageName
-                           << "serializedForExecution"));
+                      BSON(TransformAggStageDescriptor::kStageName << arguments));
 }
 
 using DocumentSourceExtensionOptimizableTestDeathTest = DocumentSourceExtensionOptimizableTest;
