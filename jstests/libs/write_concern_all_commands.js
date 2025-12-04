@@ -16,6 +16,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {assertWriteConcernError} from "jstests/libs/write_concern_util.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const dbName = "testDB";
 const collName = "testColl";
@@ -6043,7 +6044,7 @@ const shardedDDLCommandsRequiringMajorityCommit = [
     "shardCollection",
 ];
 
-function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, writeWithoutSk, coll) {
+function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, writeWithoutSk, timeseriesViews, coll) {
     if (
         !shardedCollection &&
         (command == "moveChunk" ||
@@ -6116,6 +6117,19 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }
+
+        // When UWE is enabled, a findAndModify update on sharded viewful timeseries collection
+        // may fail on mongos directly, so there's no write concern error to check.
+        if (
+            clusterType == "sharded" &&
+            ["findAndModify", "findOneAndUpdate"].includes(command) &&
+            shardedCollection &&
+            timeseriesViews &&
+            isUweEnabled(coll.getDB())
+        ) {
+            jsTestLog("Skipping " + command + " test for failure case.");
+            return true;
+        }
     }
 }
 
@@ -6148,6 +6162,7 @@ function executeWriteConcernBehaviorTests(
     secondariesRunning,
     shardedCollection,
     writeWithoutSk,
+    timeseriesViews,
 ) {
     commandsToRun.forEach((command) => {
         let cmd = masterCommandsList[command];
@@ -6161,7 +6176,17 @@ function executeWriteConcernBehaviorTests(
         let forceUseMajorityWC = clusterType == "sharded" && umcRequireMajority.includes(command);
 
         if (cmd.noop) {
-            if (!shouldSkipTestCase(clusterType, command, "noop", shardedCollection, writeWithoutSk, coll))
+            if (
+                !shouldSkipTestCase(
+                    clusterType,
+                    command,
+                    "noop",
+                    shardedCollection,
+                    writeWithoutSk,
+                    timeseriesViews,
+                    coll,
+                )
+            )
                 runCommandTest(
                     cmd.noop,
                     conn,
@@ -6175,7 +6200,17 @@ function executeWriteConcernBehaviorTests(
         }
 
         if (cmd.success) {
-            if (!shouldSkipTestCase(clusterType, command, "success", shardedCollection, writeWithoutSk, coll))
+            if (
+                !shouldSkipTestCase(
+                    clusterType,
+                    command,
+                    "success",
+                    shardedCollection,
+                    writeWithoutSk,
+                    timeseriesViews,
+                    coll,
+                )
+            )
                 runCommandTest(
                     cmd.success,
                     conn,
@@ -6189,7 +6224,17 @@ function executeWriteConcernBehaviorTests(
         }
 
         if (cmd.failure) {
-            if (!shouldSkipTestCase(clusterType, command, "failure", shardedCollection, writeWithoutSk, coll))
+            if (
+                !shouldSkipTestCase(
+                    clusterType,
+                    command,
+                    "failure",
+                    shardedCollection,
+                    writeWithoutSk,
+                    timeseriesViews,
+                    coll,
+                )
+            )
                 runCommandTest(
                     cmd.failure,
                     conn,
@@ -6224,7 +6269,19 @@ export function checkWriteConcernBehaviorForAllCommands(
 
         stopSecondaries(cluster, clusterType);
 
-        executeWriteConcernBehaviorTests(conn, coll, cluster, clusterType, preSetup, commandsList, commandsToTest);
+        executeWriteConcernBehaviorTests(
+            conn,
+            coll,
+            cluster,
+            clusterType,
+            preSetup,
+            commandsList,
+            commandsToTest,
+            [] /* secondariesRunning */,
+            shardedCollection,
+            false /* writeWithoutSk */,
+            limitToTimeseriesViews,
+        );
 
         restartSecondaries(cluster, clusterType);
 
@@ -6276,6 +6333,8 @@ export function checkWriteConcernBehaviorForAllCommands(
             commandsToTest,
             [csrsSecondaries[1]],
             shardedCollection,
+            false /* writeWithoutSk */,
+            limitToTimeseriesViews,
         );
 
         cluster.configRS.restart(csrsSecondaries[0]);
@@ -6297,6 +6356,8 @@ export function checkWriteConcernBehaviorForAllCommands(
             commandsToTest,
             secondariesRunning,
             shardedCollection,
+            false /* writeWithoutSk */,
+            limitToTimeseriesViews,
         );
 
         restartSecondaries(cluster, clusterType);
@@ -6332,6 +6393,8 @@ export function checkWriteConcernBehaviorAdditionalCRUDOps(
         commandsToTest,
         [] /* secondariesRunning */,
         shardedCollection,
+        writeWithoutSk,
+        limitToTimeseriesViews,
     );
 
     restartSecondaries(cluster, clusterType);
