@@ -41,6 +41,7 @@
 #include "mongo/db/shard_role/shard_catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/feature_document_util.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_store.h"
@@ -206,16 +207,18 @@ void putMetaData(OperationContext* opCtx,
 namespace {
 /**
  * Creates the underlying storage for a collection or index, handling cases where the ident is
- * transiently in use but can be safely dropped. The actual creation is performed by the `create`
- * callback argument, which should attempt to create the record store or SDI and return whatever
- * error that produces. The `identExists` callback should scan the catalog for the ident and check
- * if it's already present. This callback is only invoked after an ident conflict has been detected,
- * so it can perform checks which are too expensive for the happy path.
+ * transiently in use. The actual creation is performed by the `create` callback argument, which
+ * should attempt to create the record store or SDI and return whatever error that produces. The
+ * `identExists` callback should scan the catalog for the ident and check if it's already present.
+ * This callback is only invoked after an ident conflict has been detected, so it can perform
+ * checks which are too expensive for the happy path. On ident collision we will reuse the ident if
+ * it is empty on disk. Otherwise, ObjectAlreadyExists is propagated to the caller.
  */
 Status createStorage(OperationContext* opCtx,
                      StringData ident,
                      function_ref<Status()> create,
-                     function_ref<bool()> identExists) {
+                     function_ref<bool()> identExists,
+                     function_ref<bool()> identEmpty) {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
@@ -257,8 +260,26 @@ Status createStorage(OperationContext* opCtx,
             return dropStatus;
         }
 
-        // Try again after dropping the existing table. This is expected to always work.
         status = create();
+        if (status == ErrorCodes::ObjectAlreadyExists) {
+            // Rarely, layered table drops will report OK but collide with subsequent table
+            // creations. We can re-use the table as long as it is empty.
+            // TODO (SERVER-114575): When layered table drops are supported, this error will no
+            // longer be a valid scenario and should be returned as a real error.
+            try {
+                if (!identEmpty()) {
+                    return status;
+                }
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
+
+            LOGV2_DEBUG(11439700,
+                        1,
+                        "Ident already exists on disk after drop attempt, but can be re-used",
+                        "ident"_attr = ident);
+            status = Status::OK();
+        }
     }
 
     if (!status.isOK()) {
@@ -289,18 +310,19 @@ StatusWith<std::unique_ptr<RecordStore>> createCollection(
         internal::createMetaDataForNewCollection(nss, collectionOptions);
 
     auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
     auto status = createStorage(
         opCtx,
         ident,
+        [&] { return engine->createRecordStore(provider, ru, nss, ident, recordStoreOptions); },
+        [&] { return mdbCatalog->hasCollectionIdent(opCtx, ident); },
         [&] {
-            return engine->createRecordStore(provider,
-                                             *shard_role_details::getRecoveryUnit(opCtx),
-                                             nss,
-                                             ident,
-                                             recordStoreOptions);
-        },
-        [&] { return mdbCatalog->hasCollectionIdent(opCtx, ident); });
+            auto existingRs = engine->getRecordStore(
+                opCtx, nss, ident, recordStoreOptions, collectionOptions.uuid);
+            auto cursor = existingRs->getCursor(opCtx, ru);
+            return !cursor->next();
+        });
     if (!status.isOK()) {
         return status;
     }
@@ -332,6 +354,8 @@ Status createIndex(OperationContext* opCtx,
     auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto keyFormat =
+        collectionOptions.clusteredIndex.has_value() ? KeyFormat::String : KeyFormat::Long;
 
     return createStorage(
         opCtx,
@@ -346,7 +370,13 @@ Status createIndex(OperationContext* opCtx,
                 indexConfig,
                 collectionOptions.indexOptionDefaults.getStorageEngine());
         },
-        [&] { return mdbCatalog->hasIndexIdent(opCtx, ident); });
+        [&] { return mdbCatalog->hasIndexIdent(opCtx, ident); },
+        [&] {
+            auto sortedDataInterface = engine->getSortedDataInterface(
+                opCtx, ru, nss, *collectionOptions.uuid, ident, indexConfig, keyFormat);
+            auto cursor = sortedDataInterface->newCursor(opCtx, ru);
+            return !cursor->next(ru);
+        });
 }
 
 StatusWith<ImportResult> importCollection(OperationContext* opCtx,
