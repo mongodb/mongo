@@ -357,6 +357,11 @@ public:
      */
     void toBsonWithMetaData(BSONObjBuilder* builder) const;
 
+    /**
+     * Like the 'toBson()' method, but includes only metadata.
+     */
+    void toBsonWithMetaDataOnly(BSONObjBuilder* builder) const;
+
     template <typename BSONTraits = BSONObj::DefaultSizeTrait>
     BSONObj toBsonWithMetaData() const {
         if (isTriviallyConvertibleWithMetadata()) {
@@ -365,6 +370,15 @@ public:
 
         BSONObjBuilder bb;
         toBsonWithMetaData(&bb);
+        BSONObj docBSONObj = bb.obj<BSONTraits>();
+        validateDocumentBSONSize(docBSONObj, BSONTraits::MaxSize);
+        return docBSONObj;
+    }
+
+    template <typename BSONTraits = BSONObj::DefaultSizeTrait>
+    BSONObj toBsonWithMetaDataOnly() const {
+        BSONObjBuilder bb;
+        toBsonWithMetaDataOnly(&bb);
         BSONObj docBSONObj = bb.obj<BSONTraits>();
         validateDocumentBSONSize(docBSONObj, BSONTraits::MaxSize);
         return docBSONObj;

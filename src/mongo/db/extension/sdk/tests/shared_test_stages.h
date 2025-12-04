@@ -221,8 +221,13 @@ public:
         bob.append("existingDoc", input.resultDocument->getUnownedBSONObj());
         // Transform the returned input document by adding a new field.
         bob.append("addedFields", _documents[_currentIndex++]);
-        // We need to return the result as a ByteBuf, since we are returning a temporary.
-        return ExtensionGetNextResult::advanced(ExtensionBSONObj::makeAsByteBuf(bob.done()));
+        // We need to preserve metadata from source stage if present and return the result as a
+        // ByteBuf, since we are returning a temporary.
+        return input.resultMetadata.has_value()
+            ? ExtensionGetNextResult::advanced(
+                  ExtensionBSONObj::makeAsByteBuf(bob.done()),
+                  ExtensionBSONObj::makeAsByteBuf(input.resultMetadata->getUnownedBSONObj()))
+            : ExtensionGetNextResult::advanced(ExtensionBSONObj::makeAsByteBuf(bob.done()));
     }
 
     void open() override {}
@@ -340,8 +345,6 @@ public:
 
     extension::ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
                                               ::MongoExtensionExecAggStage* execStage) override {
-        // TODO SERVER-113905: once we support metadata, we should only support returning both
-        // document and metadata.
         if (_documentsWithMetadata.empty()) {
             return extension::ExtensionGetNextResult::eof();
         }

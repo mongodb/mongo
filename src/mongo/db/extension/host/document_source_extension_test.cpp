@@ -1582,4 +1582,44 @@ TEST_F(DocumentSourceExtensionTest, ShouldPropagateSourceMetadata) {
     }
     ASSERT_TRUE(sourceStage->getNext().isEOF());
 }
+
+TEST_F(DocumentSourceExtensionTest, TransformReceivesSourceMetadata) {
+    auto sourceAstNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::FruitsAsDocumentsAstNode::make());
+    auto sourceAstHandle = AggStageAstNodeHandle(sourceAstNode);
+
+    auto sourceOptimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(sourceAstHandle));
+    auto sourceStage = exec::agg::buildStage(sourceOptimizable);
+
+    auto transformAstNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+    auto transformAstHandle = AggStageAstNodeHandle(transformAstNode);
+
+    auto transformOptimizable = host::DocumentSourceExtensionOptimizable::create(
+        getExpCtx(), std::move(transformAstHandle));
+
+    auto transformStage = exec::agg::buildStageAndStitch(transformOptimizable, sourceStage);
+
+    std::array<std::pair<const char*, double>, 5> expected = {
+        std::pair{"$textScore", 5.0},
+        std::pair{"$searchScore", 1.5},
+        std::pair{"$searchScore", 2.0},
+        std::pair{"$textScore", 4.0},
+        std::pair{"$searchScore", 5.0},
+    };
+
+    // Verify transform stage output has metadata.
+    for (size_t i = 0; i < 5; ++i) {
+        auto nextResult = transformStage->getNext();
+        ASSERT_TRUE(nextResult.isAdvanced());
+        BSONObj docWithMeta = nextResult.releaseDocument().toBsonWithMetaData();
+
+        auto [fieldName, expectedVal] = expected[i];
+        ASSERT_TRUE(docWithMeta.hasField(fieldName));
+        ASSERT_EQ(expectedVal, docWithMeta.getField(fieldName).numberDouble());
+    }
+
+    ASSERT_TRUE(transformStage->getNext().isEOF());
+}
 }  // namespace mongo::extension

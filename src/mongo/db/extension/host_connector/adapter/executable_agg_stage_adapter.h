@@ -77,6 +77,7 @@ public:
 private:
     exec::agg::GetNextResult _getNextResult{exec::agg::GetNextResult::makeEOF()};
     boost::optional<BSONObj> _resultDocument{boost::none};
+    boost::optional<BSONObj> _resultMetadata{boost::none};
 };
 
 /**

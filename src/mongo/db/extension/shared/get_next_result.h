@@ -212,6 +212,7 @@ struct ExtensionGetNextResult {
      */
     static ExtensionGetNextResult makeAdvancedFromApiResult(
         ::MongoExtensionGetNextResult& apiResult) {
+        // send back metadata only if present
         return isEmptyByteContainer(apiResult.resultMetadata)
             ? advanced(ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument))
             : advanced(ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument),
@@ -230,8 +231,8 @@ struct ExtensionGetNextResult {
     }
 
     /**
-     * Instantiates a ExtensionGetNextResult from the provided ::MongoExtensionGetNextResult. Sets
-     * the code and results of the ExtensionGetNextResult accordingly. If the
+     * Instantiates a ExtensionGetNextResult from the provided ::MongoExtensionGetNextResult.
+     * Sets the code and results of the ExtensionGetNextResult accordingly. If the
      * MongoExtensionGetNextResult struct has an invalid code, asserts in that case.
      */
     static ExtensionGetNextResult makeFromApiResult(::MongoExtensionGetNextResult& apiResult) {
@@ -257,11 +258,11 @@ struct ExtensionGetNextResult {
     }
 
     /**
-     * Populates a ::MongoExtensionGetNextResult struct with this ExtensionGetNextResult's code and
-     * internal results. Transfers ownership of any resources out of this instance and into the
-     * apiResult. Asserts that we were provided with a valid getNextResult code. Asserts if the
-     * ExtensionGetNextResult doesn't have a value for the result when it's expected or
-     * does have a value for a result when it's not expected.
+     * Populates a ::MongoExtensionGetNextResult struct with this ExtensionGetNextResult's code
+     * and internal results. Transfers ownership of any resources out of this instance and into
+     * the apiResult. Asserts that we were provided with a valid getNextResult code. Asserts if
+     * the ExtensionGetNextResult doesn't have a value for the result when it's expected or does
+     * have a value for a result when it's not expected.
      */
     void toApiResult(::MongoExtensionGetNextResult& apiResult) {
         switch (code) {

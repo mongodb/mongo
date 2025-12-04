@@ -600,6 +600,10 @@ constexpr StringData Document::metaFieldChangeStreamControlEvent;
 
 void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
     toBson(builder);
+    toBsonWithMetaDataOnly(builder);
+}
+
+void Document::toBsonWithMetaDataOnly(BSONObjBuilder* builder) const {
     if (!metadata()) {
         return;
     }

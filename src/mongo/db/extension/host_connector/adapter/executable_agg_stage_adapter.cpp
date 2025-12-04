@@ -42,6 +42,7 @@ namespace mongo::extension::host_connector {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         apiResult->code = ::MongoExtensionGetNextResultCode::kPauseExecution;
         apiResult->resultDocument = createEmptyByteContainer();
+        apiResult->resultMetadata = createEmptyByteContainer();
 
         auto& aggStageAdapter = *static_cast<HostExecAggStageAdapter*>(execAggStage);
 
@@ -92,9 +93,14 @@ void CachedGetNextResult::getAsExtensionNextResult(::MongoExtensionGetNextResult
     if (!_resultDocument) {
         _resultDocument = _getNextResult.getDocument().toBson();
     }
+    if (!_resultMetadata) {
+        _resultMetadata = _getNextResult.getDocument().toBsonWithMetaDataOnly();
+    }
     // Populate the output result as a view on the cached result BSON.
     outputResult.resultDocument.type = MongoExtensionByteContainerType::kByteView;
     outputResult.resultDocument.bytes.view = objAsByteView(*_resultDocument);
+    outputResult.resultMetadata.type = MongoExtensionByteContainerType::kByteView;
+    outputResult.resultMetadata.bytes.view = objAsByteView(*_resultMetadata);
 }
 
 };  // namespace mongo::extension::host_connector
