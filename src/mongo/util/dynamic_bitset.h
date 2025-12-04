@@ -36,6 +36,7 @@
 #include "mongo/util/modules.h"
 
 #include <bit>
+#include <iterator>
 #include <type_traits>
 
 namespace MONGO_MOD_PUB mongo {
@@ -45,6 +46,9 @@ T maskbit(size_t bitIndex) {
     return static_cast<T>(1) << bitIndex;
 }
 }  // namespace bitset_details
+
+template <typename T, size_t nBlocks, typename Storage>
+class DynamicBitsetPopulationView;
 
 /**
  * Bitset class implementation, which can dynamically grow and shrink. t has the capability to
@@ -469,6 +473,100 @@ private:
 
     // 0 is the least significant word.
     Storage _storage;
+
+    friend class DynamicBitsetPopulationView<T, nBlocks, Storage>;
 };
 
+/**
+ * A view on DynamicBitset provides a forward iterator over the indices of its set bits.
+ * The iterator is invalidated after updating or resizing the bitset.
+ */
+template <typename T, size_t nBlocks, typename Storage>
+class DynamicBitsetPopulationView {
+public:
+    using Bitset = DynamicBitset<T, nBlocks, Storage>;
+
+    class Iterator {
+    public:
+        using value_type = std::size_t;
+        using difference_type = std::ptrdiff_t;
+
+        Iterator() = default;
+
+        Iterator(const Storage* storage, size_t blockIndex)
+            : _storage(storage), _nextBlockIndex(blockIndex) {
+            _moveToNextSetBit();
+        }
+
+        value_type operator*() const {
+            return _bitIndex;
+        }
+
+        Iterator& operator++() {
+            _moveToNextSetBit();
+            return *this;
+        }
+
+        Iterator operator++(int) {
+            auto tmp = *this;
+            ++*this;
+            return tmp;
+        }
+
+        bool operator==(const Iterator& other) const {
+            return _bitIndex == other._bitIndex;
+        }
+
+    private:
+        /**
+         * Finds the lowest set bit index in the current block to calculate the bitset index and
+         * clears the bit. Advances to the next block when the current one is exhausted.
+         */
+        void _moveToNextSetBit() {
+            dassert(_storage, "increment of singular iterator");
+
+            while (_currentBlock == 0 && _nextBlockIndex < _storage->size()) {
+                _currentBlock = (*_storage)[_nextBlockIndex++];
+            }
+
+            if (_currentBlock != 0) {
+                _bitIndex =
+                    Bitset::kBitsPerBlock * (_nextBlockIndex - 1) + std::countr_zero(_currentBlock);
+                _currentBlock &= _currentBlock - 1;
+            } else {
+                _bitIndex = Bitset::npos;
+            }
+        }
+
+        const Storage* _storage{nullptr};
+        size_t _nextBlockIndex{0};
+        Bitset::BlockType _currentBlock{0};
+        value_type _bitIndex{Bitset::npos};
+    };
+
+    explicit DynamicBitsetPopulationView(const DynamicBitset<T, nBlocks, Storage>& bitset)
+        : _storage(&bitset._storage) {}
+
+    Iterator begin() const {
+        return Iterator{_storage, 0};
+    }
+
+    Iterator end() const {
+        return Iterator{_storage, _storage->size()};
+    }
+
+private:
+    static_assert(std::forward_iterator<Iterator>);
+
+    const Storage* _storage;
+};
+
+/**
+ * Creates a DynamicBitsetPopulationView to iterate over set bits.
+ */
+template <typename T, size_t nBlocks, typename Storage>
+DynamicBitsetPopulationView<T, nBlocks, Storage> makePopulationView(
+    const DynamicBitset<T, nBlocks, Storage>& bitset) {
+    return DynamicBitsetPopulationView<T, nBlocks, Storage>(bitset);
+}
 }  // namespace MONGO_MOD_PUB mongo
