@@ -101,9 +101,9 @@ if exist "%REPO_ROOT%\bazel-%cur_dir%" (
 if not defined python (
     (
         echo python prereq missing, using bazel to install python...
-        "%BAZEL_REAL%" build --bes_backend= --bes_results_url= @py_windows_x86_64//:all
+        "%BAZEL_REAL%" build --bes_backend= --bes_results_url= --workspace_status_command= @py_windows_x86_64//:all
         if !ERRORLEVEL! NEQ 0 (
-            "%BAZEL_REAL%" build --config=local @py_windows_x86_64//:all
+            "%BAZEL_REAL%" build --config=local --workspace_status_command= @py_windows_x86_64//:all
             if !ERRORLEVEL! NEQ 0 (
                 if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" (
                     call :cleanup_logfile
