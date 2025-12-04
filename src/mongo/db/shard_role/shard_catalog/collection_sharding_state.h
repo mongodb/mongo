@@ -79,7 +79,7 @@ public:
  * this reason, it must always be accessed through ScopedCollectionShardingState  helper classes,
  * which acquire the appropriate read locks to protect against concurrent modifications.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT CollectionShardingState {
+class MONGO_MOD_USE_REPLACEMENT(acquireCollection) CollectionShardingState {
 public:
     CollectionShardingState() = default;
     virtual ~CollectionShardingState() = default;
@@ -266,7 +266,7 @@ public:
  * Singleton factory to instantiate CollectionShardingState objects specific to the type of instance
  * which is running.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT CollectionShardingStateFactory {
+class MONGO_MOD_PUBLIC CollectionShardingStateFactory {
     CollectionShardingStateFactory(const CollectionShardingStateFactory&) = delete;
     CollectionShardingStateFactory& operator=(const CollectionShardingStateFactory&) = delete;
 

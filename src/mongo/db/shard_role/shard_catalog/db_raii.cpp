@@ -31,47 +31,24 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/profile_settings.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/direct_connection_util.h"
-#include "mongo/db/shard_role/lock_manager/exception_util.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_helper.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
-#include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch.h"
-#include "mongo/db/shard_role/shard_catalog/collection_yield_restore.h"
-#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
-#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
-#include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
-#include "mongo/db/shard_role/shard_catalog/snapshot_helper.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/topology/sharding_state.h"
-#include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/message.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
-#include "mongo/util/duration.h"
 #include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
 #include <algorithm>
-#include <mutex>
-#include <string>
 #include <tuple>
 
 #include <boost/move/utility_core.hpp>
@@ -429,49 +406,6 @@ AutoGetDbForReadMaybeLockFree::AutoGetDbForReadMaybeLockFree(OperationContext* o
         _autoGetLockFree.emplace(opCtx, dbName, deadline);
     } else {
         _autoGet.emplace(opCtx, dbName, MODE_IS, deadline);
-    }
-}
-
-void assertReadConcernSupported(const CollectionPtr& coll,
-                                const repl::ReadConcernArgs& readConcernArgs,
-                                const RecoveryUnit::ReadSource& readSource) {
-    const auto readConcernLevel = readConcernArgs.getLevel();
-    const auto& ns = coll->ns();
-
-    // The pre-images collection prunes old content using untimestamped truncates. A read
-    // establishing a snapshot at a point in time (PIT) may see data inconsistent with that PIT:
-    // data that should have been present at that PIT will be missing if it was truncated, since a
-    // non-truncated operation effectively overwrites history.
-    uassert(7829600,
-            "Reading with readConcern snapshot from pre-images collection is "
-            "not supported",
-            !ns.isChangeStreamPreImagesCollection() ||
-                readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
-
-    // Ban snapshot reads on capped collections.
-    uassert(
-        ErrorCodes::SnapshotUnavailable,
-        "Reading from non replicated capped collections with readConcern snapshot is not supported",
-        !coll->isCapped() || ns.isReplicated() ||
-            readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
-
-    // Disallow snapshot reads and causal consistent majority reads on config.transactions
-    // outside of transactions to avoid running the collection at a point-in-time in the middle
-    // of a secondary batch. Such reads are unsafe because config.transactions updates are
-    // coalesced on secondaries. Majority reads without an afterClusterTime is allowed because
-    // they are allowed to return arbitrarily stale data. We allow kNoTimestamp and kLastApplied
-    // reads because they must be from internal readers given the snapshot/majority readConcern
-    // (e.g. for session checkout).
-    if (ns == NamespaceString::kSessionTransactionsTableNamespace &&
-        readSource != RecoveryUnit::ReadSource::kNoTimestamp &&
-        readSource != RecoveryUnit::ReadSource::kLastApplied &&
-        ((readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern &&
-          !readConcernArgs.allowTransactionTableSnapshot()) ||
-         (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern &&
-          readConcernArgs.getArgsAfterClusterTime()))) {
-        uasserted(5557800,
-                  "Snapshot reads and causal consistent majority reads on config.transactions "
-                  "are not supported");
     }
 }
 

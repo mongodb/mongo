@@ -30,27 +30,25 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/time_support.h"
 
 #include <functional>
-#include <vector>
 
 namespace mongo::catalog_helper {
 
-MONGO_MOD_PRIVATE extern FailPoint setAutoGetCollectionWait;
-
-MONGO_MOD_NEEDS_REPLACEMENT extern StorageEngine::TimestampMonitor::TimestampListener
+MONGO_MOD_NEEDS_REPLACEMENT
+extern StorageEngine::TimestampMonitor::TimestampListener
     kCollectionCatalogCleanupTimestampListener;
+
+MONGO_MOD_PRIVATE extern FailPoint setAutoGetCollectionWait;
 
 /**
  * Executes the provided callback on the 'setAutoGetCollectionWait' FailPoint.
  */
-MONGO_MOD_PRIVATE static void setAutoGetCollectionWaitFailpointExecute(
+MONGO_MOD_PRIVATE
+static void setAutoGetCollectionWaitFailpointExecute(
     const std::function<void(const BSONObj&)>& callback) {
     setAutoGetCollectionWait.execute(callback);
 }

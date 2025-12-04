@@ -52,7 +52,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
-#include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_util.h"
 #include "mongo/db/shard_role/shard_catalog/snapshot_helper.h"
@@ -91,6 +90,7 @@ namespace mongo {
 using TransactionResources = shard_role_details::TransactionResources;
 
 namespace {
+
 auto& killedDueToRangeDeletionCounter =
     *MetricBuilder<Counter64>("operation.killedDueToRangeDeletion");
 
@@ -368,6 +368,53 @@ void checkPlacementVersion(OperationContext* opCtx,
 
     assertPlacementConflictTimePresentWhenRequired(
         opCtx, nss, receivedDbVersion, receivedShardVersion);
+}
+
+/**
+ * Asserts whether the read concern is supported for the given collection with the specified read
+ * source.
+ */
+void assertReadConcernSupported(const CollectionPtr& coll,
+                                const repl::ReadConcernArgs& readConcernArgs,
+                                const RecoveryUnit::ReadSource& readSource) {
+    const auto readConcernLevel = readConcernArgs.getLevel();
+    const auto& ns = coll->ns();
+
+    // The pre-images collection prunes old content using untimestamped truncates. A read
+    // establishing a snapshot at a point in time (PIT) may see data inconsistent with that PIT:
+    // data that should have been present at that PIT will be missing if it was truncated, since a
+    // non-truncated operation effectively overwrites history.
+    uassert(7829600,
+            "Reading with readConcern snapshot from pre-images collection is "
+            "not supported",
+            !ns.isChangeStreamPreImagesCollection() ||
+                readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    // Ban snapshot reads on capped collections.
+    uassert(
+        ErrorCodes::SnapshotUnavailable,
+        "Reading from non replicated capped collections with readConcern snapshot is not supported",
+        !coll->isCapped() || ns.isReplicated() ||
+            readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    // Disallow snapshot reads and causal consistent majority reads on config.transactions
+    // outside of transactions to avoid running the collection at a point-in-time in the middle
+    // of a secondary batch. Such reads are unsafe because config.transactions updates are
+    // coalesced on secondaries. Majority reads without an afterClusterTime is allowed because
+    // they are allowed to return arbitrarily stale data. We allow kNoTimestamp and kLastApplied
+    // reads because they must be from internal readers given the snapshot/majority readConcern
+    // (e.g. for session checkout).
+    if (ns == NamespaceString::kSessionTransactionsTableNamespace &&
+        readSource != RecoveryUnit::ReadSource::kNoTimestamp &&
+        readSource != RecoveryUnit::ReadSource::kLastApplied &&
+        ((readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern &&
+          !readConcernArgs.allowTransactionTableSnapshot()) ||
+         (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern &&
+          readConcernArgs.getArgsAfterClusterTime()))) {
+        uasserted(5557800,
+                  "Snapshot reads and causal consistent majority reads on config.transactions "
+                  "are not supported");
+    }
 }
 
 std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireLocalCollectionOrView(

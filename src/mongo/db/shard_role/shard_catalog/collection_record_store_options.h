@@ -28,6 +28,7 @@
  */
 
 #pragma once
+
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/storage/record_store.h"

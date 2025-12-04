@@ -31,10 +31,11 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::collection_options_validation {
+
+MONGO_MOD_PRIVATE
 Status validateStorageEngineOptions(const BSONObj& storageEngine);
 
 }  // namespace mongo::collection_options_validation

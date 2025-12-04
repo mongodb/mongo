@@ -44,14 +44,12 @@
 #include "mongo/db/shard_role/shard_catalog/virtual_collection_options.h"
 #include "mongo/util/modules.h"
 
-#include <memory>
-
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-class DatabaseImpl final : public Database {
+class MONGO_MOD_PRIVATE DatabaseImpl final : public Database {
 public:
     explicit DatabaseImpl(const DatabaseName& dbName);
 

@@ -33,8 +33,7 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-
-#include <memory>
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -42,7 +41,8 @@ namespace mongo {
  * Represents an error returned from the collMod command when an attempt to enforce the constraint
  * on an index fails because constraint violations exist.
  */
-class CannotConvertIndexToUniqueInfo final : public ErrorExtraInfo {
+class MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS CannotConvertIndexToUniqueInfo final
+    : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::CannotConvertIndexToUnique;
 

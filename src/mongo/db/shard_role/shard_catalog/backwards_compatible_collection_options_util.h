@@ -33,6 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -48,7 +49,7 @@ namespace mongo {
  * - Collection options are strict (so can't simply add an option to previous mongod [sub-]versions)
  *
  */
-namespace backwards_compatible_collection_options {
+namespace MONGO_MOD_NEEDS_REPLACEMENT backwards_compatible_collection_options {
 
 constexpr inline auto kTimeseriesBucketsMayHaveMixedSchemaData =
     "timeseriesBucketsMayHaveMixedSchemaData"_sd;
@@ -124,5 +125,5 @@ std::pair<BSONObj, BSONObj> getCollModCmdAndAdditionalO2Field(const BSONObj& col
  */
 BSONObj parseCollModCmdFromOplogEntry(const repl::OplogEntry& entry);
 
-}  // namespace backwards_compatible_collection_options
+}  // namespace MONGO_MOD_NEEDS_REPLACEMENT backwards_compatible_collection_options
 }  // namespace mongo

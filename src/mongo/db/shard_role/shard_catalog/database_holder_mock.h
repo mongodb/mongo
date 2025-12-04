@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
+#include "mongo/util/modules.h"
 
 #include <boost/none.hpp>
 

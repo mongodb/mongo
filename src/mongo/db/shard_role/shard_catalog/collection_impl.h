@@ -60,11 +60,9 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
-#include "mongo/util/version/releases.h"
 
-#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -77,7 +75,11 @@
 
 namespace mongo {
 
-class CollectionImpl final : public Collection {
+// TODO (SERVER-113355): Change MONGO_MOD_USE_REPLACEMENT below with MONGO_MOD_PRIVATE by either
+// moving FactoryImpl outside of the class so it doesn't inherit the module visibility of
+// CollectionImpl or make it so that visibility at higher levels can be overridden at the lower
+// levels.
+class MONGO_MOD_USE_REPLACEMENT(Collection) CollectionImpl final : public Collection {
 public:
     // Uses the collator factory to convert the BSON representation of a collator to a
     // CollatorInterface. Returns null if the BSONObj is empty. We expect the stored collation to be

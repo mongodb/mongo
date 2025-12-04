@@ -38,11 +38,6 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
-
-class Collection;
-class CollectionPtr;
-class CollectionCatalogEntry;
-
 namespace catalog {
 
 /**
@@ -52,8 +47,8 @@ namespace catalog {
  * Note: If the caller calls this method without locking the collection, then the returned result
  * could be stale right after this call.
  */
-MONGO_MOD_NEEDS_REPLACEMENT Status checkIfNamespaceExists(OperationContext* opCtx,
-                                                          const NamespaceString& nss);
+MONGO_MOD_PUBLIC
+Status checkIfNamespaceExists(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
  * Iterates through all the collections in the given database and runs the callback function on each
@@ -66,21 +61,25 @@ MONGO_MOD_NEEDS_REPLACEMENT Status checkIfNamespaceExists(OperationContext* opCt
  *
  * Iterating through the remaining collections stops when the callback returns false.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void forEachCollectionFromDb(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    LockMode collLockMode,
-    CollectionCatalog::CollectionInfoFn callback,
-    CollectionCatalog::CollectionInfoFn predicate = nullptr);
+MONGO_MOD_PUBLIC
+void forEachCollectionFromDb(OperationContext* opCtx,
+                             const DatabaseName& dbName,
+                             LockMode collLockMode,
+                             CollectionCatalog::CollectionInfoFn callback,
+                             CollectionCatalog::CollectionInfoFn predicate = nullptr);
 
-MONGO_MOD_NEEDS_REPLACEMENT boost::optional<bool> getConfigDebugDump(const VersionContext& vCtx,
-                                                                     const NamespaceString& nss);
+/**
+ * Checks whether the specified namespace should be included in the debug dump of the config
+ * collections.
+ */
+MONGO_MOD_PUBLIC
+boost::optional<bool> getConfigDebugDump(const VersionContext& vCtx, const NamespaceString& nss);
 
 /**
  * Indicates whether the data drop (the data table) should occur immediately or be two-phased, which
  * delays data removal to support older PIT reads or rollback.
  */
-enum class MONGO_MOD_NEEDS_REPLACEMENT DataRemoval {
+enum class MONGO_MOD_PUBLIC DataRemoval {
     kImmediate,
     kTwoPhase,
 };
@@ -101,11 +100,12 @@ enum class MONGO_MOD_NEEDS_REPLACEMENT DataRemoval {
  * guarantees that there are no remaining users of the index. This handles situations wherein there
  * is no in-memory state available for an index, such as during repair.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void removeIndex(OperationContext* opCtx,
-                                             StringData indexName,
-                                             Collection* collection,
-                                             std::shared_ptr<IndexCatalogEntry> entry,
-                                             DataRemoval dataRemoval = DataRemoval::kTwoPhase);
+MONGO_MOD_PUBLIC
+void removeIndex(OperationContext* opCtx,
+                 StringData indexName,
+                 Collection* collection,
+                 std::shared_ptr<IndexCatalogEntry> entry,
+                 DataRemoval dataRemoval = DataRemoval::kTwoPhase);
 
 /**
  * Performs two-phase collection drop.
@@ -132,15 +132,18 @@ MONGO_MOD_PRIVATE Status dropDatabase(OperationContext* opCtx, const DatabaseNam
  * Delete all collections with a name starting with collectionNamePrefix in a database.
  * To drop all collections regardless of prefix, use an empty string.
  */
-MONGO_MOD_NEEDS_REPLACEMENT Status dropCollectionsWithPrefix(
-    OperationContext* opCtx, const DatabaseName& dbName, const std::string& collectionNamePrefix);
+MONGO_MOD_PUBLIC
+Status dropCollectionsWithPrefix(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const std::string& collectionNamePrefix);
 
 /**
  * Shuts down collection catalog and storage engine cleanly.
  * Set `memLeakAllowed` to true for faster shutdown.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void shutDownCollectionCatalogAndGlobalStorageEngineCleanly(
-    ServiceContext* service, bool memLeakAllowed);
+MONGO_MOD_PUBLIC
+void shutDownCollectionCatalogAndGlobalStorageEngineCleanly(ServiceContext* service,
+                                                            bool memLeakAllowed);
 
 /**
  * Starts up storage engine.
@@ -148,25 +151,28 @@ MONGO_MOD_NEEDS_REPLACEMENT void shutDownCollectionCatalogAndGlobalStorageEngine
  * In most scenarios, startUpStorageEngineAndCollectionCatalog() should be used instead of this
  * function unless there is a specific reason to defer collection catalog initialization.
  */
-MONGO_MOD_NEEDS_REPLACEMENT StorageEngine::LastShutdownState startUpStorageEngine(
-    OperationContext* opCtx,
-    StorageEngineInitFlags initFlags,
-    BSONObjBuilder* startupTimeElapsedBuilder);
+MONGO_MOD_PUBLIC
+StorageEngine::LastShutdownState startUpStorageEngine(OperationContext* opCtx,
+                                                      StorageEngineInitFlags initFlags,
+                                                      BSONObjBuilder* startupTimeElapsedBuilder);
 
 /**
  * Initializes catalog (storage engine's MDB and CollectionCatalog). To be used in scenarios where
  * catalog initialization needs to be deferred after storage engine startup (via
  * startUpStorageEngine).
  */
-MONGO_MOD_NEEDS_REPLACEMENT void startUpCollectionCatalogDeferred(OperationContext* opCtx);
+MONGO_MOD_NEEDS_REPLACEMENT
+void startUpCollectionCatalogDeferred(OperationContext* opCtx);
 
 /**
  * Starts up storage engine and initializes the collection catalog.
  */
-MONGO_MOD_NEEDS_REPLACEMENT StorageEngine::LastShutdownState
-startUpStorageEngineAndCollectionCatalog(ServiceContext* service,
-                                         Client* client,
-                                         StorageEngineInitFlags initFlags = {},
-                                         BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
+MONGO_MOD_NEEDS_REPLACEMENT
+StorageEngine::LastShutdownState startUpStorageEngineAndCollectionCatalog(
+    ServiceContext* service,
+    Client* client,
+    StorageEngineInitFlags initFlags = {},
+    BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
+
 }  // namespace catalog
 }  // namespace mongo

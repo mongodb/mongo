@@ -43,6 +43,7 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -66,7 +67,7 @@ namespace mongo {
  *
  * This class's chunk mapping is immutable once constructed.
  */
-class CollectionMetadata {
+class MONGO_MOD_PUBLIC CollectionMetadata {
 public:
     /**
      * Instantiates a metadata object, which represents an unsharded collection. This 'isSharded'

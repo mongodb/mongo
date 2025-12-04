@@ -36,36 +36,38 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
-#include <memory>
-
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-MONGO_MOD_NEEDS_REPLACEMENT void checkCollectionUUIDMismatch(OperationContext* opCtx,
-                                                             const NamespaceString& ns,
-                                                             const Collection* coll,
-                                                             const boost::optional<UUID>& uuid);
+MONGO_MOD_PUBLIC
+void checkCollectionUUIDMismatch(OperationContext* opCtx,
+                                 const NamespaceString& ns,
+                                 const Collection* coll,
+                                 const boost::optional<UUID>& uuid);
 
-MONGO_MOD_NEEDS_REPLACEMENT void checkCollectionUUIDMismatch(OperationContext* opCtx,
-                                                             const NamespaceString& ns,
-                                                             const CollectionPtr& coll,
-                                                             const boost::optional<UUID>& uuid);
+MONGO_MOD_PUBLIC
+void checkCollectionUUIDMismatch(OperationContext* opCtx,
+                                 const NamespaceString& ns,
+                                 const CollectionPtr& coll,
+                                 const boost::optional<UUID>& uuid);
 
 /**
  * Same as above, but with the catalog passed explicitly.
  */
-MONGO_MOD_PRIVATE void checkCollectionUUIDMismatch(OperationContext* opCtx,
-                                                   const CollectionCatalog& catalog,
-                                                   const NamespaceString& ns,
-                                                   const Collection* coll,
-                                                   const boost::optional<UUID>& uuid);
+MONGO_MOD_PRIVATE
+void checkCollectionUUIDMismatch(OperationContext* opCtx,
+                                 const CollectionCatalog& catalog,
+                                 const NamespaceString& ns,
+                                 const Collection* coll,
+                                 const boost::optional<UUID>& uuid);
 
 
-MONGO_MOD_PRIVATE void checkCollectionUUIDMismatch(OperationContext* opCtx,
-                                                   const CollectionCatalog& catalog,
-                                                   const NamespaceString& ns,
-                                                   const CollectionPtr& coll,
-                                                   const boost::optional<UUID>& uuid);
+MONGO_MOD_PRIVATE
+void checkCollectionUUIDMismatch(OperationContext* opCtx,
+                                 const CollectionCatalog& catalog,
+                                 const NamespaceString& ns,
+                                 const CollectionPtr& coll,
+                                 const boost::optional<UUID>& uuid);
 
 }  // namespace mongo

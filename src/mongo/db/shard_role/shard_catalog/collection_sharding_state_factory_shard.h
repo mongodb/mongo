@@ -33,10 +33,12 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/stale_shard_exception_handler.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class CollectionShardingStateFactoryShard final : public CollectionShardingStateFactory {
+class MONGO_MOD_PUBLIC CollectionShardingStateFactoryShard final
+    : public CollectionShardingStateFactory {
 public:
     CollectionShardingStateFactoryShard(ServiceContext* serviceContext);
 

@@ -39,18 +39,14 @@
 namespace mongo {
 namespace catalog {
 
-using MinVisibleTimestamp = Timestamp;
-using MinVisibleTimestampMap = std::map<UUID, MinVisibleTimestamp>;
-using RequiresTimestampExtendedRangeSupportMap = std::map<UUID, bool>;
+using MinVisibleTimestamp MONGO_MOD_PRIVATE = Timestamp;
+using MinVisibleTimestampMap MONGO_MOD_PRIVATE = std::map<UUID, MinVisibleTimestamp>;
+using RequiresTimestampExtendedRangeSupportMap MONGO_MOD_PRIVATE = std::map<UUID, bool>;
+
 struct MONGO_MOD_PRIVATE PreviousCatalogState {
     MinVisibleTimestampMap minValidTimestampMap;
     RequiresTimestampExtendedRangeSupportMap requiresTimestampExtendedRangeSupportMap;
 };
-
-/**
- * Checks if the catalog is open.
- */
-MONGO_MOD_PRIVATE bool isCatalogOpen(OperationContext* opCtx);
 
 /**
  * Closes the catalog, destroying all associated in-memory data structures for all databases. After
@@ -76,5 +72,6 @@ MONGO_MOD_NEEDS_REPLACEMENT void openCatalog(OperationContext* opCtx,
  * Must be called with the global lock acquired in exclusive mode.
  */
 MONGO_MOD_NEEDS_REPLACEMENT void openCatalogAfterStorageChange(OperationContext* opCtx);
+
 }  // namespace catalog
 }  // namespace mongo

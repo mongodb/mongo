@@ -41,15 +41,11 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
-#include <string>
-
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-
-class OperationContext;
 
 /**
  * Creates a collection as described in "cmdObj" on the database "dbName". Creates the collection's

@@ -33,6 +33,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 
@@ -44,12 +45,13 @@ namespace mongo {
  * Sets up and provides a repl::StorageInterface and OperationContext. Database data are cleared
  * between test runs.
  */
-class CatalogScopedGlobalServiceContextForTest : public MongoDScopedGlobalServiceContextForTest {
+class MONGO_MOD_PUBLIC CatalogScopedGlobalServiceContextForTest
+    : public MongoDScopedGlobalServiceContextForTest {
 public:
     CatalogScopedGlobalServiceContextForTest(Options options, bool shouldSetupTL);
 };
 
-class CatalogTestFixture : public ServiceContextTest {
+class MONGO_MOD_OPEN CatalogTestFixture : public ServiceContextTest {
 public:
     using Options = MongoDScopedGlobalServiceContextForTest::Options;
 

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/database_name.h"
@@ -45,21 +44,17 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/immutable/map.h"
 #include "mongo/util/immutable/unordered_map.h"
 #include "mongo/util/immutable/unordered_set.h"
-#include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
 #include <functional>
-#include <map>
 #include <memory>
 #include <set>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -70,10 +65,12 @@
 
 namespace mongo {
 
+MONGO_MOD_FILE_PRIVATE
 extern const SharedCollectionDecorations::Decoration<AtomicWord<bool>>
     historicalIDTrackerAllowsMixedModeWrites;
 
 namespace catalog {
+
 // Forward declaration of a friend class for the CollectionCatalog since it resides in another
 // namespace. This is a special class that controls opening/closing the catalog and resides in
 // catalog_control.cpp
@@ -82,14 +79,18 @@ class CatalogControlUtils;
 /**
  * Must be called after MDBCatalog is loaded.
  */
+MONGO_MOD_PUBLIC
 void initializeCollectionCatalog(OperationContext* opCtx,
                                  StorageEngine* engine,
                                  boost::optional<Timestamp> stableTs);
+
+MONGO_MOD_PUBLIC
 void initializeCollectionCatalog(OperationContext* opCtx, StorageEngine* engine);
 
 /**
  * Creates a Collection object and registers it in the CollectionCatalog.
  */
+MONGO_MOD_PUBLIC
 void initCollectionObject(OperationContext* opCtx,
                           StorageEngine* engine,
                           RecordId catalogId,
@@ -102,10 +103,12 @@ void initCollectionObject(OperationContext* opCtx,
  * This function doesn't return databases whose creation has committed durably but hasn't been
  * published yet in the CollectionCatalog.
  */
+MONGO_MOD_PUBLIC
 std::vector<DatabaseName> listDatabases(boost::optional<TenantId> tenantId = boost::none);
+
 }  // namespace catalog
 
-class CollectionCatalog {
+class MONGO_MOD_USE_REPLACEMENT(acquireCollection) CollectionCatalog {
     friend class iterator;
     using OrderedCollectionMap =
         immutable::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>;

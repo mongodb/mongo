@@ -35,7 +35,7 @@
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/string_map.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
@@ -43,7 +43,7 @@
 
 namespace mongo {
 
-class DatabaseHolderImpl : public DatabaseHolder {
+class MONGO_MOD_USE_REPLACEMENT(DatabaseHolder) DatabaseHolderImpl : public DatabaseHolder {
 public:
     DatabaseHolderImpl() = default;
 

@@ -47,15 +47,13 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
 #include <memory>
-#include <string>
 #include <utility>
-#include <vector>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -392,7 +390,7 @@ private:
  * Entering the critical section doesn't serialise with concurrent recovery/refresh, because
  * causally such refreshes would have happened *before* the critical section was entered.
  */
-class CollectionCriticalSection {
+class MONGO_MOD_USE_REPLACEMENT(ShardingMigrationCriticalSection) CollectionCriticalSection {
     CollectionCriticalSection(const CollectionCriticalSection&) = delete;
     CollectionCriticalSection& operator=(const CollectionCriticalSection&) = delete;
 

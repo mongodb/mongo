@@ -43,6 +43,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/views/view.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -59,9 +60,13 @@ namespace mongo {
 class CollectionCatalog;
 
 namespace auto_get_collection {
-enum class ViewMode { kViewsPermitted, kViewsForbidden };
 
-struct Options {
+enum class MONGO_MOD_USE_REPLACEMENT(acquireCollection) ViewMode {
+    kViewsPermitted,
+    kViewsForbidden
+};
+
+struct MONGO_MOD_USE_REPLACEMENT(acquireCollection) Options {
     Options viewMode(ViewMode viewMode) {
         _viewMode = viewMode;
         return std::move(*static_cast<Options*>(this));
@@ -101,7 +106,7 @@ struct Options {
  * It is guaranteed that the lock will be released when this object goes out of scope, therefore
  * the database reference returned by this class should not be retained.
  */
-class AutoGetDb {
+class MONGO_MOD_USE_REPLACEMENT(acquireCollection) AutoGetDb {
     AutoGetDb(const AutoGetDb&) = delete;
     AutoGetDb& operator=(const AutoGetDb&) = delete;
 
@@ -192,7 +197,7 @@ private:
  * there must be some additional concurrency checks around resolving the UUID to a namespace and
  * then subsequently acquiring the lock.
  */
-class CollectionNamespaceOrUUIDLock {
+class MONGO_MOD_USE_REPLACEMENT(acquireCollection) CollectionNamespaceOrUUIDLock {
 public:
     CollectionNamespaceOrUUIDLock(OperationContext* opCtx,
                                   const NamespaceStringOrUUID& nsOrUUID,
@@ -227,7 +232,7 @@ private:
  * Any acquired locks may be released when this object goes out of scope, therefore the database
  * and the collection references returned by this class should not be retained.
  */
-class AutoGetCollection {
+class MONGO_MOD_USE_REPLACEMENT(acquireCollection) AutoGetCollection {
     AutoGetCollection(const AutoGetCollection&) = delete;
     AutoGetCollection& operator=(const AutoGetCollection&) = delete;
 
@@ -315,7 +320,7 @@ class ScopedLocalCatalogWriteFence;
  * It is safe to re-use an instance for multiple WriteUnitOfWorks. It is not safe to destroy it
  * before the active WriteUnitOfWork finishes.
  */
-class CollectionWriter final {
+class MONGO_MOD_USE_REPLACEMENT(acquireCollection) CollectionWriter final {
 public:
     // This constructor indicates to the shard role subsystem that the subsequent code enters into
     // local DDL land and that the content of the local collection should not be trusted until it
@@ -411,6 +416,7 @@ private:
 /**
  * Writes to system.views need to use a stronger lock to prevent inconsistencies like view cycles.
  */
+MONGO_MOD_USE_REPLACEMENT(acquireCollection)
 LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode);
 
 /**
@@ -419,7 +425,7 @@ LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMod
  * Snapshot is abandoned in constructor and destructor, so it can only be used before
  * the recovery unit becomes active or when the existing snapshot is no longer needed.
  */
-class ReadSourceScope {
+class MONGO_MOD_USE_REPLACEMENT(acquireCollection) ReadSourceScope {
 public:
     ReadSourceScope(OperationContext* opCtx,
                     RecoveryUnit::ReadSource readSource,
@@ -457,14 +463,14 @@ private:
  * The catalog resources are released when this object goes out of scope, therefore the oplog
  * collection reference returned by this class should not be retained.
  */
-enum class OplogAccessMode { kRead, kWrite, kLogOp };
+enum class MONGO_MOD_USE_REPLACEMENT(acquireCollection) OplogAccessMode { kRead, kWrite, kLogOp };
 
-struct AutoGetOplogFastPathOptions {
+struct MONGO_MOD_NEEDS_REPLACEMENT AutoGetOplogFastPathOptions {
     bool skipRSTLLock = false;
     boost::optional<rss::consensus::IntentRegistry::Intent> explicitIntent = boost::none;
 };
 
-class AutoGetOplogFastPath {
+class MONGO_MOD_NEEDS_REPLACEMENT AutoGetOplogFastPath {
     AutoGetOplogFastPath(const AutoGetOplogFastPath&) = delete;
     AutoGetOplogFastPath& operator=(const AutoGetOplogFastPath&) = delete;
 

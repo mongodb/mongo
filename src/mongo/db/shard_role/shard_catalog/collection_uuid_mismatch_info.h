@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -44,7 +45,8 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-class CollectionUUIDMismatchInfo final : public ErrorExtraInfo {
+
+class MONGO_MOD_PUBLIC CollectionUUIDMismatchInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::CollectionUUIDMismatch;
 
@@ -83,4 +85,5 @@ private:
     std::string _expectedCollection;
     boost::optional<std::string> _actualCollection;
 };
+
 }  // namespace mongo

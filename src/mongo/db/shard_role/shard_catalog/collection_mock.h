@@ -29,19 +29,17 @@
 
 #pragma once
 
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 /**
  * This class comprises a mock Collection for use by CollectionCatalog unit tests.
  */
-class CollectionMock : public Collection {
+class MONGO_MOD_PUBLIC CollectionMock : public Collection {
 public:
     explicit CollectionMock(const NamespaceString& nss)
         : CollectionMock(UUID::gen(), nss, std::unique_ptr<IndexCatalog>()) {}

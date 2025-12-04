@@ -29,15 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
-#include <set>
-#include <string>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -47,7 +45,7 @@ namespace mongo {
 /**
  * Registry of opened databases.
  */
-class DatabaseHolder {
+class MONGO_MOD_PUBLIC DatabaseHolder {
 public:
     // Operation Context binding.
     static DatabaseHolder* get(ServiceContext* service);

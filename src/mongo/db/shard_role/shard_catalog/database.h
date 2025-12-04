@@ -40,6 +40,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/virtual_collection_options.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -49,7 +50,7 @@ namespace mongo {
  * The semantics for a const Database are that you can mutate individual collections but not add or
  * remove them.
  */
-class Database : public Decorable<Database> {
+class MONGO_MOD_PUBLIC Database : public Decorable<Database> {
 public:
     /**
      * Creates the namespace 'ns' in the database 'db' according to 'options'. If

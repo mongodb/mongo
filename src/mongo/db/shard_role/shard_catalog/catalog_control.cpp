@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
-#include "mongo/db/index_builds/rebuild_indexes.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
@@ -53,7 +52,6 @@
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -72,6 +70,15 @@
 
 namespace mongo {
 namespace catalog {
+namespace {
+
+bool isCatalogOpen(OperationContext* opCtx) {
+    invariant(shard_role_details::getLocker(opCtx)->isW());
+    return opCtx->getServiceContext()->getStorageEngine()->isMDBCatalogOpen();
+}
+
+}  // namespace
+
 // Class since it accesses the internal
 // CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite method. This is possible because
 // this class is actually a friend class with a forward declaration in collection_catalog.h. Note
@@ -150,11 +157,6 @@ public:
         LOGV2(20278, "openCatalog: finished reloading collection catalog");
     }
 };
-
-bool isCatalogOpen(OperationContext* opCtx) {
-    invariant(shard_role_details::getLocker(opCtx)->isW());
-    return opCtx->getServiceContext()->getStorageEngine()->isMDBCatalogOpen();
-}
 
 PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     invariant(shard_role_details::getLocker(opCtx)->isW());

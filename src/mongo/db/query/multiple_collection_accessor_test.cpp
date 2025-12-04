@@ -46,7 +46,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_control.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"

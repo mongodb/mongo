@@ -31,6 +31,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace catalog_repair {
@@ -45,6 +46,7 @@ namespace catalog_repair {
  * unknown internal idents. If we started from a clean shutdown, the internal idents may contain
  * information for resuming index builds.
  */
+MONGO_MOD_PUBLIC
 StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
     OperationContext* opCtx,
     StorageEngine* engine,

@@ -67,11 +67,9 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
-#include "mongo/util/version/releases.h"
 
-#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <iosfwd>
@@ -90,7 +88,7 @@ namespace mongo {
 /**
  * Holds information update an update operation.
  */
-struct CollectionUpdateArgs {
+struct MONGO_MOD_PUBLIC CollectionUpdateArgs {
     enum class StoreDocOption { None, PreImage, PostImage };
 
     CollectionUpdateArgs() = delete;
@@ -136,7 +134,7 @@ struct CollectionUpdateArgs {
  * Local catalog ('_mdb_catalog') information identifying where collection contents are/should be
  * stored at the time of collection creation.
  */
-struct CreateCollCatalogIdentifier {
+struct MONGO_MOD_PUBLIC CreateCollCatalogIdentifier {
     /**
      * Where collection information is stored in the local catalog.
      */
@@ -161,14 +159,15 @@ struct CreateCollCatalogIdentifier {
  * associated with all of the Collection instances for a collection, sharing whatever data may
  * decorate it across all point in time views of the collection.
  */
-class SharedCollectionDecorations : public Decorable<SharedCollectionDecorations> {
+class MONGO_MOD_USE_REPLACEMENT("Do not use without Catalog Team's knowledge")
+    SharedCollectionDecorations : public Decorable<SharedCollectionDecorations> {
 public:
     SharedCollectionDecorations() = default;
     SharedCollectionDecorations(const SharedCollectionDecorations&) = delete;
     SharedCollectionDecorations& operator=(const SharedCollectionDecorations&) = delete;
 };
 
-class Collection : public Decorable<Collection> {
+class MONGO_MOD_PUBLIC Collection : public Decorable<Collection> {
 public:
     /**
      * A Collection::Factory is a factory class that constructs Collection objects.
@@ -756,6 +755,7 @@ public:
      */
     virtual void onDeregisterFromCatalog(ServiceContext* svcCtx) = 0;
 
+    MONGO_MOD_PUBLIC
     friend auto logAttrs(const Collection& col) {
         return logv2::multipleAttrs(col.ns(), col.uuid());
     }
@@ -783,7 +783,7 @@ public:
  * TODO SERVER-95260: Investigate if this can be detected once generational lock information is
  * available.
  */
-class ConsistentCollection {
+class MONGO_MOD_PUBLIC ConsistentCollection {
 public:
     ConsistentCollection() = default;
 
@@ -852,7 +852,7 @@ private:
  * resuming. CollectionPtr will re-load the Collection from the Catalog when restoring from a yield
  * that dropped locks.
  */
-class CollectionPtr : public Yieldable {
+class MONGO_MOD_PUBLIC CollectionPtr : public Yieldable {
 public:
     static CollectionPtr null;
 
@@ -956,16 +956,19 @@ private:
     boost::optional<ShardKeyPattern> _shardKeyPattern = boost::none;
 };
 
+MONGO_MOD_PUBLIC
 inline std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll) {
     os << coll.get();
     return os;
 }
 
+MONGO_MOD_PUBLIC
 inline ValidationActionEnum validationActionOrDefault(
     boost::optional<ValidationActionEnum> action) {
     return action.value_or(ValidationActionEnum::error);
 }
 
+MONGO_MOD_PUBLIC
 inline ValidationLevelEnum validationLevelOrDefault(boost::optional<ValidationLevelEnum> level) {
     return level.value_or(ValidationLevelEnum::strict);
 }
@@ -976,6 +979,7 @@ inline ValidationLevelEnum validationLevelOrDefault(boost::optional<ValidationLe
  * Note: The caller should check if 'userCollation' is not empty since the empty 'userCollation'
  * has the special meaning that the query follows the collection default collation that exists.
  */
+MONGO_MOD_PUBLIC
 inline std::unique_ptr<CollatorInterface> getUserCollator(OperationContext* opCtx,
                                                           const BSONObj& userCollation) {
     tassert(7542402, "Empty user collation", !userCollation.isEmpty());
@@ -988,6 +992,7 @@ inline std::unique_ptr<CollatorInterface> getUserCollator(OperationContext* opCt
  * the collection-default collation and also returns a flag indicating whether the user-provided
  * collation matches the collection default collation.
  */
+MONGO_MOD_PUBLIC
 std::pair<std::unique_ptr<CollatorInterface>, ExpressionContextCollationMatchesDefault>
 resolveCollator(OperationContext* opCtx, BSONObj userCollation, const CollectionPtr& collection);
 

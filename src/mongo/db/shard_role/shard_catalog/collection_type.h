@@ -30,6 +30,9 @@
 #pragma once
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo::query_shape {
 

@@ -55,7 +55,7 @@ namespace mongo {
 class CollatorFactoryInterface;
 class CreateCommand;
 
-struct MONGO_MOD_NEEDS_REPLACEMENT CollectionOptions {
+struct MONGO_MOD_PUBLIC CollectionOptions {
     /**
      * Returns true if the options indicate the namespace is a view.
      */
@@ -182,7 +182,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT CollectionOptions {
     bool recordIdsReplicated = false;
 };
 
-MONGO_MOD_PRIVATE Status
-validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceString& ns);
+MONGO_MOD_PRIVATE
+Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceString& ns);
 
 }  // namespace mongo

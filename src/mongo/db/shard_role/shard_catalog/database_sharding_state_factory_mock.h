@@ -31,12 +31,14 @@
 
 #include "mongo/db/database_name.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
 namespace mongo {
 
-class DatabaseShardingStateFactoryMock final : public DatabaseShardingStateFactory {
+class MONGO_MOD_PUBLIC DatabaseShardingStateFactoryMock final
+    : public DatabaseShardingStateFactory {
 public:
     DatabaseShardingStateFactoryMock() = default;
 

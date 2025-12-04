@@ -32,12 +32,12 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/stale_shard_exception_handler.h"
-
-#include <memory>
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class DatabaseShardingStateFactoryShard final : public DatabaseShardingStateFactory {
+class MONGO_MOD_PUBLIC DatabaseShardingStateFactoryShard final
+    : public DatabaseShardingStateFactory {
 public:
     DatabaseShardingStateFactoryShard() = default;
 
