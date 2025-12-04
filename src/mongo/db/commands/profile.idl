@@ -72,6 +72,8 @@ commands:
                 type: safeInt64
                 description: "The threshold, in milliseconds, at which slow ops are logged during execution."
                 optional: true
+            # WARNING: If adding a new parameter to this command, be sure to update the 'isReadOnly'
+            # special-case in the authorization logic.
 
     setProfilingFilterGlobally:
         description: "Parser for the 'setProfilingFilterGlobally' command."

@@ -55,6 +55,18 @@
 
 namespace mongo {
 
+namespace {
+
+// This assert is here to make sure new command options are considered in the 'isReadOnly' check. If
+// this assert fails, please make sure you consider the authorization implications of your change.
+MONGO_STATIC_ASSERT(ProfileCmdRequest::fieldMetadata.size() == 45);
+
+bool isReadOnly(const ProfileCmdRequest& request) {
+    return !request.getSlowms() && !request.getSlowinprogms() && !request.getSampleRate() &&
+        !request.getFilter();
+}
+}  // namespace
+
 Status ProfileCmdBase::checkAuthForOperation(OperationContext* opCtx,
                                              const DatabaseName& dbName,
                                              const BSONObj& cmdObj) const {
@@ -69,10 +81,9 @@ Status ProfileCmdBase::checkAuthForOperation(OperationContext* opCtx,
         ProfileCmdRequest::parse(cmdObj, IDLParserContext("profile", vts, dbName.tenantId(), sc));
     const auto profilingLevel = request.getCommandParameter();
 
-    if (profilingLevel < 0 && !request.getSlowms() && !request.getSlowinprogms() &&
-        !request.getSampleRate()) {
-        // If the user just wants to view the current values of 'slowms' and 'sampleRate', they
-        // only need read rights on system.profile, even if they can't change the profiling level.
+    if (profilingLevel < 0 && isReadOnly(request)) {
+        // If the user just wants to view the current profiling settings, they only need read rights
+        // on system.profile, even if they can't change the profiling level.
         if (authzSession->isAuthorizedForActionsOnResource(
                 ResourcePattern::forExactNamespace(
                     NamespaceStringUtil::deserialize(dbName, "system.profile")),
