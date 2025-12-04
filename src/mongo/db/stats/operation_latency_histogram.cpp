@@ -173,23 +173,36 @@ void increment(HistogramsType& histograms,
     updateHistogram(histograms[index], bucket, latency, isQueryableEncryptionOperation);
 }
 
+// Appends the data to the `builder` in an object with the name `key`.
+//
+// The remaining parameters affect how histograms are output, which only happens if
+// `includeHistograms`is true. In this case, the histogram data will be output in a subobject named
+// "histogram", which will contain one field representing each histogram bucket. The name of each
+// field will indicate the bucket value (e.g., 1.02e+03μs_count) and the value will be the number of
+// increments that fall in that bucket.
+// - `slowMSBucketsOnly` true puts all values above the global slowMS threshold in a single bucket.
+// - `includeEmptyBuckets` will make the histogram include buckets where the count is 0.
+// - `logBucketScalingFactor` influences the size of each bucket. The minimum is 1, which will add
+//    one bucket for each `kLowerBounds`. If set to 2, it will add a bucket for only every other
+//    value in `kLowerBounds`, and if 3 every third value, etc.
 template <typename HistogramDataType, typename StringType>
 void appendHistogram(const HistogramDataType& data,
                      StringType key,
                      bool includeHistograms,
                      bool slowMSBucketsOnly,
                      bool includeEmptyBuckets,
+                     int logBucketScalingFactor,
                      BSONObjBuilder& builder) {
     BSONObjBuilder histogramBuilder(builder.subobjStart(key));
     const uint64_t slowMicros = static_cast<uint64_t>(serverGlobalParams.slowMS.load()) * 1000;
     const bool filterBuckets = slowMSBucketsOnly && slowMicros >= 0;
 
     if (includeHistograms) {
-        uint64_t filteredCount = 0;
+        uint64_t bucketValue = 0;
         int lowestFilteredBoundIndex = -1;
         BSONObjBuilder countBuilder(histogramBuilder.subobjStart("histogram"));
         for (size_t i = 0; i < operation_latency_histogram_details::kMaxBuckets; i++) {
-            const auto bucketValue = [&] {
+            bucketValue += [&] {
                 if constexpr (std::is_same_v<HistogramDataType,
                                              AtomicOperationLatencyHistogram::HistogramType>) {
                     return data.buckets[i].loadRelaxed();
@@ -206,11 +219,22 @@ void appendHistogram(const HistogramDataType& data,
                 if (lowestFilteredBoundIndex == -1) {
                     lowestFilteredBoundIndex = i;
                 }
-
-                filteredCount += bucketValue;
                 continue;
             }
-            countBuilder.append(bucketName(i), static_cast<long long>(bucketValue));
+
+            // If the scaling factor is such that we should skip this bucket, don't record anything
+            // yet unless this is the last bucket. We won't skip if the next bucket is the first
+            // above the slowMS threshold, so that we get the smallest bucket possible above that
+            // threshold.
+            if ((i + 1) % logBucketScalingFactor != 0 &&
+                i != operation_latency_histogram_details::kMaxBuckets - 1 &&
+                !(filterBuckets && kLowerBounds[i + 1] >= slowMicros)) {
+                continue;
+            }
+
+            countBuilder.append(bucketName(i - (i % logBucketScalingFactor)),
+                                static_cast<long long>(bucketValue));
+            bucketValue = 0;
         }
 
         // Append final bucket only if it contains values to minimize data in FTDC. Final bucket
@@ -220,9 +244,9 @@ void appendHistogram(const HistogramDataType& data,
         // lowestFilteredBoundIndex because if the slowMS threshold is too high there may be no
         // buckets above it.
         if (filterBuckets && lowestFilteredBoundIndex > 0 &&
-            (filteredCount > 0 || includeEmptyBuckets)) {
+            (bucketValue > 0 || includeEmptyBuckets)) {
             countBuilder.append(bucketName(lowestFilteredBoundIndex),
-                                static_cast<long long>(filteredCount));
+                                static_cast<long long>(bucketValue));
         }
         countBuilder.doneFast();
     }
@@ -252,6 +276,7 @@ void appendHistograms(HistogramsType& histograms,
                       bool includeHistograms,
                       bool slowMSBucketsOnly,
                       bool includeEmptyBuckets,
+                      int logBucketScalingFactor,
                       BSONObjBuilder& builder) {
     static_assert(static_cast<int>(Command::ReadWriteType::kCommand) == 0);
     static_assert(static_cast<int>(Command::ReadWriteType::kRead) == 1);
@@ -266,6 +291,7 @@ void appendHistograms(HistogramsType& histograms,
                         includeHistograms,
                         slowMSBucketsOnly,
                         includeEmptyBuckets,
+                        logBucketScalingFactor,
                         builder);
     }
 }
@@ -278,7 +304,8 @@ std::array<uint64_t, operation_latency_histogram_details::kMaxBuckets> getLowerB
 }  // namespace operation_latency_histogram_details
 
 OperationLatencyHistogram::OperationLatencyHistogram(const Options& options)
-    : _includeEmptyBuckets(options.includeEmptyBuckets) {}
+    : _includeEmptyBuckets(options.includeEmptyBuckets),
+      _logBucketScalingFactor(options.logBucketScalingFactor) {}
 
 void OperationLatencyHistogram::increment(uint64_t latency,
                                           Command::ReadWriteType type,
@@ -289,12 +316,17 @@ void OperationLatencyHistogram::increment(uint64_t latency,
 void OperationLatencyHistogram::append(bool includeHistograms,
                                        bool slowMSBucketsOnly,
                                        BSONObjBuilder* builder) const {
-    appendHistograms(
-        _histograms, includeHistograms, slowMSBucketsOnly, _includeEmptyBuckets, *builder);
+    appendHistograms(_histograms,
+                     includeHistograms,
+                     slowMSBucketsOnly,
+                     _includeEmptyBuckets,
+                     _logBucketScalingFactor,
+                     *builder);
 }
 
 AtomicOperationLatencyHistogram::AtomicOperationLatencyHistogram(const Options& options)
-    : _includeEmptyBuckets(options.includeEmptyBuckets) {}
+    : _includeEmptyBuckets(options.includeEmptyBuckets),
+      _logBucketScalingFactor(options.logBucketScalingFactor) {}
 
 void AtomicOperationLatencyHistogram::increment(uint64_t latency,
                                                 Command::ReadWriteType type,
@@ -305,8 +337,12 @@ void AtomicOperationLatencyHistogram::increment(uint64_t latency,
 void AtomicOperationLatencyHistogram::append(bool includeHistograms,
                                              bool slowMSBucketsOnly,
                                              BSONObjBuilder* builder) const {
-    appendHistograms(
-        _histograms, includeHistograms, slowMSBucketsOnly, _includeEmptyBuckets, *builder);
+    appendHistograms(_histograms,
+                     includeHistograms,
+                     slowMSBucketsOnly,
+                     _includeEmptyBuckets,
+                     _logBucketScalingFactor,
+                     *builder);
 }
 
 }  // namespace mongo

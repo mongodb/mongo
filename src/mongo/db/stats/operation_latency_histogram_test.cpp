@@ -340,6 +340,242 @@ TEST(OperationLatencyHistogram, CheckBucketCountsSlowBucketsIncludeEmptyBucketsH
     }
 }
 
+TEST(OperationLatencyHistogram,
+     CheckBucketCountsAndTotalLatencySlowBucketsExcludeEmptyBucketsLogBucketScalingFactor) {
+    OperationLatencyHistogram hist({.includeEmptyBuckets = false, .logBucketScalingFactor = 3});
+    // Increment at the boundary for the first and third buckets out of ever 6. The result should be
+    // that the in the output histogram, bucket values are always 2.
+    uint64_t expectedSum = 0;
+    for (int i = 0; i < kMaxBuckets; ++i) {
+        if (i % 6 == 0 || i % 6 == 2) {
+            hist.increment(kLowerBounds[i], Command::ReadWriteType::kRead, false);
+            expectedSum += kLowerBounds[i];
+        }
+    }
+
+    auto orig = serverGlobalParams.slowMS.load();
+    serverGlobalParams.slowMS.store(100);
+    ScopeGuard g1 = [orig] {
+        serverGlobalParams.slowMS.store(orig);
+    };
+
+    BSONObjBuilder outBuilder;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder);
+    BSONObj out = outBuilder.done();
+    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+
+    const size_t kMaxUnFilteredBuckets = 23;
+    // Two out of six buckets has one count. Add one since if there were 1 bucket there would be 1
+    // read (not zero), and because of the specific value of kMaxBuckets % 6.
+    ASSERT_EQUALS(out["reads"]["ops"].Long(), kMaxBuckets / 3 + 1);
+    BSONObj readBuckets = out["reads"]["histogram"].Obj();
+    ASSERT_EQUALS(readBuckets.nFields(),
+                  static_cast<unsigned int>(kMaxUnFilteredBuckets + 2) / 6 + 1);
+    size_t arrayIndex = 0;
+    for (const BSONElement field : readBuckets) {
+        // The aggregate bucket is actually kMaxUnFilteredBuckets + 1, because there is no entry in
+        // bucket with index kMaxUnFilteredBuckets (23), but one in the next bucket.
+        size_t bucketIndex = std::min(arrayIndex * 6, kMaxUnFilteredBuckets + 1);
+        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
+                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
+                            kLowerBounds[bucketIndex] / 100);
+        if (bucketIndex < static_cast<int>(kMaxUnFilteredBuckets)) {
+            // Regular buckets. Because the pattern of counts is 1,0,1,0,0,0, the counts are always
+            // 2. E.g., Buckets 0 and 2 are incremented, which means the first appended (0-2)
+            // contains 2 values, while the next possible bucket (3-5) is skipped.
+            ASSERT_EQUALS(field.Long(), 2);
+        } else {
+            // Aggregate bucket
+            ASSERT_EQUALS(field.Long(), 10);
+        }
+        ++arrayIndex;
+    }
+}
+
+TEST(OperationLatencyHistogram,
+     CheckBucketCountsAndTotalLatencySlowBucketsIncludeEmptyBucketsLogBucketScalingFactor) {
+    OperationLatencyHistogram hist({.includeEmptyBuckets = true, .logBucketScalingFactor = 3});
+    // Increment at the boundary for the first and third buckets out of ever 6. The result should be
+    // that the in the output histogram, bucket values alternate between 0 and 2.
+    uint64_t expectedSum = 0;
+    for (int i = 0; i < kMaxBuckets; ++i) {
+        if (i % 6 == 0 || i % 6 == 2) {
+            hist.increment(kLowerBounds[i], Command::ReadWriteType::kRead, false);
+            expectedSum += kLowerBounds[i];
+        }
+    }
+
+    auto orig = serverGlobalParams.slowMS.load();
+    serverGlobalParams.slowMS.store(100);
+    ScopeGuard g1 = [orig] {
+        serverGlobalParams.slowMS.store(orig);
+    };
+
+    BSONObjBuilder outBuilder;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder);
+    BSONObj out = outBuilder.done();
+    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+
+    const size_t kMaxUnFilteredBuckets = 23;
+    // Two out of six buckets has one count. Add one since if there were 1 bucket there would be 1
+    // read (not zero), and because of the specific value of kMaxBuckets % 6.
+    ASSERT_EQUALS(out["reads"]["ops"].Long(), kMaxBuckets / 3 + 1);
+    BSONObj readBuckets = out["reads"]["histogram"].Obj();
+    ASSERT_EQUALS(readBuckets.nFields(),
+                  static_cast<unsigned int>(kMaxUnFilteredBuckets + 2) / 3 + 1);
+    size_t arrayIndex = 0;
+    for (const BSONElement field : readBuckets) {
+        size_t bucketIndex = std::min(arrayIndex * 3, kMaxUnFilteredBuckets);
+        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
+                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
+                            kLowerBounds[bucketIndex] / 100);
+        if (bucketIndex < static_cast<int>(kMaxUnFilteredBuckets)) {
+            // Regular buckets. Because the pattern of counts is 1,0,1,0,0,0, the counts alternate
+            // between 0 and 2. E.g., Buckets 0 and 2 are incremented, which means the first
+            // appended (0-2) contains 2 values, while the next appended (3-5) contains none.
+            ASSERT_EQUALS(field.Long(), bucketIndex % 6 == 0 ? 2 : 0);
+        } else {
+            // Aggregate bucket
+            ASSERT_EQUALS(field.Long(), 10);
+        }
+        ++arrayIndex;
+    }
+}
+
+// Returns the last field of `obj`.
+BSONElement getLastElement(BSONObj& obj) {
+    std::vector<BSONElement> elems;
+    obj.elems(elems);
+    return elems[elems.size() - 1];
+}
+
+TEST(OperationLatencyHistogram, WhichBucketIsSlowLogBucketScalingFactorExcludeEmptyBuckets) {
+    auto orig = serverGlobalParams.slowMS.load();
+    ScopeGuard g1 = [orig] {
+        serverGlobalParams.slowMS.store(orig);
+    };
+
+    OperationLatencyHistogram hist({.includeEmptyBuckets = false, .logBucketScalingFactor = 3});
+    // Add a reading above each slowMS that we'll test. Each value crosses a bucket threshold when
+    // logBucketScalingFactor is 1, but not always when it is 3.
+    hist.increment(4 * 1000, Command::ReadWriteType::kRead, false);
+    hist.increment(5 * 1000, Command::ReadWriteType::kRead, false);
+    hist.increment(7 * 1000, Command::ReadWriteType::kRead, false);
+
+    // Start with slowMS of 3.
+    serverGlobalParams.slowMS.store(3);
+    constexpr int kSlowBucket3Ms = 12;
+    // Sanity check
+    ASSERT_LT(3 * 1000, kLowerBounds[kSlowBucket3Ms]);
+    ASSERT_GT(3 * 1000, kLowerBounds[kSlowBucket3Ms - 1]);
+    BSONObjBuilder outBuilder1;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder1);
+    BSONObj out = outBuilder1.done();
+    BSONObj readBuckets = out["reads"]["histogram"].Obj();
+    // All points are above the slowMS threshold, so we just have the last bucket.
+    ASSERT_EQUALS(readBuckets.nFields(), 1);
+    BSONElement lastElement = getLastElement(readBuckets);
+    ASSERT_APPROX_EQUAL(bucketFromFieldName(lastElement),
+                        static_cast<int64_t>(kLowerBounds[kSlowBucket3Ms]),
+                        kLowerBounds[kSlowBucket3Ms] / 100);
+    ASSERT_EQ(lastElement.Long(), 3);
+
+    // With slowMS of 4, one more bucket is added because there is now a point below the slowMS
+    // threshold.
+    serverGlobalParams.slowMS.store(4);
+    constexpr int kSlowBucket4Ms = kSlowBucket3Ms + 1;
+    // Sanity check
+    ASSERT_LT(4 * 1000, kLowerBounds[kSlowBucket4Ms]);
+    ASSERT_GT(4 * 1000, kLowerBounds[kSlowBucket4Ms - 1]);
+    BSONObjBuilder outBuilder2;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder2);
+    out = outBuilder2.done();
+    readBuckets = out["reads"]["histogram"].Obj();
+    ASSERT_EQUALS(readBuckets.nFields(), 2);
+    lastElement = getLastElement(readBuckets);
+    ASSERT_APPROX_EQUAL(bucketFromFieldName(lastElement),
+                        static_cast<int64_t>(kLowerBounds[kSlowBucket4Ms]),
+                        kLowerBounds[kSlowBucket4Ms] / 100);
+    ASSERT_EQ(lastElement.Long(), 2);
+
+    // With slowMS of 6, no buckets are added since the 5ms latency goes into the last non-aggregate
+    // bucket according to the logBucketScalingFactor.
+    serverGlobalParams.slowMS.store(6);
+    constexpr int kSlowBucket6Ms = kSlowBucket4Ms + 1;
+    // Sanity check
+    ASSERT_LT(6 * 1000, kLowerBounds[kSlowBucket6Ms]);
+    ASSERT_GT(6 * 1000, kLowerBounds[kSlowBucket6Ms - 1]);
+    BSONObjBuilder outBuilder3;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder3);
+    out = outBuilder3.done();
+    readBuckets = out["reads"]["histogram"].Obj();
+    std::cout << readBuckets << std::endl;
+    ASSERT_EQUALS(readBuckets.nFields(), 2);
+    lastElement = getLastElement(readBuckets);
+    ASSERT_APPROX_EQUAL(bucketFromFieldName(lastElement),
+                        static_cast<int64_t>(kLowerBounds[kSlowBucket6Ms]),
+                        kLowerBounds[kSlowBucket6Ms] / 100);
+    ASSERT_EQ(lastElement.Long(), 1);
+}
+
+
+TEST(OperationLatencyHistogram, WhichBucketIsSlowLogBucketScalingFactorIncludeEmptyBuckets) {
+    auto orig = serverGlobalParams.slowMS.load();
+    ScopeGuard g1 = [orig] {
+        serverGlobalParams.slowMS.store(orig);
+    };
+
+    OperationLatencyHistogram hist({.includeEmptyBuckets = true, .logBucketScalingFactor = 3});
+    // Don't need to add any data since we'll record empty buckets anyway.
+
+    // Start with slowMS of 3.
+    serverGlobalParams.slowMS.store(3);
+    constexpr int kSlowBucket3Ms = 12;
+    // Sanity check
+    ASSERT_LT(3 * 1000, kLowerBounds[kSlowBucket3Ms]);
+    ASSERT_GT(3 * 1000, kLowerBounds[kSlowBucket3Ms - 1]);
+    BSONObjBuilder outBuilder1;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder1);
+    BSONObj out = outBuilder1.done();
+    BSONObj readBuckets = out["reads"]["histogram"].Obj();
+    ASSERT_EQUALS(readBuckets.nFields(), 5);
+    ASSERT_APPROX_EQUAL(bucketFromFieldName(getLastElement(readBuckets)),
+                        static_cast<int64_t>(kLowerBounds[kSlowBucket3Ms]),
+                        kLowerBounds[kSlowBucket3Ms] / 100);
+
+    // With slowMS of 4, one more bucket is added because there is a new non-aggregate bucket
+    // according to the logBucketScalingFactor.
+    serverGlobalParams.slowMS.store(4);
+    constexpr int kSlowBucket4Ms = kSlowBucket3Ms + 1;
+    // Sanity check
+    ASSERT_LT(4 * 1000, kLowerBounds[kSlowBucket4Ms]);
+    ASSERT_GT(4 * 1000, kLowerBounds[kSlowBucket4Ms - 1]);
+    BSONObjBuilder outBuilder2;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder2);
+    out = outBuilder2.done();
+    readBuckets = out["reads"]["histogram"].Obj();
+    ASSERT_EQUALS(readBuckets.nFields(), 6);
+    ASSERT_APPROX_EQUAL(bucketFromFieldName(getLastElement(readBuckets)),
+                        static_cast<int64_t>(kLowerBounds[kSlowBucket4Ms]),
+                        kLowerBounds[kSlowBucket4Ms] / 100);
+
+    // With slowMS of 6, no buckets are added since the 4ms bucket gets folded into the last
+    // non-aggregate bucket according to the logBucketScalingFactor.
+    serverGlobalParams.slowMS.store(6);
+    constexpr int kSlowBucket6Ms = kSlowBucket4Ms + 1;
+    // Sanity check
+    ASSERT_LT(6 * 1000, kLowerBounds[kSlowBucket6Ms]);
+    ASSERT_GT(6 * 1000, kLowerBounds[kSlowBucket6Ms - 1]);
+    BSONObjBuilder outBuilder3;
+    hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder3);
+    out = outBuilder3.done();
+    readBuckets = out["reads"]["histogram"].Obj();
+    ASSERT_EQUALS(readBuckets.nFields(), 6);
+    ASSERT_APPROX_EQUAL(bucketFromFieldName(getLastElement(readBuckets)),
+                        static_cast<int64_t>(kLowerBounds[kSlowBucket6Ms]),
+                        kLowerBounds[kSlowBucket6Ms] / 100);
+}
+
 TEST(OperationLatencyHistogram, CheckLastBucketValueSlowBucketsExcludeEmptyBuckets) {
     // Set a specific slowMS value so we know how many histogram values will be recorded.
     auto orig = serverGlobalParams.slowMS.load();
@@ -465,6 +701,42 @@ TEST(OperationLatencyHistogram, CheckLastBucketValueSlowBucketsIncludeEmptyBucke
             (bucketIndex == static_cast<int>(kMaxUnFilteredBuckets));
         ASSERT_EQUALS(field.Long(), isPopulatedBucket ? 1 : 0);
         ++bucketIndex;
+    }
+}
+
+// Check that we don't skip the last bucket value regardless of if it's a bucket we would include
+// with the given log scaling factor.
+TEST(OperationLatencyHistogram, CheckLastBucketValuePresentLogScalingFactor) {
+    const uint64_t kHigherThanLastBucket = kLowerBounds[kMaxBuckets - 1] + 100;
+
+    // We want one value for the following scenarios
+    // - the max bucket would be the last bucket included in a set of buckets (3)
+    // - the max bucket would be the first value in a new set of buckets (5)
+    const std::vector<int> kLogScalingFactors{3, 5};
+    ASSERT_EQ((kMaxBuckets - 1) % kLogScalingFactors[0], kLogScalingFactors[0] - 1);
+    ASSERT_EQ((kMaxBuckets - 1) % kLogScalingFactors[1], 0);
+
+
+    for (int logScalingFactor : kLogScalingFactors) {
+        OperationLatencyHistogram hist(
+            {.includeEmptyBuckets = false, .logBucketScalingFactor = logScalingFactor});
+        hist.increment(kHigherThanLastBucket,
+                       Command::ReadWriteType::kRead,
+                       /*isQueryableEncryptionOp=*/false);
+
+        BSONObj out;
+        BSONObjBuilder outBuilder;
+        hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/false, &outBuilder);
+        out = outBuilder.done();
+        BSONObj readBuckets = out["reads"]["histogram"].Obj();
+
+        ASSERT_EQUALS(readBuckets.nFields(), static_cast<unsigned int>(1));
+        int64_t expectedBucketValue =
+            kLowerBounds[kMaxBuckets - 1 - ((kMaxBuckets - 1) % logScalingFactor)];
+        ASSERT_APPROX_EQUAL(bucketFromFieldName(readBuckets.firstElement()),
+                            expectedBucketValue,
+                            expectedBucketValue / 100);
+        ASSERT_EQUALS(readBuckets.firstElement().Long(), 1);
     }
 }
 

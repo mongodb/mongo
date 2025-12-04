@@ -130,7 +130,8 @@ void updateCollectionData(WithLock,
 }
 }  // namespace
 
-ServiceLatencyTracker::ServiceLatencyTracker() : _totalTime({.includeEmptyBuckets = true}) {}
+ServiceLatencyTracker::ServiceLatencyTracker()
+    : _totalTime({.includeEmptyBuckets = true, .logBucketScalingFactor = 3}) {}
 
 ServiceLatencyTracker& ServiceLatencyTracker::getDecoration(Service* service) {
     return getServiceLatencyTracker(service);

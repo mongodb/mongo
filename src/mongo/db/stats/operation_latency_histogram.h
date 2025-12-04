@@ -62,6 +62,13 @@ struct OperationLatencyHistogramOptions {
      * the structure of the appended latency histograms should be consistent over time.
      */
     bool includeEmptyBuckets = false;
+
+    /*
+     * The log of the amount to increment each bucket size. By default, buckets are (mostly) powers
+     * of 2, however this can be increased to make bucket sizes larger. This can be used to reduce
+     * the number of fields added when calling `append`. This should always be at least 1.
+     */
+    int logBucketScalingFactor = 1;
 };
 
 /**
@@ -86,12 +93,16 @@ public:
     void increment(uint64_t latency, Command::ReadWriteType type, bool isQueryableEncryptionOp);
 
     /**
-     * Appends the four histograms with latency totals and operation counts.
+     * Appends the four histograms with latency totals and operation counts. If `slowMSBucketsOnly`
+     * is true, values above `slowMSBucketsOnly` are aggregated into a single bucket. The recorded
+     * value of this bucket won't be exactly `slowMSBucketsOnly` but will be the smallest available
+     * bucket threshold above it.
      */
     void append(bool includeHistograms, bool slowMSBucketsOnly, BSONObjBuilder* builder) const;
 
 private:
     bool _includeEmptyBuckets;
+    int _logBucketScalingFactor;
     std::array<HistogramType, operation_latency_histogram_details::kHistogramsCount> _histograms;
 };
 
@@ -107,6 +118,7 @@ public:
 
 private:
     bool _includeEmptyBuckets;
+    int _logBucketScalingFactor;
     std::array<HistogramType, operation_latency_histogram_details::kHistogramsCount> _histograms;
 };
 }  // namespace mongo
