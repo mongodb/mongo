@@ -633,6 +633,8 @@ last-continuous:
     ticket: SERVER-93153
   - test_file: jstests/change_streams/resume_expanded_events.js
     ticket: SERVER-93153
+  - test_file: jstests/core/index/index_on_incorrect_collection.js
+    ticket: SERVER-113888
   suites: null
 last-lts:
   all:
@@ -1318,4 +1320,6 @@ last-lts:
     ticket: SERVER-93153
   - test_file: jstests/change_streams/resume_expanded_events.js
     ticket: SERVER-93153
+  - test_file: jstests/core/index/index_on_incorrect_collection.js
+    ticket: SERVER-113888
   suites: null
