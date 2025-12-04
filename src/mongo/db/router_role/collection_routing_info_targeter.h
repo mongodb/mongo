@@ -56,6 +56,23 @@
 
 namespace mongo {
 
+struct TargetOpResult {
+    TargetOpResult() = default;
+
+    TargetOpResult(std::vector<ShardEndpoint> endpoints) : endpoints(std::move(endpoints)) {}
+
+    TargetOpResult(std::vector<ShardEndpoint> endpoints,
+                   bool useTwoPhaseWriteProtocol,
+                   bool isNonTargetedRetryableWriteWithId)
+        : endpoints(std::move(endpoints)),
+          useTwoPhaseWriteProtocol(useTwoPhaseWriteProtocol),
+          isNonTargetedRetryableWriteWithId(isNonTargetedRetryableWriteWithId) {}
+
+    std::vector<ShardEndpoint> endpoints;
+    bool useTwoPhaseWriteProtocol = false;
+    bool isNonTargetedRetryableWriteWithId = false;
+};
+
 /**
  * NSTargeter based on a CollectionRoutingInfo implementation. Wraps all exception codepaths and
  * returns NamespaceNotFound status on applicable failures.
@@ -126,9 +143,8 @@ public:
      */
     bool hasStaleShardResponse() override;
 
-
     void noteCannotImplicitlyCreateCollectionResponse(
-        OperationContext* optCtx, const CannotImplicitlyCreateCollectionInfo& createInfo) override;
+        OperationContext* opCtx, const CannotImplicitlyCreateCollectionInfo& createInfo) override;
 
     /**
      * Replaces the targeting information with the latest information from the cache.  If this
@@ -196,68 +212,7 @@ public:
                                const ChunkManager& cm);
 
 private:
-    // Maximum number of database creation attempts, which may fail due to a concurrent drop.
-    static const size_t kMaxDatabaseCreationAttempts;
-
     std::unique_ptr<RoutingContext> _init(OperationContext* opCtx, bool refresh);
-
-    /**
-     * Returns a CanonicalQuery if parsing succeeds.
-     *
-     * Returns !OK with message if query could not be canonicalized.
-     *
-     * If 'collation' is empty, we use the collection default collation for targeting.
-     */
-    static StatusWith<std::unique_ptr<CanonicalQuery>> _canonicalize(
-        OperationContext* opCtx,
-        boost::intrusive_ptr<mongo::ExpressionContext> expCtx,
-        const NamespaceString& nss,
-        const BSONObj& query,
-        const BSONObj& collation,
-        const ChunkManager& cm);
-
-    static bool _isExactIdQuery(const CanonicalQuery& query, const ChunkManager& cm);
-
-    bool _isTimeseriesLogicalOperation(OperationContext* opCtx) const;
-
-    /**
-     * Returns a vector of ShardEndpoints for a potentially multi-shard query.
-     *
-     * Uses the collation specified on the CanonicalQuery for targeting. If there is no query
-     * collation, uses the collection default. If 'bypassIsFieldHashedCheck' is true, it skips
-     * checking if the shard key was hashed and assumes that any non-collatable shard key was not
-     * hashed from a collatable type.
-     *
-     * Returns !OK with message if query could not be targeted.
-     */
-    StatusWith<std::vector<ShardEndpoint>> _targetQuery(const CanonicalQuery& query,
-                                                        bool bypassIsFieldHashedCheck) const;
-
-    /**
-     * Returns a vector of ShardEndpoints for a potentially multi-shard query.
-     *
-     * This method is an alternative to _targetQuery that is intended to be used for multi:true
-     * upsert queries only.
-     *
-     * This method attempts to extract a shard key from the CanonicalQuery and then attempts target
-     * a single shard using this shard key.
-     *
-     * Returns !OK with message if a shard key could not be extracted or a single shard could not
-     * be targeted due to collation.
-     */
-    StatusWith<std::vector<ShardEndpoint>> _targetQueryForMultiUpsert(
-        const CanonicalQuery& query) const;
-
-    /**
-     * Returns a ShardEndpoint for an exact shard key query.
-     *
-     * Also has the side effect of updating the chunks stats with an estimate of the amount of
-     * data targeted at this shard key.
-     *
-     * If 'collation' is empty, we use the collection default collation for targeting.
-     */
-    StatusWith<ShardEndpoint> _targetShardKey(const BSONObj& shardKey,
-                                              const BSONObj& collation) const;
 
     // Full namespace of the collection for this targeter
     NamespaceString _nss;
@@ -270,7 +225,7 @@ private:
     // viewless timeseries so nss conversion will not be needed anymore
     bool _nssConvertedToTimeseriesBuckets = false;
 
-    // Stores last error occurred
+    // Stores the type of the last error that occurred (if any).
     boost::optional<LastErrorType> _lastError;
 
     // Set to the epoch of the namespace we are targeting. If we ever refresh the catalog cache
@@ -279,8 +234,64 @@ private:
 
     std::unique_ptr<RoutingContext> _routingCtx;
 
-    // The latest loaded routing cache entry
+    // The latest loaded routing cache entry.
     CollectionRoutingInfo _cri;
 };
+
+/**
+ * Returns a CanonicalQuery if parsing succeeds.
+ *
+ * Returns !OK with message if query could not be canonicalized.
+ *
+ * If 'collation' is empty, we use the collection default collation for targeting.
+ */
+StatusWith<std::unique_ptr<CanonicalQuery>> canonicalizeFindQuery(
+    OperationContext* opCtx,
+    boost::intrusive_ptr<mongo::ExpressionContext> expCtx,
+    const NamespaceString& nss,
+    const BSONObj& query,
+    const BSONObj& collation,
+    const CollectionRoutingInfo& cri);
+
+/**
+ * Returns a vector of ShardEndpoints for a potentially multi-shard query.
+ *
+ * Uses the collation specified on the CanonicalQuery for targeting. If there is no query
+ * collation, uses the collection default. If 'bypassIsFieldHashedCheck' is true, it skips
+ * checking if the shard key was hashed and assumes that any non-collatable shard key was not
+ * hashed from a collatable type.
+ *
+ * Returns !OK with message if query could not be targeted.
+ */
+StatusWith<std::vector<ShardEndpoint>> targetQuery(const CollectionRoutingInfo& cri,
+                                                   const CanonicalQuery& query,
+                                                   bool bypassIsFieldHashedCheck);
+
+/**
+ * Returns a vector of ShardEndpoints for a potentially multi-shard query.
+ *
+ * This method is an alternative to _targetQuery that is intended to be used for multi:true
+ * upsert queries only.
+ *
+ * This method attempts to extract a shard key from the CanonicalQuery and then attempts target
+ * a single shard using this shard key.
+ *
+ * Returns !OK with message if a shard key could not be extracted or a single shard could not
+ * be targeted due to collation.
+ */
+StatusWith<std::vector<ShardEndpoint>> targetQueryForMultiUpsert(const CollectionRoutingInfo& cri,
+                                                                 const CanonicalQuery& query);
+
+/**
+ * Returns a ShardEndpoint for an exact shard key query.
+ *
+ * Also has the side effect of updating the chunks stats with an estimate of the amount of
+ * data targeted at this shard key.
+ *
+ * If 'collation' is empty, we use the collection default collation for targeting.
+ */
+StatusWith<ShardEndpoint> targetShardKey(const CollectionRoutingInfo& cri,
+                                         const BSONObj& shardKey,
+                                         const BSONObj& collation);
 
 }  // namespace mongo

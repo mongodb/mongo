@@ -84,8 +84,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
-namespace {
 
+namespace {
 MONGO_FAIL_POINT_DEFINE(waitForDatabaseToBeDropped);
 MONGO_FAIL_POINT_DEFINE(isTrackedTimeSeriesBucketsNamespaceAlwaysTrue);
 MONGO_FAIL_POINT_DEFINE(isTrackedTimeSeriesNamespaceAlwaysTrue);
@@ -117,7 +117,10 @@ void validateUpdateDoc(const UpdateOpRef& updateRef) {
     }
 
     const auto updateType = updateMod.type();
-    invariant(updateType == UpdateType::kReplacement || updateType == UpdateType::kModifier);
+    tassert(11428700,
+            "Expected replacement update or modifier update",
+            updateType == UpdateType::kReplacement || updateType == UpdateType::kModifier);
+
     const auto& updateExpr = updateType == UpdateType::kReplacement
         ? updateMod.getUpdateReplacement()
         : updateMod.getUpdateModifier();
@@ -155,7 +158,8 @@ bool isMetadataDifferent(const CollectionRoutingInfo& criA, const CollectionRout
 
 ShardEndpoint targetUnshardedCollection(const NamespaceString& nss,
                                         const CollectionRoutingInfo& cri) {
-    invariant(!cri.isSharded());
+    tassert(11428701, "Expected collection to be unsharded", !cri.isSharded());
+
     if (cri.hasRoutingTable()) {
         // Target the only shard that owns this collection.
         const auto shardId = cri.getChunkManager().getMinKeyShardIdWithSimpleCollation();
@@ -170,10 +174,10 @@ ShardEndpoint targetUnshardedCollection(const NamespaceString& nss,
             nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : cri.getDbVersion());
     }
 }
-
 }  // namespace
 
-const size_t CollectionRoutingInfoTargeter::kMaxDatabaseCreationAttempts = 3;
+// Maximum number of database creation attempts, which may fail due to a concurrent drop.
+constexpr size_t kMaxDatabaseCreationAttempts = 3;
 
 CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(OperationContext* opCtx,
                                                              const NamespaceString& nss,
@@ -195,7 +199,10 @@ CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const NamespaceStri
         _nssConvertedToTimeseriesBuckets = true;
     }
     _routingCtx = RoutingContext::createSynthetic({{_nss, _cri}});
-    invariant(!_cri.hasRoutingTable() || _cri.getChunkManager().getNss() == _nss);
+
+    tassert(11428702,
+            "Expected namespace from ChunkManager to match provided namespace",
+            !_cri.hasRoutingTable() || _cri.getChunkManager().getNss() == _nss);
 }
 
 /**
@@ -308,10 +315,9 @@ const NamespaceString& CollectionRoutingInfoTargeter::getNS() const {
     return _nss;
 }
 
-BSONObj CollectionRoutingInfoTargeter::extractBucketsShardKeyFromTimeseriesDoc(
-    const BSONObj& doc,
-    const ShardKeyPattern& pattern,
-    const TimeseriesOptions& timeseriesOptions) {
+BSONObj extractBucketsShardKeyFromTimeseriesDoc(const BSONObj& doc,
+                                                const ShardKeyPattern& pattern,
+                                                const TimeseriesOptions& timeseriesOptions) {
     allocator_aware::BSONObjBuilder builder;
 
     auto timeField = timeseriesOptions.getTimeField();
@@ -343,8 +349,10 @@ BSONObj CollectionRoutingInfoTargeter::extractBucketsShardKeyFromTimeseriesDoc(
     return pattern.extractShardKeyFromDoc(docWithShardKey);
 }
 
-bool CollectionRoutingInfoTargeter::_isExactIdQuery(const CanonicalQuery& query,
-                                                    const ChunkManager& cm) {
+namespace {
+bool isExactIdQuery(const CanonicalQuery& query,
+                    bool isSharded,
+                    const CollatorInterface* defaultCollator) {
     auto shardKey = extractShardKeyFromQuery(kVirtualIdShardKey, query);
     BSONElement idElt = shardKey["_id"];
 
@@ -352,9 +360,9 @@ bool CollectionRoutingInfoTargeter::_isExactIdQuery(const CanonicalQuery& query,
         return false;
     }
 
-    if (CollationIndexKey::isCollatableType(idElt.type()) && cm.isSharded() &&
+    if (CollationIndexKey::isCollatableType(idElt.type()) && isSharded &&
         !query.getFindCommandRequest().getCollation().isEmpty() &&
-        !CollatorInterface::collatorsMatch(query.getCollator(), cm.getDefaultCollator())) {
+        !CollatorInterface::collatorsMatch(query.getCollator(), defaultCollator)) {
 
         // The collation applies to the _id field, but the user specified a collation which doesn't
         // match the collection default.
@@ -363,12 +371,14 @@ bool CollectionRoutingInfoTargeter::_isExactIdQuery(const CanonicalQuery& query,
 
     return true;
 }
+}  // namespace
 
-bool CollectionRoutingInfoTargeter::isExactIdQuery(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const BSONObj& query,
-                                                   const BSONObj& collation,
-                                                   const ChunkManager& cm) {
+bool isExactIdQuery(OperationContext* opCtx,
+                    const NamespaceString& nss,
+                    const BSONObj& query,
+                    const BSONObj& collation,
+                    bool isSharded,
+                    const CollatorInterface* defaultCollator) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
     if (!collation.isEmpty()) {
@@ -381,37 +391,45 @@ bool CollectionRoutingInfoTargeter::isExactIdQuery(OperationContext* opCtx,
                                               .allowedFeatures =
                                                   MatchExpressionParser::kAllowAllSpecialFeatures},
     });
-    return cq.isOK() && _isExactIdQuery(*cq.getValue(), cm);
+    return cq.isOK() && isExactIdQuery(*cq.getValue(), isSharded, defaultCollator);
 }
 
-bool CollectionRoutingInfoTargeter::_isTimeseriesLogicalOperation(OperationContext* opCtx) const {
+bool isTimeseriesLogicalOperation(OperationContext* opCtx,
+                                  const CollectionRoutingInfo& cri,
+                                  bool isViewfulTimeseries) {
     // For viewless timeseries collections logical operations are those that do not specifcy
     // rawData flag.
     //
     // For legacy viewful timeseries collection logical operations are the ones that either:
     //  - Target the view namespace and specify the rawData flag
     //  - Target directly the bucket namespace
-    return _cri.getChunkManager().isTimeseriesCollection() && !isRawDataOperation(opCtx) &&
-        (_cri.getChunkManager().isNewTimeseriesWithoutView() || _nssConvertedToTimeseriesBuckets);
+    const auto& cm = cri.getChunkManager();
+    return (cm.isTimeseriesCollection() && !isRawDataOperation(opCtx) &&
+            (cm.isNewTimeseriesWithoutView() || isViewfulTimeseries));
 }
 
-ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCtx,
-                                                          const BSONObj& doc) const {
-    if (!_cri.isSharded()) {
-        return targetUnshardedCollection(_nss, _cri);
+ShardEndpoint targetInsert(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           const CollectionRoutingInfo& cri,
+                           bool isViewfulTimeseries,
+                           const BSONObj& doc) {
+    if (!cri.isSharded()) {
+        return targetUnshardedCollection(nss, cri);
     }
 
     // Collection is sharded
+    const auto& cm = cri.getChunkManager();
+
     const BSONObj shardKey = [&]() {
-        const auto& shardKeyPattern = _cri.getChunkManager().getShardKeyPattern();
+        const auto& shardKeyPattern = cm.getShardKeyPattern();
         BSONObj shardKey;
         if (shardKeyPattern.hasId()) {
             uassert(ErrorCodes::InvalidIdField,
                     "Document is missing _id field, which is part of the shard key pattern",
                     doc.hasField("_id"));
         }
-        if (_isTimeseriesLogicalOperation(opCtx)) {
-            const auto& tsFields = _cri.getChunkManager().getTimeseriesFields();
+        if (isTimeseriesLogicalOperation(opCtx, cri, isViewfulTimeseries)) {
+            const auto& tsFields = cm.getTimeseriesFields();
             tassert(5743701, "Missing timeseriesFields on timeseries collection", tsFields);
             shardKey = extractBucketsShardKeyFromTimeseriesDoc(
                 doc, shardKeyPattern, tsFields->getTimeseriesOptions());
@@ -429,18 +447,22 @@ ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCt
         return shardKey;
     }();
 
-
     // Target the shard key
-    return uassertStatusOK(_targetShardKey(shardKey, CollationSpec::kSimpleSpec));
+    return uassertStatusOK(targetShardKey(cri, shardKey, CollationSpec::kSimpleSpec));
 }
 
+namespace {
 bool isRetryableWrite(OperationContext* opCtx) {
     return opCtx->getTxnNumber() && !opCtx->inMultiDocumentTransaction();
 }
+}  // namespace
 
-NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
-    OperationContext* opCtx, const BatchItemRef& itemRef) const {
-    NSTargeter::TargetingResult result;
+TargetOpResult targetUpdate(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const CollectionRoutingInfo& cri,
+                            bool isViewfulTimeseries,
+                            const BatchItemRef& itemRef) {
+    TargetOpResult result;
     auto updateOp = itemRef.getUpdateOp();
     const bool isMulti = updateOp.getMulti();
 
@@ -455,24 +477,26 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
         ? getQueryCounters(opCtx).findAndModifyNonTargetedShardedCount
         : getQueryCounters(opCtx).updateOneNonTargetedShardedCount;
 
-    if (!_cri.isSharded()) {
+    if (!cri.isSharded()) {
         if (isMulti) {
             getQueryCounters(opCtx).updateManyCount.increment(1);
         } else {
             updateOneUnshardedCount.increment(1);
         }
 
-        result.endpoints.emplace_back(targetUnshardedCollection(_nss, _cri));
+        result.endpoints.emplace_back(targetUnshardedCollection(nss, cri));
         return result;
     }
 
     // Collection is sharded
     const auto collation = write_ops::collationOf(updateOp);
+    const bool isTimeseriesLogicalOp =
+        isTimeseriesLogicalOperation(opCtx, cri, isViewfulTimeseries);
 
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(
         opCtx,
-        _nss,
-        _cri,
+        nss,
+        cri,
         collation,
         boost::none,  // explain
         itemRef.getCommand().getLet(),
@@ -480,8 +504,9 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
 
     const bool isUpsert = updateOp.getUpsert();
     auto query = updateOp.getFilter();
+    const auto& cm = cri.getChunkManager();
 
-    if (_isTimeseriesLogicalOperation(opCtx)) {
+    if (isTimeseriesLogicalOp) {
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "A {multi:false} update on a sharded timeseries collection is disallowed.",
@@ -506,7 +531,7 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
         query = timeseries::getBucketLevelPredicateForRouting(
             query,
             expCtx,
-            _cri.getChunkManager().getTimeseriesFields()->getTimeseriesOptions(),
+            cm.getTimeseriesFields()->getTimeseriesOptions(),
             feature_flags::gTimeseriesUpdatesSupport.isEnabled(
                 VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
@@ -515,14 +540,14 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
     validateUpdateDoc(updateOp);
 
     // Parse update query.
-    const auto cq = uassertStatusOKWithContext(
-        _canonicalize(opCtx, expCtx, _nss, query, collation, _cri.getChunkManager()),
-        str::stream() << "Could not parse update query " << query);
+    const auto cq =
+        uassertStatusOKWithContext(canonicalizeFindQuery(opCtx, expCtx, nss, query, collation, cri),
+                                   str::stream() << "Could not parse update query " << query);
 
     // Target based on the update's filter.
     //
-    // If this is a multi:true upsert, we call _targetQueryForMultiUpsert() to do targeting.
-    // For all other kinds of updates, we call _targetQuery() to do targeting.
+    // If this is a multi:true upsert, we call targetQueryForMultiUpsert() to do targeting.
+    // For all other kinds of updates, we call targetQuery() to do targeting.
     //
     // In either case, if a non-OK status is returned we will throw an exception here.
     //
@@ -532,8 +557,8 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
     // single shard.
     const bool bypassIsFieldHashedCheck = isFindAndModify;
     result.endpoints = isMulti && isUpsert
-        ? uassertStatusOK(_targetQueryForMultiUpsert(*cq))
-        : uassertStatusOK(_targetQuery(*cq, bypassIsFieldHashedCheck));
+        ? uassertStatusOK(targetQueryForMultiUpsert(cri, *cq))
+        : uassertStatusOK(targetQuery(cri, *cq, bypassIsFieldHashedCheck));
 
     // For multi:true updates/upserts, there are no other checks to perform. Increment query
     // counters as appropriate and return 'result'.
@@ -544,7 +569,7 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
 
     bool multipleEndpoints = result.endpoints.size() > 1u;
     const bool isExactId =
-        _isExactIdQuery(*cq, _cri.getChunkManager()) && !_isTimeseriesLogicalOperation(opCtx);
+        isExactIdQuery(*cq, cm.isSharded(), cm.getDefaultCollator()) && !isTimeseriesLogicalOp;
 
     // In the multiple shards scenario, for multi:false upserts, multi:false non-upsert updates
     // whose filter doesn't have an "_id" equality, and for findAndModify we use the two phase write
@@ -583,10 +608,12 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
     return result;
 }
 
-
-NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetDelete(
-    OperationContext* opCtx, const BatchItemRef& itemRef) const {
-    NSTargeter::TargetingResult result;
+TargetOpResult targetDelete(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const CollectionRoutingInfo& cri,
+                            bool isViewfulTimeseries,
+                            const BatchItemRef& itemRef) {
+    TargetOpResult result;
 
     auto deleteOp = itemRef.getDeleteOp();
     const bool isMulti = deleteOp.getMulti();
@@ -603,30 +630,34 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetDelete(
         ? getQueryCounters(opCtx).findAndModifyNonTargetedShardedCount
         : getQueryCounters(opCtx).deleteOneNonTargetedShardedCount;
 
-    if (!_cri.isSharded()) {
+    if (!cri.isSharded()) {
         if (isMulti) {
             getQueryCounters(opCtx).deleteManyCount.increment(1);
         } else {
             deleteOneUnshardedCount.increment(1);
         }
 
-        result.endpoints.emplace_back(targetUnshardedCollection(_nss, _cri));
+        result.endpoints.emplace_back(targetUnshardedCollection(nss, cri));
         return result;
     }
 
     // Collection is sharded
+    const bool isTimeseriesLogicalOp =
+        isTimeseriesLogicalOperation(opCtx, cri, isViewfulTimeseries);
+
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(
         opCtx,
-        _nss,
-        _cri,
+        nss,
+        cri,
         collation,
         boost::none,  // explain
         itemRef.getCommand().getLet(),
         itemRef.getCommand().getLegacyRuntimeConstants());
 
     BSONObj deleteQuery = deleteOp.getFilter();
+    const auto& cm = cri.getChunkManager();
 
-    if (_isTimeseriesLogicalOperation(opCtx)) {
+    if (isTimeseriesLogicalOp) {
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot perform a non-multi delete on a time-series collection",
                 feature_flags::gTimeseriesDeletesSupport.isEnabled(
@@ -634,7 +665,7 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetDelete(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                     isMulti);
 
-        auto tsFields = _cri.getChunkManager().getTimeseriesFields();
+        auto tsFields = cm.getTimeseriesFields();
         tassert(5918101, "Missing timeseriesFields on buckets collection", tsFields);
 
         // Translate the delete query on a timeseries collection into the bucket-level predicate
@@ -654,11 +685,11 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetDelete(
 
     // Parse delete query.
     const auto cq = uassertStatusOKWithContext(
-        _canonicalize(opCtx, expCtx, _nss, deleteQuery, collation, _cri.getChunkManager()),
+        canonicalizeFindQuery(opCtx, expCtx, nss, deleteQuery, collation, cri),
         str::stream() << "Could not parse delete query " << deleteQuery);
 
     const bool isExactId =
-        _isExactIdQuery(*cq, _cri.getChunkManager()) && !_isTimeseriesLogicalOperation(opCtx);
+        isExactIdQuery(*cq, cm.isSharded(), cm.getDefaultCollator()) && !isTimeseriesLogicalOp;
 
     // Target based on the delete's filter.
     //
@@ -667,7 +698,7 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetDelete(
     // This means that we always assume that a findAndModify request using _id is targetable to a
     // single shard.
     const bool bypassIsFieldHashedCheck = isFindAndModify;
-    auto endpoints = uassertStatusOK(_targetQuery(*cq, bypassIsFieldHashedCheck));
+    auto endpoints = uassertStatusOK(targetQuery(cri, *cq, bypassIsFieldHashedCheck));
     const bool multipleEndpoints = endpoints.size() > 1u;
 
     result.endpoints = std::move(endpoints);
@@ -703,17 +734,18 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetDelete(
     return result;
 }
 
-StatusWith<std::unique_ptr<CanonicalQuery>> CollectionRoutingInfoTargeter::_canonicalize(
+StatusWith<std::unique_ptr<CanonicalQuery>> canonicalizeFindQuery(
     OperationContext* opCtx,
     boost::intrusive_ptr<mongo::ExpressionContext> expCtx,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& collation,
-    const ChunkManager& cm) {
-
+    const CollectionRoutingInfo& cri) {
     // Parse query.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
+
+    const auto& cm = cri.getChunkManager();
     expCtx->setUUID(cm.getUUID());
 
     tassert(8557200,
@@ -734,30 +766,31 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CollectionRoutingInfoTargeter::_cano
     });
 }
 
-StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQuery(
-    const CanonicalQuery& query, bool bypassIsFieldHashedCheck) const {
+StatusWith<std::vector<ShardEndpoint>> targetQuery(const CollectionRoutingInfo& cri,
+                                                   const CanonicalQuery& query,
+                                                   bool bypassIsFieldHashedCheck) {
 
     std::set<ShardId> shardIds;
     try {
         getShardIdsForCanonicalQuery(
-            query, _cri.getChunkManager(), &shardIds, bypassIsFieldHashedCheck);
+            query, cri.getChunkManager(), &shardIds, bypassIsFieldHashedCheck);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {
-        ShardVersion shardVersion = _cri.getShardVersion(shardId);
+        ShardVersion shardVersion = cri.getShardVersion(shardId);
         endpoints.emplace_back(std::move(shardId), std::move(shardVersion), boost::none);
     }
 
     return endpoints;
 }
 
-StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQueryForMultiUpsert(
-    const CanonicalQuery& query) const {
+StatusWith<std::vector<ShardEndpoint>> targetQueryForMultiUpsert(const CollectionRoutingInfo& cri,
+                                                                 const CanonicalQuery& query) {
     // Attempt to extract the shard key from the query.
-    const auto& shardKeyPattern = _cri.getChunkManager().getShardKeyPattern();
+    const auto& shardKeyPattern = cri.getChunkManager().getShardKeyPattern();
     BSONObj shardKey = extractShardKeyFromQuery(shardKeyPattern, query);
 
     // If extracting the shard key failed, return a non-OK Status.
@@ -766,47 +799,92 @@ StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQue
                       "Failed to target upsert by query :: could not extract exact shard key"};
     }
 
-    // Call _targetShardKey() and throw an error if this fails.
+    // Call targetShardKey() and throw an error if this fails.
     const BSONObj& collation = query.getFindCommandRequest().getCollation();
-    auto swEndpoint = _targetShardKey(shardKey, collation);
+    auto swEndpoint = targetShardKey(cri, shardKey, collation);
 
-    // If _targetShardKey() returned a non-OK Status, return that status with added context.
+    // If targetShardKey() returned a non-OK Status, return that status with added context.
     if (!swEndpoint.isOK()) {
         return swEndpoint.getStatus().withContext("Failed to target upsert by query");
     }
 
-    // Store the result of _targetShardKey() into a vector and return the vector.
+    // Store the result of targetShardKey() into a vector and return the vector.
     std::vector<ShardEndpoint> endpoints;
     endpoints.emplace_back(std::move(swEndpoint.getValue()));
     return endpoints;
 }
 
-StatusWith<ShardEndpoint> CollectionRoutingInfoTargeter::_targetShardKey(
-    const BSONObj& shardKey, const BSONObj& collation) const {
+StatusWith<ShardEndpoint> targetShardKey(const CollectionRoutingInfo& cri,
+                                         const BSONObj& shardKey,
+                                         const BSONObj& collation) {
     try {
-        auto chunk = _cri.getChunkManager().findIntersectingChunk(shardKey, collation);
+        auto chunk = cri.getChunkManager().findIntersectingChunk(shardKey, collation);
         return ShardEndpoint(
-            chunk.getShardId(), _cri.getShardVersion(chunk.getShardId()), boost::none);
+            chunk.getShardId(), cri.getShardVersion(chunk.getShardId()), boost::none);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
 }
 
-std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetAllShards(
-    OperationContext* opCtx) const {
+std::vector<ShardEndpoint> targetAllShards(OperationContext* opCtx,
+                                           const CollectionRoutingInfo& cri) {
     // This function is only called if doing a multi write that targets more than one shard. This
     // implies the collection is sharded, so we should always have a chunk manager.
-    invariant(_cri.isSharded());
+    tassert(11428703, "Expected collection to be sharded", cri.isSharded());
 
     auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {
-        ShardVersion shardVersion = _cri.getShardVersion(shardId);
+        ShardVersion shardVersion = cri.getShardVersion(shardId);
         endpoints.emplace_back(std::move(shardId), std::move(shardVersion), boost::none);
     }
 
     return endpoints;
+}
+
+ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCtx,
+                                                          const BSONObj& doc) const {
+    return mongo::targetInsert(opCtx, _nss, _cri, _nssConvertedToTimeseriesBuckets, doc);
+}
+
+NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
+    OperationContext* opCtx, const BatchItemRef& itemRef) const {
+    auto result = mongo::targetUpdate(opCtx, _nss, _cri, _nssConvertedToTimeseriesBuckets, itemRef);
+
+    return {std::move(result.endpoints),
+            result.useTwoPhaseWriteProtocol,
+            result.isNonTargetedRetryableWriteWithId};
+}
+
+NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetDelete(
+    OperationContext* opCtx, const BatchItemRef& itemRef) const {
+    auto result = mongo::targetDelete(opCtx, _nss, _cri, _nssConvertedToTimeseriesBuckets, itemRef);
+
+    return {std::move(result.endpoints),
+            result.useTwoPhaseWriteProtocol,
+            result.isNonTargetedRetryableWriteWithId};
+}
+
+std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetAllShards(
+    OperationContext* opCtx) const {
+    return mongo::targetAllShards(opCtx, _cri);
+}
+
+BSONObj CollectionRoutingInfoTargeter::extractBucketsShardKeyFromTimeseriesDoc(
+    const BSONObj& doc,
+    const ShardKeyPattern& pattern,
+    const TimeseriesOptions& timeseriesOptions) {
+    return mongo::extractBucketsShardKeyFromTimeseriesDoc(doc, pattern, timeseriesOptions);
+}
+
+bool CollectionRoutingInfoTargeter::isExactIdQuery(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const BSONObj& query,
+                                                   const BSONObj& collation,
+                                                   const ChunkManager& cm) {
+    return mongo::isExactIdQuery(
+        opCtx, nss, query, collation, cm.isSharded(), cm.getDefaultCollator());
 }
 
 void CollectionRoutingInfoTargeter::noteCouldNotTarget() {
@@ -852,7 +930,7 @@ void CollectionRoutingInfoTargeter::noteCannotImplicitlyCreateCollectionResponse
     // CannotImplicitlyCreateCollection error for one namespace can be duplicated to operations on
     // the other namespace. In this case, we only need to create the collection for the namespace
     // the error actually refers to.
-    if (createInfo.getNss() == getNS()) {
+    if (createInfo.getNss() == _nss) {
         _lastError = LastErrorType::kCannotImplicitlyCreateCollection;
     }
 }
@@ -875,13 +953,13 @@ bool CollectionRoutingInfoTargeter::refreshIfNeeded(OperationContext* opCtx) {
 
     // Get the latest metadata information from the cache if there were issues
     auto lastManager = _cri;
-    _routingCtx = _init(opCtx, false);
+    _routingCtx = _init(opCtx, /*refresh*/ false);
     _cri = _routingCtx->getCollectionRoutingInfo(_nss);
     auto metadataChanged = isMetadataDifferent(lastManager, _cri);
 
     if (_lastError.value() == LastErrorType::kCouldNotTarget && !metadataChanged) {
-        // If we couldn't target, and we didn't already update the metadata we must force a refresh
-        _routingCtx = _init(opCtx, true);
+        // If we couldn't target, and we didn't already update the metadata we must force a refresh.
+        _routingCtx = _init(opCtx, /*refresh*/ true);
         _cri = _routingCtx->getCollectionRoutingInfo(_nss);
         metadataChanged = isMetadataDifferent(lastManager, _cri);
     }
@@ -895,8 +973,8 @@ bool CollectionRoutingInfoTargeter::createCollectionIfNeeded(OperationContext* o
     }
 
     try {
-        cluster::createCollectionWithRouterLoop(opCtx, getNS());
-        LOGV2_DEBUG(8037201, 3, "Successfully created collection", "nss"_attr = getNS());
+        cluster::createCollectionWithRouterLoop(opCtx, _nss);
+        LOGV2_DEBUG(8037201, 3, "Successfully created collection", "nss"_attr = _nss);
     } catch (const DBException& ex) {
         LOGV2(8037200, "Could not create collection", "error"_attr = redact(ex.toStatus()));
         _lastError = boost::none;
@@ -907,12 +985,29 @@ bool CollectionRoutingInfoTargeter::createCollectionIfNeeded(OperationContext* o
     return true;
 }
 
-int CollectionRoutingInfoTargeter::getAproxNShardsOwningChunks() const {
-    if (_cri.hasRoutingTable()) {
-        return _cri.getChunkManager().getAproxNShardsOwningChunks();
-    }
+int getAproxNShardsOwningChunks(const CollectionRoutingInfo& cri) {
+    return cri.hasRoutingTable() ? cri.getChunkManager().getAproxNShardsOwningChunks() : 0;
+}
 
-    return 0;
+bool isTrackedTimeSeriesBucketsNamespace(const CollectionRoutingInfo& cri) {
+    // Used for testing purposes to force that we always have a tracked timeseries bucket namespace.
+    if (MONGO_unlikely(isTrackedTimeSeriesBucketsNamespaceAlwaysTrue.shouldFail())) {
+        return true;
+    }
+    return cri.hasRoutingTable() && cri.getChunkManager().isTimeseriesCollection() &&
+        !cri.getChunkManager().isNewTimeseriesWithoutView();
+}
+
+bool isTrackedTimeSeriesNamespace(const CollectionRoutingInfo& cri) {
+    // Used for testing purposes to force that we always have a tracked timeseries namespace.
+    if (MONGO_unlikely(isTrackedTimeSeriesNamespaceAlwaysTrue.shouldFail())) {
+        return true;
+    }
+    return cri.hasRoutingTable() && cri.getChunkManager().isTimeseriesCollection();
+}
+
+int CollectionRoutingInfoTargeter::getAproxNShardsOwningChunks() const {
+    return mongo::getAproxNShardsOwningChunks(_cri);
 }
 
 bool CollectionRoutingInfoTargeter::isTargetedCollectionSharded() const {
@@ -920,25 +1015,16 @@ bool CollectionRoutingInfoTargeter::isTargetedCollectionSharded() const {
 }
 
 bool CollectionRoutingInfoTargeter::isTrackedTimeSeriesBucketsNamespace() const {
-    // Used for testing purposes to force that we always have a tracked timeseries bucket namespace.
-    if (MONGO_unlikely(isTrackedTimeSeriesBucketsNamespaceAlwaysTrue.shouldFail())) {
-        return true;
-    }
-    return _cri.hasRoutingTable() && _cri.getChunkManager().isTimeseriesCollection() &&
-        !_cri.getChunkManager().isNewTimeseriesWithoutView();
+    return mongo::isTrackedTimeSeriesBucketsNamespace(_cri);
 }
 
 bool CollectionRoutingInfoTargeter::isTrackedTimeSeriesNamespace() const {
-    // Used for testing purposes to force that we always have a tracked timeseries namespace.
-    if (MONGO_unlikely(isTrackedTimeSeriesNamespaceAlwaysTrue.shouldFail())) {
-        return true;
-    }
-    return _cri.hasRoutingTable() && _cri.getChunkManager().isTimeseriesCollection();
+    return mongo::isTrackedTimeSeriesNamespace(_cri);
 }
 
 bool CollectionRoutingInfoTargeter::timeseriesNamespaceNeedsRewrite(
     const NamespaceString& nss) const {
-    return isTrackedTimeSeriesBucketsNamespace() && !nss.isTimeseriesBucketsCollection();
+    return mongo::isTrackedTimeSeriesBucketsNamespace(_cri) && !nss.isTimeseriesBucketsCollection();
 }
 
 RoutingContext& CollectionRoutingInfoTargeter::getRoutingCtx() const {
