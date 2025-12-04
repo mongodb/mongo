@@ -11,5 +11,7 @@ external rules-lint-ignored=true
 rpm/*.spec rules-lint-ignored=true
 src/mongo/bson/column/bson_column_compressed_data.inl rules-lint-ignored=true
 *.idl linguist-language=yaml
+# Do not automatically merge golden test expected output files
+jstests/**/expected_output/**/* -merge
 
 MODULE.bazel.lock rules-lint-ignored=true linguist-generated
