@@ -128,50 +128,69 @@ bool Transforms::partialPushdown(PipelineRewriteContext& ctx,
 }
 
 namespace {
+struct RuleRegistration {
+    PipelineRewriteRule rule;
+    FeatureFlag* featureFlag = nullptr;
+};
+
 /**
  * Manages a mapping between DocumentSources and rewrite rules that are applicable to them.
  */
-class PipelineRewriteRuleRegistry {
+class RuleRegistry {
 public:
-    void registerRules(std::type_index key, std::vector<PipelineRewriteRule> rules) {
+    void registerRules(std::type_index key,
+                       std::vector<PipelineRewriteRule> rules,
+                       FeatureFlag* featureFlag) {
         for (auto&& rule : rules) {
             tassert(11010016,
                     str::stream() << "Duplicate rule name \"" << rule.name << '\"',
                     _registeredRuleNames.insert(rule.name).second);
 
-            _rules[key].push_back(std::move(rule));
+            _rules[key].emplace_back(std::move(rule), featureFlag);
         }
     }
 
-    const std::vector<PipelineRewriteRule>& getRules(const DocumentSource& ds) const {
+    const std::vector<RuleRegistration>& getRules(ExpressionContext& expCtx,
+                                                  const DocumentSource& ds) const {
+        static const std::vector<RuleRegistration> kEmpty = {};
+
         auto it = _rules.find(std::type_index{typeid(ds)});
-        return it == _rules.end() ? _kEmptyRules : it->second;
+        return it == _rules.end() ? kEmpty : it->second;
     }
 
 private:
     std::set<std::string> _registeredRuleNames;
-    stdx::unordered_map<std::type_index, std::vector<PipelineRewriteRule>> _rules;
-
-    // To return an empty result by reference when no rules have been registered.
-    constexpr static const std::vector<PipelineRewriteRule> _kEmptyRules = {};
+    stdx::unordered_map<std::type_index, std::vector<RuleRegistration>> _rules;
 };
 
-const auto getPipelineRewriteRuleRegistry =
-    ServiceContext::declareDecoration<PipelineRewriteRuleRegistry>();
+const auto getPipelineRewriteRuleRegistry = ServiceContext::declareDecoration<RuleRegistry>();
 }  // namespace
 
 void PipelineRewriteContext::enqueueRules() {
-    auto& ds = current();
-    auto& registry = getPipelineRewriteRuleRegistry(&_serviceCtx);
-    addRules(registry.getRules(ds));
+    auto& registry =
+        getPipelineRewriteRuleRegistry(_expCtx.getOperationContext()->getServiceContext());
+
+    for (auto&& registration : registry.getRules(_expCtx, current())) {
+        // (Generic FCV reference): Fall back to kLastLTS when 'vCtx' is not initialized.
+        bool enabled = !registration.featureFlag ||
+            registration.featureFlag->checkWithContext(
+                _expCtx.getVersionContext(),
+                _expCtx.getIfrContext(),
+                ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS});
+
+        if (enabled) {
+            addRule(registration.rule);
+        }
+    }
 }
 
 namespace registration_detail {
 void registerRules(ServiceContext* serviceCtx,
                    std::type_index key,
-                   std::vector<Rule<PipelineRewriteContext>> rules) {
+                   std::vector<Rule<PipelineRewriteContext>> rules,
+                   FeatureFlag* featureFlag) {
     auto& registry = getPipelineRewriteRuleRegistry(serviceCtx);
-    registry.registerRules(key, std::move(rules));
+    registry.registerRules(key, std::move(rules), featureFlag);
 }
 
 void clearRulesForTest(ServiceContext* serviceCtx) {

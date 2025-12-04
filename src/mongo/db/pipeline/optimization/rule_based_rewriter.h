@@ -46,13 +46,40 @@ namespace mongo::rule_based_rewrites::pipeline {
  *                OPTIMIZE_RULE(DocumentSourceMatch),
  *                {"SOME_OTHER_RULE", precondition, transform, 1.0});
  */
-#define REGISTER_RULES(DS, ...)                                                              \
-    const ServiceContext::ConstructorActionRegisterer documentSourcePrereqsRegisterer_##DS { \
-        "PipelineOptimizationContext" #DS, [](ServiceContext* serviceCtx) {                  \
-            namespace rbr = rule_based_rewrites::pipeline;                                   \
-            rbr::registration_detail::registerRules<DS>(serviceCtx, {__VA_ARGS__});          \
-        }                                                                                    \
+#define REGISTER_RULES(DS, ...) REGISTER_RULES_WITH_FEATURE_FLAG(DS, nullptr, __VA_ARGS__)
+
+/**
+ * Macro for registering rules gated by a feature flag. Example usage:
+ *
+ * REGISTER_RULES_WITH_FEATURE_FLAG(DocumentSourceMatch,
+ *                                  featureFlagFoo,
+ *                                  OPTIMIZE_AT_RULE(DocumentSourceMatch),
+ *                                  OPTIMIZE_RULE(DocumentSourceMatch),
+ *                                  {"SOME_OTHER_RULE", precondition, transform, 1.0});
+ */
+#define REGISTER_RULES_WITH_FEATURE_FLAG(DS, featureFlag, ...)                    \
+    const ServiceContext::ConstructorActionRegisterer _REGISTERER_NAME_CAT(       \
+        documentSourcePrereqsRegisterer_##DS##_, __LINE__) {                      \
+        "PipelineOptimizationContext" #DS _REGISTERER_NAME_STR(__LINE__),         \
+            [](ServiceContext* serviceCtx) {                                      \
+                _REGISTER_RULES_HELPER(DS, serviceCtx, featureFlag, __VA_ARGS__); \
+            }                                                                     \
     }
+
+#define _REGISTERER_NAME_CAT2(a, b) a##b
+#define _REGISTERER_NAME_CAT(a, b) _REGISTERER_NAME_CAT2(a, b)
+
+#define _REGISTERER_NAME_STR2(s) #s
+#define _REGISTERER_NAME_STR(s) _REGISTERER_NAME_STR2(s)
+
+#define _REGISTER_RULES_HELPER(DS, serviceCtx, featureFlag, ...)                         \
+    namespace rbr = rule_based_rewrites::pipeline;                                       \
+    /* Require 'featureFlag' to be a constexpr. */                                       \
+    constexpr FeatureFlag* constFeatureFlag{featureFlag};                                \
+    /* This non-constexpr variable works around a bug in GCC when 'featureFlag' is null. \
+     */                                                                                  \
+    FeatureFlag* featureFlagValue{constFeatureFlag};                                     \
+    rbr::registration_detail::registerRules<DS>(serviceCtx, {__VA_ARGS__}, featureFlagValue);
 
 /**
  * Helper for defining a rule that calls optimizeAt() for a given document source.
@@ -102,18 +129,10 @@ public:
     PipelineRewriteContext(Pipeline& pipeline)
         : PipelineRewriteContext(*pipeline.getContext(), pipeline.getSources()) {}
 
-    PipelineRewriteContext(const ExpressionContext& expCtx,
+    PipelineRewriteContext(ExpressionContext& expCtx,
                            DocumentSourceContainer& container,
                            boost::optional<DocumentSourceContainer::iterator> startingPos = {})
-        : PipelineRewriteContext(
-              *expCtx.getOperationContext()->getServiceContext(), container, startingPos) {}
-
-    PipelineRewriteContext(const ServiceContext& serviceCtx,
-                           DocumentSourceContainer& container,
-                           boost::optional<DocumentSourceContainer::iterator> startingPos = {})
-        : _container(container),
-          _itr(startingPos.value_or(_container.begin())),
-          _serviceCtx(serviceCtx) {}
+        : _container(container), _itr(startingPos.value_or(_container.begin())), _expCtx(expCtx) {}
 
     bool hasMore() const final {
         return _itr != _container.end();
@@ -168,7 +187,7 @@ private:
     DocumentSourceContainer& _container;
     DocumentSourceContainer::iterator _itr;
 
-    const ServiceContext& _serviceCtx;
+    ExpressionContext& _expCtx;
 
     friend struct Transforms;
 };
@@ -262,11 +281,14 @@ namespace registration_detail {
 
 void registerRules(ServiceContext* serviceCtx,
                    std::type_index key,
-                   std::vector<Rule<PipelineRewriteContext>> rules);
+                   std::vector<Rule<PipelineRewriteContext>> rules,
+                   FeatureFlag* featureFlag = nullptr);
 
 template <std::derived_from<DocumentSource> DS>
-void registerRules(ServiceContext* serviceCtx, std::vector<Rule<PipelineRewriteContext>> rules) {
-    registerRules(serviceCtx, typeid(DS), std::move(rules));
+void registerRules(ServiceContext* serviceCtx,
+                   std::vector<Rule<PipelineRewriteContext>> rules,
+                   FeatureFlag* featureFlag = nullptr) {
+    registerRules(serviceCtx, typeid(DS), std::move(rules), featureFlag);
 }
 
 void clearRulesForTest(ServiceContext* serviceCtx);

@@ -71,7 +71,7 @@ void optimizePipeline(Pipeline& pipeline) {
 /**
  * Modifies the container, optimizes each stage individually.
  */
-void optimizeEachStage(const ExpressionContext& expCtx, DocumentSourceContainer* container) {
+void optimizeEachStage(ExpressionContext& expCtx, DocumentSourceContainer* container) {
     applyRuleBasedRewrites(rbr::PipelineRewriteContext(expCtx, *container), Tags::InPlace);
 }
 
@@ -79,7 +79,7 @@ void optimizeEachStage(const ExpressionContext& expCtx, DocumentSourceContainer*
  * Modifies the container, optimizing it by combining, swapping, dropping and/or inserting
  * stages.
  */
-void optimizeContainer(const ExpressionContext& expCtx,
+void optimizeContainer(ExpressionContext& expCtx,
                        DocumentSourceContainer* container,
                        boost::optional<DocumentSourceContainer::iterator> itr) {
     applyRuleBasedRewrites(rbr::PipelineRewriteContext(expCtx, *container, itr), Tags::Reordering);
@@ -91,7 +91,7 @@ void optimizeContainer(const ExpressionContext& expCtx,
  * Returns a valid iterator that points to the new "end of the pipeline": i.e., the stage that
  * comes after 'itr' in the newly optimized pipeline.
  */
-DocumentSourceContainer::iterator optimizeEndOfPipeline(const ExpressionContext& expCtx,
+DocumentSourceContainer::iterator optimizeEndOfPipeline(ExpressionContext& expCtx,
                                                         DocumentSourceContainer::iterator itr,
                                                         DocumentSourceContainer* container) {
     // We must create a new DocumentSourceContainer representing the subsection of the pipeline we

@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/feature_flag_test_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_skip.h"
@@ -46,10 +47,12 @@ public:
     }
 };
 
-#define REGISTER_TEST_RULES(DS, ...)                                             \
-    {                                                                            \
-        auto* service = getExpCtx()->getOperationContext()->getServiceContext(); \
-        registration_detail::registerRules<DS>(service, {__VA_ARGS__});          \
+#define REGISTER_TEST_RULES(DS, ...) REGISTER_TEST_RULES_WITH_FEATURE_FLAG(DS, nullptr, __VA_ARGS__)
+
+#define REGISTER_TEST_RULES_WITH_FEATURE_FLAG(DS, featureFlag, ...)                 \
+    {                                                                               \
+        auto* serviceCtx = getExpCtx()->getOperationContext()->getServiceContext(); \
+        _REGISTER_RULES_HELPER(DS, serviceCtx, featureFlag, __VA_ARGS__)            \
     }
 
 void runTest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -358,6 +361,25 @@ TEST_F(PipelineRewriteEngineTest, ApplyMultipleRulesDifferentTypesDifferentPrior
                 "{$skip: 5}",
                 "{$sort: {a: 1}}",
             });
+}
+
+TEST_F(PipelineRewriteEngineTest, RunFeatureFlagGatedRuleWhenFlagEnabled) {
+    REGISTER_TEST_RULES_WITH_FEATURE_FLAG(
+        DocumentSourceMatch,
+        &feature_flags::gFeatureFlagBlender,
+        {"REMOVE_MATCH", alwaysTrue, Transforms::eraseCurrent, 1.0});
+
+    RAIIServerParameterControllerForTest controller("featureFlagBlender", true);
+    runTest(getExpCtx(), {"{$match: {a: 1}}"}, {});
+}
+
+TEST_F(PipelineRewriteEngineTest, DontRunFeatureFlagGatedRuleWhenFlagDisabled) {
+    REGISTER_TEST_RULES_WITH_FEATURE_FLAG(DocumentSourceMatch,
+                                          &feature_flags::gFeatureFlagBlender,
+                                          {"NEVER_RUN", alwaysTrue, shouldNeverRun, 1.0});
+
+    RAIIServerParameterControllerForTest controller("featureFlagBlender", false);
+    runTest(getExpCtx(), {"{$match: {a: 1}}"}, {"{$match: {a: 1}}"});
 }
 
 using PipelineRewriteEngineTestDeathTest = PipelineRewriteEngineTest;

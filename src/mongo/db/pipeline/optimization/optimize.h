@@ -50,14 +50,14 @@ MONGO_MOD_NEEDS_REPLACEMENT void optimizePipeline(Pipeline& pipeline);
 /**
  * Modifies the container, optimizes each stage individually.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void optimizeEachStage(const ExpressionContext&,
+MONGO_MOD_NEEDS_REPLACEMENT void optimizeEachStage(ExpressionContext&,
                                                    DocumentSourceContainer* container);
 
 /**
  * Modifies the container, optimizing it by combining, swapping, dropping and/or inserting
  * stages. If 'itr' is given, optimizes the pipeline starting from the stage that 'itr' points to.
  */
-void optimizeContainer(const ExpressionContext&,
+void optimizeContainer(ExpressionContext&,
                        DocumentSourceContainer* container,
                        boost::optional<DocumentSourceContainer::iterator> itr = {});
 
@@ -67,7 +67,7 @@ void optimizeContainer(const ExpressionContext&,
  * Returns a valid iterator that points to the new "end of the pipeline": i.e., the stage that
  * comes after 'itr' in the newly optimized pipeline.
  */
-DocumentSourceContainer::iterator optimizeEndOfPipeline(const ExpressionContext&,
+DocumentSourceContainer::iterator optimizeEndOfPipeline(ExpressionContext&,
                                                         DocumentSourceContainer::iterator itr,
                                                         DocumentSourceContainer* container);
 
