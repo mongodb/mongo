@@ -89,6 +89,14 @@ public:
             case MatchExpression::GEO_NEAR:
             case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN:
                 return true;
+            case MatchExpression::INTERNAL_EXPR_EQ:
+            case MatchExpression::INTERNAL_EXPR_LT:
+            case MatchExpression::INTERNAL_EXPR_GTE:
+                // Inexact bounds can't be inverted. These comparisons produce inexact bounds due to
+                // the lack of type bracketing and indexes not distinguishing between null and
+                // missing.
+                return !isExactBoundsGenerating(
+                    static_cast<const ComparisonMatchExpressionBase*>(me)->getData());
             default:
                 return false;
         }
