@@ -104,13 +104,6 @@ WT_PUBLIC_HEADERS = [
     "wt_version_header",
 ]
 
-# TODO(WT-13397): Remove once wiredtiger renames this file
-symlink(
-    name = "wiredtiger_s390x_checksum_index_1",
-    input = WT_FILELIST_ZSERIES_HOST[1],
-    output = "crc32le-vx.S",
-)
-
 mongo_cc_library(
     name = "wiredtiger_checksum",
     srcs = [
@@ -129,7 +122,7 @@ mongo_cc_library(
             "@platforms//cpu:ppc": WT_FILELIST_POWERPC_HOST,
             "@platforms//cpu:s390x": [
                 WT_FILELIST_ZSERIES_HOST[0],
-                ":wiredtiger_s390x_checksum_index_1",
+                WT_FILELIST_ZSERIES_HOST[1],
             ],
         },
     ],
