@@ -216,15 +216,6 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 
 (function testMisplacedCollectionOnConfigServer() {
     jsTest.log("Executing testMisplacedCollectionOnConfigServer");
-    // TODO SERVER-107179: do not skip test in multiversion suites
-    const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
-    if (isMultiVersion) {
-        jsTestLog(
-            "Skipping test because checkMetadataConsistency in the previous binary " +
-                "version doesn't include yet the config server as a participant shard",
-        );
-        return;
-    }
 
     const db = getNewDb();
     const session = st.configRS.getPrimary().startSession({retryWrites: true});
