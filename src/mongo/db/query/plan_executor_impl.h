@@ -155,7 +155,7 @@ public:
                      NamespaceString nss,
                      PlanYieldPolicy::YieldPolicy yieldPolicy,
                      boost::optional<size_t> cachedPlanHash,
-                     QueryPlanner::CostBasedRankerResult cbrResult,
+                     QueryPlanner::PlanRankingResult planRankingResult,
                      stage_builder::PlanStageToQsnMap planStageQsnMap,
                      std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages);
 

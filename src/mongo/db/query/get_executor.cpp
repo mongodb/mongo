@@ -48,7 +48,6 @@
 #include "mongo/db/exec/classic/count.h"
 #include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/exec/classic/eof.h"
-#include "mongo/db/exec/classic/multi_plan_rate_limiter.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/record_store_fast_count.h"
 #include "mongo/db/exec/classic/sort_key_generator.h"
@@ -72,10 +71,6 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/compiler/ce/exact/exact_cardinality.h"
-#include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
-#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
-#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
@@ -91,6 +86,7 @@
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
@@ -380,8 +376,7 @@ public:
             } else {
                 planCacheCounters.incrementClassicSkippedCounter();
             }
-            return buildSingleSolutionPlan(std::move(solution),
-                                           QueryPlanner::CostBasedRankerResult{});
+            return buildSingleSolutionPlan(std::move(solution), QueryPlanner::PlanRankingResult{});
         }
 
         // Tailable: If the query requests tailable the collection must be capped.
@@ -451,76 +446,16 @@ public:
             return buildSubPlan();
         }
 
-        std::vector<std::unique_ptr<QuerySolution>> solutions;
-        QueryPlanner::CostBasedRankerResult cbrResult;
-        auto rankerMode = _plannerParams->planRankerMode;
-        if (rankerMode != QueryPlanRankerModeEnum::kMultiPlanning) {
-            using namespace cost_based_ranker;
-            std::unique_ptr<ce::SamplingEstimator> samplingEstimator{nullptr};
-            std::unique_ptr<ce::ExactCardinalityEstimator> exactCardinality{nullptr};
-            if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
-                rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
-                samplingEstimator = ce::SamplingEstimatorImpl::makeDefaultSamplingEstimator(
-                    *_cq,
-                    CardinalityEstimate{
-                        CardinalityType{
-                            _plannerParams->mainCollectionInfo.collStats->getCardinality()},
-                        EstimationSource::Metadata},
-                    _yieldPolicy,
-                    getCollections());
-            } else if (rankerMode == QueryPlanRankerModeEnum::kExactCE) {
-                exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
-                    getCollections().getMainCollectionAcquisition(), *_cq, _opCtx);
-            }
-
-            // Populating the 'topLevelSampleFields' requires 2 steps:
-            //  1. Extract the set of top level fields from the filter, sort and project
-            //  components of the CanonicalQuery.
-            //  2. Extract the fields of the relevant indexes from the plan() function by passing in
-            //  the pointer to 'topLevelSampleFieldNames' as an output parameter.
-            auto topLevelSampleFieldNames =
-                ce::extractTopLevelFieldsFromMatchExpression(_cq->getPrimaryMatchExpression());
-            auto statusWithMultiPlanSolns =
-                QueryPlanner::plan(*_cq, *_plannerParams, topLevelSampleFieldNames);
-            if (!statusWithMultiPlanSolns.isOK()) {
-                return statusWithMultiPlanSolns.getStatus().withContext(
-                    str::stream() << "error processing query: " << _cq->toStringForErrorMsg()
-                                  << " planner returned error");
-            }
-            if (samplingEstimator) {
-                // If we do not have any fields that we want to sample then we just include all the
-                // fields in the sample. This can occur if we encounter a find all query with no
-                // project or sort specified.
-                // TODO: SERVER-108819 We can skip generating the sample entirely in this case and
-                // instead use collection cardinality.
-                samplingEstimator->generateSample(
-                    topLevelSampleFieldNames.empty()
-                        ? ce::ProjectionParams{ce::NoProjection{}}
-                        : ce::TopLevelFieldsProjection{std::move(topLevelSampleFieldNames)});
-            }
-            auto statusWithCBRSolns =
-                QueryPlanner::planWithCostBasedRanking(*_cq,
-                                                       *_plannerParams,
-                                                       samplingEstimator.get(),
-                                                       exactCardinality.get(),
-                                                       std::move(statusWithMultiPlanSolns));
-            if (!statusWithCBRSolns.isOK()) {
-                return statusWithCBRSolns.getStatus();
-            }
-            solutions = std::move(statusWithCBRSolns.getValue().solutions);
-            cbrResult = std::move(statusWithCBRSolns.getValue());
-        } else {
-            auto statusWithMultiPlanSolns = QueryPlanner::plan(*_cq, *_plannerParams);
-            if (!statusWithMultiPlanSolns.isOK()) {
-                return statusWithMultiPlanSolns.getStatus().withContext(
-                    str::stream() << "error processing query: " << _cq->toStringForErrorMsg()
-                                  << " planner returned error");
-            }
-            solutions = std::move(statusWithMultiPlanSolns.getValue());
+        plan_ranking::PlanRanker planRanker;
+        auto rankerResult =
+            planRanker.rankPlans(_opCtx, *_cq, *_plannerParams, _yieldPolicy, getCollections());
+        if (!rankerResult.isOK()) {
+            return rankerResult.getStatus();
         }
-
+        std::vector<std::unique_ptr<QuerySolution>> solutions =
+            std::move(rankerResult.getValue().solutions);
         // The planner should have returned an error status if there are no solutions.
-        invariant(solutions.size() > 0);
+        tassert(11413100, "No solutions!!", !solutions.empty());
 
         // See if one of our solutions is a fast count hack in disguise.
         if (_cq->isCountLike()) {
@@ -530,7 +465,8 @@ public:
                                 2,
                                 "Using fast count",
                                 "query"_attr = redact(_queryStringForDebugLog));
-                    return buildSingleSolutionPlan(std::move(solutions[i]), std::move(cbrResult));
+                    return buildSingleSolutionPlan(std::move(solutions[i]),
+                                                   std::move(rankerResult.getValue()));
                 }
             }
         }
@@ -541,9 +477,10 @@ public:
             !internalQueryPlannerUseMultiplannerForSingleSolutions) {
             // Only one possible plan. Build the stages from the solution.
             solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
-            return buildSingleSolutionPlan(std::move(solutions[0]), std::move(cbrResult));
+            return buildSingleSolutionPlan(std::move(solutions[0]),
+                                           std::move(rankerResult.getValue()));
         }
-        return buildMultiPlan(std::move(solutions), std::move(cbrResult));
+        return buildMultiPlan(std::move(solutions), std::move(rankerResult.getValue()));
     }
 
     const QueryPlannerParams& getPlannerParams() {
@@ -586,7 +523,8 @@ protected:
      * If there is only one available query solution, builds a PlanStage tree for it.
      */
     virtual std::unique_ptr<ResultType> buildSingleSolutionPlan(
-        std::unique_ptr<QuerySolution> solution, QueryPlanner::CostBasedRankerResult cbrResult) = 0;
+        std::unique_ptr<QuerySolution> solution,
+        QueryPlanner::PlanRankingResult planRankingResult) = 0;
 
     /**
      * Either constructs a PlanStage tree from a cached plan (if exists in the plan cache), or
@@ -619,7 +557,7 @@ protected:
      */
     virtual std::unique_ptr<ResultType> buildMultiPlan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
-        QueryPlanner::CostBasedRankerResult cbrResult) = 0;
+        QueryPlanner::PlanRankingResult planRankingResult) = 0;
 
     /**
      * Helper for getting the QuerySolution hash from the plan caches.
@@ -700,10 +638,10 @@ private:
 
     std::unique_ptr<ClassicRuntimePlannerResult> buildSingleSolutionPlan(
         std::unique_ptr<QuerySolution> solution,
-        QueryPlanner::CostBasedRankerResult cbrResult) final {
+        QueryPlanner::PlanRankingResult planRankingResult) final {
         auto result = releaseResult();
         result->runtimePlanner = std::make_unique<crp_classic::SingleSolutionPassthroughPlanner>(
-            makePlannerData(), std::move(solution), std::move(cbrResult));
+            makePlannerData(), std::move(solution), std::move(planRankingResult));
         return result;
     }
 
@@ -759,10 +697,10 @@ private:
 
     std::unique_ptr<ClassicRuntimePlannerResult> buildMultiPlan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
-        QueryPlanner::CostBasedRankerResult cbrResult) final {
+        QueryPlanner::PlanRankingResult planRankingResult) final {
         auto result = releaseResult();
         result->runtimePlanner = std::make_unique<crp_classic::MultiPlanner>(
-            makePlannerData(), std::move(solutions), std::move(cbrResult));
+            makePlannerData(), std::move(solutions), std::move(planRankingResult));
         return result;
     }
 
@@ -849,7 +787,7 @@ protected:
     }
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildSingleSolutionPlan(
-        std::unique_ptr<QuerySolution> solution, QueryPlanner::CostBasedRankerResult) final {
+        std::unique_ptr<QuerySolution> solution, QueryPlanner::PlanRankingResult) final {
         // TODO SERVER-92589: Support CBR with SBE plans
         auto result = this->releaseResult();
         result->runtimePlanner = std::make_unique<crp_sbe::SingleSolutionPassthroughPlanner>(
@@ -865,7 +803,7 @@ protected:
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildMultiPlan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
-        QueryPlanner::CostBasedRankerResult cbrResult) final {
+        QueryPlanner::PlanRankingResult planRankingResult) final {
         // TODO SERVER-92589: Support CBR with SBE plans
         for (auto&& solution : solutions) {
             solution->indexFilterApplied = this->_plannerParams->indexFiltersApplied;
@@ -880,7 +818,8 @@ protected:
                 this->makePlannerData(), std::move(solutions), true /*shouldWriteToPlanCache*/);
             return result;
         } else {
-            return this->buildSingleSolutionPlan(std::move(solutions[0]), std::move(cbrResult));
+            return this->buildSingleSolutionPlan(std::move(solutions[0]),
+                                                 std::move(planRankingResult));
         }
     }
 

@@ -44,12 +44,11 @@
 namespace mongo::classic_runtime_planner {
 
 ClassicPlannerInterface::ClassicPlannerInterface(PlannerData plannerData)
-    : ClassicPlannerInterface(std::move(plannerData), QueryPlanner::CostBasedRankerResult{}) {}
+    : ClassicPlannerInterface(std::move(plannerData), QueryPlanner::PlanRankingResult{}) {}
 
-ClassicPlannerInterface::ClassicPlannerInterface(
-    PlannerData plannerData, QueryPlanner::CostBasedRankerResult costBasedRankerResult)
-    : _costBasedRankerResult(std::move(costBasedRankerResult)),
-      _plannerData(std::move(plannerData)) {
+ClassicPlannerInterface::ClassicPlannerInterface(PlannerData plannerData,
+                                                 QueryPlanner::PlanRankingResult planRankingResult)
+    : _planRankingResult(std::move(planRankingResult)), _plannerData(std::move(plannerData)) {
     if (collections().hasMainCollection()) {
         _nss = collections().getMainCollection()->ns();
     } else {
@@ -59,7 +58,7 @@ ClassicPlannerInterface::ClassicPlannerInterface(
     }
     if (cq()->getExpCtx()->getExplain().has_value()) {
         // Translate CBR rejected plans into PlanStages so they can be explained
-        for (auto&& solution : _costBasedRankerResult.rejectedPlans) {
+        for (auto&& solution : _planRankingResult.rejectedPlans) {
             _cbrRejectedPlanStages.push_back(buildExecutableTree(*solution));
         }
     }
@@ -239,7 +238,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> ClassicPlannerInterface::ma
                                                        std::move(_nss),
                                                        yieldPolicy(),
                                                        cachedPlanHash(),
-                                                       std::move(_costBasedRankerResult),
+                                                       std::move(_planRankingResult),
                                                        std::move(_planStageQsnMap),
                                                        std::move(_cbrRejectedPlanStages)));
 }

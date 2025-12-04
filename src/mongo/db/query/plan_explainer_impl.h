@@ -63,12 +63,12 @@ public:
         : PlanExplainer{explainInfo}, _root{root} {}
     PlanExplainerImpl(PlanStage* root,
                       boost::optional<size_t> cachedPlanHash,
-                      QueryPlanner::CostBasedRankerResult cbrResult,
+                      QueryPlanner::PlanRankingResult planRankingResult,
                       stage_builder::PlanStageToQsnMap planStageQsnMap,
                       std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages)
         : _root{root},
           _cachedPlanHash(cachedPlanHash),
-          _cbrResult(std::move(cbrResult)),
+          _planRankingResult(std::move(planRankingResult)),
           _planStageQsnMap(std::move(planStageQsnMap)),
           _cbrRejectedPlanStages(std::move(cbrRejectedPlanStages)) {}
     const ExplainVersion& getVersion() const final;
@@ -85,7 +85,7 @@ public:
 private:
     PlanStage* const _root;
     boost::optional<size_t> _cachedPlanHash;
-    QueryPlanner::CostBasedRankerResult _cbrResult;
+    QueryPlanner::PlanRankingResult _planRankingResult;
     stage_builder::PlanStageToQsnMap _planStageQsnMap;
     std::vector<std::unique_ptr<PlanStage>> _cbrRejectedPlanStages;
 };

@@ -59,7 +59,7 @@ public:
     ClassicPlannerInterface(PlannerData plannerData);
 
     ClassicPlannerInterface(PlannerData plannerData,
-                            QueryPlanner::CostBasedRankerResult costBasedRankerData);
+                            QueryPlanner::PlanRankingResult planRankingResult);
 
     /**
      * Function which adds the necessary stages for the generated PlanExecutor to perform deletes.
@@ -107,7 +107,7 @@ protected:
     boost::optional<size_t> cachedPlanHash() const;
     WorkingSet* ws() const;
 
-    QueryPlanner::CostBasedRankerResult _costBasedRankerResult;
+    QueryPlanner::PlanRankingResult _planRankingResult;
     stage_builder::PlanStageToQsnMap _planStageQsnMap;
     std::vector<std::unique_ptr<PlanStage>> _cbrRejectedPlanStages;
 
@@ -145,7 +145,7 @@ class SingleSolutionPassthroughPlanner final : public ClassicPlannerInterface {
 public:
     SingleSolutionPassthroughPlanner(PlannerData plannerData,
                                      std::unique_ptr<QuerySolution> querySolution,
-                                     QueryPlanner::CostBasedRankerResult cbrResult);
+                                     QueryPlanner::PlanRankingResult planRankingResult);
 
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
@@ -181,7 +181,7 @@ class MultiPlanner final : public ClassicPlannerInterface {
 public:
     MultiPlanner(PlannerData plannerData,
                  std::vector<std::unique_ptr<QuerySolution>> solutions,
-                 QueryPlanner::CostBasedRankerResult cbrResult);
+                 QueryPlanner::PlanRankingResult planRankingResult);
 
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;

@@ -42,19 +42,19 @@ namespace mongo::plan_explainer_factory {
 std::unique_ptr<PlanExplainer> make(PlanStage* root, boost::optional<size_t> cachedPlanHash) {
     return make(root,
                 cachedPlanHash,
-                QueryPlanner::CostBasedRankerResult{},
+                QueryPlanner::PlanRankingResult{},
                 stage_builder::PlanStageToQsnMap{},
                 {} /* cbrRejectedPlanStages */);
 }
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     boost::optional<size_t> cachedPlanHash,
-                                    QueryPlanner::CostBasedRankerResult cbrResult,
+                                    QueryPlanner::PlanRankingResult planRankingResult,
                                     stage_builder::PlanStageToQsnMap planStageQsnMap,
                                     std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages) {
     return std::make_unique<PlanExplainerImpl>(root,
                                                cachedPlanHash,
-                                               std::move(cbrResult),
+                                               std::move(planRankingResult),
                                                std::move(planStageQsnMap),
                                                std::move(cbrRejectedPlanStages));
 }

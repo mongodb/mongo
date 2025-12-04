@@ -42,7 +42,6 @@
 #include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/classic/near.h"
 #include "mongo/db/exec/classic/plan_stage.h"
-#include "mongo/db/exec/classic/sort.h"
 #include "mongo/db/exec/classic/text_match.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/field_ref.h"
@@ -976,7 +975,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
         bob.append("solutionHashUnstable", (long long)candidateSolutionHash);
     }
     statsToBSON(_planStageQsnMap,
-                _cbrResult.estimates,
+                _planRankingResult.estimates,
                 *stats,
                 verbosity,
                 winningPlanIdx,
@@ -1014,7 +1013,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
                 }
                 auto stats = _root->getStats();
                 statsToBSON(_planStageQsnMap,
-                            _cbrResult.estimates,
+                            _planRankingResult.estimates,
                             *stats,
                             verbosity,
                             i,
@@ -1039,10 +1038,10 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
     // For each rejected plan via CBR, explain it, and look up the corresponding cost and CE.
     tassert(10872501,
             "CBR PlanStage and QuerySolution vectors must have equal length.",
-            _cbrRejectedPlanStages.size() == _cbrResult.rejectedPlans.size());
+            _cbrRejectedPlanStages.size() == _planRankingResult.rejectedPlans.size());
     for (size_t i = 0; i < _cbrRejectedPlanStages.size(); ++i) {
         auto&& rejectedPlan = _cbrRejectedPlanStages[i];
-        auto&& rejectedSoln = _cbrResult.rejectedPlans[i];
+        auto&& rejectedSoln = _planRankingResult.rejectedPlans[i];
         const auto candidateSolutionHash = rejectedSoln->hash();
         bool isCached = _cachedPlanHash && (*_cachedPlanHash == candidateSolutionHash);
         BSONObjBuilder bob;
@@ -1050,8 +1049,14 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
             bob.append("solutionHashUnstable", (long long)candidateSolutionHash);
         }
         auto stats = rejectedPlan->getStats();
-        statsToBSON(
-            _planStageQsnMap, _cbrResult.estimates, *stats, verbosity, i, &bob, &bob, isCached);
+        statsToBSON(_planStageQsnMap,
+                    _planRankingResult.estimates,
+                    *stats,
+                    verbosity,
+                    i,
+                    &bob,
+                    &bob,
+                    isCached);
         res.push_back({bob.obj(), boost::none /*summary*/});
     }
 

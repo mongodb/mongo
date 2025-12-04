@@ -50,7 +50,7 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root,
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     boost::optional<size_t> cachedPlanHash,
-                                    QueryPlanner::CostBasedRankerResult cbrResult,
+                                    QueryPlanner::PlanRankingResult planRankingResult,
                                     stage_builder::PlanStageToQsnMap planStageQsnMap,
                                     std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages);
 

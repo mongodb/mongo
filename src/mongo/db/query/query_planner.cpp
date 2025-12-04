@@ -1678,7 +1678,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     return {std::move(out)};
 }  // QueryPlanner::plan
 
-StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedRanking(
+StatusWith<QueryPlanner::PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
     ce::SamplingEstimator* samplingEstimator,
@@ -1749,9 +1749,9 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
             "Some plan has fallen into the gray zone between accepted and rejected QSNs.",
             acceptedSoln.size() + rejectedSoln.size() == allSoln.size());
 
-    return QueryPlanner::CostBasedRankerResult{.solutions = std::move(acceptedSoln),
-                                               .rejectedPlans = std::move(rejectedSoln),
-                                               .estimates = std::move(estimates)};
+    return QueryPlanner::PlanRankingResult{.solutions = std::move(acceptedSoln),
+                                           .rejectedPlans = std::move(rejectedSoln),
+                                           .estimates = std::move(estimates)};
 }
 
 /**

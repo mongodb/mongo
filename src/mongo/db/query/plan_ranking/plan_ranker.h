@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2024-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,26 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
+#pragma once
 
-namespace mongo::classic_runtime_planner {
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_params.h"
 
-SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
-    PlannerData plannerData,
-    std::unique_ptr<QuerySolution> querySolution,
-    QueryPlanner::PlanRankingResult planRankingResult)
-    : ClassicPlannerInterface(std::move(plannerData), std::move(planRankingResult)),
-      _querySolution(std::move(querySolution)) {
-    auto root = buildExecutableTree(*_querySolution);
-    setRoot(std::move(root));
-}
 
-Status SingleSolutionPassthroughPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
-    // Nothing to do.
-    return Status::OK();
-}
+namespace mongo {
+namespace plan_ranking {
 
-std::unique_ptr<QuerySolution> SingleSolutionPassthroughPlanner::extractQuerySolution() {
-    return std::move(_querySolution);
-}
-}  // namespace mongo::classic_runtime_planner
+/**
+ * The PlanRanker is responsible for ranking candidate query plans and selecting the best plan(s)
+ * to be executed.
+ *
+ * It will work as a dispatcher to the appropriate plan ranking strategy based on the provided plan
+ * ranking mode. Currently, it supports both cost-based ranking (CBR) and multi-planning strategies.
+ */
+class PlanRanker {
+public:
+    StatusWith<QueryPlanner::PlanRankingResult> rankPlans(
+        OperationContext* opCtx,
+        CanonicalQuery& query,
+        const QueryPlannerParams& plannerParams,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
+        const MultipleCollectionAccessor& collections) const;
+};
+}  // namespace plan_ranking
+}  // namespace mongo

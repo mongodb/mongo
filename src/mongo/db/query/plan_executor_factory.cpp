@@ -40,8 +40,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
-#include <variant>
-
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -71,7 +69,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 std::move(nss),
                 yieldPolicy,
                 cachedPlanHash,
-                QueryPlanner::CostBasedRankerResult{},
+                QueryPlanner::PlanRankingResult{},
                 {} /* planStageQsnMap */,
                 {} /* cbrRejectedPlanStages */);
 }
@@ -98,7 +96,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 std::move(nss),
                 yieldPolicy,
                 boost::none /* cachedPlanHash */,
-                QueryPlanner::CostBasedRankerResult{},
+                QueryPlanner::PlanRankingResult{},
                 {} /* planStageQsnMap */,
                 {} /* cbrRejectedPlanStages */);
 }
@@ -115,7 +113,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     boost::optional<size_t> cachedPlanHash,
-    QueryPlanner::CostBasedRankerResult cbrResult,
+    QueryPlanner::PlanRankingResult planRankingResult,
     stage_builder::PlanStageToQsnMap planStageQsnMap,
     std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages) {
     try {
@@ -130,7 +128,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                              std::move(nss),
                                              yieldPolicy,
                                              cachedPlanHash,
-                                             std::move(cbrResult),
+                                             std::move(planRankingResult),
                                              std::move(planStageQsnMap),
                                              std::move(cbrRejectedPlanStages));
         PlanExecutor::Deleter planDeleter(opCtx);

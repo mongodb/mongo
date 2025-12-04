@@ -33,8 +33,8 @@ namespace mongo::classic_runtime_planner {
 
 MultiPlanner::MultiPlanner(PlannerData plannerData,
                            std::vector<std::unique_ptr<QuerySolution>> solutions,
-                           QueryPlanner::CostBasedRankerResult cbrResult)
-    : ClassicPlannerInterface(std::move(plannerData), std::move(cbrResult)) {
+                           QueryPlanner::PlanRankingResult planRankingResult)
+    : ClassicPlannerInterface(std::move(plannerData), std::move(planRankingResult)) {
     auto stage = std::make_unique<MultiPlanStage>(
         cq()->getExpCtxRaw(),
         collections().getMainCollectionPtrOrAcquisition(),
