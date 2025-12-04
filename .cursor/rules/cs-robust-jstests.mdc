@@ -8,7 +8,7 @@ This rule mandates that all AI-generated code, suggestions, and documentation fo
 
 ## CONDITIONS
 
-Targeted file path: These rules apply to any file matching the glob `jstests/**/*.js
+Targeted file path: These rules apply to any file matching the glob `jstests/**/*.js`
 Allowed actions:
 1. Generating new test code: Fully permitted, but must follow all rules below.
 2. Refactoring/editing existing test code: Fully permitted, but must follow all rules below.
@@ -52,7 +52,7 @@ Required practices (Violations trigger an error/warning and corrective suggestio
 
 10. **Always ensure the test includes a clear top-level comment** describing the test's purpose.
 
-11. **Ensure that non-assertion exceptions are handled inside the callback of `assert.soon`**. In general, prefer using runCommand method over helpers like find method that throws exceptions when getting an error response.
+11. **Ensure that non-assertion exceptions are handled inside the callback of `assert.soon`**. If the mongo connection object is used in the callback and is connected directly to a shard or replica set node, prefer using assert.soonRetryOnNetworkErrors or the more generic assert.soonRetryOnAcceptableErrors (note that the mongo connection objects used in jstests can still throw network errors). Mongo shell connections to mongos are mostly exempt to this rule since we almost never kill mongos in tests or passthroughs.
 
 ## INSTRUCTIONS FOR REVIEWERS
 
