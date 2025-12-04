@@ -139,7 +139,7 @@ void throwAppropriateException(bool txnTooLargeEnabled,
 
 void dumpErrorLog() {
     int ret = wiredtiger_dump_error_log([](const char* message) -> int {
-        LOGV2(11131000, "WiredTiger dump error log", "message"_attr = message);
+        LOGV2_FATAL_CONTINUE(11131000, "WiredTiger dump error log", "message"_attr = message);
         return 0;
     });
 
@@ -147,7 +147,7 @@ void dumpErrorLog() {
         return;
     }
 
-    LOGV2(11131001, "WiredTiger dump error log failed", "ret"_attr = ret);
+    LOGV2_FATAL_CONTINUE(11131001, "WiredTiger dump error log failed", "ret"_attr = ret);
 }
 
 Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
