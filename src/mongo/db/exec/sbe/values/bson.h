@@ -98,6 +98,35 @@ inline const char* getValue(const char* be) noexcept {
     return be + 1 + strlen(be + 1) + 1;
 }
 
+inline std::pair<value::TypeTags, value::Value> getField(const char* be,
+                                                         StringData fieldStr) noexcept {
+    const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
+    // Skip document length.
+    be += sizeof(int);
+    while (be != end - 1) {
+        auto ptr = be;
+        // Compute equality and length in a single pass. Avoids reading the same bytes twice.
+        for (auto c : fieldStr)
+            // Increment before compare to skip the type tag byte.
+            if (*++ptr != c || c == '\0')
+                goto next;  // *ptr is the first non-matching byte, possibly the 0 terminator
+
+        // If the field names are equal, incrementing ptr will step onto a null terminator byte.
+        if (*++ptr == '\0') {
+            auto [tag, val] = bson::convertFrom<true>(be, end, fieldStr.size());
+            return {tag, val};
+        }
+
+next:
+        // Skip any remaining part of the field name.
+        while (*ptr != '\0')
+            ++ptr;
+
+        be = bson::advance(be, ptr - be - 1);
+    }
+    return {value::TypeTags::Nothing, 0};
+}
+
 inline const char* fieldNameRaw(const char* be) noexcept {
     return be + 1;
 }

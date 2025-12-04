@@ -76,19 +76,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTag
                                                                   StringData fieldStr) {
     if (MONGO_likely(objTag == value::TypeTags::bsonObject)) {
         auto be = value::bitcastTo<const char*>(objValue);
-        const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
-        // Skip document length.
-        be += 4;
-        while (be != end - 1) {
-            auto sv = bson::fieldNameAndLength(be);
-
-            if (sv == fieldStr) {
-                auto [tag, val] = bson::convertFrom<true>(be, end, fieldStr.size());
-                return {false, tag, val};
-            }
-
-            be = bson::advance(be, sv.size());
-        }
+        auto [tag, val] = bson::getField(be, fieldStr);
+        return {false, tag, val};
     } else if (objTag == value::TypeTags::Object) {
         auto [tag, val] = value::getObjectView(objValue)->getField(fieldStr);
         return {false, tag, val};

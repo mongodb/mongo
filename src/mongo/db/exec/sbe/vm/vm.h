@@ -454,6 +454,12 @@ public:
     typedef std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t, bool>
         MultiAccState;
 
+    FastTuple<bool, value::TypeTags, value::Value> getField_test(value::TypeTags objTag,
+                                                                 value::Value objValue,
+                                                                 StringData fieldStr) {
+        return getField(objTag, objValue, fieldStr);
+    }
+
 private:
     /**
      * Executes the VM instructions of an arbitrary CodeFragment starting at 'position'.

@@ -63,17 +63,7 @@ MONGO_COMPILER_ALWAYS_INLINE inline void placeFieldsFromRecordInAccessors(
         // If we're only looking for 1 field, then it's more efficient to forgo the hashtable
         // and just use equality comparison.
         auto name = StringData{scanFieldNames[0]};
-        auto [tag, val] = [start, last, end, name] {
-            for (auto bsonElement = start; bsonElement != last;) {
-                auto field = bson::fieldNameAndLength(bsonElement);
-                if (field == name) {
-                    return bson::convertFrom<true>(bsonElement, end, field.size());
-                }
-                bsonElement = bson::advance(bsonElement, field.size());
-            }
-            return std::make_pair(value::TypeTags::Nothing, value::Value{0});
-        }();
-
+        auto [tag, val] = bson::getField(rawBson, name);
         scanFieldAccessors.front().reset(false, tag, val);
     } else {
         // If we're looking for 2 or more fields, it's more efficient to use the hashtable.
