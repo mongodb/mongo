@@ -19,7 +19,8 @@ variables:
     has_packages: false
     bazel_compile_flags: >-
       --define=MONGO_DISTMOD=amazon2023
-      --linkstatic=False
+      --dtlto=False
+      --pgo_profile_use=False
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
@@ -82,7 +83,6 @@ buildvariants:
     expansions:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
-        --linkstatic=False
         --config=local
       compile_variant: *amazon-linux2023-arm64-local-compile
     tasks:

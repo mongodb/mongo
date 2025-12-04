@@ -22,7 +22,8 @@ variables:
   - &linux-x86-dynamic-enterprise-compile-expansions
     has_packages: false
     bazel_compile_flags: >-
-      --linkstatic=False
+      --dtlto=False
+      --pgo_profile_use=False
 
   # THIS HAS COPIES IN
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
@@ -190,7 +191,7 @@ variables:
 buildvariants:
   - <<: *generic_linux_compile_params
     name: &linux-x86-dynamic-compile-future-tag-multiversion-latest linux-x86-dynamic-compile-future-tag-multiversion-latest
-    display_name: "Linux x86 Shared Library Compile (future git tag multiversion - latest)"
+    display_name: "Linux x86 Compile (future git tag multiversion - latest)"
     tags: []
     expansions:
       <<: *linux-x86-dynamic-enterprise-compile-expansions
@@ -203,7 +204,7 @@ buildvariants:
 
   - <<: *generic_linux_compile_params
     name: &linux-x86-dynamic-compile-future-tag-multiversion-last-continuous linux-x86-dynamic-compile-future-tag-multiversion-last-continuous
-    display_name: "Linux x86 Shared Library Compile (future git tag multiversion - last continuous)"
+    display_name: "Linux x86 Compile (future git tag multiversion - last continuous)"
     tags: []
     expansions:
       <<: *linux-x86-dynamic-enterprise-compile-expansions
@@ -231,7 +232,7 @@ buildvariants:
       - name: crypt_build_debug_and_test
 
   - name: &linux-x86-dynamic-grpc linux-x86-dynamic-grpc
-    display_name: "~ Linux x86 Shared Library Enterprise with Ingress GRPC"
+    display_name: "~ Linux x86 Enterprise with Ingress GRPC"
     cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-xlarge
@@ -240,7 +241,8 @@ buildvariants:
       <<: *generic_linux_compile_expansions
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
-        --linkstatic=False
+        --dtlto=False
+        --pgo_profile_use=False
       compile_variant: *linux-x86-dynamic-grpc
       clang_tidy_toolchain: v5
       large_distro_name: rhel8.8-xlarge
@@ -272,7 +274,7 @@ buildvariants:
   - &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
     <<: *linux_x86_dynamic_compile_variant_dependency
     name: enterprise-rhel-8-64-bit-dynamic-all-feature-flags
-    display_name: "* Shared Library Enterprise RHEL 8 (all feature flags)"
+    display_name: "* Enterprise RHEL 8 (all feature flags)"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
@@ -310,7 +312,7 @@ buildvariants:
 
   - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
     name: enterprise-rhel-8-64-bit-dynamic-all-feature-flags-experimental
-    display_name: "* Shared Library Enterprise RHEL 8 (all feature flags) Experimental"
+    display_name: "* Enterprise RHEL 8 (all feature flags) Experimental"
     tags: ["suggested"]
     tasks:
       &experimental-task-list # TODO(SERVER-90936): Remove streams_kafka* and streams_lambda tests when they work with the "default" tag.
@@ -324,7 +326,7 @@ buildvariants:
 
   - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
     name: enterprise-rhel-8-64-bit-dynamic-all-non-rollback-feature-flags
-    display_name: "Shared Library Enterprise RHEL 8 (all non-rollback feature flags)"
+    display_name: "Enterprise RHEL 8 (all non-rollback feature flags)"
     tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
     expansions:
@@ -336,7 +338,7 @@ buildvariants:
 
   - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
     name: enterprise-rhel-8-64-bit-dynamic-all-non-rollback-feature-flags-experimental
-    display_name: "Shared Library Enterprise RHEL 8 (all non-rollback feature flags) Experimental"
+    display_name: "Enterprise RHEL 8 (all non-rollback feature flags) Experimental"
     tags: []
     cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
     expansions:
@@ -471,7 +473,8 @@ buildvariants:
       <<: *linux_x86_generic_expansions
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
-        --linkstatic=False
+        --dtlto=False
+        --pgo_profile_use=False
       test_flags: >-
         --mongosSetParameters="{replicaSetMonitorProtocol: sdam}"
         --mongodSetParameters="{replicaSetMonitorProtocol: sdam}"
@@ -564,7 +567,8 @@ buildvariants:
       <<: *linux_x86_generic_expansions
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
-        --linkstatic=False
+        --dtlto=False
+        --pgo_profile_use=False
       multiversion_platform: rhel8
       multiversion_edition: enterprise
       test_flags: >-
@@ -612,7 +616,7 @@ buildvariants:
   ### Query Patch-Specific Build Variants ###
 
   - name: enterprise-rhel-8-64-bit-dynamic-query-quick-patch-only
-    display_name: "~ Shared Library Enterprise RHEL 8 Query Quick Patch Only"
+    display_name: "~ Enterprise RHEL 8 Query Quick Patch Only"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     run_on:
@@ -665,7 +669,7 @@ buildvariants:
 
   - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
     name: enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-query-quick-patch-only
-    display_name: "~ Shared Library Enterprise RHEL 8 Query Quick Patch Only (all feature flags)"
+    display_name: "~ Enterprise RHEL 8 Query Quick Patch Only (all feature flags)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     expansions:
@@ -677,7 +681,7 @@ buildvariants:
 
   - name: enterprise-rhel-8-64-bit-dynamic-classic-engine-all-feature-flags-fuzzers
     <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
-    display_name: "*| Shared Library Enterprise RHEL 8 (Classic Engine all feature flags) Fuzzers"
+    display_name: "*| Enterprise RHEL 8 (Classic Engine all feature flags) Fuzzers"
     tags: ["suggested"]
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     expansions:
@@ -697,7 +701,7 @@ buildvariants:
 
   - name: enterprise-rhel-8-64-bit-dynamic-classic-engine-all-non-rollback-feature-flags-fuzzers
     <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
-    display_name: "Shared Library Enterprise RHEL 8 (Classic Engine all non-rollback feature flags) Fuzzers"
+    display_name: "Enterprise RHEL 8 (Classic Engine all non-rollback feature flags) Fuzzers"
     tags: []
     cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
     expansions:
@@ -718,7 +722,7 @@ buildvariants:
   ### Security Patch-Specific Build Variants ###
   - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
     name: enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-security-patch-only
-    display_name: "~ Shared Library Enterprise RHEL 8 Security Patch Only (all feature flags)"
+    display_name: "~ Enterprise RHEL 8 Security Patch Only (all feature flags)"
     tags: []
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     expansions:

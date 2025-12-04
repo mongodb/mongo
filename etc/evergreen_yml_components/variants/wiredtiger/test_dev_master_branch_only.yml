@@ -84,7 +84,8 @@ buildvariants:
       bazel_compile_flags: >-
         --dbg=True
         --opt=on
-        --linkstatic=False
+        --dtlto=False
+        --pgo_profile_use=False
         --build_enterprise=False
       test_flags: >-
         --excludeWithAnyTags=requires_http_client

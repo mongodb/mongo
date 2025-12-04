@@ -273,7 +273,6 @@ buildvariants:
       build_mongot: true
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
-        --linkstatic=False
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:
