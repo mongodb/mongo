@@ -42,8 +42,10 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(queue, QueueStageParams::id);
+
 REGISTER_INTERNAL_DOCUMENT_SOURCE(queue,
-                                  LiteParsedDocumentSourceDefault::parse,
+                                  QueueLiteParsed::parse,
                                   DocumentSourceQueue::createFromBson,
                                   true);
 ALLOCATE_DOCUMENT_SOURCE_ID(queue, DocumentSourceQueue::id)

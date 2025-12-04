@@ -51,6 +51,7 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(out, OutStageParams::id);
 
 REGISTER_DOCUMENT_SOURCE(out,
                          DocumentSourceOut::LiteParsed::parse,

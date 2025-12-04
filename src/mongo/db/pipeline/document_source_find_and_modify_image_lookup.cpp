@@ -52,8 +52,11 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+
+ALLOCATE_STAGE_PARAMS_ID(findAndModifyImageLookup, FindAndModifyImageLookupStageParams::id);
+
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalFindAndModifyImageLookup,
-                                  LiteParsedDocumentSourceInternal::parse,
+                                  FindAndModifyImageLookupLiteParsed::parse,
                                   DocumentSourceFindAndModifyImageLookup::createFromBson,
                                   true);
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalFindAndModifyImageLookup,

@@ -46,8 +46,10 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(reshardingOwnershipMatch, ReshardingOwnershipMatchStageParams::id);
+
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalReshardingOwnershipMatch,
-                                  LiteParsedDocumentSourceInternal::parse,
+                                  ReshardingOwnershipMatchLiteParsed::parse,
                                   DocumentSourceReshardingOwnershipMatch::createFromBson,
                                   true);
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalReshardingOwnershipMatch,

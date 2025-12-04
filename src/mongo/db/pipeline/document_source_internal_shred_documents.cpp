@@ -37,8 +37,10 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(_internalShredDocuments, InternalShredDocumentsStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(_internalShredDocuments,
-                         LiteParsedDocumentSourceDefault::parse,
+                         InternalShredDocumentsLiteParsed::parse,
                          DocumentSourceInternalShredDocuments::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalShredDocuments, DocumentSourceInternalShredDocuments::id)

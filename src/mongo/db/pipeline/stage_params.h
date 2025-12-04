@@ -68,7 +68,7 @@ namespace mongo {
  *   2. Use the ALLOCATE_STAGE_PARAMS_ID macro to assign a unique ID
  *   3. Implement getId() to return the allocated ID
  */
-class StageParams {
+class MONGO_MOD_OPEN StageParams {
 public:
     virtual ~StageParams() = default;
 
@@ -102,7 +102,7 @@ public:
  * Note: This class does NOT own the backing BSON object. The BSONElement is a view into a larger
  * BSON object that must remain valid for the lifetime of this DefaultStageParams instance.
  */
-class DefaultStageParams : public StageParams {
+class MONGO_MOD_OPEN DefaultStageParams : public StageParams {
 public:
     /**
      * Constructs a DefaultStageParams from the original BSON specification element.
@@ -125,5 +125,35 @@ private:
     // backing BSON object.
     BSONElement _originalSpec;
 };
+
+/**
+ * Defines a stage-specific parameter class that uses the default implementation.
+ *
+ * This macro creates a new class named `{stageName}StageParams` that inherits from
+ * `DefaultStageParams`. The class stores the original BSON specification element and
+ * provides a unique type identifier for runtime type checking without using RTTI.
+ *
+ * Use this macro when a stage needs its own parameter type for identification purposes
+ * but doesn't require custom parameter parsing or storage beyond the default behavior
+ * (which simply preserves the original BSONElement).
+ *
+ * @param stageName The name of the stage (without the "$" prefix). This will be used
+ *                  to generate the class name `{stageName}StageParams` and to allocate
+ *                  a unique ID for type identification.
+ *
+ * Example usage:
+ *   DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Test);
+ *   // Creates TestStageParams class that can be instantiated with:
+ *   // auto params = std::make_unique<TestStageParams>(bsonElement);
+ */
+#define DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(stageName)                                            \
+    class stageName##StageParams : public mongo::DefaultStageParams {                              \
+    public:                                                                                        \
+        stageName##StageParams(mongo::BSONElement element) : mongo::DefaultStageParams(element) {} \
+        static const Id& id;                                                                       \
+        Id getId() const final {                                                                   \
+            return id;                                                                             \
+        }                                                                                          \
+    };
 
 }  // namespace mongo

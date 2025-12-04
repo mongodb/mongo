@@ -208,12 +208,14 @@ DocumentSourceContainer::iterator ReplaceRootTransformation::doOptimizeAt(
     return std::next(itr);
 }
 
+ALLOCATE_STAGE_PARAMS_ID(replaceRoot, ReplaceRootStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(replaceRoot,
-                         LiteParsedDocumentSourceDefault::parse,
+                         ReplaceRootLiteParsed::parse,
                          DocumentSourceReplaceRoot::createFromBson,
                          AllowedWithApiStrict::kAlways);
 REGISTER_DOCUMENT_SOURCE(replaceWith,
-                         LiteParsedDocumentSourceDefault::parse,
+                         ReplaceRootLiteParsed::parse,
                          DocumentSourceReplaceRoot::createFromBson,
                          AllowedWithApiStrict::kAlways);
 

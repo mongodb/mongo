@@ -57,6 +57,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalListCollections);
+
 /**
  * Provides a document source interface to get a list of collections. If the targeted database is
  * `admin`, it will return all the collections of the cluster. Otherwise, it will return all the
@@ -92,6 +94,10 @@ public:
 
         bool isInitialSource() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<InternalListCollectionsStageParams>(_originalBson);
         }
 
         bool generatesOwnDataOnce() const final {

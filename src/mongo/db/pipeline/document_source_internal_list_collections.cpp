@@ -48,6 +48,8 @@ DocumentSourceInternalListCollections::DocumentSourceInternalListCollections(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(kStageNameInternal, pExpCtx) {}
 
+ALLOCATE_STAGE_PARAMS_ID(_internalListCollections, InternalListCollectionsStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(_internalListCollections,
                          DocumentSourceInternalListCollections::LiteParsed::parse,
                          DocumentSourceInternalListCollections::createFromBson,

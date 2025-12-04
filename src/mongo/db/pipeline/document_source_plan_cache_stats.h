@@ -61,6 +61,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(PlanCacheStats);
+
 class DocumentSourcePlanCacheStats final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$planCacheStats"_sd;
@@ -88,6 +90,10 @@ public:
 
         bool isInitialSource() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<PlanCacheStatsStageParams>(_originalBson);
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,

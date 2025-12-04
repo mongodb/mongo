@@ -59,6 +59,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(MergeCursors);
+
 /**
  * A stage used only internally to merge results that are being gathered from remote hosts, possibly
  * including this host.

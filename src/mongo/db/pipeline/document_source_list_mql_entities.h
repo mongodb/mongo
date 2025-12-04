@@ -55,6 +55,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListMqlEntities);
+
 /**
  * Test-only aggregation stage which describes the set of MQL entities available in this binary,
  * which may vary depending on the binary (mongod/mongos, commmunity/enterprise). For the
@@ -91,6 +93,10 @@ public:
 
         bool isInitialSource() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<ListMqlEntitiesStageParams>(_originalBson);
         }
     };
 

@@ -51,6 +51,8 @@ DocumentSourceInternalAllCollectionStats::DocumentSourceInternalAllCollectionSta
     : DocumentSource(kStageNameInternal, pExpCtx),
       _internalAllCollectionStatsSpec(std::move(spec)) {}
 
+ALLOCATE_STAGE_PARAMS_ID(_internalAllCollectionStats, InternalAllCollectionStatsStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(_internalAllCollectionStats,
                          DocumentSourceInternalAllCollectionStats::LiteParsed::parse,
                          DocumentSourceInternalAllCollectionStats::createFromBsonInternal,

@@ -55,6 +55,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(BucketAuto);
+
 /**
  * The $bucketAuto stage takes a user-specified number of buckets and automatically determines
  * boundaries such that the values are approximately equally distributed between those buckets.

@@ -51,6 +51,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(FindAndModifyImageLookup);
+
 /**
  * This stage will take a list of oplog entry documents as input and forge a no-op pre- or
  * post-image to be returned before the document for each 'findAndModify' oplog entry that has the

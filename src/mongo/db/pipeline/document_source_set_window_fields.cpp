@@ -102,13 +102,15 @@ bool modifiedSortPaths(const SortPattern& pat, const DocumentSource::GetModPaths
 }
 }  // namespace
 
+ALLOCATE_STAGE_PARAMS_ID(setWindowFields, SetWindowFieldsStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(setWindowFields,
-                         LiteParsedDocumentSourceDefault::parse,
+                         SetWindowFieldsLiteParsed::parse,
                          document_source_set_window_fields::createFromBson,
                          AllowedWithApiStrict::kAlways);
 
 REGISTER_DOCUMENT_SOURCE(_internalSetWindowFields,
-                         LiteParsedDocumentSourceDefault::parse,
+                         SetWindowFieldsLiteParsed::parse,
                          DocumentSourceInternalSetWindowFields::createFromBson,
                          AllowedWithApiStrict::kAlways);
 

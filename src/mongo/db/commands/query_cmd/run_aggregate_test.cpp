@@ -377,8 +377,11 @@ private:
     SimpleMemoryUsageTracker _tracker;
 };
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(TrackingMock);
+ALLOCATE_STAGE_PARAMS_ID(trackingMock, TrackingMockStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(trackingMock,
-                         LiteParsedDocumentSourceDefault::parse,
+                         TrackingMockLiteParsed::parse,
                          DocumentSourceTrackingMock::createFromBson,
                          AllowedWithApiStrict::kAlways);
 ALLOCATE_DOCUMENT_SOURCE_ID(trackingMock, DocumentSourceTrackingMock::id)

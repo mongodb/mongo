@@ -50,6 +50,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Sample);
+
 class DocumentSourceSample final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$sample"_sd;

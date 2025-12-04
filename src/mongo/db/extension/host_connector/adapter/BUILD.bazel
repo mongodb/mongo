@@ -42,6 +42,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db/extension/public:api",
         "//src/mongo/db/extension/sdk:sdk_cpp",
+        "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:lite_parsed_document_source",
     ],
 )

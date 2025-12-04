@@ -49,6 +49,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalSplitPipeline);
+
 /**
  * An internal stage available for testing. Acts as a simple passthrough of intermediate results
  * from the source stage, but forces the pipeline to split at the point where this stage appears

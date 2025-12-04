@@ -51,6 +51,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListClusterCatalog);
+
 /**
  * This aggregation stage is the '$listClusterCatalog' stage.
  * Lists any collection in the catalog and their related sharding informations.
@@ -103,6 +105,10 @@ public:
 
     bool generatesOwnDataOnce() const final {
         return true;
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<ListClusterCatalogStageParams>(_originalBson);
     }
 
     ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,

@@ -74,6 +74,9 @@
 #include <fmt/format.h>
 
 namespace mongo {
+
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Out);
+
 /**
  * Implementation for the $out aggregation stage.
  */
@@ -124,6 +127,10 @@ public:
 
         bool isWriteStage() const override {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const override {
+            return std::make_unique<OutStageParams>(_originalBson);
         }
     };
 

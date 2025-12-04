@@ -62,8 +62,10 @@ DocumentSourceRedact::DocumentSourceRedact(const intrusive_ptr<ExpressionContext
     : DocumentSource(kStageName, expCtx),
       _redactProcessor(std::make_shared<RedactProcessor>(expCtx, expression, currentId)) {}
 
+ALLOCATE_STAGE_PARAMS_ID(redact, RedactStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(redact,
-                         LiteParsedDocumentSourceDefault::parse,
+                         RedactLiteParsed::parse,
                          DocumentSourceRedact::createFromBson,
                          AllowedWithApiStrict::kAlways);
 ALLOCATE_DOCUMENT_SOURCE_ID(redact, DocumentSourceRedact::id)

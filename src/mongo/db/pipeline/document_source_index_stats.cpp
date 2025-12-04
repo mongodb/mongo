@@ -48,6 +48,8 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
+ALLOCATE_STAGE_PARAMS_ID(indexStats, IndexStatsStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(indexStats,
                          DocumentSourceIndexStats::LiteParsed::parse,
                          DocumentSourceIndexStats::createFromBson,

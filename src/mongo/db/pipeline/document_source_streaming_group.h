@@ -51,6 +51,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(StreamingGroup);
+
 /**
  * This class represents streaming group implementation that can only be used when at least one of
  * _id fields is monotonic. It stores and output groups in batches. All groups in the batch has

@@ -53,6 +53,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListCatalog);
+
 /**
  * Provides a document source interface to retrieve catalog metadata for collections and views.
  * Each document returned represents either:
@@ -84,6 +86,10 @@ public:
 
         bool isInitialSource() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<ListCatalogStageParams>(_originalBson);
         }
 
     private:

@@ -100,8 +100,10 @@ namespace mongo {
  * $_internalUnpackBucket is an internal stage for materializing time-series measurements from
  * time-series collections. It should never be used anywhere outside the MongoDB server.
  */
+ALLOCATE_STAGE_PARAMS_ID(_internalUnpackBucket, InternalUnpackBucketStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(_internalUnpackBucket,
-                         LiteParsedDocumentSourceDefault::parse,
+                         InternalUnpackBucketLiteParsed::parse,
                          DocumentSourceInternalUnpackBucket::createFromBsonInternal,
                          AllowedWithApiStrict::kAlways);
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalUnpackBucket, DocumentSourceInternalUnpackBucket::id)
@@ -112,7 +114,7 @@ ALLOCATE_DOCUMENT_SOURCE_ID(_internalUnpackBucket, DocumentSourceInternalUnpackB
  * rather than user applications.
  */
 REGISTER_DOCUMENT_SOURCE(_unpackBucket,
-                         LiteParsedDocumentSourceDefault::parse,
+                         InternalUnpackBucketLiteParsed::parse,
                          DocumentSourceInternalUnpackBucket::createFromBsonExternal,
                          AllowedWithApiStrict::kAlways);
 

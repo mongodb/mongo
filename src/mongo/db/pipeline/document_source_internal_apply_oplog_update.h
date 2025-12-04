@@ -49,6 +49,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalApplyOplogUpdate);
+
 /**
  * This is an internal stage that takes an oplog update description and applies the update to the
  * input Document.

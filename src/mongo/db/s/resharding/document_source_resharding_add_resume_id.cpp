@@ -42,8 +42,10 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(reshardingAddResumeId, ReshardingAddResumeIdStageParams::id);
+
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_addReshardingResumeId,
-                                  LiteParsedDocumentSourceInternal::parse,
+                                  ReshardingAddResumeIdLiteParsed::parse,
                                   DocumentSourceReshardingAddResumeId::createFromBson,
                                   true);
 ALLOCATE_DOCUMENT_SOURCE_ID(_addReshardingResumeId, DocumentSourceReshardingAddResumeId::id)

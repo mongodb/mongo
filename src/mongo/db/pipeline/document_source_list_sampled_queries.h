@@ -78,6 +78,8 @@ struct ListSampledQueriesSharedState {
     std::unique_ptr<exec::agg::Pipeline> execPipeline;
 };
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListSampledQueries);
+
 class DocumentSourceListSampledQueries final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$listSampledQueries"_sd;
@@ -107,6 +109,10 @@ public:
 
         bool isInitialSource() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<ListSampledQueriesStageParams>(_originalBson);
         }
 
         void assertSupportsMultiDocumentTransaction() const override {

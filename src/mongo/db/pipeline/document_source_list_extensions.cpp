@@ -47,6 +47,8 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(listExtensions, ListExtensionsStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(listExtensions,
                                            DocumentSourceListExtensions::LiteParsed::parse,
                                            DocumentSourceListExtensions::createFromBson,

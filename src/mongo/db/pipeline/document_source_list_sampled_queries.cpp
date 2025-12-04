@@ -39,6 +39,8 @@
 namespace mongo {
 namespace analyze_shard_key {
 
+ALLOCATE_STAGE_PARAMS_ID(listSampledQueries, ListSampledQueriesStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(listSampledQueries,
                          DocumentSourceListSampledQueries::LiteParsed::parse,
                          DocumentSourceListSampledQueries::createFromBson,

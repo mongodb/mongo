@@ -61,6 +61,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(CollStats);
+
 /**
  * Provides a document source interface to retrieve collection-level statistics for a given
  * collection.
@@ -97,6 +99,10 @@ public:
         }
 
         void assertPermittedInAPIVersion(const APIParameters&) const override;
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<CollStatsStageParams>(_originalBson);
+        }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();

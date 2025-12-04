@@ -77,6 +77,8 @@ private:
     const DocumentMetadataFields::MetaType _metaType;
 };
 
+DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(SetMetadata);
+
 /**
  * $setMetadata takes one {<$meta field> : <Expression>} pair and sets the metadata on each incoming
  * document with the result of evaluating that expression.

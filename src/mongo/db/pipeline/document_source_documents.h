@@ -50,6 +50,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Documents);
+
 namespace DocumentSourceDocuments {
 class LiteParsed : public LiteParsedDocumentSource {
 public:
@@ -79,6 +81,10 @@ public:
 
     bool generatesOwnDataOnce() const final {
         return true;
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<DocumentsStageParams>(_originalBson);
     }
 };
 

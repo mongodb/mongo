@@ -71,6 +71,8 @@ static constexpr StringData kExtensionStubParserStageNameField = "stageName"_sd;
 static constexpr StringData kExtensionStubParserMessageField = "message"_sd;
 }  // namespace
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(StubParser);
+ALLOCATE_STAGE_PARAMS_ID(stubParser, StubParserStageParams::id);
 
 void registerStubParser(std::string stageName, std::string message) {
     LOGV2(10918509,
@@ -78,7 +80,7 @@ void registerStubParser(std::string stageName, std::string message) {
           "stageName"_attr = stageName,
           "message"_attr = message);
     LiteParsedDocumentSource::registerParser(stageName,
-                                             LiteParsedDocumentSourceDefault::parse,
+                                             StubParserLiteParsed::parse,
                                              AllowedWithApiStrict::kAlways,
                                              AllowedWithClientType::kAny);
     DocumentSource::registerParser(

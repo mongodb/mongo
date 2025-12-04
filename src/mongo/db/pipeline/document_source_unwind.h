@@ -57,6 +57,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Unwind);
+
 class DocumentSourceUnwind final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$unwind"_sd;

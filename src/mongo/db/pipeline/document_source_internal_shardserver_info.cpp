@@ -47,6 +47,8 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(_internalShardServerInfo, InternalShardServerInfoStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(_internalShardServerInfo,
                          DocumentSourceInternalShardServerInfo::LiteParsed::parse,
                          DocumentSourceInternalShardServerInfo::createFromBson,

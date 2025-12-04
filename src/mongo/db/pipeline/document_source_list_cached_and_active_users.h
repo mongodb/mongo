@@ -64,6 +64,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListCachedAndActiveUsers);
+
 /*
  * This implements an aggregation document source that lists the active/cached users in the
  * authorization manager. It is intended for diagnostic and reporting purposes.
@@ -96,6 +98,10 @@ public:
 
         bool isInitialSource() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<ListCachedAndActiveUsersStageParams>(_originalBson);
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,

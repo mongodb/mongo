@@ -40,6 +40,8 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
+ALLOCATE_STAGE_PARAMS_ID(internalSearchIdLookup, InternalSearchIdLookupStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(_internalSearchIdLookup,
                          DocumentSourceInternalSearchIdLookUp::LiteParsed::parse,
                          DocumentSourceInternalSearchIdLookUp::createFromBson,

@@ -60,6 +60,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListSessions);
+
 /**
  * $listSessions: { allUsers: true/false, users: [ {user:"jsmith", db:"test"}, ... ] }
  * Return all sessions in the config.system.sessions collection
@@ -121,6 +123,10 @@ public:
 
         bool isInitialSource() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<ListSessionsStageParams>(_originalBson);
         }
 
     private:

@@ -65,6 +65,8 @@ StringData removePrefixWorkaround(StringData key, StringData pre) {
 }
 }  // namespace
 
+ALLOCATE_STAGE_PARAMS_ID(searchStage, SearchStageStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(search,
                          LiteParsedSearchStage::parse,
                          DocumentSourceSearch::createFromBson,

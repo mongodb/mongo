@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalShredDocuments);
+
 /**
  * Converts documents into a shredded format to avoid performance regressions from the switch to
  * having a field cache in 4.4.

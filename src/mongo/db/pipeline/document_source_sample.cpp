@@ -54,8 +54,10 @@ constexpr StringData DocumentSourceSample::kStageName;
 DocumentSourceSample::DocumentSourceSample(const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(kStageName, pExpCtx), _size(0) {}
 
+ALLOCATE_STAGE_PARAMS_ID(sample, SampleStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(sample,
-                         LiteParsedDocumentSourceDefault::parse,
+                         SampleLiteParsed::parse,
                          DocumentSourceSample::createFromBson,
                          AllowedWithApiStrict::kAlways);
 ALLOCATE_DOCUMENT_SOURCE_ID(sample, DocumentSourceSample::id)

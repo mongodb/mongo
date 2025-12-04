@@ -62,8 +62,10 @@ using boost::intrusive_ptr;
  * QueryFeatureNotAllowed and duplicate parser map errors in $scoreFusion tests ($scoreFusion is
  * gated behind the same feature flag).
  */
+ALLOCATE_STAGE_PARAMS_ID(score, ScoreStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(score,
-                         LiteParsedDocumentSourceDefault::parse,
+                         ScoreLiteParsed::parse,
                          DocumentSourceScore::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
 

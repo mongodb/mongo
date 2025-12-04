@@ -49,8 +49,10 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::list;
 
+ALLOCATE_STAGE_PARAMS_ID(sortByCount, SortByCountStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(sortByCount,
-                         LiteParsedDocumentSourceDefault::parse,
+                         SortByCountLiteParsed::parse,
                          DocumentSourceSortByCount::createFromBson,
                          AllowedWithApiStrict::kAlways);
 

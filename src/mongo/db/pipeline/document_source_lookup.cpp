@@ -504,6 +504,8 @@ PrivilegeVector DocumentSourceLookUp::LiteParsed::requiredPrivileges(
     return requiredPrivileges;
 }
 
+ALLOCATE_STAGE_PARAMS_ID(lookUp, LookUpStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(lookup,
                          DocumentSourceLookUp::LiteParsed::parse,
                          DocumentSourceLookUp::createFromBson,

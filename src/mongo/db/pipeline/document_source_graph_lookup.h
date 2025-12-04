@@ -82,6 +82,8 @@ struct GraphLookUpParams {
     boost::optional<long long> maxDepth;
 };
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(GraphLookUp);
+
 class DocumentSourceGraphLookUp final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$graphLookup"_sd;
@@ -112,6 +114,10 @@ public:
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
             return {Privilege(ResourcePattern::forExactNamespace(_foreignNss), ActionType::find)};
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const override {
+            return std::make_unique<GraphLookUpStageParams>(_originalBson);
         }
     };
 

@@ -41,6 +41,8 @@ using boost::intrusive_ptr;
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(collStats, CollStatsStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(collStats,
                          DocumentSourceCollStats::LiteParsed::parse,
                          DocumentSourceCollStats::createFromBson,

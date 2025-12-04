@@ -51,6 +51,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Skip);
+
 class DocumentSourceSkip final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$skip"_sd;

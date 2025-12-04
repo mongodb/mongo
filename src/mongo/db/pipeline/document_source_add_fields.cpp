@@ -47,12 +47,14 @@
 namespace mongo {
 using boost::intrusive_ptr;
 
+ALLOCATE_STAGE_PARAMS_ID(addFields, AddFieldsStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(addFields,
-                         LiteParsedDocumentSourceDefault::parse,
+                         AddFieldsLiteParsed::parse,
                          DocumentSourceAddFields::createFromBson,
                          AllowedWithApiStrict::kAlways);
 REGISTER_DOCUMENT_SOURCE(set,
-                         LiteParsedDocumentSourceDefault::parse,
+                         AddFieldsLiteParsed::parse,
                          DocumentSourceAddFields::createFromBson,
                          AllowedWithApiStrict::kAlways);
 

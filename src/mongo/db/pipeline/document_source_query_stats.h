@@ -62,6 +62,8 @@ namespace mongo {
 
 using namespace query_stats;
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(QueryStats);
+
 class DocumentSourceQueryStats final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$queryStats"_sd;
@@ -103,6 +105,10 @@ public:
 
         void assertSupportsMultiDocumentTransaction() const override {
             transactionNotSupported(kStageName);
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<QueryStatsStageParams>(_originalBson);
         }
 
         const TransformAlgorithmEnum _algorithm;

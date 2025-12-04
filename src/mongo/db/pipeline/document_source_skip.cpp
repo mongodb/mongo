@@ -53,8 +53,10 @@ DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext>& p
                                        long long nToSkip)
     : DocumentSource(kStageName, pExpCtx), _nToSkip(nToSkip) {}
 
+ALLOCATE_STAGE_PARAMS_ID(skip, SkipStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(skip,
-                         LiteParsedDocumentSourceDefault::parse,
+                         SkipLiteParsed::parse,
                          DocumentSourceSkip::createFromBson,
                          AllowedWithApiStrict::kAlways);
 ALLOCATE_DOCUMENT_SOURCE_ID(skip, DocumentSourceSkip::id)

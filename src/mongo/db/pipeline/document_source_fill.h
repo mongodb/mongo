@@ -42,6 +42,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Fill);
+
 namespace document_source_fill {
 constexpr StringData kStageName = "$fill"_sd;
 constexpr StringData kLocfMethod = "locf"_sd;

@@ -57,6 +57,8 @@ using boost::intrusive_ptr;
 using std::list;
 using std::vector;
 
+ALLOCATE_STAGE_PARAMS_ID(bucket, BucketStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(bucket,
                          DocumentSourceBucket::LiteParsed::parse,
                          DocumentSourceBucket::createFromBson,

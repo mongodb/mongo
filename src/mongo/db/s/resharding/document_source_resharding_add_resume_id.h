@@ -48,6 +48,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(ReshardingAddResumeId);
+
 /**
  * This stage is responsible for attaching the resharding's _id field to all the input oplog entry
  * documents. For a document that corresponds to an applyOps oplog entry for a committed

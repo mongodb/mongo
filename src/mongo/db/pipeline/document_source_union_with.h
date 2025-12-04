@@ -99,6 +99,8 @@ struct UnionWithSharedState {
     VariablesParseState _variablesParseState;
 };
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(UnionWith);
+
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceUnionWith final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$unionWith"_sd;
@@ -123,6 +125,10 @@ public:
 
         bool requiresAuthzChecks() const override {
             return false;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const override {
+            return std::make_unique<UnionWithStageParams>(_originalBson);
         }
     };
 

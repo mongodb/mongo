@@ -146,15 +146,17 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
             !_sortExecutor->sortPattern().empty());
 }
 
+ALLOCATE_STAGE_PARAMS_ID(sort, SortStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(sort,
-                         LiteParsedDocumentSourceDefault::parse,
+                         SortLiteParsed::parse,
                          DocumentSourceSort::createFromBson,
                          AllowedWithApiStrict::kAlways);
 
 ALLOCATE_DOCUMENT_SOURCE_ID(sort, DocumentSourceSort::id)
 
 REGISTER_DOCUMENT_SOURCE_WITH_CLIENT_TYPE(_internalBoundedSort,
-                                          LiteParsedDocumentSourceDefault::parse,
+                                          SortLiteParsed::parse,
                                           DocumentSourceSort::parseBoundedSort,
                                           ::mongo::getTestCommandsEnabled()
                                               ? AllowedWithApiStrict::kNeverInVersion1

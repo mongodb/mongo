@@ -41,6 +41,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalSearchIdLookup);
+
 class DSInternalSearchIdLookUpCatalogResourceHandle;
 /**
  * Queries local collection for _id equality matches. Intended for use with
@@ -85,6 +87,10 @@ public:
 
         bool isInitialSource() const override {
             return false;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<InternalSearchIdLookupStageParams>(_originalBson);
         }
 
         const BSONObj& getBsonSpec() const {

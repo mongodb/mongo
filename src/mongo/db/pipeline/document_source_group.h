@@ -47,6 +47,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Group);
+
 /**
  * This class represents hash based group implementation that stores all groups until source is
  * depleted and only then starts outputing documents.

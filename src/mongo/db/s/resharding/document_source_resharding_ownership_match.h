@@ -50,6 +50,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(ReshardingOwnershipMatch);
+
 /**
  * This is a purpose-built stage to filter out documents which are 'owned' by this shard according
  * to a given shardId and shard key. This stage was created to optimize performance of internal

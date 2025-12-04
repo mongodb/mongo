@@ -45,8 +45,11 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(_internalConvertBucketIndexStats,
+                         InternalConvertBucketIndexStatsStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(_internalConvertBucketIndexStats,
-                         LiteParsedDocumentSourceDefault::parse,
+                         InternalConvertBucketIndexStatsLiteParsed::parse,
                          DocumentSourceInternalConvertBucketIndexStats::createFromBson,
                          AllowedWithApiStrict::kInternal);
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalConvertBucketIndexStats,

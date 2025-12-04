@@ -63,6 +63,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(CurrentOp);
+
 class DocumentSourceCurrentOp final : public DocumentSource {
 public:
     using TruncationMode = MongoProcessInterface::CurrentOpTruncateMode;
@@ -96,6 +98,10 @@ public:
               _localOps(localOps),
               _privileges(
                   {Privilege(ResourcePattern::forClusterResource(tenantId), ActionType::inprog)}) {}
+
+        std::unique_ptr<StageParams> getStageParams() const override {
+            return std::make_unique<CurrentOpStageParams>(_originalBson);
+        }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();

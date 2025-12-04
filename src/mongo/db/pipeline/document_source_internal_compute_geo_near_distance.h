@@ -57,6 +57,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalComputeGeoNearDistance);
+
 /**
  * This is an internal stage that computes the distance between the given centroid and the value of
  * '_field' of the input Document.

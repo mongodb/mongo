@@ -56,6 +56,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(GeoNear);
+
 class DocumentSourceGeoNear : public DocumentSource {
 public:
     static constexpr StringData kKeyFieldName = "key"_sd;

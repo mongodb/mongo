@@ -51,6 +51,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Limit);
+
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceLimit final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$limit"_sd;

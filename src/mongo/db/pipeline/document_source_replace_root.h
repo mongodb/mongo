@@ -52,6 +52,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(ReplaceRoot);
+
 /**
  * This class implements the transformation logic for the $replaceRoot and $replaceWith stages.
  */

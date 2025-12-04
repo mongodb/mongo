@@ -48,6 +48,8 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(listSessions, ListSessionsStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(listSessions,
                          DocumentSourceListSessions::LiteParsed::parse,
                          DocumentSourceListSessions::createFromBson,

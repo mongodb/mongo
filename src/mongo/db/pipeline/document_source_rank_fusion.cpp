@@ -56,6 +56,8 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(rankFusion, RankFusionStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(rankFusion,
                          DocumentSourceRankFusion::LiteParsed::parse,
                          DocumentSourceRankFusion::createFromBson,

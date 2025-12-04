@@ -50,6 +50,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListExtensions);
+
 /**
  * Document source for the $listExtensions stage, implemented as a wrapper of DocumentSourceQueue.
  */
@@ -81,6 +83,10 @@ public:
 
         bool isInitialSource() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<ListExtensionsStageParams>(_originalBson);
         }
 
     private:

@@ -60,8 +60,10 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalAllCollectionStats);
+
 /**
- * This aggregation stage is the ‘$_internalAllCollectionStats´. It takes no arguments. Its
+ * This aggregation stage is the '$_internalAllCollectionStats´. It takes no arguments. Its
  * response will be a cursor, each document of which represents the collection statistics for a
  * single collection for all the existing collections.
  *
@@ -102,6 +104,10 @@ public:
 
         bool isInitialSource() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<InternalAllCollectionStatsStageParams>(_originalBson);
         }
 
     private:

@@ -68,6 +68,8 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(merge, MergeStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(merge,
                          DocumentSourceMerge::LiteParsed::parse,
                          DocumentSourceMerge::createFromBson,

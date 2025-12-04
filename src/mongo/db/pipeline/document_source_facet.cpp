@@ -62,6 +62,8 @@ using std::pair;
 using std::string;
 using std::vector;
 
+ALLOCATE_STAGE_PARAMS_ID(facet, FacetStageParams::id);
+
 DocumentSourceFacet::DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,
                                          const intrusive_ptr<ExpressionContext>& expCtx,
                                          size_t bufferSizeBytes,

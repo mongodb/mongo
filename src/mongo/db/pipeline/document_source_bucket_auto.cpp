@@ -52,8 +52,10 @@ using boost::intrusive_ptr;
 using std::string;
 using std::vector;
 
+ALLOCATE_STAGE_PARAMS_ID(bucketAuto, BucketAutoStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(bucketAuto,
-                         LiteParsedDocumentSourceDefault::parse,
+                         BucketAutoLiteParsed::parse,
                          DocumentSourceBucketAuto::createFromBson,
                          AllowedWithApiStrict::kAlways);
 ALLOCATE_DOCUMENT_SOURCE_ID(bucketAuto, DocumentSourceBucketAuto::id)

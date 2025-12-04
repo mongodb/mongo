@@ -49,6 +49,8 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::list;
 
+ALLOCATE_STAGE_PARAMS_ID(shardedDataDistribution, ShardedDataDistributionStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(shardedDataDistribution,
                          DocumentSourceShardedDataDistribution::LiteParsed::parse,
                          DocumentSourceShardedDataDistribution::createFromBson,

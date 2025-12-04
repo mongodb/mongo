@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(listSearchIndexes, ListSearchIndexesStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(listSearchIndexes,
                          DocumentSourceListSearchIndexes::LiteParsedListSearchIndexes::parse,
                          DocumentSourceListSearchIndexes::createFromBson,

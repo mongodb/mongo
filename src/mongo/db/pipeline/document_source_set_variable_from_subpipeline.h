@@ -58,6 +58,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(SetVariableFromSubPipeline);
+
 struct SetVariableFromSubPipelineSharedState {
     std::unique_ptr<exec::agg::Pipeline> _subExecPipeline;
 };

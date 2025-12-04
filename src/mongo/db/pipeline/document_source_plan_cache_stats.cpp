@@ -44,6 +44,8 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(planCacheStats, PlanCacheStatsStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(planCacheStats,
                          DocumentSourcePlanCacheStats::LiteParsed::parse,
                          DocumentSourcePlanCacheStats::createFromBson,

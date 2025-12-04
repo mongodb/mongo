@@ -50,6 +50,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Queue);
+
 /**
  * A DocumentSource which re-spools a queue of documents loaded into it. This stage does not
  * retrieve any input from an earlier stage. It can consume either a normal queue of documents or

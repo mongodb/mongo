@@ -52,6 +52,8 @@ Document makeDocumentFromCachedUserInfo(const AuthorizationRouter::CachedUserInf
 }
 }  // namespace
 
+ALLOCATE_STAGE_PARAMS_ID(listCachedAndActiveUsers, ListCachedAndActiveUsersStageParams::id);
+
 REGISTER_TEST_DOCUMENT_SOURCE(listCachedAndActiveUsers,
                               DocumentSourceListCachedAndActiveUsers::LiteParsed::parse,
                               DocumentSourceListCachedAndActiveUsers::createFromBson);

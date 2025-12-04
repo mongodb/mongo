@@ -46,6 +46,8 @@ namespace mongo {
 
 using namespace query_settings;
 
+ALLOCATE_STAGE_PARAMS_ID(querySettings, QuerySettingsStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(querySettings,
                          DocumentSourceQuerySettings::LiteParsed::parse,
                          DocumentSourceQuerySettings::createFromBson,

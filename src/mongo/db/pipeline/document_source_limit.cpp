@@ -53,8 +53,10 @@ DocumentSourceLimit::DocumentSourceLimit(const intrusive_ptr<ExpressionContext>&
                                          long long limit)
     : DocumentSource(kStageName, pExpCtx), _limit(limit) {}
 
+ALLOCATE_STAGE_PARAMS_ID(limit, LimitStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(limit,
-                         LiteParsedDocumentSourceDefault::parse,
+                         LimitLiteParsed::parse,
                          DocumentSourceLimit::createFromBson,
                          AllowedWithApiStrict::kAlways);
 ALLOCATE_DOCUMENT_SOURCE_ID(limit, DocumentSourceLimit::id)

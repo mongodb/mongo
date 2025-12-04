@@ -44,8 +44,10 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(reshardingIterateTransaction, ReshardingIterateTransactionStageParams::id);
+
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalReshardingIterateTransaction,
-                                  LiteParsedDocumentSourceInternal::parse,
+                                  ReshardingIterateTransactionLiteParsed::parse,
                                   DocumentSourceReshardingIterateTransaction::createFromBson,
                                   true);
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalReshardingIterateTransaction,

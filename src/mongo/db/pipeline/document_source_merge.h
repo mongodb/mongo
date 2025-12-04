@@ -82,6 +82,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Merge);
+
 /**
  * A class for the $merge aggregation stage to handle all supported merge modes. Each instance of
  * this class must be initialized (via a constructor) with a 'MergeDescriptor', which defines a
@@ -143,6 +145,10 @@ public:
 
         bool isWriteStage() const override {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const override {
+            return std::make_unique<MergeStageParams>(_originalBson);
         }
 
     private:

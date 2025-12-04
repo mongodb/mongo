@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ScoreFusion);
+
 /**
  * The $scoreFusion stage is syntactic sugar for generating an output of scored results by combining
  * the results of any number of scored subpipelines with relative score fusion.
@@ -96,6 +98,10 @@ public:
 
         bool isHybridSearchStage() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const override {
+            return std::make_unique<ScoreFusionStageParams>(_originalBson);
         }
     };
 

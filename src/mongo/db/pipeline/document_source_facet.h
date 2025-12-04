@@ -100,6 +100,8 @@ private:
     std::unique_ptr<StatsProvider> _provider{nullptr};
 };
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Facet);
+
 /**
  * A $facet stage contains multiple sub-pipelines. Each input to the $facet stage will feed into
  * each of the sub-pipelines. The $facet stage is blocking, and outputs only one document,
@@ -137,6 +139,10 @@ public:
 
         bool requiresAuthzChecks() const override {
             return false;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const override {
+            return std::make_unique<FacetStageParams>(_originalBson);
         }
     };
 

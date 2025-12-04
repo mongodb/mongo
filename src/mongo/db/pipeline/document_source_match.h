@@ -59,6 +59,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Match);
+
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceMatch : public DocumentSource {
 public:
     static bool containsTextOperator(const MatchExpression& expr);

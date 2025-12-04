@@ -137,13 +137,15 @@ RangeStatement RangeStatement::parse(RangeSpec spec) {
     return range;
 }
 
+ALLOCATE_STAGE_PARAMS_ID(densify, DensifyStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(densify,
-                         LiteParsedDocumentSourceDefault::parse,
+                         DensifyLiteParsed::parse,
                          document_source_densify::createFromBson,
                          AllowedWithApiStrict::kAlways);
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalDensify,
-                                  LiteParsedDocumentSourceDefault::parse,
+                                  DensifyLiteParsed::parse,
                                   DocumentSourceInternalDensify::createFromBson,
                                   true);
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalDensify, DocumentSourceInternalDensify::id)

@@ -52,13 +52,15 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
+ALLOCATE_STAGE_PARAMS_ID(project, ProjectStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(project,
-                         LiteParsedDocumentSourceDefault::parse,
+                         ProjectLiteParsed::parse,
                          DocumentSourceProject::createFromBson,
                          AllowedWithApiStrict::kAlways);
 
 REGISTER_DOCUMENT_SOURCE(unset,
-                         LiteParsedDocumentSourceDefault::parse,
+                         ProjectLiteParsed::parse,
                          DocumentSourceProject::createFromBson,
                          AllowedWithApiStrict::kAlways);
 

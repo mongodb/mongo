@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(AddFields);
+
 /**
  * $addFields adds or replaces the specified fields to/in the document while preserving the original
  * document. It is modeled on and throws the same errors as $project.

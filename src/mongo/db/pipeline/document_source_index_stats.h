@@ -58,6 +58,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(IndexStats);
+
 /**
  * Provides a document source interface to retrieve index statistics for a given namespace.
  * Each document returned represents a single index and mongod instance.
@@ -92,6 +94,10 @@ public:
 
         bool isInitialSource() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<IndexStatsStageParams>(_originalBson);
         }
 
     private:

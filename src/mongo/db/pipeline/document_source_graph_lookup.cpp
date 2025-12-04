@@ -99,6 +99,8 @@ std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp
         spec, parseGraphLookupFromAndResolveNamespace(fromElement, nss.dbName()));
 }
 
+ALLOCATE_STAGE_PARAMS_ID(graphLookUp, GraphLookUpStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(graphLookup,
                          DocumentSourceGraphLookUp::LiteParsed::parse,
                          DocumentSourceGraphLookUp::createFromBson,

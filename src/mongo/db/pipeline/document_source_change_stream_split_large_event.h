@@ -49,6 +49,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(ChangeStreamSplitLargeEvent);
+
 class DocumentSourceChangeStreamSplitLargeEvent final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$changeStreamSplitLargeEvent"_sd;

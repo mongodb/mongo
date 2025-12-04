@@ -47,6 +47,9 @@
 namespace mongo {
 namespace analyze_shard_key {
 
+ALLOCATE_STAGE_PARAMS_ID(analyzeShardKeyReadWriteDistribution,
+                         AnalyzeShardKeyReadWriteDistributionStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(_analyzeShardKeyReadWriteDistribution,
                          DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed::parse,
                          DocumentSourceAnalyzeShardKeyReadWriteDistribution::createFromBson,

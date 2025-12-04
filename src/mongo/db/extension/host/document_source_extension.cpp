@@ -35,6 +35,9 @@
 
 namespace mongo::extension::host {
 
+ALLOCATE_STAGE_PARAMS_ID(expandable, ExpandableStageParams::id);
+ALLOCATE_STAGE_PARAMS_ID(expanded, ExpandedStageParams::id);
+
 class DocumentSourceExtension::LiteParsedExpandable::ExpansionValidationFrame {
 public:
     ExpansionValidationFrame(ExpansionState& state, std::string stageName)

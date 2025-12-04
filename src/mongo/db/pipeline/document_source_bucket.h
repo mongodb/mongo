@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Bucket);
+
 /**
  * The $bucket stage is an alias for a $group stage followed by a $sort stage.
  */
@@ -65,6 +67,10 @@ public:
 
         bool requiresAuthzChecks() const override {
             return false;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<BucketStageParams>(_originalBson);
         }
 
         /**

@@ -64,6 +64,8 @@ auto& changeStreamsShowExpandedEvents =
     *MetricBuilder<Counter64>{"changeStreams.showExpandedEvents"};
 }
 
+ALLOCATE_STAGE_PARAMS_ID(changeStream, ChangeStreamStageParams::id);
+
 // The $changeStream stage is an alias for many stages.
 REGISTER_DOCUMENT_SOURCE(changeStream,
                          DocumentSourceChangeStream::LiteParsed::parse,

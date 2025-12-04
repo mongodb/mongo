@@ -84,6 +84,8 @@ std::string getDefaultMaxChunkSize(OperationContext* opCtx) {
     return std::string("null");
 }
 
+ALLOCATE_STAGE_PARAMS_ID(listClusterCatalog, ListClusterCatalogStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(listClusterCatalog,
                          DocumentSourceListClusterCatalog::LiteParsed::parse,
                          DocumentSourceListClusterCatalog::createFromBson,

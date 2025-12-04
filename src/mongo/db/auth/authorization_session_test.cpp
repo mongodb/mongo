@@ -2368,6 +2368,9 @@ TEST_F(AuthorizationSessionTest, ClusterActionsTestUser) {
     authzSession->logoutAllDatabases("Test finished");
 }
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(NoPrivsWithAuthzChecks)
+ALLOCATE_STAGE_PARAMS_ID(noPrivsWithAuthzChecks, NoPrivsWithAuthzChecksStageParams::id);
+
 // Test agg stage that doesn't use authz checks and doesn't use opt-out
 class TestDocumentSourceNoPrivsWithAuthzChecks : public DocumentSource {
 public:
@@ -2390,6 +2393,10 @@ public:
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
             return {};
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const override {
+            return std::make_unique<NoPrivsWithAuthzChecksStageParams>(_originalBson);
         }
     };
 

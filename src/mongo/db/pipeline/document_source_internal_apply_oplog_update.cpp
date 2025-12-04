@@ -45,8 +45,10 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(_internalApplyOplogUpdate, InternalApplyOplogUpdateStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(_internalApplyOplogUpdate,
-                         LiteParsedDocumentSourceDefault::parse,
+                         InternalApplyOplogUpdateLiteParsed::parse,
                          DocumentSourceInternalApplyOplogUpdate::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalApplyOplogUpdate, DocumentSourceInternalApplyOplogUpdate::id)

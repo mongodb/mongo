@@ -47,6 +47,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalInhibitOptimization);
+
 /**
  * An internal stage available for testing. Acts as a simple passthrough of intermediate results
  * from the source stage. Does not participate in optimizations such as swapping, coalescing, or

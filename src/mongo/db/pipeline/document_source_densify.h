@@ -61,8 +61,9 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-
 namespace mongo {
+
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Densify);
 
 class RangeStatement;
 class DensifyValue {

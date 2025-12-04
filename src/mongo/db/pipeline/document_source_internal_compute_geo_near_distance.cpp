@@ -52,8 +52,11 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(_internalComputeGeoNearDistance,
+                         InternalComputeGeoNearDistanceStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(_internalComputeGeoNearDistance,
-                         LiteParsedDocumentSourceDefault::parse,
+                         InternalComputeGeoNearDistanceLiteParsed::parse,
                          DocumentSourceInternalGeoNearDistance::createFromBson,
                          AllowedWithApiStrict::kInternal);
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalComputeGeoNearDistance,

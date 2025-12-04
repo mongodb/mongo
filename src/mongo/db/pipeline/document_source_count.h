@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Count);
+
 /**
  * The $count stage is an alias for a $group stage followed by a $project stage.
  */

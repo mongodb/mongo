@@ -44,11 +44,14 @@ namespace {
 const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("test.liteParsedDocSource"_sd);
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Mock);
+ALLOCATE_STAGE_PARAMS_ID(mock, MockStageParams::id);
+
 // Mock parser functions for testing
 std::unique_ptr<LiteParsedDocumentSource> createMockParser(const NamespaceString& nss,
                                                            const BSONElement& spec,
                                                            const LiteParserOptions& options) {
-    return std::make_unique<LiteParsedDocumentSourceDefault>(spec);
+    return std::make_unique<MockLiteParsed>(spec);
 }
 
 }  // namespace
@@ -243,15 +246,8 @@ DEATH_TEST_F(LiteParsedDocumentSourceParseTest, IFRFlagIsRequired, "11395101") {
 /**
  * A dummy test stage parameters class used for testing. It just allocates an ID.
  */
-class TestStageParams : public DefaultStageParams {
-public:
-    TestStageParams(BSONElement element) : DefaultStageParams(element) {}
-    static const Id& id;
-    Id getId() const override {
-        return id;
-    }
-};
-ALLOCATE_STAGE_PARAMS_ID(testStage, TestStageParams::id);
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Test);
+ALLOCATE_STAGE_PARAMS_ID(test, TestStageParams::id);
 
 /**
  * A dummy LiteParsedDocumentSource that implements just enough functionality to return custom

@@ -36,6 +36,9 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListSearchIndexes);
+
 class DocumentSourceListSearchIndexesSpec;
 
 class DocumentSourceListSearchIndexes final : public DocumentSource {
@@ -80,6 +83,10 @@ public:
 
         bool isSearchStage() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<ListSearchIndexesStageParams>(_originalBson);
         }
 
         LiteParsedListSearchIndexes(const BSONElement& spec, NamespaceString nss)

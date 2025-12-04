@@ -61,6 +61,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListLocalSessions);
+
 ListSessionsSpec listSessionsParseSpec(StringData stageName, const BSONElement& spec);
 PrivilegeVector listSessionsRequiredPrivileges(const ListSessionsSpec& spec,
                                                const boost::optional<TenantId>& tenantId);
@@ -109,6 +111,10 @@ public:
 
         bool isInitialSource() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<ListLocalSessionsStageParams>(_originalBson);
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,

@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(RankFusion);
+
 /**
  * The $rankFusion stage is syntactic sugar for generating an output of ranked results by combining
  * the results of any number of ranked subpipelines with reciprocal rank fusion.
@@ -100,6 +102,10 @@ public:
 
         bool isHybridSearchStage() const final {
             return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const override {
+            return std::make_unique<RankFusionStageParams>(_originalBson);
         }
     };
 

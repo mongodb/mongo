@@ -77,8 +77,10 @@ using boost::intrusive_ptr;
 
 constexpr StringData DocumentSourceGeoNear::kKeyFieldName;
 
+ALLOCATE_STAGE_PARAMS_ID(geoNear, GeoNearStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(geoNear,
-                         LiteParsedDocumentSourceDefault::parse,
+                         GeoNearLiteParsed::parse,
                          DocumentSourceGeoNear::createFromBson,
                          AllowedWithApiStrict::kAlways);
 ALLOCATE_DOCUMENT_SOURCE_ID(geoNear, DocumentSourceGeoNear::id)

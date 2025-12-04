@@ -48,6 +48,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Score);
+
 /**
  * $score computes the "score" metadata field based on some input Expression, without making any
  * modifications to the non-metadata fields of the original document.

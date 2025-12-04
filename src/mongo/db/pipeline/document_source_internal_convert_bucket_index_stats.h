@@ -48,6 +48,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalConvertBucketIndexStats);
+
 /**
  * Aggregation stage that converts buckets schema index stats to time-series schema index stats.
  */

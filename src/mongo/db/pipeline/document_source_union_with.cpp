@@ -68,6 +68,8 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(unionWith, UnionWithStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(unionWith,
                          DocumentSourceUnionWith::LiteParsed::parse,
                          DocumentSourceUnionWith::createFromBson,

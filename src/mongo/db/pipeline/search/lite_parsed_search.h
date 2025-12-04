@@ -33,6 +33,9 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
+
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(SearchStage);
+
 /**
  * A 'LiteParsed' representation of either a $search or $searchMeta stage.
  * This is the parent class for the $listSearchIndexes stage.
@@ -70,6 +73,10 @@ public:
 
     void assertSupportsMultiDocumentTransaction() const override {
         transactionNotSupported(getParseTimeName());
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<SearchStageStageParams>(_originalBson);
     }
 
     explicit LiteParsedSearchStage(const BSONElement& spec, NamespaceString nss)

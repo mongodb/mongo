@@ -66,8 +66,10 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
+ALLOCATE_STAGE_PARAMS_ID(match, MatchStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(match,
-                         LiteParsedDocumentSourceDefault::parse,
+                         MatchLiteParsed::parse,
                          DocumentSourceMatch::createFromBson,
                          AllowedWithApiStrict::kAlways);
 

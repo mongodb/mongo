@@ -34,8 +34,10 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(setMetadata, SetMetadataStageParams::id);
+
 REGISTER_INTERNAL_DOCUMENT_SOURCE(setMetadata,
-                                  LiteParsedDocumentSourceInternal::parse,
+                                  SetMetadataLiteParsed::parse,
                                   DocumentSourceSetMetadata::createFromBson,
                                   true);
 

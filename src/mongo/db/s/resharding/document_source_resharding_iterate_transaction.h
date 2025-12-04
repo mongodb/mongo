@@ -50,6 +50,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(ReshardingIterateTransaction);
+
 /**
  * This stage keeps track of applyOps oplog entries that represent transactions and iterates them
  * whenever an oplog entry commits a transaction. When the stage observes an applyOps or commit

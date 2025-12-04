@@ -51,6 +51,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ShardedDataDistribution);
+
 /**
  * This aggregation stage is an alias for ‘$shardedDataDistribution’. It takes no arguments. Its
  * response will be a cursor, each document of which represents the data-distribution information
@@ -84,6 +86,10 @@ public:
 
     bool isInitialSource() const final {
         return true;
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<ShardedDataDistributionStageParams>(_originalBson);
     }
 
 private:

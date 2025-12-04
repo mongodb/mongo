@@ -60,6 +60,8 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalShardServerInfo);
+
 /**
  * An internal stage available for testing. Gets the host and shard name for every shard server in
  * the cluster.
@@ -84,6 +86,10 @@ public:
                                            bool bypassDocumentValidation) const final {
             return {Privilege(ResourcePattern::forClusterResource(boost::none),
                               ActionSet{ActionType::internal})};
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<InternalShardServerInfoStageParams>(_originalBson);
         }
     };
 

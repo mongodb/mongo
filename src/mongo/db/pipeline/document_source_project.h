@@ -49,6 +49,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Project);
+
 /**
  * The $project stage can be used for simple transformations such as including or excluding a set
  * of fields, or can do more sophisticated things, like include some fields and add new "computed"

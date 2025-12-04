@@ -45,8 +45,10 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(_internalSplitPipeline, InternalSplitPipelineStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(_internalSplitPipeline,
-                         LiteParsedDocumentSourceDefault::parse,
+                         InternalSplitPipelineLiteParsed::parse,
                          DocumentSourceInternalSplitPipeline::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalSplitPipeline, DocumentSourceInternalSplitPipeline::id)

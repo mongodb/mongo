@@ -52,6 +52,8 @@
 
 namespace mongo {
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Redact);
+
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceRedact final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$redact"_sd;

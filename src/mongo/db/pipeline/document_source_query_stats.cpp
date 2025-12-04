@@ -50,6 +50,8 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(queryStats, QueryStatsStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
                                            DocumentSourceQueryStats::LiteParsed::parse,
                                            DocumentSourceQueryStats::createFromBson,

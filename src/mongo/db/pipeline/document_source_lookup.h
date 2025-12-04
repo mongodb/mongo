@@ -93,6 +93,8 @@ struct LookUpSharedState {
 
 void lookupPipeValidator(const Pipeline& pipeline);
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(LookUp);
+
 /**
  * Queries separate collection for equality matches with documents in the pipeline collection.
  * Adds matching documents to a new array field in the input document.
@@ -148,6 +150,10 @@ public:
 
         bool requiresAuthzChecks() const override {
             return false;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const override {
+            return std::make_unique<LookUpStageParams>(_originalBson);
         }
     };
 

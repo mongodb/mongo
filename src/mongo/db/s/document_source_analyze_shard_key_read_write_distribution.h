@@ -60,6 +60,8 @@
 namespace mongo {
 namespace analyze_shard_key {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(AnalyzeShardKeyReadWriteDistribution);
+
 class DocumentSourceAnalyzeShardKeyReadWriteDistribution final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_analyzeShardKeyReadWriteDistribution"_sd;
@@ -91,6 +93,10 @@ public:
 
         void assertSupportsMultiDocumentTransaction() const override {
             transactionNotSupported(kStageName);
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<AnalyzeShardKeyReadWriteDistributionStageParams>(_originalBson);
         }
 
     private:

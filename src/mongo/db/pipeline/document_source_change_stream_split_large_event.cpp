@@ -48,8 +48,10 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(changeStreamSplitLargeEvent, ChangeStreamSplitLargeEventStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(changeStreamSplitLargeEvent,
-                         LiteParsedDocumentSourceDefault::parse,
+                         ChangeStreamSplitLargeEventLiteParsed::parse,
                          DocumentSourceChangeStreamSplitLargeEvent::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
 ALLOCATE_DOCUMENT_SOURCE_ID(changeStreamSplitLargeEvent,
