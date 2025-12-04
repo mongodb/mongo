@@ -1612,31 +1612,29 @@ variables:
       - name: compile
     commands:
       - func: "fetch artifacts"
+      - func: "format test script"
+        vars:
+          format_test_script_args: -t 180 -c ../../../test/format/CONFIG.disagg -- disagg.mode=leader runs.timer=5:10
+          num_jobs: 1 # FIXME-WT-16134 PALite cannot run multiple jobs. PALI will address this.
       - func: "format test disagg"
         vars:
           format_args: disagg.mode=leader runs.timer=5:10
-          times: 15
+          times: 5
 
   # FIXME-WT-16113: Consolidate this logic in test/format itself.
-  - &format-stress-data-validation-test-disagg-leader
+  - &format-stress-test-disagg-leader-data-validation
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
+      - func: "format test script"
+        vars:
+          format_test_script_args: -t 180 -c ../../../test/format/CONFIG.disagg -- disagg.mode=leader ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
+          num_jobs: 1 # FIXME-WT-16134 PALite cannot run multiple jobs. PALI will address this.
       - func: "format test disagg"
         vars:
           # Validate data with a non-layered table.
           format_args: disagg.mode=leader ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
-          times: 15
-
-  - &format-stress-test-disagg-follower-palm
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "format test disagg"
-        vars:
-          format_args: disagg.page_log=palm disagg.mode=follower runs.timer=5:10
           times: 5
 
   - &format-stress-test-disagg-follower
@@ -1644,10 +1642,13 @@ variables:
       - name: compile
     commands:
       - func: "fetch artifacts"
+      - func: "format test script"
+        vars:
+          format_test_script_args: -t 180 -c ../../../test/format/CONFIG.disagg -- disagg.mode=follower runs.timer=5:10
       - func: "format test disagg"
         vars:
           format_args: disagg.mode=follower runs.timer=5:10
-          times: 15
+          times: 5
 
   - &format-stress-test-disagg-switch-palm
     depends_on:
@@ -4578,9 +4579,6 @@ tasks:
 
   - <<: *format-stress-test-disagg-leader-palm
     name: format-stress-test-disagg-leader-palm
-    tags: ["stress-test-disagg", "stress-test-disagg-san-fail"]
-  - <<: *format-stress-test-disagg-leader-verify
-    name: format-stress-test-disagg-leader-verify
     tags: ["stress-test-disagg"]
   - <<: *format-stress-test-disagg-leader
     name: format-stress-test-disagg-leader-1
@@ -4588,33 +4586,24 @@ tasks:
   - <<: *format-stress-test-disagg-leader
     name: format-stress-test-disagg-leader-2
     tags: ["stress-test-disagg"]
-  - <<: *format-stress-data-validation-test-disagg-leader
-    name: format-stress-data-validation-test-disagg-leader-1
+  - <<: *format-stress-test-disagg-leader-data-validation
+    name: format-stress-test-disagg-leader-data-validation-1
     tags: ["stress-test-disagg"]
-  - <<: *format-stress-data-validation-test-disagg-leader
-    name: format-stress-data-validation-test-disagg-leader-2
+  - <<: *format-stress-test-disagg-leader-data-validation
+    name: format-stress-test-disagg-leader-data-validation-2
     tags: ["stress-test-disagg"]
 
-  - <<: *format-stress-test-disagg-follower-palm
-    name: format-stress-test-disagg-follower-palm
-    tags: ["stress-test-disagg-san-fail"]
   - <<: *format-stress-test-disagg-follower
     name: format-stress-test-disagg-follower-1
     tags: ["stress-test-disagg"]
   - <<: *format-stress-test-disagg-follower
     name: format-stress-test-disagg-follower-2
     tags: ["stress-test-disagg"]
-  - <<: *format-stress-test-disagg-follower
-    name: format-stress-test-disagg-follower-3
-    tags: ["stress-test-disagg"]
-  - <<: *format-stress-test-disagg-follower
-    name: format-stress-test-disagg-follower-4
-    tags: ["stress-test-disagg"]
 
   # FIXME-WT-14566: Enable disagg switch mode on all platforms once failures have been resolved.
   - <<: *format-stress-test-disagg-switch-palm
     name: format-stress-test-disagg-switch-palm-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+    tags: ["stress-test-disagg-fail"]
   - <<: *format-stress-test-disagg-switch-palm
     name: format-stress-test-disagg-switch-palm-2
     tags: ["stress-test-disagg-fail"]
@@ -4625,7 +4614,7 @@ tasks:
   # FIXME-WT-14566: Enable disagg switch mode on all platforms once failures have been resolved.
   - <<: *format-stress-test-disagg-switch
     name: format-stress-test-disagg-switch-1
-    tags: ["stress-test-disagg-fail"]
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
   - <<: *format-stress-test-disagg-switch
     name: format-stress-test-disagg-switch-2
     tags: ["stress-test-disagg-fail"]
@@ -4634,49 +4623,50 @@ tasks:
     tags: ["stress-test-disagg-fail"]
 
   - name: format-stress-disagg-leader-pull-request-test
-    # FIXME-WT-16114-Enable disagg tests once they are stable.
-    # tags: ["pull_request"]
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "format test disagg"
+      - func: "format test script"
         vars:
-          format_args: disagg.mode=leader runs.rows=10000 runs.ops=50000
-          times: 15
+          # run for 10 minutes.
+          format_test_script_args: -c ../../../test/format/CONFIG.disagg -t 10 -- disagg.mode=leader runs.rows=10000 runs.ops=50000
 
   - name: format-stress-disagg-follower-pull-request-test
-    # FIXME-WT-16114-Enable disagg tests once they are stable.
-    # tags: ["pull_request"]
+    tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "format test disagg"
+      - func: "format test script"
         vars:
-          format_args: disagg.mode=follower runs.rows=10000 runs.ops=50000
-          times: 15
+          # run for 10 minutes.
+          format_test_script_args: -c ../../../test/format/CONFIG.disagg -t 10 -- disagg.mode=follower runs.rows=10000 runs.ops=50000
 
   - name: format-stress-disagg-leader-msan-test-palm
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "format test disagg"
+      - func: "format test script"
         vars:
+          # run for 10 minutes.
           # MemorySanitizer requires that all program code is instrumented, otherwise it may generate false reports.
-          format_args: disagg.page_log=palm disagg.mode=leader runs.rows=10000 runs.ops=50000 disk.encryption=none
-          times: 5
+          format_test_script_args: -c ../../../test/format/CONFIG.disagg -t 10 -- disagg.page_log=palm disagg.mode=leader runs.rows=10000 runs.ops=50000 disk.encryption=none
+          num_jobs: 1  # MSAN builds (with PALM) can cause OOM issues if multiple jobs are run in parallel.
+
   - name: format-stress-disagg-follower-msan-test-palm
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "format test disagg"
+      - func: "format test script"
         vars:
+          # run for 10 minutes.
           # MemorySanitizer requires that all program code is instrumented, otherwise it may generate false reports.
-          format_args: disagg.page_log=palm disagg.mode=follower runs.rows=10000 runs.ops=50000 disk.encryption=none
-          times: 5
+          format_test_script_args: -c ../../../test/format/CONFIG.disagg -t 10 -- disagg.page_log=palm disagg.mode=follower runs.rows=10000 runs.ops=50000 disk.encryption=none
+          num_jobs: 1  # MSAN builds (with PALM) can cause OOM issues if multiple jobs are run in parallel.
 
   - name: format-stress-test-no-barrier
     tags: ["stress-test-no-barrier"]
@@ -6457,6 +6447,7 @@ buildvariants:
     # Exclude wt12015_backup_corruption for ASan builds. It creates false positives when it deliberately kills processes that invoke corruption.
     unit_test_variant_args: --asan
     ctest_extra_args: -E "wt12015_backup_corruption"
+    additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
   tags: ["pull_request", "sanitizer"]
   tasks:
     - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test"
@@ -6468,6 +6459,8 @@ buildvariants:
       batchtime: 1440 # once a day
     - name: live-restore-long
     - name: ".stress-test-asan"
+    - name: ".stress-test-disagg"
+      distros: ubuntu2004-large
     - name: ".unit_test"
     - name: ".unit_test_long"
 
@@ -6593,9 +6586,8 @@ buildvariants:
     - name: examples-c-production-disable-shared-test
     - name: examples-c-production-disable-static-test
     - name: format-msan-test
-    # FIXME-WT-16114-Enable disagg tests once they are stable.
-    # - name: format-stress-disagg-leader-msan-test-palm
-    # - name: format-stress-disagg-follower-msan-test-palm
+    - name: format-stress-disagg-leader-msan-test-palm
+    - name: format-stress-disagg-follower-msan-test-palm
     - name: make-check-test
       distros: ubuntu2004-large
 
@@ -7335,6 +7327,7 @@ buildvariants:
     # Exclude wt12015_backup_corruption for ASan builds. It creates false positives when it deliberately kills processes that invoke corruption.
     ctest_extra_args: -E "wt12015_backup_corruption"
     unit_test_variant_args: --asan
+    additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
   tasks:
     - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test"
     - name: examples-c-test
@@ -7345,6 +7338,8 @@ buildvariants:
       batchtime: 1440 # once a day
     - name: live-restore-long
     - name: ".stress-test-asan"
+    - name: ".stress-test-disagg"
+      distros: amazon2023-arm64-latest-large-m8g
     - name: ".unit_test"
     - name: ".unit_test_long"
 
@@ -7398,9 +7393,8 @@ buildvariants:
     - name: examples-c-production-disable-shared-test
     - name: examples-c-production-disable-static-test
     - name: format-msan-test
-    # FIXME-WT-16114-Enable disagg tests once they are stable.
-    # - name: format-stress-disagg-leader-msan-test-palm
-    # - name: format-stress-disagg-follower-msan-test-palm
+    - name: format-stress-disagg-leader-msan-test-palm
+    - name: format-stress-disagg-follower-msan-test-palm
     - name: make-check-test
       distros: amazon2023-arm64-latest-large-m8g
     - name: csuite-long-running
@@ -7493,25 +7487,6 @@ buildvariants:
     - name: compile
     - name: ".stress-test-disagg-san-fail"
     - name: checkpoint-test
-
-- name: amazon2023-disagg-msan-stress
-  display_name: "[Failure Expected] (ARMV9) Amazon 2023 MSAN Disagg Stress tests"
-  batchtime: 4320 # once every three days
-  run_on:
-  - amazon2023-arm64-latest-large-m8g
-  expansions:
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
-    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=MSan
-    # MemorySanitizer requires that all program code is instrumented, otherwise it may generate false reports.
-    posix_configure_flags: -DENABLE_LZ4=0 -DENABLE_SNAPPY=0 -DENABLE_ZLIB=0 -DENABLE_ZSTD=0
-    CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
-    ENABLE_TCMALLOC: 0
-    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
-    disagg_run: true
-  tasks:
-    - name: compile
-    - name: format-stress-disagg-leader-msan-test-palm
-    - name: format-stress-disagg-follower-msan-test-palm
 
 - name: amazon2023-disagg-ubsan-stress
   display_name: "[Failure Expected] (ARMV9) Amazon 2023 UBSAN Disagg Stress tests"

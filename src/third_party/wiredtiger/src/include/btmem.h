@@ -847,9 +847,10 @@ struct __wt_page {
 #define WT_READGEN_STEP 100
     uint64_t read_gen;
 
-    uint64_t cache_create_gen; /* Page create timestamp */
-    uint64_t evict_pass_gen;   /* Eviction pass generation */
-
+    uint64_t cache_create_gen;     /* Page create timestamp */
+    uint64_t evict_pass_gen;       /* Eviction pass generation */
+    uint64_t evict_queue_attempts; /* Number of times eviction tries to queue a page for eviction
+                                      but fails */
     WT_PAGE_DISAGG_INFO *disagg_info;
 
 #ifdef HAVE_DIAGNOSTIC

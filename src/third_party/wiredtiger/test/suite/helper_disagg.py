@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
+import wiredtiger
 import functools, os, shutil, wttest
 
 # These routines help run the various page log sources used by disaggregated storage.
@@ -287,3 +288,267 @@ class DisaggConfigMixin:
         # Step up as the leader
         if step_up:
             self.conn.reconfigure(f'disaggregated=(role="leader")')
+
+# The oplog simulates the MongoDB oplog and does a bit more.
+# Basic operations:
+# - Append a bunch of k,v pairs to the oplog. For convenience, this class chooses
+#   the keys (string-ized timestamp) and initial values (the same string-ized timestamp).
+#   The values may later be changed by update operations.  Timestamp advances on each append.
+#
+# - Add some update of k,v pairs to the oplog.  From keys already available, some are
+#   updated to new values.  Timestamp advances on each update.
+#
+# - Apply some entries of the oplog to a WT session.  It is assumed that
+#   the URIs needed are already created.
+#
+# - Check the current state of the oplog (up to some position) against tables
+#   accessed by a WT session. Both point reads and a read scan are done.
+class Oplog(object):
+    def __init__(self, key_size=-1, value_size=-1):
+        self._timestamp = 0       # last (1-based) timestamp used
+        self._entries = []        # list of (table,k,v) triples.
+        self._uris = []           # list of (uri,entlist) pairs.  Each entlist is an ordered list of
+                                  # offsets into _entries that apply to this table.
+        self._lookup = dict()     # lookup keyed by (table,k) pairs, gives a list of (ts,v) pairs.
+        self._tombstone_value = 'tombstone'
+
+        # For debugging - when _use_timestamps is false, don't actually
+        # use the internally generated timestamps with WT calls.
+        self._use_timestamps = True
+        self.key_size = key_size
+        self.value_size = value_size
+
+    # Generate the key from an int, by default a simple string.
+    # The key size can be modified to make this longer.
+    def gen_key(self, i):
+        result = str(i)
+        if self.key_size > 0 and self.key_size > len(result):
+            result += '.' * (self.key_size - len(result))
+        return result
+
+    # Generate the key integer, the reverse of gen_key.
+    def decode_key(self, s):
+        if self.key_size <= 0:
+            return int(s)
+        if '.' in s:
+            end = s.index('.')
+        else:
+            end = len(s)
+        result = int(s[:end])
+        if self.key_size > end:
+            if s[end:] != '.' * (self.key_size - end):
+                raise Exception(f'Oplog key returned: {s}, unexpected format for key_size={self.key_size}')
+        elif end != len(s):
+            raise Exception(f'Oplog key returned: {s}, unexpected format for key_size={self.key_size}')
+        return result
+
+    # Generate the value from an int, by default a simple string.
+    # Note: this can be overridden, as long as decode_value is as well
+    def gen_value(self, i):
+        result = str(i)
+        if self.value_size > 0 and self.value_size > len(result):
+            result += '.' * (self.value_size - len(result))
+        return result
+
+    def add_uri(self, uri):
+        self._uris.append((uri,[]))
+        return len(self._uris)     # URI table numbers are 1-based.
+
+    def last_timestamp(self):
+        return self._timestamp
+
+    # Get the entlist for a table. The entlist is a list of entries
+    # in the oplog (integer 0-based positions) that represent
+    # all the operations on a table.
+    def _get_entlist(self, table):
+        if table <= 0 or table > len(self._uris):
+            raise Exception('oplog.append: bad table id')
+        return self._uris[table - 1][1]
+
+    # Append a single entry to the oplog, incrementing the internal timestamp.
+    # Also update the entlist that is attached to the _uris table, it
+    # indicates which oplog entries have activity for a given table -
+    # useful for updates.  Also update the _lookup, which gives them
+    # current value and history for each key.
+    #
+    def _append_single(self, table, entlist, k, v):
+        self._timestamp += 1
+        pos = len(self._entries)
+        self._entries.append((table,k,v))
+        entlist.append(pos)
+        look_key = (table,k)
+        look_value = (self._timestamp,v)
+        if not look_key in self._lookup:
+            # First entry - make a list of ts,value pairs
+            self._lookup[look_key] = [look_value]
+        else:
+            self._lookup[look_key].append(look_value)
+
+    # Get the current value of a key, ignoring timestamps
+    def _current_value(self, table, k):
+        pairs = self._lookup[(table,k)]
+        # the last pair will be the most recent oplog entry
+        (_,v) = pairs[-1]
+        return v
+
+    # Add inserts to the oplog, return the first entry position
+    def insert(self, table, count, start_value=None):
+        first_pos = len(self._entries)
+        entlist = self._get_entlist(table)
+
+        # Use the timestamp as the key by default, that guarantees these
+        # will be inserts, as they've never been seen before.
+        ts = self._timestamp + 1
+        if start_value == None:
+            start_value = ts
+        for i in range(start_value, start_value + count):
+            self._append_single(table, entlist, i, i)
+        return first_pos
+
+    # Update some entries in the oplog for the table
+    def update(self, table, count, start_value = 0):
+        first_pos = len(self._entries)
+        entlist = self._get_entlist(table)
+
+        if len(entlist) == 0:
+            # If oplog has no entries for this table,
+            # silently succeed
+            return
+        for i in range(start_value, start_value + count):
+            # entindex is the entry we'll update
+            entindex = entlist[i]
+            (gottable,k,v) = self._entries[entindex]
+            if gottable != table:
+                raise Exception(f'oplog internal error: intindex for {table} ' + \
+                                f'references oplog entry {entindex}, which is not for this table')
+            self._append_single(table, entlist, k, v+k)
+        return first_pos
+
+    # Remove some entries in the oplog for the table
+    def remove(self, table, count, start_value = 0):
+        first_pos = len(self._entries)
+        entlist = self._get_entlist(table)
+
+        if len(entlist) == 0:
+            # If oplog has no entries for this table, silently succeed
+            return
+        for i in range(start_value, start_value + count):
+            # entindex is the entry we'll update
+            entindex = entlist[i]
+            (gottable,k,_) = self._entries[entindex]
+            if gottable != table:
+                raise Exception(f'oplog internal error: intindex for {table} ' + \
+                                f'references oplog entry {entindex}, which is not for this table')
+            self._append_single(table, entlist, k, self._tombstone_value)
+        return first_pos
+
+    # Apply the oplog entries starting at the position to the session
+    def apply(self, testcase, session, pos, count):
+        # Keep a cache of open cursors
+        cursors = [None] * len(self._entries)
+        while count > 0:
+            (table, k, v) = self._entries[pos]
+            ts = pos + 1
+            cursor = cursors[table - 1]
+            if not cursor:
+                uri = self._uris[table - 1][0]
+                cursor = session.open_cursor(uri)
+                cursors[table - 1] = cursor
+            session.begin_transaction()
+            if v == self._tombstone_value:
+                cursor.set_key(self.gen_key(k))
+                cursor.remove()
+            else:
+                cursor[self.gen_key(k)] = self.gen_value(v)
+            if self._use_timestamps:
+                session.commit_transaction(f'commit_timestamp={testcase.timestamp_str(ts)}')
+            else:
+                session.commit_transaction()
+            pos += 1
+            count -= 1
+        for cursor in cursors:
+            if cursor:
+                cursor.close()
+
+    def get_table_snapshot(self, table):
+        entlist = self._uris[table - 1][1]
+        result = dict()
+
+        for entindex in entlist:
+            (_,k,v) = self._entries[entindex]
+            if v == self._tombstone_value:
+                result.pop(self.gen_key(k), None)  # Remove if exists
+            else:
+                result[self.gen_key(k)] = self.gen_value(v)
+
+        # Sort by keys as strings (lexicographic order: "1", "10", "11", "2", "21", ...)
+        return sorted(result.items(), key=lambda x: x[0])
+
+    def check(self, testcase, session, pos, count):
+        # Keep a cache of open cursors
+        cursors = [None] * len(self._entries)
+
+        pos_limit = pos + count
+        # Walk through oplog entries doing point-reads at timestamps
+        while count > 0:
+            (table, k, v) = self._entries[pos]
+            ts = pos + 1
+            cursor = cursors[table - 1]
+            if not cursor:
+                uri = self._uris[table - 1][0]
+                cursor = session.open_cursor(uri)
+                cursors[table - 1] = cursor
+            if self._use_timestamps:
+                expected_value_int = v
+                session.begin_transaction(f'read_timestamp={testcase.timestamp_str(ts)}')
+            else:
+                expected_value_int = self._current_value(table, k)
+                session.begin_transaction()
+            if expected_value_int == self._tombstone_value:
+                cursor.set_key(self.gen_key(k))
+                testcase.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+            else:
+                actual_key = self.gen_key(k)
+                expected_value = self.gen_value(expected_value_int)
+                result_value = cursor[actual_key]
+                if (result_value != expected_value):
+                    testcase.pr(f'point-read of {actual_key} at ts={ts} gives {result_value}, expected {expected_value}')
+                    testcase.assertEqual(result_value, expected_value)
+            session.rollback_transaction()
+            pos += 1
+            count -= 1
+        for cursor in cursors:
+            if cursor:
+                cursor.close()
+
+        # Do a cursor scan, compare against most recent.
+        for uri, entlist in self._uris:
+            # Set up the values we think should be present for this table
+            values = dict()        # key -> value for most recent value
+            prev = -1
+            for entindex in entlist:
+                if entindex < prev:
+                    raise Exception(f'oplog: intindex for {table} is out of order')
+                if entindex >= pos_limit:
+                    break
+                (_,k,v) = self._entries[entindex]
+                values[k] = v    # overwrites in time order, so we end up with most recent
+
+            # Walk the cursor and check
+            cursor = session.open_cursor(uri)
+            for k,v in cursor:
+                kint = self.decode_key(k)
+                if not kint in values:
+                    testcase.pr(f'FAILURE got unexpected key {kint}, value {v} from cursor')
+                elif v != self.gen_value(values[kint]):
+                    testcase.pr(f'FAILURE at key {kint}, got value {v} want {values[kint]}')
+                testcase.assertEqual(v, self.gen_value(values[kint]))
+                del values[kint]
+            cursor.close()
+
+    def __str__(self):
+        return 'Oplog:' + \
+            f' timestamp={self._timestamp}, use_timestamp={self._use_timestamps}' + \
+            f' entries - list of (table,k,v)={self._entries},' + \
+            f' uris - list of (uri, entlist)={self._uris},' + \
+            f' lookup - (table,k) -> list of (ts,value)={self._lookup}'

@@ -1,0 +1,47 @@
+/*! @arch_page arch-disagg-layered-cursor Layered Cursor
+
+A layered cursor is the cursor implementation for layered tables, providing a unified view across two
+constituent cursors: an ingest cursor and a stable cursor. The layered cursor acts as an adapter,
+coordinating operations between these two constituents and transparently merging data from both
+layers to present a consistent view to the caller.
+
+This design enables efficient access to recent changes stored in the local ingest table while seamlessly
+falling back to the shared stable table for older data. It maintains proper cursor semantics and handles
+special cases, such as tombstone values, which indicate deleted records in the ingest layer.
+
+See @ref arch-disagg-layered for more information about layered tables.
+
+@section layered-cursor-implementation Implementation aspects
+
+__Note:__ This section is closely tied to the source code and may become outdated if not
+maintained in sync with implementation changes.
+
+@subsection layered-cursor-underlying Underlying cursors
+
+The main parts of the `WT_CURSOR_LAYERED` structure are three underlying `WT_CURSOR` fields: `iface`,
+`ingest_cursor` and `stable_cursor`.
+- `iface` is the first member of the structure and is the only part visible to users. Customers interact
+exclusively with this cursor; they are unaware of the `WT_CURSOR_LAYERED` structure itself. The iface
+cursor does not point to any real B-tree; all information is propagated from the underlying constituent
+cursors (`ingest_cursor` and `stable_cursor`).
+- `ingest_cursor` and `stable_cursor` are allocated dynamically and stored as pointers because there may
+be situations where one of the constituents does not yet exist, but the layered cursor still needs
+to operate on the layered table (for example, the stable table may be absent on a follower before
+the first checkpoint). Each of these cursors points to its corresponding table (ingest or stable)
+and is used to access that constituent.
+
+@subsection layered-cursor-positioning Keeping a position
+
+Certain cursor operations (e.g., `search()`, `next()`, `update()`) leave the cursor positioned on a
+specific record.
+
+For a standard `WT_CURSOR`, being positioned means that the key/value pair is held by the cursor and
+the `WT_CURSTD_KEY_INT` and `WT_CURSTD_VALUE_INT` flags are set. These flags indicate that the key and
+value are pointing into the underlying B-tree.
+
+For a layered cursor, being positioned means the same for the `iface` cursor, with an additional
+guarantee: the `current_cursor` pointer must reference the constituent cursor from which the `iface`
+value was obtained. This constituent cursor is expected to be positioned on the equal key/value pair
+as the `iface` cursor within its respective B-tree.
+
+*/

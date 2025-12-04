@@ -2737,9 +2737,13 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, u_int max_en
             continue;
         }
 
+        /* update number of attempts this page has been evicted */
+        ++page->evict_queue_attempts;
+        __wt_atomic_stats_max(
+          &evict->evict_max_eviction_queue_attempts, page->evict_queue_attempts);
+
         __evict_try_queue_page(
           session, queue, ref, last_parent, evict_entry, &urgent_queued, &queued);
-
         if (queued) {
             ++evict_entry;
             ++pages_queued;

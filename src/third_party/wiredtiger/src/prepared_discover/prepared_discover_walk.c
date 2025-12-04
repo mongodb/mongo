@@ -43,10 +43,10 @@ static int
 __prepared_discover_process_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
   uint64_t recno, WT_ITEM *row_key, WT_CELL_UNPACK_KV *vpack)
 {
+    WT_DECL_ITEM(value);
     WT_DECL_RET;
     WT_ITEM *key;
     WT_PAGE *page;
-    WT_TIME_WINDOW *tw;
     uint8_t *memp;
 
     page = ref->page;
@@ -66,20 +66,32 @@ __prepared_discover_process_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_
         key->size = WT_PTRDIFF(memp, key->data);
     }
 
-    /* Retrieve the time window from the unpacked value cell. */
-    __wt_cell_get_tw(vpack, &tw);
-
     /* Add an entry for this key to the transaction structure */
-    if (rip != NULL)
-        WT_ERR(
-          __wti_prepared_discover_add_artifact_ondisk_row(session, tw->start_prepared_id, tw, key));
-    else
+    if (rip != NULL) {
+        /*
+         * In disagg, follower node needs to restore prepared updates from stable checkpoint onto
+         * the ingest table for resolving txn since it can only edit the ingest table. Therefore it
+         * needs to do a full restoration of the update and move it to the ingest table. For leader
+         * mode and non-disagg btree, it should already have restored the prepared update to its
+         * btree, so we would never hit this block.
+         */
+        WT_ASSERT_ALWAYS(session,
+          __wt_conn_is_disagg(session) && !S2C(session)->layered_table_manager.leader,
+          "prepared update restoration should only happen on disaggregated follower nodes");
+
+        WT_ERR(__wt_scr_alloc(session, 0, &value));
+        WT_ERR(__wt_page_cell_data_ref_kv(session, page, vpack, value));
+        const char *stable_uri = session->dhandle->name;
+        WT_SAVE_DHANDLE(session,
+          ret = __wti_prepared_discover_restore_and_add_artifact_upd(
+            session, stable_uri, key, value, vpack));
+    } else
         WT_ASSERT_ALWAYS(
           session, false, "Column store prepared transaction discovery not supported");
-
 err:
     if (rip == NULL || row_key == NULL)
         __wt_scr_free(session, &key);
+    __wt_scr_free(session, &value);
     return (ret);
 }
 
@@ -119,13 +131,10 @@ __prepared_discover_check_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_RO
 static int
 __prepared_discover_process_prepared_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *upd)
 {
-    uint64_t prepared_id;
-
     WT_ASSERT(
       session, upd->prepare_state != WT_PREPARE_INIT && upd->prepare_state != WT_PREPARE_RESOLVED);
 
-    prepared_id = upd->prepared_id;
-    WT_RET(__wti_prepared_discover_add_artifact_upd(session, prepared_id, key, upd));
+    WT_RET(__wti_prepared_discover_add_artifact_upd(session, upd, key));
     return (0);
 }
 
@@ -399,10 +408,10 @@ int
 __wt_prepared_discover_filter_apply_handles(WT_SESSION_IMPL *session)
 {
     WT_CURSOR *cursor;
+    WT_DECL_ITEM(stable_uri_buf);
     WT_DECL_RET;
-    const char *uri, *config;
+    const char *checkpoint_name, *uri, *config;
     bool has_prepare;
-
     /*
      * TODO: how careful does this need to be about concurrent schema operations? If this step needs
      * to be exclusive in some way it should probably accumulate a set of relevant handles before
@@ -415,7 +424,6 @@ __wt_prepared_discover_filter_apply_handles(WT_SESSION_IMPL *session)
         /* Only interested in btree handles that aren't the metadata */
         if (!WT_BTREE_PREFIX(uri) || strcmp(uri, WT_METAFILE_URI) == 0)
             continue;
-
         WT_ERR_NOTFOUND_OK(cursor->get_value(cursor, &config), true);
         if (ret == WT_NOTFOUND)
             config = NULL;
@@ -423,12 +431,25 @@ __wt_prepared_discover_filter_apply_handles(WT_SESSION_IMPL *session)
         WT_ERR(__prepared_discover_btree_has_prepare(session, config, &has_prepare));
         if (!has_prepare)
             continue;
+        /* If this is a follower node, open the stable table and search for prepared update there */
+        if (__wt_conn_is_disagg(session) && !S2C(session)->layered_table_manager.leader) {
+            /* Look up the most recent data store checkpoint. This fetches the exact name to use. */
+            WT_ERR(__wt_meta_checkpoint_last_name(session, uri, &checkpoint_name, NULL, NULL));
+            WT_ASSERT(session, ret == 0);
+            WT_ERR(__wt_scr_alloc(session, 0, &stable_uri_buf));
+            /*
+             * Use a URI with a "/<checkpoint name> suffix. This is interpreted as reading from the
+             * stable checkpoint, but without it being a traditional checkpoint cursor.
+             */
+            WT_ERR(__wt_buf_fmt(session, stable_uri_buf, "%s/%s", uri, checkpoint_name));
+            uri = stable_uri_buf->data;
+        }
         WT_ERR(__prepared_discover_walk_one_tree(session, uri));
     }
     if (ret == WT_NOTFOUND)
         ret = 0;
 err:
     WT_TRET(__wt_metadata_cursor_release(session, &cursor));
-
+    __wt_scr_free(session, &stable_uri_buf);
     return (ret);
 }

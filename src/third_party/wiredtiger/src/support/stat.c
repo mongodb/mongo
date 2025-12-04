@@ -2052,6 +2052,7 @@ static const char *const __stats_connection_desc[] = {
   "per checkpoint",
   "cache: maximum milliseconds spent at a single eviction",
   "cache: maximum milliseconds spent at a single eviction per checkpoint",
+  "cache: maximum number of times a page tried to be added to eviction queue but fail",
   "cache: maximum page size seen at eviction",
   "cache: maximum updates page size seen at eviction per checkpoint",
   "cache: modified page evict attempts by application threads",
@@ -3063,6 +3064,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing eviction_maximum_visited_gen_gap_per_checkpoint */
     /* not clearing eviction_maximum_milliseconds */
     /* not clearing eviction_maximum_milliseconds_per_checkpoint */
+    /* not clearing eviction_maximum_attempts_to_queue_page */
     /* not clearing eviction_maximum_page_size */
     /* not clearing eviction_maximum_updates_page_size_per_checkpoint */
     stats->eviction_app_dirty_attempt = 0;
@@ -4119,6 +4121,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->eviction_maximum_milliseconds += WT_STAT_CONN_READ(from, eviction_maximum_milliseconds);
     to->eviction_maximum_milliseconds_per_checkpoint +=
       WT_STAT_CONN_READ(from, eviction_maximum_milliseconds_per_checkpoint);
+    to->eviction_maximum_attempts_to_queue_page +=
+      WT_STAT_CONN_READ(from, eviction_maximum_attempts_to_queue_page);
     to->eviction_maximum_page_size += WT_STAT_CONN_READ(from, eviction_maximum_page_size);
     to->eviction_maximum_updates_page_size_per_checkpoint +=
       WT_STAT_CONN_READ(from, eviction_maximum_updates_page_size_per_checkpoint);
