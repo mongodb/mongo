@@ -41,7 +41,7 @@ MONGO_FAIL_POINT_DEFINE(failExtensionDPL);
 
 BSONObj AggStageParseNodeHandle::getQueryShape(
     const ::MongoExtensionHostQueryShapeOpts& opts) const {
-    ::MongoExtensionByteBuf* buf;
+    ::MongoExtensionByteBuf* buf{nullptr};
     const auto& vtbl = vtable();
     auto* ptr = get();
 

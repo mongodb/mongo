@@ -45,7 +45,7 @@ T QueryShapeOptsHandle::serializeUsingOptsHelper(
     const std::function<T(MongoExtensionByteView)>& transformViewToReturn) const {
     assertValid();
 
-    ::MongoExtensionByteBuf* buf;
+    ::MongoExtensionByteBuf* buf{nullptr};
     auto* ptr = get();
 
     invokeCAndConvertStatusToException([&]() { return apiFunc(ptr, byteView, &buf); });

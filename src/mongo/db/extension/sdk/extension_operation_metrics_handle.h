@@ -57,7 +57,7 @@ public:
     BSONObj serialize() {
         assertValid();
 
-        ::MongoExtensionByteBuf* buf;
+        ::MongoExtensionByteBuf* buf{nullptr};
         auto* ptr = get();
 
         invokeCAndConvertStatusToException([&]() { return vtable().serialize(ptr, &buf); });

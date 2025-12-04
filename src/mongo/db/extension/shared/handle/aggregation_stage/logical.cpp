@@ -43,7 +43,7 @@ StringData LogicalAggStageHandle::getName() const {
 }
 
 BSONObj LogicalAggStageHandle::serialize() const {
-    ::MongoExtensionByteBuf* buf;
+    ::MongoExtensionByteBuf* buf{nullptr};
     invokeCAndConvertStatusToException([&]() { return vtable().serialize(get(), &buf); });
 
     tassert(11173700,
@@ -58,7 +58,7 @@ BSONObj LogicalAggStageHandle::serialize() const {
 }
 
 BSONObj LogicalAggStageHandle::explain(mongo::ExplainOptions::Verbosity verbosity) const {
-    ::MongoExtensionByteBuf* buf;
+    ::MongoExtensionByteBuf* buf{nullptr};
     auto extVerbosity = convertHostVerbosityToExtVerbosity(verbosity);
     invokeCAndConvertStatusToException(
         [&]() { return vtable().explain(get(), extVerbosity, &buf); });
