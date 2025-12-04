@@ -42,6 +42,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/direct_connection_util.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
@@ -374,7 +375,8 @@ void checkPlacementVersion(OperationContext* opCtx,
  * Asserts whether the read concern is supported for the given collection with the specified read
  * source.
  */
-void assertReadConcernSupported(const CollectionPtr& coll,
+void assertReadConcernSupported(OperationContext* opCtx,
+                                const CollectionPtr& coll,
                                 const repl::ReadConcernArgs& readConcernArgs,
                                 const RecoveryUnit::ReadSource& readSource) {
     const auto readConcernLevel = readConcernArgs.getLevel();
@@ -411,9 +413,16 @@ void assertReadConcernSupported(const CollectionPtr& coll,
           !readConcernArgs.allowTransactionTableSnapshot()) ||
          (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern &&
           readConcernArgs.getArgsAfterClusterTime()))) {
-        uasserted(5557800,
-                  "Snapshot reads and causal consistent majority reads on config.transactions "
-                  "are not supported");
+        // When we disable transaction update coalescing on secondaries to ensure that the history
+        // of updates is identical between the primary and secondaries. Then, snapshot and
+        // point-in-time (PIT) reads are allowed.
+        if (!rss::ReplicatedStorageService::get(opCtx)
+                 .getPersistenceProvider()
+                 .shouldDisableTransactionUpdateCoalescing()) {
+            uasserted(5557800,
+                      "Snapshot reads and causal consistent majority reads on config.transactions "
+                      "are not supported");
+        }
     }
 }
 
@@ -446,6 +455,7 @@ std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireLocalC
         // concern for the user (snapshot).
         if (prerequisites.operationType == AcquisitionPrerequisites::kRead) {
             assertReadConcernSupported(
+                opCtx,
                 coll,
                 prerequisites.readConcern,
                 shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());

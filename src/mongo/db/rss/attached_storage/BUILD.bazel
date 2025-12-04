@@ -16,6 +16,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
         "//src/mongo/db/rss:replicated_storage_service",
     ],

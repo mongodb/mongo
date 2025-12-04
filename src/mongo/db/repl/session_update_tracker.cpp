@@ -193,6 +193,12 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::_updateSessionInf
         }
     }
 
+    if (_disableTransactionUpdateCoalescing) {
+        auto updateOplog = createMatchingTransactionTableUpdate(entry);
+        invariant(updateOplog);
+        return std::vector<OplogEntry>{std::move(*updateOplog)};
+    }
+
     auto iter = _sessionsToUpdate.find(*lsid);
     if (iter == _sessionsToUpdate.end()) {
         _sessionsToUpdate.emplace(*lsid, entry);

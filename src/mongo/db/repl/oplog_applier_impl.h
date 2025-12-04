@@ -137,6 +137,10 @@ private:
 
     std::unique_ptr<OplogWriter> _oplogWriter;
 
+    // Disable coalescing of transaction table updates to preserve identical update chains for keys
+    // on both the primary and secondary.
+    bool _disableTransactionUpdateCoalescing;
+
 protected:
     // Marked as protected for use in unit tests.
     /**

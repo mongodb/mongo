@@ -167,6 +167,11 @@ public:
     virtual bool supportsTableVerify() const = 0;
 
     /**
+     * If true, we disable transaction update coalescing on secondaries.
+     */
+    virtual bool shouldDisableTransactionUpdateCoalescing() const = 0;
+
+    /**
      * The default feature compatibility version to be used on a new cluster. Some persistence
      * providers depend on features only available on the latest FCV.
      */

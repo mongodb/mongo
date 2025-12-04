@@ -30,6 +30,7 @@
 #include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo::rss {
@@ -119,6 +120,11 @@ bool AttachedPersistenceProvider::supportsOplogSampling() const {
 
 bool AttachedPersistenceProvider::supportsTableVerify() const {
     return true;
+}
+
+bool AttachedPersistenceProvider::shouldDisableTransactionUpdateCoalescing() const {
+    // This is only used for testing purposes.
+    return gFeatureFlagDisableTransactionUpdateCoalescing.checkEnabled();
 }
 
 multiversion::FeatureCompatibilityVersion AttachedPersistenceProvider::getMinimumRequiredFCV()

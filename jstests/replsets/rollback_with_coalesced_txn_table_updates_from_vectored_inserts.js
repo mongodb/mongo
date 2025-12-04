@@ -10,6 +10,7 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {validateTransactionTableHistory} from "jstests/replsets/libs/rollback_with_coalesced_txn_table_updates_during_oplog_application_helper.js";
 
 const rst = new ReplSetTest({
     nodes: {
@@ -140,5 +141,7 @@ assert.commandWorked(
         writeConcern: {w: 3},
     }),
 );
+
+validateTransactionTableHistory(rst, lsid, NumberLong(1));
 
 rst.stopSet();

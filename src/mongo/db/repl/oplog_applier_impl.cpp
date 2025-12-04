@@ -40,6 +40,8 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/initial_sync/initial_syncer.h"
@@ -51,6 +53,7 @@
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/split_prepare_session_manager.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
@@ -468,6 +471,10 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
       _replCoord(replCoord),
       _workerPool(workerPool),
       _storageInterface(storageInterface) {
+    _disableTransactionUpdateCoalescing =
+        rss::ReplicatedStorageService::get(cc().getServiceContext())
+            .getPersistenceProvider()
+            .shouldDisableTransactionUpdateCoalescing();
 
     _oplogWriter =
         std::make_unique<OplogWriterImpl>(nullptr /* executor */,
@@ -1012,11 +1019,12 @@ void OplogApplierImpl::_fillWriterVectors(
     std::vector<OplogEntry>* ops,
     std::vector<std::vector<ApplierOperation>>* writerVectors,
     std::vector<std::vector<OplogEntry>>* derivedOps) noexcept {
-    SessionUpdateTracker sessionUpdateTracker;
+    SessionUpdateTracker sessionUpdateTracker(_disableTransactionUpdateCoalescing);
     _deriveOpsAndFillWriterVectors(opCtx, ops, writerVectors, derivedOps, &sessionUpdateTracker);
 
     auto newOplogWrites = sessionUpdateTracker.flushAll();
     if (!newOplogWrites.empty()) {
+        invariant(!_disableTransactionUpdateCoalescing);
         derivedOps->emplace_back(std::move(newOplogWrites));
         _deriveOpsAndFillWriterVectors(
             opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);

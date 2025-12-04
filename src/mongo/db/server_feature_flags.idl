@@ -229,3 +229,10 @@ feature_flags:
         default: true
         version: 8.3
         fcv_gated: true
+    # TODO SERVER-114804: Remove this feature flag.
+    featureFlagDisableTransactionUpdateCoalescing:
+        description: "Disable transaction table update coalescing on secondaries for testing purposes"
+        cpp_varname: gFeatureFlagDisableTransactionUpdateCoalescing
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development

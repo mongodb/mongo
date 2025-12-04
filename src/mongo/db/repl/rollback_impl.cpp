@@ -40,6 +40,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
 #include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
@@ -66,6 +67,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_recovery.h"
@@ -695,11 +697,18 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
           "update"_attr = getCommandCount(kUpdateCmdName),
           "delete"_attr = getCommandCount(kDeleteCmdName));
 
-    // Retryable writes create derived updates to the transactions table which can be coalesced into
-    // one operation, so certain session operations history may be lost after restoring to the
-    // 'stableTimestamp'. We must scan the oplog and restore the transactions table entries to
-    // detail the last executed writes.
-    _restoreTxnsTableEntryFromRetryableWrites(opCtx, stableTimestamp);
+    // When we stop coalescing updates during oplog application so that no updates are lost on
+    // rollback. The table on secondaries will preserve the full update chain that existed on the
+    // primary.
+    if (!rss::ReplicatedStorageService::get(opCtx)
+             .getPersistenceProvider()
+             .shouldDisableTransactionUpdateCoalescing()) {
+        // Retryable writes create derived updates to the transactions table which can be coalesced
+        // into one operation, so certain session operations history may be lost after restoring to
+        // the 'stableTimestamp'. We must scan the oplog and restore the transactions table entries
+        // to detail the last executed writes.
+        _restoreTxnsTableEntryFromRetryableWrites(opCtx, stableTimestamp);
+    }
 
     // During replication recovery, we truncate all oplog entries with timestamps greater than the
     // oplog truncate after point. If we entered rollback, we are guaranteed to have at least one

@@ -134,6 +134,11 @@ public:
     bool supportsTableVerify() const override;
 
     /**
+     * We can enable it only for testing purposes.
+     */
+    bool shouldDisableTransactionUpdateCoalescing() const override;
+
+    /**
      * The minumum FCV required for disaggregated storage clusters.
      */
     multiversion::FeatureCompatibilityVersion getMinimumRequiredFCV() const override;

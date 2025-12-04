@@ -71,6 +71,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/repl:local_oplog_info",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
         "//src/mongo/db/shard_role/shard_catalog:collection_uuid_mismatch_info",
         "//src/mongo/db/shard_role/shard_catalog:database_holder",

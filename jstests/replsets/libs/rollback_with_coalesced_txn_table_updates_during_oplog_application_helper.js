@@ -9,6 +9,48 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getOplogEntriesForTxn} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+
+// When DisableTransactionUpdateCoalescing is enabled, we disable transaction update coalescing on
+// secondaries to ensure that the history of updates is identical between the primary and
+// secondaries.
+// This function issues a snapshot read over the oplog entries that share the same lsid and
+// txnNumber timestamp, which correspond to a new update in the config.transactions collection, and
+// verifies that this state is consistent across all nodes.
+export var validateTransactionTableHistory = function (rst, lsid, txnNumber) {
+    let primary = rst.getPrimary();
+    const isMultiversion =
+        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    if (FeatureFlagUtil.isPresentAndEnabled(primary, "DisableTransactionUpdateCoalescing") && !isMultiversion) {
+        jsTest.log.info("Checking the history of updates on config.transactions collection across nodes");
+        let oplogs = getOplogEntriesForTxn(rst, lsid, txnNumber);
+        oplogs.forEach((oplog) => {
+            let opTime = oplog["ts"];
+            let res = assert.commandWorked(
+                primary.getDB("config").runCommand({
+                    find: "transactions",
+                    readConcern: {level: "snapshot", atClusterTime: Timestamp(opTime["t"], opTime["i"])},
+                }),
+            );
+            assert.eq(res.cursor.firstBatch.length, 1);
+            const primaryTxnDoc = res.cursor.firstBatch[0];
+            // We expect new update for each opTime.
+            assert.eq(primaryTxnDoc["lastWriteOpTime"]["ts"], opTime);
+            rst.getSecondaries().forEach((secondary) => {
+                let secRes = assert.commandWorked(
+                    secondary.getDB("config").runCommand({
+                        find: "transactions",
+                        readConcern: {level: "snapshot", atClusterTime: Timestamp(opTime["t"], opTime["i"])},
+                    }),
+                );
+                assert.eq(secRes.cursor.firstBatch.length, 1);
+                const secondaryTxnDoc = secRes.cursor.firstBatch[0];
+                assert.eq(primaryTxnDoc, secondaryTxnDoc);
+            });
+        });
+    }
+};
 
 let runTest = function (
     crashAfterRollbackTruncation,
@@ -186,7 +228,7 @@ let runTest = function (
     rst.stepUp(secondary1);
 
     validateFunc(secondary1, ns, counterMajorityCommitted, counterTotal, lsid);
-
+    validateTransactionTableHistory(rst, lsid, NumberLong(2));
     rst.stopSet();
 };
 

@@ -51,6 +51,9 @@ namespace repl {
  */
 class SessionUpdateTracker {
 public:
+    explicit SessionUpdateTracker(bool disableTransactionUpdateCoalescing = false)
+        : _disableTransactionUpdateCoalescing(disableTransactionUpdateCoalescing) {}
+
     /**
      * Converts all stored transaction infos to oplog writes to config.transactions.
      * Can return an empty vector if there is nothing to flush.
@@ -107,6 +110,8 @@ private:
         const repl::OplogEntry& entry);
 
     LogicalSessionIdMap<OplogEntry> _sessionsToUpdate;
+
+    bool _disableTransactionUpdateCoalescing = false;
 };
 
 }  // namespace repl
