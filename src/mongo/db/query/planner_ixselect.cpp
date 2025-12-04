@@ -790,7 +790,7 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
 
         MONGO_verify(nullptr == node->getTag());
         node->setTag(new RelevantTag());
-        auto rt = static_cast<RelevantTag*>(node->getTag());
+        auto rt = indexTagCast<RelevantTag>(node->getTag());
         rt->path = fullPath;
 
         for (size_t i = 0; i < indices.size(); ++i) {
@@ -817,7 +817,7 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
 
         // If this is a NOT, we have to clone the tag and attach it to the NOT's child.
         if (MatchExpression::NOT == node->matchType()) {
-            RelevantTag* childRt = static_cast<RelevantTag*>(rt->clone());
+            RelevantTag* childRt = indexTagCast<RelevantTag>(rt->clone());
             childRt->path = rt->path;
             node->getChild(0)->setTag(childRt);
         }
@@ -873,7 +873,7 @@ namespace {
  */
 void clearAssignments(MatchExpression* node) {
     if (node->getTag()) {
-        RelevantTag* rt = static_cast<RelevantTag*>(node->getTag());
+        RelevantTag* rt = indexTagCast<RelevantTag>(node->getTag());
         rt->first.clear();
         rt->notFirst.clear();
     }
@@ -923,7 +923,7 @@ void QueryPlannerIXSelect::stripUnneededAssignments(MatchExpression* node,
             }
 
             // We found a EQ child of an AND which is tagged.
-            RelevantTag* rt = static_cast<RelevantTag*>(child->getTag());
+            RelevantTag* rt = indexTagCast<RelevantTag>(child->getTag());
 
             // Look through all of the indices for which this predicate can be answered with
             // the leading field of the index.
@@ -936,7 +936,7 @@ void QueryPlannerIXSelect::stripUnneededAssignments(MatchExpression* node,
                     // Clear assignments from the entire tree, and add back a single assignment
                     // for 'child' to the unique index.
                     clearAssignments(node);
-                    RelevantTag* newRt = static_cast<RelevantTag*>(child->getTag());
+                    RelevantTag* newRt = indexTagCast<RelevantTag>(child->getTag());
                     newRt->first.push_back(index);
 
                     // Tag state has been reset in the entire subtree at 'root'; nothing
@@ -960,7 +960,7 @@ void QueryPlannerIXSelect::stripUnneededAssignments(MatchExpression* node,
  * Remove 'idx' from the RelevantTag lists for 'node'.  'node' must be a leaf.
  */
 static void removeIndexRelevantTag(MatchExpression* node, size_t idx) {
-    RelevantTag* tag = static_cast<RelevantTag*>(node->getTag());
+    RelevantTag* tag = indexTagCast<RelevantTag>(node->getTag());
     if (!tag) {
         return;
     }
@@ -1117,7 +1117,7 @@ std::pair<bool, std::vector<MatchExpression*>> traverseAndPropagateANDRelatedPre
     bool wildcardFieldAssigned = false;
     std::vector<MatchExpression*> indexedPreds = {};
 
-    RelevantTag* rt = static_cast<RelevantTag*>(node->getTag());
+    RelevantTag* rt = indexTagCast<RelevantTag>(node->getTag());
     if (isIndexAssigned(rt, idx)) {
         indexedPreds.push_back(node);
         if (rt->path == wildcardField) {
@@ -1193,7 +1193,7 @@ void stripInvalidCompoundWildcardIndexAssignmentImpl(MatchExpression* node,
             }
         }
     } else {
-        RelevantTag* rt = static_cast<RelevantTag*>(node->getTag());
+        RelevantTag* rt = indexTagCast<RelevantTag>(node->getTag());
         if (isIndexAssigned(rt, idx) && rt->path != wildcardField) {
             removeIndexRelevantTag(node, idx);
         }
@@ -1288,7 +1288,7 @@ static void stripInvalidAssignmentsToTextIndex(MatchExpression* node,
 
     for (size_t i = 0; i < node->numChildren(); ++i) {
         MatchExpression* child = node->getChild(i);
-        RelevantTag* tag = static_cast<RelevantTag*>(child->getTag());
+        RelevantTag* tag = indexTagCast<RelevantTag>(child->getTag());
 
         if (nullptr == tag) {
             // 'child' could be a logical operator.  Maybe there are some assignments hiding
@@ -1404,7 +1404,7 @@ static void stripInvalidAssignmentsTo2dsphereIndex(MatchExpression* node, size_t
     // Traverse through the and-related leaf nodes. We strip all assignments to such nodes unless we
     // find an assigned geo predicate.
     for (auto child : andRelated) {
-        RelevantTag* tag = static_cast<RelevantTag*>(child->getTag());
+        RelevantTag* tag = indexTagCast<RelevantTag>(child->getTag());
 
         if (!tag) {
             // No tags to strip.

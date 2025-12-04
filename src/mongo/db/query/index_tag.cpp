@@ -339,7 +339,7 @@ bool processOrPushdownNode(MatchExpression* node,
     tassert(11321004, "indexedOr must not be null", indexedOr);
 
     // Predicate node is tagged for pushdown. Extract its route through the $or and its index tag.
-    auto* orPushdownTag = static_cast<OrPushdownTag*>(predNode->getTag());
+    auto* orPushdownTag = indexTagCast<OrPushdownTag>(predNode->getTag());
     auto destinations = orPushdownTag->releaseDestinations();
     auto indexTag = orPushdownTag->releaseIndexTag();
     predNode->setTag(nullptr);

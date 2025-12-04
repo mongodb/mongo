@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/exact_cast.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_hasher.h"
@@ -45,7 +46,7 @@
 namespace mongo {
 
 // output from enumerator to query planner
-class IndexTag : public MatchExpression::TagData {
+class IndexTag final : public MatchExpression::TagData {
 public:
     static const size_t kNoIndex;
 
@@ -98,7 +99,7 @@ public:
 };
 
 // used internally
-class RelevantTag : public MatchExpression::TagData {
+class RelevantTag final : public MatchExpression::TagData {
 public:
     RelevantTag() : elemMatchExpr(nullptr), pathPrefix("") {}
 
@@ -284,5 +285,24 @@ private:
  * tagged MatchExpression tree in canonical order.
  */
 void prepareForAccessPlanning(MatchExpression* tree);
+
+/**
+ * Downcasts from (possibly CV-qualified) TagData* to a derived type.
+ * Asserts that the cast succeeded.
+ */
+template <std::derived_from<MatchExpression::TagData> Derived, typename Base>
+requires std::is_same_v<MatchExpression::TagData, std::remove_cv_t<MatchExpression::TagData>>
+Derived* indexTagCast(Base* td) {
+    if (!td) {
+        return nullptr;
+    }
+
+    auto* ptr = exact_pointer_cast<Derived*>(td);
+    tassert(11408400,
+            str::stream() << "Expected " << typeid(Derived).name() << " type, got "
+                          << typeid(*td).name(),
+            ptr);
+    return ptr;
+}
 
 }  // namespace mongo

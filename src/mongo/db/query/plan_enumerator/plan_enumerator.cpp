@@ -127,7 +127,7 @@ std::vector<PossibleFirstAssignment> getPossibleFirstAssignments(
     std::vector<PossibleFirstAssignment> possibleFirstAssignments;
     for (auto* pred : predsOverLeadingField) {
         tassert(6811403, "Failed procondition in query plan enumerator", pred->getTag());
-        RelevantTag* rt = static_cast<RelevantTag*>(pred->getTag());
+        RelevantTag* rt = indexTagCast<RelevantTag>(pred->getTag());
 
         if (rt->elemMatchExpr == nullptr) {
             // 'pred' isn't part of an $elemMatch, so we can't assign any other predicates on the
@@ -153,7 +153,7 @@ std::vector<PossibleFirstAssignment> getPossibleFirstAssignments(
         const auto* pred = elemMatchExprIt.second.front();
 
         tassert(6811405, "Failed procondition in query plan enumerator", pred->getTag());
-        RelevantTag* rt = static_cast<RelevantTag*>(pred->getTag());
+        RelevantTag* rt = indexTagCast<RelevantTag>(pred->getTag());
         tassert(
             6811406, "Failed procondition in query plan enumerator", rt->elemMatchExpr != nullptr);
 
@@ -255,16 +255,16 @@ void tagForSort(MatchExpression* tree) {
             tagForSort(child);
             if (child->getTag() &&
                 child->getTag()->getType() == MatchExpression::TagData::Type::IndexTag) {
-                auto childTag = static_cast<const IndexTag*>(child->getTag());
+                auto childTag = indexTagCast<const IndexTag>(child->getTag());
                 if (!indexTag || indexTag->index > childTag->index) {
                     indexTag = childTag;
                 }
             } else if (child->getTag() &&
                        child->getTag()->getType() ==
                            MatchExpression::TagData::Type::OrPushdownTag) {
-                OrPushdownTag* childTag = static_cast<OrPushdownTag*>(child->getTag());
+                OrPushdownTag* childTag = indexTagCast<OrPushdownTag>(child->getTag());
                 if (childTag->getIndexTag()) {
-                    auto childIndexTag = static_cast<const IndexTag*>(childTag->getIndexTag());
+                    auto childIndexTag = indexTagCast<const IndexTag>(childTag->getIndexTag());
                     if (!indexTag || indexTag->index > childIndexTag->index) {
                         indexTag = childIndexTag;
                     }
@@ -528,7 +528,7 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, const PrepMemoContext& cont
                     "Failed procondition in query plan enumerator",
                     Indexability::nodeCanUseIndexOnOwnField(child));
 
-            RelevantTag* rt = static_cast<RelevantTag*>(child->getTag());
+            RelevantTag* rt = indexTagCast<RelevantTag>(child->getTag());
 
             if (expressionRequiresIndex(child)) {
                 // 'child' is a predicate which *must* be tagged with an index.
@@ -844,7 +844,7 @@ void PlanEnumerator::assignPredicate(
 void PlanEnumerator::markTraversedThroughElemMatchObj(PrepMemoContext* context) {
     tassert(6811421, "Failed procondition in query plan enumerator", context);
     for (auto&& pred : context->outsidePreds) {
-        auto relevantTag = static_cast<RelevantTag*>(pred.first->getTag());
+        auto relevantTag = indexTagCast<RelevantTag>(pred.first->getTag());
         // Only indexed predicates should ever be considered as outside predicates eligible for
         // pushdown.
         tassert(6811422, "Failed procondition in query plan enumerator", relevantTag);
@@ -889,7 +889,7 @@ void PlanEnumerator::enumerateOneIndex(
     // predicates from the current node.
     for (const auto& pred : outsidePreds) {
         tassert(6811423, "Failed procondition in query plan enumerator", pred.first->getTag());
-        RelevantTag* relevantTag = static_cast<RelevantTag*>(pred.first->getTag());
+        RelevantTag* relevantTag = indexTagCast<RelevantTag>(pred.first->getTag());
         for (auto index : relevantTag->first) {
             if (idxToFirst.find(index) != idxToFirst.end() ||
                 idxToNotFirst.find(index) != idxToNotFirst.end()) {
@@ -1277,7 +1277,7 @@ void PlanEnumerator::getIndexedPreds(MatchExpression* node,
                                      const PrepMemoContext& context,
                                      std::vector<MatchExpression*>* indexedPreds) {
     if (Indexability::nodeCanUseIndexOnOwnField(node)) {
-        RelevantTag* rt = static_cast<RelevantTag*>(node->getTag());
+        RelevantTag* rt = indexTagCast<RelevantTag>(node->getTag());
         tassert(9074700, "RelevantTag is not assigned to the match expression node", rt != nullptr);
 
         if (context.elemMatchExpr) {
@@ -1388,7 +1388,7 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
         tassert(6811425,
                 "Failed procondition in query plan enumerator",
                 nullptr != assignedPred->getTag());
-        RelevantTag* usedRt = static_cast<RelevantTag*>(assignedPred->getTag());
+        RelevantTag* usedRt = indexTagCast<RelevantTag>(assignedPred->getTag());
         set<string> usedPrefixes;
         usedPrefixes.insert(getPathPrefix(usedRt->path));
         used[nullptr] = std::move(usedPrefixes);
@@ -1414,7 +1414,7 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
         tassert(6811426,
                 "Failed procondition in query plan enumerator",
                 Indexability::nodeCanUseIndexOnOwnField(couldCompound[i]));
-        RelevantTag* rt = static_cast<RelevantTag*>(couldCompound[i]->getTag());
+        RelevantTag* rt = indexTagCast<RelevantTag>(couldCompound[i]->getTag());
 
         if (used.end() == used.find(rt->elemMatchExpr)) {
             // This is a new $elemMatch that we haven't seen before.
@@ -1476,7 +1476,7 @@ void PlanEnumerator::assignMultikeySafePredicates(
         const auto posInIdx = indexAssignment->positions[i];
 
         tassert(6811431, "Failed procondition in query plan enumerator", assignedPred->getTag());
-        RelevantTag* rt = static_cast<RelevantTag*>(assignedPred->getTag());
+        RelevantTag* rt = indexTagCast<RelevantTag>(assignedPred->getTag());
 
         // 'assignedPred' has already been assigned to 'thisIndex', so canAssignPredToIndex() ought
         // to return true.
@@ -1498,7 +1498,7 @@ void PlanEnumerator::assignMultikeySafePredicates(
     for (const auto& orPushdown : indexAssignment->orPushdowns) {
         tassert(
             6811433, "Failed procondition in query plan enumerator", orPushdown.first->getTag());
-        RelevantTag* rt = static_cast<RelevantTag*>(orPushdown.first->getTag());
+        RelevantTag* rt = indexTagCast<RelevantTag>(orPushdown.first->getTag());
 
         // Any outside predicates already assigned to 'thisIndex' were assigned in the first
         // position.
@@ -1517,7 +1517,7 @@ void PlanEnumerator::assignMultikeySafePredicates(
             tassert(6811435,
                     "Failed procondition in query plan enumerator",
                     Indexability::nodeCanUseIndexOnOwnField(couldAssignPred));
-            RelevantTag* rt = static_cast<RelevantTag*>(couldAssignPred->getTag());
+            RelevantTag* rt = indexTagCast<RelevantTag>(couldAssignPred->getTag());
 
             if (keyElem.fieldNameStringData() != rt->path) {
                 continue;
@@ -1588,7 +1588,7 @@ bool PlanEnumerator::alreadyCompounded(const set<MatchExpression*>& ixisectAssig
 
 size_t PlanEnumerator::getPosition(const IndexEntry& indexEntry, MatchExpression* predicate) const {
     tassert(6811436, "Failed procondition in query plan enumerator", predicate->getTag());
-    RelevantTag* relevantTag = static_cast<RelevantTag*>(predicate->getTag());
+    RelevantTag* relevantTag = indexTagCast<RelevantTag>(predicate->getTag());
     size_t position = 0;
     for (auto&& element : indexEntry.keyPattern) {
         if (element.fieldName() == relevantTag->path) {
@@ -1627,7 +1627,7 @@ void PlanEnumerator::compound(const vector<MatchExpression*>& tryCompound,
         for (size_t j = 0; j < tryCompound.size(); ++j) {
             MatchExpression* maybe = tryCompound[j];
             // Sigh we grab the full path from the relevant tag.
-            RelevantTag* rt = static_cast<RelevantTag*>(maybe->getTag());
+            RelevantTag* rt = indexTagCast<RelevantTag>(maybe->getTag());
             if (keyElt.fieldName() == rt->path) {
                 // preds and positions are parallel arrays.
                 assign->preds.push_back(maybe);
@@ -1678,7 +1678,7 @@ void PlanEnumerator::tagMemo(size_t id) {
                                     pred->getTag()->getType() ==
                                         MatchExpression::TagData::Type::OrPushdownTag);
                             OrPushdownTag* orPushdownTag =
-                                static_cast<OrPushdownTag*>(pred->getTag());
+                                indexTagCast<OrPushdownTag>(pred->getTag());
                             orPushdownTag->setIndexTag(new IndexTag(
                                 assign.index, assign.positions[j], assign.canCombineBounds));
                         } else {
@@ -1693,7 +1693,7 @@ void PlanEnumerator::tagMemo(size_t id) {
                         if (!expr->getTag()) {
                             expr->setTag(new OrPushdownTag());
                         }
-                        OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(expr->getTag());
+                        OrPushdownTag* orPushdownTag = indexTagCast<OrPushdownTag>(expr->getTag());
                         orPushdownTag->addDestination(orPushdown.second.clone());
                     }
                 }

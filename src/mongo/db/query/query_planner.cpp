@@ -560,7 +560,7 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
 
     if (taggedTree->getTag() &&
         taggedTree->getTag()->getType() == MatchExpression::TagData::Type::IndexTag) {
-        IndexTag* itag = static_cast<IndexTag*>(taggedTree->getTag());
+        IndexTag* itag = indexTagCast<IndexTag>(taggedTree->getTag());
         if (itag->index >= relevantIndices.size()) {
             str::stream ss;
             ss << "Index number is " << itag->index << " but there are only "
@@ -584,10 +584,10 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
         indexTree->canCombineBounds = itag->canCombineBounds;
     } else if (taggedTree->getTag() &&
                taggedTree->getTag()->getType() == MatchExpression::TagData::Type::OrPushdownTag) {
-        OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(taggedTree->getTag());
+        OrPushdownTag* orPushdownTag = indexTagCast<OrPushdownTag>(taggedTree->getTag());
 
         if (orPushdownTag->getIndexTag()) {
-            const IndexTag* itag = static_cast<const IndexTag*>(orPushdownTag->getIndexTag());
+            const IndexTag* itag = indexTagCast<const IndexTag>(orPushdownTag->getIndexTag());
 
             if (is2DIndex(relevantIndices[itag->index].keyPattern)) {
                 return Status(ErrorCodes::BadValue, "can't cache '2d' index");
@@ -655,7 +655,7 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
 
     if (!indexTree->orPushdowns.empty()) {
         filter->setTag(new OrPushdownTag());
-        OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(filter->getTag());
+        OrPushdownTag* orPushdownTag = indexTagCast<OrPushdownTag>(filter->getTag());
         for (const auto& orPushdown : indexTree->orPushdowns) {
             auto index = indexMap.find(orPushdown.indexEntryId);
             if (index == indexMap.end()) {
@@ -678,7 +678,7 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
             return Status(ErrorCodes::NoQueryExecutionPlans, ss);
         }
         if (filter->getTag()) {
-            OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(filter->getTag());
+            OrPushdownTag* orPushdownTag = indexTagCast<OrPushdownTag>(filter->getTag());
             orPushdownTag->setIndexTag(
                 new IndexTag(got->second, indexTree->index_pos, indexTree->canCombineBounds));
         } else {
@@ -1184,7 +1184,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     if (QueryPlannerCommon::hasNode(
             query.getPrimaryMatchExpression(), MatchExpression::GEO_NEAR, &gnNode)) {
         // No index for GEO_NEAR?  No query.
-        RelevantTag* tag = static_cast<RelevantTag*>(gnNode->getTag());
+        RelevantTag* tag = indexTagCast<RelevantTag>(gnNode->getTag());
         if (!tag || (0 == tag->first.size() && 0 == tag->notFirst.size())) {
             LOGV2_DEBUG(20973, 5, "Unable to find index for $geoNear query");
             // Don't leave tags on query tree.
@@ -1203,7 +1203,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     const MatchExpression* textNode = nullptr;
     if (QueryPlannerCommon::hasNode(
             query.getPrimaryMatchExpression(), MatchExpression::TEXT, &textNode)) {
-        RelevantTag* tag = static_cast<RelevantTag*>(textNode->getTag());
+        RelevantTag* tag = indexTagCast<RelevantTag>(textNode->getTag());
 
         // Exactly one text index required for TEXT.  We need to check this explicitly because
         // the text stage can't be built if no text index exists or there is an ambiguity as to
