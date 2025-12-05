@@ -13,7 +13,7 @@ class State {
             case State.DATABASE_ABSENT:
                 return "DatabaseAbsent";
             case State.DATABASE_PRESENT_COLLECTION_ABSENT:
-                return "DatabasePresentCollectionAbsent";
+                return "DatabasePresent::CollectionAbsent";
             case State.COLLECTION_PRESENT_SHARDED:
                 return "CollectionPresent::ShardedCollection";
             case State.COLLECTION_PRESENT_UNSPLITTABLE:

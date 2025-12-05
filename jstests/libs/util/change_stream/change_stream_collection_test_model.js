@@ -8,7 +8,7 @@ import {Action} from "jstests/libs/util/change_stream/change_stream_action.js";
 class CollectionTestModel {
     constructor() {
         this.states = new Set();
-        this.transitions = new Map(); // state -> Map<action, toState>
+        this.transitions = new Map(); // state -> Map<action, toState>.
         this.startState = null;
         this._initializeStates();
         this._configureTransitions();
@@ -51,7 +51,7 @@ class CollectionTestModel {
         // ===== DATABASE_PRESENT_COLLECTION_ABSENT state transitions =====
         this.setActions(State.DATABASE_PRESENT_COLLECTION_ABSENT, [
             [Action.INSERT_DOC, State.COLLECTION_PRESENT_UNTRACKED],
-            [Action.CREATE_SHARDED_COLLECTION, State.COLLECTION_PRESENT_SHARDED],
+            [Action.CREATE_SHARDED_COLLECTION, State.COLLECTION_PRESENT_SHARDED], // TODO: SERVER-114857 - No-op for now
             [Action.CREATE_UNSPLITTABLE_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
             [Action.CREATE_UNTRACKED_COLLECTION, State.COLLECTION_PRESENT_UNTRACKED],
             [Action.DROP_DATABASE, State.DATABASE_ABSENT],
@@ -67,10 +67,10 @@ class CollectionTestModel {
             [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             // Cross-database renames not supported for sharded collections.
             [Action.UNSHARD_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
-            [Action.RESHARD_COLLECTION, State.COLLECTION_PRESENT_SHARDED],
+            [Action.RESHARD_COLLECTION, State.COLLECTION_PRESENT_SHARDED], // TODO: SERVER-114857 - No-op for now
             [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_SHARDED],
-            // MOVE_COLLECTION only works on unsharded collections.
             [Action.MOVE_CHUNK, State.COLLECTION_PRESENT_SHARDED],
+            // MOVE_COLLECTION only works on unsharded collections.
         ]);
 
         // ===== COLLECTION_PRESENT_UNSPLITTABLE state transitions =====
@@ -81,7 +81,7 @@ class CollectionTestModel {
             [Action.RENAME_TO_NON_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             // Cross-database renames not supported for tracked collections.
-            [Action.SHARD_COLLECTION, State.COLLECTION_PRESENT_SHARDED],
+            [Action.SHARD_COLLECTION, State.COLLECTION_PRESENT_SHARDED], // TODO: SERVER-114857 - No-op for now
             [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_UNSPLITTABLE],
             [Action.MOVE_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
         ]);
@@ -94,7 +94,7 @@ class CollectionTestModel {
             [Action.RENAME_TO_NON_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             // Cross-database renames require source and target on same shard.
-            [Action.SHARD_COLLECTION, State.COLLECTION_PRESENT_SHARDED],
+            [Action.SHARD_COLLECTION, State.COLLECTION_PRESENT_SHARDED], // TODO: SERVER-114857 - No-op for now
             [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_UNTRACKED],
             [Action.MOVE_COLLECTION, State.COLLECTION_PRESENT_UNTRACKED],
         ]);
@@ -121,8 +121,8 @@ class CollectionTestModel {
 
     /**
      * Set multiple transitions from a state at once.
-     * @param {number} fromState - The source state
-     * @param {Array} transitions - Array of [action, toState] pairs
+     * @param {number} fromState - The source state.
+     * @param {Array} transitions - Array of [action, toState] pairs.
      */
     setActions(fromState, transitions) {
         for (const [action, toState] of transitions) {

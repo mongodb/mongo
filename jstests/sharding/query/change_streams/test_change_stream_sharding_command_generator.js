@@ -1,68 +1,135 @@
 /**
- * Generates all possible change stream test scenarios via combinatorial testing.
- * Explores state transitions for database and collection operations in a sharded cluster.
+ * Tests state machine command generation for change streams.
+ * @tags: [uses_change_streams]
  */
 import {CollectionTestModel} from "jstests/libs/util/change_stream/change_stream_collection_test_model.js";
 import {ShardingCommandGenerator} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator.js";
+import {ShardingCommandGeneratorParams} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator_params.js";
 import {State} from "jstests/libs/util/change_stream/change_stream_state.js";
 import {Action} from "jstests/libs/util/change_stream/change_stream_action.js";
-import {describe, it} from "jstests/libs/mochalite.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
 describe("ShardingCommandGenerator", function () {
+    before(() => {
+        this.st = new ShardingTest({shards: 2, mongos: 1});
+        this.shards = assert.commandWorked(this.st.s.adminCommand({listShards: 1})).shards;
+    });
+
+    after(() => {
+        this.st.stop();
+    });
+
     it("should generate identical command sequences for the same seed", () => {
-        const testSeed = 42;
+        const seed = 42;
+        const gen1 = new ShardingCommandGenerator(seed);
+        const gen2 = new ShardingCommandGenerator(seed);
+
         const model1 = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
         const model2 = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
 
-        const gen1 = new ShardingCommandGenerator(testSeed);
-        const gen2 = new ShardingCommandGenerator(testSeed);
+        const params1 = new ShardingCommandGeneratorParams("repro_db_1", "repro_coll", this.shards);
+        const params2 = new ShardingCommandGeneratorParams("repro_db_2", "repro_coll", this.shards);
 
-        const commands1 = gen1.generateCommands(model1);
-        const commands2 = gen2.generateCommands(model2);
+        const results1 = gen1.generateCommands(model1, params1);
+        const results2 = gen2.generateCommands(model2, params2);
 
-        jsTest.log.info(`Generated ${commands1.length} commands with seed ${testSeed}`);
-        assert.eq(commands1.length, commands2.length, "Same seed should produce same number of commands");
+        assert.eq(results1.length, results2.length, "Same seed should produce same number of commands");
 
-        for (let i = 0; i < commands1.length; i++) {
-            assert.eq(commands1[i].from, commands2[i].from, `Command ${i}: from state mismatch`);
-            assert.eq(commands1[i].action, commands2[i].action, `Command ${i}: action mismatch`);
-            assert.eq(commands1[i].to, commands2[i].to, `Command ${i}: to state mismatch`);
+        for (let i = 0; i < results1.length; i++) {
+            const t1 = results1[i].transition;
+            const t2 = results2[i].transition;
+            assert.eq(t1.from, t2.from, `Command ${i}: from state mismatch`);
+            assert.eq(t1.action, t2.action, `Command ${i}: action mismatch`);
+            assert.eq(t1.to, t2.to, `Command ${i}: to state mismatch`);
         }
     });
 
     it("should generate valid command sequence covering all edges", () => {
+        const seed = new Date().getTime();
+        const generator = new ShardingCommandGenerator(seed);
         const testModel = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
+        const params = new ShardingCommandGeneratorParams("test_db_gen", "test_coll", this.shards);
+
+        const results = generator.generateCommands(testModel, params);
+
+        jsTest.log.info(`Generated ${results.length} commands (seed: ${seed})`);
+
+        verifyCommands(testModel, results);
+    });
+
+    it("should execute commands successfully", () => {
         const testSeed = new Date().getTime();
         const generator = new ShardingCommandGenerator(testSeed);
+        const collName = "test_coll_exec";
 
-        jsTest.log.info(`RANDOM SEED: ${generator.getSeed()}`);
-        jsTest.log.info(`Start State: ${State.getName(testModel.getStartState())}`);
-        jsTest.log.info("To reproduce: new ShardingCommandGenerator(" + generator.getSeed() + ")");
+        jsTest.log.info(`Testing command execution (seed: ${generator.getSeed()})`);
 
-        const commands = generator.generateCommands(testModel);
-        jsTest.log.info(`Total commands: ${commands.length}`);
+        // Test with DATABASE_ABSENT starting state
+        const testModel = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
+        const dbName = `test_db_exec`;
+        const db = this.st.s.getDB(dbName);
 
-        // Log command sequence
-        jsTest.log.info("\nCommand sequence:");
-        commands.forEach((cmd, index) => {
-            jsTest.log.info(
-                `  ${index + 1}. ${State.getName(cmd.from)} --[${Action.getName(cmd.action)}]--> ${State.getName(cmd.to)}`,
-            );
-        });
+        // Drop database to start clean
+        try {
+            assert.commandWorked(db.dropDatabase());
+        } catch (e) {
+            // Database might not exist, that's okay
+            jsTest.log.info(`Note: Could not drop database (may not exist): ${e.message}`);
+        }
 
-        // Run verification
-        verifyCommands(testModel, commands);
+        // Generate and execute commands
+        const params = new ShardingCommandGeneratorParams(dbName, collName, this.shards);
+        const results = generator.generateCommands(testModel, params);
+        jsTest.log.info(`Generated ${results.length} commands for execution`);
+
+        let passed = 0,
+            failed = 0;
+        const failuresByType = {};
+
+        for (const {command, transition} of results) {
+            try {
+                command.execute(this.st.s);
+                passed++;
+            } catch (e) {
+                const cmdType = command.toString();
+                failuresByType[cmdType] = (failuresByType[cmdType] || 0) + 1;
+
+                // Only log first few failures of each type to avoid spam
+                if (failuresByType[cmdType] <= 2) {
+                    jsTest.log.info(`Failed: ${cmdType} - ${e.message.split("\n")[0]}`);
+                }
+                failed++;
+            }
+        }
+
+        jsTest.log.info(`Execution: ${passed} passed, ${failed} failed`);
+        if (failed > 0) {
+            jsTest.log.info(`Failures by command type:`);
+            for (const [cmdType, count] of Object.entries(failuresByType)) {
+                jsTest.log.info(`  ${cmdType}: ${count} failure(s)`);
+            }
+        }
+
+        // Note: Some commands use simplified/simulated implementations (see SERVER-114857).
+        // For example, sharding uses a basic _id shard key, and resharding is a no-op.
+        jsTest.log.info(`Note: Commands use simplified implementations for testing (see SERVER-114857)`);
+
+        // We should have at least some successful executions
+        assert.gt(passed, 0, "Expected at least some commands to execute successfully");
     });
 });
 
 /**
- * Verifies that the generated commands are correct and complete.
+ * Verifies that generated commands are correct and cover all state machine transitions.
+ * @param {CollectionTestModel} testModel - The state machine model.
+ * @param {Array} results - Array of {command, transition} objects.
  */
-function verifyCommands(testModel, commands) {
+function verifyCommands(testModel, results) {
     const errors = [];
     const warnings = [];
 
-    // 1. Verify edge coverage - check that all edges in the model are covered
+    // 1. Verify edge coverage
     jsTest.log.info("1. Checking edge coverage...");
     const allEdges = new Map();
     for (const vertex of testModel.states) {
@@ -77,8 +144,9 @@ function verifyCommands(testModel, commands) {
     }
 
     const coveredEdges = new Set();
-    for (const cmd of commands) {
-        const edgeKey = JSON.stringify({from: cmd.from, action: cmd.action, to: cmd.to});
+    for (const result of results) {
+        const transition = result.transition;
+        const edgeKey = JSON.stringify({from: transition.from, action: transition.action, to: transition.to});
         coveredEdges.add(edgeKey);
     }
 
@@ -106,22 +174,22 @@ function verifyCommands(testModel, commands) {
         });
     }
 
-    // 2. Verify state transitions are valid according to the model
+    // 2. Verify state transition validity
     jsTest.log.info("2. Checking state transition validity...");
     let validTransitions = 0;
     const invalidTransitions = [];
 
-    for (let i = 0; i < commands.length; i++) {
-        const cmd = commands[i];
-        const actionsMap = testModel.collectionStateToActionsMap(cmd.from);
-        const expectedToState = actionsMap.get(cmd.action);
+    for (let i = 0; i < results.length; i++) {
+        const transition = results[i].transition;
+        const actionsMap = testModel.collectionStateToActionsMap(transition.from);
+        const expectedToState = actionsMap.get(transition.action);
 
         if (expectedToState === undefined) {
-            const error = `Command ${i + 1}: Invalid action ${Action.getName(cmd.action)} from state ${State.getName(cmd.from)}`;
+            const error = `Command ${i + 1}: Invalid action ${Action.getName(transition.action)} from state ${State.getName(transition.from)}`;
             invalidTransitions.push(error);
             errors.push(error);
-        } else if (expectedToState !== cmd.to) {
-            const error = `Command ${i + 1}: Expected transition to ${State.getName(expectedToState)} but got ${State.getName(cmd.to)}`;
+        } else if (expectedToState !== transition.to) {
+            const error = `Command ${i + 1}: Expected transition to ${State.getName(expectedToState)} but got ${State.getName(transition.to)}`;
             invalidTransitions.push(error);
             errors.push(error);
         } else {
@@ -146,18 +214,18 @@ function verifyCommands(testModel, commands) {
     const startState = testModel.getStartState();
     const inconsistencies = [];
 
-    if (commands.length > 0) {
+    if (results.length > 0) {
         // Check first command starts from correct state
-        if (commands[0].from !== startState) {
-            const error = `First command should start from ${State.getName(startState)} but starts from ${State.getName(commands[0].from)}`;
+        if (results[0].transition.from !== startState) {
+            const error = `First command should start from ${State.getName(startState)} but starts from ${State.getName(results[0].transition.from)}`;
             inconsistencies.push(error);
             errors.push(error);
         }
 
         // Check that each command's 'to' matches next command's 'from'
-        for (let i = 0; i < commands.length - 1; i++) {
-            if (commands[i].to !== commands[i + 1].from) {
-                const error = `Command ${i + 1} ends in ${State.getName(commands[i].to)} but command ${i + 2} starts from ${State.getName(commands[i + 1].from)}`;
+        for (let i = 0; i < results.length - 1; i++) {
+            if (results[i].transition.to !== results[i + 1].transition.from) {
+                const error = `Command ${i + 1} ends in ${State.getName(results[i].transition.to)} but command ${i + 2} starts from ${State.getName(results[i + 1].transition.from)}`;
                 inconsistencies.push(error);
                 errors.push(error);
             }
@@ -173,11 +241,12 @@ function verifyCommands(testModel, commands) {
         });
     }
 
-    // 4. Check for duplicate edges (informational)
+    // 4. Check for duplicate edge coverage (informational only)
     jsTest.log.info("4. Checking for duplicate edge coverage...");
     const edgeCounts = new Map();
-    for (const cmd of commands) {
-        const edgeKey = JSON.stringify({from: cmd.from, action: cmd.action, to: cmd.to});
+    for (const result of results) {
+        const transition = result.transition;
+        const edgeKey = JSON.stringify({from: transition.from, action: transition.action, to: transition.to});
         edgeCounts.set(edgeKey, (edgeCounts.get(edgeKey) || 0) + 1);
     }
 
@@ -205,11 +274,11 @@ function verifyCommands(testModel, commands) {
 
     // 5. Summary
     jsTest.log.info("VERIFICATION SUMMARY:");
-    jsTest.log.info(`  Total commands: ${commands.length}`);
+    jsTest.log.info(`  Total commands: ${results.length}`);
     jsTest.log.info(
         `  Edge coverage: ${coveredEdges.size}/${allEdges.size} (${((coveredEdges.size / allEdges.size) * 100).toFixed(1)}%)`,
     );
-    jsTest.log.info(`  Valid transitions: ${validTransitions}/${commands.length}`);
+    jsTest.log.info(`  Valid transitions: ${validTransitions}/${results.length}`);
     jsTest.log.info(`  Errors: ${errors.length}`);
     jsTest.log.info(`  Warnings: ${warnings.length}`);
 

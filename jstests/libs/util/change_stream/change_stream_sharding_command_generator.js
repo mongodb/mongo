@@ -3,6 +3,49 @@
  * Uses the jstest shell's Random implementation for reproducibility.
  * Requires an explicit seed to ensure deterministic behavior.
  */
+import {Action} from "jstests/libs/util/change_stream/change_stream_action.js";
+import {ShardingCommandGeneratorParams} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator_params.js";
+import {
+    InsertDocCommand,
+    CreateDatabaseCommand,
+    CreateShardedCollectionCommand,
+    CreateUnsplittableCollectionCommand,
+    CreateUntrackedCollectionCommand,
+    DropCollectionCommand,
+    DropDatabaseCommand,
+    RenameCommand,
+    RenameToNonExistentSameDbCommand,
+    RenameToExistentSameDbCommand,
+    RenameToNonExistentDifferentDbCommand,
+    RenameToExistentDifferentDbCommand,
+    UnshardCollectionCommand,
+    ReshardCollectionCommand,
+    MovePrimaryCommand,
+    MoveCollectionCommand,
+    MoveChunkCommand,
+} from "jstests/libs/util/change_stream/change_stream_commands.js";
+
+// Maps action IDs to command classes.
+const actionToCommandClass = {
+    [Action.INSERT_DOC]: InsertDocCommand,
+    [Action.CREATE_DATABASE]: CreateDatabaseCommand,
+    [Action.CREATE_SHARDED_COLLECTION]: CreateShardedCollectionCommand,
+    [Action.CREATE_UNSPLITTABLE_COLLECTION]: CreateUnsplittableCollectionCommand,
+    [Action.CREATE_UNTRACKED_COLLECTION]: CreateUntrackedCollectionCommand,
+    [Action.DROP_COLLECTION]: DropCollectionCommand,
+    [Action.DROP_DATABASE]: DropDatabaseCommand,
+    [Action.RENAME_TO_NON_EXISTENT_SAME_DB]: RenameToNonExistentSameDbCommand,
+    [Action.RENAME_TO_EXISTENT_SAME_DB]: RenameToExistentSameDbCommand,
+    [Action.RENAME_TO_NON_EXISTENT_DIFFERENT_DB]: RenameToNonExistentDifferentDbCommand,
+    [Action.RENAME_TO_EXISTENT_DIFFERENT_DB]: RenameToExistentDifferentDbCommand,
+    [Action.SHARD_COLLECTION]: CreateShardedCollectionCommand,
+    [Action.UNSHARD_COLLECTION]: UnshardCollectionCommand,
+    [Action.RESHARD_COLLECTION]: ReshardCollectionCommand,
+    [Action.MOVE_PRIMARY]: MovePrimaryCommand,
+    [Action.MOVE_COLLECTION]: MoveCollectionCommand,
+    [Action.MOVE_CHUNK]: MoveChunkCommand,
+};
+
 class ShardingCommandGenerator {
     constructor(seed) {
         assert(seed !== null && seed !== undefined, "Seed must be explicitly provided to ShardingCommandGenerator");
@@ -14,18 +57,31 @@ class ShardingCommandGenerator {
     }
 
     /**
+     * Create a command instance for a given action ID.
+     * @param {number} action - The action ID.
+     * @param {ShardingCommandGeneratorParams} params - The generator parameters.
+     * @returns {Command} The command instance.
+     */
+    createCommand(action, params) {
+        const CommandClass = actionToCommandClass[action];
+        assert(CommandClass !== undefined, `No command class found for action ${action}`);
+        return new CommandClass(params.getDbName(), params.getCollName(), params.getShardSet());
+    }
+
+    /**
      * Generates a sequence of commands that covers all transitions in the state machine.
      * Step 1: Precompute shortest paths between all pairs of states.
      * Step 2: Randomly pick unvisited actions; navigate via precomputed paths when needed.
      * @param {CollectionTestModel} testModel - The state machine model.
-     * @returns {Array} Array of {from, action, to} transitions.
+     * @param {ShardingCommandGeneratorParams} params - The generator parameters.
+     * @returns {Array} Array of {command, transition} objects.
      */
-    generateCommands(testModel) {
+    generateCommands(testModel, params) {
         // Re-seed to ensure reproducibility since Random is a global singleton
         Random.srand(this.seed);
 
         const startState = testModel.getStartState();
-        assert(startState !== null, "Start state must be set on the test model before generating commands");
+        assert(startState !== null, "Start state must be set before generating commands");
 
         // Step 1: For each state, compute shortest paths to all other states using BFS.
         const shortestPaths = this._precomputeAllShortestPaths(testModel);
@@ -35,14 +91,16 @@ class ShardingCommandGenerator {
 
         // Step 3: Select starting state.
         let currentState = startState;
-        const commands = [];
+        const results = [];
 
         // Step 4: While there are unvisited actions.
         while (unvisitedActions.size > 0) {
             // 4a: For each unvisited self-loop action (state → state), visit and mark as visited.
             let selfLoopAction = this._getRandomUnvisitedSelfLoop(testModel, currentState, unvisitedActions);
             while (selfLoopAction !== null) {
-                commands.push(this._createTransition(currentState, selfLoopAction, currentState));
+                const transition = this._createTransition(currentState, selfLoopAction, currentState);
+                const command = this.createCommand(transition.action, params);
+                results.push({command, transition});
                 this._markActionAsVisited(unvisitedActions, currentState, selfLoopAction);
                 selfLoopAction = this._getRandomUnvisitedSelfLoop(testModel, currentState, unvisitedActions);
             }
@@ -50,7 +108,9 @@ class ShardingCommandGenerator {
             // 4b: If exists unvisited non-self-loop action, visit it and move to target state.
             const action = this._getRandomUnvisitedNonSelfLoop(testModel, currentState, unvisitedActions);
             if (action !== null) {
-                commands.push(this._createTransition(currentState, action.action, action.to));
+                const transition = this._createTransition(currentState, action.action, action.to);
+                const command = this.createCommand(transition.action, params);
+                results.push({command, transition});
                 this._markActionAsVisited(unvisitedActions, currentState, action.action);
                 currentState = action.to;
             } else if (unvisitedActions.size > 0) {
@@ -64,14 +124,15 @@ class ShardingCommandGenerator {
 
                 const path = shortestPaths.get(currentState).get(targetState).path;
                 for (const step of path) {
-                    commands.push(this._createTransition(step.from, step.action, step.to));
+                    const transition = this._createTransition(step.from, step.action, step.to);
+                    const command = this.createCommand(transition.action, params);
+                    results.push({command, transition});
                     this._markActionAsVisited(unvisitedActions, step.from, step.action);
                 }
                 currentState = targetState;
             }
         }
-
-        return commands;
+        return results;
     }
 
     _createTransition(from, action, to) {
@@ -117,7 +178,6 @@ class ShardingCommandGenerator {
                 }
             }
         }
-
         return paths;
     }
 
@@ -184,6 +244,10 @@ class ShardingCommandGenerator {
 
     /**
      * Find nearest state with unvisited actions using precomputed paths.
+     * @param {number} currentState - The current state.
+     * @param {Map} unvisitedActions - Map of states to unvisited actions.
+     * @param {Map} shortestPaths - Precomputed shortest paths.
+     * @returns {number|null} The nearest state with unvisited actions, or null.
      */
     _findNearestStateWithUnvisitedActions(currentState, unvisitedActions, shortestPaths) {
         const pathsFromCurrent = shortestPaths.get(currentState);
@@ -200,7 +264,6 @@ class ShardingCommandGenerator {
                 }
             }
         }
-
         return nearest;
     }
 }
