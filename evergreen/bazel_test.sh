@@ -41,10 +41,10 @@ echo "${ALL_FLAGS}" >.bazel_build_flags
 # to capture exit codes
 set +o errexit
 
-# Build then test with retries.
+# Fetch then test with retries.
 export RETRY_ON_FAIL=1
 bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
-    build ${ALL_FLAGS} ${targets}
+    fetch ${ALL_FLAGS} ${targets}
 RET=$?
 
 if [[ "$RET" == "0" ]]; then
