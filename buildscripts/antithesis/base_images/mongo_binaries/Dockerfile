@@ -20,7 +20,8 @@ RUN set -eux; \
             curl \
             python3 \
             llvm-${LLVM_VERSION} \
-            libc6-dbg; then \
+            libc6-dbg \
+            gdb; then \
             break; \
         fi; \
         echo "APT failed on attempt $i... retrying in ${delay}s"; \
