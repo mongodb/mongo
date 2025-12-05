@@ -33,6 +33,8 @@
 
 using namespace mongo::multikey_paths;
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo {
 
 void PathArrayness::addPath(const FieldPath& path, const MultikeyComponents& multikeyPath) {
@@ -40,7 +42,10 @@ void PathArrayness::addPath(const FieldPath& path, const MultikeyComponents& mul
 }
 
 bool PathArrayness::isPathArray(const FieldPath& path) const {
-    return _root.isPathArray(path);
+    bool arrayness = _root.isPathArray(path);
+    LOGV2_DEBUG(
+        11467800, 5, "Checking path arrayness", "path"_attr = path, "isPathArray"_attr = arrayness);
+    return arrayness;
 }
 
 bool PathArrayness::TrieNode::isPathArray(const FieldPath& path) const {
