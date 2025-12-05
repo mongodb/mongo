@@ -4876,7 +4876,7 @@ ReadPreference ReplicationCoordinatorImpl::_getSyncSourceReadPreference(WithLock
         enableOverrideClusterChainingSetting.load()) {
         // No update to read preference necessary.
 
-    } else if (!memberState.primary()) {
+    } else if (!memberState.primary() && _selfIndex >= 0) {
         // SERVER-105416: If we are the only electable node, then we need to be able to sync from
         // secondaries.
         // Otherwise, if we are not the primary and chaining is disabled in the config (without
