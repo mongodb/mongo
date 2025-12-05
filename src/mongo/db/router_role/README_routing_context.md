@@ -63,12 +63,12 @@ runAndValidate(targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
 
 ```
 template <class F>
-auto routeWithRoutingContext(OperationContext* opCtx, StringData comment, F&& callbackFn);
+auto routeWithRoutingContext(StringData comment, F&& callbackFn);
 
 // Sample Usage
 sharding::router::CollectionRouter router(serviceCtx, "test.foo");
 
-router.routeWithRoutingContext(opCtx, "dispatch shard pipeline",
+router.routeWithRoutingContext("Dispatch shard pipeline",
                                [&](OperationContext* opCtx, RoutingContext& routingCtx) {
     cri = routingCtx.getCollectionRoutingInfo("test.foo");
     shards = getShardsToTargetForQuery(cri, query)

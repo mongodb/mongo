@@ -1040,7 +1040,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                 result);
     }
 
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), namespaces.executionNss);
+    sharding::router::CollectionRouter router(opCtx, namespaces.executionNss);
 
     bool isExplain = verbosity.has_value();
     if (isExplain) {
@@ -1076,7 +1076,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // Route the command and capture the returned status.
     Status status = std::invoke([&]() -> Status {
         try {
-            return router.routeWithRoutingContext(opCtx, comment, bodyFn);
+            return router.routeWithRoutingContext(comment, bodyFn);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }
@@ -1169,10 +1169,9 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
             "$rankFusion and $scoreFusion are unsupported on timeseries collections",
             !(resolvedView.timeseries() && request.getIsHybridSearch()));
 
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), nsStruct.executionNss);
+    sharding::router::CollectionRouter router(opCtx, nsStruct.executionNss);
     try {
         router.routeWithRoutingContext(
-            opCtx,
             "ClusterAggregate::retryOnViewError",
             [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                 // For a sharded time-series collection, the routing is based on both routing table

@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
-#include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
@@ -58,23 +57,24 @@ namespace {
 constexpr size_t kMaxDatabaseCreationAttempts = 3;
 }
 
-RouterBase::RouterBase(CatalogCache* catalogCache) : _catalogCache(catalogCache) {}
+RouterBase::RouterBase(OperationContext* opCtx, CatalogCache* catalogCache)
+    : _opCtx(opCtx), _catalogCache(catalogCache) {}
 
-void RouterBase::_initTxnRouterIfNeeded(OperationContext* opCtx) {
+void RouterBase::_initTxnRouterIfNeeded() {
     bool activeTxnParticipantAddParticipants =
-        opCtx->isActiveTransactionParticipant() && opCtx->inMultiDocumentTransaction();
+        _opCtx->isActiveTransactionParticipant() && _opCtx->inMultiDocumentTransaction();
 
-    auto txnRouter = TransactionRouter::get(opCtx);
+    auto txnRouter = TransactionRouter::get(_opCtx);
     if (txnRouter && activeTxnParticipantAddParticipants) {
-        auto opCtxTxnNum = opCtx->getTxnNumber();
+        auto opCtxTxnNum = _opCtx->getTxnNumber();
         invariant(opCtxTxnNum);
         txnRouter.beginOrContinueTxn(
-            opCtx, *opCtxTxnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+            _opCtx, *opCtxTxnNum, TransactionRouter::TransactionActions::kStartOrContinue);
     }
 }
 
-DBPrimaryRouter::DBPrimaryRouter(ServiceContext* service, const DatabaseName& db)
-    : RouterBase(Grid::get(service)->catalogCache()), _dbName(db) {}
+DBPrimaryRouter::DBPrimaryRouter(OperationContext* opCtx, const DatabaseName& db)
+    : RouterBase(opCtx, Grid::get(opCtx->getServiceContext())->catalogCache()), _dbName(db) {}
 
 void DBPrimaryRouter::appendDDLRoutingTokenToCommand(const DatabaseType& dbt,
                                                      BSONObjBuilder* builder) {
@@ -95,21 +95,19 @@ void DBPrimaryRouter::appendCRUDUnshardedRoutingTokenToCommand(const ShardId& sh
     appendShardVersion(*builder, ShardVersion::UNTRACKED());
 }
 
-CachedDatabaseInfo DBPrimaryRouter::_getRoutingInfo(OperationContext* opCtx) const {
-    return uassertStatusOK(_catalogCache->getDatabase(opCtx, _dbName));
+CachedDatabaseInfo DBPrimaryRouter::_getRoutingInfo() const {
+    return uassertStatusOK(_catalogCache->getDatabase(_opCtx, _dbName));
 }
 
-CachedDatabaseInfo DBPrimaryRouter::_createDbIfRequestedAndGetRoutingInfo(
-    OperationContext* opCtx) const {
-
+CachedDatabaseInfo DBPrimaryRouter::_createDbIfRequestedAndGetRoutingInfo() const {
     if (_createDbImplicitly) {
         size_t attempts = 0;
         while (attempts < kMaxDatabaseCreationAttempts) {
             try {
                 if (attempts > 0) {
-                    cluster::createDatabase(opCtx, _dbName, _suggestedPrimaryId);
+                    cluster::createDatabase(_opCtx, _dbName, _suggestedPrimaryId);
                 }
-                return _getRoutingInfo(opCtx);
+                return _getRoutingInfo();
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 ++attempts;
                 LOGV2_INFO(11398601,
@@ -122,10 +120,10 @@ CachedDatabaseInfo DBPrimaryRouter::_createDbIfRequestedAndGetRoutingInfo(
         }
     }
 
-    return _getRoutingInfo(opCtx);
+    return _getRoutingInfo();
 }
 
-void DBPrimaryRouter::_onException(OperationContext* opCtx, RoutingRetryInfo* retryInfo, Status s) {
+void DBPrimaryRouter::_onException(RoutingRetryInfo* retryInfo, Status s) {
     if (s == ErrorCodes::StaleDbVersion) {
         auto si = s.extraInfo<StaleDbRoutingVersion>();
         tassert(6375900, "StaleDbVersion must have extraInfo", si);
@@ -141,7 +139,7 @@ void DBPrimaryRouter::_onException(OperationContext* opCtx, RoutingRetryInfo* re
     }
 
     // It is not safe to retry stale errors if running in a transaction.
-    if (TransactionRouter::get(opCtx)) {
+    if (TransactionRouter::get(_opCtx)) {
         uassertStatusOK(s);
     }
 
@@ -162,12 +160,12 @@ void DBPrimaryRouter::_onException(OperationContext* opCtx, RoutingRetryInfo* re
 }
 
 CollectionRouterCommon::CollectionRouterCommon(
-    CatalogCache* catalogCache, const std::vector<NamespaceString>& targetedNamespaces)
-    : RouterBase(catalogCache), _targetedNamespaces(targetedNamespaces) {}
+    OperationContext* opCtx,
+    CatalogCache* catalogCache,
+    const std::vector<NamespaceString>& targetedNamespaces)
+    : RouterBase(opCtx, catalogCache), _targetedNamespaces(targetedNamespaces) {}
 
-void CollectionRouterCommon::_onException(OperationContext* opCtx,
-                                          RoutingRetryInfo* retryInfo,
-                                          Status s) {
+void CollectionRouterCommon::_onException(RoutingRetryInfo* retryInfo, Status s) {
     const auto isNssInvolvedInRouting = [&](const NamespaceString& nss) {
         if (nss.isTimeseriesBucketsCollection() &&
             std::find(_targetedNamespaces.begin(),
@@ -261,7 +259,7 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
     }
 
     // It is not safe to retry stale errors if running in a transaction.
-    if (auto txnRouter = TransactionRouter::get(opCtx)) {
+    if (auto txnRouter = TransactionRouter::get(_opCtx)) {
         uassertStatusOK(s);
     }
 
@@ -281,8 +279,7 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
     }
 }
 
-CollectionRoutingInfo CollectionRouterCommon::_getRoutingInfo(OperationContext* opCtx,
-                                                              const NamespaceString& nss) {
+CollectionRoutingInfo CollectionRouterCommon::_getRoutingInfo(const NamespaceString& nss) {
     // When in a multi-document transaction, allow getting routing info from the CatalogCache even
     // though locks may be held. The CatalogCache will throw CannotRefreshDueToLocksHeld if the
     // entry is not already cached.
@@ -290,32 +287,32 @@ CollectionRoutingInfo CollectionRouterCommon::_getRoutingInfo(OperationContext* 
     // Note that we only do this if we indeed hold a lock. Otherwise first executions on a mongos
     // would cause this to unnecessarily throw a transient CannotRefreshDueToLocksHeld error.
     const auto allowLocks =
-        opCtx->inMultiDocumentTransaction() && shard_role_details::getLocker(opCtx)->isLocked();
+        _opCtx->inMultiDocumentTransaction() && shard_role_details::getLocker(_opCtx)->isLocked();
 
     // Call getCollectionRoutingInfoAt if we need to read the CollectionRoutingInfo at a specific
     // point in time. Otherwise just return the most recent one.
-    auto maybeAtClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-    if (!maybeAtClusterTime && TransactionRouter::get(opCtx)) {
-        maybeAtClusterTime = TransactionRouter::get(opCtx).getSelectedAtClusterTime();
+    auto maybeAtClusterTime = repl::ReadConcernArgs::get(_opCtx).getArgsAtClusterTime();
+    if (!maybeAtClusterTime && TransactionRouter::get(_opCtx)) {
+        maybeAtClusterTime = TransactionRouter::get(_opCtx).getSelectedAtClusterTime();
     }
 
     if (maybeAtClusterTime) {
         return uassertStatusOK(_catalogCache->getCollectionRoutingInfoAt(
-            opCtx, nss, maybeAtClusterTime->asTimestamp(), allowLocks));
+            _opCtx, nss, maybeAtClusterTime->asTimestamp(), allowLocks));
     }
-    return uassertStatusOK(_catalogCache->getCollectionRoutingInfo(opCtx, nss, allowLocks));
+    return uassertStatusOK(_catalogCache->getCollectionRoutingInfo(_opCtx, nss, allowLocks));
 }
 
-RoutingContext CollectionRouter::_getRoutingContext(OperationContext* opCtx) {
+RoutingContext CollectionRouter::_getRoutingContext() {
     // When in a multi-document transaction, allow getting routing info from the CatalogCache even
     // though locks may be held. The CatalogCache will throw CannotRefreshDueToLocksHeld if the
     // entry is not already cached.
     const auto allowLocks =
-        opCtx->inMultiDocumentTransaction() && shard_role_details::getLocker(opCtx)->isLocked();
-    return RoutingContext(opCtx, _targetedNamespaces, allowLocks);
+        _opCtx->inMultiDocumentTransaction() && shard_role_details::getLocker(_opCtx)->isLocked();
+    return RoutingContext(_opCtx, _targetedNamespaces, allowLocks);
 }
 
-RoutingContext CollectionRouter::_createDbIfRequestedAndGetRoutingContext(OperationContext* opCtx) {
+RoutingContext CollectionRouter::_createDbIfRequestedAndGetRoutingContext() {
     const NamespaceString& nss = _targetedNamespaces.front();
 
     if (_createDbImplicitly) {
@@ -323,9 +320,9 @@ RoutingContext CollectionRouter::_createDbIfRequestedAndGetRoutingContext(Operat
         while (attempts < kMaxDatabaseCreationAttempts) {
             try {
                 if (attempts > 0) {
-                    cluster::createDatabase(opCtx, nss.dbName(), _suggestedPrimaryId);
+                    cluster::createDatabase(_opCtx, nss.dbName(), _suggestedPrimaryId);
                 }
-                return _getRoutingContext(opCtx);
+                return _getRoutingContext();
 
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 ++attempts;
@@ -338,11 +335,10 @@ RoutingContext CollectionRouter::_createDbIfRequestedAndGetRoutingContext(Operat
             }
         }
     }
-    return _getRoutingContext(opCtx);
+    return _getRoutingContext();
 }
 
-CollectionRoutingInfo CollectionRouter::_createDbIfRequestedAndGetRoutingInfo(
-    OperationContext* opCtx) {
+CollectionRoutingInfo CollectionRouter::_createDbIfRequestedAndGetRoutingInfo() {
     const NamespaceString& nss = _targetedNamespaces.front();
 
     if (_createDbImplicitly) {
@@ -350,9 +346,9 @@ CollectionRoutingInfo CollectionRouter::_createDbIfRequestedAndGetRoutingInfo(
         while (attempts < kMaxDatabaseCreationAttempts) {
             try {
                 if (attempts > 0) {
-                    cluster::createDatabase(opCtx, nss.dbName(), _suggestedPrimaryId);
+                    cluster::createDatabase(_opCtx, nss.dbName(), _suggestedPrimaryId);
                 }
-                return _getRoutingInfo(opCtx, nss);
+                return _getRoutingInfo(nss);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 ++attempts;
                 LOGV2_INFO(11398603,
@@ -364,7 +360,7 @@ CollectionRoutingInfo CollectionRouter::_createDbIfRequestedAndGetRoutingInfo(
             }
         }
     }
-    return _getRoutingInfo(opCtx, nss);
+    return _getRoutingInfo(nss);
 }
 
 void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
@@ -381,26 +377,31 @@ void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(const ShardId& shar
     appendShardVersion(*builder, cri.getShardVersion(shardId));
 }
 
-CollectionRouter::CollectionRouter(ServiceContext* service, NamespaceString nss)
-    : CollectionRouterCommon(Grid::get(service)->catalogCache(), {std::move(nss)}) {}
+CollectionRouter::CollectionRouter(OperationContext* opCtx, NamespaceString nss)
+    : CollectionRouterCommon(
+          opCtx, Grid::get(opCtx->getServiceContext())->catalogCache(), {std::move(nss)}) {}
 
-CollectionRouter::CollectionRouter(CatalogCache* catalogCache, NamespaceString nss)
-    : CollectionRouterCommon(catalogCache, {std::move(nss)}) {}
+CollectionRouter::CollectionRouter(OperationContext* opCtx,
+                                   CatalogCache* catalogCache,
+                                   NamespaceString nss)
+    : CollectionRouterCommon(opCtx, catalogCache, {std::move(nss)}) {}
 
-MultiCollectionRouter::MultiCollectionRouter(ServiceContext* service,
+MultiCollectionRouter::MultiCollectionRouter(OperationContext* opCtx,
                                              const std::vector<NamespaceString>& nssList)
-    : CollectionRouterCommon(Grid::get(service)->catalogCache(), nssList) {}
+    : CollectionRouterCommon(
+          opCtx, Grid::get(opCtx->getServiceContext())->catalogCache(), nssList) {}
 
 bool MultiCollectionRouter::isAnyCollectionNotLocal(
-    OperationContext* opCtx,
-    const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap) {
-    auto* grid = Grid::get(opCtx->getServiceContext());
+    OperationContext*, const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap) {
+    auto* grid = Grid::get(_opCtx->getServiceContext());
     // By definition, all collections in a non sharded deployment are local.
     if (!(grid->isInitialized() && grid->isShardingInitialized())) {
         return false;
     }
 
-    const auto myShardId = ShardingState::get(opCtx)->shardId();
+    const auto myShardId = ShardingState::get(_opCtx)->shardId();
+    const auto atClusterTime = repl::ReadConcernArgs::get(_opCtx).getArgsAtClusterTime();
+
     bool anyCollectionNotLocal = false;
 
     // For each collection, figure out if it fully lives on this shard.
@@ -410,7 +411,6 @@ bool MultiCollectionRouter::isAnyCollectionNotLocal(
                 "Must be an entry in criMap for namespace " + nss.toStringForErrorMsg(),
                 nssCri != criMap.end());
 
-        const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
         const auto chunkManagerMaybeAtClusterTime = atClusterTime
             ? ChunkManager::makeAtTime(nssCri->second.getChunkManager(),
                                        atClusterTime->asTimestamp())
@@ -435,6 +435,7 @@ bool MultiCollectionRouter::isAnyCollectionNotLocal(
     }
     return anyCollectionNotLocal;
 }
+
 }  // namespace router
 }  // namespace sharding
 }  // namespace mongo

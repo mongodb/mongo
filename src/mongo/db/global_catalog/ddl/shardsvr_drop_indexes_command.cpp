@@ -275,9 +275,9 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
     }
 
     StaleConfigRetryState retryState;
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), resolvedNs);
+    sharding::router::CollectionRouter router(opCtx, resolvedNs);
     return router.routeWithRoutingContext(
-        opCtx, "dropIndexes", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+        "dropIndexes", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             auto shardResponses =
                 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
                     opCtx,

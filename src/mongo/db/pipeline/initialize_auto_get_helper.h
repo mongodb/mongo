@@ -129,10 +129,9 @@ bool initializeAutoGet(OperationContext* opCtx,
             }
         }
 
-        sharding::router::MultiCollectionRouter multiCollectionRouter(opCtx->getServiceContext(),
+        sharding::router::MultiCollectionRouter multiCollectionRouter(opCtx,
                                                                       secondaryExecNssListJustNss);
         multiCollectionRouter.route(
-            opCtx,
             "initializeAutoGet",
             [&](OperationContext* opCtx,
                 const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap) {

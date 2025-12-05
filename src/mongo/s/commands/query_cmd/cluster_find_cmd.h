@@ -339,8 +339,8 @@ public:
             };
 
             try {
-                sharding::router::CollectionRouter router{opCtx->getServiceContext(), ns()};
-                router.routeWithRoutingContext(opCtx, "explain find"_sd, findBodyFn);
+                sharding::router::CollectionRouter router(opCtx, ns());
+                router.routeWithRoutingContext("explain find"_sd, findBodyFn);
 
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 auto bodyBuilder = result->getBodyBuilder();

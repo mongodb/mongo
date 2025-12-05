@@ -627,10 +627,8 @@ void checkExpectedTargetCollectionOptionsMatch(OperationContext* opCtx,
 void checkExpectedTargetIndexesMatch(OperationContext* opCtx,
                                      const NamespaceString targetNss,
                                      const std::vector<BSONObj>& expectedIndexes) {
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), targetNss);
-
+    sharding::router::CollectionRouter router(opCtx, targetNss);
     const auto currentIndexes = router.routeWithRoutingContext(
-        opCtx,
         "checking indexes prerequisites within rename collection coordinator",
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             const auto response = loadIndexesFromAuthoritativeShard(opCtx, routingCtx, targetNss);

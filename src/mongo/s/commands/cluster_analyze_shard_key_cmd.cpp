@@ -86,11 +86,9 @@ public:
             const auto& nss = ns();
             uassertStatusOK(validateNamespace(nss));
 
-            sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+            sharding::router::CollectionRouter router(opCtx, nss);
             return router.routeWithRoutingContext(
-                opCtx,
-                Request::kCommandName,
-                [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                Request::kCommandName, [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                     auto cri = routingCtx.getCollectionRoutingInfo(nss);
                     uassert(ErrorCodes::IllegalOperation,
                             "Cannot analyze a shard key for a collection in a fixed database",

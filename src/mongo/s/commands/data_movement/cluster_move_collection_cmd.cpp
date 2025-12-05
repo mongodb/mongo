@@ -69,9 +69,8 @@ public:
                   "dbName"_attr = request().getDbName(),
                   "toShard"_attr = request().getToShard());
 
-            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
-            router.route(opCtx,
-                         Request::kCommandParameterFieldName,
+            sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
+            router.route(Request::kCommandParameterFieldName,
                          [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
                              auto cmdResponse =
                                  executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(

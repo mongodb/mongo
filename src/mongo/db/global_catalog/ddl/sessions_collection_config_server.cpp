@@ -136,9 +136,8 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
 
 void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {
     const auto nss = NamespaceString::kLogicalSessionsNamespace;
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
+    sharding::router::CollectionRouter router(opCtx, nss);
     router.routeWithRoutingContext(
-        opCtx,
         "SessionsCollectionConfigServer::_generateIndexesIfNeeded"_sd,
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             const auto& cri = routingCtx.getCollectionRoutingInfo(nss);

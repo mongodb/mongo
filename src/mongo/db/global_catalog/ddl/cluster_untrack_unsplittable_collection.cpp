@@ -56,9 +56,8 @@ public:
             generic_argument_util::setMajorityWriteConcern(shardsvrRequest);
 
             // Route the command to the primary shard.
-            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), ns().dbName());
+            sharding::router::DBPrimaryRouter router(opCtx, ns().dbName());
             router.route(
-                opCtx,
                 Request::kCommandParameterFieldName,
                 [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
                     auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(

@@ -120,11 +120,9 @@ Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
     auto req = request();
     generic_argument_util::setMajorityWriteConcern(req, &opCtx->getWriteConcern());
 
-    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+    sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
     return router.route(
-        opCtx,
-        Request::kCommandName,
-        [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+        Request::kCommandName, [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
             // Rewrite command verb to _shardSvrCompactStructuredEnccryptionData.
             auto cmd = req.toBSON();
             BSONObjBuilder reqBuilder;

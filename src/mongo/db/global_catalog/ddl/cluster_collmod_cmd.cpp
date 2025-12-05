@@ -137,11 +137,10 @@ public:
                     nss != NamespaceString::kConfigSettingsNamespace);
         }
 
-        sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), cmd.getDbName());
+        sharding::router::DBPrimaryRouter router(opCtx, cmd.getDbName());
 
         try {
             return router.route(
-                opCtx,
                 Request::kCommandName,
                 [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
                     ShardsvrCollMod collModCommand(nss);

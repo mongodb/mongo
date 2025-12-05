@@ -148,9 +148,8 @@ public:
         ListIndexesReply typedRun(OperationContext* opCtx) final {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-            sharding::router::CollectionRouter router{opCtx->getServiceContext(), ns()};
+            sharding::router::CollectionRouter router(opCtx, ns());
             return router.routeWithRoutingContext(
-                opCtx,
                 Request::kCommandName,
                 [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
                     // The CollectionRouter is not capable of implicitly translate the namespace to

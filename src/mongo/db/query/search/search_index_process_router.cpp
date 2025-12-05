@@ -93,10 +93,8 @@ std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>
 SearchIndexProcessRouter::fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
                                                             const NamespaceString& nss,
                                                             bool failOnTsColl) {
-    sharding::router::DBPrimaryRouter router{opCtx->getServiceContext(), nss.dbName()};
-
+    sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
     auto uuidAndPossibleCollName = router.route(
-        opCtx,
         "get collection UUID",
         [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb)
             -> std::pair<boost::optional<UUID>, boost::optional<ResolvedView>> {

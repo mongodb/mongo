@@ -550,7 +550,7 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
         return false;
     }
 
-    sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
+    sharding::router::CollectionRouter router(opCtx, originalNss);
 
     // Implicitly create the db if it doesn't exist. There is no way right now to return an
     // explain on a sharded cluster if the database doesn't exist.
@@ -558,9 +558,7 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
     // doesn't exist.
     router.createDbImplicitlyOnRoute();
     return router.routeWithRoutingContext(
-        opCtx,
-        "explain write"_sd,
-        [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
+        "explain write"_sd, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
             const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
             auto [translatedNss, translatedReqBSON] = translateRequestForTimeseriesIfNeeded(
                 opCtx, originalRoutingCtx, originalNss, req, targeter);
@@ -642,7 +640,7 @@ void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
         return;
     }
 
-    sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
+    sharding::router::CollectionRouter router(opCtx, originalNss);
 
     // Implicitly create the db if it doesn't exist. There is no way right now to return an
     // explain on a sharded cluster if the database doesn't exist.
@@ -650,9 +648,7 @@ void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
     // doesn't exist.
     router.createDbImplicitlyOnRoute();
     router.routeWithRoutingContext(
-        opCtx,
-        "explain write"_sd,
-        [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
+        "explain write"_sd, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
             const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
             auto [translatedNss, translatedReqBSON] = translateRequestForTimeseriesIfNeeded(
                 opCtx, originalRoutingCtx, originalNss, *requestPtr, targeter);

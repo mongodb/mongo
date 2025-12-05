@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/cleanup_structured_encryption_data_coordinator.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/fle_options_gen.h"
 #include "mongo/crypto/fle_stats.h"
@@ -40,7 +38,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/router_role/router_role.h"
@@ -56,14 +53,12 @@
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/rpc/unique_message.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/namespace_string_util.h"
@@ -71,7 +66,6 @@
 #include "mongo/util/uuid.h"
 
 #include <string>
-#include <tuple>
 #include <utility>
 #include <variant>
 
@@ -81,7 +75,6 @@
 #include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -226,25 +219,20 @@ void doAnchorCleanupWithUpdatedCollectionState(OperationContext* opCtx,
 
     // Run the anchor cleanups in CollectionRouters to force refresh of catalog cache entries
     // for the ESC collection, and retry if write errors occur due to StaleConfig.
-    sharding::router::CollectionRouter escRouter(opCtx->getServiceContext(), escNss);
+    sharding::router::CollectionRouter router(opCtx, escNss);
+    router.route(description, [&](OperationContext* opCtx, const CollectionRoutingInfo& innerCri) {
+        tassert(7647924,
+                str::stream() << "Namespace " << escNss.toStringForErrorMsg()
+                              << " is expected to be unsharded, but is sharded",
+                !innerCri.isSharded());
 
-    escRouter.route(
-        opCtx,
-        description,
-        [&](OperationContext* innerOpCtx, const CollectionRoutingInfo& innerCri) {
-            tassert(7647924,
-                    str::stream() << "Namespace " << escNss.toStringForErrorMsg()
-                                  << " is expected to be unsharded, but is sharded",
-                    !innerCri.isSharded());
+        uassertStatusOK(FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+            opCtx, escNss, ChunkVersion::UNTRACKED()));
+        ScopedSetShardRole escShardRole(
+            opCtx, escNss, ShardVersion::UNTRACKED(), innerCri.getDbVersion());
 
-            uassertStatusOK(
-                FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-                    innerOpCtx, escNss, ChunkVersion::UNTRACKED()));
-            ScopedSetShardRole escShardRole(
-                innerOpCtx, escNss, ShardVersion::UNTRACKED(), innerCri.getDbVersion());
-
-            cleanupESCAnchors(innerOpCtx, escNss, pq, tagsPerDelete, escStats);
-        });
+        cleanupESCAnchors(opCtx, escNss, pq, tagsPerDelete, escStats);
+    });
 }
 
 bool doRenameOperation(OperationContext* opCtx,

@@ -74,7 +74,6 @@
 
 #include <algorithm>
 #include <iterator>
-#include <type_traits>
 #include <typeinfo>
 
 #include <boost/none.hpp>
@@ -210,10 +209,8 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
     try {
         auto findCmd = cmdBuilder.obj();
         const auto& foreignNss = foreignExpCtx->getNamespaceString();
-        sharding::router::CollectionRouter router(
-            expCtx->getOperationContext()->getServiceContext(), foreignNss);
+        sharding::router::CollectionRouter router(expCtx->getOperationContext(), foreignNss);
         auto shardResults = router.route(
-            foreignExpCtx->getOperationContext(),
             str::stream() << "Looking up document matching " << redact(filter.toBson()),
             [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                 auto routingCtxPtr = uassertStatusOK(getAndValidateRoutingCtx(foreignExpCtx, cri));
@@ -409,10 +406,8 @@ MongosProcessInterface::fieldsHaveSupportingUniqueIndex(
     // this is any shard that currently owns at least one chunk. This helper sends database and/or
     // shard versions to ensure this router is not stale, but will not automatically retry if either
     // version is stale.
-    sharding::router::CollectionRouter router{expCtx->getOperationContext()->getServiceContext(),
-                                              nss};
+    sharding::router::CollectionRouter router(expCtx->getOperationContext(), nss);
     return router.routeWithRoutingContext(
-        expCtx->getOperationContext(),
         "MongosProcessInterface::fieldsHaveSupportingUniqueIndex"_sd,
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             auto response =

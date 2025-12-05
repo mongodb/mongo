@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/pipeline/process_interface/common_process_interface.h"
 
 #include "mongo/bson/bsonelement.h"
@@ -415,10 +414,9 @@ std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnASharde
         return appendPrimaryShardIfRequested(resultCollections.docs, cdb->getPrimary());
     };
 
-    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+    sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
     try {
         return router.route(
-            opCtx,
             "CommonMongodProcessInterface::_runListCollectionsCommandOnAShardedCluster",
             runListCollectionsFunc);
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {

@@ -123,9 +123,9 @@ public:
         LOGV2_DEBUG(
             22757, 1, "setIndexCommitQuorum", logAttrs(nss), "command"_attr = redact(cmdObj));
 
-        sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+        sharding::router::CollectionRouter router(opCtx, nss);
         return router.routeWithRoutingContext(
-            opCtx, getName(), [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+            getName(), [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                 auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
                     routingCtx,

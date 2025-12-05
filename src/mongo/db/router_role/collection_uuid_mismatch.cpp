@@ -87,9 +87,8 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
     listCollections.setDbName(info->dbName());
     listCollections.setFilter(BSON("info.uuid" << info->collectionUUID()));
 
-    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), info->dbName());
+    sharding::router::DBPrimaryRouter router(opCtx, info->dbName());
     return router.route(
-        opCtx,
         "populateCollectionUUIDMismatch"_sd,
         [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) -> Status {
             auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(

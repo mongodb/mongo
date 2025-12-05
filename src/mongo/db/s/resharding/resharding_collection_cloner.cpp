@@ -187,9 +187,8 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
     boost::optional<RouterRelaxCollectionUUIDConsistencyCheckBlock>
         routerRelaxCollectionUUIDConsistencyCheckBlock(boost::in_place_init_if, _relaxed, opCtx);
 
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), _sourceNss);
+    sharding::router::CollectionRouter router(opCtx, _sourceNss);
     auto dispatchResults = router.routeWithRoutingContext(
-        opCtx,
         "resharding collection cloner fetching with natural order (query stage)"_sd,
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             AsyncRequestsSender::ShardHostMap designatedHostsMap;

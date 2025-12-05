@@ -266,9 +266,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                         opCtx, ns, shardsWithData, session, executor, token);
                 }
 
-                sharding::router::CollectionRouter router(opCtx->getServiceContext(), ns);
-                router.route(opCtx,
-                             "validating indexes for refineCollectionShardKey"_sd,
+                sharding::router::CollectionRouter router(opCtx, ns);
+                router.route("validating indexes for refineCollectionShardKey"_sd,
                              [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                                  ShardsvrValidateShardKeyCandidate validateRequest(ns);
                                  validateRequest.setKey(_doc.getNewShardKey());

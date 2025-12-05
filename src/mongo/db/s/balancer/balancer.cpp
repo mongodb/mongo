@@ -761,9 +761,9 @@ void Balancer::moveRange(OperationContext* opCtx,
 
     const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
 
-    sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+    sharding::router::CollectionRouter router(opCtx, nss);
     router.routeWithRoutingContext(
-        opCtx, "moveRange"_sd, [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
+        "moveRange"_sd, [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
             unusedRoutingCtx.skipValidation();
 
             const auto cm = uassertStatusOK(getPlacementInfoForShardedCollection(opCtx, nss));

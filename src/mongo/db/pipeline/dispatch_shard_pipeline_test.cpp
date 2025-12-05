@@ -283,11 +283,9 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     const bool eligibleForSampling = false;
     auto future = launchAsync([&] {
         // Shouldn't throw.
-        sharding::router::CollectionRouter router(getServiceContext(), kTestAggregateNss);
+        sharding::router::CollectionRouter router(operationContext(), kTestAggregateNss);
         auto results = router.routeWithRoutingContext(
-            operationContext(),
-            "dispatch shard pipeline"_sd,
-            [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+            "dispatch shard pipeline"_sd, [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                 return sharded_agg_helpers::dispatchShardPipeline(routingCtx,
                                                                   serializedCommand,
                                                                   pipelineDataSource,

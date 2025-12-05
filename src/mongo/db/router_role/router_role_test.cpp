@@ -33,12 +33,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
-#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/session_catalog_router.h"
@@ -49,7 +45,6 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-
 namespace {
 
 /**
@@ -238,10 +233,9 @@ TEST_F(RouterRoleTestTxn, DBPrimaryRouterDoesNotRetryForSubRouter) {
 
     // The DBPrimaryRouter should not retry if the shard acted as a sub-router.
     int tries = 0;
-    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
+    sharding::router::DBPrimaryRouter router(operationContext(), _nss.dbName());
     ASSERT_THROWS_CODE(
-        router.route(operationContext(),
-                     "test",
+        router.route("test",
                      [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
                          tries++;
                          uasserted(
@@ -260,10 +254,9 @@ TEST_F(RouterRoleTestTxn, DBPrimaryRouterDoesNotRetryOnStaleDbVersionForNonSubRo
     // The DBPrimaryRouter should not retry on StaleDbVersion error if the shard did not act
     // as a sub-router.
     int tries = 0;
-    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
+    sharding::router::DBPrimaryRouter router(operationContext(), _nss.dbName());
     ASSERT_THROWS_CODE(
-        router.route(operationContext(),
-                     "test",
+        router.route("test",
                      [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
                          tries++;
                          uasserted(
@@ -282,20 +275,17 @@ TEST_F(RouterRoleTest, DBPrimaryRouterRetryOnStaleDbVersionForNonSubRouterWithou
     // The DBPrimaryRouter should retry on StaleDbVersion error when not operating within a
     // transaction.
     int tries = 0;
-    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
+    sharding::router::DBPrimaryRouter router(operationContext(), _nss.dbName());
     auto future = launchAsync([&] {
-        router.route(
-            operationContext(),
-            "test",
-            [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-                tries++;
-                if (tries == 1) {
-                    uasserted(StaleDbRoutingVersion(_nss.dbName(),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(0, 0)),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(0, 0))),
-                              "staleDbVersion");
-                }
-            });
+        router.route("test", [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+            tries++;
+            if (tries == 1) {
+                uasserted(StaleDbRoutingVersion(_nss.dbName(),
+                                                DatabaseVersion(UUID::gen(), Timestamp(0, 0)),
+                                                DatabaseVersion(UUID::gen(), Timestamp(0, 0))),
+                          "staleDbVersion");
+            }
+        });
     });
     future.default_timed_get();
 
@@ -306,25 +296,22 @@ TEST_F(RouterRoleTestTxn, DBPrimaryRouterSetsPlacementConflictTimeIfSubRouter) {
     auto clusterTime = Timestamp(1, 1);
     actAsSubRouter(LogicalTime(clusterTime));
 
-    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
-    router.route(
-        operationContext(), "test", [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-            auto txnRouter = TransactionRouter::get(opCtx);
-            ASSERT(txnRouter);
+    sharding::router::DBPrimaryRouter router(operationContext(), _nss.dbName());
+    router.route("test", [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+        auto txnRouter = TransactionRouter::get(opCtx);
+        ASSERT(txnRouter);
 
-            auto placementConflictTime = txnRouter.getPlacementConflictTime();
-            ASSERT(placementConflictTime);
-            ASSERT_EQ(placementConflictTime->asTimestamp(), clusterTime);
-        });
+        auto placementConflictTime = txnRouter.getPlacementConflictTime();
+        ASSERT(placementConflictTime);
+        ASSERT_EQ(placementConflictTime->asTimestamp(), clusterTime);
+    });
 }
 
 TEST_F(RouterRoleTest, DBPrimaryRouterHappyPath) {
     int tries = 0;
 
-    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
-    router.route(operationContext(),
-                 "test",
-                 [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) { tries++; });
+    sharding::router::DBPrimaryRouter router(operationContext(), _nss.dbName());
+    router.route("test", [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) { tries++; });
 
     ASSERT_EQ(tries, 1);
 }
@@ -332,20 +319,17 @@ TEST_F(RouterRoleTest, DBPrimaryRouterHappyPath) {
 TEST_F(RouterRoleTest, DBPrimaryRouterRetriesAfterStaleDb) {
     int tries = 0;
 
-    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
+    sharding::router::DBPrimaryRouter router(operationContext(), _nss.dbName());
     auto future = launchAsync([&] {
-        router.route(
-            operationContext(),
-            "test",
-            [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-                tries++;
-                if (tries == 1) {
-                    uasserted(StaleDbRoutingVersion(_nss.dbName(),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
-                              "staleDbVersion");
-                }
-            });
+        router.route("test", [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+            tries++;
+            if (tries == 1) {
+                uasserted(StaleDbRoutingVersion(_nss.dbName(),
+                                                DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
+                                                DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
+                          "staleDbVersion");
+            }
+        });
     });
 
     mockConfigServerQueriesForDbRefresh(_nss.dbName(),
@@ -363,18 +347,15 @@ TEST_F(RouterRoleTest, DBPrimaryRouterExceedsMaxRetryAttempts) {
 
     // The DBPrimaryRouter should retry until it reaches the maximum available retries.
     int tries = 0;
-    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
+    sharding::router::DBPrimaryRouter router(operationContext(), _nss.dbName());
     auto future = launchAsync([&] {
-        router.route(operationContext(),
-                     "test",
-                     [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-                         tries++;
-                         uasserted(
-                             StaleDbRoutingVersion(_nss.dbName(),
-                                                   DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
-                                                   DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
-                             "staleDbVersion");
-                     });
+        router.route("test", [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+            tries++;
+            uasserted(StaleDbRoutingVersion(_nss.dbName(),
+                                            DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
+                                            DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
+                      "staleDbVersion");
+        });
     });
 
     mockConfigServerQueriesForDbRefresh(_nss.dbName(),
@@ -393,21 +374,18 @@ TEST_F(RouterRoleTest, DBPrimaryRouterImplicitlyCreatesDbWhenSpecified) {
 
     // 1. Route asynchronously a dummy operation with 'createDbImplicitly' set to true.
     // The first attempt will fail with a StaleDbVersion to force a db refresh.
-    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
+    sharding::router::DBPrimaryRouter router(operationContext(), _nss.dbName());
     router.createDbImplicitlyOnRoute();
     auto future = launchAsync([&] {
-        router.route(
-            operationContext(),
-            "test",
-            [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-                tries++;
-                if (tries == 1) {
-                    uasserted(StaleDbRoutingVersion(_nss.dbName(),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
-                              "staleDbVersion");
-                }
-            });
+        router.route("test", [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+            tries++;
+            if (tries == 1) {
+                uasserted(StaleDbRoutingVersion(_nss.dbName(),
+                                                DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
+                                                DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
+                          "staleDbVersion");
+            }
+        });
     });
 
     // 2. Mock a db drop by return an empty database to force an implicit db creation (need to
@@ -436,20 +414,17 @@ TEST_F(RouterRoleTest, DBPrimaryRouterDoesntImplicitlyCreateDbByDefault) {
 
     // 1. Route asynchronously a dummy operation with 'createDbImplicitly' set to true.
     // The first attempt will fail with a StaleDbVersion to force a db refresh.
-    sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
+    sharding::router::DBPrimaryRouter router(operationContext(), _nss.dbName());
     auto future = launchAsync([&] {
-        router.route(
-            operationContext(),
-            "test",
-            [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-                tries++;
-                if (tries == 1) {
-                    uasserted(StaleDbRoutingVersion(_nss.dbName(),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
-                              "staleDbVersion");
-                }
-            });
+        router.route("test", [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+            tries++;
+            if (tries == 1) {
+                uasserted(StaleDbRoutingVersion(_nss.dbName(),
+                                                DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
+                                                DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
+                          "staleDbVersion");
+            }
+        });
     });
 
     // 2. Mock a db drop by return an empty database to force an implicit db creation (need to
@@ -472,10 +447,9 @@ TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryForSubRouter) {
 
     // The CollectionRouter should not retry if the shard acted as a sub-router.
     int tries = 0;
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     ASSERT_THROWS_CODE(
-        router.route(operationContext(),
-                     "test",
+        router.route("test",
                      [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                          tries++;
                          OID epoch{OID::gen()};
@@ -500,10 +474,9 @@ TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryOnStaleConfigInTxnForNonSu
     // The CollectionRouter should not retry on StaleConfig error if the shard did not act as
     // a sub-router.
     int tries = 0;
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     ASSERT_THROWS_CODE(
-        router.route(operationContext(),
-                     "test",
+        router.route("test",
                      [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                          tries++;
                          uasserted(StaleConfigInfo(_nss,
@@ -523,16 +496,15 @@ TEST_F(RouterRoleTestTxn, CollectionRouterSetsPlacementConflictTimeIfSubRouter) 
     auto clusterTime = Timestamp(1, 1);
     actAsSubRouter(LogicalTime(clusterTime));
 
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
-    router.route(
-        operationContext(), "test", [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-            auto txnRouter = TransactionRouter::get(opCtx);
-            ASSERT(txnRouter);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
+    router.route("test", [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+        auto txnRouter = TransactionRouter::get(opCtx);
+        ASSERT(txnRouter);
 
-            auto placementConflictTime = txnRouter.getPlacementConflictTime();
-            ASSERT(placementConflictTime);
-            ASSERT_EQ(placementConflictTime->asTimestamp(), clusterTime);
-        });
+        auto placementConflictTime = txnRouter.getPlacementConflictTime();
+        ASSERT(placementConflictTime);
+        ASSERT_EQ(placementConflictTime->asTimestamp(), clusterTime);
+    });
 }
 
 TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigWithoutTxn) {
@@ -542,22 +514,20 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigWithoutTxn) {
     // The CollectionRouter should retry on StaleConfig errors when not operating within a
     // transaction.
     int tries = 0;
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     auto future = launchAsync([&] {
-        router.route(operationContext(),
-                     "test",
-                     [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                         ASSERT_TRUE(cri.hasRoutingTable());
-                         tries++;
-                         if (tries == 1) {
-                             uasserted(StaleConfigInfo(_nss,
-                                                       ShardVersionFactory::make(ChunkVersion(
-                                                           {epoch, timestamp}, {2, 0})),
-                                                       boost::none,
-                                                       ShardId{"0"}),
-                                       "StaleConfig error");
-                         }
-                     });
+        router.route("test", [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+            ASSERT_TRUE(cri.hasRoutingTable());
+            tries++;
+            if (tries == 1) {
+                uasserted(StaleConfigInfo(
+                              _nss,
+                              ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0})),
+                              boost::none,
+                              ShardId{"0"}),
+                          "StaleConfig error");
+            }
+        });
     });
     mockConfigServerQueriesForCollRefresh(_nss, epoch, timestamp);
     future.default_timed_get();
@@ -569,21 +539,18 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleDbVersionWithoutTxn) {
     // The CollectionRouter should retry on StaleDbVersion error when not operating within a
     // transaction.
     int tries = 0;
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     auto future = launchAsync([&] {
-        router.route(
-            operationContext(),
-            "test",
-            [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                ASSERT_TRUE(cri.hasRoutingTable());
-                tries++;
-                if (tries == 1) {
-                    uasserted(StaleDbRoutingVersion(_nss.dbName(),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(0, 0)),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(0, 0))),
-                              "staleDbVersion");
-                }
-            });
+        router.route("test", [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+            ASSERT_TRUE(cri.hasRoutingTable());
+            tries++;
+            if (tries == 1) {
+                uasserted(StaleDbRoutingVersion(_nss.dbName(),
+                                                DatabaseVersion(UUID::gen(), Timestamp(0, 0)),
+                                                DatabaseVersion(UUID::gen(), Timestamp(0, 0))),
+                          "staleDbVersion");
+            }
+        });
     });
     future.default_timed_get();
 }
@@ -595,23 +562,19 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleEpochWithoutTxn) {
     // The CollectionRouter should retry on StaleEpoch error when not operating within a
     // transaction.
     int tries = 0;
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     auto future = launchAsync([&] {
-        router.route(
-            operationContext(),
-            "test",
-            [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                ASSERT_TRUE(cri.hasRoutingTable());
-                tries++;
-                if (tries == 1) {
-                    uasserted(
-                        StaleEpochInfo(
-                            _nss,
-                            ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0})),
-                            ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0}))),
-                        "staleEpoch");
-                }
-            });
+        router.route("test", [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+            ASSERT_TRUE(cri.hasRoutingTable());
+            tries++;
+            if (tries == 1) {
+                uasserted(StaleEpochInfo(
+                              _nss,
+                              ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0})),
+                              ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0}))),
+                          "staleEpoch");
+            }
+        });
     });
     mockConfigServerQueriesForCollRefresh(_nss, epoch, timestamp);
     future.default_timed_get();
@@ -620,17 +583,15 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleEpochWithoutTxn) {
     // The CollectionRouter should retry on StaleEpoch(without ExtraInfo) error when not operating
     // within a transaction.
     tries = 0;
-    sharding::router::CollectionRouter router2(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router2(operationContext(), _nss);
     auto future2 = launchAsync([&] {
-        router2.route(operationContext(),
-                      "test",
-                      [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                          ASSERT_TRUE(cri.hasRoutingTable());
-                          tries++;
-                          if (tries == 1) {
-                              uasserted(ErrorCodes::StaleEpoch, "staleEpoch");
-                          }
-                      });
+        router2.route("test", [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+            ASSERT_TRUE(cri.hasRoutingTable());
+            tries++;
+            if (tries == 1) {
+                uasserted(ErrorCodes::StaleEpoch, "staleEpoch");
+            }
+        });
     });
     mockConfigServerQueriesForCollRefresh(_nss, OID::gen(), Timestamp{2, 0});
     future2.default_timed_get();
@@ -638,10 +599,9 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleEpochWithoutTxn) {
 
     // The CollectionRouter should not retry on StaleEpoch error if nss is not involved in routing.
     tries = 0;
-    sharding::router::CollectionRouter routerNotRetry(getServiceContext(), _nss);
+    sharding::router::CollectionRouter routerNotRetry(operationContext(), _nss);
     ASSERT_THROWS_CODE(
         routerNotRetry.route(
-            operationContext(),
             "test",
             [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                 ASSERT_TRUE(cri.hasRoutingTable());
@@ -663,9 +623,8 @@ TEST_F(RouterRoleTestTxn, CollectionRouterRetryOnTransactionParticipantFailedUny
 
     // The CollectionRouter should not retry on TransactionParticipantFailedUnyield error.
     int tries = 0;
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
-    ASSERT_THROWS_CODE(router.route(operationContext(),
-                                    "test",
+    sharding::router::CollectionRouter router(operationContext(), _nss);
+    ASSERT_THROWS_CODE(router.route("test",
                                     [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                                         tries++;
                                         const auto status = Status(
@@ -688,9 +647,8 @@ TEST_F(RouterRoleTestTxn, CollectionRouterWithRoutingContextDoesNotRetryForSubRo
 
     // The CollectionRouter should not retry if the shard acted as a sub-router.
     int tries = 0;
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     ASSERT_THROWS_CODE(router.routeWithRoutingContext(
-                           operationContext(),
                            "test",
                            [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                                tries++;
@@ -717,9 +675,8 @@ TEST_F(RouterRoleTestTxn,
     // The CollectionRouter should not retry on StaleConfig error if the shard did not act as
     // a sub-router.
     int tries = 0;
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     ASSERT_THROWS_CODE(router.routeWithRoutingContext(
-                           operationContext(),
                            "test",
                            [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                                tries++;
@@ -743,10 +700,10 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextRetryOnStaleConfigWitho
     // The CollectionRouter::routeWithRoutingContext should retry on StaleConfig error when not
     // operating within a transaction.
     int tries = 0;
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     auto future = launchAsync([&] {
         router.routeWithRoutingContext(
-            operationContext(), "test", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+            "test", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                 tries++;
                 const auto& cri = routingCtx.getCollectionRoutingInfo(_nss);
                 ASSERT_TRUE(cri.hasRoutingTable());
@@ -773,9 +730,8 @@ using RouterRoleTestDeathTest = RouterRoleTest;
 DEATH_TEST_F(RouterRoleTestDeathTest,
              CollectionRouterWithRoutingContextRetryOnStaleConfigWithoutValidation,
              "RoutingContext ended without validating routing tables for nss test.foo") {
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     ASSERT_THROWS_CODE(router.routeWithRoutingContext(
-                           operationContext(),
                            "test",
                            [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                                const auto& cri = routingCtx.getCollectionRoutingInfo(_nss);
@@ -796,13 +752,11 @@ TEST_F(RouterRoleTestTxn, CollectionRouterWithRoutingContextAtTransactionCluster
     auto testAtTimestamp =
         [&](const Timestamp& clusterTime, int testId, std::string expectedShardId) {
             setupTransactionWithAtClusterTime(clusterTime, txnId);
-            sharding::router::CollectionRouter router(getServiceContext(), _nss);
+            sharding::router::CollectionRouter router(operationContext(), _nss);
 
             auto future = launchAsync([&] {
                 router.routeWithRoutingContext(
-                    operationContext(),
-                    "test",
-                    [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                    "test", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                         const auto& cri = routingCtx.getCollectionRoutingInfo(_nss);
                         ASSERT_TRUE(cri.hasRoutingTable());
                         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
@@ -836,13 +790,11 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextAtReadConcernClusterTim
     auto testAtTimestamp =
         [&](const Timestamp& clusterTime, int testId, std::string expectedShardId) {
             setupReadConcernAtClusterTime(clusterTime);
-            sharding::router::CollectionRouter router(getServiceContext(), _nss);
+            sharding::router::CollectionRouter router(operationContext(), _nss);
 
             auto future = launchAsync([&] {
                 router.routeWithRoutingContext(
-                    operationContext(),
-                    "test",
-                    [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                    "test", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                         const auto& cri = routingCtx.getCollectionRoutingInfo(_nss);
                         ASSERT_TRUE(cri.hasRoutingTable());
                         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
@@ -871,10 +823,9 @@ TEST_F(RouterRoleTestTxn, MultiCollectionRouterDoesNotRetryForSubRouter) {
 
     // The MultiCollectionRouter should not retry if the shard acted as a sub-router.
     int tries = 0;
-    sharding::router::MultiCollectionRouter router(getServiceContext(), {_nss});
+    sharding::router::MultiCollectionRouter router(operationContext(), {_nss});
     ASSERT_THROWS_CODE(
-        router.route(operationContext(),
-                     "test",
+        router.route("test",
                      [&](OperationContext* opCtx,
                          stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap) {
                          tries++;
@@ -900,10 +851,9 @@ TEST_F(RouterRoleTestTxn, MultiCollectionRouterDoesNotRetryOnStaleConfigForNonSu
     // The MultiCollectionRouter should not retry on StaleConfig error if the shard did not act
     // as a sub-router.
     int tries = 0;
-    sharding::router::MultiCollectionRouter router(getServiceContext(), {_nss});
+    sharding::router::MultiCollectionRouter router(operationContext(), {_nss});
     ASSERT_THROWS_CODE(
-        router.route(operationContext(),
-                     "test",
+        router.route("test",
                      [&](OperationContext* opCtx,
                          stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap) {
                          tries++;
@@ -928,10 +878,9 @@ TEST_F(RouterRoleTest, MultiCollectionRouterRetryOnStaleConfig) {
     // The MultiCollectionRouter should retry on StaleConfig error when not operating within a
     // transaction.
     int tries = 0;
-    sharding::router::MultiCollectionRouter router(getServiceContext(), {_nss, nss2});
+    sharding::router::MultiCollectionRouter router(operationContext(), {_nss, nss2});
     auto future = launchAsync([&] {
-        router.route(operationContext(),
-                     "test",
+        router.route("test",
                      [&](OperationContext* opCtx,
                          stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap) {
                          ASSERT_EQ(2, criMap.size());
@@ -965,10 +914,9 @@ TEST_F(RouterRoleTest,
     // The MultiCollectionRouter should not retry on StaleConfig error with non-targeted
     // namespace when the router is stale.
     int tries = 0;
-    sharding::router::MultiCollectionRouter router(getServiceContext(), {_nss, nss2});
+    sharding::router::MultiCollectionRouter router(operationContext(), {_nss, nss2});
     auto future = launchAsync([&] {
         router.route(
-            operationContext(),
             "test",
             [&](OperationContext* opCtx,
                 stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap) {
@@ -995,9 +943,8 @@ TEST_F(RouterRoleTestTxn, MultiCollectionRouterSetsPlacementConflictTimeIfSubRou
     auto clusterTime = Timestamp(1, 1);
     actAsSubRouter(LogicalTime(clusterTime));
 
-    sharding::router::MultiCollectionRouter router(getServiceContext(), {_nss});
-    router.route(operationContext(),
-                 "test",
+    sharding::router::MultiCollectionRouter router(operationContext(), {_nss});
+    router.route("test",
                  [&](OperationContext* opCtx,
                      stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap) {
                      auto txnRouter = TransactionRouter::get(opCtx);
@@ -1127,7 +1074,7 @@ TEST_F(RouterRoleTestTxn, RoutingContextCreationWithCRI) {
 }
 
 TEST_F(RouterRoleTest, CollectionRouterExceedsMaxRetryAttempts) {
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     ASSERT(!TransactionRouter::get(operationContext()));
     int maxTestRetries = 10;
 
@@ -1138,8 +1085,7 @@ TEST_F(RouterRoleTest, CollectionRouterExceedsMaxRetryAttempts) {
     // The CollectionRouter should retry until it reaches the maximum available retries.
     int tries = 0;
     auto future = launchAsync([&] {
-        router.route(operationContext(),
-                     "test shard not found",
+        router.route("test shard not found",
                      [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                          tries++;
                          uasserted(ErrorCodes::ShardNotFound, "Shard has been removed");
@@ -1171,13 +1117,12 @@ TEST_F(RouterRoleTest, CollectionRouterExceedsMaxRetryAttempts) {
 }
 
 TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryOnShardNotFoundInTxn) {
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     ASSERT(TransactionRouter::get(operationContext()));
 
     // The CollectionRouter should not retry on ShardNotFound error.
     int tries = 0;
-    ASSERT_THROWS_CODE(router.route(operationContext(),
-                                    "test shard not found",
+    ASSERT_THROWS_CODE(router.route("test shard not found",
                                     [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                                         ASSERT_TRUE(cri.hasRoutingTable());
                                         tries++;
@@ -1195,15 +1140,14 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnShardNotFound) {
     OID epoch{OID::gen()};
     Timestamp timestamp{1, 0};
 
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     ASSERT(!TransactionRouter::get(operationContext()));
 
     // The CollectionRouter should retry on ShardNotFound error when not operating within a
     // transaction.
     int tries = 0;
     auto future = launchAsync([&] {
-        router.route(operationContext(),
-                     "test shard not found",
+        router.route("test shard not found",
                      [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                          ASSERT_TRUE(cri.hasRoutingTable());
                          tries++;
@@ -1304,11 +1248,9 @@ TEST_F(RouterRoleTestTxn, CollectionRouterGetRoutingInfoAtTransactionClusterTime
         [&](const Timestamp& clusterTime, int testId, std::string expectedShardId) {
             setupTransactionWithAtClusterTime(clusterTime, txnId);
 
-            sharding::router::CollectionRouter router(getServiceContext(), _nss);
-
+            sharding::router::CollectionRouter router(operationContext(), _nss);
             auto future = launchAsync([&] {
                 router.route(
-                    operationContext(),
                     "test transaction cluster time",
                     [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                         ASSERT_TRUE(cri.hasRoutingTable());
@@ -1343,11 +1285,9 @@ TEST_F(RouterRoleTest, CollectionRouterGetRoutingInfoAtReadConcernClusterTime) {
         [&](const Timestamp& clusterTime, int testId, std::string expectedShardId) {
             setupReadConcernAtClusterTime(clusterTime);
 
-            sharding::router::CollectionRouter router(getServiceContext(), _nss);
-
+            sharding::router::CollectionRouter router(operationContext(), _nss);
             auto future = launchAsync([&] {
                 router.route(
-                    operationContext(),
                     "test transaction cluster time",
                     [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                         ASSERT_TRUE(cri.hasRoutingTable());
@@ -1378,10 +1318,9 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigTimeseriesBucket) {
 
     // The CollectionRouter should retry because bucket collection maps to targeted timeseries view.
     int tries = 0;
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     auto future = launchAsync([&] {
-        router.route(operationContext(),
-                     "test timeseries routing",
+        router.route("test timeseries routing",
                      [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                          ASSERT_TRUE(cri.hasRoutingTable());
                          tries++;
@@ -1402,24 +1341,21 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigTimeseriesBucket) {
 }
 
 TEST_F(RouterRoleTest, CollectionRouterDoesntImplicitlyCreateDbByDefault) {
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
 
     // 1. Route asynchronously a dummy operation.
     // The first attempt will fail with a StaleDbVersion to force a db refresh.
     int tries = 0;
     auto future = launchAsync([&] {
-        router.route(
-            operationContext(),
-            "test",
-            [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                tries++;
-                if (tries == 1) {
-                    uasserted(StaleDbRoutingVersion(_nss.dbName(),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
-                              "staleDbVersion");
-                }
-            });
+        router.route("test", [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+            tries++;
+            if (tries == 1) {
+                uasserted(StaleDbRoutingVersion(_nss.dbName(),
+                                                DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
+                                                DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
+                          "staleDbVersion");
+            }
+        });
     });
 
     // 2. Mock a db drop as well by returning an empty database to force an implicit db creation
@@ -1438,25 +1374,22 @@ TEST_F(RouterRoleTest, CollectionRouterDoesntImplicitlyCreateDbByDefault) {
 }
 
 TEST_F(RouterRoleTest, CollectionRouterImplicitlyCreatesDbWhenSpecified) {
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(operationContext(), _nss);
     router.createDbImplicitlyOnRoute();
 
     // 1. Route asynchronously a dummy operation with 'createDbImplicitly' set to true.
     // The first attempt will fail with a StaleDbVersion to force a db refresh.
     int tries = 0;
     auto future = launchAsync([&] {
-        router.route(
-            operationContext(),
-            "test",
-            [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                tries++;
-                if (tries == 1) {
-                    uasserted(StaleDbRoutingVersion(_nss.dbName(),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
-                              "staleDbVersion");
-                }
-            });
+        router.route("test", [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+            tries++;
+            if (tries == 1) {
+                uasserted(StaleDbRoutingVersion(_nss.dbName(),
+                                                DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
+                                                DatabaseVersion(UUID::gen(), Timestamp(2, 0))),
+                          "staleDbVersion");
+            }
+        });
     });
 
     // 2. Mock a db drop as well by returning an empty database to force an implicit db creation

@@ -707,11 +707,9 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
         isRawDataOperation(opCtx) = true;
     }
 
-    sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
+    sharding::router::CollectionRouter router(opCtx, originalNss);
     return router.routeWithRoutingContext(
-        opCtx,
-        "findAndModify explain",
-        [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
+        "findAndModify explain", [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
             // Clear the BSONObjBuilder since this lambda function may be retried if the router
             // cache is
             // stale.
@@ -1016,13 +1014,13 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         }
     };
 
-    sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
+    sharding::router::CollectionRouter router(opCtx, originalNss);
 
     // Technically, findAndModify should only be creating database if upsert is true, but
     // this would require that the parsing be pulled into this function.
     // TODO (SERVER-114203) - Implicitly create a database only when upsert is true.
     router.createDbImplicitlyOnRoute();
-    router.routeWithRoutingContext(opCtx, getName(), findAndModifyBody);
+    router.routeWithRoutingContext(getName(), findAndModifyBody);
 
     return true;
 }

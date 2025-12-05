@@ -27,19 +27,14 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/pipeline/document_source_cursor.h"
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/pipeline/initialize_auto_get_helper.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/find_common.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
-#include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/serialization_context.h"
 

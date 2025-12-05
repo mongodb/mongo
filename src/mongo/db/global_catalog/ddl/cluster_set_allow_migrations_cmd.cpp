@@ -84,9 +84,8 @@ public:
             shardsvrRequest.setSetAllowMigrationsRequest(allowMigrationsRequest);
             generic_argument_util::setMajorityWriteConcern(shardsvrRequest);
 
-            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
-            router.route(opCtx,
-                         Request::kCommandParameterFieldName,
+            sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
+            router.route(Request::kCommandParameterFieldName,
                          [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
                              auto cmdResponse =
                                  executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(

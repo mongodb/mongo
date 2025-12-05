@@ -140,8 +140,8 @@ RecipientStateMachineExternalStateImpl::getCollectionOptions(
     boost::optional<Timestamp> afterClusterTime,
     StringData reason) {
     // Load the collection options from the primary shard for the database.
-    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
-    return router.route(opCtx, reason, [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+    sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
+    return router.route(reason, [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
         return MigrationDestinationManager::getCollectionOptions(
             opCtx,
             NamespaceStringOrUUID{nss.dbName(), uuid},
@@ -173,21 +173,20 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
                                                              StringData reason,
                                                              bool expandSimpleCollation) {
     // Load the list of indexes from the shard which owns the global minimum chunk.
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
-    return router.route(
-        opCtx, reason, [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Expected collection " << nss.toStringForErrorMsg()
-                                  << " to be tracked",
-                    cri.hasRoutingTable());
-            return MigrationDestinationManager::getCollectionIndexes(
-                opCtx,
-                nss,
-                cri.getChunkManager().getMinKeyShardIdWithSimpleCollation(),
-                cri,
-                afterClusterTime,
-                expandSimpleCollation);
-        });
+    sharding::router::CollectionRouter router(opCtx, nss);
+    return router.route(reason, [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Expected collection " << nss.toStringForErrorMsg()
+                              << " to be tracked",
+                cri.hasRoutingTable());
+        return MigrationDestinationManager::getCollectionIndexes(
+            opCtx,
+            nss,
+            cri.getChunkManager().getMinKeyShardIdWithSimpleCollation(),
+            cri,
+            afterClusterTime,
+            expandSimpleCollation);
+    });
 }
 
 /**
@@ -200,8 +199,8 @@ void RecipientStateMachineExternalStateImpl::route(
     const NamespaceString& nss,
     StringData reason,
     unique_function<void(OperationContext* opCtx, const CollectionRoutingInfo& cri)> callback) {
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
-    router.route(opCtx, reason, callback);
+    sharding::router::CollectionRouter router(opCtx, nss);
+    router.route(reason, callback);
 }
 
 void RecipientStateMachineExternalStateImpl::updateCoordinatorDocument(OperationContext* opCtx,

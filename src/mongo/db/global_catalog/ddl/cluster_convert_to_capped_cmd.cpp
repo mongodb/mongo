@@ -99,19 +99,18 @@ public:
         generic_argument_util::setMajorityWriteConcern(shardSvrConvertToCappedCommand,
                                                        &opCtx->getWriteConcern());
 
-        sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
-        router.route(
-            opCtx, getName(), [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
-                auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                    opCtx,
-                    dbName,
-                    dbInfo,
-                    shardSvrConvertToCappedCommand.toBSON(),
-                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    Shard::RetryPolicy::kIdempotent);
-                const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-                uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
-            });
+        sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
+        router.route(getName(), [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+            auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                opCtx,
+                dbName,
+                dbInfo,
+                shardSvrConvertToCappedCommand.toBSON(),
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                Shard::RetryPolicy::kIdempotent);
+            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+        });
 
 
         return true;

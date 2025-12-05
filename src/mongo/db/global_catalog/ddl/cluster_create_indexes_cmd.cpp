@@ -130,12 +130,10 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOGV2_DEBUG(22750, 1, "CMD: createIndexes", logAttrs(nss), "command"_attr = redact(cmdObj));
 
-        sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+        sharding::router::CollectionRouter router(opCtx, nss);
         router.createDbImplicitlyOnRoute();
         return router.routeWithRoutingContext(
-            opCtx,
-            Request::kCommandName,
-            [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
+            Request::kCommandName, [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
                 // The CollectionRouter is not capable of implicitly translate the namespace
                 // to a timeseries buckets collection, which is required in this command.
                 // Hence, we'll use the CollectionRouter to handle StaleConfig errors but

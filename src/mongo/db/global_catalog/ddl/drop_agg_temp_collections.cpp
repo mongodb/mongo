@@ -47,28 +47,26 @@ namespace mongo {
 namespace {
 
 void dropTempCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
-    router.route(opCtx,
-                 "dropAggTempCollections",
-                 [&nss](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-                     // Drop the collection
-                     const auto shard = uassertStatusOK(
-                         Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cdb->getPrimary()));
+    sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
+    router.route(
+        "dropAggTempCollections", [&nss](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+            // Drop the collection
+            const auto shard = uassertStatusOK(
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cdb->getPrimary()));
 
-                     ShardsvrDropCollection shardsvrDropCollection(nss);
-                     generic_argument_util::setMajorityWriteConcern(shardsvrDropCollection);
-                     const auto cmdResponse =
-                         executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                             opCtx,
-                             nss.dbName(),
-                             cdb,
-                             shardsvrDropCollection.toBSON(),
-                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                             Shard::RetryPolicy::kIdempotent);
+            ShardsvrDropCollection shardsvrDropCollection(nss);
+            generic_argument_util::setMajorityWriteConcern(shardsvrDropCollection);
+            const auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                opCtx,
+                nss.dbName(),
+                cdb,
+                shardsvrDropCollection.toBSON(),
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                Shard::RetryPolicy::kIdempotent);
 
-                     const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-                     uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
-                 });
+            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+        });
 }
 
 }  // namespace

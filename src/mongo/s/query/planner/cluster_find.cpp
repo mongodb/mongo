@@ -808,10 +808,9 @@ void ClusterFind::runQuery(OperationContext* opCtx,
                            const MatchExpressionParser::AllowedFeatureSet& allowedFeatures,
                            rpc::ReplyBuilderInterface* const result,
                            bool didDoFLERewrite) {
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), origNss);
+    sharding::router::CollectionRouter router(opCtx, origNss);
     try {
         router.routeWithRoutingContext(
-            opCtx,
             FindCommandRequest::kCommandName,
             [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
                 // Clear the bodyBuilder since this lambda function may be retried if the router

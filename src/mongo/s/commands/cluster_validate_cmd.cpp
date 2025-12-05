@@ -99,9 +99,9 @@ public:
              BSONObjBuilder& output) override {
         const NamespaceString nss(parseNs(dbName, providedCmdObj));
 
-        sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+        sharding::router::CollectionRouter router(opCtx, nss);
         return router.routeWithRoutingContext(
-            opCtx, getName(), [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
+            getName(), [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
                 // The CollectionRouter is not capable of implicitly translate the namespace
                 // to a timeseries buckets collection, which is required in this command.
                 // Hence, we'll use the CollectionRouter to handle StaleConfig errors but

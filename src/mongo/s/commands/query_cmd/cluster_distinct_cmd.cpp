@@ -267,9 +267,8 @@ public:
         const BSONObj& originalCmdObj = opMsgRequest.body;
         const NamespaceString originalNss(parseNs(opMsgRequest.parseDbName(), originalCmdObj));
 
-        sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
+        sharding::router::CollectionRouter router(opCtx, originalNss);
         return router.routeWithRoutingContext(
-            opCtx,
             "explain distinct"_sd,
             [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
                 // Clear the bodyBuilder since this lambda function may be retried if the router
@@ -386,9 +385,9 @@ public:
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         NamespaceString originalNss(parseNs(dbName, originalCmdObj));
         try {
-            sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
+            sharding::router::CollectionRouter router(opCtx, originalNss);
             return router.routeWithRoutingContext(
-                opCtx, getName(), [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
+                getName(), [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
                     // Clear the bodyBuilder since this lambda function may be retried if the router
                     // cache is stale.
                     result.resetToEmpty();

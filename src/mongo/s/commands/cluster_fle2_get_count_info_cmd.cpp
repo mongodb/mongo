@@ -133,9 +133,9 @@ ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext
 
     auto nss = request().getNamespace();
 
-    sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+    sharding::router::CollectionRouter router(opCtx, nss);
     return router.routeWithRoutingContext(
-        opCtx, Request::kCommandName, [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+        Request::kCommandName, [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             tassert(7924701,
                     "ESC collection cannot be sharded",
                     !routingCtx.getCollectionRoutingInfo(nss).isSharded());

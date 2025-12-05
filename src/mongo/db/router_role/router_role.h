@@ -38,7 +38,6 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/router_role/routing_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/util/assert_util.h"
@@ -52,15 +51,16 @@ namespace router {
 
 class MONGO_MOD_PRIVATE RouterBase {
 protected:
-    RouterBase(CatalogCache* catalogCache);
+    RouterBase(OperationContext* opCtx, CatalogCache* catalogCache);
 
     struct RoutingRetryInfo {
         const std::string comment;
         int numAttempts{0};
     };
 
-    void _initTxnRouterIfNeeded(OperationContext* opCtx);
+    void _initTxnRouterIfNeeded();
 
+    OperationContext* const _opCtx;
     CatalogCache* const _catalogCache;
 };
 
@@ -74,19 +74,19 @@ protected:
  */
 class MONGO_MOD_PUBLIC DBPrimaryRouter final : public RouterBase {
 public:
-    DBPrimaryRouter(ServiceContext* service, const DatabaseName& db);
+    DBPrimaryRouter(OperationContext* opCtx, const DatabaseName& db);
 
     template <typename F>
-    auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
+    auto route(StringData comment, F&& callbackFn) {
         RoutingRetryInfo retryInfo{std::string{comment}};
-        _initTxnRouterIfNeeded(opCtx);
+        _initTxnRouterIfNeeded();
 
         while (true) {
-            auto cdb = _createDbIfRequestedAndGetRoutingInfo(opCtx);
+            auto cdb = _createDbIfRequestedAndGetRoutingInfo();
             try {
-                return callbackFn(opCtx, cdb);
+                return callbackFn(_opCtx, cdb);
             } catch (const DBException& ex) {
-                _onException(opCtx, &retryInfo, ex.toStatus());
+                _onException(&retryInfo, ex.toStatus());
             }
         }
     }
@@ -114,9 +114,9 @@ public:
                                                          BSONObjBuilder* builder);
 
 private:
-    CachedDatabaseInfo _getRoutingInfo(OperationContext* opCtx) const;
-    CachedDatabaseInfo _createDbIfRequestedAndGetRoutingInfo(OperationContext* opCtx) const;
-    void _onException(OperationContext* opCtx, RoutingRetryInfo* retryInfo, Status s);
+    CachedDatabaseInfo _getRoutingInfo() const;
+    CachedDatabaseInfo _createDbIfRequestedAndGetRoutingInfo() const;
+    void _onException(RoutingRetryInfo* retryInfo, Status s);
 
     DatabaseName _dbName;
 
@@ -129,15 +129,16 @@ private:
  */
 class MONGO_MOD_PRIVATE CollectionRouterCommon : public RouterBase {
 protected:
-    CollectionRouterCommon(CatalogCache* catalogCache,
+    CollectionRouterCommon(OperationContext* opCtx,
+                           CatalogCache* catalogCache,
                            const std::vector<NamespaceString>& routingNamespaces);
 
     static void appendCRUDRoutingTokenToCommand(const ShardId& shardId,
                                                 const CollectionRoutingInfo& cri,
                                                 BSONObjBuilder* builder);
 
-    void _onException(OperationContext* opCtx, RoutingRetryInfo* retryInfo, Status s);
-    CollectionRoutingInfo _getRoutingInfo(OperationContext* opCtx, const NamespaceString& nss);
+    void _onException(RoutingRetryInfo* retryInfo, Status s);
+    CollectionRoutingInfo _getRoutingInfo(const NamespaceString& nss);
 
     const std::vector<NamespaceString> _targetedNamespaces;
 };
@@ -148,25 +149,25 @@ protected:
  */
 class MONGO_MOD_PUBLIC CollectionRouter final : public CollectionRouterCommon {
 public:
-    CollectionRouter(ServiceContext* service, NamespaceString nss);
+    CollectionRouter(OperationContext* opCtx, NamespaceString nss);
 
     // TODO SERVER-95927: Remove this constructor.
-    CollectionRouter(CatalogCache* catalogCache, NamespaceString nss);
+    CollectionRouter(OperationContext* opCtx, CatalogCache* catalogCache, NamespaceString nss);
 
     template <typename F>
-    auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
-        return _routeImpl(opCtx, comment, [&] {
-            auto cri = _createDbIfRequestedAndGetRoutingInfo(opCtx);
-            return callbackFn(opCtx, cri);
+    auto route(StringData comment, F&& callbackFn) {
+        return _routeImpl(comment, [&] {
+            auto cri = _createDbIfRequestedAndGetRoutingInfo();
+            return callbackFn(_opCtx, cri);
         });
     }
 
     template <typename F>
-    auto routeWithRoutingContext(OperationContext* opCtx, StringData comment, F&& callbackFn) {
-        return _routeImpl(opCtx, comment, [&] {
-            RoutingContext routingCtx = _createDbIfRequestedAndGetRoutingContext(opCtx);
+    auto routeWithRoutingContext(StringData comment, F&& callbackFn) {
+        return _routeImpl(comment, [&] {
+            RoutingContext routingCtx = _createDbIfRequestedAndGetRoutingContext();
             return routing_context_utils::runAndValidate(
-                routingCtx, [&](RoutingContext& ctx) { return callbackFn(opCtx, ctx); });
+                routingCtx, [&](RoutingContext& ctx) { return callbackFn(_opCtx, ctx); });
         });
     }
 
@@ -185,23 +186,23 @@ public:
 
 private:
     template <typename F>
-    auto _routeImpl(OperationContext* opCtx, StringData comment, F&& work) {
+    auto _routeImpl(StringData comment, F&& work) {
         RoutingRetryInfo retryInfo{std::string{comment}};
-        _initTxnRouterIfNeeded(opCtx);
+        _initTxnRouterIfNeeded();
 
         while (true) {
             try {
                 return std::forward<F>(work)();
             } catch (const DBException& ex) {
-                _onException(opCtx, &retryInfo, ex.toStatus());
+                _onException(&retryInfo, ex.toStatus());
             }
         }
     }
 
-    RoutingContext _getRoutingContext(OperationContext* opCtx);
+    RoutingContext _getRoutingContext();
 
-    RoutingContext _createDbIfRequestedAndGetRoutingContext(OperationContext* opCtx);
-    CollectionRoutingInfo _createDbIfRequestedAndGetRoutingInfo(OperationContext* opCtx);
+    RoutingContext _createDbIfRequestedAndGetRoutingContext();
+    CollectionRoutingInfo _createDbIfRequestedAndGetRoutingInfo();
 
     bool _createDbImplicitly{false};
     boost::optional<ShardId> _suggestedPrimaryId;
@@ -209,32 +210,32 @@ private:
 
 class MONGO_MOD_PUBLIC MultiCollectionRouter final : public CollectionRouterCommon {
 public:
-    MultiCollectionRouter(ServiceContext* service, const std::vector<NamespaceString>& nssList);
+    MultiCollectionRouter(OperationContext* opCtx, const std::vector<NamespaceString>& nssList);
 
     /**
      * Member function which discerns whether any of the namespaces in 'routingNamespaces' are not
      * local.
      */
     bool isAnyCollectionNotLocal(
-        OperationContext* opCtx,
+        OperationContext*,
         const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap);
 
 
     template <typename F>
-    auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
+    auto route(StringData comment, F&& callbackFn) {
         RoutingRetryInfo retryInfo{std::string{comment}};
-        _initTxnRouterIfNeeded(opCtx);
+        _initTxnRouterIfNeeded();
 
         while (true) {
             stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap;
             for (const auto& nss : _targetedNamespaces) {
-                criMap.emplace(nss, _getRoutingInfo(opCtx, nss));
+                criMap.emplace(nss, _getRoutingInfo(nss));
             }
 
             try {
-                return callbackFn(opCtx, criMap);
+                return callbackFn(_opCtx, criMap);
             } catch (const DBException& ex) {
-                _onException(opCtx, &retryInfo, ex.toStatus());
+                _onException(&retryInfo, ex.toStatus());
             }
         }
     }

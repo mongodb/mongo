@@ -30,7 +30,6 @@
 #include "mongo/db/global_catalog/ddl/drop_collection_if_uuid_not_matching_gen.h"
 #include "mongo/db/global_catalog/ddl/notify_sharding_event_utils.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
-#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/router_role/routing_cache/routing_information_cache.h"
 #include "mongo/db/s/balancer/balance_stats.h"
@@ -45,14 +44,12 @@
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/request_types/commit_reshard_collection_gen.h"
-#include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/testing_proctor.h"
@@ -1285,10 +1282,9 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
                        // routing table and send shard-versioned commands to them.
                        const auto routingInformationCache =
                            RoutingInformationCache::get(opCtx.get());
-                       sharding::router::CollectionRouter cr(routingInformationCache,
-                                                             _coordinatorDoc.getSourceNss());
-                       return cr.route(
-                           opCtx.get(),
+                       sharding::router::CollectionRouter router(
+                           opCtx.get(), routingInformationCache, _coordinatorDoc.getSourceNss());
+                       return router.route(
                            "Resharding: Fetching the number of documents to copy from each shard",
                            [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
                                std::map<ShardId, ShardVersion> donorShardVersions;

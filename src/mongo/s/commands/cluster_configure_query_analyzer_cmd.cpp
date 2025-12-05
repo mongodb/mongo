@@ -58,7 +58,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-
 namespace mongo {
 namespace analyze_shard_key {
 
@@ -85,9 +84,8 @@ public:
             const auto& nss = ns();
             uassertStatusOK(validateNamespace(nss));
 
-            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+            sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
             return router.route(
-                opCtx,
                 Request::kCommandName,
                 [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
                     auto cmdObj =

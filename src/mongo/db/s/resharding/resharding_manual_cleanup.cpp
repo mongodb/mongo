@@ -285,10 +285,8 @@ void ReshardingCoordinatorCleaner::_dropTemporaryReshardingCollection(
     generic_argument_util::setMajorityWriteConcern(dropCollectionCommand,
                                                    &opCtx->getWriteConcern());
 
-    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(),
-                                             tempReshardingNss.dbName());
-    router.route(opCtx,
-                 "dropTemporaryReshardingCollection"_sd,
+    sharding::router::DBPrimaryRouter router(opCtx, tempReshardingNss.dbName());
+    router.route("dropTemporaryReshardingCollection"_sd,
                  [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
                      auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                          opCtx,

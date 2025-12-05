@@ -107,13 +107,11 @@
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_catalog/external_data_source_scope_guard.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
-#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/shard_role/shard_role_loop.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
@@ -856,9 +854,9 @@ Status runAggregateOnViewSharded(std::unique_ptr<ResolvedViewAggExState> resolve
     // multiple times. We need a reusable owning handle to the same execution state.
     // TODO SERVER-114574 Change AggExState to be passed by unique_ptr throughout.
     std::shared_ptr<ResolvedViewAggExState> aggExState = std::move(resolvedViewAggExState);
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), resolvedViewNss);
+    sharding::router::CollectionRouter router(opCtx, resolvedViewNss);
     status = router.routeWithRoutingContext(
-        opCtx, "runAggregateOnView", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+        "runAggregateOnView", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             const auto& cri = routingCtx.getCollectionRoutingInfo(resolvedViewNss);
 
             // Setup the opCtx's OperationShardingState with the expected placement versions for

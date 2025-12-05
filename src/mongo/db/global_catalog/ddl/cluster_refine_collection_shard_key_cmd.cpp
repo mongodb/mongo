@@ -95,9 +95,8 @@ public:
             generic_argument_util::setMajorityWriteConcern(refineCollectionShardKeyCommand,
                                                            &opCtx->getWriteConcern());
 
-            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
-            router.route(opCtx,
-                         Request::kCommandParameterFieldName,
+            sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
+            router.route(Request::kCommandParameterFieldName,
                          [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
                              auto cmdResponse =
                                  executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(

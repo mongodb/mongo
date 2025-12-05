@@ -98,11 +98,9 @@ public:
             auto& cmd = request();
             setReadWriteConcern(opCtx, cmd, this);
 
-            sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+            sharding::router::CollectionRouter router(opCtx, nss);
             router.routeWithRoutingContext(
-                opCtx,
-                Request::kCommandName,
-                [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                Request::kCommandName, [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                     auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
                         opCtx,
                         routingCtx,

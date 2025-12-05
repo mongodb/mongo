@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -73,7 +72,6 @@
 
 #include <set>
 #include <string>
-#include <type_traits>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -81,7 +79,6 @@
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 namespace {
@@ -260,9 +257,8 @@ public:
         const auto cmdToSend = applyReadWriteConcern(opCtx, this, newCmd);
 
         try {
-            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+            sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
             router.route(
-                opCtx,
                 Request::kCommandName,
                 [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
                     auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(

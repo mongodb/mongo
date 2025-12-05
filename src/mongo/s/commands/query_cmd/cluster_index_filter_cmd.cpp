@@ -119,9 +119,9 @@ public:
         const NamespaceString nss(parseNs(dbName, cmdObj));
         const BSONObj query;
 
-        sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+        sharding::router::CollectionRouter router(opCtx, nss);
         return router.routeWithRoutingContext(
-            opCtx, getName(), [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+            getName(), [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                 // Clear the result builder since this lambda function may be retried if the router
                 // cache is stale.
                 result.resetToEmpty();

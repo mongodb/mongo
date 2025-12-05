@@ -154,9 +154,9 @@ BSONObj executeCoordinateMultiUpdate(OperationContext* opCtx,
 
     generic_argument_util::setMajorityWriteConcern(coordinateCommand, &opCtx->getWriteConcern());
 
-    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+    sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
     return router.route(
-        opCtx, "multi update"_sd, [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+        "multi update"_sd, [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
             auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                 opCtx,
                 DatabaseName::kAdmin,

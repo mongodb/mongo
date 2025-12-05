@@ -81,9 +81,8 @@ void DropIndexesCoordinator::_dropIndexes(OperationContext* opCtx,
         }
     }
 
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), targetNss);
+    sharding::router::CollectionRouter router(opCtx, targetNss);
     router.route(
-        opCtx,
         "DropIndexesCoordinator::_dropIndexesPhase",
         [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
             const auto chunkManager = cri.getChunkManager();

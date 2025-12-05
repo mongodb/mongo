@@ -13,10 +13,9 @@ Operations performed in the _Router Role_ must retrieve the routing information 
 Here are two usage examples:
 
 ```
-sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
+sharding::router::CollectionRouter router(opCtx, nss);
 
 return router.routeWithRoutingContext(
-        opCtx,
         "<Comment to identify this process>"sd,
         [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             ...
@@ -27,10 +26,9 @@ return router.routeWithRoutingContext(
 ```
 
 ```
-sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
 
 return router.route(
-        opCtx,
         "<Comment to identify this process>"sd,
         [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
             ...
@@ -73,8 +71,7 @@ sharding::router::MultiCollectionRouter multiCollectionRouter(
     nssList
 );
 
-multiCollectionRouter.route(
-        opCtx,
+multiCollectionrouter.route(
         "<Comment to identify this process>"sd,
         [&](OperationContext* opCtx,
                 const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap) {

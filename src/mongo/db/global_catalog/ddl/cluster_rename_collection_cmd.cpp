@@ -70,7 +70,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(renameWaitAfterDatabaseCreation);
 namespace {
@@ -143,11 +142,10 @@ public:
                         ActionType::setUserWriteBlockMode));
             generic_argument_util::setMajorityWriteConcern(renameCollRequest);
 
-            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), fromNss.dbName());
+            sharding::router::DBPrimaryRouter router(opCtx, fromNss.dbName());
 
             try {
                 router.route(
-                    opCtx,
                     Request::kCommandName,
                     [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
                         // Creates the destination database if it doesn't exist already.

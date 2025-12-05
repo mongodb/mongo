@@ -332,9 +332,9 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                       "https://docs.mongodb.com/manual/core/map-reduce/");
     }
 
-    sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+    sharding::router::CollectionRouter router(opCtx, nss);
     return router.routeWithRoutingContext(
-        opCtx, "mapReduce"_sd, [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+        "mapReduce"_sd, [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             // Clear the `result` BSONObjBuilder since this lambda function may be retried if the
             // router cache is stale.
             result.resetToEmpty();

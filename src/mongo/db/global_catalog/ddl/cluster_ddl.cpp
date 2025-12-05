@@ -37,7 +37,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/router_role.h"
@@ -53,7 +52,6 @@
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/read_through_cache.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -287,12 +285,10 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
         uassertStatusOK(getWriteConcernStatusFromCommandResult(remoteResponse->data));
 
     } else {
-        sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+        sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
         router.createDbImplicitlyOnRoute();
         router.route(
-            opCtx,
-            "createCollection"_sd,
-            [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+            "createCollection"_sd, [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
                 const auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                     opCtx,
                     nss.dbName(),
@@ -317,9 +313,8 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
 
 void createCollectionWithRouterLoop(OperationContext* opCtx,
                                     const ShardsvrCreateCollection& request) {
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), request.getNamespace());
-    router.route(opCtx,
-                 "cluster::createCollectionWithRouterLoop",
+    sharding::router::CollectionRouter router(opCtx, request.getNamespace());
+    router.route("cluster::createCollectionWithRouterLoop",
                  [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                      cluster::createCollection(opCtx, request);
                  });

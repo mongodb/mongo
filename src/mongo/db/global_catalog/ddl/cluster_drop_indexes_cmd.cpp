@@ -144,11 +144,9 @@ public:
         generic_argument_util::setMajorityWriteConcern(shardsvrDropIndexCmd,
                                                        &opCtx->getWriteConcern());
 
-        sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
+        sharding::router::DBPrimaryRouter router(opCtx, dbName);
         router.route(
-            opCtx,
-            Request::kCommandName,
-            [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+            Request::kCommandName, [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
                 auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                     opCtx,
                     dbName,
