@@ -183,6 +183,16 @@ public:
                  std::vector<std::unique_ptr<QuerySolution>> solutions,
                  QueryPlanner::PlanRankingResult planRankingResult);
 
+    /**
+     * Runs the trial period by working all candidate plans for as long as given in 'trialConfig'.
+     */
+    Status runTrials(MultiPlanStage::TrialPhaseConfig trialConfig);
+
+    /**
+     * Returns the specific stats from the multi-planner stage.
+     */
+    const MultiPlanStats* getSpecificStats() const;
+
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
 

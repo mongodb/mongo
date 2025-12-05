@@ -262,9 +262,20 @@ MultiPlanTicket MultiPlanStage::rateLimit(PlanYieldPolicy* yieldPolicy,
     return std::move(ticket.value());
 }
 
-Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
+size_t MultiPlanStage::numCandidatePlans() const {
+    return _candidates.size();
+}
+
+Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig trialConfig) {
     if (bestPlanChosen()) {
         return Status::OK();
+    }
+
+    if (_specificStats.earlyExit) {
+        LOGV2_WARNING(11482700,
+                      "Running trials for multi-plan stage when we have a winning candidate! We "
+                      "should be choosing the best plan instead.",
+                      "query"_attr = _query->toStringShort(false));
     }
 
     const size_t candidatesSize = _candidates.size();
@@ -304,18 +315,12 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     classicNumPlansTotal.increment(_candidates.size());
     classicCount.increment();
 
-    const double collFraction =
-        trial_period::getCollFractionPerCandidatePlan(*_query, _candidates.size());
-    const size_t numWorks = trial_period::getTrialPeriodMaxWorks(
-        opCtx(), collectionPtr(), internalQueryPlanEvaluationWorks.load(), collFraction);
-    size_t numResults = trial_period::getTrialPeriodNumToReturn(*_query);
-
     try {
         // Work the plans, stopping when a plan hits EOF or returns some fixed number of results.
         size_t ix = 0;
         bool moreToDo = true;
-        for (; ix < numWorks && moreToDo; ++ix) {
-            moreToDo = workAllPlans(numResults, yieldPolicy);
+        for (; ix < trialConfig.maxNumWorksPerPlan && moreToDo; ++ix) {
+            moreToDo = workAllPlans(trialConfig.targetNumResults, yieldPolicy);
         }
         auto totalWorks = ix * _candidates.size();
         classicWorksHistogram.increment(totalWorks);
@@ -323,6 +328,16 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         if (moreToDo) {
             multiPlannerHitWorksLimitTotal.incrementRelaxed();
         }
+
+        int numDocsFound = 0;
+        for (const auto& candidate : _candidates) {
+            numDocsFound += candidate.results.size();
+        }
+
+        _specificStats.totalWorks += totalWorks;
+        _specificStats.numResultsFound = numDocsFound;
+        _specificStats.numCandidatePlans = _candidates.size();
+        _specificStats.earlyExit = !moreToDo;
     } catch (DBException& e) {
         return e.toStatus().withContext("error while multiplanner was selecting best plan");
     }
@@ -331,6 +346,29 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks));
     classicMicrosHistogram.increment(durationMicros);
     classicMicrosTotal.increment(durationMicros);
+    return Status::OK();
+}
+
+MultiPlanStage::TrialPhaseConfig MultiPlanStage::getTrialPhaseConfig() const {
+    const double collFraction =
+        trial_period::getCollFractionPerCandidatePlan(*_query, _candidates.size());
+
+    const size_t numWorks = trial_period::getTrialPeriodMaxWorks(
+        opCtx(), collectionPtr(), internalQueryPlanEvaluationWorks.load(), collFraction);
+
+    size_t numResults = trial_period::getTrialPeriodNumToReturn(*_query);
+    return {numWorks, numResults};
+}
+
+Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
+    return pickBestPlan(yieldPolicy, getTrialPhaseConfig());
+}
+
+Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig trialConfig) {
+    auto runTrialsStatus = runTrials(yieldPolicy, trialConfig);
+    if (runTrialsStatus.isOK() == false) {
+        return runTrialsStatus;
+    }
 
     // After picking best plan, ranking will own plan stats from candidate solutions (winner and
     // losers).
@@ -425,7 +463,8 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             candidate.results.push_back(id);
 
             // Once a plan returns enough results, stop working.
-            if (candidate.results.size() >= numResults) {
+            if (candidate.results.size() >= numResults || candidate.root->isEOF()) {
+                candidate.exitedEarly = true;
                 doneWorking = true;
                 multiPlannerHitResultsLimitTotal.incrementRelaxed();
             }
@@ -433,6 +472,7 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             // First plan to hit EOF wins automatically.  Stop evaluating other plans.
             // Assumes that the ranking will pick this plan.
             doneWorking = true;
+            candidate.exitedEarly = true;
             multiPlannerHitEofTotal.incrementRelaxed();
         } else if (PlanStage::NEED_YIELD == state) {
             // Run-time plan selection occurs before a WriteUnitOfWork is opened and it's not

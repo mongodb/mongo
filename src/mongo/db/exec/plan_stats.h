@@ -37,10 +37,8 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/record_id_bound.h"
-#include "mongo/db/record_id.h"
 #include "mongo/util/container_size_helper.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/time_support.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -758,6 +756,14 @@ struct MultiPlanStats : public SpecificStats {
     }
 
     boost::optional<std::string> replanReason;
+    // Total number of works across all candidate plans.
+    int totalWorks = 0;
+    // Total number of documents returned across all candidate plans.
+    int numResultsFound = 0;
+    // Number of candidate plans considered.
+    int numCandidatePlans = 0;
+    // True if we exited the multi-planner early due to one plan hitting EOF or filling a batch
+    bool earlyExit = false;
 };
 
 struct OrStats : public SpecificStats {

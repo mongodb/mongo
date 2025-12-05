@@ -217,6 +217,17 @@ public:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
         std::unique_ptr<CanonicalQuery> canonicalQuery) override;
 
+
+    /**
+     * Runs the trial period by working all candidate plans for as long as given in 'trialConfig'.
+     */
+    Status runTrials(MultiPlanStage::TrialPhaseConfig trialConfig);
+
+    /**
+     * Returns the specific stats for the multi-plan stage.
+     */
+    const MultiPlanStats* getSpecificStats() const;
+
 private:
     using SbePlanAndData = std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>;
 

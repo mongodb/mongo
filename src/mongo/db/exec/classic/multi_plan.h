@@ -41,7 +41,6 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/util/modules.h"
@@ -69,6 +68,14 @@ extern FailPoint sleepWhileMultiplanning;
 class MultiPlanStage final : public RequiresCollectionStage {
 public:
     static const char* kStageType;
+
+    struct TrialPhaseConfig {
+        // How many works to give each plan during the trial period.
+        size_t maxNumWorksPerPlan;
+        // How many results per plan are we targeting to retrieve during the trial period.
+        // If a plan returns this many results, we can stop the trial period early.
+        size_t targetNumResults;
+    };
 
     /**
      * Callback function which gets called from 'pickBestPlan()'. The 'PlanRankingDecision' and
@@ -115,6 +122,17 @@ public:
                  std::unique_ptr<PlanStage> root,
                  WorkingSet* sharedWs);
 
+    size_t numCandidatePlans() const;
+
+    /**
+     * Runs the trial period by working all candidate plans in round-robin fashion up to a total of
+     * 'maxNumWorksPerPlan' works per plan or until one plan hits EOF or returns 'targetNumResults'
+     * results.
+     */
+    Status runTrials(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig trialConfig);
+
+    TrialPhaseConfig getTrialPhaseConfig() const;
+
     /**
      * Runs all plans added by addPlan(), ranks them, and picks a best plan. All further calls to
      * doWork() will return results from the best plan.
@@ -132,6 +150,8 @@ public:
      * ErrorCodes::QueryPlanKilled if the query plan was killed during a yield.
      */
     Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
+
+    Status pickBestPlan(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig trialConfig);
 
     /**
      * Returns true if a best plan has been chosen.

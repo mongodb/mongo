@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/value.h"

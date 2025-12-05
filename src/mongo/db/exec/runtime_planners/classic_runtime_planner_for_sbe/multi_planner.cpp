@@ -65,10 +65,19 @@ MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
             opCtx(), collections().getMainCollectionPtrOrAcquisition(), *cq(), *solution, ws());
         _multiPlanStage->addPlan(std::move(solution), std::move(nextPlanRoot), ws());
     }
-
     auto trialPeriodYieldPolicy = makeClassicYieldPolicy(
         opCtx(), cq()->nss(), static_cast<PlanStage*>(_multiPlanStage.get()), yieldPolicy());
     uassertStatusOK(_multiPlanStage->pickBestPlan(trialPeriodYieldPolicy.get()));
+}
+
+const MultiPlanStats* MultiPlanner::getSpecificStats() const {
+    return static_cast<const MultiPlanStats*>(_multiPlanStage->getSpecificStats());
+}
+
+Status MultiPlanner::runTrials(MultiPlanStage::TrialPhaseConfig trialConfig) {
+    auto trialPeriodYieldPolicy = makeClassicYieldPolicy(
+        opCtx(), cq()->nss(), static_cast<PlanStage*>(_multiPlanStage.get()), yieldPolicy());
+    return _multiPlanStage->runTrials(trialPeriodYieldPolicy.get(), trialConfig);
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
@@ -93,11 +102,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
                                         cachedPlanHash()));
     }
 
-    // The winning plan did not reach EOF during the trial period, or we were otherwise unable to
-    // use the EOF optimization. Construct an SBE plan executor.
+    // The winning plan did not reach EOF during the trial period, or we were otherwise unable
+    // to use the EOF optimization. Construct an SBE plan executor.
     //
-    // When the EOF optimization is not in use, we should own the 'QuerySolution'. In contrast, when
-    // the EOF optimization is used, MultiPlanStage retains ownership of the winning solution.
+    // When the EOF optimization is not in use, we should own the 'QuerySolution'. In contrast,
+    // when the EOF optimization is used, MultiPlanStage retains ownership of the winning
+    // solution.
     invariant(_winningSolution);
     return prepareSbePlanExecutor(std::move(canonicalQuery),
                                   std::move(_winningSolution),
@@ -124,10 +134,10 @@ void MultiPlanner::_buildSbePlanAndMaybeCache(
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
     std::vector<plan_ranker::CandidatePlan>& candidates) {
     invariant(queryToCache.isSbeCompatible());
-    // Note: 'queryToCache' is _not_ necessarily the same as the canonical query available in cq().
-    // This is because subplanning will plan (and cache) each branch of the top-level OR in a query
-    // separately, and invoke this callback with each branch as if it were an independent top-level
-    // query.
+    // Note: 'queryToCache' is _not_ necessarily the same as the canonical query available in
+    // cq(). This is because subplanning will plan (and cache) each branch of the top-level OR
+    // in a query separately, and invoke this callback with each branch as if it were an
+    // independent top-level query.
 
     boost::optional<NumReads> numReads;
     if (_shouldWriteToPlanCache) {
@@ -135,8 +145,8 @@ void MultiPlanner::_buildSbePlanAndMaybeCache(
         numReads = plan_cache_util::computeNumReadsFromStats(*stats, *ranking);
     }
 
-    // If classic plan cache is enabled, write to it. We need to do this before we extend the QSN
-    // tree with the agg pipeline, since the agg portion does not get cached in classic.
+    // If classic plan cache is enabled, write to it. We need to do this before we extend the
+    // QSN tree with the agg pipeline, since the agg portion does not get cached in classic.
     if (_shouldWriteToPlanCache && !useSbePlanCache()) {
         plan_cache_util::updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
             opCtx(),
@@ -152,7 +162,8 @@ void MultiPlanner::_buildSbePlanAndMaybeCache(
 
     if (!_shouldUseEofOptimization()) {
         // Extend the winning solution with the agg pipeline. If using the EOF optimisation,
-        // plan_executor_factory::make(...) may later require the best solution to still be owned by
+        // plan_executor_factory::make(...) may later require the best solution to still be
+        // owned by
         // `_multiPlanStage` (not yet extracted).
         _winningSolution = extendSolutionWithPipeline(_multiPlanStage->extractBestSolution());
         solnToCache = _winningSolution.get();
