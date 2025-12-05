@@ -32,6 +32,7 @@
 #include "mongo/db/extension/host_connector/adapter/host_portal_adapter.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::host {
 

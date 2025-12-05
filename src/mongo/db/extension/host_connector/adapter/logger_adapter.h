@@ -30,6 +30,7 @@
 
 #include "mongo/db/extension/public/api.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::host_connector {
 

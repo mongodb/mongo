@@ -39,6 +39,7 @@
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::sdk {
 inline StringData stringViewToStringData(std::string_view sv) {

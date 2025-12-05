@@ -39,6 +39,7 @@
 #include "mongo/db/query/search/search_query_view_spec_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_cursor.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

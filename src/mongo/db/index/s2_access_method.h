@@ -42,6 +42,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
 #include <memory>
@@ -50,7 +51,9 @@
 
 namespace mongo {
 
-class S2AccessMethod : public SortedDataIndexAccessMethod {
+// Public: instantiated in index_access_method.cpp (index_builds module) and fixSpec() called from
+// index_catalog_impl.cpp (catalog_and_routing.shard_role module)
+class MONGO_MOD_PUBLIC S2AccessMethod : public SortedDataIndexAccessMethod {
 public:
     S2AccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree)
         : S2AccessMethod(btreeState, std::move(btree), IndexNames::GEO_2DSPHERE) {}

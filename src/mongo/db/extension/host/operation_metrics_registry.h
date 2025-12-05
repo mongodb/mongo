@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host_connector/handle/host_operation_metrics_handle.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <string>

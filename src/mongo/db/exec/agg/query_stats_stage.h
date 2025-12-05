@@ -33,6 +33,7 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/query_stats_entry.h"
 #include "mongo/db/query/query_stats/transform_algorithm_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

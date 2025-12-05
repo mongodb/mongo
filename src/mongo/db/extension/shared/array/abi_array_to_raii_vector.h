@@ -28,6 +28,7 @@
  */
 #pragma once
 #include "mongo/db/extension/shared/array/array_core.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/scopeguard.h"
 
 #include <vector>

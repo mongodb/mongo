@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #define MONGO_HAVE_FAST_BYTE_VECTOR
 
 // TODO replace this with #if BOOST_HW_SIMD_X86 >= BOOST_HW_SIMD_X86_SSE2_VERSION in boost 1.60

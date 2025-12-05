@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/extension/host/load_extension.h"
+#include "mongo/util/modules.h"
 
 #include <filesystem>
 

@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::sdk {
 

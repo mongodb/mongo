@@ -30,6 +30,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/sdk/host_services.h"
+#include "mongo/util/modules.h"
 
 #define MAKE_EXCEPTION_INFO(code, message) \
     BSON("message" << message << "errorCode" << static_cast<int>(code));

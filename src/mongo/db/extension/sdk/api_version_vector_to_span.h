@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/util/modules.h"
 
 #include <span>
 namespace mongo::extension::sdk {

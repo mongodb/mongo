@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/extension/sdk/host_services.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::sdk {
 inline void sdk_log(const std::string& message,

@@ -36,10 +36,13 @@
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class S2BucketAccessMethod : public S2AccessMethod {
+// Public: instantiated in index_access_method.cpp (index_builds module) and fixSpec() called from
+// index_catalog_impl.cpp (catalog_and_routing.shard_role module)
+class MONGO_MOD_PUBLIC S2BucketAccessMethod : public S2AccessMethod {
 public:
     S2BucketAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree)
         : S2AccessMethod(btreeState, std::move(btree), IndexNames::GEO_2DSPHERE_BUCKET) {}

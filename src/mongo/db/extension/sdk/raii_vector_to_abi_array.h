@@ -29,6 +29,7 @@
 #pragma once
 #include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/shared/array/array_core.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo::extension::sdk {

@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/search/search_query_view_spec_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <queue>

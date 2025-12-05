@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -55,7 +56,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListExtensions);
 /**
  * Document source for the $listExtensions stage, implemented as a wrapper of DocumentSourceQueue.
  */
-class DocumentSourceListExtensions final {
+class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceListExtensions final {
 public:
     static constexpr StringData kStageName = "$listExtensions"_sd;
 

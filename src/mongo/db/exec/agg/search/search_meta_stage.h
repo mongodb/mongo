@@ -32,6 +32,7 @@
 #include "mongo/db/exec/agg/search/internal_search_mongot_remote_stage.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/executor/task_executor_cursor.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

@@ -31,6 +31,7 @@
 #include "mongo/db/extension/host/document_source_extension.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::host {
 

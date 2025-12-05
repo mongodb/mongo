@@ -37,6 +37,7 @@
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_cursor.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

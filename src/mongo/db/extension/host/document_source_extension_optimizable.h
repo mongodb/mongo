@@ -32,6 +32,7 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::host {
 

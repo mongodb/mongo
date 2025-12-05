@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>
@@ -60,7 +61,7 @@ namespace mongo::timeseries {
  *   2. Add fields from _computedMetaProjFields.
  *   3. Remove any fields in _fieldSet, since we are in exclude mode.
  */
-class BucketSpec {
+class MONGO_MOD_PUBLIC BucketSpec {
 public:
     // When unpacking buckets with kInclude we must produce measurements that contain the
     // set of fields. Otherwise, if the kExclude option is used, the measurements will include the

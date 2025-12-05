@@ -32,6 +32,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::host_connector {
 /**

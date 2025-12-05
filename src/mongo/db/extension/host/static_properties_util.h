@@ -30,6 +30,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/extension/public/extension_agg_stage_static_properties_gen.h"
 #include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::host {
 namespace static_properties_util {

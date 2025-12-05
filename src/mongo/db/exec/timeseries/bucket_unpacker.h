@@ -40,6 +40,7 @@
 #include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
@@ -100,9 +101,10 @@ inline int computeElementCountFromTimestampObjSize(int targetTimestampObjSize) {
 }
 
 /**
- * BucketUnpacker will unpack bucket fields for metadata and the provided fields.
+ * BucketUnpacker will unpack bucket fields for metadata and the provided fields. Marked public
+ * because computeMeasurementCount() is called from timeseries module.
  */
-class BucketUnpacker {
+class MONGO_MOD_PUBLIC BucketUnpacker {
 public:
     /**
      * Returns the number of measurements in the bucket in O(1) time.

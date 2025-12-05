@@ -33,6 +33,7 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/timeseries_index_conversion_options.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::exec::agg {
 
