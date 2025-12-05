@@ -372,6 +372,7 @@ conn_stats = [
     EvictStat('eviction_internal_pages_queued', 'internal pages queued for eviction'),
     EvictStat('eviction_internal_pages_seen', 'internal pages seen by eviction walk'),
     EvictStat('eviction_interupted_by_app', 'application requested eviction interrupt'),
+    EvictStat('eviction_maximum_attempts_to_evict_page', 'maximum number of times a page tried to be evicted', 'no_clear,no_scale,size'),
     EvictStat('eviction_maximum_attempts_to_queue_page', 'maximum number of times a page tried to be added to eviction queue but fail', 'no_clear,no_scale,size'),
     EvictStat('eviction_maximum_clean_page_size_per_checkpoint', 'maximum clean page size seen at eviction per checkpoint', 'no_clear,no_scale,size'),
     EvictStat('eviction_maximum_dirty_page_size_per_checkpoint', 'maximum dirty page size seen at eviction per checkpoint', 'no_clear,no_scale,size'),

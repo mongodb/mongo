@@ -687,8 +687,8 @@ __wt_checkpoint_verbose_timer_started(WT_SESSION_IMPL *session)
 static void
 __checkpoint_timer_stats_set(WTI_CKPT_TIMER *timer, uint64_t msec)
 {
-    __wt_atomic_stats_max(&timer->max, msec);
-    __wt_atomic_stats_min(&timer->min, msec);
+    __wt_atomic_stats_max_uint64(&timer->max, msec);
+    __wt_atomic_stats_min_uint64(&timer->min, msec);
     __wt_atomic_store_uint64_relaxed(&timer->recent, msec);
     (void)__wt_atomic_add_uint64_relaxed(&timer->total, msec);
 }
@@ -1193,7 +1193,8 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     __wt_atomic_store_uint64_relaxed(&evict->evict_max_dirty_page_size_per_checkpoint, 0);
     __wt_atomic_store_uint64_relaxed(&evict->evict_max_updates_page_size_per_checkpoint, 0);
     __wt_atomic_store_uint64_relaxed(&evict->evict_max_ms_per_checkpoint, 0);
-    __wt_atomic_store_uint64_relaxed(&evict->evict_max_eviction_queue_attempts, 0);
+    __wt_atomic_store_uint16_relaxed(&evict->evict_max_eviction_queue_attempts, 0);
+    __wt_atomic_store_uint16_relaxed(&evict->evict_max_evict_page_attempts, 0);
     __wt_atomic_store_uint64_relaxed(&evict->reentry_hs_eviction_ms, 0);
     __wt_atomic_store_uint32_relaxed(&conn->heuristic_controls.obsolete_tw_btree_count, 0);
     __wt_atomic_store_uint64_relaxed(&conn->rec_maximum_hs_wrapup_milliseconds, 0);
@@ -1356,8 +1357,10 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      * a protection against someone creating a layered table, dropping the table, and then
      * recreating a local table with the same name.
      */
-    if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader)
-        WT_ERR(__wt_disagg_copy_metadata_process(session));
+    if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader) {
+        WT_WITH_SCHEMA_LOCK(session, ret = __wt_disagg_copy_metadata_process(session));
+        WT_ERR(ret);
+    }
 
     /* Wait prior to checkpointing the history store to simulate checkpoint slowness. */
     __checkpoint_timing_stress(session, WT_TIMING_STRESS_HS_CHECKPOINT_DELAY, &tsp);

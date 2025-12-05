@@ -44,7 +44,6 @@ from wtscenario import make_scenarios
 # change happened after the checkpoint started.
 #
 @disagg_test_class
-@wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 class test_layered62(wttest.WiredTigerTestCase):
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \

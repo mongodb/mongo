@@ -32,7 +32,6 @@ from wtscenario import make_scenarios
 
 # test_layered60.py
 #    Test creating empty tables while a checkpoint is running.
-@wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
 class test_layered60(wttest.WiredTigerTestCase):
     conn_base_config = 'statistics=(all),' \

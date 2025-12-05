@@ -1232,7 +1232,8 @@ done:
         /* Although rollback to stable is not needed, we still need to set the durable timestamp. */
         WT_TXN_GLOBAL *txn_global = &conn->txn_global;
         txn_global->has_durable_timestamp = txn_global->has_stable_timestamp;
-        txn_global->durable_timestamp = txn_global->stable_timestamp;
+        __wt_atomic_store_uint64_relaxed(
+          &txn_global->durable_timestamp, txn_global->stable_timestamp);
 
         if (disagg)
             __wt_verbose_info(session, WT_VERB_RTS, "%s", "skipped recovery RTS due to disagg");

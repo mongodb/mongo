@@ -147,7 +147,6 @@ FNV
 FOREACH
 FS
 FULLFSYNC
-FUNC
 FUNCSIG
 Failpoint
 FindClose
@@ -212,7 +211,6 @@ Keyedness
 Kounavis
 LANGID
 LF
-LLVM
 LLVMFuzzerTestOneInput
 LMDB
 LOGOP
@@ -255,7 +253,6 @@ MSan
 MUTEX
 MacOS
 MapViewOfFile
-Marsaglia
 Marsaglia's
 Mellor
 Mitzenmacher
@@ -297,7 +294,6 @@ PALI
 PDEATHSIG
 PFX
 PID
-PINDEX
 POS
 POSIX
 PPC
@@ -305,7 +301,6 @@ PREFETCH
 PREV
 PRId
 PRIu
-PRIx
 PRNG
 PSD
 PSE
@@ -344,7 +339,6 @@ RETRYABLE
 RHEL
 RLE
 RLEs
-RMW
 RNG
 RNGs
 RPC
@@ -482,7 +476,6 @@ WiredTigerShared
 WiredTigerSharedHS
 WiredTigerTmplog
 WithSeeds
-Wl
 Wmissing
 WriteFile
 Wundef
@@ -490,7 +483,6 @@ Wuninitialized
 Wunused
 XP
 XXXXXX
-Xorshift
 YCSB
 ZSTD
 Zlib
@@ -566,7 +558,6 @@ bool
 boolean
 booleans
 boption
-bpack
 br
 breakpoint
 bs
@@ -961,6 +952,7 @@ keyid
 keyids
 keylen
 keyv
+kp
 kv
 kvraw
 kvs
@@ -992,9 +984,7 @@ linux
 llll
 llu
 llvm
-loadbool
 loadtext
-loadvbool
 loc
 localTime
 localkey
@@ -1036,7 +1026,6 @@ maxv
 mb
 mbll
 mbss
-md
 mem
 membar
 memcmp
@@ -1061,7 +1050,6 @@ mn
 mnt
 mongod
 mrs
-msan
 msecs
 msg
 msvc
@@ -1171,6 +1159,7 @@ pid
 pindexp
 plh
 plhandle
+pluggable
 pmem
 poptable
 popthreads
@@ -1332,8 +1321,6 @@ stepp
 stlr
 stlrb
 stlrh
-storebool
-storevbool
 str
 strace
 strcat
@@ -1482,7 +1469,6 @@ vPodir
 vW
 va
 validator
-vals
 valuep
 valuev
 vanishingly

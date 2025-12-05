@@ -32,7 +32,6 @@ from wtscenario import make_scenarios
 
 # test_layered40.py
 #    Test layered table metadata has logging disabled.
-@wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
 class test_layered40(wttest.WiredTigerTestCase):
     conn_config = 'log=(enabled=true),disaggregated=(role="leader"),'

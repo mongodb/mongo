@@ -41,8 +41,6 @@ fi
 PROG="./t"
 CONFIG="../../../test/format/CONFIG.disagg"
 DISAGG_MULTI_CONFIG="disagg.multi=1 runs.predictable_replay=1 "
-# FIXME-WT-14566 Limit some configs for now.
-LIMIT_CONFIG="runs.timer=1 runs.rows=10000"
 LEADER_LOG="$home_dir/leader.out"
 FOLLOWER_LOG="$home_dir/follower/follower.out"
 SESSION_NAME="format_disagg_multi_node"

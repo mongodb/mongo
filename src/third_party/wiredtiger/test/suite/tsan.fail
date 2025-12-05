@@ -64,3 +64,4 @@ test_truncate11.py
 test_truncate15.py
 test_truncate19.py
 test_txn24.py
+test_verbose03.py # FIXME-WT-15978

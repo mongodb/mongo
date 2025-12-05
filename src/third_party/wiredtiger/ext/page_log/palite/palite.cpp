@@ -767,6 +767,9 @@ class Connection {
 
     /* Common configuration parameters for connections */
     constexpr static std::string_view config_statements[] = {
+
+      /* Set busy timeout to 10 seconds. */
+      "PRAGMA busy_timeout = 10000;"
       /*
        * The WAL journaling mode uses a write-ahead log instead of a rollback journal to implement
        * transactions. This significantly improves performance.
@@ -780,10 +783,7 @@ class Connection {
       "PRAGMA synchronous = OFF;",
 
       /* For temporary store use memory instead of disk. */
-      "PRAGMA temp_store = MEMORY;",
-
-      /* Set busy timeout to 10 seconds. */
-      "PRAGMA busy_timeout = 10000;"};
+      "PRAGMA temp_store = MEMORY;"};
 
 public:
     using StatementPtr = std::unique_ptr<sqlite3_stmt, std::function<decltype(sqlite3_reset)>>;

@@ -654,7 +654,7 @@ __wt_conn_dhandle_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t fla
      * allowed to be relocked by the same session.
      */
     if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) && !LF_ISSET(WT_BTREE_BULK)) {
-        dhandle->excl_session = session;
+        __wt_tsan_suppress_store_pointer((void *)&dhandle->excl_session, (void *)session);
         dhandle->excl_ref = 1;
     }
     F_SET(dhandle, WT_DHANDLE_OPEN);

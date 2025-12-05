@@ -975,6 +975,13 @@ __wt_disagg_copy_metadata_process(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
 
+    /*
+     * This requires schema lock to ensure that we capture a consistent snapshot of metadata entries
+     * related to the given shared table, e.g., the various file, colgroup, table, and layered
+     * entries.
+     */
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+
     __wt_spin_lock(session, &conn->disaggregated_storage.copy_metadata_lock);
 
     TAILQ_FOREACH_SAFE(entry, &conn->disaggregated_storage.copy_metadata_qh, q, tmp)

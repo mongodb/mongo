@@ -33,7 +33,6 @@ from wtscenario import make_scenarios
 # test_layered64.py
 #    Test the checksum part of the checkpoint metadata.
 @disagg_test_class
-@wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 class test_layered64(wttest.WiredTigerTestCase):
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \

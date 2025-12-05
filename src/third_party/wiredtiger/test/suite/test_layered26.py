@@ -33,7 +33,6 @@ from wtscenario import make_scenarios
 # test_layered26.py
 #    Make sure a secondary picking up a checkpoint adds in the stable
 #    component of the table.
-@wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
 class test_layered26(wttest.WiredTigerTestCase):
     nitems = 5000

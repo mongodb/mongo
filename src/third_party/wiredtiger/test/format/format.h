@@ -310,9 +310,9 @@ typedef struct {
 #define PREFIX_LEN_CONFIG_MAX 80
     uint32_t prefix_len_max;
 
-    bool disagg_leader;          /* If disaggregated storage role is configured as a leader. */
-    pid_t follower_pid;          /* For multi-node disagg follower process */
-    uint64_t last_checkpoint_ts; /* Last checkpoint timestamp picked up by follower. */
+    bool disagg_leader; /* If disaggregated storage role is configured as a leader. */
+    pid_t follower_pid; /* For multi-node disagg follower process */
+    char checkpoint_metadata[FILENAME_MAX]; /* Last checkpoint metadata picked up by follower. */
 
     bool column_store_config;           /* At least one column-store table configured */
     bool disagg_storage_config;         /* If disaggregated storage is configured */
@@ -463,10 +463,11 @@ void cursor_dump_page(WT_CURSOR *, const char *);
 bool disagg_is_mode_switch(void);
 bool disagg_is_multi_node(void);
 void disagg_setup_multi_node(void);
-int disagg_switch_roles(void);
+void disagg_switch_roles(void);
 void disagg_teardown_multi_node(void);
 bool enable_session_prefetch(void);
 void fclose_and_clear(FILE **);
+void follower_read_latest_checkpoint(void);
 void key_gen_common(TABLE *, WT_ITEM *, uint64_t, const char *);
 void key_gen_init(WT_ITEM *);
 void key_gen_teardown(WT_ITEM *);

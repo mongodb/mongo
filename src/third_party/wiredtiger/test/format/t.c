@@ -405,7 +405,7 @@ main(int argc, char *argv[])
         for (reps = 1; reps <= (FORMAT_OPERATION_REPS * 2); ++reps) {
             ops_seconds = g.disagg_leader ? leader_ops_seconds : DISAGG_SWITCH_FOLLOWER_OPS_SEC;
             operations(ops_seconds, reps, (FORMAT_OPERATION_REPS * 2));
-            testutil_check(disagg_switch_roles());
+            disagg_switch_roles();
         }
     }
 

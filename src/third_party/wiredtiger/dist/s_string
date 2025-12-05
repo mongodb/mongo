@@ -77,7 +77,7 @@ while :
         # that building a replacement list of words with the newer version of aspell will omit them
         # from our custom words file, and subsequently running s_string with older aspell version will
         # report spelling errors. Manually whitelist these names to address this.
-        whitelist_words="AWS AWS's MongoDB MONGODB PostgreSQL Reify sanitizer sanitizers"
+        whitelist_words="AWS AWS's MongoDB MONGODB PostgreSQL Reify sanitizer sanitizers dylib"
         for name in $whitelist_words; do
             echo $name >> $t
         done

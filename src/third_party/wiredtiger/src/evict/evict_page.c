@@ -101,9 +101,9 @@ __evict_stats_update(WT_SESSION_IMPL *session, uint8_t flags)
     }
     if (!session->evict_timeline.reentry_hs_eviction) {
         eviction_time_milliseconds = eviction_time / WT_THOUSAND;
-        __wt_atomic_stats_max(
+        __wt_atomic_stats_max_uint64(
           &conn->evict->evict_max_ms_per_checkpoint, eviction_time_milliseconds);
-        __wt_atomic_stats_max(&conn->evict->evict_max_ms, eviction_time_milliseconds);
+        __wt_atomic_stats_max_uint64(&conn->evict->evict_max_ms, eviction_time_milliseconds);
         if (eviction_time_milliseconds > WT_MINUTE * WT_THOUSAND)
             __wt_verbose_warning(session, WT_VERB_EVICTION,
               "Eviction took more than 1 minute (%" PRIu64 "us). Building disk image took %" PRIu64
@@ -263,18 +263,21 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
      * statistic.
      */
     page_size = __wt_atomic_load_size_relaxed(&page->memory_footprint);
-    __wt_atomic_stats_max(&conn->evict->evict_max_page_size, page_size);
+    __wt_atomic_stats_max_uint64(&conn->evict->evict_max_page_size, page_size);
 
     /* Clean page */
     if (!is_dirty) {
-        __wt_atomic_stats_max(&conn->evict->evict_max_clean_page_size_per_checkpoint, page_size);
+        __wt_atomic_stats_max_uint64(
+          &conn->evict->evict_max_clean_page_size_per_checkpoint, page_size);
     } else {
         /* Dirty page */
-        __wt_atomic_stats_max(&conn->evict->evict_max_dirty_page_size_per_checkpoint, page_size);
+        __wt_atomic_stats_max_uint64(
+          &conn->evict->evict_max_dirty_page_size_per_checkpoint, page_size);
     }
     /* Check if the page has updates */
     if (page->modify != NULL) {
-        __wt_atomic_stats_max(&conn->evict->evict_max_updates_page_size_per_checkpoint, page_size);
+        __wt_atomic_stats_max_uint64(
+          &conn->evict->evict_max_updates_page_size_per_checkpoint, page_size);
     }
 
     /* Figure out whether reconciliation was done on the page */

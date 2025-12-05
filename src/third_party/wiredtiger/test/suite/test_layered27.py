@@ -33,7 +33,6 @@ from wtscenario import make_scenarios
 
 # test_layered27.py
 # Test draining the ingest table
-@wttest.skip_for_hook("tiered", "FIXME-WT-14938: crashing with tiered hook.")
 @disagg_test_class
 class test_layered27(wttest.WiredTigerTestCase):
     conn_base_config = ',create,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \

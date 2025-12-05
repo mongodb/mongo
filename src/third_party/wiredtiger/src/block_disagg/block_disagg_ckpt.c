@@ -105,11 +105,11 @@ __wti_block_disagg_checkpoint(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *root
 }
 
 /*
- * __wti_block_disagg_checkpoint_resolve --
- *     Resolve the checkpoint.
+ * __block_disagg_checkpoint_resolve --
+ *     Resolve the checkpoint. Assumes that the relevant locks are already acquired.
  */
-int
-__wti_block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool failed)
+static int
+__block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool failed)
 {
     WT_BLOCK_DISAGG *block_disagg;
     WT_CONFIG_ITEM cval;
@@ -126,6 +126,13 @@ __wti_block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool 
 
     md_cursor = NULL;
     md_key = NULL;
+
+    /*
+     * This requires schema lock to ensure that we capture a consistent snapshot of metadata entries
+     * related to the given shared table, e.g., the various file, colgroup, table, and layered
+     * entries.
+     */
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
 
     if (failed)
         return (0);
@@ -182,6 +189,18 @@ err:
     if (md_cursor != NULL)
         WT_TRET(__wt_metadata_cursor_release(session, &md_cursor));
 
+    return (ret);
+}
+
+/*
+ * __wti_block_disagg_checkpoint_resolve --
+ *     Resolve the checkpoint.
+ */
+int
+__wti_block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool failed)
+{
+    WT_DECL_RET;
+    WT_WITH_SCHEMA_LOCK(session, ret = __block_disagg_checkpoint_resolve(bm, session, failed));
     return (ret);
 }
 

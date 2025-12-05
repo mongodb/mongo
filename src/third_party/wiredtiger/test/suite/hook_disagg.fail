@@ -2,29 +2,12 @@
 # This list are test files that are not run, they are known failures. The reasons for the failures are not known,
 # they'll need to be triaged. When we know something about the failure, they are commented.
 test_autoclose.py
-test_base02.py
-test_base04.py  # FIXME: WT-15417
-test_bug003.py
-test_bug004.py  # page verify failed
-test_bug005.py
-test_bug006.py
-test_bug010.py
-test_bug027.py
-test_bulk01.py
-test_bulk02.py
 test_checkpoint06.py # FIXME: WT-15507
 test_config02.py
 test_config09.py
-test_config10.py
-test_config12.py
-test_cursor01.py
-test_cursor06.py  # FIXME: WT-15417
 test_cursor17.py  # FIXME: WT-15418
 test_cursor21.py  # FIXME: WT-15369
-test_debug_mode08.py
-test_drop.py
 test_drop03.py
-test_drop_create.py
 test_dump.py
 test_dump01.py
 test_dump02.py
@@ -32,7 +15,6 @@ test_dump03.py
 test_dump04.py
 test_dump05.py
 test_dupc.py
-test_durability01.py
 test_durable_ts01.py  # FIXME: WT-15370
 test_durable_ts03.py
 test_empty.py
@@ -40,58 +22,30 @@ test_encrypt06.py
 test_env01.py
 test_error_info01.py
 test_error_info03.py
-test_eviction02.py
-test_eviction03.py
 test_hs01.py  # FIXME: WT-15371
-test_hs06.py
-test_hs09.py
 test_hs18.py
 test_hs21.py
 test_hs24.py
 test_hs30.py
-test_hs32.py
 test_hs_evict_race01.py
 test_log03.py
 test_metadata_cursor01.py
-test_metadata_cursor02.py
-test_metadata_cursor03.py
 test_metadata_cursor04.py
-test_prefetch01.py
-test_prefetch02.py
 test_prepare03.py
-test_prepare11.py
-test_prepare13.py
 test_prepare28.py
 test_prepare29.py
 test_prepare_cursor01.py
-test_prepare_hs02.py
 test_prepare_hs03.py
 test_prepare_hs04.py
 test_readonly01.py
 test_readonly03.py  # WT-14582
 test_shared_cache01.py
 test_stat01.py
-test_stat02.py
-test_stat03.py
-test_stat04.py
-test_stat05.py
-test_stat13.py
-test_stat_log01.py
 test_stat_log02.py
-test_sweep03.py  # FIXME: WT-15417
-test_timestamp20.py
 test_truncate01.py # FIXME: WT-15474
 test_truncate21.py # FIXME: WT-15472
 test_truncate24.py # FIXME: WT-15473
-test_txn02.py
-test_txn04.py
 test_txn06.py
-test_txn08.py
-test_txn09.py
-test_txn10.py
-test_txn14.py
-test_txn16.py
-test_txn18.py
 test_txn22.py
 test_util01.py
 test_util02.py
@@ -104,9 +58,6 @@ test_util13.py
 test_util14.py
 test_util15.py
 test_util17.py
-test_util18.py
-test_util22.py
 test_verbose01.py  # FIXME: WT-15372
 test_verbose02.py
-test_verbose03.py
 test_verbose04.py
