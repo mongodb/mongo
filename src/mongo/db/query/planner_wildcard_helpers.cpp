@@ -380,6 +380,11 @@ std::pair<BSONObj, size_t> expandWildcardIndexKeyPattern(const BSONObj& wildcard
             builder.appendAs(field, expandFieldName);
             wildcardFieldPos = fieldPos;
         } else {
+            tassert(11390001,
+                    str::stream() << "Expansion of wildcard index " << wildcardKeyPattern
+                                  << " would result in duplicate field: " << expandFieldName,
+                    fieldName != expandFieldName);
+
             builder.append(field);
         }
         ++fieldPos;
