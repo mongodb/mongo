@@ -305,6 +305,7 @@ catalog_and_routing.router_role:
       consistency level.
     slack: server-catalog-and-routing
     jira: Catalog and Routing
+    fully_marked: true
   files:
     - src/mongo/db/router_role/**
     - src/mongo/s/service_entry_point_router_role[._]*
