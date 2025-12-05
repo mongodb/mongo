@@ -138,6 +138,17 @@ LogicalSessionIdSet makeLogicalSessionIds(const std::vector<LogicalSessionFromCl
                                           OperationContext* opCtx,
                                           std::initializer_list<Privilege> allowSpoof = {});
 
+LogicalSessionId makeLogicalSessionIdForTest();
+
+LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUIDForTest(
+    boost::optional<LogicalSessionId> parentLsid = boost::none,
+    boost::optional<TxnNumber> parentTxnNumber = boost::none);
+
+LogicalSessionId makeLogicalSessionIdWithTxnUUIDForTest(
+    boost::optional<LogicalSessionId> parentLsid = boost::none);
+
+LogicalSessionRecord makeLogicalSessionRecordForTest();
+
 namespace MONGO_MOD_PUB logical_session_id_helpers {
 
 void serializeLsidAndTxnNumber(OperationContext* opCtx, BSONObjBuilder* builder);

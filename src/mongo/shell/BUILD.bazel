@@ -20,7 +20,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/client:clientdriver_minimal",
-        "//src/mongo/db/session:logical_session_id",
         "//src/mongo/scripting:bson_template_evaluator",
         "//src/mongo/util:pcre_util",
         "//src/mongo/util:pcre_wrapper",

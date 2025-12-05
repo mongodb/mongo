@@ -35,40 +35,6 @@
 
 namespace mongo {
 
-LogicalSessionId makeLogicalSessionIdForTest() {
-    LogicalSessionId lsid;
-
-    lsid.setId(UUID::gen());
-    lsid.setUid(SHA256Block::computeHash({}));
-
-    return lsid;
-}
-
-LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUIDForTest(
-    boost::optional<LogicalSessionId> parentLsid, boost::optional<TxnNumber> parentTxnNumber) {
-    auto lsid = parentLsid ? LogicalSessionId(parentLsid->getId(), parentLsid->getUid())
-                           : makeLogicalSessionIdForTest();
-    lsid.setTxnUUID(UUID::gen());
-    lsid.setTxnNumber(parentTxnNumber ? *parentTxnNumber : 0);
-    return lsid;
-}
-
-LogicalSessionId makeLogicalSessionIdWithTxnUUIDForTest(
-    boost::optional<LogicalSessionId> parentLsid) {
-    auto lsid = parentLsid ? LogicalSessionId(parentLsid->getId(), parentLsid->getUid())
-                           : makeLogicalSessionIdForTest();
-    lsid.setTxnUUID(UUID::gen());
-    return lsid;
-}
-
-LogicalSessionRecord makeLogicalSessionRecordForTest() {
-    LogicalSessionRecord record{};
-
-    record.setId(makeLogicalSessionIdForTest());
-
-    return record;
-}
-
 OperationSessionInfoFromClient::OperationSessionInfoFromClient(
     LogicalSessionFromClient lsidFromClient) {
     setSessionId(std::move(lsidFromClient));

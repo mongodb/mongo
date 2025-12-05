@@ -60,7 +60,6 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:generic_cursor",
         "//src/mongo/db/session:kill_sessions",
         "//src/mongo/db/session:logical_session_cache",
-        "//src/mongo/db/session:logical_session_id",
         "//src/mongo/util/concurrency:spin_lock",
     ],
 )
@@ -153,7 +152,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_request",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/shard_role:service_context_non_d",
-        "//src/mongo/db/session:logical_session_id",
         "//src/mongo/db:shared_request_handling",
         "//src/mongo/db:vector_clock",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",

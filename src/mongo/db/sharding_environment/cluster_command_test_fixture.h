@@ -38,6 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/util/fail_point.h"

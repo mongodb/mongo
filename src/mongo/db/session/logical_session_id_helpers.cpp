@@ -31,6 +31,8 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
+#include "mongo/crypto/hash_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -274,6 +276,40 @@ LogicalSessionIdSet makeLogicalSessionIds(const std::vector<LogicalSessionFromCl
     }
 
     return lsids;
+}
+
+LogicalSessionId makeLogicalSessionIdForTest() {
+    LogicalSessionId lsid;
+
+    lsid.setId(UUID::gen());
+    lsid.setUid(SHA256Block::computeHash({}));
+
+    return lsid;
+}
+
+LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUIDForTest(
+    boost::optional<LogicalSessionId> parentLsid, boost::optional<TxnNumber> parentTxnNumber) {
+    auto lsid = parentLsid ? LogicalSessionId(parentLsid->getId(), parentLsid->getUid())
+                           : makeLogicalSessionIdForTest();
+    lsid.setTxnUUID(UUID::gen());
+    lsid.setTxnNumber(parentTxnNumber ? *parentTxnNumber : 0);
+    return lsid;
+}
+
+LogicalSessionId makeLogicalSessionIdWithTxnUUIDForTest(
+    boost::optional<LogicalSessionId> parentLsid) {
+    auto lsid = parentLsid ? LogicalSessionId(parentLsid->getId(), parentLsid->getUid())
+                           : makeLogicalSessionIdForTest();
+    lsid.setTxnUUID(UUID::gen());
+    return lsid;
+}
+
+LogicalSessionRecord makeLogicalSessionRecordForTest() {
+    LogicalSessionRecord record{};
+
+    record.setId(makeLogicalSessionIdForTest());
+
+    return record;
 }
 
 namespace logical_session_id_helpers {

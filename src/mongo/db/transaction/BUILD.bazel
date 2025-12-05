@@ -51,7 +51,6 @@ mongo_cc_library(
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:query_request",
         "//src/mongo/db/repl:repl_coordinator_interface",
-        "//src/mongo/db/session:logical_session_id",
         "//src/mongo/db/session:logical_session_id_helpers",
         "//src/mongo/db/session:session_catalog",
         "//src/mongo/executor:inline_executor",

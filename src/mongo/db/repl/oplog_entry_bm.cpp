@@ -31,6 +31,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 
 #include <random>
 

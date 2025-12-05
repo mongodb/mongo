@@ -33,6 +33,7 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/repl/hello/hello_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/network_test_env.h"

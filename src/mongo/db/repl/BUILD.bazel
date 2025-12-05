@@ -210,8 +210,7 @@ mongo_cc_library(
     ],
     deps = [
         ":oplog_entry",
-        "//src/mongo:base",
-        "//src/mongo/db/session:logical_session_id",
+        "//src/mongo/db:server_base",
         "//src/mongo/idl:idl_parser",
     ],
 )
@@ -600,8 +599,7 @@ mongo_cc_library(
         "split_prepare_session_manager.cpp",
     ],
     deps = [
-        "//src/mongo:base",
-        "//src/mongo/db/session:logical_session_id",
+        "//src/mongo/db:server_base",
         "//src/mongo/db/session:logical_session_id_helpers",
     ],
 )
@@ -1389,7 +1387,6 @@ mongo_cc_library(
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
         "//src/mongo/db/index_builds:index_builds_common",
-        "//src/mongo/db/session:logical_session_id",
     ],
 )
 
@@ -1994,6 +1991,7 @@ mongo_cc_benchmark(
     deps = [
         ":apply_ops_command_info",
         ":oplog_entry",
+        "//src/mongo/db/session:logical_session_id_helpers",
         "//src/mongo/db/shard_role/lock_manager",
     ],
 )

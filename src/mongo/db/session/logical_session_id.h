@@ -34,12 +34,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/crypto/hash_block.h"
-#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -89,17 +86,6 @@ inline bool operator==(const LogicalSessionRecord& lhs, const LogicalSessionReco
 inline bool operator!=(const LogicalSessionRecord& lhs, const LogicalSessionRecord& rhs) {
     return !(lhs == rhs);
 }
-
-LogicalSessionId makeLogicalSessionIdForTest();
-
-LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUIDForTest(
-    boost::optional<LogicalSessionId> parentLsid = boost::none,
-    boost::optional<TxnNumber> parentTxnNumber = boost::none);
-
-LogicalSessionId makeLogicalSessionIdWithTxnUUIDForTest(
-    boost::optional<LogicalSessionId> parentLsid = boost::none);
-
-LogicalSessionRecord makeLogicalSessionRecordForTest();
 
 struct LogicalSessionIdHash {
     std::size_t operator()(const LogicalSessionId& lsid) const {

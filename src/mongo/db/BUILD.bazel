@@ -1318,6 +1318,8 @@ mongo_cc_library(
         "//src/mongo/db/repl:read_concern_args_gen",
         "//src/mongo/db/repl:read_concern_gen",
         "//src/mongo/db/router_role:gossiped_routing_cache_gen",
+        "//src/mongo/db/session:logical_session_id.cpp",
+        "//src/mongo/db/session:logical_session_id_gen",
         "//src/mongo/db/shard_role/lock_manager:dump_lock_manager.cpp",
         "//src/mongo/db/sharding_environment:shard_id.cpp",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
@@ -1344,7 +1346,6 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db/repl:optime",
-        "//src/mongo/db/session:logical_session_id",
         "//src/mongo/idl:basic_types_serialization",
         "//src/mongo/idl:idl_parser",
         "//src/mongo/rpc:get_status_from_command_result",
@@ -1384,7 +1385,6 @@ mongo_cc_library(
     deps = [
         ":commands",
         "//src/mongo/db/pipeline:lite_parsed_document_source",
-        "//src/mongo/db/session:logical_session_id",
     ],
 )
 
@@ -1593,7 +1593,6 @@ mongo_cc_library(
     deps = [
         "multi_key_path_tracker",
         "server_base",
-        "//src/mongo/db/session:logical_session_id",
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/storage:recovery_unit_base",
         "//src/mongo/db/storage:write_unit_of_work",
@@ -1939,7 +1938,6 @@ mongo_cc_library(
         "//src/mongo/db/query:query_request",
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/write_ops:write_ops_parsers",
-        "//src/mongo/db/session:logical_session_id",
         "//src/mongo/db/transaction:transaction_api",
         "//src/mongo/executor:inline_executor",
         "//src/mongo/executor:task_executor_pool",
@@ -2104,7 +2102,6 @@ mongo_cc_library(
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db/query:query_request",
         "//src/mongo/db/repl:repl_coordinator_interface",
-        "//src/mongo/db/session:logical_session_id",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
@@ -2191,8 +2188,6 @@ mongo_cc_library(
     deps = [
         ":service_context",
         ":shared_request_handling",
-        "//src/mongo/db/session:logical_session_id",
-        "//src/mongo/db/session:logical_session_id_helpers",
         "//src/mongo/db/transaction:transaction_api",
         "//src/mongo/rpc",
         "//src/mongo/s:startup_initialization",
