@@ -23,6 +23,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
   hooks:
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
       shell_options:
         global_vars:

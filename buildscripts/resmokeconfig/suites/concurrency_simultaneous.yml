@@ -24,6 +24,7 @@ executor:
     tests: true
   config: {}
   hooks:
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
       shell_options:
         global_vars:

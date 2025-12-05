@@ -44,6 +44,7 @@ executor:
     num_rs_nodes_per_shard: 2
   hooks:
     - class: CheckReplDBHash
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

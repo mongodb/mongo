@@ -62,6 +62,10 @@ export class CollectionValidator {
                             if (!currHashes[db] || !currHashes[db][coll]) {
                                 return;
                             }
+                            if (db == "config" && coll == "availability_01994e24-d524-7b1c-a710-a2f978f41301") {
+                                // Skip checking config.availability_01994e24-d524-7b1c-a710-a2f978f41301 because we keep writing to it in the background.
+                                return;
+                            }
                             assert.eq(
                                 hashes[db][coll].all,
                                 currHashes[db][coll].all,

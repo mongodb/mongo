@@ -53,6 +53,7 @@ executor:
     shell_options:
       eval: await import("jstests/libs/override_methods/implicit_identity_views.js");
   hooks:
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

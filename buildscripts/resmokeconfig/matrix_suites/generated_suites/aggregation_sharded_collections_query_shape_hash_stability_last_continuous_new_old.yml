@@ -37,6 +37,7 @@ executor:
       - {}
     persist_connection_strings: true
   hooks:
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

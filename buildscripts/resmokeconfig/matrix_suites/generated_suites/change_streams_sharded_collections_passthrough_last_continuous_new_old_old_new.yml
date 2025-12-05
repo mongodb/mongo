@@ -40,6 +40,7 @@ executor:
     old_bin_version: last_continuous
   hooks:
     - class: CheckReplDBHash
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

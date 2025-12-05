@@ -65,6 +65,7 @@ executor:
         nodb: ""
     - class: CheckReplOplogs
     - class: CheckReplDBHash
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

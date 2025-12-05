@@ -371,6 +371,7 @@
             global_vars:
               TestData:
                 skipValidationOnInvalidViewDefinitions: true
+        - class: RunCanaryWorkloadInBackground
         - class: ValidateCollections
           shell_options:
             global_vars:
@@ -392,6 +393,7 @@
             global_vars:
               TestData:
                 skipValidationOnInvalidViewDefinitions: true
+        - class: RunCanaryWorkloadInBackground
         - class: ValidateCollections
           shell_options:
             global_vars:

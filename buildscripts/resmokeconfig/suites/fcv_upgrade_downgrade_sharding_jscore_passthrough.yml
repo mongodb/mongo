@@ -141,6 +141,7 @@ executor:
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: FCVUpgradeDowngradeInBackground
     - class: CleanEveryN

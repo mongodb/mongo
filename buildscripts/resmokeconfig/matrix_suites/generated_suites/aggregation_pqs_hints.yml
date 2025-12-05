@@ -29,6 +29,7 @@ executor:
         enableTestCommands: 1
     num_nodes: 2
   hooks:
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

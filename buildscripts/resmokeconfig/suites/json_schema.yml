@@ -19,6 +19,7 @@ executor:
       - ValidateCollections
   config: {}
   hooks:
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20
