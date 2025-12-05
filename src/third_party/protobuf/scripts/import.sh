@@ -7,9 +7,7 @@ IFS=$'\n\t'
 set -vx
 
 NAME=protobuf
-REVISION="v4.25.0"
-# VERSION variable is not used in this script, but is in here for SBOM generation. Should match the official release tag
-VERSION="v25.0"
+VERSION="v4.25.0"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/protobuf
 PATCH_DIR=$(git rev-parse --show-toplevel)/src/third_party/protobuf/patches
@@ -18,7 +16,7 @@ if [[ -d $DEST_DIR/dist ]]; then
     exit 1
 fi
 
-git clone --branch $REVISION https://github.com/mongodb-forks/protobuf.git $DEST_DIR/dist
+git clone --branch $VERSION https://github.com/mongodb-forks/protobuf.git $DEST_DIR/dist
 pushd $DEST_DIR/dist
 git apply $PATCH_DIR/*.patch
 rm -rf benchmarks

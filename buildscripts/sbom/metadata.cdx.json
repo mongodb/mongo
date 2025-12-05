@@ -1798,7 +1798,7 @@
         }
       ],
       "copyright": "Copyright 2008 Google Inc. Copyright 2023 Google LLC. All rights reserved.",
-      "cpe": "cpe:2.3:a:google:protobuf:{{VERSION}}:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:google:protobuf-cpp:{{VERSION}}:*:*:*:*:*:*:*",
       "purl": "pkg:github/protocolbuffers/protobuf@{{VERSION}}",
       "externalReferences": [
         {
