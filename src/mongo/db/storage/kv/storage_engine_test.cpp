@@ -413,6 +413,20 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreClustered) {
     ASSERT_EQ(0, memcmp(data, rd.data(), strlen(data)));
 }
 
+TEST_F(StorageEngineTest, TemporaryRecordStoreReuseOrErrorExistingIdent) {
+    const std::string ident = ident::generateNewInternalIdent();
+    auto opCtx = cc().makeOperationContext();
+    auto tempRs = _storageEngine->makeTemporaryRecordStore(opCtx.get(), ident, KeyFormat::Long);
+    ASSERT(tempRs);
+
+    // makeTemporaryRecordStore colliding with an empty on disk ident is tolerated.
+    auto& retryRu = *shard_role_details::getRecoveryUnit(opCtx.get());
+    auto reused = _storageEngine->makeTemporaryRecordStore(opCtx.get(), ident, KeyFormat::Long);
+    ASSERT(reused);
+    auto cursor = reused->rs()->getCursor(opCtx.get(), retryRu);
+    ASSERT_FALSE(cursor->next());
+}
+
 class StorageEngineReconcileTest : public StorageEngineTest {
 protected:
     UUID collectionUUID = UUID::gen();

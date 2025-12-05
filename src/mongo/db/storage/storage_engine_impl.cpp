@@ -732,8 +732,41 @@ std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStor
             "Cannot use a non-internal ident to create a temporary RecordStore instance",
             ident::isInternalIdent(ident));
 
-    std::unique_ptr<RecordStore> rs = _engine->makeTemporaryRecordStore(
-        *shard_role_details::getRecoveryUnit(opCtx), ident, keyFormat);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto createTemporary = [&] {
+        return _engine->makeTemporaryRecordStore(ru, ident, keyFormat);
+    };
+    std::unique_ptr<RecordStore> rs;
+    try {
+        rs = createTemporary();
+    } catch (const ExceptionFor<ErrorCodes::ObjectAlreadyExists>&) {
+        // ObjectAlreadyExists can happen if a table is created while a checkpoint is in progress,
+        // as DDL operations being non-transactional means that the table *might* be included in the
+        // checkpoint despite not existing at the checkpoint's timestamp. Temporary idents are not
+        // represented in the catalog, so if we collide we can just drop the on-disk table.
+
+        // TODO (SERVER-114575): A layered drop can report success while not dropping the table. If
+        // so, we can re-use the ident if it is empty, which should always be the case. When layered
+        // table drops are supported, dropIdent's effect should always be consistent with its
+        // return status and a collision on re-creating an ident should be an error.
+        uassertStatusOK(_engine->dropIdent(ru, ident, false /* identHasSizeInfo */));
+
+        try {
+            rs = createTemporary();
+        } catch (const ExceptionFor<ErrorCodes::ObjectAlreadyExists>&) {
+            auto existing = _engine->getTemporaryRecordStore(ru, ident, keyFormat);
+            auto cursor = existing->getCursor(opCtx, ru);
+            invariant(!cursor->next());
+
+            LOGV2_DEBUG(11440001,
+                        1,
+                        "Temporary ident already exists on disk after drop attempt; reusing "
+                        "existing ident",
+                        "ident"_attr = ident);
+            rs = std::move(existing);
+        }
+    }
+
     LOGV2_DEBUG(22258, 1, "Created temporary record store", "ident"_attr = rs->getIdent());
     return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
 }
