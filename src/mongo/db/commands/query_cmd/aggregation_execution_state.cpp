@@ -464,7 +464,7 @@ StatusWith<ResolvedNamespaceMap> AggExState::resolveInvolvedNamespaces() const {
     return resolvedNamespaces;
 }
 
-void AggExState::performValidationChecks() {
+void AggExState::performValidationChecks() const {
     auto request = getRequest();
     auto& liteParsedPipeline = _aggReqDerivatives->liteParsedPipeline;
 

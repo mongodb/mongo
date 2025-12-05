@@ -990,6 +990,8 @@ error_codes:
   - {code: 475, name: ReshardCollectionInterruptedDueToFCVChange}
   - {code: 476, name: ReshardCollectionMissingAbortReason}
 
+  - {code: 477, name: CollectionBecameView}
+
   # Error codes 4000-8999 are reserved.
 
   # Non-sequential error codes for compatibility only)

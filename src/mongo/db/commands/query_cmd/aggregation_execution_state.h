@@ -238,7 +238,7 @@ public:
      *     - validation of time-series related stages
      *     - validation of command parameters
      */
-    void performValidationChecks();
+    void performValidationChecks() const;
 
     /**
      * Increments global stage counters corresponding to the stages in this lite parsed pipeline.
