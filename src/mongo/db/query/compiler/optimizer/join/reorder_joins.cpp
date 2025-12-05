@@ -34,7 +34,7 @@
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/random_utils.h"
-#include "mongo/db/query/util/bitset_iterator.h"
+#include "mongo/db/query/util/bitset_util.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::join_ordering {

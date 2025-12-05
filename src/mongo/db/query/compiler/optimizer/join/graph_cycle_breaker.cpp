@@ -29,7 +29,7 @@
 
 #include "mongo/db/query/compiler/optimizer/join/graph_cycle_breaker.h"
 
-#include "mongo/db/query/util/bitset_iterator.h"
+#include "mongo/db/query/util/bitset_util.h"
 
 namespace mongo::join_ordering {
 std::vector<EdgeId> GraphCycleBreaker::breakCycles(std::vector<EdgeId> subgraph) {

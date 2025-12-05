@@ -99,8 +99,7 @@ mongo_cc_library(
     srcs = [
     ],
     hdrs = [
-        "bitset_compare.h",
-        "bitset_iterator.h",
+        "bitset_util.h",
     ],
 )
 
@@ -117,8 +116,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "query_util_test",
     srcs = [
-        "bitset_compare_test.cpp",
-        "bitset_iterator_test.cpp",
+        "bitset_util_test.cpp",
         "cartesian_product_test.cpp",
         "deferred_test.cpp",
         "disjoint_set_test.cpp",

@@ -28,17 +28,12 @@
  */
 
 
-#include "mongo/db/query/util/bitset_iterator.h"
+#include "mongo/db/query/util/bitset_util.h"
 
 #include "mongo/unittest/unittest.h"
 
-#include <iterator>
-
 namespace mongo {
 namespace {
-// Makes sure that BitsetIterator satisfies forward_iterator's requirements.
-static_assert(std::forward_iterator<BitsetIterator<77>>);
-
 /**
  * Sets the bits specified by 'expectedBits' and asserts that the 'iterable' function correctly
  * returns all of their indices. The 'size' parameter is passed to the iterable function to test its
@@ -60,7 +55,6 @@ void assertBitsetIterator(std::vector<size_t> expectedBits, size_t size = N) {
 
     ASSERT_EQ(actualBits, expectedBits);
 }
-}  // namespace
 
 TEST(BitsetIteratorTest, Bitset64) {
     assertBitsetIterator<64>({});                // empty array
@@ -106,4 +100,33 @@ TEST(BitsetIteratorTest, Bitset200Size75) {
     ASSERT_EQ(allBits[74], 74);
     assertBitsetIterator<200>(allBits, 75);  // all bits set
 }
+
+template <size_t N>
+void assertLess(std::string_view lhs, std::string_view rhs) {
+    std::bitset<N> lhb{lhs.data(), lhs.size()};
+    std::bitset<N> lhb2{lhs.data(), lhs.size()};
+    std::bitset<N> rhb{rhs.data(), rhs.size()};
+    ASSERT_TRUE(bitsetLess(lhb, rhb));
+    ASSERT_FALSE(bitsetLess(rhb, lhb));
+    ASSERT_FALSE(bitsetLess(lhb, lhb));
+    ASSERT_FALSE(bitsetLess(lhb, lhb2));
+}
+
+TEST(BitsetCompareTest, Less) {
+    assertLess<8>("0", "1");
+    assertLess<32>("0", "1");
+    assertLess<64>("0", "1");
+    assertLess<100>("0", "1");
+
+
+    assertLess<8>("10", "11");
+    assertLess<32>("10", "11");
+    assertLess<64>("10", "11");
+    assertLess<100>("10", "11");
+
+    assertLess<32>("1000000000010", "1000000000011");
+    assertLess<64>("1000000000010", "1000000000011");
+    assertLess<100>("1000000000010", "1000000000011");
+}
+}  // namespace
 }  // namespace mongo

@@ -29,12 +29,19 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <bit>
 #include <bitset>
+#include <climits>
+#include <iterator>
+#include <type_traits>
 
 /**
- * Defines the iterable function which provides simple iteration over the indices of the set bits in
+ * Defines bitset utils:
+ *
+ * 1. The iterable function which provides simple iteration over the indices of the set bits in
  * the bitset.
  *
  * Usage:
@@ -51,7 +58,7 @@
  *     // prints 7 and 10
  * }
  *
- * If the largest set bit index is known, you can provide it to optimize the iteration range:
+ * If the largest set bit index is known, you can provide it to hint the iteration range:
  *
  *  #include <mongo/db/query/util/bitset_iterator.h>
  *  #include <iostream>
@@ -65,22 +72,43 @@
  *         std::cout << bitIndex << std::endl;
  *     }
  *     // prints 7 and 10
+ *
+ * 2. The comparison function of two bitsets: bitsetLess.
  */
 namespace mongo {
+
+/**
+ * The number of bits that can be returned by 'std::bitset<N>::to_ullong()' function. If the
+ * bitset's size is less or equal that number of bits we can get its underlaying data using the
+ * 'to_ullong()' function to implement optimized access to the bits.
+ */
+constexpr std::size_t kBitsFitInULLong = sizeof(unsigned long long) * CHAR_BIT;
+
 /**
  * A forward iterator that iterates over the indexes of the set bits of the given bitset.
  */
+template <size_t N, typename Enable = void>
+class BitsetIterator;
+
+/**
+ * A generic, non-effective specialization for large (>64) bitsets of BitsetIterator, a forward
+ * iterator that iterates over the indexes of the set bits of the given bitset.
+ */
 template <size_t N>
-class BitsetIterator {
+class BitsetIterator<N, typename std::enable_if_t<(N > kBitsFitInULLong)>> {
 public:
     using value_type = size_t;
     using difference_type = std::ptrdiff_t;
 
-    BitsetIterator() : _bitset(0), _index(N), _size(N) {}
+    BitsetIterator() = default;
 
-    explicit BitsetIterator(const std::bitset<N>& bitset, size_t index, size_t size)
+    /**
+     * Creates a new insrance of BitsetIterator.
+     * index == size means end iterator.
+     */
+    BitsetIterator(const std::bitset<N>& bitset, size_t index, size_t size)
         : _bitset(bitset), _index(index), _size(size) {
-        move();
+        _move();
     }
 
     size_t operator*() const {
@@ -89,7 +117,7 @@ public:
 
     BitsetIterator& operator++() {
         ++_index;
-        move();
+        _move();
         return *this;
     }
 
@@ -103,19 +131,72 @@ public:
         return _index == other._index && _bitset == other._bitset;
     }
 
-    bool operator!=(const BitsetIterator& other) const {
-        return !(*this == other);
+private:
+    std::bitset<N> _bitset{};
+    std::size_t _index{N};
+    // Claim that the index of the largest set bit is guaranteed to be (_size - 1) or less.
+    std::size_t _size{N};
+
+    void _move() {
+        for (; _index < _size && !_bitset[_index]; ++_index)
+            ;
+    }
+};
+
+/**
+ * An optimized specialization for small (<=64) bitsets of BitsetIterator, a forward
+ * iterator that iterates over the indexes of the set bits of the given bitset.
+ */
+template <size_t N>
+class BitsetIterator<N, typename std::enable_if_t<(N <= kBitsFitInULLong)>> {
+public:
+    using value_type = size_t;
+    using difference_type = std::ptrdiff_t;
+
+    BitsetIterator() = default;
+
+    /**
+     * Constructs a new insrance of BitsetIterator.
+     * index == size means end iterator.
+     */
+    BitsetIterator(std::bitset<N> bitset, size_t index, size_t size)
+        : _bitset(index < size ? bitset.to_ullong() : 0), _index(index), _size(size) {
+        dassert(_index <= N, "index is expected to be less or equal the size of the bitset");
+        _move();
+    }
+
+    size_t operator*() const {
+        return _index;
+    }
+
+    BitsetIterator& operator++() {
+        _move();
+        return *this;
+    }
+
+    BitsetIterator operator++(int) {
+        auto tmp{*this};
+        ++(*this);
+        return tmp;
+    }
+
+    bool operator==(const BitsetIterator& other) const {
+        return _index == other._index && _bitset == other._bitset;
     }
 
 private:
-    std::bitset<N> _bitset;
-    std::size_t _index;
+    unsigned long long _bitset{0};
+    std::size_t _index{N};
     // Claim that the index of the largest set bit is guaranteed to be (_size - 1) or less.
-    std::size_t _size;
+    std::size_t _size{N};
 
-    void move() {
-        for (; _index < _size && !_bitset[_index]; ++_index)
-            ;
+    void _move() {
+        if (_bitset != 0) {
+            _index = std::countr_zero(_bitset);
+            _bitset &= _bitset - 1;
+        } else {
+            _index = _size;
+        }
     }
 };
 
@@ -136,12 +217,13 @@ BitsetIterator<N> end(const std::bitset<N>& bitset, size_t size = N) {
 }
 
 /**
- * An iterable wrapper around bitset.
+ * A view on std::bitset provides a forward iterator over the indices of its set bits.
+ * The iterator is invalidated after updating the bitset.
  */
 template <size_t N>
-class IterableBitset {
+class BitsetPopulationView {
 public:
-    explicit IterableBitset(const std::bitset<N>& bitset, size_t size)
+    explicit BitsetPopulationView(const std::bitset<N>& bitset, size_t size)
         : _bitset(bitset), _size(size) {}
 
     BitsetIterator<N> begin() const {
@@ -153,6 +235,8 @@ public:
     }
 
 private:
+    static_assert(std::forward_iterator<BitsetIterator<N>>);
+
     const std::bitset<N>& _bitset;
     // Claim that the index of the largest set bit is guaranteed to be (_size - 1) or less.
     size_t _size;
@@ -162,7 +246,27 @@ private:
  * A utility function that creates an iterable bitset.
  */
 template <size_t N>
-IterableBitset<N> iterable(const std::bitset<N>& bitset, size_t size = N) {
-    return IterableBitset<N>{bitset, size};
+BitsetPopulationView<N> iterable(const std::bitset<N>& bitset, size_t size = N) {
+    return BitsetPopulationView<N>{bitset, size};
+}
+
+/**
+ * Returns true if the lhs bitset is smaller than the rhs in lexicographical order.
+ */
+template <size_t N>
+bool bitsetLess(const std::bitset<N>& lhs, const std::bitset<N>& rhs) {
+    if constexpr (N <= kBitsFitInULLong) {
+        return lhs.to_ullong() < rhs.to_ullong();
+    } else {
+        if (lhs == rhs) {
+            return false;
+        }
+        for (size_t i = N - 1; i >= 0; --i) {
+            if (lhs[i] ^ rhs[i]) {
+                return rhs[i];
+            }
+        }
+        return false;
+    }
 }
 }  // namespace mongo

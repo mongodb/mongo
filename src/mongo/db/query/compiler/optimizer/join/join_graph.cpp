@@ -30,7 +30,7 @@
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/util/bitset_compare.h"
+#include "mongo/db/query/util/bitset_util.h"
 
 namespace mongo::join_ordering {
 namespace {
