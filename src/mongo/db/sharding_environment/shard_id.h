@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/pcre.h"
 
 #include <cstring>
@@ -39,6 +40,8 @@
 #include <ostream>
 #include <string>
 #include <utility>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

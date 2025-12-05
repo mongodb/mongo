@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -40,7 +41,7 @@ class ServiceContext;
 /**
  * Encapsulates per-process statistics for the sharding subsystem.
  */
-struct ShardingStatistics {
+struct MONGO_MOD_NEEDS_REPLACEMENT ShardingStatistics {
     // Counts how many times threads hit stale config exception (which is what triggers metadata
     // refreshes).
     AtomicWord<long long> countStaleConfigErrors{0};

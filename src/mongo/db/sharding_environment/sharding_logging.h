@@ -39,6 +39,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
@@ -48,7 +49,7 @@ namespace mongo {
 /**
  * Diagnostic logging of sharding metadata events (changelog and actionlog).
  */
-class ShardingLogging {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardingLogging {
 public:
     /**
      * Retrieves the ShardingLogging instance associated with the current service/operation context.

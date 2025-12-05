@@ -33,6 +33,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 
@@ -41,7 +42,7 @@ namespace mongo {
 /**
  * This class is used to build shard version objects.
  */
-class ShardVersionFactory {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardVersionFactory {
 public:
     static ShardVersion make(const ChunkManager& chunkManager);
 

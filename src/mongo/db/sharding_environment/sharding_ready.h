@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -47,7 +48,7 @@ namespace mongo {
  * config server is not part of a sharded cluster and is still auto-bootstrapping into a config
  * shard. In that case, ShardingReady is set when the config server becomes a config shard.
  */
-class ShardingReady {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardingReady {
 
     ShardingReady(const ShardingReady&) = delete;
     ShardingReady& operator=(const ShardingReady&) = delete;

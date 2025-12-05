@@ -31,6 +31,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
 #include <string>
@@ -43,7 +44,7 @@ namespace mongo {
  *
  * NOTE: Not thread-safe, so it should not be used from more than one thread at a time.
  */
-class RouterUptimeReporter {
+class MONGO_MOD_NEEDS_REPLACEMENT RouterUptimeReporter {
     RouterUptimeReporter(const RouterUptimeReporter&) = delete;
     RouterUptimeReporter& operator=(const RouterUptimeReporter&) = delete;
 

@@ -38,6 +38,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <compare>
@@ -51,7 +52,7 @@ namespace mongo {
 /**
  * The most-significant component of the shard versioning protocol (collection epoch/timestamp).
  */
-class CollectionGeneration {
+class MONGO_MOD_NEEDS_REPLACEMENT CollectionGeneration {
 public:
     CollectionGeneration(OID epoch, Timestamp timestamp) : _epoch(epoch), _timestamp(timestamp) {}
 
@@ -97,7 +98,7 @@ protected:
  * its own without the Generation component above, that's why most of its methods are protected and
  * are exposed as semantic checks in ChunkVersion below.
  */
-class CollectionPlacement {
+class MONGO_MOD_NEEDS_REPLACEMENT CollectionPlacement {
 public:
     CollectionPlacement(uint32_t major, uint32_t minor)
         : _combined(static_cast<uint64_t>(minor) | (static_cast<uint64_t>(major) << 32)) {}
@@ -135,7 +136,8 @@ protected:
  * 3. (n, 0), n > 0 - invalid configuration.
  * 4. (n, m), n > 0, m > 0 - normal sharded collection placement version.
  */
-class ChunkVersion : public CollectionGeneration, public CollectionPlacement {
+class MONGO_MOD_NEEDS_REPLACEMENT ChunkVersion : public CollectionGeneration,
+                                                 public CollectionPlacement {
 public:
     /**
      * The name for the chunk version information field, which ddl operations use to send only

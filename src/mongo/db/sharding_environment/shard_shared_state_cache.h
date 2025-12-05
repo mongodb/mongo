@@ -36,6 +36,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/rwmutex.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -44,7 +45,7 @@ namespace mongo {
  *
  * All state objects are created on demand and retained until explicitly deleted.
  */
-class ShardSharedStateCache {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardSharedStateCache {
 public:
     struct Stats {
         /**

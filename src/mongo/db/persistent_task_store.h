@@ -49,6 +49,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <functional>
@@ -56,6 +57,8 @@
 #include <utility>
 
 #include <fmt/format.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

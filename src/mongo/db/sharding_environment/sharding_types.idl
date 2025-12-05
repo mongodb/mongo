@@ -34,6 +34,7 @@ global:
         - "mongo/db/sharding_environment/shard_id.h"
         - "mongo/db/versioning_protocol/database_version.h"
         - "mongo/db/versioning_protocol/shard_version.h"
+    mod_visibility: needs_replacement
 
 imports:
     - "mongo/db/basic_types.idl"

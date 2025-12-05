@@ -44,6 +44,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <functional>
@@ -60,7 +61,7 @@ namespace mongo {
  * Maintains the targeting and command execution logic for a single shard. Performs polling of
  * the shard (if replica set).
  */
-class ShardRemote : public Shard {
+class MONGO_MOD_PUBLIC ShardRemote : public Shard {
     ShardRemote(const ShardRemote&) = delete;
     ShardRemote& operator=(const ShardRemote&) = delete;
 

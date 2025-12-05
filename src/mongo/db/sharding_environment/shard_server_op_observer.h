@@ -39,6 +39,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
@@ -53,7 +54,7 @@ namespace mongo {
  * OpObserver which is installed on the op observers chain when the server is running as a shard
  * server (--shardsvr).
  */
-class ShardServerOpObserver final : public OpObserverNoop {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardServerOpObserver final : public OpObserverNoop {
     ShardServerOpObserver(const ShardServerOpObserver&) = delete;
     ShardServerOpObserver& operator=(const ShardServerOpObserver&) = delete;
 

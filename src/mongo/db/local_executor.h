@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -53,22 +54,25 @@ namespace mongo {
 /**
  * Returns the local executor.
  */
-std::shared_ptr<executor::TaskExecutor> getLocalExecutor(ServiceContext* srvCtx);
+MONGO_MOD_NEEDS_REPLACEMENT std::shared_ptr<executor::TaskExecutor> getLocalExecutor(
+    ServiceContext* srvCtx);
 
 /**
  * Returns the local executor.
  */
-std::shared_ptr<executor::TaskExecutor> getLocalExecutor(OperationContext* opCtx);
+MONGO_MOD_NEEDS_REPLACEMENT std::shared_ptr<executor::TaskExecutor> getLocalExecutor(
+    OperationContext* opCtx);
 
 /**
  * Sets the local executor.
  */
-void setLocalExecutor(ServiceContext* srvCtx, std::shared_ptr<executor::TaskExecutor> executor);
+MONGO_MOD_NEEDS_REPLACEMENT void setLocalExecutor(ServiceContext* srvCtx,
+                                                  std::shared_ptr<executor::TaskExecutor> executor);
 
 /**
  * Creates a local executor.
  */
-std::shared_ptr<executor::TaskExecutor> createLocalExecutor(ServiceContext* srvCtx,
-                                                            const std::string& name);
+MONGO_MOD_NEEDS_REPLACEMENT std::shared_ptr<executor::TaskExecutor> createLocalExecutor(
+    ServiceContext* srvCtx, const std::string& name);
 
 }  // namespace mongo

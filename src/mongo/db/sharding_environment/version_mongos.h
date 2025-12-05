@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <iosfwd>
 
 namespace mongo {
@@ -40,6 +42,6 @@ namespace mongo {
  * NOTE: Outputs the version of MongoS to `os` (as part of the --version option),
  * which reports different data than if `os` is null!
  */
-void logMongosVersionInfo(std::ostream* os);
+MONGO_MOD_NEEDS_REPLACEMENT void logMongosVersionInfo(std::ostream* os);
 
 }  // namespace mongo

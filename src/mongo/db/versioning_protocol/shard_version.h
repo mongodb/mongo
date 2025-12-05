@@ -35,6 +35,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/util/modules.h"
 
 #include <iosfwd>
 #include <string>
@@ -54,7 +55,7 @@ namespace mongo {
  * network requests and the shard versioning protocol.
  *
  */
-class ShardVersion {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardVersion {
 public:
     /**
      * The name for the shard version information field, which shard-aware commands should include

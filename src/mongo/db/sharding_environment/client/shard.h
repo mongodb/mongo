@@ -53,6 +53,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <functional>
@@ -76,7 +77,7 @@ class RemoteCommandTargeter;
  * Presents an interface for talking to shards, regardless of whether that shard is remote or is
  * the current (local) shard.
  */
-class Shard {
+class MONGO_MOD_PUBLIC Shard {
 public:
     struct CommandResponse {
         CommandResponse(boost::optional<HostAndPort> hostAndPort,

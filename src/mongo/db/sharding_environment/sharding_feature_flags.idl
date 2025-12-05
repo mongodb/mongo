@@ -30,6 +30,7 @@
 
 global:
     cpp_namespace: "mongo"
+    mod_visibility: needs_replacement
 
 feature_flags:
     featureFlagConcurrencyInChunkMigration:

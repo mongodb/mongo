@@ -33,6 +33,7 @@
 #include "mongo/client/remote_command_targeter_factory.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <map>
@@ -44,7 +45,7 @@ namespace mongo {
 /**
  * An object factory for creating Shard instances via calling registered builders.
  */
-class ShardFactory {
+class MONGO_MOD_PUBLIC ShardFactory {
     ShardFactory(const ShardFactory&) = delete;
     ShardFactory& operator=(const ShardFactory&) = delete;
 

@@ -260,6 +260,7 @@ catalog_and_routing:
       topology modules.
     slack: server-catalog-and-routing
     jira: Catalog and Routing
+    fully_marked: true
   files:
     - src/mongo/db/sharding_environment/**
     - src/mongo/db/versioning_protocol/**

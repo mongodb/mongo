@@ -27,6 +27,7 @@
 
 global:
     cpp_namespace: mongo
+    mod_visibility: needs_replacement
 
 server_parameters:
     minNumChunksForSessionsCollection:

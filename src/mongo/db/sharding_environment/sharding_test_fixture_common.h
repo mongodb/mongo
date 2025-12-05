@@ -42,6 +42,7 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -56,7 +57,7 @@ namespace mongo {
 /**
  * Contains common functionality and tools, which apply to both mongos and mongod unit-tests.
  */
-class ShardingTestFixtureCommon : public ServiceContextTest {
+class MONGO_MOD_OPEN ShardingTestFixtureCommon : public ServiceContextTest {
 public:
     /**
      * Constructs a standalone RoutingTableHistory object (i.e., not linked to any CatalogCache),

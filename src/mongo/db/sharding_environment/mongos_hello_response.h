@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/rpc/topology_version_gen.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -47,7 +48,7 @@ class BSONObjBuilder;
  *
  * Only handles responses from mongos.
  */
-class MongosHelloResponse {
+class MONGO_MOD_NEEDS_REPLACEMENT MongosHelloResponse {
 public:
     static constexpr StringData kTopologyVersionFieldName = "topologyVersion"_sd;
     static constexpr StringData kIsMasterFieldName = "ismaster"_sd;

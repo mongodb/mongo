@@ -38,6 +38,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/sharding_initialization.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>
@@ -54,7 +55,8 @@ namespace mongo {
  * services, attaches them to the same service context to which it itself is attached and puts the
  * ShardingState in the initialized state.
  */
-class ShardingInitializationMongoD : public ReplicaSetAwareService<ShardingInitializationMongoD> {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardingInitializationMongoD
+    : public ReplicaSetAwareService<ShardingInitializationMongoD> {
     ShardingInitializationMongoD(const ShardingInitializationMongoD&) = delete;
     ShardingInitializationMongoD& operator=(const ShardingInitializationMongoD&) = delete;
 
@@ -140,7 +142,8 @@ private:
  * Initialize the sharding components for a mongod running as a config server (if they haven't
  * already been set up).
  */
-void initializeGlobalShardingStateForConfigServer(OperationContext* opCtx);
+MONGO_MOD_NEEDS_REPLACEMENT void initializeGlobalShardingStateForConfigServer(
+    OperationContext* opCtx);
 
 /**
  * Helper method to initialize sharding awareness from the shard identity document if it can be
@@ -150,7 +153,7 @@ void initializeGlobalShardingStateForConfigServer(OperationContext* opCtx);
  * this function into one single builder that records the time elapsed during startup. Its default
  * value is nullptr because we only want to time this function when it is called during startup.
  */
-void initializeShardingAwarenessAndLoadGlobalSettings(
+MONGO_MOD_NEEDS_REPLACEMENT void initializeShardingAwarenessAndLoadGlobalSettings(
     OperationContext* opCtx,
     const ShardIdentity& shardIdentity,
     BSONObjBuilder* startupTimeElapsedBuilder = nullptr);

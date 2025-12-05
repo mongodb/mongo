@@ -33,6 +33,7 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -44,7 +45,7 @@ class DBClientBase;
  * Intercepts creation of sharded connections and transparently performs the internal
  * authentication on them.
  */
-class ShardingConnectionHook : public DBConnectionHook {
+class MONGO_MOD_PUBLIC ShardingConnectionHook : public DBConnectionHook {
 public:
     ShardingConnectionHook(std::unique_ptr<rpc::EgressMetadataHook> egressHook);
 

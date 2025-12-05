@@ -39,6 +39,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <functional>
@@ -67,15 +68,16 @@ using ShardingEgressMetadataHookBuilder = std::function<std::unique_ptr<EgressMe
 /**
  * Constructs a TaskExecutor which contains the required configuration for the sharding subsystem.
  */
-std::shared_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
+MONGO_MOD_NEEDS_REPLACEMENT std::shared_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
     std::unique_ptr<executor::NetworkInterface> net);
 
-std::unique_ptr<rpc::EgressMetadataHookList> makeShardingEgressHooksList(ServiceContext* service);
+MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<rpc::EgressMetadataHookList>
+makeShardingEgressHooksList(ServiceContext* service);
 
 /**
  * Initializes the global ShardingCatalogClient, ShardingCatalogManager, and Grid objects.
  */
-Status initializeGlobalShardingState(
+MONGO_MOD_NEEDS_REPLACEMENT Status initializeGlobalShardingState(
     OperationContext* opCtx,
     std::unique_ptr<CatalogCache> catalogCache,
     std::unique_ptr<ShardRegistry> shardRegistry,
@@ -87,19 +89,19 @@ Status initializeGlobalShardingState(
  * Loads global settings from config server such as cluster ID and default write concern.
  */
 
-Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx,
-                                          ShardingCatalogClient* catalogClient);
+MONGO_MOD_NEEDS_REPLACEMENT Status
+loadGlobalSettingsFromConfigServer(OperationContext* opCtx, ShardingCatalogClient* catalogClient);
 
 /**
  * Pre-caches mongod routing info for the calling process.
  */
 
-void preCacheMongosRoutingInfo(OperationContext* opCtx);
+MONGO_MOD_NEEDS_REPLACEMENT void preCacheMongosRoutingInfo(OperationContext* opCtx);
 
 /**
  * Warms up connections to shards with best effort strategy.
  */
 
-Status preWarmConnectionPool(OperationContext* opCtx);
+MONGO_MOD_NEEDS_REPLACEMENT Status preWarmConnectionPool(OperationContext* opCtx);
 
 }  // namespace mongo

@@ -29,6 +29,7 @@ global:
     cpp_namespace: mongo
     cpp_includes:
         - "mongo/db/sharding_environment/sharding_runtime_d_params.h"
+    mod_visibility: needs_replacement
 
 server_parameters:
     chunkMigrationConcurrency:

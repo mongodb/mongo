@@ -39,6 +39,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
 
 #include <functional>
@@ -58,7 +59,7 @@ class NetworkInterface;
 /**
  * Contains the sharding context for a running server. Exists on both MongoD and MongoS.
  */
-class Grid {
+class MONGO_MOD_NEEDS_REPLACEMENT Grid {
 public:
     Grid();
     ~Grid();

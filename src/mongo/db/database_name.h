@@ -39,6 +39,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 
@@ -56,6 +57,8 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -124,8 +127,8 @@ public:
      *
      * MUST only be used for tests.
      */
-    static DatabaseName createDatabaseName_forTest(boost::optional<TenantId> tenantId,
-                                                   StringData dbString) {
+    MONGO_MOD_PUBLIC static DatabaseName createDatabaseName_forTest(
+        boost::optional<TenantId> tenantId, StringData dbString) {
         return DatabaseName(tenantId, dbString);
     }
 
@@ -244,7 +247,7 @@ public:
      *
      * MUST only be used for tests.
      */
-    std::string toStringWithTenantId_forTest() const {
+    MONGO_MOD_PUBLIC std::string toStringWithTenantId_forTest() const {
         return toStringWithTenantId();
     }
 
@@ -253,7 +256,7 @@ public:
      *
      * MUST only be used for tests.
      */
-    std::string toString_forTest() const {
+    MONGO_MOD_PUBLIC std::string toString_forTest() const {
         return toString();
     }
 
@@ -741,7 +744,7 @@ protected:
         std::min(sizeof(Storage) - sizeof(char), size_t(63));
 };
 
-inline std::string stringify_forTest(const DatabaseName& dbName) {
+MONGO_MOD_PUBLIC inline std::string stringify_forTest(const DatabaseName& dbName) {
     return toStringForLogging(dbName);
 }
 

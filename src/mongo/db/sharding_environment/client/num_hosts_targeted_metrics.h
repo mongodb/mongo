@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/platform/atomic.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>
@@ -41,7 +42,7 @@ class BSONObjBuilder;
 class OperationContext;
 class ServiceContext;
 
-class NumHostsTargetedMetrics {
+class MONGO_MOD_PUBLIC NumHostsTargetedMetrics {
 public:
     enum QueryType {
         kFindCmd,
