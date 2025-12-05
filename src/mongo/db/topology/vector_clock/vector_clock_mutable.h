@@ -34,6 +34,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
@@ -44,7 +45,7 @@ namespace mongo {
  *
  * Only linked in contexts where ticking is allowed, ie. mongod, embedded, mongod-based unittests.
  */
-class VectorClockMutable : public VectorClock {
+class MONGO_MOD_NEEDS_REPLACEMENT VectorClockMutable : public VectorClock {
 public:
     // Decorate ServiceContext with VectorClockMutable*, that will resolve to the mutable vector
     // clock implementation.

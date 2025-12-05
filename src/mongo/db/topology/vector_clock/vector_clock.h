@@ -37,6 +37,7 @@
 #include "mongo/db/topology/vector_clock/vector_clock_gen.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
 
 #include <array>
@@ -53,7 +54,7 @@ namespace mongo {
  * The VectorClock service provides a collection of cluster-wide logical clocks (including the
  * clusterTime), that are used to provide causal-consistency to various other services.
  */
-class VectorClock {
+class MONGO_MOD_NEEDS_REPLACEMENT VectorClock {
 protected:
     enum class Component : uint8_t {
         ClusterTime = 0,

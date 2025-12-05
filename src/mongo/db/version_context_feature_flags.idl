@@ -28,6 +28,7 @@
 
 global:
     cpp_namespace: "mongo"
+    mod_visibility: needs_replacement
 
 feature_flags:
     # TODO (SERVER-110309): remove this feature flag

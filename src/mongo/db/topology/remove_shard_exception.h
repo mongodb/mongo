@@ -33,11 +33,12 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/topology/remove_shard_draining_progress_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 
-class RemoveShardDrainingInfo final : public ErrorExtraInfo {
+class MONGO_MOD_NEEDS_REPLACEMENT RemoveShardDrainingInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::RemoveShardDrainingInProgress;
 

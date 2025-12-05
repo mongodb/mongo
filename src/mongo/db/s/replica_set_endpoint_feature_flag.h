@@ -30,19 +30,20 @@
 #pragma once
 
 #include "mongo/db/version_context.h"
+#include "mongo/util/modules.h"
 namespace mongo {
 namespace replica_set_endpoint {
 
 /**
  * Returns true if the feature flag is enabled, not ignoring the feature compatibility version.
  */
-bool isFeatureFlagEnabled(const VersionContext& vCtx);
+MONGO_MOD_NEEDS_REPLACEMENT bool isFeatureFlagEnabled(const VersionContext& vCtx);
 
 /**
  * Returns true if the feature flag is enabled, ignoring the feature compatibility version.
  * To be used only by the machinery for maintaining the ReplicaSetEndpointShardingState.
  */
-bool isFeatureFlagEnabledIgnoreFCV();
+MONGO_MOD_NEEDS_REPLACEMENT bool isFeatureFlagEnabledIgnoreFCV();
 
 }  // namespace replica_set_endpoint
 }  // namespace mongo

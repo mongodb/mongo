@@ -35,12 +35,13 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/user_write_block/user_writes_block_reason_gen.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 
 namespace mongo {
 
-class GlobalUserWriteBlockState {
+class MONGO_MOD_NEEDS_REPLACEMENT GlobalUserWriteBlockState {
 public:
     GlobalUserWriteBlockState() = default;
 

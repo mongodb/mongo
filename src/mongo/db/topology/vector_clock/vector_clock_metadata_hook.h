@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>
@@ -45,7 +46,7 @@ class Status;
 
 namespace rpc {
 
-class VectorClockMetadataHook : public EgressMetadataHook {
+class MONGO_MOD_NEEDS_REPLACEMENT VectorClockMetadataHook : public EgressMetadataHook {
 public:
     explicit VectorClockMetadataHook(ServiceContext* service);
 

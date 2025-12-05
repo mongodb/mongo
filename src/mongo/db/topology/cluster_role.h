@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/logv2/log_service.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <cstdint>
@@ -53,7 +54,7 @@ namespace mongo {
  *  - { RouterServer }
  * For a cluster that is not sharded, the cluster role of each node is { None }.
  */
-class ClusterRole {
+class MONGO_MOD_NEEDS_REPLACEMENT ClusterRole {
 public:
     enum Value : uint8_t {
         /**
@@ -136,11 +137,11 @@ private:
  */
 BSONArray toBSON(ClusterRole role);
 
-std::ostream& operator<<(std::ostream& os, ClusterRole r);
+MONGO_MOD_NEEDS_REPLACEMENT std::ostream& operator<<(std::ostream& os, ClusterRole r);
 
 StringBuilder& operator<<(StringBuilder& s, ClusterRole r);
 
-inline std::string toString(ClusterRole r) {
+MONGO_MOD_NEEDS_REPLACEMENT inline std::string toString(ClusterRole r) {
     std::ostringstream os;
     os << r;
     return os.str();
@@ -150,7 +151,7 @@ inline std::string toString(ClusterRole r) {
  * Returns the LogService corresponding to `role`.
  * `role` must be None, ShardService, or RouterService.
  */
-inline logv2::LogService toLogService(ClusterRole role) {
+MONGO_MOD_NEEDS_REPLACEMENT inline logv2::LogService toLogService(ClusterRole role) {
     if (role.hasExclusively(ClusterRole::ShardServer))
         return logv2::LogService::shard;
     if (role.hasExclusively(ClusterRole::RouterServer))

@@ -37,6 +37,7 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -56,7 +57,7 @@ namespace mongo {
  * synchronisation. Initialisation is driven from outside (specifically
  * ShardingInitializationMongoD, which should be its only caller).
  */
-class ShardingState {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardingState {
     ShardingState(const ShardingState&) = delete;
     ShardingState& operator=(const ShardingState&) = delete;
 

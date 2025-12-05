@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/db/pipeline/change_stream_reader_builder.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class ChangeStreamReaderBuilderImpl : public ChangeStreamReaderBuilder {
+class MONGO_MOD_NEEDS_REPLACEMENT ChangeStreamReaderBuilderImpl : public ChangeStreamReaderBuilder {
 public:
     /**
      * Builds CollectionChangeStreamShardTargeterImpl, DatabaseChangeStreamShardTargeterImpl or

@@ -30,6 +30,7 @@ imports:
 
 global:
     cpp_namespace: mongo::migration_blocking_operation
+    mod_visibility: needs_replacement
 
 structs:
     PauseMigrationsDuringMultiUpdatesParam:

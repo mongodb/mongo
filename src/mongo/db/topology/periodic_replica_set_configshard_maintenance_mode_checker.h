@@ -30,11 +30,12 @@
 #pragma once
 
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
 
-class PeriodicReplicaSetConfigShardMaintenanceModeChecker {
+class MONGO_MOD_NEEDS_REPLACEMENT PeriodicReplicaSetConfigShardMaintenanceModeChecker {
 public:
     static PeriodicReplicaSetConfigShardMaintenanceModeChecker& get(ServiceContext* serviceContext);
 

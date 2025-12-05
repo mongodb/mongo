@@ -39,6 +39,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
@@ -49,7 +50,7 @@ namespace mongo {
 /**
  * Update in-memory cluster server parameters on insert/update/remove.
  */
-class ClusterServerParameterOpObserver final : public OpObserverNoop {
+class MONGO_MOD_NEEDS_REPLACEMENT ClusterServerParameterOpObserver final : public OpObserverNoop {
 public:
     NamespaceFilters getNamespaceFilters() const final {
         return {NamespaceFilter::kConfig, NamespaceFilter::kConfig};

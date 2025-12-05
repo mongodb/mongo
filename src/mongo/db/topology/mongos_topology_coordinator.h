@@ -38,6 +38,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
@@ -48,7 +49,7 @@
 
 namespace mongo {
 
-class MongosTopologyCoordinator {
+class MONGO_MOD_NEEDS_REPLACEMENT MongosTopologyCoordinator {
 public:
     static MongosTopologyCoordinator* get(OperationContext* opCtx);
 

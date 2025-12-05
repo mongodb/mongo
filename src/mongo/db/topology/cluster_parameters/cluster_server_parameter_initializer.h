@@ -33,6 +33,7 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -42,7 +43,7 @@ namespace mongo {
  * An interface that provides methods to manipulate in-memory cluster server parameter values in
  * response to on-disk changes, specifically in a replica set context.
  */
-class ClusterServerParameterInitializer
+class MONGO_MOD_NEEDS_REPLACEMENT ClusterServerParameterInitializer
     : public ReplicaSetAwareService<ClusterServerParameterInitializer> {
     ClusterServerParameterInitializer(const ClusterServerParameterInitializer&) = delete;
     ClusterServerParameterInitializer& operator=(const ClusterServerParameterInitializer&) = delete;

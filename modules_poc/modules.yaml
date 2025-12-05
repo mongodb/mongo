@@ -323,6 +323,7 @@ catalog_and_routing.topology:
       consistency level.
     slack: server-catalog-and-routing
     jira: Catalog and Routing
+    fully_marked: true
   files:
     - src/mongo/db/topology/**
 
@@ -503,6 +504,7 @@ catalog_and_routing.topology.causal_consistency:
   meta:
     slack: server-sharding
     jira: Cluster Scalability
+    fully_marked: true
   files:
     - src/mongo/db/keys_collection*
     - src/mongo/db/key_generator*

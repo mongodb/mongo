@@ -40,6 +40,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
@@ -54,7 +55,7 @@ namespace mongo {
  * OpObserver for user write blocking. On write operations, checks whether the current global user
  * write blocking state allows the write, and uasserts if not.
  */
-class UserWriteBlockModeOpObserver final : public OpObserverNoop {
+class MONGO_MOD_NEEDS_REPLACEMENT UserWriteBlockModeOpObserver final : public OpObserverNoop {
     UserWriteBlockModeOpObserver(const UserWriteBlockModeOpObserver&) = delete;
     UserWriteBlockModeOpObserver& operator=(const UserWriteBlockModeOpObserver&) = delete;
 

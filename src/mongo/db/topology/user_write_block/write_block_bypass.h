@@ -33,9 +33,10 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
-class WriteBlockBypass {
+class MONGO_MOD_NEEDS_REPLACEMENT WriteBlockBypass {
 public:
     static WriteBlockBypass& get(OperationContext* opCtx);
 

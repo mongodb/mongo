@@ -31,6 +31,7 @@
 
 #include "mongo/db/server_options.h"
 #include "mongo/db/version_context_metadata_gen.h"
+#include "mongo/util/modules.h"
 
 #include <variant>
 
@@ -55,7 +56,7 @@ class ClientLock;
  * operations for now. Our plans are to expand this to more operations in a future project
  * (SPM-4227).
  */
-class VersionContext {
+class MONGO_MOD_NEEDS_REPLACEMENT VersionContext {
 public:
     using FCV = multiversion::FeatureCompatibilityVersion;
     using FCVSnapshot = ServerGlobalParams::FCVSnapshot;
@@ -196,14 +197,16 @@ private:
 /**
  * Use this when running outside of an operation (for example, during startup, or in unit tests).
  */
-inline const VersionContext kNoVersionContext{VersionContext::OutsideOperationTag{}};
+MONGO_MOD_NEEDS_REPLACEMENT inline const VersionContext kNoVersionContext{
+    VersionContext::OutsideOperationTag{}};
 
 /**
  * Use this if you want to deliberately bypass Operation FCV and make feature flag checks against
  * the node's local FCV only. This should be used with a lot of care, only if you can ensure none
  * of your current or future callers acts incorrectly due to ignoring their Operation FCV.
  */
-inline const VersionContext kVersionContextIgnored_UNSAFE{VersionContext::IgnoreOFCVTag{}};
+MONGO_MOD_NEEDS_REPLACEMENT inline const VersionContext kVersionContextIgnored_UNSAFE{
+    VersionContext::IgnoreOFCVTag{}};
 
 /**
  * Synchronously wait for all operations associated with a stale version context to drain.
@@ -216,8 +219,7 @@ inline const VersionContext kVersionContextIgnored_UNSAFE{VersionContext::Ignore
  * - Associated with a stale version context, but that have been already killed
  *
  */
-void waitForOperationsNotMatchingVersionContextToComplete(OperationContext* opCtx,
-                                                          const VersionContext& vCtx,
-                                                          Date_t deadline = Date_t::max());
+MONGO_MOD_NEEDS_REPLACEMENT void waitForOperationsNotMatchingVersionContextToComplete(
+    OperationContext* opCtx, const VersionContext& vCtx, Date_t deadline = Date_t::max());
 
 }  // namespace mongo
