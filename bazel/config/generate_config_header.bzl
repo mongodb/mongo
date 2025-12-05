@@ -24,6 +24,18 @@ def generate_config_header_impl(ctx):
         action_name = ACTION_NAMES.cpp_compile,
         variables = compile_variables,
     )
+
+    # The config header generation should not fail due to compiler warnings,
+    # so remove any flags that would treat warnings as errors.
+    compiler_flags = [
+        flag
+        for flag in compiler_flags
+        if not (
+            flag == "-Werror" or
+            flag.startswith("-Werror") or
+            flag == "/WX"
+        )
+    ]
     link_flags = cc_common.get_memory_inefficient_command_line(
         feature_configuration = feature_configuration,
         action_name = ACTION_NAMES.cpp_link_executable,
