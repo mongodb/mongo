@@ -52,6 +52,7 @@ namespace execution_control {
 namespace MONGO_MOD_PUBLIC throughput_probing {
 
 class MONGO_MOD_PRIVATE ThroughputProbingTest;
+class MONGO_MOD_PRIVATE InitStateWarningTest;
 
 MONGO_MOD_PRIVATE Status validateInitialConcurrency(int32_t concurrency,
                                                     const boost::optional<TenantId>&);
@@ -82,6 +83,7 @@ public:
 
 private:
     friend class throughput_probing::ThroughputProbingTest;
+    friend class throughput_probing::InitStateWarningTest;
 
     enum class ProbingState {
         kStable,

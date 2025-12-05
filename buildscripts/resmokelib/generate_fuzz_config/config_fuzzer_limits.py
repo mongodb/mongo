@@ -229,7 +229,7 @@ config_fuzzer_params = {
             "max": 1.0,
             "fuzz_at": ["startup"],
         },
-        "throughputProbingInitialConcurrency": {"min": 4, "max": 128, "fuzz_at": ["startup"]},
+        "throughputProbingInitialConcurrency": {"min": 8, "max": 256, "fuzz_at": ["startup"]},
         "throughputProbingMinConcurrency": {
             "min": 4,
             "max": "throughputProbingInitialConcurrency",

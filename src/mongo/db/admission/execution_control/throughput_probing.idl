@@ -45,8 +45,11 @@ server_parameters:
 
     throughputProbingInitialConcurrency:
         description: >-
-            The initial number of TOTAL concurrent read/write transactions for throughput probing. The
-            default value of 0 means to use the number of logical CPU cores.
+            The initial total number of concurrent read and write transactions when throughput probing
+            starts. This value represents the combined concurrency across both ticket pools. A value of 0
+            (the default) uses twice the number of logical CPU cores. If specified, the value must be in
+            the range [2 * throughputProbingMinConcurrency, 2 * throughputProbingMaxConcurrency]; values
+            outside this range will be clamped and a warning will be logged.
         set_at: startup
         cpp_vartype: int32_t
         cpp_varname: gInitialConcurrency

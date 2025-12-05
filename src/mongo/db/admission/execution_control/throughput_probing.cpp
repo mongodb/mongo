@@ -51,17 +51,11 @@ namespace mongo::admission::execution_control {
 namespace throughput_probing {
 
 Status validateInitialConcurrency(int32_t concurrency, const boost::optional<TenantId>&) {
-    if (concurrency < gMinConcurrency) {
-        return {ErrorCodes::BadValue,
-                "Throughput probing initial concurrency cannot be less than minimum concurrency"};
-    }
-
-    if (concurrency > gMaxConcurrency.load()) {
-        return {ErrorCodes::BadValue,
-                "Throughput probing initial concurrency cannot be greater than maximum "
-                "concurrency"};
-    }
-
+    // This validator intentionally performs no validation. Strict validation here would cause
+    // startup failures when server parameters are processed in an unpredictable order (e.g.,
+    // initialConcurrency may be validated before minConcurrency or maxConcurrency are set).
+    // Instead, validation and clamping are deferred to _initState(), which runs after all
+    // parameters are initialized.
     return Status::OK();
 }
 
@@ -385,11 +379,33 @@ void ThroughputProbing::_decreaseConcurrency(OperationContext* opCtx) {
 }
 
 void ThroughputProbing::_initState() {
+    int32_t minTotalConcurrency = gMinConcurrency * 2;
+    int32_t maxTotalConcurrency = gMaxConcurrency.load() * 2;
+    // Warn if the configured initial concurrency is outside the valid range. The value will be
+    // clamped below, but users should be aware their setting was not honored. The valid range is
+    // [2 * minConcurrency, 2 * maxConcurrency] because _stableConcurrency represents the TOTAL
+    // concurrency (reads + writes combined), while min/max apply to each pool separately.
+    if (gInitialConcurrency != 0 && gInitialConcurrency < minTotalConcurrency) {
+        LOGV2_WARNING(11352800,
+                      "Configured throughputProbingInitialConcurrency is below the minimum "
+                      "allowed value and will be clamped",
+                      "configured"_attr = gInitialConcurrency,
+                      "minimum"_attr = minTotalConcurrency);
+    }
+
+    if (gInitialConcurrency != 0 && gInitialConcurrency > maxTotalConcurrency) {
+        LOGV2_WARNING(11352801,
+                      "Configured throughputProbingInitialConcurrency exceeds the maximum "
+                      "allowed value and will be clamped",
+                      "configured"_attr = gInitialConcurrency,
+                      "maximum"_attr = maxTotalConcurrency);
+    }
+
     _stableConcurrency = gInitialConcurrency
-        ? gInitialConcurrency
+        ? std::clamp(gInitialConcurrency, minTotalConcurrency, maxTotalConcurrency)
         : std::clamp(static_cast<int32_t>(ProcessInfo::getNumLogicalCores() * 2),
-                     gMinConcurrency * 2,
-                     gMaxConcurrency.load() * 2);
+                     minTotalConcurrency,
+                     maxTotalConcurrency);
     _stableThroughput = 0;
     _state = ProbingState::kStable;
     _prevNumFinishedProcessing = -1;

@@ -248,17 +248,19 @@ def generate_special_mongod_parameters(rng, ret, params):
     # throughputProbingConcurrencyMovingAverageWeight is the only parameter that uses rng.random().
     ret["throughputProbingConcurrencyMovingAverageWeight"] = 1 - rng.random()
 
-    # We assign throughputProbingInitialConcurrency first because throughputProbingMinConcurrency and throughputProbingMaxConcurrency depend on it.
+    # We assign throughputProbingInitialConcurrency first, then derive min/max to satisfy:
+    # 2 * minConcurrency <= initialConcurrency <= 2 * maxConcurrency
+    # (initialConcurrency is TOTAL while min/maxConcurrency are PER-POOL)
     ret["throughputProbingInitialConcurrency"] = rng.randint(
         params["throughputProbingInitialConcurrency"]["min"],
         params["throughputProbingInitialConcurrency"]["max"],
     )
     ret["throughputProbingMinConcurrency"] = rng.randint(
         params["throughputProbingMinConcurrency"]["min"],
-        ret["throughputProbingInitialConcurrency"],
+        ret["throughputProbingInitialConcurrency"] // 2,
     )
     ret["throughputProbingMaxConcurrency"] = rng.randint(
-        ret["throughputProbingInitialConcurrency"],
+        ret["throughputProbingInitialConcurrency"] // 2,
         params["throughputProbingMaxConcurrency"]["max"],
     )
     ret["throughputProbingReadWriteRatio"] = rng.uniform(

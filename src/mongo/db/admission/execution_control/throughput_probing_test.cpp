@@ -33,6 +33,7 @@
 #include "mongo/db/admission/execution_control/throughput_probing_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mock_periodic_runner.h"
@@ -51,10 +52,93 @@
 namespace mongo::admission::execution_control::throughput_probing {
 
 TEST(ThroughputProbingParameterTest, InitialConcurrency) {
-    ASSERT_OK(validateInitialConcurrency(gMinConcurrency, {}));
-    ASSERT_OK(validateInitialConcurrency(gMaxConcurrency.load(), {}));
-    ASSERT_NOT_OK(validateInitialConcurrency(gMinConcurrency - 1, {}));
-    ASSERT_NOT_OK(validateInitialConcurrency(gMaxConcurrency.load() + 1, {}));
+    // The validator intentionally performs no validation and always returns OK. Validation is
+    // deferred to _initState() to avoid startup failures due to parameter ordering issues.
+    // All values should pass validation.
+    ASSERT_OK(validateInitialConcurrency(0, {}));
+    ASSERT_OK(validateInitialConcurrency(gMinConcurrency * 2, {}));
+    ASSERT_OK(validateInitialConcurrency(gMaxConcurrency.load() * 2, {}));
+    ASSERT_OK(validateInitialConcurrency(1, {}));                           // Below minimum
+    ASSERT_OK(validateInitialConcurrency(gMaxConcurrency.load() * 3, {}));  // Above maximum
+}
+
+class InitStateWarningTest : public ServiceContextTest {
+protected:
+    InitStateWarningTest()
+        : ServiceContextTest(
+              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+                  nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()))) {
+        _svcCtx->setPeriodicRunner(std::make_unique<MockPeriodicRunner>());
+    }
+
+    void createAndInitProbing(int32_t initialConcurrency) {
+        gInitialConcurrency = initialConcurrency;
+        _throughputProbing = std::make_unique<ThroughputProbing>(
+            _svcCtx, &_readTicketHolder, &_writeTicketHolder, Milliseconds{1});
+        _throughputProbing->_initState();
+    }
+
+    ServiceContext* _svcCtx{getServiceContext()};
+    TicketHolder _readTicketHolder{
+        _svcCtx, 0, true /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth};
+    TicketHolder _writeTicketHolder{
+        _svcCtx, 0, true /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth};
+    std::unique_ptr<ThroughputProbing> _throughputProbing;
+};
+
+TEST_F(InitStateWarningTest, NoWarningForDefaultValue) {
+    // Default value of 0 should not produce any warnings.
+    unittest::LogCaptureGuard logs;
+    createAndInitProbing(0);
+    logs.stop();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 11352800)), 0);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 11352801)), 0);
+}
+
+TEST_F(InitStateWarningTest, NoWarningForValidRange) {
+    // Values within [2 * minConcurrency, 2 * maxConcurrency] should not produce warnings.
+    unittest::LogCaptureGuard logs;
+    createAndInitProbing(gMinConcurrency * 2);
+    logs.stop();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 11352800)), 0);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 11352801)), 0);
+}
+
+TEST_F(InitStateWarningTest, WarningForBelowMinimum) {
+    // Values below 2 * minConcurrency should log warning 11352800.
+    int32_t belowMin = gMinConcurrency;  // This is < 2 * gMinConcurrency
+    unittest::LogCaptureGuard logs;
+    createAndInitProbing(belowMin);
+    logs.stop();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 11352800)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 11352801)), 0);
+
+    // Verify the warning contains the expected attributes.
+    ASSERT_EQ(logs.countBSONContainingSubset(
+                  BSON("id" << 11352800 << "attr"
+                            << BSON("configured" << belowMin << "minimum" << gMinConcurrency * 2))),
+              1);
+}
+
+TEST_F(InitStateWarningTest, WarningForAboveMaximum) {
+    // Values above 2 * maxConcurrency should log warning 11352801.
+    int32_t aboveMax = gMaxConcurrency.load() * 2 + 1;
+    unittest::LogCaptureGuard logs;
+    createAndInitProbing(aboveMax);
+    logs.stop();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 11352800)), 0);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 11352801)), 1);
+
+    // Verify the warning contains the expected attributes.
+    ASSERT_EQ(
+        logs.countBSONContainingSubset(BSON(
+            "id" << 11352801 << "attr"
+                 << BSON("configured" << aboveMax << "maximum" << gMaxConcurrency.load() * 2))),
+        1);
 }
 
 TEST(ThroughputProbingParameterTest, MinConcurrency) {
