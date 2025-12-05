@@ -8,6 +8,7 @@ src/third_party/wiredtiger/dist
 bazel/auto_header/.auto_header
 src/mongo/db/modules/atlas/.auto_header
 src/mongo/db/modules/enterprise/.auto_header
+.git
 
 # Ignore node_modules due to the following error
 # ERROR: in verify_node_modules_ignored:
