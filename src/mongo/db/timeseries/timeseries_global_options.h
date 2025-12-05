@@ -48,6 +48,9 @@ inline Status validateTimeAndMetaField(const std::string& str) {
         return Status(ErrorCodes::BadValue,
                       "The 'timeField' or the 'metaField' cannot contain embedded null bytes");
     }
+    if (str.starts_with('$')) {
+        return Status(ErrorCodes::BadValue, "The 'timeField' or 'metaField' cannot start with '$'");
+    }
     return Status::OK();
 }
 
