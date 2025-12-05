@@ -233,6 +233,8 @@ void CommonProcessInterface::updateClientOperationTime(OperationContext* opCtx) 
     }
 }
 
+namespace {
+
 bool keyPatternNamesExactPaths(const BSONObj& keyPattern,
                                const std::set<FieldPath>& uniqueKeyPaths) {
     size_t nFieldsMatched = 0;
@@ -248,14 +250,31 @@ bool keyPatternNamesExactPaths(const BSONObj& keyPattern,
     return nFieldsMatched == uniqueKeyPaths.size();
 }
 
+bool isIdIndexFullyUnique(const ShardKeyPattern* shardKeyPattern, const BSONObj& indexKeyPattern) {
+    // We can't use ShardKeyPattern::isIndexUniquenessCompatible because it has a hard-coded
+    // exception for _id index that we want to bypass. _id is guaranteed to be unique across all
+    // shards only if the shard key is _id.
+    return shardKeyPattern == nullptr ||
+        (shardKeyPattern->getKeyPatternFields().size() == 1 &&
+         shardKeyPattern->getKeyPatternFields()[0]->equalsDottedField(
+             indexKeyPattern.firstElementFieldNameStringData()));
+}
+
+}  // namespace
+
 MongoProcessInterface::SupportingUniqueIndex CommonProcessInterface::supportsUniqueKey(
     const IndexDescriptor* indexDescriptor,
     const CollatorInterface* indexCollator,
     const CollatorInterface* queryCollator,
+    const ShardKeyPattern* shardKeyPattern,
     const std::set<FieldPath>& uniqueKeyPaths) {
-    bool supports = (indexDescriptor->unique() && !indexDescriptor->isPartial() &&
-                     keyPatternNamesExactPaths(indexDescriptor->keyPattern(), uniqueKeyPaths) &&
-                     CollatorInterface::collatorsMatch(indexCollator, queryCollator));
+    const bool isFullyUnique = indexDescriptor->isIdIndex()
+        ? isIdIndexFullyUnique(shardKeyPattern, indexDescriptor->keyPattern())
+        : indexDescriptor->unique();
+    const bool supports =
+        (isFullyUnique && !indexDescriptor->isPartial() &&
+         keyPatternNamesExactPaths(indexDescriptor->keyPattern(), uniqueKeyPaths) &&
+         CollatorInterface::collatorsMatch(indexCollator, queryCollator));
     if (!supports) {
         return MongoProcessInterface::SupportingUniqueIndex::None;
     }

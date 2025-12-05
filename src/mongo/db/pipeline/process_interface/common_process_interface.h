@@ -142,6 +142,7 @@ public:
     static SupportingUniqueIndex supportsUniqueKey(const IndexDescriptor* indexDescriptor,
                                                    const CollatorInterface* indexCollator,
                                                    const CollatorInterface* queryCollator,
+                                                   const ShardKeyPattern* shardKeyPattern,
                                                    const std::set<FieldPath>& uniqueKeyPaths);
 
     /**

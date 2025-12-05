@@ -1002,8 +1002,13 @@ CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
         const IndexCatalogEntry* entry = indexIterator->next();
         result = std::max(
             result,
-            supportsUniqueKey(
-                entry->descriptor(), entry->getCollator(), expCtx->getCollator(), fieldPaths));
+            supportsUniqueKey(entry->descriptor(),
+                              entry->getCollator(),
+                              expCtx->getCollator(),
+                              collection.getShardingDescription().isSharded()
+                                  ? &collection.getShardingDescription().getShardKeyPattern()
+                                  : nullptr,
+                              fieldPaths));
         if (result == SupportingUniqueIndex::Full) {
             break;
         }

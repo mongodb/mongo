@@ -421,6 +421,8 @@ MongosProcessInterface::fieldsHaveSupportingUniqueIndex(
             uassertStatusOK(response);
 
             const auto& indexes = response.getValue().docs;
+            const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
+
             return std::accumulate(
                 indexes.begin(),
                 indexes.end(),
@@ -436,7 +438,11 @@ MongosProcessInterface::fieldsHaveSupportingUniqueIndex(
                     return std::max(
                         result,
                         supportsUniqueKey(
-                            &descriptor, collator.get(), expCtx->getCollator(), fieldPaths));
+                            &descriptor,
+                            collator.get(),
+                            expCtx->getCollator(),
+                            cri.isSharded() ? &cri.getChunkManager().getShardKeyPattern() : nullptr,
+                            fieldPaths));
                 });
         });
 }
