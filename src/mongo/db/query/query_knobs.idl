@@ -1166,17 +1166,6 @@ server_parameters:
             expr: false
         redact: false
 
-    # TODO SERVER-68341 Remove this query knob after tenancy is supported in the sharded cluster.
-    internalChangeStreamUseTenantIdForTesting:
-        description: >-
-            If true, then change streams will operate upon an internal tenant id for testing
-            purposes if the actual tenant is not provided.
-        set_at: [startup]
-        cpp_varname: "internalChangeStreamUseTenantIdForTesting"
-        cpp_vartype: AtomicWord<bool>
-        default: false
-        redact: false
-
     minAllocationToShardsPollPeriodSecs:
         description: >-
             Defines the minimum distance in time in seconds between two adjacent config server
