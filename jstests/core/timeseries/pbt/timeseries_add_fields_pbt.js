@@ -3,6 +3,7 @@
  *
  * @tags: [
  * query_intensive_pbt,
+ * requires_timeseries,
  * # Runs queries that may return many results, requiring getmores.
  * requires_getmore,
  * # This test runs commands that are not allowed with security token: setParameter.
@@ -22,6 +23,11 @@ if (isSlowBuild(db)) {
     quit();
 }
 
+const is83orAbove = (() => {
+    const {version} = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}).featureCompatibilityVersion;
+    return MongoRunner.compareBinVersions(version, "8.3") >= 0;
+})();
+
 const numRuns = 40;
 const numQueriesPerRun = 40;
 
@@ -29,11 +35,11 @@ const controlColl = db.add_fields_pbt_control;
 const experimentColl = db.add_fields_pbt_experiment;
 
 const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl);
-const aggModel = addFieldsFirstStageAggModel();
+const tsAggModel = addFieldsFirstStageAggModel({isTS: true, is83orAbove: is83orAbove});
 
 testProperty(
     correctnessProperty,
     {controlColl, experimentColl},
-    makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
+    makeWorkloadModel({collModel: getCollectionModel({isTS: true}), aggModel: tsAggModel, numQueriesPerRun}),
     numRuns,
 );

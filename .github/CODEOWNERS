@@ -860,6 +860,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/core/timeseries/libs/**/viewless_timeseries_util.js @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 /jstests/core/timeseries/libs/**/timeseries.js @10gen/server-collection-write-path @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/core/timeseries/pbt/OWNERS.yml
+/jstests/core/timeseries/pbt/**/* @10gen/query-integration-timeseries @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/core/timeseries/query/OWNERS.yml
 /jstests/core/timeseries/query/**/* @10gen/query-integration-timeseries @svc-auto-approve-bot
 /jstests/core/timeseries/query/**/timeseries_block_explain.js @10gen/query-execution-sbe @svc-auto-approve-bot

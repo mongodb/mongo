@@ -1,8 +1,17 @@
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getDatasetModel, getDocModel} from "jstests/libs/property_test_helpers/models/document_models.js";
-import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {
+    addFieldsConstArb,
+    addFieldsVarArb,
+    computedProjectArb,
+    simpleProjectArb,
+    getAggPipelineArb,
+    getQueryAndOptionsModel,
+} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
+import {getNestedProperties} from "jstests/libs/query/analyze_plan.js";
 
 export function createStabilityWorkload(numQueriesPerRun) {
     // TODO SERVER-108077 SERVER-106983 when these tickets are complete, remove filters and allow
@@ -29,5 +38,60 @@ export function createStabilityWorkload(numQueriesPerRun) {
         // Use 5 as the minimum to avoid an error about the number of buckets needing to be at least
         // the number of types in the dataset.
         extraParamsModel: fc.record({numberBuckets: fc.integer({min: 5, max: 2000})}),
+    });
+}
+
+export function addFieldsFirstStageAggModel({isTS = false, is83orAbove = true} = {}) {
+    let aggArb = fc.record({
+        addFieldsStage: fc.oneof(addFieldsConstArb, addFieldsVarArb),
+        restOfPipeline: getAggPipelineArb({isTS: isTS}),
+    });
+
+    // Older versions suffer from SERVER-101007
+    // TODO SERVER-114269 remove this check.
+    if (!is83orAbove) {
+        aggArb = aggArb.filter(({_, restOfPipeline}) => getNestedProperties(restOfPipeline, "$elemMatch").length == 0);
+    }
+
+    return aggArb.map(({addFieldsStage, restOfPipeline}) => {
+        return {"pipeline": [addFieldsStage, ...restOfPipeline], "options": {}};
+    });
+}
+
+export function matchFirstStageAggModel({isTS = false, is83orAbove = true} = {}) {
+    let aggArb = fc.record({
+        matchStage: getMatchArb(),
+        restOfPipeline: getAggPipelineArb({isTS: isTS}),
+    });
+
+    // Older versions suffer from SERVER-101007
+    // TODO SERVER-114269 remove this check.
+    if (!is83orAbove) {
+        aggArb = aggArb.filter(
+            ({matchStage, restOfPipeline}) =>
+                getNestedProperties(matchStage, "$elemMatch").length == 0 &&
+                getNestedProperties(restOfPipeline, "$elemMatch").length == 0,
+        );
+    }
+
+    return aggArb.map(({matchStage, restOfPipeline}) => {
+        return {"pipeline": [matchStage, ...restOfPipeline], "options": {}};
+    });
+}
+
+export function projectFirstStageAggModel({isTS = false, is83orAbove = true} = {}) {
+    let aggArb = fc.record({
+        projectStage: fc.oneof(simpleProjectArb, computedProjectArb),
+        restOfPipeline: getAggPipelineArb({isTS: isTS}),
+    });
+
+    // Older versions suffer from SERVER-101007
+    // TODO SERVER-114269 remove this check.
+    if (!is83orAbove) {
+        aggArb = aggArb.filter(({_, restOfPipeline}) => getNestedProperties(restOfPipeline, "$elemMatch").length == 0);
+    }
+
+    return aggArb.map(({projectStage, restOfPipeline}) => {
+        return {"pipeline": [projectStage, ...restOfPipeline], "options": {}};
     });
 }

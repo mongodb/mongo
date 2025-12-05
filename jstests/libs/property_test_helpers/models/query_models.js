@@ -87,10 +87,9 @@ export const skipArb = fc.record({$skip: fc.integer({min: 1, max: 5})});
  *       when a deterministic bag is required.
  * The output is in order from simplest agg stages to most complex, for minimization.
  */
-function getAllowedStages(allowOrs, deterministicBag) {
+function getAllowedStages(allowOrs, deterministicBag, isTS) {
     let allowedStages = [];
-    // TODO SERVER-83072 remove 'isTimeseriesTestSuite' once $group timeseries array bug is fixed.
-    const isTimeseriesTestSuite = TestData.isTimeseriesTestSuite || false;
+    const isTimeseriesCollection = TestData.isTimeseriesTestSuite || isTS;
     if (deterministicBag) {
         allowedStages = [
             simpleProjectArb,
@@ -113,7 +112,7 @@ function getAllowedStages(allowOrs, deterministicBag) {
             getSortArb(),
         ];
     }
-    if (!isTimeseriesTestSuite) {
+    if (!isTimeseriesCollection) {
         allowedStages.push(groupArb);
     }
     return allowedStages;
@@ -122,8 +121,9 @@ function getAllowedStages(allowOrs, deterministicBag) {
 /*
  * The pipeline arb generates a pipeline of stages.
  */
-export function getAggPipelineArb({allowOrs = true, deterministicBag = true, allowedStages = []} = {}) {
-    const stages = allowedStages.length == 0 ? getAllowedStages(allowOrs, deterministicBag) : allowedStages;
+export function getAggPipelineArb({allowOrs = true, deterministicBag = true, allowedStages = [], isTS = false} = {}) {
+    // TODO SERVER-83072 remove 'isTS' once $group timeseries array bug is fixed.
+    const stages = allowedStages.length == 0 ? getAllowedStages(allowOrs, deterministicBag, isTS) : allowedStages;
     // Length 6 seems long enough to cover interactions between stages.
     return fc.array(oneof(...stages), {minLength: 1, maxLength: 6});
 }
