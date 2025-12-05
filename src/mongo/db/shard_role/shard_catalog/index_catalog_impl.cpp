@@ -1490,7 +1490,11 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
 
     _rebuildIndexUpdateIdentifier();
 
-    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
+    auto& collectionQueryInfo = CollectionQueryInfo::get(collection);
+    collectionQueryInfo.rebuildIndexData(opCtx, collection);
+    if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
+        collectionQueryInfo.rebuildPathArrayness(opCtx, collection);
+    }
     CollectionIndexUsageTrackerDecoration::write(collection).unregisterIndex(indexName);
     _deleteIndexFromDisk(opCtx, collection, indexName, std::move(ownedEntry));
 
@@ -1753,7 +1757,11 @@ const IndexCatalogEntry* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
                                     IndexFeatures::make(desc, collection->ns().isOnInternalDb()));
 
     // Last rebuild index data for CollectionQueryInfo for this Collection.
-    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
+    auto& collectionQueryInfo = CollectionQueryInfo::get(collection);
+    collectionQueryInfo.rebuildIndexData(opCtx, collection);
+    if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
+        collectionQueryInfo.rebuildPathArrayness(opCtx, collection);
+    }
 
     // Return the new entry.
     return newEntry;

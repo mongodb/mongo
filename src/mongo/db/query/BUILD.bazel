@@ -717,10 +717,25 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/fts:base_fts",
+        "//src/mongo/db/query/compiler/metadata:path_arrayness",
         "//src/mongo/db/query/plan_cache:query_plan_cache",
         "//src/mongo/db/query/query_settings",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog",
         "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "collection_query_info_test",
+    srcs = [
+        "//src/mongo/db/query:collection_query_info_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        "collection_query_info",
+        "//src/mongo/db/index_builds:index_build_test_helpers",
+        "//src/mongo/db/query/compiler/ce/sampling:sampling_test_utils",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )

@@ -315,4 +315,3 @@ feature_flags:
         cpp_varname: gFeatureFlagPathArrayness
         fcv_gated: false
         default: false
-        incremental_rollout_phase: in_development

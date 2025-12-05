@@ -1264,9 +1264,12 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         }
     }
 
+    auto& collectionQueryInfo = CollectionQueryInfo::get(collection);
     // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    CollectionQueryInfo::get(collection)
-        .clearQueryCache(opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection));
+    collectionQueryInfo.clearQueryCache(opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection));
+    if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
+        collectionQueryInfo.rebuildPathArrayness(opCtx, collection);
+    }
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this](OperationContext*, boost::optional<Timestamp>) { _buildIsCleanedUp = true; });
 

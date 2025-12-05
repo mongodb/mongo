@@ -58,6 +58,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -115,7 +116,9 @@ void CollectionQueryInfo::PlanCacheState::clearPlanCache() {
     planCacheInvalidator.clearPlanCache();
 }
 
-CollectionQueryInfo::CollectionQueryInfo() : _planCacheState{std::make_shared<PlanCacheState>()} {}
+CollectionQueryInfo::CollectionQueryInfo()
+    : _planCacheState{std::make_shared<PlanCacheState>()},
+      _pathArraynessState{std::make_shared<PathArraynessState>()} {}
 
 void CollectionQueryInfo::clearQueryCache(OperationContext* opCtx, const CollectionPtr& coll) {
     // We are operating on a cloned collection, the use_count can only be 1 if we've created a new
@@ -163,6 +166,58 @@ const PlanCacheIndexabilityState& CollectionQueryInfo::getPlanCacheIndexabilityS
     return _planCacheState->planCacheIndexabilityState;
 }
 
+CollectionQueryInfo::PathArraynessState::PathArraynessState()
+    : pathArrayness{std::make_shared<PathArrayness>()} {}
+
+void CollectionQueryInfo::updatePathArraynessForSetMultikey(OperationContext* opCtx,
+                                                            const Collection* coll) const {
+    // Acquire write lock to prevent concurrent re-assignment of PathArrayness.
+    auto writeLock = _pathArraynessState->rwMutex.writeLock();
+    // Create an empty PathArrayness in response to an index multikeyness change from a document
+    // write/update operation.
+    // TODO: SERVER-114809: Create a PathArrayness that reflects a more precise arrayness state.
+    _pathArraynessState->pathArrayness = std::make_shared<PathArrayness>();
+}
+
+void CollectionQueryInfo::rebuildPathArrayness(OperationContext* opCtx, const Collection* coll) {
+    // Create temporary pathArrayness that we populate before unseating the shared_ptr.
+    PathArrayness tmpPathArrayness;
+    // Acquire write lock to ensure atomic reads from index catalog and atomic writes to
+    // PathArrayness.
+    auto ii = coll->getIndexCatalog()->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
+    while (ii->more()) {
+        const IndexCatalogEntry* ice = ii->next();
+        const auto desc = ice->descriptor();
+        // We skip over indexes that do not provide a full view of the arrayness of data over the
+        // whole collection.
+        // We will read wildcard indexes later during query planning once we have a
+        // 'CanonicalQuery'.
+        if (desc->isPartial() || desc->getIndexType() == INDEX_WILDCARD || desc->hidden()) {
+            continue;
+        }
+
+        MultikeyPaths multikeyPaths;
+        coll->isIndexMultikey(opCtx, desc->indexName(), &multikeyPaths);
+        // If multikeyPaths is empty then that means we don't support path level index
+        // tracking. At that point there is no reason to append this path onto the trie
+        // since we should just assume this path is an array.
+        if (!multikeyPaths.empty()) {
+            size_t indexCounter = 0;
+            for (const auto& key : desc->keyPattern()) {
+                FieldPath path(key.fieldNameStringData());
+                tmpPathArrayness.addPath(path, multikeyPaths[indexCounter]);
+                ++indexCounter;
+            }
+        }
+    }
+    _pathArraynessState->pathArrayness = std::make_shared<PathArrayness>(tmpPathArrayness);
+}
+
+std::shared_ptr<const PathArrayness> CollectionQueryInfo::getPathArrayness() const {
+    auto readLock = _pathArraynessState->rwMutex.readLock();
+    return _pathArraynessState->pathArrayness;
+}
+
 void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
     // Skip registering the index in a --repair, as the server will terminate after
     // the repair operation completes.
@@ -182,6 +237,9 @@ void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
     }
 
     rebuildIndexData(opCtx, coll);
+    if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
+        rebuildPathArrayness(opCtx, coll);
+    }
 }
 
 void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, const Collection* coll) {

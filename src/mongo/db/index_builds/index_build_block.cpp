@@ -320,6 +320,10 @@ Status IndexBuildBlock::buildEmptyIndex(OperationContext* opCtx,
 
     // sanity check
     invariant(collection->isIndexReady(descriptor->indexName()));
+    // We can rebuild the path arrayness information once this index is ready.
+    if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
+        CollectionQueryInfo::get(collection).rebuildPathArrayness(opCtx, collection);
+    }
 
     return Status::OK();
 }

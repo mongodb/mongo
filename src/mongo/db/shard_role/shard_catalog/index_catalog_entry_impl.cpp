@@ -306,8 +306,12 @@ void IndexCatalogEntryImpl::forceSetMultikey(OperationContext* const opCtx,
     // currently support path-level multikey path tracking.
     coll->forceSetIndexIsMultikey(opCtx, &_descriptor, isMultikey, multikeyPaths);
 
-    // Since multikey metadata has changed, invalidate the query cache.
-    CollectionQueryInfo::get(coll).clearQueryCacheForSetMultikey(coll);
+    // Since multikey metadata has changed, invalidate the query cache and rebuild PathArrayness.
+    auto& collectionQueryInfo = CollectionQueryInfo::get(coll);
+    collectionQueryInfo.clearQueryCacheForSetMultikey(coll);
+    if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
+        collectionQueryInfo.updatePathArraynessForSetMultikey(opCtx, coll.get());
+    }
 }
 
 Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
@@ -720,7 +724,11 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
                     "Index set to multi key, clearing query plan cache",
                     logAttrs(collection->ns()),
                     "keyPattern"_attr = _descriptor.keyPattern());
-        CollectionQueryInfo::get(collection).clearQueryCacheForSetMultikey(collection);
+        auto& collectionQueryInfo = CollectionQueryInfo::get(collection);
+        collectionQueryInfo.clearQueryCacheForSetMultikey(collection);
+        if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
+            collectionQueryInfo.updatePathArraynessForSetMultikey(opCtx, collection.get());
+        }
     }
 }
 
