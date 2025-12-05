@@ -483,12 +483,105 @@ boost::optional<DocNeededAndSortPattern> allAccsNeedFirstOrLastDoc(
     return DocNeededAndSortPattern{docNeeded, sortPattern};
 }
 
+// Distinct Scan rewrite is only intended for $group stages that group on a single field.
+static constexpr size_t kNumberOfGroupFieldsInDistinctScanRewrite = 1;
+
+enum class SortPatternDirectionComparison {
+    sameDirection,
+    reverseDirection,
+    incompatible,
+};
+
+/**
+ * Checks if the infix's fields matches sortPattern's fields starting with sortPatternStartIndex. If
+ * the directions are inconsistent or field names don't match returns incompatible.
+ * For example, sortPattern: {a: 1, b: 1, c: -1} and sortPatternStartIndex = 1. For infix {b:1, c:
+ * -1} it return sameDirection, for infix {b: -1, c: 1} it return reverseDirection, for infixes
+ * {b: 1, c: 1} or {a: 1, b: 1} it returns incompatible.
+ */
+SortPatternDirectionComparison getMatchedDirection(const SortPattern& sortPattern,
+                                                   const SortPattern& infix,
+                                                   size_t sortPatternStartIndex) {
+    const bool isDirectionTheSame =
+        sortPattern[sortPatternStartIndex].isAscending == infix[0].isAscending;
+    for (size_t i = 0; i != infix.size(); ++i) {
+        const auto& patternField = sortPattern[sortPatternStartIndex + i];
+        const auto& infixField = infix[i];
+
+        if (patternField.expression || infixField.expression) {
+            return SortPatternDirectionComparison::incompatible;
+        }
+        if ((patternField.isAscending == infixField.isAscending) != isDirectionTheSame) {
+            return SortPatternDirectionComparison::incompatible;
+        }
+        if (patternField.fieldPath != infixField.fieldPath) {
+            return SortPatternDirectionComparison::incompatible;
+        }
+    }
+    return isDirectionTheSame ? SortPatternDirectionComparison::sameDirection
+                              : SortPatternDirectionComparison::reverseDirection;
+}
+
+/**
+ * Tries to find if the index fields and directions are matched fields and directions inside the
+ * sortPattern. If it finds such match it returns the starting index of the match and the
+ * value indicating whether the directions of the matched fields the same or the opposite. Otherwise
+ * it returns incompatible in the second value.
+ * For example, sortPattern: {a: 1, b: 1, c: -1}. For infix {b: 1, c: -1} it returns {1,
+ * sameDirection}, for infix {b: -1, c: 1} it returns {1, reverseDirection}, for infixes {b: 1, c:
+ * 1} or {a: 1, c: -1} it returns {0, incompatible}.
+ */
+std::pair<size_t, SortPatternDirectionComparison> findMatchedSortingInfix(
+    const SortPattern& sortPattern, const SortPattern& infix) {
+    if (infix.size() > sortPattern.size()) {
+        return {0, SortPatternDirectionComparison::incompatible};
+    }
+
+    const size_t diff = sortPattern.size() - infix.size();
+    for (size_t patternStartIndex = 0; patternStartIndex <= diff; ++patternStartIndex) {
+        const auto cmp = getMatchedDirection(sortPattern, infix, patternStartIndex);
+        if (cmp != SortPatternDirectionComparison::incompatible) {
+            return {patternStartIndex, cmp};
+        }
+    }
+    return {0, SortPatternDirectionComparison::incompatible};
+}
+
+/**
+ *  Compare the the directions of the sorts specified by the preceding $sort stage and the
+ * accumulators of the current $group stage. Returns whether they have the same or opptite
+ * directions, or the sort patterns are incompatible.
+ * For example, sortStagePattern {a: 1, b: 1, c: 1}. groupPatterns
+ * {b: 1, c: 1} or {b: 1} return sameDirection, groupPatterns {b: -1, c: -1} or {b: -1} return
+ * reverseDirection, groupPatterns {a: 1, b: 1, c: 1} or {a: 1, b: 1} return sameDirection,
+ * groupPatterns {a: -1, b: -1, c:- 1} or {a: 1, c: 1} return incompatible.
+ */
+SortPatternDirectionComparison compareSortPatterns(const SortPattern& sortStagePattern,
+                                                   const SortPattern& groupPattern) {
+    const auto [matchedStartIndex, cmp] = findMatchedSortingInfix(sortStagePattern, groupPattern);
+    if (matchedStartIndex < kNumberOfGroupFieldsInDistinctScanRewrite &&
+        cmp == SortPatternDirectionComparison::sameDirection) {
+        // 1. sameDirection for sortStagePattern: {a: 1, b: 1, c: 1},
+        // groupPattern: {a: 1, b: 1, c: 1}.
+        return cmp;
+    } else if (matchedStartIndex == kNumberOfGroupFieldsInDistinctScanRewrite) {
+        // 2. sameDirection for sortStagePattern: {a: 1, b: 1, c: 1}, groupPattern: {b: 1, c: 1}.
+        // 3. reverseDirection for sortStagePattern: {a: 1, b: 1, c: 1},
+        // groupPattern: {b: -1, c: -1}.
+        return cmp;
+    }
+    // 4. incompatible for sortStagePattern: {a: 1, b: 1, c: 1},
+    // groupPattern: {a:- 1, b: -1, c: -1}.
+    // 5. incompatible for other cases when field names don't match or the directions are
+    // inconsistent.
+    return SortPatternDirectionComparison::incompatible;
+}
 }  // namespace
 
 auto DocumentSourceGroupBase::getRewriteGroupRequirements() const
     -> boost::optional<RewriteGroupRequirements> {
     const auto& idExpressions = _groupProcessor.getIdExpressions();
-    if (idExpressions.size() != 1) {
+    if (idExpressions.size() != kNumberOfGroupFieldsInDistinctScanRewrite) {
         // This transformation is only intended for $group stages that group on a single field.
         return boost::none;
     }
@@ -523,15 +616,25 @@ auto DocumentSourceGroupBase::getRewriteGroupRequirements() const
     return RewriteGroupRequirements{docNeeded, groupId, sortPattern};
 }
 
-std::pair<boost::optional<SortPattern>, std::unique_ptr<GroupFromFirstDocumentTransformation>>
-DocumentSourceGroupBase::rewriteGroupAsTransformOnFirstDocument() const {
+RewriteOnFirstDocumentResult DocumentSourceGroupBase::rewriteGroupAsTransformOnFirstDocument(
+    boost::optional<SortPattern> sortStagePattern) const {
     auto rewriteGroupRequirements = getRewriteGroupRequirements();
     if (!rewriteGroupRequirements) {
-        return {boost::none, nullptr};
+        return {};
     }
 
     auto [docsNeeded, groupId, sortPattern] = *rewriteGroupRequirements;
+    SortPatternDirectionComparison dirCmp = SortPatternDirectionComparison::incompatible;
+    boost::optional<bool> isDirectionTheSame{true};
+    if (sortStagePattern && sortPattern) {
+        dirCmp = compareSortPatterns(*sortStagePattern, *sortPattern);
+        if (dirCmp == SortPatternDirectionComparison::incompatible) {
+            return {};
+        }
+    }
 
+    // Whether the idField matched the first field of the sortStagePattern is being checked at later
+    // stages of the query processing when we try to create an IndexScan plan from $sort + $group.
     boost::intrusive_ptr<Expression> idField;
     const auto& idFieldNames = _groupProcessor.getIdFieldNames();
     // The _id field can be specified either as a fieldpath (ex. _id: "$a") or as a singleton
@@ -540,7 +643,10 @@ DocumentSourceGroupBase::rewriteGroupAsTransformOnFirstDocument() const {
         idField = ExpressionFieldPath::createPathFromString(
             pExpCtx.get(), groupId, pExpCtx->variablesParseState);
     } else {
-        invariant(idFieldNames.size() == 1);
+        tassert(11080300,
+                "Distinct Scan rewrite is only intended for $group stages that group on a single "
+                "field.",
+                idFieldNames.size() == kNumberOfGroupFieldsInDistinctScanRewrite);
         idField = ExpressionObject::create(
             pExpCtx.get(), {{idFieldNames.front(), _groupProcessor.getIdExpressions().front()}});
     }
@@ -572,12 +678,14 @@ DocumentSourceGroupBase::rewriteGroupAsTransformOnFirstDocument() const {
                 }
                 [[fallthrough]];
             default:
-                return {boost::none, nullptr};
+                return {};
         }
     }
 
-    return {sortPattern,
-            GroupFromFirstDocumentTransformation::create(
+    return {.sortPattern = sortPattern,
+            .sortDirectionChangeIsRequired =
+                dirCmp == SortPatternDirectionComparison::reverseDirection,
+            .rewrittenGroupStage = GroupFromFirstDocumentTransformation::create(
                 pExpCtx, groupId, getSourceName(), std::move(fields), docsNeeded)};
 }
 
