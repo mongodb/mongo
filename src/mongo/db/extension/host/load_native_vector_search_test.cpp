@@ -208,7 +208,7 @@ TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithFilter) {
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 5U);
 
-    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: { metric: "cosine" } })JSON");
     expectStageEq(stages, 1, R"JSON({ $match: { x: 1 } })JSON");
     expectStageEq(stages, 2, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityCosine: {
         vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
@@ -223,7 +223,7 @@ TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithoutFilter) {
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
-    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: { metric: "cosine" } })JSON");
     expectStageEq(stages, 1, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityCosine: {
         vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
         score: false } } } }
@@ -236,7 +236,7 @@ TEST_F(LoadNativeVectorSearchTest, CosineNormalizedSerializesAsExpected) {
     auto spec = makeNativeVectorSearchSpec(/*filter*/ false, "cosine", /*normalize*/ true);
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
-    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: { metric: "cosine" } })JSON");
     expectStageEq(stages, 1, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityCosine: {
       vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
       score: true } } } })JSON");
@@ -249,7 +249,7 @@ TEST_F(LoadNativeVectorSearchTest, DotProductNoNormalizeSerializesAsExpected) {
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
-    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: { metric: "dotProduct" } })JSON");
     expectStageEq(stages, 1, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityDotProduct: {
         vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
         score: false } } } }
@@ -263,7 +263,7 @@ TEST_F(LoadNativeVectorSearchTest, DotProductNormalizedSerializesAsExpected) {
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
-    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: { metric: "dotProduct" } })JSON");
     expectStageEq(stages, 1, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityDotProduct: {
       vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
       score: true } } } })JSON");
@@ -277,7 +277,7 @@ TEST_F(LoadNativeVectorSearchTest, NativeVectorSearchEuclideanNoNormalizeUsesMul
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
-    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: { metric: "euclidean" } })JSON");
     expectStageEq(stages, 1, R"JSON({ $setMetadata: { vectorSearchScore: { $multiply: [
         { $const: -1 },
         { $similarityEuclidean: {
@@ -295,7 +295,7 @@ TEST_F(LoadNativeVectorSearchTest, NativeVectorSearchEuclideanNormalizedSerializ
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
-    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: {} })JSON");
+    expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: { metric: "euclidean" } })JSON");
     expectStageEq(stages, 1, R"JSON({ $setMetadata: { vectorSearchScore: { $similarityEuclidean: {
         vectors: [ [ { $const: 1.0 }, { $const: 2.0 }, { $const: 3.0 } ], "$embedding" ],
         score: true } } } }

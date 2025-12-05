@@ -34,8 +34,8 @@ function runTest(verbosity, pipeline, expectedStages) {
                     assert.gt(shardStage.nReturned, 0, result);
                 }
             }
-
-            // TODO SERVER-112519 Validate stage-specific execution stats.
+            assert.eq(stageOutput.execMetricField, "execMetricValue");
+            assert.gte(stageOutput.executionTimeMillisEstimate, 0);
         }
     }
 }
@@ -46,5 +46,3 @@ runTest("executionStats", [{$explain: {input: "hello"}}], {$explain: {input: "he
 runTest("allPlansExecution", [{$explain: {input: "hello"}}], {
     $explain: {input: "hello", verbosity: "allPlansExecution"},
 });
-
-// TODO SERVER-112519 Add tests covering explain on a desugar stage.

@@ -94,7 +94,9 @@ public:
     static constexpr std::string kCounterField = "counter";
 
     explicit MetricsExecAggStage(const std::string& algorithm)
-        : sdk::ExecAggStageTransform(kMetricsStageName), _algorithm(algorithm) {}
+        : sdk::ExecAggStageTransform(kMetricsStageName),
+          _algorithm(algorithm),
+          _latestStart(Date_t::min()) {}
 
     mongo::extension::ExtensionGetNextResult getNext(
         const sdk::QueryExecutionContextHandle& execCtx,
@@ -102,9 +104,9 @@ public:
         // Get metrics from the execution context (stored on OperationContext).
         auto metrics = execCtx.getMetrics(execStage);
 
-        auto now = Date_t::now();
+        _latestStart = Date_t::now();
         BSONObjBuilder updateBuilder;
-        updateBuilder.append("start", now);
+        updateBuilder.append("start", _latestStart);
         updateBuilder.append("algorithm", _algorithm);
 
         auto bson = updateBuilder.obj();
@@ -121,7 +123,7 @@ public:
     void close() override {}
 
     BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSONObj();
+        return BSON("latestStart" << _latestStart);
     }
 
     /**
@@ -134,6 +136,7 @@ public:
 
 private:
     std::string _algorithm;
+    Date_t _latestStart;
 };
 
 class MetricsLogicalStage : public sdk::LogicalAggStage {
@@ -142,11 +145,12 @@ public:
         : sdk::LogicalAggStage(kMetricsStageName), _algorithm(algorithm) {}
 
     BSONObj serialize() const override {
-        return BSON(kMetricsStageName << BSONObj());
+        // This is the serialization used for mongos.
+        return BSON(kMetricsStageName << BSON("metric" << _algorithm));
     }
 
     BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSON(kMetricsStageName << BSONObj());
+        return BSON(kMetricsStageName << BSON("algorithm" << _algorithm));
     }
 
     std::unique_ptr<sdk::ExecAggStageBase> compile() const override {

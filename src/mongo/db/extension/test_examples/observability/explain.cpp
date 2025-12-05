@@ -37,8 +37,19 @@
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 
-class ExplainLogicalStage
-    : public sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage> {
+constexpr char ExplainStageName[] = "$explain";
+
+class ExplainExecStage : public sdk::TestExecStage {
+public:
+    ExplainExecStage(std::string_view stageName, const mongo::BSONObj& arguments)
+        : sdk::TestExecStage(stageName, arguments) {}
+
+    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSON("execMetricField" << "execMetricValue");
+    }
+};
+
+class ExplainLogicalStage : public sdk::TestLogicalStage<ExplainExecStage> {
 public:
     ExplainLogicalStage(std::string_view stageName, const mongo::BSONObj& spec)
         : TestLogicalStage(stageName, spec) {}
@@ -91,7 +102,7 @@ public:
     void validate(const mongo::BSONObj& arguments) const override {
         sdk_uassert(
             11239403,
-            (str::stream() << "input to " << kStageName << " must be a string " << arguments),
+            (str::stream() << "input to " << ExplainStageName << " must be a string " << arguments),
             arguments["input"] && arguments["input"].type() == mongo::BSONType::string);
     }
 };

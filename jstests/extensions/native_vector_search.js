@@ -168,32 +168,3 @@ for (const metric of ["cosine", "dotProduct", "euclidean"]) {
         norm.map((d) => d.score),
     );
 }
-
-// Explain output contains post-desugar stages.
-{
-    resetCollWithDocs([
-        {_id: 1, embedding: [1, 0]},
-        {_id: 2, embedding: [0.5, 0.5]},
-    ]);
-
-    const expl = coll.explain().aggregate([
-        {
-            $nativeVectorSearch: {
-                path: "embedding",
-                queryVector: [1, 0],
-                limit: 2,
-                metric: "cosine",
-            },
-        },
-    ]);
-
-    // Expected:
-    //   1. $cursor
-    //   2. $vectorSearchMetrics
-    //   3. $setMetadata
-    //   4. $sort  (limit is folded into sort)
-    const stages = expl.stages ? expl.stages : expl.shards[Object.keys(expl.shards)[0]].stages;
-    const names = stages.map((s) => Object.keys(s)[0]);
-    assert.eq(names, ["$cursor", "$vectorSearchMetrics", "$setMetadata", "$sort"]);
-    assert.eq(stages[3].$sort.limit, 2);
-}

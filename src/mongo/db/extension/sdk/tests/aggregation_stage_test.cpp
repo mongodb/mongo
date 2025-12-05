@@ -463,7 +463,6 @@ public:
         return BSON(kStageName << verbosity);
     }
 
-    // TODO (SERVER-112395): Implement this function for testing.
     std::unique_ptr<ExecAggStageBase> compile() const override {
         return nullptr;
     }
