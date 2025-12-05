@@ -182,7 +182,8 @@ private:
     admission::execution_control::OperationExecutionStats _writeLongStats;
 
     Atomic<bool> _priorityLowered{false};
-    admission::execution_control::OperationType _opType;
+    admission::execution_control::OperationType _opType{
+        admission::execution_control::OperationType::kRead};
 };
 
 }  // namespace mongo
