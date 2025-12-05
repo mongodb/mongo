@@ -1062,6 +1062,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/libs/unique_indexes/OWNERS.yml
 /jstests/libs/unique_indexes/**/* @10gen/server-index-builds @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/libs/util/change_stream/OWNERS.yml
+/jstests/libs/util/change_stream/**/* @10gen/query-execution-change-streams @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/libunwind/OWNERS.yml
 /jstests/libunwind/**/* @10gen/server-programmability @svc-auto-approve-bot
 
