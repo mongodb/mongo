@@ -34,13 +34,14 @@
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/query/collation/collation_spec.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
 #include <string>
 #include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * An interface for ordering and matching according to a collation. Instances should be retrieved
@@ -189,4 +190,4 @@ private:
     const Collation _spec;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

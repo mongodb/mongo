@@ -33,11 +33,15 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
 
-namespace mongo {
+/**
+ * TODO SERVER-114832 Break audit dependency on this class.
+ */
+namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
 
 /**
  * Finds the element at 'path' in 'doc', starting at 'startIndex' in 'path'. If none is found, an
@@ -49,4 +53,4 @@ BSONElement getFieldDottedOrArray(const BSONObj& doc,
                                   size_t* idxPath,
                                   size_t startIndex = 0);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo

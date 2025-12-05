@@ -27,6 +27,7 @@
 #
 
 global:
+    mod_visibility: public
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/query/client_cursor/cursor_id.h"

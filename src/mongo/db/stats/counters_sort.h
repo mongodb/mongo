@@ -31,8 +31,9 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
 
 class SortCounters {
 public:
@@ -58,4 +59,4 @@ public:
 };
 extern SortCounters sortCounters;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo

@@ -32,12 +32,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+MONGO_MOD_PUBLIC;
 namespace mongo::doc_validation_error {
 /**
  * Set of functions which create an ErrorAnnotation provided that a validator expression is being

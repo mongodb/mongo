@@ -36,12 +36,16 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/path.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 
 namespace mongo {
 
-class MatchableDocument {
+/**
+ * TODO SERVER-114832 Break audit dependency on this class.
+ */
+class MONGO_MOD_UNFORTUNATELY_OPEN MatchableDocument {
 public:
     // Inlining to allow subclasses to see that this is a no-op and avoid a function call.
     // Speeds up query execution measurably.

@@ -34,10 +34,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Contains the name of the command that uses the cursor.
@@ -59,4 +60,4 @@ private:
     std::string _commandName;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

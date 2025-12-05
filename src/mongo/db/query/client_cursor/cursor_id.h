@@ -29,8 +29,10 @@
 
 #pragma once
 
-namespace mongo {
+#include "mongo/util/modules.h"
+
+namespace MONGO_MOD_PUBLIC mongo {
 
 using CursorId = long long;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -32,10 +32,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class BSONObj;
 class ServiceContext;
@@ -81,4 +82,4 @@ public:
     virtual StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) = 0;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

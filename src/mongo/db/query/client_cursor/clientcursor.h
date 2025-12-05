@@ -60,6 +60,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -72,7 +73,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class CursorManager;
 class RecoveryUnit;
@@ -679,4 +680,4 @@ private:
 void incrementCursorLifespanMetric(Date_t birth, Date_t death);
 CursorStats& cursorStats();
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

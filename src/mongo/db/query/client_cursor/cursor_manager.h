@@ -51,6 +51,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -63,7 +64,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class AuthorizationSession;
 class OperationContext;
@@ -309,4 +310,4 @@ private:
     stdx::unordered_map<OperationKey, std::set<CursorId>, UUID::Hash> _opKeyMap;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

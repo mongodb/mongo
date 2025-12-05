@@ -43,6 +43,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 
 #include <cstddef>
@@ -53,7 +54,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Builds the cursor field for a reply to a cursor-generating command in-place.
@@ -329,4 +330,4 @@ private:
     bool _wasStatementExecuted = false;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -40,6 +40,7 @@
 #include "mongo/rpc/message.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -55,7 +56,7 @@
 #include <absl/meta/type_traits.h>
 #include <fmt/format.h>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * for storing operation counters
@@ -885,4 +886,4 @@ public:
 /** Returns the appropriate QueryCounters instance for `opCtx`'s service. */
 QueryCounters& getQueryCounters(OperationContext* opCtx);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

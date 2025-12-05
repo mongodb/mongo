@@ -31,9 +31,14 @@
 
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <random>
 
+/**
+ * TODO SERVER-114887: Determine if other modules should depend on this.
+ */
+MONGO_MOD_PUBLIC;
 namespace mongo::random_utils {
 /**
  * Returns a random number generator that is a static object initialized once per thread.

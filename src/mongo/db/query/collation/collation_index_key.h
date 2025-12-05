@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class BSONElement;
 class BSONObjBuilder;
@@ -60,4 +61,4 @@ public:
                                              BSONObjBuilder* out);
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

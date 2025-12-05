@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 int getClientCursorMonitorFrequencySecs();
 
@@ -41,4 +42,4 @@ long long getCursorTimeoutMillis();
 
 Milliseconds getDefaultCursorTimeoutMillis();
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

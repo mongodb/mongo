@@ -33,10 +33,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class CollatorFactoryMock : public CollatorFactoryInterface {
 public:
@@ -47,4 +48,4 @@ public:
     StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) final;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

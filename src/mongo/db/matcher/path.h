@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -42,7 +43,10 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+/**
+ * TODO SERVER-114832 Break audit dependency on this class.
+ */
+namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
 
 class ElementPath {
 public:
@@ -295,4 +299,4 @@ struct BSONElementSubIterator {
     BSONElementIterator cursor;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo

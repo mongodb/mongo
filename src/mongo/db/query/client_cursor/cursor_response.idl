@@ -29,6 +29,7 @@
 # This IDL file describes the BSON format for cursor response object.
 
 global:
+    mod_visibility: public
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/namespace_string.h"

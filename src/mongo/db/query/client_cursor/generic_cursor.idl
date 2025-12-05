@@ -31,6 +31,7 @@
 # for that class.
 
 global:
+    mod_visibility: public
     cpp_namespace: "mongo"
 
 imports:

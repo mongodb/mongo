@@ -37,9 +37,11 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
+MONGO_MOD_PUBLIC;
 namespace mongo::doc_validation_error {
 // The default maximum allowed size for a single doc validation error.
 constexpr static int kDefaultMaxDocValidationErrorSize = 12 * 1024 * 1024;
