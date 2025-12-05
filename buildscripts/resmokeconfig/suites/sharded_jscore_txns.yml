@@ -38,7 +38,6 @@ executor:
     # We don't execute dbHash or oplog consistency checks since there is only a single replica set
     # node.
     - class: CheckMetadataConsistencyInBackground
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CheckOrphansDeleted
     - class: CleanEveryN

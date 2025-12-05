@@ -43,7 +43,6 @@ executor:
           TestData: *TestData
         eval: jsTest.authenticate(db.getMongo())
         <<: *authOptions
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
       shell_options:
         global_vars:

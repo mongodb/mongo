@@ -39,7 +39,6 @@ executor:
     #
     # TODO SERVER-26466: Add CheckReplOplogs hook to the concurrency suite.
     - class: CheckReplDBHash
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanupConcurrencyWorkloads
     - class: ContinuousMaintenance

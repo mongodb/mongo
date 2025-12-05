@@ -11,7 +11,6 @@ executor:
     hooks:
       - ValidateCollections
   hooks:
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
       shell_options:
         global_vars:

@@ -218,7 +218,6 @@
         # validating the entire contents of the collection.
         - class: CheckReplOplogs
         - class: CheckReplDBHash
-        - class: RunCanaryWorkloadInBackground
         - class: ValidateCollections
           shell_options:
             global_vars:
@@ -242,7 +241,6 @@
         # validating the entire contents of the collection.
         - class: CheckReplOplogs
         - class: CheckReplDBHash
-        - class: RunCanaryWorkloadInBackground
         - class: ValidateCollections
           shell_options:
             global_vars:
@@ -269,7 +267,6 @@
         # validating the entire contents of the collection.
         - class: CheckReplOplogs
         - class: CheckReplDBHash
-        - class: RunCanaryWorkloadInBackground
         - class: ValidateCollections
           shell_options:
             global_vars:
@@ -289,7 +286,6 @@
           randomize_kill: true
         - class: CheckReplDBHash
         - class: CheckMetadataConsistencyInBackground
-        - class: RunCanaryWorkloadInBackground
         - class: ValidateCollections
           shell_options:
             global_vars:
@@ -389,7 +385,6 @@
           randomize_kill: true
         - class: CheckReplDBHash
         - class: CheckMetadataConsistencyInBackground
-        - class: RunCanaryWorkloadInBackground
         - class: ValidateCollections
           shell_options:
             global_vars:

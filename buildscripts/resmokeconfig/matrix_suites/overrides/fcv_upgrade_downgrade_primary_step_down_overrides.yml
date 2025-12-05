@@ -25,7 +25,6 @@
           kill: true
         - class: CheckReplOplogs
         - class: CheckReplDBHash
-        - class: RunCanaryWorkloadInBackground
         - class: ValidateCollections
           shell_options:
             global_vars:

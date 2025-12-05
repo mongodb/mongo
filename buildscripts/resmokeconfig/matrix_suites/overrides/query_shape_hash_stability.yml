@@ -164,7 +164,6 @@
   value:
     executor:
       hooks:
-        - class: RunCanaryWorkloadInBackground
         - class: ValidateCollections
         - class: CleanEveryN
           n: 20
@@ -194,7 +193,6 @@
   value:
     executor:
       hooks:
-        - class: RunCanaryWorkloadInBackground
         - class: ValidateCollections
         - class: CleanEveryN
           n: 20
@@ -224,7 +222,6 @@
   value:
     executor:
       hooks:
-        - class: RunCanaryWorkloadInBackground
         - class: ValidateCollections
         - class: CleanEveryN
           n: 20
@@ -254,7 +251,6 @@
   value:
     executor:
       hooks:
-        - class: RunCanaryWorkloadInBackground
         - class: ValidateCollections
         - class: CleanEveryN
           n: 20

@@ -46,7 +46,6 @@ executor:
       shell_options:
         global_vars:
           TestData: *id001
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CheckOrphansDeleted
     - class: CleanEveryN

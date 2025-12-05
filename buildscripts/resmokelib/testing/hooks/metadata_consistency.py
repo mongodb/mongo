@@ -97,7 +97,7 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
 
         if test.test_name in self.SKIP_TESTS:
             self.logger.info(
-                "Metadata consistency check explicitly disabled for %s", test.test_name
+                "Metadata consistency check explicitely disabled for %s", test.test_name
             )
             return
 

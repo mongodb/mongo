@@ -36,7 +36,6 @@ executor:
     - class: DropSessionsCollection
     - class: CheckReplOplogs
     - class: CheckReplDBHash
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

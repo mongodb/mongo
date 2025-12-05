@@ -55,7 +55,6 @@ executor:
     # that is fsync locked and has replica set endpoint enabled.
     # - CheckReplDBHash
     - class: RunQueryStats
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

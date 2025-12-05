@@ -26,7 +26,6 @@ executor:
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
   fixture:
     class: ShardedClusterFixture
