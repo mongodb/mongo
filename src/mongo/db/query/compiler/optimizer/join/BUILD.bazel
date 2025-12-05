@@ -30,6 +30,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db/query:canonical_query_base",
         "//src/mongo/db/query/util:query_util_bitset",
+        "//src/mongo/db/query/util:query_util_disjoint_set",
     ],
 )
 

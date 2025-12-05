@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <vector>
 
 #include <boost/optional/optional.hpp>

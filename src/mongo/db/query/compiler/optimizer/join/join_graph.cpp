@@ -100,6 +100,13 @@ JoinEdge JoinEdge::reverseEdge() const {
     return ret;
 }
 
+void JoinEdge::insertPredicate(JoinPredicate pred) {
+    auto pos = std::find(predicates.begin(), predicates.end(), pred);
+    if (pos == predicates.end()) {
+        predicates.push_back(pred);
+    }
+}
+
 std::vector<EdgeId> JoinGraph::getJoinEdges(NodeSet left, NodeSet right) const {
     std::vector<EdgeId> result;
 
@@ -153,12 +160,10 @@ boost::optional<EdgeId> JoinGraph::addEdge(NodeSet left,
 
     if (auto edgeId = findEdge(left, right); edgeId.has_value()) {
         auto&& edge = _edges[*edgeId];
-        if (edge.left == left && edge.right == right) {
-            edge.predicates.insert(edge.predicates.end(), predicates.begin(), predicates.end());
-        } else {
+        if (edge.left == right) {
             swapPredicateSides(predicates);
-            edge.predicates.insert(edge.predicates.end(), predicates.begin(), predicates.end());
         }
+        edge.insertPredicates(predicates.begin(), predicates.end());
         return *edgeId;
     }
 

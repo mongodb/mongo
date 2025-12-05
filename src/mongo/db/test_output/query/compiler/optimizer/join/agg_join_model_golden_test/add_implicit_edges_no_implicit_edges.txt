@@ -1,0 +1,286 @@
+VARIATION addImplicitEdges_NoImplicitEdges
+input {
+    "pipeline": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "fromA",
+                "localField": "a",
+                "foreignField": "a"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromA"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "B",
+                "as": "fromB",
+                "localField": "fromA.b",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromB"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "C",
+                "as": "fromC",
+                "localField": "fromB.c",
+                "foreignField": "c"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromC"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "D",
+                "as": "fromD",
+                "localField": "fromC.d",
+                "foreignField": "d"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromD"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "E",
+                "as": "fromE",
+                "localField": "fromD.e",
+                "foreignField": "e"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromE"
+            }
+        }
+    ]
+}
+output: {
+    "graph": {
+        "nodes": [
+            {
+                "collectionName": "test.pipeline_test",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": ""
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "fromA"
+            },
+            {
+                "collectionName": "test.B",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "fromB"
+            },
+            {
+                "collectionName": "test.C",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "fromC"
+            },
+            {
+                "collectionName": "test.D",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "fromD"
+            },
+            {
+                "collectionName": "test.E",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "fromE"
+            }
+        ],
+        "edges": [
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"1"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000000000000010"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"2"},
+                        "right": {"$numberInt":"3"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000010",
+                "right": "0000000000000000000000000000000000000000000000000000000000000100"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"4"},
+                        "right": {"$numberInt":"5"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000100",
+                "right": "0000000000000000000000000000000000000000000000000000000000001000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"6"},
+                        "right": {"$numberInt":"7"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000001000",
+                "right": "0000000000000000000000000000000000000000000000000000000000010000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"8"},
+                        "right": {"$numberInt":"9"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000010000",
+                "right": "0000000000000000000000000000000000000000000000000000000000100000"
+            }
+        ]
+    },
+    "resolvedPaths": [
+        {
+            "nodeId": {"$numberInt":"0"},
+            "fieldName": "a"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "fieldName": "a"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"2"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"2"},
+            "fieldName": "c"
+        },
+        {
+            "nodeId": {"$numberInt":"3"},
+            "fieldName": "c"
+        },
+        {
+            "nodeId": {"$numberInt":"3"},
+            "fieldName": "d"
+        },
+        {
+            "nodeId": {"$numberInt":"4"},
+            "fieldName": "d"
+        },
+        {
+            "nodeId": {"$numberInt":"4"},
+            "fieldName": "e"
+        },
+        {
+            "nodeId": {"$numberInt":"5"},
+            "fieldName": "e"
+        }
+    ],
+    "prefix": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "fromA",
+                "localField": "a",
+                "foreignField": "a"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromA"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "B",
+                "as": "fromB",
+                "localField": "fromA.b",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromB"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "C",
+                "as": "fromC",
+                "localField": "fromB.c",
+                "foreignField": "c"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromC"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "D",
+                "as": "fromD",
+                "localField": "fromC.d",
+                "foreignField": "d"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromD"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "E",
+                "as": "fromE",
+                "localField": "fromD.e",
+                "foreignField": "e"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromE"
+            }
+        }
+    ],
+    "suffix": []
+}
+

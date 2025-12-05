@@ -92,5 +92,13 @@ struct AggJoinModel {
     std::string toString(bool pretty) const {
         return toBSON().jsonString(/*format*/ ExtendedCanonicalV2_0_0, pretty);
     }
+
+    /**
+     * Find and add implicit (transitive) esges within the graph.
+     * `maxNodes` is the maximum number of nodes allowed in a connected component to be used for
+     * implicit edge finding.
+     * Example: two edges A.a = B.b and B.b = C.c form an implicit edge A.a = C.c.
+     */
+    void addImplicitEdges(size_t maxNodes);
 };
 }  // namespace mongo::join_ordering

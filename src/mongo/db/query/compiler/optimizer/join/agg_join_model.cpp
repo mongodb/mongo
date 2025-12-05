@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
+#include "mongo/db/query/util/disjoint_set.h"
 
 #include <memory>
 #include <utility>
@@ -248,5 +249,32 @@ BSONObj AggJoinModel::toBSON() const {
     result.append("prefix", pipelineToBSON(prefix));
     result.append("suffix", pipelineToBSON(suffix));
     return result.obj();
+}
+
+void AggJoinModel::addImplicitEdges(size_t maxNodes) {
+    DisjointSet ds{resolvedPaths.size()};
+    for (const auto& edge : graph.edges()) {
+        for (const auto& pred : edge.predicates) {
+            if (pred.op == JoinPredicate::Eq) {
+                ds.unite(pred.left, pred.right);
+            }
+        }
+    }
+
+    stdx::unordered_map<size_t, absl::InlinedVector<PathId, 8>> pathSets{};
+    for (size_t i = 0; i < ds.size(); ++i) {
+        auto setId = ds.find(i);
+        tassert(11116502, "Unknown pathId", setId.has_value());
+        auto& pathSet = pathSets[setId.value()];
+        if (pathSet.size() < maxNodes) {
+            const PathId currentPathId = static_cast<PathId>(i);
+            const NodeId currentNodeId = resolvedPaths[currentPathId].nodeId;
+            for (PathId pathId : pathSet) {
+                const NodeId nodeId = resolvedPaths[pathId].nodeId;
+                graph.addSimpleEqualityEdge(nodeId, currentNodeId, pathId, currentPathId);
+            }
+            pathSet.push_back(currentPathId);
+        }
+    }
 }
 }  // namespace mongo::join_ordering

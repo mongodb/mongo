@@ -1,29 +1,12 @@
-VARIATION longPrefix
+VARIATION addImplicitEdges_MultipleImplictEdges
 input {
     "pipeline": [
-        {
-            "$match": {
-                "c": {"$numberInt":"1"},
-                "h": {"$numberInt":"12"}
-            }
-        },
-        {
-            "$sort": {
-                "e": {"$numberInt":"1"}
-            }
-        },
-        {
-            "$project": {
-                "k": false,
-                "_id": true
-            }
-        },
         {
             "$lookup": {
                 "from": "A",
                 "as": "fromA",
                 "localField": "a",
-                "foreignField": "b"
+                "foreignField": "a"
             }
         },
         {
@@ -35,13 +18,26 @@ input {
             "$lookup": {
                 "from": "B",
                 "as": "fromB",
-                "localField": "a",
+                "localField": "fromA.a",
                 "foreignField": "b"
             }
         },
         {
             "$unwind": {
                 "path": "$fromB"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "C",
+                "as": "fromC",
+                "localField": "fromB.b",
+                "foreignField": "c"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromC"
             }
         }
     ]
@@ -52,26 +48,7 @@ output: {
             {
                 "collectionName": "test.pipeline_test",
                 "accessPath": {
-                    "filter": {
-                        "$and": [
-                            {
-                                "c": {
-                                    "$eq": {"$numberInt":"1"}
-                                }
-                            },
-                            {
-                                "h": {
-                                    "$eq": {"$numberInt":"12"}
-                                }
-                            }
-                        ]
-                    },
-                    "projection": {
-                        "k": false
-                    },
-                    "sort": {
-                        "e": {"$numberInt":"1"}
-                    }
+                    "filter": {}
                 },
                 "embedPath": ""
             },
@@ -88,6 +65,13 @@ output: {
                     "filter": {}
                 },
                 "embedPath": "fromB"
+            },
+            {
+                "collectionName": "test.C",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "fromC"
             }
         ],
         "edges": [
@@ -106,6 +90,28 @@ output: {
                 "predicates": [
                     {
                         "op": "eq",
+                        "left": {"$numberInt":"1"},
+                        "right": {"$numberInt":"2"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000010",
+                "right": "0000000000000000000000000000000000000000000000000000000000000100"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"2"},
+                        "right": {"$numberInt":"3"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000100",
+                "right": "0000000000000000000000000000000000000000000000000000000000001000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
                         "left": {"$numberInt":"0"},
                         "right": {"$numberInt":"2"}
                     }
@@ -117,12 +123,23 @@ output: {
                 "predicates": [
                     {
                         "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"3"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000000000001000"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
                         "left": {"$numberInt":"1"},
-                        "right": {"$numberInt":"2"}
+                        "right": {"$numberInt":"3"}
                     }
                 ],
                 "left": "0000000000000000000000000000000000000000000000000000000000000010",
-                "right": "0000000000000000000000000000000000000000000000000000000000000100"
+                "right": "0000000000000000000000000000000000000000000000000000000000001000"
             }
         ]
     },
@@ -133,11 +150,15 @@ output: {
         },
         {
             "nodeId": {"$numberInt":"1"},
-            "fieldName": "b"
+            "fieldName": "a"
         },
         {
             "nodeId": {"$numberInt":"2"},
             "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"3"},
+            "fieldName": "c"
         }
     ],
     "prefix": [
@@ -146,7 +167,7 @@ output: {
                 "from": "A",
                 "as": "fromA",
                 "localField": "a",
-                "foreignField": "b"
+                "foreignField": "a"
             }
         },
         {
@@ -158,13 +179,26 @@ output: {
             "$lookup": {
                 "from": "B",
                 "as": "fromB",
-                "localField": "a",
+                "localField": "fromA.a",
                 "foreignField": "b"
             }
         },
         {
             "$unwind": {
                 "path": "$fromB"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "C",
+                "as": "fromC",
+                "localField": "fromB.b",
+                "foreignField": "c"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromC"
             }
         }
     ],

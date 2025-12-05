@@ -1,23 +1,6 @@
-VARIATION longPrefix
+VARIATION addImplicitEdges_OneImplictEdge
 input {
     "pipeline": [
-        {
-            "$match": {
-                "c": {"$numberInt":"1"},
-                "h": {"$numberInt":"12"}
-            }
-        },
-        {
-            "$sort": {
-                "e": {"$numberInt":"1"}
-            }
-        },
-        {
-            "$project": {
-                "k": false,
-                "_id": true
-            }
-        },
         {
             "$lookup": {
                 "from": "A",
@@ -52,26 +35,7 @@ output: {
             {
                 "collectionName": "test.pipeline_test",
                 "accessPath": {
-                    "filter": {
-                        "$and": [
-                            {
-                                "c": {
-                                    "$eq": {"$numberInt":"1"}
-                                }
-                            },
-                            {
-                                "h": {
-                                    "$eq": {"$numberInt":"12"}
-                                }
-                            }
-                        ]
-                    },
-                    "projection": {
-                        "k": false
-                    },
-                    "sort": {
-                        "e": {"$numberInt":"1"}
-                    }
+                    "filter": {}
                 },
                 "embedPath": ""
             },

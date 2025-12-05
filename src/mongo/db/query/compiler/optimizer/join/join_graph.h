@@ -33,6 +33,8 @@
 #include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
 #include "mongo/util/modules.h"
 
+#include <algorithm>
+
 /** This file introduces the join optimizer's logical model. It defines classes representing a join
  * graph and its components.
  */
@@ -88,6 +90,8 @@ struct JoinPredicate {
     /** Serializes the Join Predicate to BSON.
      */
     BSONObj toBSON() const;
+
+    friend auto operator<=>(const JoinPredicate& lhs, const JoinPredicate& rhs) = default;
 };
 
 /**
@@ -117,6 +121,23 @@ struct JoinEdge {
      * which relies on the order of the predicates of the edge, despite the edge being undirected.
      */
     JoinEdge reverseEdge() const;
+
+    /**
+     * Insert in a new predicate to the edge, it is no-op if the predicate already is presented.
+     * The function assumes that the predicate has the same orientation (left/right side) as the
+     * edge.
+     */
+    void insertPredicate(JoinPredicate pred);
+
+    /**
+     * Insert the predicates from the range ['first', 'last'), which are not yet presented in the
+     * edge. The function assumes that the predicates have the same orientation (left/right side) as
+     * the edge.
+     */
+    template <typename It>
+    void insertPredicates(It first, It last) {
+        std::for_each(first, last, [this](JoinPredicate pred) { insertPredicate(pred); });
+    }
 };
 
 /** A join graph is a logical model that represents the joins in a query. It consists of join nodes
@@ -211,6 +232,10 @@ public:
      */
     std::string toString(bool pretty) const {
         return toBSON().jsonString(/*format*/ ExtendedCanonicalV2_0_0, pretty);
+    }
+
+    const std::vector<JoinEdge>& edges() const {
+        return _edges;
     }
 
 private:

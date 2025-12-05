@@ -49,6 +49,7 @@ public:
         auto joinModel = AggJoinModel::constructJoinModel(*pipeline);
 
         if (joinModel.isOK()) {
+            joinModel.getValue().addImplicitEdges(4);
             ctx.outStream() << "output: " << joinModel.getValue().toString(/*pretty*/ true)
                             << std::endl;
         } else {
@@ -136,5 +137,84 @@ TEST_F(AggJoinModelGoldenTest, veryLargePipeline) {
 
     auto pipeline = makePipeline(std::move(stages), {"A"});
     runVariation(std::move(pipeline), "veryLargePipeline");
+}
+
+/**
+ * The test case with three nodes: A.b = base.a = B.b;
+ * one implicit precicate: A.b = B.b.
+ */
+TEST_F(AggJoinModelGoldenTest, addImplicitEdges_OneImplictEdge) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "a", foreignField: "b", as: "fromB"}},
+            {$unwind: "$fromB"}
+        ])";
+    auto pipeline = makePipeline(query, {"A", "B"});
+    runVariation(std::move(pipeline), "addImplicitEdges_OneImplictEdge");
+}
+
+/**
+ * The test case with four nodes nodes: base.a = A.a = B.b = C.c;
+ * three implicit predicates: base.a = B.b, base.a = C.c, A.a = C.c
+ */
+TEST_F(AggJoinModelGoldenTest, addImplicitEdges_MultipleImplictEdges) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "a", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "fromA.a", foreignField: "b", as: "fromB"}},
+            {$unwind: "$fromB"},
+            {$lookup: {from: "C", localField: "fromB.b", foreignField: "c", as: "fromC"}},
+            {$unwind: "$fromC"}
+        ])";
+    auto pipeline = makePipeline(query, {"A", "B", "C"});
+    runVariation(std::move(pipeline), "addImplicitEdges_MultipleImplictEdges");
+}
+
+/**
+ * The test case with two connected components:
+ * - base.a = A.a = B.b = C.c,
+ * - C.d = D.d = E.e
+ * implicit predicates:
+ * - base.a = B.b, base.a = C.c, A.a = C.c
+ * - C.d = E.e
+ */
+TEST_F(AggJoinModelGoldenTest, addImplicitEdges_TwoConnectedComponents) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "a", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "fromA.a", foreignField: "b", as: "fromB"}},
+            {$unwind: "$fromB"},
+            {$lookup: {from: "C", localField: "fromB.b", foreignField: "c", as: "fromC"}},
+            {$unwind: "$fromC"},
+            {$lookup: {from: "D", localField: "fromC.d", foreignField: "d", as: "fromD"}},
+            {$unwind: "$fromD"},
+            {$lookup: {from: "E", localField: "fromD.d", foreignField: "e", as: "fromE"}},
+            {$unwind: "$fromE"}
+        ])";
+    auto pipeline = makePipeline(query, {"A", "B", "C", "D", "E"});
+    runVariation(std::move(pipeline), "addImplicitEdges_TwoConnectedComponents");
+}
+
+/**
+ * The test case without connected components:
+ * - base.a = A.a, A.b = B.b, B.c = C.c, C.d = D.d, D.e = E.e
+ * implicit predicates: none
+ */
+TEST_F(AggJoinModelGoldenTest, addImplicitEdges_NoImplicitEdges) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "a", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "fromA.b", foreignField: "b", as: "fromB"}},
+            {$unwind: "$fromB"},
+            {$lookup: {from: "C", localField: "fromB.c", foreignField: "c", as: "fromC"}},
+            {$unwind: "$fromC"},
+            {$lookup: {from: "D", localField: "fromC.d", foreignField: "d", as: "fromD"}},
+            {$unwind: "$fromD"},
+            {$lookup: {from: "E", localField: "fromD.e", foreignField: "e", as: "fromE"}},
+            {$unwind: "$fromE"}
+        ])";
+    auto pipeline = makePipeline(query, {"A", "B", "C", "D", "E"});
+    runVariation(std::move(pipeline), "addImplicitEdges_NoImplicitEdges");
 }
 }  // namespace mongo::join_ordering
