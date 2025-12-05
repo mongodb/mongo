@@ -31,6 +31,7 @@
 
 #include "mongo/db/global_catalog/ddl/sessions_collection_sharded.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -39,7 +40,8 @@ class OperationContext;
 /**
  * Accesses the sessions collection for config servers.
  */
-class SessionsCollectionConfigServer : public SessionsCollectionSharded {
+class MONGO_MOD_NEEDS_REPLACEMENT SessionsCollectionConfigServer
+    : public SessionsCollectionSharded {
 public:
     /**
      * Ensures that the sessions collection has been set up for this cluster, sharded, and with the

@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/global_catalog/type_shard_identity_gen.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -42,7 +43,7 @@ namespace mongo {
 /**
  * Contains all the information needed to make a mongod instance shard aware.
  */
-class ShardIdentityType : public ShardIdentity {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardIdentityType : public ShardIdentity {
 public:
     // The _id value for this document type.
     static const std::string IdName;

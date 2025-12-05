@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/client/connection_string.h"
+    mod_visibility: needs_replacement
 
 imports:
     - "mongo/db/basic_types.idl"

@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace notify_sharding_event {
@@ -38,13 +39,15 @@ namespace notify_sharding_event {
 // List of supported ShardingEvent notification types
 // TODO SERVER-100729 Remove any reference to the deprecated kDatabasesAdded event type
 // once 9.0 becomes LTS.
-static constexpr char kDatabasesAdded[] = "databasesAdded";
-static constexpr char kCollectionSharded[] = "collectionSharded";
-static constexpr char kCollectionResharded[] = "collectionResharded";
-static constexpr char kNamespacePlacementChanged[] = "namespacePlacementChanged";
-static constexpr char kPlacementHistoryMetadataChanged[] = "placementHistoryMetadataChanged";
+MONGO_MOD_NEEDS_REPLACEMENT static constexpr char kDatabasesAdded[] = "databasesAdded";
+MONGO_MOD_NEEDS_REPLACEMENT static constexpr char kCollectionSharded[] = "collectionSharded";
+MONGO_MOD_NEEDS_REPLACEMENT static constexpr char kCollectionResharded[] = "collectionResharded";
+MONGO_MOD_NEEDS_REPLACEMENT static constexpr char kNamespacePlacementChanged[] =
+    "namespacePlacementChanged";
+MONGO_MOD_NEEDS_REPLACEMENT static constexpr char kPlacementHistoryMetadataChanged[] =
+    "placementHistoryMetadataChanged";
 
-inline Status validateEventType(const std::string& eventType) {
+MONGO_MOD_NEEDS_REPLACEMENT inline Status validateEventType(const std::string& eventType) {
     if (eventType == kCollectionResharded || eventType == kNamespacePlacementChanged ||
         eventType == kDatabasesAdded || eventType == kCollectionSharded ||
         eventType == kPlacementHistoryMetadataChanged) {

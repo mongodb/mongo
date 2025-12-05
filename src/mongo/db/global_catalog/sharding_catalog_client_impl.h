@@ -59,6 +59,7 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -82,7 +83,7 @@ class TaskExecutor;
 /**
  * Implements the catalog client for reading from replica set config servers.
  */
-class ShardingCatalogClientImpl final : public ShardingCatalogClient {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardingCatalogClientImpl final : public ShardingCatalogClient {
 
 public:
     ShardingCatalogClientImpl(std::shared_ptr<Shard> overrideConfigShard);

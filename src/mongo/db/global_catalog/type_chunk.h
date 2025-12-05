@@ -50,6 +50,7 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -66,7 +67,7 @@ class Status;
 template <typename T>
 class StatusWith;
 
-class ChunkHistory : public ChunkHistoryBase {
+class MONGO_MOD_NEEDS_REPLACEMENT ChunkHistory : public ChunkHistoryBase {
 public:
     using ChunkHistoryBase::serialize;
     using ChunkHistoryBase::toBSON;
@@ -124,7 +125,7 @@ public:
  * server's collection schema, but that will be future work when the new schema is stable and there
  * is time to do the extra work, as well as handle the backwards compatibility issues it poses.
  */
-class ChunkType {
+class MONGO_MOD_NEEDS_REPLACEMENT ChunkType {
 public:
     // Name of the chunks collection in the config server.
     static const NamespaceString ConfigNS;

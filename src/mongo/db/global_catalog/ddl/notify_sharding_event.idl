@@ -31,6 +31,7 @@ global:
     cpp_includes:
         - "mongo/client/connection_string.h"
         - "mongo/db/global_catalog/ddl/notify_sharding_event_utils.h"
+    mod_visibility: needs_replacement
 
 imports:
     - "mongo/db/basic_types.idl"

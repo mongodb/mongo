@@ -34,13 +34,15 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
 
 namespace mongo {
 
-class CannotImplicitlyCreateCollectionInfo final : public ErrorExtraInfo {
+class MONGO_MOD_NEEDS_REPLACEMENT CannotImplicitlyCreateCollectionInfo final
+    : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::CannotImplicitlyCreateCollection;
 

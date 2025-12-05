@@ -30,7 +30,8 @@
 #pragma once
 
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
-extern FailPoint shuffleListCommandResults;
+MONGO_MOD_NEEDS_REPLACEMENT extern FailPoint shuffleListCommandResults;
 }

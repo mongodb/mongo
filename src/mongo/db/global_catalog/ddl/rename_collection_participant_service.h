@@ -47,6 +47,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -59,7 +60,8 @@
 
 namespace mongo {
 
-class RenameCollectionParticipantService final : public repl::PrimaryOnlyService {
+class MONGO_MOD_NEEDS_REPLACEMENT RenameCollectionParticipantService final
+    : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "RenameCollectionParticipantService"_sd;
 
@@ -102,7 +104,7 @@ public:
  * --  Unblock CRUD operations.
  *
  */
-class RenameParticipantInstance
+class MONGO_MOD_NEEDS_REPLACEMENT RenameParticipantInstance
     : public repl::PrimaryOnlyService::TypedInstance<RenameParticipantInstance> {
 public:
     using StateDoc = RenameCollectionParticipantDocument;

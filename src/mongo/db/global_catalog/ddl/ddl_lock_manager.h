@@ -37,6 +37,7 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -51,7 +52,7 @@ namespace mongo {
 /**
  * Service to manage DDL locks.
  */
-class DDLLockManager {
+class MONGO_MOD_NEEDS_REPLACEMENT DDLLockManager {
 
     /**
      * ScopedBaseDDLLock will hold a DDL lock for the given resource without performing any check.

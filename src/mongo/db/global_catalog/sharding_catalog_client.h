@@ -54,6 +54,7 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -77,7 +78,7 @@ class LogicalTime;
  * should eventually all be moved to ShardingCatalogManager as catalog manipulation operations
  * move to be run on the config server primary.
  */
-class ShardingCatalogClient {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardingCatalogClient {
     ShardingCatalogClient(const ShardingCatalogClient&) = delete;
     ShardingCatalogClient& operator=(const ShardingCatalogClient&) = delete;
 

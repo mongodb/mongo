@@ -31,10 +31,11 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/global_catalog/type_shard_database_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class ShardDatabaseType : private ShardDatabaseTypeBase {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardDatabaseType : private ShardDatabaseTypeBase {
 public:
     // Make field names accessible.
     using ShardDatabaseTypeBase::kDbNameFieldName;

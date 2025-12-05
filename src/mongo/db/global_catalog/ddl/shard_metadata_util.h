@@ -37,6 +37,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
@@ -57,7 +58,7 @@ namespace shardmetadatautil {
 /**
  * Structure representing the generated query and sort order for a chunk diffing operation.
  */
-struct QueryAndSort {
+struct MONGO_MOD_NEEDS_REPLACEMENT QueryAndSort {
     const BSONObj query;
     const BSONObj sort;
 };
@@ -77,7 +78,8 @@ struct QueryAndSort {
  * due to the yield described above. If updates are applied in ascending version order, the newer
  * update is applied last.
  */
-QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionPlacementVersion);
+MONGO_MOD_NEEDS_REPLACEMENT QueryAndSort
+createShardChunkDiffQuery(const ChunkVersion& collectionPlacementVersion);
 
 /**
  * Writes a persisted signal to indicate that it is once again safe to read from the chunks
@@ -92,15 +94,15 @@ QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionPlacementVe
  * Note: if there is no document present in the collections collection for 'nss', nothing is
  * updated.
  */
-Status unsetPersistedRefreshFlags(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const ChunkVersion& refreshedVersion);
+MONGO_MOD_NEEDS_REPLACEMENT Status unsetPersistedRefreshFlags(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              const ChunkVersion& refreshedVersion);
 
 /**
  * Represents a subset of a collection's config.cache.collections entry that relates to refresh
  * state.
  */
-struct RefreshState {
+struct MONGO_MOD_NEEDS_REPLACEMENT RefreshState {
     bool operator==(const RefreshState& other) const;
 
     std::string toString() const;
@@ -119,20 +121,20 @@ struct RefreshState {
 /**
  * Reads the persisted refresh signal for 'nss' and returns those settings.
  */
-StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
-                                                  const NamespaceString& nss);
+MONGO_MOD_NEEDS_REPLACEMENT StatusWith<RefreshState> getPersistedRefreshFlags(
+    OperationContext* opCtx, const NamespaceString& nss);
 
 /**
  * Reads the shard server's collections collection entry identified by 'nss'.
  */
-StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCtx,
-                                                          const NamespaceString& nss);
+MONGO_MOD_NEEDS_REPLACEMENT StatusWith<ShardCollectionType> readShardCollectionsEntry(
+    OperationContext* opCtx, const NamespaceString& nss);
 
 /**
  * Reads the shard server's databases collection entry identified by 'dbName'.
  */
-StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx,
-                                                      const DatabaseName& dbName);
+MONGO_MOD_NEEDS_REPLACEMENT StatusWith<ShardDatabaseType> readShardDatabasesEntry(
+    OperationContext* opCtx, const DatabaseName& dbName);
 
 /**
  * Updates the collections collection entry matching 'query' with 'update' using local write
@@ -141,10 +143,10 @@ StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx,
  * If 'upsert' is true, expects 'lastRefreshedCollectionPlacementVersion' to be absent in the
  * update: these refreshing fields should only be added to an existing document.
  */
-Status updateShardCollectionsEntry(OperationContext* opCtx,
-                                   const BSONObj& query,
-                                   const BSONObj& update,
-                                   bool upsert);
+MONGO_MOD_NEEDS_REPLACEMENT Status updateShardCollectionsEntry(OperationContext* opCtx,
+                                                               const BSONObj& query,
+                                                               const BSONObj& update,
+                                                               bool upsert);
 
 /**
  * Updates the databases collection entry matching 'query' with 'update' using local write
@@ -156,24 +158,25 @@ Status updateShardCollectionsEntry(OperationContext* opCtx,
  *
  * 'inc' should not specify 'upsert' true.
  */
-Status updateShardDatabasesEntry(OperationContext* opCtx,
-                                 const BSONObj& query,
-                                 const BSONObj& update,
-                                 const BSONObj& inc,
-                                 bool upsert);
+MONGO_MOD_NEEDS_REPLACEMENT Status updateShardDatabasesEntry(OperationContext* opCtx,
+                                                             const BSONObj& query,
+                                                             const BSONObj& update,
+                                                             const BSONObj& inc,
+                                                             bool upsert);
 
 /**
  * Reads the shard server's chunks collection corresponding to 'nss' for chunks matching 'query',
  * returning at most 'limit' chunks in 'sort' order. 'epoch' populates the returned chunks' version
  * fields, because we do not yet have UUIDs to replace epochs nor UUIDs associated with namespaces.
  */
-StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const BSONObj& query,
-                                                   const BSONObj& sort,
-                                                   boost::optional<long long> limit,
-                                                   const OID& epoch,
-                                                   const Timestamp& timestamp);
+MONGO_MOD_NEEDS_REPLACEMENT StatusWith<std::vector<ChunkType>> readShardChunks(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& query,
+    const BSONObj& sort,
+    boost::optional<long long> limit,
+    const OID& epoch,
+    const Timestamp& timestamp);
 
 /**
  * Takes a vector of 'chunks' and updates the shard's chunks collection for 'nss'. Any chunk
@@ -193,10 +196,10 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
  *   than 'currEpoch'.
  * - Other errors if unable to do local writes/reads to the config.chunks.ns collection.
  */
-Status updateShardChunks(OperationContext* opCtx,
-                         const NamespaceString& nss,
-                         const std::vector<ChunkType>& chunks,
-                         const OID& currEpoch);
+MONGO_MOD_NEEDS_REPLACEMENT Status updateShardChunks(OperationContext* opCtx,
+                                                     const NamespaceString& nss,
+                                                     const std::vector<ChunkType>& chunks,
+                                                     const OID& currEpoch);
 
 /**
  * Deletes locally persisted chunk metadata associated with 'nss': drops the chunks collection
@@ -206,18 +209,20 @@ Status updateShardChunks(OperationContext* opCtx,
  * If the chunks were dropped first, the secondary would keep refreshing until it exceeded its
  * retries, rather than returning with a useful error message.
  */
-Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const NamespaceString& nss);
+MONGO_MOD_NEEDS_REPLACEMENT Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx,
+                                                                       const NamespaceString& nss);
 
 /**
  * Drops locally persisted chunk metadata associated with 'nss': only drops the chunks collection.
  */
-void dropChunks(OperationContext* opCtx, const NamespaceString& nss);
+MONGO_MOD_NEEDS_REPLACEMENT void dropChunks(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
  * Deletes locally persisted database metadata associated with 'dbName': removes the databases
  * collection entry.
  */
-Status deleteDatabasesEntry(OperationContext* opCtx, const DatabaseName& dbName);
+MONGO_MOD_NEEDS_REPLACEMENT Status deleteDatabasesEntry(OperationContext* opCtx,
+                                                        const DatabaseName& dbName);
 
 }  // namespace shardmetadatautil
 }  // namespace mongo

@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>
@@ -62,7 +63,7 @@ class StatusWith;
  */
 namespace shardutil {
 
-static constexpr size_t kMaxSplitPoints = 8192;
+MONGO_MOD_NEEDS_REPLACEMENT static constexpr size_t kMaxSplitPoints = 8192;
 
 /**
  * Executes the dataSize command against the specified shard and obtains the total data
@@ -72,10 +73,11 @@ static constexpr size_t kMaxSplitPoints = 8192;
  *  ShardNotFound if shard by that id is not available on the registry
  *  NoSuchKey if the total shard size could not be retrieved
  */
-StatusWith<long long> retrieveCollectionShardSize(OperationContext* opCtx,
-                                                  const ShardId& shardId,
-                                                  NamespaceString const& ns,
-                                                  bool estimate = true);
+MONGO_MOD_NEEDS_REPLACEMENT StatusWith<long long> retrieveCollectionShardSize(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    NamespaceString const& ns,
+    bool estimate = true);
 
 /**
  * Ask the specified shard to figure out the split points for a given chunk.
@@ -87,13 +89,14 @@ StatusWith<long long> retrieveCollectionShardSize(OperationContext* opCtx,
  * - chunkSizeBytes: chunk size to target in bytes.
  * - limit: limits the number of split points to search. Unspecified means no limit
  */
-StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
-                                                        const ShardId& shardId,
-                                                        const NamespaceString& nss,
-                                                        const ShardKeyPattern& shardKeyPattern,
-                                                        const ChunkRange& chunkRange,
-                                                        long long chunkSizeBytes,
-                                                        boost::optional<int> limit = boost::none);
+MONGO_MOD_NEEDS_REPLACEMENT StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    const NamespaceString& nss,
+    const ShardKeyPattern& shardKeyPattern,
+    const ChunkRange& chunkRange,
+    long long chunkSizeBytes,
+    boost::optional<int> limit = boost::none);
 
 /**
  * Asks the specified shard to split the chunk described by min/maxKey into the respective split
@@ -107,14 +110,15 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
  * chunkRange Bounds of the chunk to be split.
  * splitPoints The set of points at which the chunk should be split.
  */
-Status splitChunkAtMultiplePoints(OperationContext* opCtx,
-                                  const ShardId& shardId,
-                                  const NamespaceString& nss,
-                                  const ShardKeyPattern& shardKeyPattern,
-                                  const OID& epoch,
-                                  const Timestamp& timestamp,
-                                  const ChunkRange& chunkRange,
-                                  const std::vector<BSONObj>& splitPoints);
+MONGO_MOD_NEEDS_REPLACEMENT Status
+splitChunkAtMultiplePoints(OperationContext* opCtx,
+                           const ShardId& shardId,
+                           const NamespaceString& nss,
+                           const ShardKeyPattern& shardKeyPattern,
+                           const OID& epoch,
+                           const Timestamp& timestamp,
+                           const ChunkRange& chunkRange,
+                           const std::vector<BSONObj>& splitPoints);
 
 }  // namespace shardutil
 }  // namespace mongo

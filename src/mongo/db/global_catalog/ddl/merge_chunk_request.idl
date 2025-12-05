@@ -31,6 +31,7 @@ global:
     cpp_includes:
         - "mongo/db/global_catalog/ddl/merge_chunk_request_valid.h"
         - "mongo/util/uuid.h"
+    mod_visibility: needs_replacement
 
 imports:
     - "mongo/db/basic_types.idl"

@@ -36,6 +36,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -48,7 +49,7 @@
 
 namespace mongo {
 
-using ReshardingFields = TypeCollectionReshardingFields;
+using ReshardingFields MONGO_MOD_NEEDS_REPLACEMENT = TypeCollectionReshardingFields;
 
 /**
  * This class represents the layout and contents of documents contained in the config server's
@@ -90,7 +91,7 @@ using ReshardingFields = TypeCollectionReshardingFields;
  *   }
  *
  */
-class CollectionType : private CollectionTypeBase {
+class MONGO_MOD_NEEDS_REPLACEMENT CollectionType : private CollectionTypeBase {
 public:
     // Make field names accessible.
     static constexpr auto kEpochFieldName = kPre22CompatibleEpochFieldName;

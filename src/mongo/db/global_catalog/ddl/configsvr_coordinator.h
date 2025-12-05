@@ -46,6 +46,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
@@ -56,7 +57,8 @@
 
 namespace mongo {
 
-ConfigsvrCoordinatorMetadata extractConfigsvrCoordinatorMetadata(const BSONObj& stateDoc);
+MONGO_MOD_NEEDS_REPLACEMENT ConfigsvrCoordinatorMetadata
+extractConfigsvrCoordinatorMetadata(const BSONObj& stateDoc);
 
 /**
  * ConfigsvrCoordinators are POS instances that run on the configsvr and represent cluster
@@ -64,7 +66,8 @@ ConfigsvrCoordinatorMetadata extractConfigsvrCoordinatorMetadata(const BSONObj& 
  * such operations. Concrete operations extend ConfigsvrCoordinator and implement their specific
  * bussiness logic on '_runImpl'
  */
-class ConfigsvrCoordinator : public repl::PrimaryOnlyService::TypedInstance<ConfigsvrCoordinator> {
+class MONGO_MOD_NEEDS_REPLACEMENT ConfigsvrCoordinator
+    : public repl::PrimaryOnlyService::TypedInstance<ConfigsvrCoordinator> {
 public:
     explicit ConfigsvrCoordinator(const BSONObj& stateDoc);
 
@@ -113,7 +116,7 @@ protected:
 };
 
 template <class StateDoc, class Phase>
-class ConfigsvrCoordinatorImpl : public ConfigsvrCoordinator {
+class MONGO_MOD_UNFORTUNATELY_OPEN ConfigsvrCoordinatorImpl : public ConfigsvrCoordinator {
 public:
     ConfigsvrCoordinatorImpl(const BSONObj& stateDoc)
         : ConfigsvrCoordinator(stateDoc),

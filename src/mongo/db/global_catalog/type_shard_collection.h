@@ -36,6 +36,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <boost/move/utility_core.hpp>
@@ -43,7 +44,7 @@
 
 namespace mongo {
 
-class ShardCollectionType : private ShardCollectionTypeBase {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardCollectionType : private ShardCollectionTypeBase {
 public:
     static constexpr auto kAllowMigrationsFieldName = kPre50CompatibleAllowMigrationsFieldName;
 

@@ -47,6 +47,7 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/read_through_cache.h"
@@ -68,7 +69,7 @@ namespace mongo {
 
 class ChunkManager;
 
-struct PlacementVersionTargetingInfo {
+struct MONGO_MOD_NEEDS_REPLACEMENT PlacementVersionTargetingInfo {
     /**
      * Constructs a placement information for a collection with the specified generation, starting
      * at placementVersion {0, 0} and maxValidAfter of Timestamp{0, 0}. The expectation is that the
@@ -88,7 +89,7 @@ struct PlacementVersionTargetingInfo {
 
 // Map from a shard to a struct indicating both the max chunk version on that shard and whether the
 // shard is currently marked as needing a catalog cache refresh (stale).
-using ShardPlacementVersionMap =
+using ShardPlacementVersionMap MONGO_MOD_NEEDS_REPLACEMENT =
     stdx::unordered_map<ShardId, PlacementVersionTargetingInfo, ShardId::Hasher>;
 
 /**
@@ -96,7 +97,7 @@ using ShardPlacementVersionMap =
  * provides a simpler, high-level interface for domain specific operations without exposing the
  * underlying implementation.
  */
-class ChunkMap {
+class MONGO_MOD_NEEDS_REPLACEMENT ChunkMap {
 public:
     // Vector of chunks ordered by max key in ascending order.
     using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
@@ -340,7 +341,7 @@ private:
  * In-memory representation of the routing table for a single sharded collection at various points
  * in time.
  */
-class RoutingTableHistory {
+class MONGO_MOD_NEEDS_REPLACEMENT RoutingTableHistory {
     RoutingTableHistory(const RoutingTableHistory&) = delete;
     RoutingTableHistory& operator=(const RoutingTableHistory&) = delete;
 
@@ -575,7 +576,7 @@ private:
  *
  * This class should go away once a cluster-wide comparable ChunkVersion is implemented.
  */
-class ComparableChunkVersion {
+class MONGO_MOD_NEEDS_REPLACEMENT ComparableChunkVersion {
 public:
     /**
      * Creates a ComparableChunkVersion that wraps the given ChunkVersion.
@@ -660,7 +661,7 @@ private:
  * supports tracked collections (i.e., collections which have entries in config.collections and
  * config.chunks).
  */
-struct OptionalRoutingTableHistory {
+struct MONGO_MOD_NEEDS_REPLACEMENT OptionalRoutingTableHistory {
     // UNTRACKED collection constructor
     OptionalRoutingTableHistory() = default;
 
@@ -671,16 +672,18 @@ struct OptionalRoutingTableHistory {
     std::shared_ptr<RoutingTableHistory> optRt;
 };
 
-using RoutingTableHistoryCache = ReadThroughCache<NamespaceString,
-                                                  OptionalRoutingTableHistory,
-                                                  ComparableChunkVersion,
-                                                  ObservableMutex<stdx::mutex>>;
-using RoutingTableHistoryValueHandle = RoutingTableHistoryCache::ValueHandle;
+using RoutingTableHistoryCache MONGO_MOD_UNFORTUNATELY_OPEN =
+    ReadThroughCache<NamespaceString,
+                     OptionalRoutingTableHistory,
+                     ComparableChunkVersion,
+                     ObservableMutex<stdx::mutex>>;
+using RoutingTableHistoryValueHandle MONGO_MOD_NEEDS_REPLACEMENT =
+    RoutingTableHistoryCache::ValueHandle;
 
 /**
  * Combines a shard, the shard version, and database version that the shard should be using
  */
-struct ShardEndpoint {
+struct MONGO_MOD_NEEDS_REPLACEMENT ShardEndpoint {
     ShardEndpoint(const ShardId& shardName,
                   boost::optional<ShardVersion> shardVersionParam,
                   boost::optional<DatabaseVersion> dbVersionParam);
@@ -696,14 +699,14 @@ struct ShardEndpoint {
 /**
  * Compares shard endpoints in a map.
  */
-struct EndpointComp {
+struct MONGO_MOD_NEEDS_REPLACEMENT EndpointComp {
     bool operator()(const ShardEndpoint* endpointA, const ShardEndpoint* endpointB) const;
 };
 
 /**
  * Wrapper around a RoutingTableHistory, which pins it to a particular point in time.
  */
-class ChunkManager {
+class MONGO_MOD_NEEDS_REPLACEMENT ChunkManager {
 public:
     ChunkManager(RoutingTableHistoryValueHandle rt, boost::optional<Timestamp> clusterTime)
         : _rt(std::move(rt)), _clusterTime(std::move(clusterTime)) {}
@@ -1021,6 +1024,6 @@ private:
  * If `max` is the max bound of some chunk, returns that chunk. Otherwise, returns the chunk that
  * contains the key `max`.
  */
-Chunk getChunkForMaxBound(const ChunkManager& cm, const BSONObj& max);
+MONGO_MOD_NEEDS_REPLACEMENT Chunk getChunkForMaxBound(const ChunkManager& cm, const BSONObj& max);
 
 }  // namespace mongo

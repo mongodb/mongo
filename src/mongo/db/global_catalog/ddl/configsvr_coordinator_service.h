@@ -37,6 +37,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>
@@ -45,7 +46,8 @@ namespace mongo {
 
 class ConfigsvrCoordinator;
 
-class ConfigsvrCoordinatorService final : public repl::PrimaryOnlyService {
+class MONGO_MOD_NEEDS_REPLACEMENT ConfigsvrCoordinatorService final
+    : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "ConfigsvrCoordinatorService"_sd;
 

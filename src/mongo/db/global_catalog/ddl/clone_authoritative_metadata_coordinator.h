@@ -32,10 +32,11 @@
 #include "mongo/db/global_catalog/ddl/clone_authoritative_metadata_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class CloneAuthoritativeMetadataCoordinator final
+class MONGO_MOD_NEEDS_REPLACEMENT CloneAuthoritativeMetadataCoordinator final
     : public RecoverableShardingDDLCoordinator<CloneAuthoritativeMetadataCoordinatorDocument,
                                                CloneAuthoritativeMetadataCoordinatorPhaseEnum> {
 public:

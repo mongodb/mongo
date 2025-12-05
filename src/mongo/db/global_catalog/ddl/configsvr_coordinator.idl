@@ -28,6 +28,7 @@
 
 global:
     cpp_namespace: "mongo"
+    mod_visibility: needs_replacement
 
 imports:
     - "mongo/db/session/logical_session_id.idl"

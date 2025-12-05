@@ -32,6 +32,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
 #include <boost/move/utility_core.hpp>
@@ -46,7 +47,7 @@ class ServiceContext;
  * inconsistent indexes across shards. The job only runs on the primary node in the config server
  * replica set.
  */
-class PeriodicShardedIndexConsistencyChecker final {
+class MONGO_MOD_NEEDS_REPLACEMENT PeriodicShardedIndexConsistencyChecker final {
     PeriodicShardedIndexConsistencyChecker(const PeriodicShardedIndexConsistencyChecker&) = delete;
     PeriodicShardedIndexConsistencyChecker& operator=(
         const PeriodicShardedIndexConsistencyChecker&) = delete;

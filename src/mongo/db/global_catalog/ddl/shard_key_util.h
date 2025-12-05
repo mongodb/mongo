@@ -41,6 +41,7 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -57,7 +58,7 @@ namespace shardkeyutil {
  * existing indexes for a collection when sharding a collection or refining its shard key.
  * Subclasses provide the implementation details specific to either case.
  */
-class ShardKeyValidationBehaviors {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardKeyValidationBehaviors {
 public:
     virtual ~ShardKeyValidationBehaviors() {}
 
@@ -79,7 +80,8 @@ public:
 /**
  * Implementation of steps for validating a shard key for shardCollection.
  */
-class ValidationBehaviorsShardCollection final : public ShardKeyValidationBehaviors {
+class MONGO_MOD_NEEDS_REPLACEMENT ValidationBehaviorsShardCollection final
+    : public ShardKeyValidationBehaviors {
 public:
     ValidationBehaviorsShardCollection(OperationContext* opCtx, const ShardId& dataShard)
         : _opCtx(opCtx),
@@ -110,7 +112,8 @@ private:
 /**
  * Implementation of steps for validating a shard key for refineCollectionShardKey locally.
  */
-class ValidationBehaviorsLocalRefineShardKey final : public ShardKeyValidationBehaviors {
+class MONGO_MOD_NEEDS_REPLACEMENT ValidationBehaviorsLocalRefineShardKey final
+    : public ShardKeyValidationBehaviors {
 public:
     ValidationBehaviorsLocalRefineShardKey(OperationContext* opCtx, const CollectionPtr& coll);
 
@@ -137,7 +140,8 @@ private:
 /**
  * Implementation of steps for validating a shard key for resharding building indexes after cloning.
  */
-class ValidationBehaviorsReshardingBulkIndex final : public ShardKeyValidationBehaviors {
+class MONGO_MOD_NEEDS_REPLACEMENT ValidationBehaviorsReshardingBulkIndex final
+    : public ShardKeyValidationBehaviors {
 public:
     class RecipientStateMachineExternalState;
     ValidationBehaviorsReshardingBulkIndex();
@@ -204,14 +208,15 @@ private:
  *
  * Returns true if the index has been created, false otherwise.
  */
-bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const ShardKeyPattern& shardKeyPattern,
-                                                   const boost::optional<BSONObj>& defaultCollation,
-                                                   bool unique,
-                                                   bool enforceUniquenessCheck,
-                                                   const ShardKeyValidationBehaviors& behaviors,
-                                                   boost::optional<TimeseriesOptions> tsOpts);
+MONGO_MOD_NEEDS_REPLACEMENT bool validateShardKeyIndexExistsOrCreateIfPossible(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardKeyPattern& shardKeyPattern,
+    const boost::optional<BSONObj>& defaultCollation,
+    bool unique,
+    bool enforceUniquenessCheck,
+    const ShardKeyValidationBehaviors& behaviors,
+    boost::optional<TimeseriesOptions> tsOpts);
 /**
  * Compares the proposed shard key with the collection's existing indexes to ensure they are a legal
  * combination.
@@ -222,17 +227,17 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
  * It throws an exception if a valid shard key index doesn't exist and it's not possible to create
  * one.
  */
-bool validShardKeyIndexExists(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const ShardKeyPattern& shardKeyPattern,
-                              const boost::optional<BSONObj>& defaultCollation,
-                              bool requiresUnique,
-                              const ShardKeyValidationBehaviors& behaviors,
-                              std::string* errMsg = nullptr);
+MONGO_MOD_NEEDS_REPLACEMENT bool validShardKeyIndexExists(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardKeyPattern& shardKeyPattern,
+    const boost::optional<BSONObj>& defaultCollation,
+    bool requiresUnique,
+    const ShardKeyValidationBehaviors& behaviors,
+    std::string* errMsg = nullptr);
 
-void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const ShardKeyPattern& shardKeyPattern);
+MONGO_MOD_NEEDS_REPLACEMENT void validateShardKeyIsNotEncrypted(
+    OperationContext* opCtx, const NamespaceString& nss, const ShardKeyPattern& shardKeyPattern);
 
 /**
  * Validates a user provided shard key for timeseries collections.
@@ -240,16 +245,17 @@ void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
  * - If meta field is present, it can be ranged or hashed.
  * - If time field is present, it must be ranged and at the end of the key pattern.
  */
-void validateTimeseriesShardKey(StringData timeFieldName,
-                                boost::optional<StringData> metaFieldName,
-                                const BSONObj& shardKeyPattern);
+MONGO_MOD_NEEDS_REPLACEMENT void validateTimeseriesShardKey(
+    StringData timeFieldName,
+    boost::optional<StringData> metaFieldName,
+    const BSONObj& shardKeyPattern);
 
 /**
  * Returns a chunk range with extended or truncated boundaries to match the number of fields in the
  * given metadata's shard key pattern.
  */
-ChunkRange extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata,
-                                             const ChunkRange& range);
+MONGO_MOD_NEEDS_REPLACEMENT ChunkRange
+extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata, const ChunkRange& range);
 
 }  // namespace shardkeyutil
 }  // namespace mongo

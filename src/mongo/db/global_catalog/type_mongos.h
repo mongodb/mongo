@@ -34,6 +34,7 @@
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <string>
@@ -50,7 +51,7 @@ namespace mongo {
  * config.mongos collection. All manipulation of documents coming from that
  * collection should be done with this class.
  */
-class MongosType {
+class MONGO_MOD_NEEDS_REPLACEMENT MongosType {
 public:
     // Name of the mongos collection in the config server.
     static const NamespaceString ConfigNS;

@@ -35,6 +35,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
@@ -49,7 +50,7 @@ class BSONObj;
 /**
  * Represents a cache entry for a single Chunk. Owned by a RoutingTableHistory.
  */
-class ChunkInfo {
+class MONGO_MOD_NEEDS_REPLACEMENT ChunkInfo {
 public:
     explicit ChunkInfo(const ChunkType& from);
 
@@ -147,7 +148,7 @@ private:
     AtomicWord<bool> _jumbo;
 };
 
-class Chunk {
+class MONGO_MOD_NEEDS_REPLACEMENT Chunk {
 public:
     Chunk(ChunkInfo& chunkInfo, const boost::optional<Timestamp>& atClusterTime)
         : _chunkInfo(chunkInfo), _atClusterTime(atClusterTime) {}

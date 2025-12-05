@@ -35,13 +35,15 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/modules.h"
 
 #include <set>
 #include <string>
 
 namespace mongo {
 
-class ShardingRecoveryService : public ReplicaSetAwareServiceShardSvr<ShardingRecoveryService> {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardingRecoveryService
+    : public ReplicaSetAwareServiceShardSvr<ShardingRecoveryService> {
 
 public:
     /*

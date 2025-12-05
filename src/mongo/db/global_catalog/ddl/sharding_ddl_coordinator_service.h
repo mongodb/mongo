@@ -48,6 +48,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <functional>
@@ -58,8 +59,9 @@ namespace mongo {
 
 class ShardingDDLCoordinator;
 
-class ShardingDDLCoordinatorService final : public repl::PrimaryOnlyService,
-                                            public DDLLockManager::Recoverable {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardingDDLCoordinatorService final
+    : public repl::PrimaryOnlyService,
+      public DDLLockManager::Recoverable {
 public:
     static constexpr StringData kServiceName = "ShardingDDLCoordinator"_sd;
 

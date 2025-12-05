@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -41,9 +42,9 @@ namespace mongo {
  * Creates the collection if it doesn't yet exist.  Does not error if the index already exists,
  * so long as the options are the same.
  */
-Status createIndexOnConfigCollection(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     const BSONObj& keys,
-                                     bool unique);
+MONGO_MOD_NEEDS_REPLACEMENT Status createIndexOnConfigCollection(OperationContext* opCtx,
+                                                                 const NamespaceString& ns,
+                                                                 const BSONObj& keys,
+                                                                 bool unique);
 
 }  // namespace mongo

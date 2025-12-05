@@ -55,6 +55,7 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
@@ -68,7 +69,7 @@ namespace mongo {
 /**
  * A dummy implementation of ShardingCatalogClient for testing purposes.
  */
-class ShardingCatalogClientMock : public ShardingCatalogClient {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardingCatalogClientMock : public ShardingCatalogClient {
 public:
     ShardingCatalogClientMock();
     ~ShardingCatalogClientMock() override;

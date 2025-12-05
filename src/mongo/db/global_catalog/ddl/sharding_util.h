@@ -39,6 +39,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/async_requests_sender.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>
@@ -50,24 +51,24 @@ namespace sharding_util {
  * Sends _flushRoutingTableCacheUpdatesWithWriteConcern to a list of shards. Throws if one of the
  * shards fails to refresh.
  */
-void tellShardsToRefreshCollection(OperationContext* opCtx,
-                                   const std::vector<ShardId>& shardIds,
-                                   const NamespaceString& nss,
-                                   const std::shared_ptr<executor::TaskExecutor>& executor);
+MONGO_MOD_NEEDS_REPLACEMENT void tellShardsToRefreshCollection(
+    OperationContext* opCtx,
+    const std::vector<ShardId>& shardIds,
+    const NamespaceString& nss,
+    const std::shared_ptr<executor::TaskExecutor>& executor);
 
 /**
  * Sends _flushRoutingTableCacheUpdatesWithWriteConcern to a list of shards. Does not wait for or
  * check the responses from the shards.
  */
-void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
-                                        const std::vector<ShardId>& shardIds,
-                                        const NamespaceString& nss);
+MONGO_MOD_NEEDS_REPLACEMENT void triggerFireAndForgetShardRefreshes(
+    OperationContext* opCtx, const std::vector<ShardId>& shardIds, const NamespaceString& nss);
 
 /**
  * Process the responses received from a set of requests sent to the shards. If `throwOnError=true`,
  * throws in case one of the commands fails.
  */
-std::vector<AsyncRequestsSender::Response> processShardResponses(
+MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> processShardResponses(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const BSONObj& command,
@@ -79,7 +80,7 @@ std::vector<AsyncRequestsSender::Response> processShardResponses(
  * Generic utility to send a command to a list of shards. If `throwOnError=true`, throws in case one
  * of the commands fails.
  */
-std::vector<AsyncRequestsSender::Response> sendCommandToShards(
+MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const BSONObj& command,
@@ -91,29 +92,30 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
  * Generic utility to send a command to a list of shards attaching the shard version to the request.
  * If `throwOnError=true`, throws in case one of the commands fails.
  */
-std::vector<AsyncRequestsSender::Response> sendCommandToShardsWithVersion(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const BSONObj& command,
-    const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    const CollectionRoutingInfo& cri,
-    bool throwOnError = true);
+MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response>
+sendCommandToShardsWithVersion(OperationContext* opCtx,
+                               const DatabaseName& dbName,
+                               const BSONObj& command,
+                               const std::vector<ShardId>& shardIds,
+                               const std::shared_ptr<executor::TaskExecutor>& executor,
+                               const CollectionRoutingInfo& cri,
+                               bool throwOnError = true);
 
 /**
  * Helper function to create an index on a collection locally.
  */
-Status createIndexOnCollection(OperationContext* opCtx,
-                               const NamespaceString& ns,
-                               const BSONObj& keys,
-                               bool unique);
+MONGO_MOD_NEEDS_REPLACEMENT Status createIndexOnCollection(OperationContext* opCtx,
+                                                           const NamespaceString& ns,
+                                                           const BSONObj& keys,
+                                                           bool unique);
 /**
  * Helper function to send a command to one shard
  */
-void invokeCommandOnShardWithIdempotentRetryPolicy(OperationContext* opCtx,
-                                                   const ShardId& recipientId,
-                                                   const DatabaseName& dbName,
-                                                   const BSONObj& cmd);
+MONGO_MOD_NEEDS_REPLACEMENT void invokeCommandOnShardWithIdempotentRetryPolicy(
+    OperationContext* opCtx,
+    const ShardId& recipientId,
+    const DatabaseName& dbName,
+    const BSONObj& cmd);
 
 /**
  * Runs doWork until it doesn't throw an error, the node is shutting down, the node has stepped
@@ -126,7 +128,7 @@ void invokeCommandOnShardWithIdempotentRetryPolicy(OperationContext* opCtx,
  * Requirements:
  * - doWork must be idempotent.
  */
-void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
+MONGO_MOD_NEEDS_REPLACEMENT void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
     OperationContext* opCtx,
     StringData taskDescription,
     std::function<void(OperationContext*)> doWork,
@@ -137,6 +139,6 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
  * shard registry. Considers only shards that are not currently draining. Will return ShardNotFound
  * if no shard is found.
  */
-ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx);
+MONGO_MOD_NEEDS_REPLACEMENT ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx);
 }  // namespace sharding_util
 }  // namespace mongo

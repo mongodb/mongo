@@ -32,6 +32,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/sessions_collection.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
@@ -44,7 +45,7 @@ class OperationContext;
 /**
  * Accesses the sessions collection for mongos and shard servers.
  */
-class SessionsCollectionSharded : public SessionsCollection {
+class MONGO_MOD_NEEDS_REPLACEMENT SessionsCollectionSharded : public SessionsCollection {
 public:
     /**
      * Only ensures that the sessions collection exists, is sharded and has the proper indexes, but

@@ -36,6 +36,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
@@ -57,7 +58,7 @@ class StatusWith;
  * config.shards collection. All manipulation of documents coming from that
  * collection should be done with this class.
  */
-class ShardType {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardType {
 public:
     enum class ShardState : int {
         kNotShardAware = 0,

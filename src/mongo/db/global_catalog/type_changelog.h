@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/version_context.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <string>
@@ -50,7 +51,7 @@ namespace mongo {
  * config.actionlog collections. All manipulation of documents coming from that collection should be
  * done with this class.
  */
-class ChangeLogType {
+class MONGO_MOD_NEEDS_REPLACEMENT ChangeLogType {
 public:
     // Field names and types in the changelog collection type.
     static const BSONField<std::string> changeId;

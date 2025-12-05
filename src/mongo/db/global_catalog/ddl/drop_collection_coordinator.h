@@ -46,6 +46,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/namespace_string_util.h"
 
 #include <memory>
@@ -55,7 +56,7 @@
 
 namespace mongo {
 
-class DropCollectionCoordinator final
+class MONGO_MOD_NEEDS_REPLACEMENT DropCollectionCoordinator final
     : public RecoverableShardingDDLCoordinator<DropCollectionCoordinatorDocument,
                                                DropCollectionCoordinatorPhaseEnum> {
 public:

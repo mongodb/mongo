@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -55,7 +56,7 @@ class StatusWith;
  * collection. All manipulation of documents coming from that collection should be done with
  * this class.
  */
-class TagsType {
+class MONGO_MOD_NEEDS_REPLACEMENT TagsType {
 public:
     // Name of the tags collection in the config server.
     static const NamespaceString ConfigNS;

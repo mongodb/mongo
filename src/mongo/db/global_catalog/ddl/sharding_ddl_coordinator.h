@@ -64,6 +64,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/version/releases.h"
 
@@ -80,9 +81,10 @@
 
 namespace mongo {
 
-ShardingDDLCoordinatorMetadata extractShardingDDLCoordinatorMetadata(const BSONObj& coorDoc);
+MONGO_MOD_NEEDS_REPLACEMENT ShardingDDLCoordinatorMetadata
+extractShardingDDLCoordinatorMetadata(const BSONObj& coorDoc);
 
-class ShardingDDLCoordinator
+class MONGO_MOD_NEEDS_REPLACEMENT ShardingDDLCoordinator
     : public repl::PrimaryOnlyService::TypedInstance<ShardingDDLCoordinator> {
 public:
     explicit ShardingDDLCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& coorDoc);
@@ -276,7 +278,7 @@ private:
 };
 
 template <class StateDoc>
-class ShardingDDLCoordinatorImpl : public ShardingDDLCoordinator {
+class MONGO_MOD_NEEDS_REPLACEMENT ShardingDDLCoordinatorImpl : public ShardingDDLCoordinator {
 public:
     boost::optional<BSONObj> reportForCurrentOp(
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
@@ -354,7 +356,8 @@ protected:
 };
 
 template <class StateDoc, class Phase>
-class RecoverableShardingDDLCoordinator : public ShardingDDLCoordinatorImpl<StateDoc> {
+class MONGO_MOD_UNFORTUNATELY_OPEN RecoverableShardingDDLCoordinator
+    : public ShardingDDLCoordinatorImpl<StateDoc> {
 protected:
     using ShardingDDLCoordinatorImpl<StateDoc>::_doc;
     using ShardingDDLCoordinatorImpl<StateDoc>::_docMutex;

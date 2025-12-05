@@ -296,6 +296,7 @@ catalog_and_routing.global_catalog:
       the cluster commit protocol.
     slack: server-catalog-and-routing
     jira: Catalog and Routing
+    fully_marked: true
   files:
     - src/mongo/db/global_catalog/**
 
