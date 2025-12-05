@@ -16,6 +16,7 @@ INDEXED_NESTED_LOOP_JOIN
 ---------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 ---Inner:
 ------FETCH
+---------ns = test.b
 ---------nodeId = 3
 ---------fetched = 1
 ---------sortedByDiskLoc = 0

@@ -13,6 +13,7 @@
 			"filter" : {
 				
 			},
+			"nss" : "test.distinct_scan_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -47,6 +48,7 @@ Execution Engine: sbe
 			"filter" : {
 				
 			},
+			"nss" : "test.distinct_scan_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -691,6 +693,7 @@ Execution Engine: classic
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
+			"nss" : "test.distinct_scan_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -711,6 +714,7 @@ Execution Engine: classic
 			"multiKeyPaths" : {
 				"b" : [ ]
 			},
+			"nss" : "test.distinct_scan_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -749,6 +753,7 @@ Execution Engine: sbe
 			"stage" : "GROUP"
 		},
 		{
+			"nss" : "test.distinct_scan_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -769,6 +774,7 @@ Execution Engine: sbe
 			"multiKeyPaths" : {
 				"b" : [ ]
 			},
+			"nss" : "test.distinct_scan_md",
 			"stage" : "IXSCAN"
 		}
 	]

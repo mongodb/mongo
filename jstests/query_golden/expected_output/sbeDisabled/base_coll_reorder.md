@@ -55,6 +55,7 @@ Execution Engine: classic
 				"winningPlan" : {
 					"direction" : "forward",
 					"isCached" : false,
+					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				}
 			}
@@ -164,6 +165,7 @@ Execution Engine: classic
 				"winningPlan" : {
 					"direction" : "forward",
 					"isCached" : false,
+					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				}
 			}
@@ -268,6 +270,7 @@ Execution Engine: classic
 				"winningPlan" : {
 					"direction" : "forward",
 					"isCached" : false,
+					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				}
 			}
@@ -405,6 +408,7 @@ Execution Engine: classic
 						}
 					},
 					"isCached" : false,
+					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				}
 			}
@@ -613,6 +617,7 @@ Execution Engine: classic
 						}
 					},
 					"isCached" : false,
+					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				}
 			}

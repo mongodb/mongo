@@ -144,9 +144,11 @@ Creating Index
 			"$lte" : 5
 		}
 	},
+	"nss" : "test.cached_partial_index_plan_not_reused_for_ineligible_query_md",
 	"inputStage" : {
 		"stage" : "IXSCAN",
 		"planNodeId" : 1,
+		"nss" : "test.cached_partial_index_plan_not_reused_for_ineligible_query_md",
 		"keyPattern" : {
 			"a" : 1
 		},

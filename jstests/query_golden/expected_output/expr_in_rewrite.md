@@ -38,6 +38,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -79,6 +80,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -101,6 +103,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -146,6 +149,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -195,6 +199,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -217,6 +222,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -260,6 +266,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -307,6 +314,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -330,6 +338,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -376,6 +385,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -428,6 +438,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -451,6 +462,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -497,6 +509,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -549,6 +562,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -572,6 +586,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -617,6 +632,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -668,6 +684,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -691,6 +708,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -738,6 +756,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -792,6 +811,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -815,6 +835,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -863,6 +884,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -919,6 +941,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -942,6 +965,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -990,6 +1014,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -1047,6 +1072,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -1070,6 +1096,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -1119,6 +1146,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -1178,6 +1206,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -1201,6 +1230,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -1246,6 +1276,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -1286,6 +1317,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -1308,6 +1340,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -1355,6 +1388,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -1410,6 +1444,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -1433,6 +1468,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -1478,6 +1514,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -1518,6 +1555,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -1540,6 +1578,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -1587,6 +1626,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -1642,6 +1682,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -1665,6 +1706,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -1711,6 +1753,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -1752,6 +1795,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -1774,6 +1818,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -1821,6 +1866,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -1876,6 +1922,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -1899,6 +1946,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -1942,6 +1990,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -1980,6 +2029,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -2002,6 +2052,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -2045,6 +2096,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -2083,6 +2135,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -2105,6 +2158,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -2149,6 +2203,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -2188,6 +2243,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -2210,6 +2266,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -2255,6 +2312,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -2306,6 +2364,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -2329,6 +2388,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -2374,6 +2434,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -2425,6 +2486,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -2448,6 +2510,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -2493,6 +2556,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -2544,6 +2608,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -2567,6 +2632,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -2612,6 +2678,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -2663,6 +2730,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -2686,6 +2754,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -2731,6 +2800,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -2782,6 +2852,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -2805,6 +2876,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -2850,6 +2922,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -2901,6 +2974,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -2924,6 +2998,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -2974,6 +3049,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -3019,6 +3095,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -3041,6 +3118,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -3101,6 +3179,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -3156,6 +3235,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -3179,6 +3259,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -3251,6 +3332,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -3344,6 +3426,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -3427,6 +3510,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -3505,6 +3589,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -3528,6 +3613,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -3597,6 +3683,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -3661,6 +3748,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -3684,6 +3772,7 @@ Summarized explain
 					"m"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -3728,6 +3817,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -3767,6 +3857,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -3790,6 +3881,7 @@ Summarized explain
 					"m.a"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -3835,6 +3927,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -3886,6 +3979,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -3910,6 +4004,7 @@ Summarized explain
 					"m.a"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -3957,6 +4052,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -4012,6 +4108,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -4036,6 +4133,7 @@ Summarized explain
 					"m.a"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -4079,6 +4177,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -4126,6 +4225,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -4150,6 +4250,7 @@ Summarized explain
 					"m.a"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -4195,6 +4296,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -4246,6 +4348,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -4270,6 +4373,7 @@ Summarized explain
 					"m.a"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -4315,6 +4419,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -4355,6 +4460,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -4378,6 +4484,7 @@ Summarized explain
 					"m.a"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -4425,6 +4532,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -4480,6 +4588,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -4504,6 +4613,7 @@ Summarized explain
 					"m.a"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -4547,6 +4657,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -4594,6 +4705,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -4617,6 +4729,7 @@ Summarized explain
 					"m.a"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -4662,6 +4775,7 @@ Summarized explain
 					]
 				}
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -4713,6 +4827,7 @@ Summarized explain
 					}
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -4737,6 +4852,7 @@ Summarized explain
 					"m.a"
 				]
 			},
+			"nss" : "test.expr_in_rewrite_md",
 			"stage" : "IXSCAN"
 		}
 	]

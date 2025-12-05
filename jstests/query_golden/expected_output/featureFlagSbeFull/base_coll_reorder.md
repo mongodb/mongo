@@ -63,6 +63,7 @@ Execution Engine: sbe
 					"filter" : {
 						
 					},
+					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				},
 				"localField" : "a",
@@ -166,6 +167,7 @@ Execution Engine: sbe
 					"filter" : {
 						
 					},
+					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				},
 				"localField" : "a",
@@ -264,6 +266,7 @@ Execution Engine: sbe
 					"filter" : {
 						
 					},
+					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				},
 				"localField" : "base",

@@ -481,6 +481,7 @@
 						}
 					},
 					{
+						"nss" : "test.sort_group_targeting",
 						"stage" : "FETCH"
 					},
 					{
@@ -504,6 +505,7 @@
 						"multiKeyPaths" : {
 							"shardKey" : [ ]
 						},
+						"nss" : "test.sort_group_targeting",
 						"stage" : "IXSCAN"
 					}
 				]
@@ -540,6 +542,7 @@
 						}
 					},
 					{
+						"nss" : "test.sort_group_targeting",
 						"stage" : "FETCH"
 					},
 					{
@@ -563,6 +566,7 @@
 						"multiKeyPaths" : {
 							"shardKey" : [ ]
 						},
+						"nss" : "test.sort_group_targeting",
 						"stage" : "IXSCAN"
 					}
 				]
@@ -665,6 +669,7 @@
 				"stage" : "SORT_KEY_GENERATOR"
 			},
 			{
+				"nss" : "test.sort_group_targeting",
 				"stage" : "FETCH"
 			},
 			{
@@ -688,6 +693,7 @@
 				"multiKeyPaths" : {
 					"shardKey" : [ ]
 				},
+				"nss" : "test.sort_group_targeting",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -706,6 +712,7 @@
 				"stage" : "SORT_KEY_GENERATOR"
 			},
 			{
+				"nss" : "test.sort_group_targeting",
 				"stage" : "FETCH"
 			},
 			{
@@ -729,6 +736,7 @@
 				"multiKeyPaths" : {
 					"shardKey" : [ ]
 				},
+				"nss" : "test.sort_group_targeting",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -821,6 +829,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.sort_group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -851,6 +860,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.sort_group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]

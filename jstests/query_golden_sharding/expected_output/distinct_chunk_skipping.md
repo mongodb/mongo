@@ -740,6 +740,7 @@
 								"$gte" : "shard0"
 							}
 						},
+						"nss" : "test.distinct_chunk_skipping",
 						"stage" : "FETCH"
 					},
 					{
@@ -760,6 +761,7 @@
 						"multiKeyPaths" : {
 							"c" : [ ]
 						},
+						"nss" : "test.distinct_chunk_skipping",
 						"stage" : "IXSCAN"
 					}
 				]
@@ -863,6 +865,7 @@
 								"$gte" : "shard0"
 							}
 						},
+						"nss" : "test.distinct_chunk_skipping",
 						"stage" : "FETCH"
 					},
 					{
@@ -883,6 +886,7 @@
 						"multiKeyPaths" : {
 							"c" : [ ]
 						},
+						"nss" : "test.distinct_chunk_skipping",
 						"stage" : "IXSCAN"
 					}
 				]

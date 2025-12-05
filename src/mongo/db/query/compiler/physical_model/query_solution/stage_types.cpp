@@ -147,6 +147,8 @@ StringData nodeStageTypeToString(const QuerySolutionNode* node) {
             return "NESTED_LOOP_JOIN_EMBEDDING"_sd;
         case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE:
             return "INDEXED_NESTED_LOOP_JOIN_EMBEDDING"_sd;
+        case STAGE_INDEX_PROBE_NODE:
+            return "INDEX_PROBE_NODE"_sd;
         default:
             return "UNKNOWN"_sd;
     }

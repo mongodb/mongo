@@ -572,8 +572,6 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
         eligibleForPlanCache = false;
     }
 
-    IndexBounds getIndexBounds() const;
-
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     // Name of the namespace.

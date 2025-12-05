@@ -34,6 +34,7 @@ Execution Engine: sbe
 			"stage" : "GROUP"
 		},
 		{
+			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -61,6 +62,7 @@ Execution Engine: sbe
 				],
 				"b" : [ ]
 			},
+			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -190,6 +192,7 @@ Execution Engine: sbe
 			"filter" : {
 				
 			},
+			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -348,6 +351,7 @@ Execution Engine: sbe
 			"filter" : {
 				
 			},
+			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -387,6 +391,7 @@ Execution Engine: sbe
 			"filter" : {
 				
 			},
+			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -443,6 +448,7 @@ Execution Engine: sbe
 			"filter" : {
 				
 			},
+			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -728,6 +734,7 @@ Execution Engine: sbe
 			"filter" : {
 				
 			},
+			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -932,6 +939,7 @@ Execution Engine: classic
 					"$lt" : 3
 				}
 			},
+			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -949,6 +957,7 @@ Execution Engine: classic
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
+			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -974,6 +983,7 @@ Execution Engine: classic
 				"$_path" : [ ],
 				"b" : [ ]
 			},
+			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "IXSCAN"
 		}
 	]

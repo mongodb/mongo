@@ -14,6 +14,7 @@
 						"$eq" : 5
 					}
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "FETCH"
 			},
 			{
@@ -34,6 +35,7 @@
 				"multiKeyPaths" : {
 					"x" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		],
@@ -44,6 +46,7 @@
 						"$eq" : 5
 					}
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "FETCH"
 			},
 			{
@@ -64,6 +67,7 @@
 				"multiKeyPaths" : {
 					"x" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -75,6 +79,7 @@
 					"$gt" : 3
 				}
 			},
+			"nss" : "test.distinct_command_multiplanning_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -100,6 +105,7 @@
 				"y" : [ ],
 				"z" : [ ]
 			},
+			"nss" : "test.distinct_command_multiplanning_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -117,6 +123,7 @@
 	"rejectedPlans" : [
 		[
 			{
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "FETCH"
 			},
 			{
@@ -139,12 +146,14 @@
 						"x"
 					]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		]
 	],
 	"winningPlan" : [
 		{
+			"nss" : "test.distinct_command_multiplanning_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -167,6 +176,7 @@
 					"x"
 				]
 			},
+			"nss" : "test.distinct_command_multiplanning_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -188,6 +198,7 @@
 						"$eq" : 5
 					}
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "FETCH"
 			},
 			{
@@ -210,6 +221,7 @@
 						"x"
 					]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		],
@@ -220,6 +232,7 @@
 						"$eq" : 5
 					}
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "FETCH"
 			},
 			{
@@ -242,6 +255,7 @@
 						"x"
 					]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -253,6 +267,7 @@
 					"$gt" : 3
 				}
 			},
+			"nss" : "test.distinct_command_multiplanning_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -278,6 +293,7 @@
 				"y" : [ ],
 				"z" : [ ]
 			},
+			"nss" : "test.distinct_command_multiplanning_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -798,6 +814,7 @@
 					"x" : [ ],
 					"y" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			},
 			{
@@ -823,6 +840,7 @@
 					"x" : [ ],
 					"y" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		],
@@ -865,6 +883,7 @@
 					"y" : [ ],
 					"z" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			},
 			{
@@ -890,6 +909,7 @@
 					"x" : [ ],
 					"y" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		],
@@ -927,6 +947,7 @@
 					"x" : [ ],
 					"y" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			},
 			{
@@ -952,6 +973,7 @@
 					"x" : [ ],
 					"y" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		],
@@ -994,6 +1016,7 @@
 					"y" : [ ],
 					"z" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			},
 			{
@@ -1019,6 +1042,7 @@
 					"x" : [ ],
 					"y" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		],
@@ -1061,6 +1085,7 @@
 					"y" : [ ],
 					"z" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			},
 			{
@@ -1086,6 +1111,7 @@
 					"x" : [ ],
 					"y" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		],
@@ -1128,6 +1154,7 @@
 					"y" : [ ],
 					"z" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			},
 			{
@@ -1153,6 +1180,7 @@
 					"x" : [ ],
 					"y" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -1543,6 +1571,7 @@
 						"$lt" : 250
 					}
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "FETCH"
 			},
 			{
@@ -1563,6 +1592,7 @@
 				"multiKeyPaths" : {
 					"x" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		],
@@ -1573,6 +1603,7 @@
 						"$gt" : -1
 					}
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "FETCH"
 			},
 			{
@@ -1598,6 +1629,7 @@
 					"y" : [ ],
 					"z" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -1693,6 +1725,7 @@
 						"$lt" : 105
 					}
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "FETCH"
 			},
 			{
@@ -1713,6 +1746,7 @@
 				"multiKeyPaths" : {
 					"x" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -1724,6 +1758,7 @@
 					"$gt" : -1
 				}
 			},
+			"nss" : "test.distinct_command_multiplanning_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -1749,6 +1784,7 @@
 				"y" : [ ],
 				"z" : [ ]
 			},
+			"nss" : "test.distinct_command_multiplanning_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -1911,6 +1947,7 @@
 					"$lt" : 250
 				}
 			},
+			"nss" : "test.distinct_command_multiplanning_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -1931,6 +1968,7 @@
 			"multiKeyPaths" : {
 				"x" : [ ]
 			},
+			"nss" : "test.distinct_command_multiplanning_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -1963,6 +2001,7 @@
 					}
 				]
 			},
+			"nss" : "test.distinct_command_multiplanning_md",
 			"stage" : "COLLSCAN"
 		}
 	]

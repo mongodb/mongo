@@ -48,6 +48,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
+#include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/gen_projection.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
@@ -751,17 +752,15 @@ std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
     return {matchedRecordsSlot, std::move(nlj)};
 }
 
-
-std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> buildIndexJoinLookupForeignSideStage(
-    StageBuilderState& state,
-    SbSlot localKeysSetSlot,
-    const FieldPath& localFieldName,
-    const FieldPath& foreignFieldName,
-    const CollectionPtr& foreignColl,
-    const IndexEntry& index,
-    boost::optional<sbe::value::SlotId> collatorSlot,
-    const PlanNodeId nodeId,
-    bool hasUnwindSrc) {
+std::tuple<SbStage, SbSlot, SbSlot, std::vector<std::pair<std::string, SbSlot>>>
+buildIndexSeekStage(StageBuilderState& state,
+                    SbStage valueGeneratorStage,
+                    SbSlotVector valueForIndexBounds,
+                    std::vector<FieldPath> foreignFieldNames,
+                    const CollectionPtr& foreignColl,
+                    const IndexEntry& index,
+                    boost::optional<sbe::value::SlotId> collatorSlot,
+                    const PlanNodeId nodeId) {
     SbBuilder b(state, nodeId);
 
     const auto foreignCollUUID = foreignColl->uuid();
@@ -777,45 +776,49 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> buildIndexJoinLookupForeignSid
     const auto indexVersion = indexAccessMethod->getSortedDataInterface()->getKeyStringVersion();
     const auto indexOrdering = indexAccessMethod->getSortedDataInterface()->getOrdering();
 
-    // Modify the set of values to lookup to include the first item of any array.
-    auto [localKeysIndexSetSlot, localKeysSetStage] =
-        buildKeySetForIndexScan(state, b.makeLimitOneCoScanTree(), localKeysSetSlot, nodeId);
-
-    // Unwind local keys one by one into 'valueForIndexBounds'.
-    auto [valueGeneratorStage, valueForIndexBounds, _] = b.makeUnwind(
-        std::move(localKeysSetStage), localKeysIndexSetSlot, true /*preserveNullAndEmptyArrays*/);
-
     if (index.type == INDEX_HASHED) {
-        // For hashed indexes, we need to hash the value before computing keystrings iff the
-        // lookup's "foreignField" is the hashed field in this index.
-        const BSONElement elt = index.keyPattern.getField(foreignFieldName.fullPath());
-        if (elt.valueStringDataSafe() == IndexNames::HASHED) {
-
-            // For collated hashed indexes, apply collation before hashing.
-            auto [outStage, outSlots] =
-                b.makeProject(std::move(valueGeneratorStage),
-                              b.makeFunction("shardHash"_sd,
-                                             collatorSlot ? b.makeFunction("collComparisonKey",
-                                                                           valueForIndexBounds,
-                                                                           SbSlot{*collatorSlot})
-                                                          : valueForIndexBounds));
-            valueGeneratorStage = std::move(outStage);
-            valueForIndexBounds = outSlots[0];
+        for (size_t i = 0; i < foreignFieldNames.size(); i++) {
+            // For hashed indexes, we need to hash the value before computing keystrings iff the
+            // lookup's "foreignField" is the hashed field in this index.
+            const BSONElement elt = index.keyPattern.getField(foreignFieldNames[i].fullPath());
+            if (elt.valueStringDataSafe() == IndexNames::HASHED &&
+                valueForIndexBounds[i].getId() != 0) {
+                // For collated hashed indexes, apply collation before hashing.
+                auto [outStage, outSlots] = b.makeProject(
+                    std::move(valueGeneratorStage),
+                    b.makeFunction("shardHash"_sd,
+                                   collatorSlot ? b.makeFunction("collComparisonKey",
+                                                                 valueForIndexBounds[i],
+                                                                 SbSlot{*collatorSlot})
+                                                : valueForIndexBounds[i]));
+                valueGeneratorStage = std::move(outStage);
+                valueForIndexBounds[i] = outSlots[0];
+            }
         }
     }
 
     // Calculate the low key and high key of each individual local field. They are stored in
     // 'lowKeySlot' and 'highKeySlot', respectively. These two slots will be made available in
-    // the loop join stage to perform index seek.
+    // the loop join stage to perform index seek. If the slot has not been initialized, use a
+    // [MinKey, MaxKey] range.
+    // TODO: SERVER-114883 support more complex index boundaries by using a GenericIndexScanStage
+    // rather than a single SimpleIndexScanStage.
     auto makeNewKeyStringCall = [&](key_string::Discriminator discriminator) {
-        StringData functionName = "ks";
-
         SbExpr::Vector args =
             SbExpr::makeSeq(b.makeInt64Constant(static_cast<int64_t>(indexVersion)),
-                            b.makeInt32Constant(indexOrdering.getBits()),
-                            valueForIndexBounds,
-                            b.makeInt64Constant(static_cast<int64_t>(discriminator)));
+                            b.makeInt32Constant(indexOrdering.getBits()));
+        for (size_t i = 0; i < valueForIndexBounds.size(); i++) {
+            if (valueForIndexBounds[i].getId() == 0) {
+                args.push_back(discriminator == key_string::Discriminator::kExclusiveBefore
+                                   ? b.makeConstant(sbe::value::TypeTags::MinKey, 0)
+                                   : b.makeConstant(sbe::value::TypeTags::MaxKey, 0));
+            } else {
+                args.push_back(valueForIndexBounds[i]);
+            }
+        }
+        args.push_back(b.makeInt64Constant(static_cast<int64_t>(discriminator)));
 
+        StringData functionName = "ks"_sd;
         if (collatorSlot) {
             functionName = "collKs";
             args.emplace_back(SbSlot{*collatorSlot});
@@ -881,9 +884,19 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> buildIndexJoinLookupForeignSid
     // stage on the inner side to get matched foreign documents. The foreign documents are
     // stored in 'foreignRecordSlot'. We also pass in 'snapshotIdSlot', 'indexIdentSlot',
     // 'indexKeySlot' and 'indexKeyPatternSlot' to perform index consistency check during the seek.
-    auto [scanNljStage, scanNljValueSlot, scanNljRecordIdSlot, scanNljFieldSlots] =
+    std::vector<std::string> topLevelFieldNames;
+    std::vector<std::pair<std::string, SbSlot>> topLevelFields;
+    StringSet dedupTopLevelFields;
+    for (auto& foreignFieldName : foreignFieldNames) {
+        auto topField = std::string(foreignFieldName.front());
+        if (dedupTopLevelFields.insert(topField).second) {
+            topLevelFields.emplace_back(topField, SbSlot{});
+            topLevelFieldNames.push_back(std::move(topField));
+        }
+    }
+    auto [scanNljStage, scanNljValueSlot, scanNljRecordIdSlot, scanNljForeignFieldTopLevelSlots] =
         makeLoopJoinForFetch(std::move(ixScanNljStage),
-                             std::vector<std::string>{std::string(foreignFieldName.front())},
+                             std::move(topLevelFieldNames),
                              foreignRecordIdSlot,
                              snapshotIdSlot,
                              indexIdentSlot,
@@ -895,10 +908,48 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> buildIndexJoinLookupForeignSid
                              nodeId,
                              SbSlotVector{} /* slotsToForward */);
 
-    return {std::move(scanNljStage),
-            scanNljValueSlot,
-            scanNljRecordIdSlot,
-            std::move(scanNljFieldSlots)};
+    for (size_t i = 0; i < topLevelFields.size(); i++) {
+        topLevelFields[i].second = std::move(scanNljForeignFieldTopLevelSlots[i]);
+    }
+
+    return {
+        std::move(scanNljStage), scanNljValueSlot, scanNljRecordIdSlot, std::move(topLevelFields)};
+}
+
+std::tuple<SbStage, SbSlot, SbSlot, SbSlot> buildIndexJoinLookupForeignSideStage(
+    StageBuilderState& state,
+    SbSlot localKeysSetSlot,
+    const FieldPath& localFieldName,
+    const FieldPath& foreignFieldName,
+    const CollectionPtr& foreignColl,
+    const IndexEntry& index,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    const PlanNodeId nodeId,
+    bool hasUnwindSrc) {
+    SbBuilder b(state, nodeId);
+
+    // Modify the set of values to lookup to include the first item of any array.
+    auto [localKeysIndexSetSlot, localKeysSetStage] =
+        buildKeySetForIndexScan(state, b.makeLimitOneCoScanTree(), localKeysSetSlot, nodeId);
+
+    // Unwind local keys one by one into 'valueForIndexBounds'.
+    auto [valueGeneratorStage, valueForIndexBounds, _] = b.makeUnwind(
+        std::move(localKeysSetStage), localKeysIndexSetSlot, true /*preserveNullAndEmptyArrays*/);
+
+    auto [stage, valueSlot, recordIdSlot, foreignFieldTopLevelSlots] =
+        buildIndexSeekStage(state,
+                            std::move(valueGeneratorStage),
+                            {valueForIndexBounds},
+                            {foreignFieldName},
+                            foreignColl,
+                            index,
+                            collatorSlot,
+                            nodeId);
+
+    return {std::move(stage),
+            std::move(valueSlot),
+            std::move(recordIdSlot),
+            std::move(foreignFieldTopLevelSlots[0].second)};
 }  // buildIndexJoinLookupForeignSideStage
 
 /*
@@ -943,7 +994,7 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
         state, std::move(localStage), slots, localFieldName, collatorSlot, nodeId);
 
     // Build the inner branch that produces the correlated foreign key slot.
-    auto [scanNljStage, foreignRecordSlot, _, scanFieldSlots] =
+    auto [scanNljStage, foreignRecordSlot, _, foreignFieldTopLevelSlot] =
         buildIndexJoinLookupForeignSideStage(state,
                                              localKeysSetSlot,
                                              localFieldName,
@@ -962,7 +1013,7 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
                                                                      std::move(scanNljStage),
                                                                      foreignRecordSlot,
                                                                      foreignFieldName,
-                                                                     scanFieldSlots[0],
+                                                                     foreignFieldTopLevelSlot,
                                                                      nodeId,
                                                                      state,
                                                                      hasUnwindSrc);
@@ -1036,21 +1087,22 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     auto [indexLookupBranchStage,
           indexLookupBranchResultSlot,
           indexLookupBranchRecordIdSlot,
-          indexLookupBranchScanSlots] = buildIndexJoinLookupForeignSideStage(state,
-                                                                             localKeysSetSlot,
-                                                                             localFieldName,
-                                                                             foreignFieldName,
-                                                                             foreignColl,
-                                                                             index,
-                                                                             collatorSlot,
-                                                                             nodeId,
-                                                                             hasUnwindSrc);
+          indexLookupBranchForeignFieldTopLevelSlot] =
+        buildIndexJoinLookupForeignSideStage(state,
+                                             localKeysSetSlot,
+                                             localFieldName,
+                                             foreignFieldName,
+                                             foreignColl,
+                                             index,
+                                             collatorSlot,
+                                             nodeId,
+                                             hasUnwindSrc);
 
     // Build the nested loop branch.
     auto [nestedLoopBranchStage,
           nestedLoopBranchResultSlot,
           nestedLoopBranchRecordIdSlot,
-          nestedLoopBranchScanSlots] =
+          nestedLoopBranchForeignFieldTopLevelSlots] =
         b.makeScan(foreignColl->uuid(),
                    foreignColl->ns().dbName(),
                    forwardScanDirection,
@@ -1071,15 +1123,16 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
                                            b.makeBoolConstant(false) /*compareArray*/));
 
     // Create a branch stage
-    auto [branchStage, branchSlots] = b.makeBranch(std::move(indexLookupBranchStage),
-                                                   std::move(nestedLoopBranchStage),
-                                                   std::move(filter),
-                                                   SbExpr::makeSV(indexLookupBranchResultSlot,
-                                                                  indexLookupBranchRecordIdSlot,
-                                                                  indexLookupBranchScanSlots[0]),
-                                                   SbExpr::makeSV(nestedLoopBranchResultSlot,
-                                                                  nestedLoopBranchRecordIdSlot,
-                                                                  nestedLoopBranchScanSlots[0]));
+    auto [branchStage, branchSlots] =
+        b.makeBranch(std::move(indexLookupBranchStage),
+                     std::move(nestedLoopBranchStage),
+                     std::move(filter),
+                     SbExpr::makeSV(indexLookupBranchResultSlot,
+                                    indexLookupBranchRecordIdSlot,
+                                    indexLookupBranchForeignFieldTopLevelSlot),
+                     SbExpr::makeSV(nestedLoopBranchResultSlot,
+                                    nestedLoopBranchRecordIdSlot,
+                                    nestedLoopBranchForeignFieldTopLevelSlots[0]));
 
     SbSlot resultSlot = branchSlots[0];
     auto [finalForeignSlot, finalForeignStage] = buildForeignMatches(localKeysSetSlot,
@@ -1484,11 +1537,6 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookupUnwind(
 }  // buildEqLookupUnwind
 
 namespace {
-PlanStageReqs makeReqsForRightSideOfNestedLoopJoin(
-    const QuerySolutionNode* root, std::vector<PlanStageReqs::OwnedSlotName> fieldRequests) {
-    return PlanStageReqs{}.setResultObj().set(std::move(fieldRequests));
-}
-
 /**
  * Generates an expression for evaluating a path that takes the value found at the first path
  * component and returns a single value from evaluating the remaining path components. The
@@ -1793,8 +1841,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildNestedLoopJoinEmb
     auto [leftStage, leftOutputs] =
         build(nestedLoopJoinEmbeddingNode->children[0].get(), leftChildReqs);
 
-    PlanStageReqs rightChildReqs = makeReqsForRightSideOfNestedLoopJoin(
-        nestedLoopJoinEmbeddingNode->children[1].get(), std::move(rightRequests));
+    PlanStageReqs rightChildReqs = PlanStageReqs{}.setResultObj().set(std::move(rightRequests));
     auto [rightStage, rightOutputs] =
         build(nestedLoopJoinEmbeddingNode->children[1].get(), rightChildReqs);
 
@@ -1907,8 +1954,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildHashJoinEmbedding
             .set(std::move(leftRequests));
     auto [leftStage, leftOutputs] = build(hashJoinEmbeddingNode->children[0].get(), leftChildReqs);
 
-    PlanStageReqs rightChildReqs = makeReqsForRightSideOfNestedLoopJoin(
-        hashJoinEmbeddingNode->children[1].get(), std::move(rightRequests));
+    PlanStageReqs rightChildReqs = PlanStageReqs{}.setResultObj().set(std::move(rightRequests));
     auto [rightStage, rightOutputs] =
         build(hashJoinEmbeddingNode->children[1].get(), rightChildReqs);
 
@@ -1955,6 +2001,167 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildHashJoinEmbedding
     return generateJoinResult(hashJoinEmbeddingNode,
                               reqs,
                               std::move(hashJoinStage),
+                              leftOutputs,
+                              rightOutputs,
+                              *fieldEffect,
+                              _state);
+}
+
+/**
+ * Build an equijoin operation according to the input STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE
+ * plan. This style of join is simpler than general-purpose $lookup joins, because it only supports
+ * equality predicates with path operands that never implicitly traverse an array.
+ */
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexedJoinEmbeddingNode(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    tassert(
+        11122200, "buildIndexedJoinEmbeddingNode() does not support kSortKey", !reqs.hasSortKeys());
+
+    SbBuilder b(_state, root->nodeId());
+
+    auto indexedJoinEmbeddingNode = static_cast<const IndexedNestedLoopJoinEmbeddingNode*>(root);
+
+    auto [leftRequests, rightRequests] =
+        collectRequestedFields(indexedJoinEmbeddingNode, reqs, _qsnAnalysis);
+
+    auto& fieldEffect = _qsnAnalysis.getQsnInfo(root).effects;
+    tassert(11122201, "Expected field effect set to be computed", fieldEffect);
+
+    // Recursively build the executable plan for the left side of the join.
+    PlanStageReqs leftChildReqs =
+        PlanStageReqs{}
+            .setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}), FieldEffects())
+            .set(std::move(leftRequests));
+    auto [leftStage, leftOutputs] =
+        build(indexedJoinEmbeddingNode->children[0].get(), leftChildReqs);
+
+    // Don't use recursion to build the index scan on the right side of the join, we have to
+    // manually inject the predicate.
+    auto indexFetch = dynamic_cast<FetchNode*>(indexedJoinEmbeddingNode->children[1].get());
+    tassert(11122202,
+            "Right child in buildIndexedJoinEmbeddingNode() must be an FetchNode",
+            indexFetch != nullptr);
+    auto indexProbe = dynamic_cast<IndexProbeNode*>(indexFetch->children[0].get());
+    tassert(11122203,
+            "Right grandchild in buildIndexedJoinEmbeddingNode() must be an IndexProbeNode",
+            indexProbe != nullptr);
+
+    const auto foreignColl = _collections.lookupCollection(indexProbe->nss);
+    tassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Collection " << indexProbe->nss.toStringForErrorMsg()
+                          << " has been dropped",
+            foreignColl);
+    tassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Collection " << indexProbe->nss.toStringForErrorMsg()
+                          << " has been renamed",
+            foreignColl->ns() == indexProbe->nss);
+
+    // Populate a map assigning to each key component its position in the key pattern, we can't be
+    // sure that the paths from the right sides of the predicates are in the order used in the index
+    // definition.
+    StringMap<size_t> indexKeyPos;
+    size_t pos = 0;
+    for (auto& key : indexProbe->index.keyPattern) {
+        indexKeyPos[std::string(key.fieldNameStringData())] = pos++;
+    }
+    SbExprOptSlotVector leftPrj;
+    std::vector<FieldPath> foreignPaths;
+    StringSet dedupForeignPaths;
+    for (const auto& predicate : indexedJoinEmbeddingNode->joinPredicates) {
+        tassert(11122204,
+                "Unknown operation in join predicate",
+                predicate.op == QSNJoinPredicate::ComparisonOp::Eq);
+
+        // Create an expression for the left side of the predicate, and add it to a ProjectStage
+        // to be placed on top of the source stages. Any path that fails to evaluate, because of a
+        // missing or non-object path component, gets treated as if it evaluated to a null value for
+        // the purposes of this comparison. This behavior matches MQL localField/foreignField
+        // $lookup semantics.
+        leftPrj.emplace_back(b.makeFillEmptyNull(generateArrayObliviousPathEvaluation(
+                                 b, predicate.leftField, leftOutputs)),
+                             boost::none);
+        if (dedupForeignPaths.emplace(predicate.rightField.fullPath()).second) {
+            foreignPaths.push_back(predicate.rightField);
+        }
+    }
+    // Ensure that the FetchStage on top of the found entries exports the fields that we require
+    // from this side.
+    for (auto& [type, name] : rightRequests) {
+        if (type == PlanStageSlots::SlotType::kField) {
+            if (dedupForeignPaths.emplace(name).second) {
+                foreignPaths.push_back(name);
+            }
+        }
+    }
+
+    // Project the computed predicates from the left side.
+    auto [leftPrjStage, leftPrjOutputs] =
+        b.makeProject(b.makeLimitOneCoScanTree(), std::move(leftPrj));
+
+    // Associate the predicates from the left side of the predicate to the position of the right
+    // side in the key pattern. If an index column is not used in a predicate, it will be left
+    // assigned to slot 0, and the buildIndexSeekStage will insert a [MinKey,MaxKey] bound for it.
+    SbSlotVector keyParts;
+    keyParts.resize(indexProbe->index.keyPattern.nFields());
+    for (size_t predicateIndex = 0;
+         predicateIndex < indexedJoinEmbeddingNode->joinPredicates.size();
+         predicateIndex++) {
+        if (auto it = indexKeyPos.find(
+                indexedJoinEmbeddingNode->joinPredicates[predicateIndex].rightField.fullPath());
+            it != indexKeyPos.end()) {
+            keyParts[it->second] = leftPrjOutputs[predicateIndex++];
+        }
+    }
+
+    auto [outStage, outputDocSlot, _, topLevelFieldSlots] =
+        buildIndexSeekStage(_state,
+                            std::move(leftPrjStage),
+                            keyParts,
+                            foreignPaths,
+                            foreignColl,
+                            indexProbe->index,
+                            _state.getCollatorSlot(),
+                            indexFetch->nodeId());
+
+    PlanStageSlots rightOutputs;
+    rightOutputs.setResultObj(outputDocSlot);
+    for (auto& [topLevelField, slot] : topLevelFieldSlots) {
+        rightOutputs.set(std::make_pair(PlanStageSlots::SlotType::kField, topLevelField), slot);
+    }
+
+    if (indexFetch->filter) {
+        auto filterExpr =
+            generateFilter(_state, indexFetch->filter.get(), outputDocSlot, rightOutputs);
+        if (!filterExpr.isNull()) {
+            outStage = b.makeFilter(std::move(outStage), std::move(filterExpr));
+        }
+    }
+
+    // Create a filter based on the join predicate in order to handle cases where index bounds are
+    // inexact.
+    SbExpr::Vector equalityPredicates;
+    equalityPredicates.reserve(indexedJoinEmbeddingNode->joinPredicates.size());
+    for (const auto& predicate : indexedJoinEmbeddingNode->joinPredicates) {
+        equalityPredicates.emplace_back(b.makeBinaryOp(
+            abt::Operations::Eq,
+            b.makeFillEmptyNull(
+                generateArrayObliviousPathEvaluation(b, predicate.leftField, leftOutputs)),
+            b.makeFillEmptyNull(
+                generateArrayObliviousPathEvaluation(b, predicate.rightField, rightOutputs))));
+    }
+
+    // Finally, get the keys from the outer side and feed them to the inner side (ixscan).
+    auto indexStage =
+        b.makeLoopJoin(std::move(leftStage),
+                       std::move(outStage),
+                       leftOutputs.getAllSlotsInOrder() /* outerProjects */,
+                       leftOutputs.getAllSlotsInOrder() /* outerCorrelated */,
+                       {}, /* innerProjects */
+                       b.makeBooleanOpTree(abt::Operations::And, std::move(equalityPredicates)));
+
+    return generateJoinResult(indexedJoinEmbeddingNode,
+                              reqs,
+                              std::move(indexStage),
                               leftOutputs,
                               rightOutputs,
                               *fieldEffect,

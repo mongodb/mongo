@@ -56,27 +56,47 @@ function runBasicJoinTest(pipeline) {
         );
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
         const bottomUpLeftDeepResults = coll.aggregate(pipeline).toArray();
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, bottomUpLeftDeepResults),
+            "Results differ between no join opt and bottom-up left-deep join enumeration",
+        );
 
         subSection("With bottom-up plan enumeration (right-deep)");
         assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinPlanTreeShape: "rightDeep"}));
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
         const bottomUpRightDeepResults = coll.aggregate(pipeline).toArray();
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, bottomUpRightDeepResults),
+            "Results differ between no join opt and bottom-up right-deep join enumeration",
+        );
 
         subSection("With bottom-up plan enumeration (zig-zag)");
         assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinPlanTreeShape: "zigZag"}));
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
         const bottomUpZigZagResults = coll.aggregate(pipeline).toArray();
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, bottomUpZigZagResults),
+            "Results differ between no join opt and bottom-up zig-zag join enumeration",
+        );
 
         subSection("With random order, seed 44, nested loop joins");
         assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinReorderMode: "random"}));
         assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinOrderSeed: 44}));
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
         const seed44NLJResults = coll.aggregate(pipeline).toArray();
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, seed44NLJResults),
+            "Results differ between no join opt and seed 44 NLJ",
+        );
 
         subSection("With random order, seed 44, hash join enabled");
         assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinReorderDefaultToHashJoin: true}));
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
         const seed44HJResults = coll.aggregate(pipeline).toArray();
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, seed44HJResults),
+            "Results differ between no join opt and seed 44 HJ",
+        );
 
         assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinReorderDefaultToHashJoin: false}));
 
@@ -85,40 +105,32 @@ function runBasicJoinTest(pipeline) {
         assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinOrderSeed: 420}));
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
         const seed420NLJResults = coll.aggregate(pipeline).toArray();
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, seed420NLJResults),
+            "Results differ between no join opt and seed 420 NLJ",
+        );
 
         subSection("With random order, seed 420, hash join enabled");
         assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinReorderDefaultToHashJoin: true}));
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
         const seed420HJResults = coll.aggregate(pipeline).toArray();
-
-        // Validate that all execution modes return the same results.
-        assert(
-            _resultSetsEqualUnordered(noJoinOptResults, bottomUpLeftDeepResults),
-            "Results differ between no join opt and bottom-up left-deep join enumeration",
-        );
-        assert(
-            _resultSetsEqualUnordered(noJoinOptResults, bottomUpRightDeepResults),
-            "Results differ between no join opt and bottom-up right-deep join enumeration",
-        );
-        assert(
-            _resultSetsEqualUnordered(noJoinOptResults, bottomUpZigZagResults),
-            "Results differ between no join opt and bottom-up zig-zag join enumeration",
-        );
-        assert(
-            _resultSetsEqualUnordered(noJoinOptResults, seed44NLJResults),
-            "Results differ between no join opt and seed 44 NLJ",
-        );
-        assert(
-            _resultSetsEqualUnordered(noJoinOptResults, seed44HJResults),
-            "Results differ between no join opt and seed 44 HJ",
-        );
-        assert(
-            _resultSetsEqualUnordered(noJoinOptResults, seed420NLJResults),
-            "Results differ between no join opt and seed 420 NLJ",
-        );
         assert(
             _resultSetsEqualUnordered(noJoinOptResults, seed420HJResults),
             "Results differ between no join opt and seed 420 HJ",
+        );
+
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinReorderDefaultToHashJoin: false}));
+
+        foreignColl1.createIndex({a: 1});
+        foreignColl2.createIndex({b: 1});
+        subSection("With fixed order, index join");
+        outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
+        const seedINJResults = coll.aggregate(pipeline).toArray();
+        foreignColl1.dropIndex({a: 1});
+        foreignColl2.dropIndex({b: 1});
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, seedINJResults),
+            "Results differ between no join opt and INJ",
         );
     } finally {
         // Reset flags.

@@ -209,6 +209,7 @@ Execution Engine: sbe
 			"filter" : {
 				
 			},
+			"nss" : "test.distinct_query_planner_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -259,6 +260,7 @@ Execution Engine: sbe
 			"stage" : "GROUP"
 		},
 		{
+			"nss" : "test.distinct_query_planner_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -279,6 +281,7 @@ Execution Engine: sbe
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.distinct_query_planner_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -374,6 +377,7 @@ Execution Engine: sbe
 			"filter" : {
 				
 			},
+			"nss" : "test.distinct_query_planner_md",
 			"stage" : "COLLSCAN"
 		}
 	]

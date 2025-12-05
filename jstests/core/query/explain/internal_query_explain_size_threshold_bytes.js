@@ -55,7 +55,7 @@ const original = assert.commandWorked(db.adminCommand({getParameter: 1, "interna
 
 try {
     // Increase explain threshold step-by-step.
-    for (let size = 350; ; size++) {
+    for (let size = 410; ; size++) {
         if (!checkSbeRestrictedOrFullyEnabled(db)) {
             // Test is SBE-only.
             break;
@@ -73,11 +73,11 @@ try {
             .aggregate([{$match: {"$or": orClauses}}, {$group: {_id: "$_id"}}, {$project: {_id: 1, a: 0}}]);
         // Test is SBE-only. Assert the query used SBE as expected.
         assert(getWarnings(explain).length > 0 || getEngine(explain) === "sbe");
-        jsTestLog("Checking explain");
+        jsTest.log.info("Checking explain");
         let winningPlan = getQueryPlanner(explain).winningPlan;
         let queryPlan = winningPlan.queryPlan;
         let slotBasedPlan = winningPlan.slotBasedPlan;
-        jsTestLog({
+        jsTest.log.info({
             "size": size,
             "Object.bsonsize(winningPlan)": Object.bsonsize(winningPlan),
             "winningPlan": winningPlan,

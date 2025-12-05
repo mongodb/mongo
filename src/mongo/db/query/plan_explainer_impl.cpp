@@ -330,6 +330,11 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         }
     } else if (STAGE_COLLSCAN == stats.stageType) {
         CollectionScanStats* spec = static_cast<CollectionScanStats*>(stats.specific.get());
+        if (auto qsnNode = dynamic_cast<const CollectionScanNode*>(querySolutionNode); qsnNode) {
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(qsnNode->nss, SerializationContext::stateDefault()));
+        }
         bob->append("direction", spec->direction > 0 ? "forward" : "backward");
         if (spec->minRecord) {
             spec->minRecord->appendToBSONAs(bob, "minRecord");
@@ -354,6 +359,11 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
         }
 
+        if (auto qsnNode = dynamic_cast<const CountScanNode*>(querySolutionNode); qsnNode) {
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(qsnNode->nss, SerializationContext::stateDefault()));
+        }
         bob->append("keyPattern", spec->keyPattern);
         bob->append("indexName", spec->indexName);
         if (!spec->collation.isEmpty()) {
@@ -424,6 +434,11 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         }
     } else if (STAGE_FETCH == stats.stageType) {
         FetchStats* spec = static_cast<FetchStats*>(stats.specific.get());
+        if (auto qsnNode = dynamic_cast<const FetchNode*>(querySolutionNode); qsnNode) {
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(qsnNode->nss, SerializationContext::stateDefault()));
+        }
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->docsExamined));
             bob->appendNumber("alreadyHasObj", static_cast<long long>(spec->alreadyHasObj));
@@ -431,6 +446,16 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     } else if (STAGE_GEO_NEAR_2D == stats.stageType || STAGE_GEO_NEAR_2DSPHERE == stats.stageType) {
         NearStats* spec = static_cast<NearStats*>(stats.specific.get());
 
+        if (auto qsnNode = dynamic_cast<const GeoNear2DNode*>(querySolutionNode); qsnNode) {
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(qsnNode->nss, SerializationContext::stateDefault()));
+        } else if (auto qsnNode = dynamic_cast<const GeoNear2DSphereNode*>(querySolutionNode);
+                   qsnNode) {
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(qsnNode->nss, SerializationContext::stateDefault()));
+        }
         bob->append("keyPattern", spec->keyPattern);
         bob->append("indexName", spec->indexName);
         bob->append("indexVersion", spec->indexVersion);
@@ -467,6 +492,11 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     } else if (STAGE_IXSCAN == stats.stageType) {
         IndexScanStats* spec = static_cast<IndexScanStats*>(stats.specific.get());
 
+        if (auto qsnNode = dynamic_cast<const IndexScanNode*>(querySolutionNode); qsnNode) {
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(qsnNode->nss, SerializationContext::stateDefault()));
+        }
         bob->append("keyPattern", spec->keyPattern);
         bob->append("indexName", spec->indexName);
         if (!spec->collation.isEmpty()) {
@@ -584,6 +614,11 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     } else if (STAGE_TEXT_MATCH == stats.stageType) {
         TextMatchStats* spec = static_cast<TextMatchStats*>(stats.specific.get());
 
+        if (auto qsnNode = dynamic_cast<const TextMatchNode*>(querySolutionNode); qsnNode) {
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(qsnNode->nss, SerializationContext::stateDefault()));
+        }
         bob->append("indexPrefix", spec->indexPrefix);
         bob->append("indexName", spec->indexName);
         bob->append("parsedTextQuery", spec->parsedTextQuery);

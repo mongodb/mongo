@@ -35,10 +35,8 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -125,11 +123,45 @@ void getAllSecondaryNamespacesHelper(const QuerySolutionNode* qsn,
         return;
     }
 
-    if (auto eqLookupNode = dynamic_cast<const EqLookupNode*>(qsn)) {
-        NamespaceString nss(eqLookupNode->foreignCollection);
-        if (nss != mainNss) {
-            secondaryNssSet.emplace(std::move(nss));
-        }
+    if (auto node = dynamic_cast<const EqLookupNode*>(qsn);
+        node && node->foreignCollection != mainNss) {
+        secondaryNssSet.emplace(node->foreignCollection);
+    }
+
+    if (auto node = dynamic_cast<const IndexScanNode*>(qsn); node && node->nss != mainNss) {
+        secondaryNssSet.emplace(node->nss);
+    }
+
+    if (auto node = dynamic_cast<const FetchNode*>(qsn); node && node->nss != mainNss) {
+        secondaryNssSet.emplace(node->nss);
+    }
+
+    if (auto node = dynamic_cast<const CollectionScanNode*>(qsn); node && node->nss != mainNss) {
+        secondaryNssSet.emplace(node->nss);
+    }
+
+    if (auto node = dynamic_cast<const CountScanNode*>(qsn); node && node->nss != mainNss) {
+        secondaryNssSet.emplace(node->nss);
+    }
+
+    if (auto node = dynamic_cast<const DistinctNode*>(qsn); node && node->nss != mainNss) {
+        secondaryNssSet.emplace(node->nss);
+    }
+
+    if (auto node = dynamic_cast<const TextMatchNode*>(qsn); node && node->nss != mainNss) {
+        secondaryNssSet.emplace(node->nss);
+    }
+
+    if (auto node = dynamic_cast<const SearchNode*>(qsn); node && node->nss != mainNss) {
+        secondaryNssSet.emplace(node->nss);
+    }
+
+    if (auto node = dynamic_cast<const GeoNear2DNode*>(qsn); node && node->nss != mainNss) {
+        secondaryNssSet.emplace(node->nss);
+    }
+
+    if (auto node = dynamic_cast<const GeoNear2DSphereNode*>(qsn); node && node->nss != mainNss) {
+        secondaryNssSet.emplace(node->nss);
     }
 
     for (auto&& child : qsn->children) {
@@ -660,6 +692,8 @@ std::unique_ptr<QuerySolutionNode> MergeSortNode::clone() const {
 void FetchNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "FETCH\n";
+    addIndent(ss, indent + 1);
+    *ss << "ns = " << toStringForLogging(nss) << '\n';
     if (nullptr != filter) {
         addIndent(ss, indent + 1);
         StringBuilder sb;
@@ -694,6 +728,8 @@ IndexScanNode::IndexScanNode(NamespaceString nss, IndexEntry indexEntry)
 void IndexScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "IXSCAN\n";
+    addIndent(ss, indent + 1);
+    *ss << "ns = " << toStringForLogging(nss) << '\n';
     addIndent(ss, indent + 1);
     *ss << "indexName = " << index.identifier.catalogName << '\n';
     addIndent(ss, indent + 1);

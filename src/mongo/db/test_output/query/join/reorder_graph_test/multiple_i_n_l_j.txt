@@ -30,6 +30,7 @@ INDEXED_NESTED_LOOP_JOIN
 ---------------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 ---Inner:
 ------FETCH
+---------ns = test.b
 ---------nodeId = 5
 ---------fetched = 1
 ---------sortedByDiskLoc = 0
@@ -60,6 +61,7 @@ INDEXED_NESTED_LOOP_JOIN
 ---------------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 ---------Inner:
 ------------FETCH
+---------------ns = test.c
 ---------------nodeId = 3
 ---------------fetched = 1
 ---------------sortedByDiskLoc = 0
@@ -69,6 +71,7 @@ INDEXED_NESTED_LOOP_JOIN
 ---------------------Namespace: test.c Index: { c: 1 }
 ---Inner:
 ------FETCH
+---------ns = test.b
 ---------nodeId = 6
 ---------fetched = 1
 ---------sortedByDiskLoc = 0

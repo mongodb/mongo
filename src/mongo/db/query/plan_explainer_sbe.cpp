@@ -287,6 +287,9 @@ void statsToBSON(const QuerySolutionNode* node,
     switch (node->getType()) {
         case STAGE_COLLSCAN: {
             auto csn = static_cast<const CollectionScanNode*>(node);
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(csn->nss, SerializationContext::stateDefault()));
             bob->append("direction", csn->direction > 0 ? "forward" : "backward");
             if (csn->minRecord) {
                 csn->minRecord->appendToBSONAs(bob, "minRecord");
@@ -298,7 +301,9 @@ void statsToBSON(const QuerySolutionNode* node,
         }
         case STAGE_COUNT_SCAN: {
             auto csn = static_cast<const CountScanNode*>(node);
-
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(csn->nss, SerializationContext::stateDefault()));
             bob->append("keyPattern", csn->index.keyPattern);
             bob->append("indexName", csn->index.identifier.catalogName);
             auto collation =
@@ -326,6 +331,9 @@ void statsToBSON(const QuerySolutionNode* node,
         }
         case STAGE_GEO_NEAR_2D: {
             auto geo2d = static_cast<const GeoNear2DNode*>(node);
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(geo2d->nss, SerializationContext::stateDefault()));
             bob->append("keyPattern", geo2d->index.keyPattern);
             bob->append("indexName", geo2d->index.identifier.catalogName);
             bob->append("indexVersion", geo2d->index.version);
@@ -333,6 +341,9 @@ void statsToBSON(const QuerySolutionNode* node,
         }
         case STAGE_GEO_NEAR_2DSPHERE: {
             auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
+            bob->append("nss",
+                        NamespaceStringUtil::serialize(geo2dsphere->nss,
+                                                       SerializationContext::stateDefault()));
             bob->append("keyPattern", geo2dsphere->index.keyPattern);
             bob->append("indexName", geo2dsphere->index.identifier.catalogName);
             bob->append("indexVersion", geo2dsphere->index.version);
@@ -340,7 +351,9 @@ void statsToBSON(const QuerySolutionNode* node,
         }
         case STAGE_IXSCAN: {
             auto ixn = static_cast<const IndexScanNode*>(node);
-
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(ixn->nss, SerializationContext::stateDefault()));
             bob->append("keyPattern", ixn->index.keyPattern);
             bob->append("indexName", ixn->index.identifier.catalogName);
             auto collation =
@@ -404,7 +417,9 @@ void statsToBSON(const QuerySolutionNode* node,
         }
         case STAGE_TEXT_MATCH: {
             auto tn = static_cast<const TextMatchNode*>(node);
-
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(tn->nss, SerializationContext::stateDefault()));
             bob->append("indexPrefix", tn->indexPrefix);
             bob->append("indexName", tn->index.identifier.catalogName);
             auto ftsQuery = dynamic_cast<fts::FTSQueryImpl*>(tn->ftsQuery.get());
@@ -480,6 +495,9 @@ void statsToBSON(const QuerySolutionNode* node,
         }
         case STAGE_SEARCH: {
             auto sn = static_cast<const SearchNode*>(node);
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(sn->nss, SerializationContext::stateDefault()));
             bob->append("isSearchMeta", sn->isSearchMeta);
             bob->appendNumber("remoteCursorId", static_cast<long long>(sn->remoteCursorId));
             bob->append("searchQuery", sn->searchQuery);
@@ -488,6 +506,13 @@ void statsToBSON(const QuerySolutionNode* node,
         case STAGE_EOF: {
             auto eofn = static_cast<const EofNode*>(node);
             bob->append("type", eof_node::typeStr(eofn->type));
+            break;
+        }
+        case STAGE_FETCH: {
+            auto fn = static_cast<const FetchNode*>(node);
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(fn->nss, SerializationContext::stateDefault()));
             break;
         }
         case STAGE_HASH_JOIN_EMBEDDING_NODE:
@@ -508,6 +533,28 @@ void statsToBSON(const QuerySolutionNode* node,
                 }
                 bob->append("joinPredicates", bab.arr());
             }
+            break;
+        }
+        case STAGE_INDEX_PROBE_NODE: {
+            auto ipn = static_cast<const IndexProbeNode*>(node);
+            bob->append(
+                "nss",
+                NamespaceStringUtil::serialize(ipn->nss, SerializationContext::stateDefault()));
+            bob->append("keyPattern", ipn->index.keyPattern);
+            bob->append("indexName", ipn->index.identifier.catalogName);
+            auto collation =
+                ipn->index.infoObj.getObjectField(IndexDescriptor::kCollationFieldName);
+            if (!collation.isEmpty()) {
+                bob->append("collation", collation);
+            }
+            bob->appendBool("isMultiKey", ipn->index.multikey);
+            if (!ipn->index.multikeyPaths.empty()) {
+                appendMultikeyPaths(ipn->index.keyPattern, ipn->index.multikeyPaths, bob);
+            }
+            bob->appendBool("isUnique", ipn->index.unique);
+            bob->appendBool("isSparse", ipn->index.sparse);
+            bob->appendBool("isPartial", ipn->index.filterExpr != nullptr);
+            bob->append("indexVersion", static_cast<int>(ipn->index.version));
             break;
         }
         default:

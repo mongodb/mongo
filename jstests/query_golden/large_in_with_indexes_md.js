@@ -1,6 +1,6 @@
 // Tests that a query with $in filter over a large array chooses the optimal index.
 import {code, codeOneLine, section, subSection} from "jstests/libs/pretty_md.js";
-import {formatExplainRoot} from "jstests/libs/query/analyze_plan.js";
+import {normalizePlan, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.large_in_with_indexes;
 coll.drop();
@@ -33,7 +33,7 @@ const explain = coll.find(filter).sort(sort).explain("executionStats");
 
 subSection("Expected plan");
 print("Note: expecting an IXSCAN on _id_1_rd_1_ard_1");
-code(tojson(formatExplainRoot(explain)));
+code(tojson(normalizePlan(getWinningPlanFromExplain(explain.queryPlanner))));
 
 subSection("Output");
 const output = coll.find(filter).sort(sort).toArray();

@@ -5085,6 +5085,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::build(const QuerySolut
         {STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE,
          &SlotBasedStageBuilder::buildNestedLoopJoinEmbeddingNode},
         {STAGE_HASH_JOIN_EMBEDDING_NODE, &SlotBasedStageBuilder::buildHashJoinEmbeddingNode},
+        {STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE,
+         &SlotBasedStageBuilder::buildIndexedJoinEmbeddingNode},
     };
 
     tassert(4822884,

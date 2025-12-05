@@ -378,6 +378,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -396,6 +397,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -479,6 +481,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -504,6 +507,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -575,6 +579,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -593,6 +598,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -690,6 +696,7 @@
 						"filter" : {
 							
 						},
+						"nss" : "test.group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -726,6 +733,7 @@
 						"filter" : {
 							
 						},
+						"nss" : "test.group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -856,6 +864,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -881,6 +890,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -959,6 +969,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -994,6 +1005,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -1110,6 +1122,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -1154,6 +1167,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -1297,6 +1311,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -1330,6 +1345,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -1428,6 +1444,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -1449,6 +1466,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -1545,6 +1563,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -1566,6 +1585,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -1664,6 +1684,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -1685,6 +1706,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -1766,6 +1788,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -1784,6 +1807,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -1865,6 +1889,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -1890,6 +1915,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -1974,6 +2000,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -1999,6 +2026,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -2083,6 +2111,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -2116,6 +2145,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -2203,6 +2233,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -2221,6 +2252,7 @@
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -2438,6 +2470,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -2456,6 +2489,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -2548,6 +2582,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -2587,6 +2622,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.group_targeting",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -2694,6 +2730,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -2712,6 +2749,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -2794,6 +2832,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -2812,6 +2851,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -2904,6 +2944,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -2922,6 +2963,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -3025,6 +3067,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -3052,6 +3095,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -3165,6 +3209,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -3199,6 +3244,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -3291,6 +3337,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -3309,6 +3356,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -3412,6 +3460,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -3440,6 +3489,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -3534,6 +3584,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -3555,6 +3606,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"filter" : {
 					
 				},
+				"nss" : "test.group_targeting_compound",
 				"stage" : "COLLSCAN"
 			}
 		]
@@ -3666,6 +3718,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.group_targeting_compound",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -3721,6 +3774,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.group_targeting_compound",
 						"stage" : "COLLSCAN"
 					}
 				]

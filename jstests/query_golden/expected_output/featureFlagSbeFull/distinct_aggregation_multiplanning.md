@@ -2025,6 +2025,7 @@ Execution Engine: classic
 									"d"
 								]
 							},
+							"nss" : "test.distinct_aggregation_multiplanning_md",
 							"stage" : "IXSCAN"
 						}
 					]
@@ -2328,6 +2329,7 @@ Execution Engine: sbe
 					"d"
 				]
 			},
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -2394,6 +2396,7 @@ Execution Engine: sbe
 			"filter" : {
 				
 			},
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -2900,6 +2903,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
+							"nss" : "test.distinct_aggregation_multiplanning_md",
 							"stage" : "IXSCAN"
 						},
 						{
@@ -2920,6 +2924,7 @@ Execution Engine: classic
 							"multiKeyPaths" : {
 								"a" : [ ]
 							},
+							"nss" : "test.distinct_aggregation_multiplanning_md",
 							"stage" : "IXSCAN"
 						}
 					],
@@ -2957,6 +2962,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
+							"nss" : "test.distinct_aggregation_multiplanning_md",
 							"stage" : "IXSCAN"
 						},
 						{
@@ -2977,6 +2983,7 @@ Execution Engine: classic
 							"multiKeyPaths" : {
 								"a" : [ ]
 							},
+							"nss" : "test.distinct_aggregation_multiplanning_md",
 							"stage" : "IXSCAN"
 						}
 					],
@@ -3014,6 +3021,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
+							"nss" : "test.distinct_aggregation_multiplanning_md",
 							"stage" : "IXSCAN"
 						},
 						{
@@ -3034,6 +3042,7 @@ Execution Engine: classic
 							"multiKeyPaths" : {
 								"a" : [ ]
 							},
+							"nss" : "test.distinct_aggregation_multiplanning_md",
 							"stage" : "IXSCAN"
 						}
 					],
@@ -3076,6 +3085,7 @@ Execution Engine: classic
 								"b" : [ ],
 								"c" : [ ]
 							},
+							"nss" : "test.distinct_aggregation_multiplanning_md",
 							"stage" : "IXSCAN"
 						},
 						{
@@ -3096,6 +3106,7 @@ Execution Engine: classic
 							"multiKeyPaths" : {
 								"a" : [ ]
 							},
+							"nss" : "test.distinct_aggregation_multiplanning_md",
 							"stage" : "IXSCAN"
 						}
 					]
@@ -3215,6 +3226,7 @@ Execution Engine: sbe
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "IXSCAN"
 		},
 		{
@@ -3235,6 +3247,7 @@ Execution Engine: sbe
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -3309,6 +3322,7 @@ Execution Engine: sbe
 				"a" : [ ],
 				"b" : [ ]
 			},
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "IXSCAN"
 		},
 		{
@@ -3329,6 +3343,7 @@ Execution Engine: sbe
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -3400,6 +3415,7 @@ Execution Engine: sbe
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "IXSCAN"
 		},
 		{
@@ -3425,6 +3441,7 @@ Execution Engine: sbe
 				"a" : [ ],
 				"b" : [ ]
 			},
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -3506,6 +3523,7 @@ Execution Engine: classic
 								"a" : [ ],
 								"b" : [ ]
 							},
+							"nss" : "test.distinct_aggregation_multiplanning_md-2",
 							"stage" : "IXSCAN"
 						}
 					]
@@ -3673,6 +3691,7 @@ Execution Engine: classic
 								"$gt" : 0
 							}
 						},
+						"nss" : "test.distinct_aggregation_multiplanning_md-3",
 						"stage" : "FETCH"
 					},
 					{
@@ -3698,6 +3717,7 @@ Execution Engine: classic
 							"b" : [ ],
 							"c" : [ ]
 						},
+						"nss" : "test.distinct_aggregation_multiplanning_md-3",
 						"stage" : "IXSCAN"
 					}
 				]
@@ -3886,6 +3906,7 @@ Execution Engine: sbe
 				"b" : [ ],
 				"c" : [ ]
 			},
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -4055,6 +4076,7 @@ Execution Engine: sbe
 				"b" : [ ],
 				"c" : [ ]
 			},
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -4191,6 +4213,7 @@ Execution Engine: sbe
 			"stage" : "GROUP"
 		},
 		{
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "FETCH"
 		},
 		{
@@ -4218,6 +4241,7 @@ Execution Engine: sbe
 				],
 				"b" : [ ]
 			},
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "IXSCAN"
 		}
 	]
@@ -4249,6 +4273,7 @@ Execution Engine: sbe
 			"filter" : {
 				
 			},
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -4296,6 +4321,7 @@ Execution Engine: sbe
 			"filter" : {
 				
 			},
+			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "COLLSCAN"
 		}
 	]

@@ -24,8 +24,10 @@
 		"multiKeyPaths" : {
 			"a" : [ ]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "IXSCAN"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -60,10 +62,12 @@
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -98,10 +102,12 @@
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -136,10 +142,12 @@
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -174,10 +182,12 @@
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -212,10 +222,12 @@
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -250,10 +262,12 @@
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -301,8 +315,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -336,8 +352,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -371,8 +389,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -406,8 +426,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -441,8 +463,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -476,8 +500,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -502,6 +528,7 @@
 				"$eq" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -525,6 +552,7 @@
 				"$lte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -548,6 +576,7 @@
 				"$gte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -580,6 +609,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -616,10 +646,12 @@
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -654,10 +686,12 @@
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -692,10 +726,12 @@
 			"multiKeyPaths" : {
 				"a" : [ ]
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -717,6 +753,7 @@
 				"$eq" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -740,6 +777,7 @@
 				"$lte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -763,6 +801,7 @@
 				"$gte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -795,6 +834,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -828,8 +868,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -863,8 +905,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -898,8 +942,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -924,6 +970,7 @@
 				"$eq" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -947,6 +994,7 @@
 				"$lte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -970,6 +1018,7 @@
 				"$gte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1002,6 +1051,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1025,6 +1075,7 @@
 				"$gt" : { "$minKey" : 1 }
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1048,6 +1099,7 @@
 				"$lt" : { "$maxKey" : 1 }
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1080,6 +1132,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1129,10 +1182,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -1164,10 +1219,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -1199,10 +1256,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -1234,10 +1293,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -1269,10 +1330,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -1304,10 +1367,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -1330,6 +1395,7 @@
 				"$eq" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1353,6 +1419,7 @@
 				"$lte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1376,6 +1443,7 @@
 				"$gte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1408,6 +1476,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1431,6 +1500,7 @@
 				"$gt" : { "$minKey" : 1 }
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1454,6 +1524,7 @@
 				"$lt" : { "$maxKey" : 1 }
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1486,6 +1557,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1509,6 +1581,7 @@
 				"$eq" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1532,6 +1605,7 @@
 				"$lte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1555,6 +1629,7 @@
 				"$gte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1587,6 +1662,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1620,10 +1696,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -1655,10 +1733,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -1690,10 +1770,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -1730,8 +1812,10 @@
 		"keyPattern" : {
 			"a" : "hashed"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "IXSCAN"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -1753,6 +1837,7 @@
 				"$lte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1776,6 +1861,7 @@
 				"$gte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1808,6 +1894,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1831,6 +1918,7 @@
 				"$gt" : { "$minKey" : 1 }
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1854,6 +1942,7 @@
 				"$lt" : { "$maxKey" : 1 }
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1886,6 +1975,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1935,8 +2025,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -1970,8 +2062,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2005,8 +2099,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2040,8 +2136,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2075,8 +2173,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2110,8 +2210,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2136,6 +2238,7 @@
 				"$eq" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2159,6 +2262,7 @@
 				"$lte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2182,6 +2286,7 @@
 				"$gte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2214,6 +2319,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2237,6 +2343,7 @@
 				"$gt" : { "$minKey" : 1 }
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2260,6 +2367,7 @@
 				"$lt" : { "$maxKey" : 1 }
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2292,6 +2400,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2315,6 +2424,7 @@
 				"$eq" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2338,6 +2448,7 @@
 				"$lte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2361,6 +2472,7 @@
 				"$gte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2393,6 +2505,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2426,8 +2539,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2461,8 +2576,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2496,8 +2613,10 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "FETCH"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2522,6 +2641,7 @@
 				"$eq" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2545,6 +2665,7 @@
 				"$lte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2568,6 +2689,7 @@
 				"$gte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2600,6 +2722,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2623,6 +2746,7 @@
 				"$gt" : { "$minKey" : 1 }
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2646,6 +2770,7 @@
 				"$lt" : { "$maxKey" : 1 }
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2678,6 +2803,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2727,10 +2853,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -2762,10 +2890,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -2797,10 +2927,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -2832,10 +2964,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -2867,10 +3001,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -2902,10 +3038,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -2928,6 +3066,7 @@
 				"$eq" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2951,6 +3090,7 @@
 				"$lte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -2974,6 +3114,7 @@
 				"$gte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -3006,6 +3147,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -3029,6 +3171,7 @@
 				"$gt" : { "$minKey" : 1 }
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -3052,6 +3195,7 @@
 				"$lt" : { "$maxKey" : 1 }
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -3084,6 +3228,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -3107,6 +3252,7 @@
 				"$eq" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -3130,6 +3276,7 @@
 				"$lte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -3153,6 +3300,7 @@
 				"$gte" : "a"
 			}
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -3185,6 +3333,7 @@
 				}
 			]
 		},
+		"nss" : "test.sharded_find_with_collation",
 		"stage" : "COLLSCAN"
 	},
 	"stage" : "SHARDING_FILTER"
@@ -3218,10 +3367,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -3253,10 +3404,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```
@@ -3288,10 +3441,12 @@
 			"keyPattern" : {
 				"_id" : 1
 			},
+			"nss" : "test.sharded_find_with_collation",
 			"stage" : "IXSCAN"
 		},
 		"stage" : "SHARDING_FILTER"
 	},
+	"nss" : "test.sharded_find_with_collation",
 	"stage" : "FETCH"
 }
 ```

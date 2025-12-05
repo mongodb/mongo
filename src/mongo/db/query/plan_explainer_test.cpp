@@ -469,11 +469,13 @@ TEST_F(PlanExplainerTest, HashJoinEmbeddingTest) {
                 {
                     "stage": "COLLSCAN",
                     "planNodeId": 0,
+                    "nss": "testdb.explain",
                     "direction": "forward"
                 },
                 {
                     "stage": "COLLSCAN",
                     "planNodeId": 0,
+                    "nss": "testdb.foreign_explain",
                     "direction": "forward"
                 }
             ]
@@ -512,11 +514,13 @@ TEST_F(PlanExplainerTest, NLJEmbeddingTest) {
                 {
                     "stage": "COLLSCAN",
                     "planNodeId": 0,
+                    "nss": "testdb.explain",
                     "direction": "forward"
                 },
                 {
                     "stage": "COLLSCAN",
                     "planNodeId": 0,
+                    "nss": "testdb.foreign_explain",
                     "direction": "forward"
                 }
             ]
@@ -555,11 +559,13 @@ TEST_F(PlanExplainerTest, INLJEmbeddingTest) {
                 {
                     "stage": "COLLSCAN",
                     "planNodeId": 0,
+                    "nss": "testdb.explain",
                     "direction": "forward"
                 },
                 {
                     "stage": "COLLSCAN",
                     "planNodeId": 0,
+                    "nss": "testdb.foreign_explain",
                     "direction": "forward"
                 }
             ]
