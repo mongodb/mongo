@@ -2285,6 +2285,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/selinux/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/selinux/**/* @10gen/server-security @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/sharding/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/sharding/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/streams/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/streams/**/* @10gen/streams-engine @svc-auto-approve-bot
 
