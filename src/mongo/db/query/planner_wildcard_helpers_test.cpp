@@ -32,6 +32,7 @@
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::wildcard_planning {
@@ -259,4 +260,19 @@ TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_NumericComponents)
     ASSERT_FALSE(expandedIndexes.front().multikey);
     ASSERT_EQ(expectedMks, expandedIndexes.front().multikeyPaths);
 }
+
+DEATH_TEST(PlannerWildcardHelpersTest, InvalidIndexExpansion, "11390001") {
+    IndexEntryMock wildcardIndex{BSON("a" << 1 << "$**" << 1), BSON("_id" << 0), {}};
+    stdx::unordered_set<std::string> fields{"a"};
+    std::vector<IndexEntry> expandedIndexes{};
+    expandWildcardIndexEntry(*wildcardIndex.indexEntry, fields, &expandedIndexes);
+}
+
+DEATH_TEST(PlannerWildcardHelpersTest, AnotherInvalidIndexExpansion, "11390001") {
+    IndexEntryMock wildcardIndex{BSON("$**" << 1 << "a" << 1), BSON("_id" << 0), {}};
+    stdx::unordered_set<std::string> fields{"a"};
+    std::vector<IndexEntry> expandedIndexes{};
+    expandWildcardIndexEntry(*wildcardIndex.indexEntry, fields, &expandedIndexes);
+}
+
 }  // namespace mongo::wildcard_planning
