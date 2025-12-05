@@ -123,6 +123,7 @@ mongo_cc_unit_test(
         "hash_roaring_set_test.cpp",
         "jparse_util_test.cpp",
         "memory_util_test.cpp",
+        "retry_test.cpp",
         "stop_token_test.cpp",
         "string_util_test.cpp",
         "throughput_gauge_test.cpp",

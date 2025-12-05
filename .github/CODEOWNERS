@@ -2720,6 +2720,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/util/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/util/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 /src/mongo/db/query/util/**/field_set* @10gen/query-execution-sbe @svc-auto-approve-bot
+/src/mongo/db/query/util/**/rank_fusion* @10gen/query-integration-search @svc-auto-approve-bot
+/src/mongo/db/query/util/**/retry* @10gen/query-integration @svc-auto-approve-bot
 /src/mongo/db/query/util/**/spill_util* @10gen/query-execution-classic @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/virtual_collection/OWNERS.yml
