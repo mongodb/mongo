@@ -1057,13 +1057,13 @@ StatusWith<std::unique_ptr<Pipeline>> preparePipeline(
     return std::move(pipeline);
 }
 
-Status executeResolvedAggregate(std::shared_ptr<AggExState> aggExState,
+Status executeResolvedAggregate(const AggExState& aggExState,
                                 AggCatalogState& aggCatalogState,
                                 rpc::ReplyBuilderInterface* result) {
     // If due to concurrent view remapping we ended up with a view here, we must not attempt to
     // treat the view as a collection. Throw a retryable error so we will resolve as a view instead.
     if (aggCatalogState.lockAcquired() && aggCatalogState.getMainCollectionOrView().isView() &&
-        !aggExState->startsWithCollStats()) {
+        !aggExState.startsWithCollStats()) {
         uasserted(ErrorCodes::CollectionBecameView,
                   "Namespace changed from collection to view during aggregation planning");
     }
@@ -1088,7 +1088,7 @@ Status executeResolvedAggregate(std::shared_ptr<AggExState> aggExState,
     // registering query stats, rewriting the pipeline to support queryable encryption, and
     // optimizing and rewriting the pipeline if necessary.
     StatusWith<std::unique_ptr<Pipeline>> swPipeline =
-        preparePipeline(*aggExState, aggCatalogState, expCtx);
+        preparePipeline(aggExState, aggCatalogState, expCtx);
     if (!swPipeline.isOK()) {
         return swPipeline.getStatus();
     }
@@ -1097,7 +1097,7 @@ Status executeResolvedAggregate(std::shared_ptr<AggExState> aggExState,
     std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
 
     auto swResForJoin = join_ordering::getJoinReorderedExecutor(
-        aggCatalogState.getCollections(), *pipeline, aggExState->getOpCtx(), expCtx);
+        aggCatalogState.getCollections(), *pipeline, aggExState.getOpCtx(), expCtx);
     if (swResForJoin.isOK()) {
         /**
          * We are careful to keep the AggJoinModel alive for the entirety of this function scope.
@@ -1125,7 +1125,7 @@ Status executeResolvedAggregate(std::shared_ptr<AggExState> aggExState,
             };
 
         // Attach pipeline suffix to SBE executor for join-reordered prefix of the pipeline.
-        execs = prepareExecutorsForPipeline(*aggExState,
+        execs = prepareExecutorsForPipeline(aggExState,
                                             aggCatalogState,
                                             std::move(resForJoin.model.suffix),
                                             std::move(resForJoin.executor),
@@ -1133,7 +1133,7 @@ Status executeResolvedAggregate(std::shared_ptr<AggExState> aggExState,
                                             {} /* additionalExecutors */,
                                             false /* hasGeoNear */);
     } else {
-        execs = prepareExecutors(*aggExState, aggCatalogState, std::move(pipeline));
+        execs = prepareExecutors(aggExState, aggCatalogState, std::move(pipeline));
     }
 
     // Dispose of the statsTracker to update stats for Top and CurOp.
@@ -1142,9 +1142,9 @@ Status executeResolvedAggregate(std::shared_ptr<AggExState> aggExState,
     // Having released the collection lock, we can now begin to fetch results from the pipeline.
     // If both explain and cursor are specified, explain wins.
     if (expCtx->getExplain()) {
-        executeExplain(*aggExState, aggCatalogState, expCtx, execs[0].get(), result);
+        executeExplain(aggExState, aggCatalogState, expCtx, execs[0].get(), result);
     } else {
-        executeUntilFirstBatch(*aggExState, aggCatalogState, expCtx, execs, result);
+        executeUntilFirstBatch(aggExState, aggCatalogState, expCtx, execs, result);
     }
 
     return Status::OK();
@@ -1163,11 +1163,6 @@ Status runAggregateOnShardedView(std::unique_ptr<ResolvedViewAggExState> resolve
     // transition into the router role for it.
     const ScopedStashShardRole scopedUnsetShardRole{opCtx, underlyingNss};
 
-    // Promote to shared_ptr because routeWithRoutingContext may invoke this callback multiple
-    // times. We need a reusable owning handle to the same execution state.
-    // TODO SERVER-114574 Change AggExState to be passed by unique_ptr throughout.
-    std::shared_ptr<ResolvedViewAggExState> sharedAggExState = std::move(resolvedViewAggExState);
-
     sharding::router::CollectionRouter router(opCtx, underlyingNss);
     Status status = router.routeWithRoutingContext(
         "runAggregateOnView", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
@@ -1176,14 +1171,14 @@ Status runAggregateOnShardedView(std::unique_ptr<ResolvedViewAggExState> resolve
             // Setup the opCtx's OperationShardingState with the expected placement versions for the
             // underlying collection. Use the same 'placementConflictTime' from the original
             // request, if present.
-            const auto scopedShardRole = sharedAggExState->setShardRole(cri);
+            const auto scopedShardRole = resolvedViewAggExState->setShardRole(cri);
 
             // Mark routing table as validated as we have entered the shard role for a local read.
             routingCtx.onRequestSentForNss(underlyingNss);
 
             // If the underlying collection is unsharded and is located on this shard, then we can
             // execute the view aggregation locally. Otherwise, we need to kick-back to the router.
-            if (!sharedAggExState->canReadUnderlyingCollectionLocally(cri)) {
+            if (!resolvedViewAggExState->canReadUnderlyingCollectionLocally(cri)) {
                 // Cannot execute the resolved aggregation locally. The router must do it.
                 //
                 // Before throwing the kick-back exception, validate the routing table we are basing
@@ -1204,13 +1199,13 @@ Status runAggregateOnShardedView(std::unique_ptr<ResolvedViewAggExState> resolve
 
             // We are now in the shard role for the underlying collection. Re-run validation and the
             // retryable-write check on the resolved request.
-            sharedAggExState->performValidationChecks();
+            resolvedViewAggExState->performValidationChecks();
 
             // Acquire catalog locks and state for the underlying collection and run the resolved
             // aggregate once.
-            auto aggCatalogState = sharedAggExState->createAggCatalogState();
+            auto aggCatalogState = resolvedViewAggExState->createAggCatalogState();
 
-            return executeResolvedAggregate(sharedAggExState, *aggCatalogState, result);
+            return executeResolvedAggregate(*resolvedViewAggExState, *aggCatalogState, result);
         });
 
     // Set the namespace of the curop back to the view namespace so ctx records stats on this view
@@ -1223,8 +1218,7 @@ Status runAggregateOnShardedView(std::unique_ptr<ResolvedViewAggExState> resolve
     return status;
 }
 
-// TODO SERVER-114574 Pass AggExState by unique_ptr instead of shared_ptr.
-Status _runAggregate(std::shared_ptr<AggExState> aggExState, rpc::ReplyBuilderInterface* result) {
+Status _runAggregate(std::unique_ptr<AggExState> aggExState, rpc::ReplyBuilderInterface* result) {
     // Perform the validation checks on the request and its derivatives before proceeding.
     aggExState->performValidationChecks();
 
@@ -1286,7 +1280,7 @@ Status _runAggregate(std::shared_ptr<AggExState> aggExState, rpc::ReplyBuilderIn
 
             // Non-sharded view: treat the resolved view as the new AggExState and proceed normally,
             // running the aggregate exactly once.
-            aggExState = std::shared_ptr<AggExState>(std::move(resolvedViewAggExState));
+            aggExState = std::move(resolvedViewAggExState);
 
             // Re-run validation on the resolved request, then rebuild catalog state for the
             // underlying collection.
@@ -1298,7 +1292,7 @@ Status _runAggregate(std::shared_ptr<AggExState> aggExState, rpc::ReplyBuilderIn
     // At this point, aggExState and aggCatalogState both describe the final namespace/pipeline
     // (either the original collection, or the resolved underlying collection for a view).
     // No further view resolution or routing decisions occur here.
-    return executeResolvedAggregate(aggExState, *aggCatalogState, result);
+    return executeResolvedAggregate(*aggExState, *aggCatalogState, result);
 }
 
 }  // namespace
@@ -1316,7 +1310,7 @@ Status runAggregate(
         usedExternalDataSources) {
 
     auto body = [&]() {
-        auto aggExState = std::make_shared<AggExState>(opCtx,
+        auto aggExState = std::make_unique<AggExState>(opCtx,
                                                        request,
                                                        liteParsedPipeline,
                                                        cmdObj,
@@ -1325,8 +1319,6 @@ Status runAggregate(
                                                        verbosity);
 
         // NOTE: It's possible this aggExState will be unusable by the time _runAggregate returns.
-        // TODO SERVER-114574 Ownership semantics here will be more clear once we pass AggExState by
-        // unique_ptr.
         auto status = _runAggregate(std::move(aggExState), result);
 
         // The aggregation pipeline may change the namespace of the curop and we need to set it back
