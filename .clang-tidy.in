@@ -134,13 +134,12 @@ Checks:          '-*,
                   -readability-string-compare,
                   -readability-uniqueptr-delete-release
                   '
-WarningsAsErrors: '*'
-HeaderFilterRegex: '(mongo/.*|@MONGO_BUILD_DIR@/.*)'
+HeaderFilterRegex: 'mongo/[-A-Za-z0-9_/]*\.(h|hpp|ipp|inl|cstruct.h|defs|def.h)'
 CheckOptions:
   - key:             bugprone-assert-side-effect.AssertMacros
     value:           assert
   - key:             mongo-header-bracket-check.mongoSourceDirs
-    value:           'src/mongo;@MONGO_BUILD_DIR@'
+    value:           'src/mongo;@MONGO_BRACKET_BUILD_DIR@'
   - key:             mongo-collection-sharding-runtime-check.exceptionDirs
     value:           'src/mongo/db/s'
   - key:             bugprone-assert-side-effect.CheckFunctionCalls

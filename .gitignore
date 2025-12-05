@@ -290,6 +290,7 @@ buildozer
 .compiledb
 .bazelrc.xcode
 .bazelrc.bazelisk
+.bazelrc.wrapper_hook
 *.bazel_info_for_ninja.txt
 .ninja_last_command_line_targets.txt
 bazel/coverity/analysis/BUILD.bazel
@@ -297,8 +298,8 @@ bazel/coverity/analysis/BUILD.bazel
 .bazel_header_list_cache
 .bazel_real
 .mongo_checks_module_path
-MODULE.bazel
-MODULE.bazel.lock
+**/MODULE.bazel.lock
+!/MODULE.bazel.lock
 .auto_header
 
 # generated configs for external fixture suites

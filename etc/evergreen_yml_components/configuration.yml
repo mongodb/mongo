@@ -69,7 +69,7 @@ commit_queue_aliases:
   variant_tags: []
   task_tags: []
 - variant: "^(amazon-linux2023-arm64-dynamic-compile|linux-x86-dynamic-compile-required)$"
-  task: "clang_tidy.*"
+  task: "^bazel_run_clang_tidy$"
   variant_tags: []
   task_tags: []
 
@@ -107,6 +107,7 @@ post:
 - func: "attach task errors"
 - func: "attach artifacts"
 - func: "attach multiversion download links"
+- func: "generate clang-tidy report"
 - func: "save ec2 task artifacts"
 - func: "attach wiki page"
 - func: "upload docker compose"

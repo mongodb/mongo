@@ -1,0 +1,3 @@
+Checks: '-*,mongo-macro-definition-leaks-check'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(mongo/.*)'

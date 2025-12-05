@@ -1,0 +1,2 @@
+Checks: '-*,mongo-unstructured-log-check'
+WarningsAsErrors: '*'

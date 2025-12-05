@@ -1,0 +1,2 @@
+Checks: '-*,mongo-mutex-check,mongo-std-atomic-check'
+WarningsAsErrors: '*'

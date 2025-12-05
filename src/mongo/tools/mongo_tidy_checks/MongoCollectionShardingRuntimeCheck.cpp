@@ -30,11 +30,34 @@
 #include "MongoCollectionShardingRuntimeCheck.h"
 
 #include <clang-tidy/utils/OptionsUtils.h>
+#include <filesystem>
 
 namespace mongo::tidy {
 
 using namespace clang;
 using namespace clang::ast_matchers;
+
+namespace {
+
+std::string normalizeToCwdRelative(llvm::StringRef rawPath) {
+    namespace fs = std::filesystem;
+
+    fs::path p(rawPath.str());
+    p = p.lexically_normal();
+
+    if (p.is_absolute()) {
+        std::error_code ec;
+        auto rel = fs::relative(p, fs::current_path(), ec);
+        if (!ec) {
+            p = std::move(rel);
+        }
+    }
+
+    // Force forward slashes for consistent StringRef::startswith comparisons.
+    return p.generic_string();
+}
+
+}  // namespace
 
 MongoCollectionShardingRuntimeCheck::MongoCollectionShardingRuntimeCheck(
     StringRef Name, clang::tidy::ClangTidyContext* Context)
@@ -74,16 +97,25 @@ void MongoCollectionShardingRuntimeCheck::check(const MatchFinder::MatchResult& 
         return;
     }
 
-    std::string suffix = "_test.cpp";
-    // Check if FilePath ends with the suffix "_test.cpp"
-    if (FilePath.size() > suffix.size() &&
-        FilePath.rfind(suffix) == FilePath.size() - suffix.size()) {
+    // Normalize to a path relative to the current working directory (Bazel execroot),
+    // so we don't depend on absolute remote paths.
+    const std::string normPath = normalizeToCwdRelative(FilePath);
+    if (normPath.empty()) {
+        return;
+    }
+
+    const std::string suffix = "_test.cpp";
+
+    // Skip tests.
+    if (normPath.size() > suffix.size() &&
+        normPath.rfind(suffix) == normPath.size() - suffix.size()) {
         return;
     }
 
     // If the file path is in an exception directory, skip the check.
     for (const auto& dir : this->exceptionDirs) {
-        if (FilePath.startswith(dir)) {
+        llvm::StringRef dirRef(dir);
+        if (llvm::StringRef(normPath).startswith(dirRef)) {
             return;
         }
     }

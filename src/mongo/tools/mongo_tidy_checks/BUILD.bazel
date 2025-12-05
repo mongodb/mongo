@@ -84,6 +84,7 @@ cc_library(
         "-Wno-noexcept-type",
         "-Wno-redundant-move",
         "-Wno-unused-parameter",
+        "-Wno-deprecated-enum-enum-conversion",
         "-Woverloaded-virtual",
         "-Wwrite-strings",
         "-Wsuggest-override",
@@ -153,6 +154,7 @@ cc_shared_library(
         "-Wl,-O3",
         "-Wl,--gc-sections",
         "-Wl,-rpath,\\$ORIGIN/../lib",  # Ensure that the shared library can find its dependencies.
+        "-Wl,-rpath-link,external/mongo_toolchain_v4/stow/llvm-v4/lib",
     ],
     deps = [
         ":mongo_tidy_checks_static",

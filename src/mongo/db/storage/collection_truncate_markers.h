@@ -270,7 +270,7 @@ public:
     static constexpr uint64_t kRandomSamplesPerMarker = 10;
 
     size_t numMarkers() const {
-        stdx::lock_guard<std::mutex> lk(_markersMutex);
+        stdx::lock_guard<Latch> lk(_markersMutex);
         return _markers.size();
     }
 
@@ -311,7 +311,8 @@ private:
 
     // Protects against concurrent access to the deque of collection markers and the
     // _initialSamplingFinished variable.
-    mutable std::mutex _markersMutex;
+    mutable Mutex _markersMutex = MONGO_MAKE_LATCH("CollectionTruncateMarkers::_markersMutex");
+
     std::deque<Marker> _markers;  // front = oldest, back = newest.
 
     // Whether or not the initial set of markers has finished being sampled.
@@ -349,7 +350,7 @@ protected:
      * markers will be created.
      */
     bool isEmpty() const {
-        stdx::lock_guard<std::mutex> lk(_markersMutex);
+        stdx::lock_guard<Latch> lk(_markersMutex);
         return _markers.size() == 0 && _currentBytes.load() == 0 && _currentRecords.load() == 0;
     }
 

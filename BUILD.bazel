@@ -448,3 +448,8 @@ sh_binary(
         "BINARY_PATH": "$(location @scip-src//file)",
     },
 )
+
+filegroup(
+    name = "clang_tidy_config_files",
+    srcs = [],
+)

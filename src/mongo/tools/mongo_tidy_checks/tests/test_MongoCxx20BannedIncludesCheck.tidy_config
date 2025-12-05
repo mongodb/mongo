@@ -1,0 +1,3 @@
+Checks: '-*,mongo-cxx20-banned-includes-check'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(mongo/.*)'

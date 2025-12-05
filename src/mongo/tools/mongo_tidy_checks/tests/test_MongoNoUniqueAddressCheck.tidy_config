@@ -1,0 +1,3 @@
+Checks: '-*,mongo-no-unique-address-check'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(mongo/.*)'

@@ -1,0 +1,2 @@
+Checks: '-*,mongo-fcv-constant-check'
+WarningsAsErrors: '*'

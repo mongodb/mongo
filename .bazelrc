@@ -86,8 +86,10 @@ common --strategy=CcGenerateDwp=local
 common --modify_execution_info=^(TestRunner|CppLink|CppArchive|SolibSymlink|ExtractDebuginfo|StripDebuginfo|CcGenerateIntermediateDwp|CcGenerateDwp)$=+no-remote-cache
 
 # Global clang tidy flags to avoid invalidating analysis cache between clang-tidy / regular runs
-common --@bazel_clang_tidy//:clang_tidy_excludes=".pb.cc,icu_init.cpp"
+common --@bazel_clang_tidy//:clang_tidy_excludes=".pb.cc,icu_init.cpp,parser_gen.cpp"
+common --@bazel_clang_tidy//:clang_tidy_additional_configs=//:clang_tidy_config_files
 common --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config_strict
+common --@bazel_clang_tidy//:clang_tidy_merge_tool=//bazel:merge_tidy_configs
 common --@bazel_clang_tidy//:clang_tidy_executable=//:clang_tidy
 common --@bazel_clang_tidy//:clang_tidy_additional_deps=//:toolchain_files
 common --@bazel_clang_tidy//:clang_tidy_plugin_deps=//src/mongo/tools/mongo_tidy_checks:mongo_tidy_checks
@@ -419,6 +421,7 @@ common:clang-tidy --//bazel/config:compiler_type=clang
 common:clang-tidy --keep_going
 common:clang-tidy --aspects @bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 common:clang-tidy --output_groups=report
+common:clang-tidy --//bazel/config:use_diagnostic_latches=True
 
 --config=mod-scanner
 common:mod-scanner --config=dbg

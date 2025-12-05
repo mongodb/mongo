@@ -648,6 +648,32 @@ tasks:
           --keep_going
           --build_tag_filters=${bazel_filters_for_cache_hydration}
 
+- name: run_bazel_clang_tidy
+  tags:
+    [
+      "assigned_to_jira_team_devprod_build",
+      "development_critical_single_variant",
+      "requires_large_host",
+      "clang_tidy",
+    ]
+  exec_timeout_secs: 3600 # 1 hr timeout for the task overall, commit queue has a more specific timeout
+  depends_on:
+    - name: version_expansions_gen
+      variant: generate-tasks-for-version
+  commands:
+    - func: "do bazel setup"
+    - func: "enable run_for_clang_tidy expansions"
+    - func: "bazel run"
+      vars:
+        target: >-
+          mongo-tidy-test
+    - func: "bazel compile"
+      vars:
+        # Note that we only run clang-tidy on the Mongo-authored targets, not on third-party code.
+        targets: //src/mongo/...
+        bazel_args: --config=clang-tidy --mongo_toolchain_version=${clang_tidy_toolchain|v5} --keep_going
+    - func: "generate clang-tidy report"
+
 - name: stitch_support_create_lib
   tags:
     [

@@ -1,0 +1,2 @@
+Checks: '-*,mongo-assert-check'
+WarningsAsErrors: '*'

@@ -1,0 +1,2 @@
+Checks: '-*,mongo-uninterruptible-lock-guard-check'
+WarningsAsErrors: '*'

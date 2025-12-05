@@ -1,0 +1,3 @@
+Checks: '-*,mongo-config-header-check'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(mongo/.*)'

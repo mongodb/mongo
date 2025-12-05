@@ -34,6 +34,7 @@
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/background.h"
 
 namespace mongo {
@@ -74,12 +75,12 @@ private:
     bool _deleteExcessDocuments(OperationContext* opCtx);
 
     // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
-    mutable stdx::mutex _opCtxMutex;
+    mutable Mutex _opCtxMutex = MONGO_MAKE_LATCH("OplogCapMaintainerThread::_opCtxMutex");
 
     // Saves a reference to the cap maintainer thread's operation context.
     boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
 
-    mutable stdx::mutex _stateMutex;
+    mutable Mutex _stateMutex = MONGO_MAKE_LATCH("OplogCapMaintainerThread::_stateMutex");
     bool _shuttingDown = false;
     Status _shutdownReason = Status::OK();
 

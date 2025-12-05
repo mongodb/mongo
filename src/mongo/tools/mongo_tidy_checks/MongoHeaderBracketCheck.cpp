@@ -30,11 +30,13 @@
 
 #include "MongoHeaderBracketCheck.h"
 
+#include <filesystem>
+#include <optional>
+
 #include <clang-tidy/utils/OptionsUtils.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Lex/PPCallbacks.h>
 #include <clang/Lex/Preprocessor.h>
-#include <filesystem>
 #include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringSet.h>
 
@@ -42,11 +44,51 @@ namespace mongo::tidy {
 
 namespace {
 
-bool startsWithAny(llvm::StringRef fullString, std::vector<std::string> const& startings) {
-    return std::any_of(startings.cbegin(), startings.cend(), [&](llvm::StringRef starting) {
-        return fullString.startswith(starting);
+static std::optional<std::string> canonicalFromSrc(const std::filesystem::path& full) {  // NOLINT
+    std::filesystem::path rel = full.lexically_normal();
+
+    // If absolute, try to make it relative to CWD (best effort; OK if it fails)
+    if (rel.is_absolute()) {
+        std::error_code ec;
+        auto tmp = std::filesystem::relative(rel, std::filesystem::current_path(), ec);
+        if (!ec)
+            rel = std::move(tmp);
+    }
+
+    bool seenSrc = false;
+    std::filesystem::path out;
+    for (const auto& comp : rel) {
+        // Note: on Windows, comp is a path; compare as string ignoring slashes.
+        if (!seenSrc) {
+            if (comp == "src")
+                seenSrc = true;
+            continue;
+        }
+        out /= comp;
+    }
+    if (!seenSrc || out.empty())
+        return std::nullopt;
+    return out.generic_string();  // forward slashes
+}
+
+
+bool containsAny(llvm::StringRef fullString, const std::vector<std::string>& patterns) {
+    namespace fs = std::filesystem;
+    const auto cwd = fs::current_path();
+
+    return std::any_of(patterns.begin(), patterns.end(), [&](const std::string& pattern) {
+        fs::path p(pattern);
+
+        // Ensure a trailing separator so we only match directory names.
+        auto patRel = (p / "").generic_string();
+        if (fullString.contains(patRel))
+            return true;
+
+        auto absolute = (cwd / p / "").generic_string();
+        return fullString.contains(absolute);
     });
 }
+
 
 class MongoIncludeBracketsPPCallbacks : public clang::PPCallbacks {
 public:
@@ -73,6 +115,10 @@ public:
             (std::filesystem::path(SearchPath.str()) / std::filesystem::path(RelativePath.str()))
                 .lexically_normal();
 
+        // If the computed path doesn’t actually exist on disk, ignore it as it would not be used.
+        if (!std::filesystem::exists(header_path)) {
+            return;
+        }
         // This represents the full path from the project root to the
         // source file that is including the include that is currently being processed.
         std::filesystem::path origin_source_path(HashLoc.printToString(SM));
@@ -83,12 +129,12 @@ public:
 
         // if this is a mongo source file including a real file
         if (!llvm::StringRef(origin_source_path).startswith("<built-in>:") &&
-            startsWithAny(llvm::StringRef(origin_source_path.lexically_normal()),
-                          Check.mongoSourceDirs)) {
+            containsAny(llvm::StringRef(origin_source_path.lexically_normal()),
+                        Check.mongoSourceDirs)) {
 
             // Check that the a third party header which is included from a mongo source file
             // is used angle brackets.
-            if (!IsAngled && !startsWithAny(llvm::StringRef(header_path), Check.mongoSourceDirs)) {
+            if (!IsAngled && !containsAny(llvm::StringRef(header_path), Check.mongoSourceDirs)) {
 
                 std::string Replacement = (llvm::Twine("<") + FileName + ">").str();
                 Check.diag(FilenameRange.getBegin(),
@@ -99,9 +145,9 @@ public:
 
             // Check that the a third party header which is in our vendored tree is not including
             // the third_party in the include path.
-            if (!startsWithAny(llvm::StringRef(header_path), Check.mongoSourceDirs) &&
-                llvm::StringRef(header_path).startswith("src/third_party") &&
-                FileName.startswith("third_party")) {
+            if (!containsAny(llvm::StringRef(header_path), Check.mongoSourceDirs) &&
+                llvm::StringRef(header_path).contains("src/third_party/") &&
+                FileName.contains("third_party/")) {
                 Check.diag(FilenameRange.getBegin(),
                            "third_party include '%0' should not start with 'third_party/'. The "
                            "included file should be useable in either context of system or "
@@ -111,12 +157,17 @@ public:
 
             // Check that the a mongo header which is included from a mongo source file
             // is used double quotes.
-            else if (IsAngled &&
-                     startsWithAny(llvm::StringRef(header_path), Check.mongoSourceDirs)) {
-                std::string Replacement = (llvm::Twine("\"") + FileName + "\"").str();
-                Check.diag(FilenameRange.getBegin(), "mongo include '%0' should use double quotes")
-                    << FileName
-                    << clang::FixItHint::CreateReplacement(FilenameRange.getAsRange(), Replacement);
+            else if (IsAngled && containsAny(llvm::StringRef(header_path), Check.mongoSourceDirs)) {
+                // TODO(SERVER-95253): Explicitly handle third party headers inside of the
+                // enterprise module directory.
+                if (!FileName.contains("bsoncxx/") && !FileName.contains("mongocxx/")) {
+                    std::string Replacement = (llvm::Twine("\"") + FileName + "\"").str();
+                    Check.diag(FilenameRange.getBegin(),
+                               "mongo include '%0' should use double quotes")
+                        << FileName
+                        << clang::FixItHint::CreateReplacement(FilenameRange.getAsRange(),
+                                                               Replacement);
+                }
             }
         }
     }
