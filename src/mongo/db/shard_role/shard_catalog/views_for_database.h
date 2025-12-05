@@ -42,6 +42,7 @@
 #include "mongo/db/views/view_graph.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <functional>
@@ -53,7 +54,7 @@ namespace mongo {
 /**
  * Holds all data for the views associated with a particular database.
  */
-class ViewsForDatabase {
+class MONGO_MOD_NEEDS_REPLACEMENT ViewsForDatabase {
 public:
     using PipelineValidatorFn = std::function<StatusWith<stdx::unordered_set<NamespaceString>>(
         OperationContext*, const ViewDefinition&)>;

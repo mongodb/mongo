@@ -47,6 +47,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <list>
@@ -61,7 +62,8 @@ class RangePreserver;
 /**
  * Contains filtering metadata for a collection.
  */
-class MetadataManager : public std::enable_shared_from_this<MetadataManager> {
+class MONGO_MOD_NEEDS_REPLACEMENT MetadataManager
+    : public std::enable_shared_from_this<MetadataManager> {
 public:
     MetadataManager(ServiceContext* serviceContext,
                     NamespaceString nss,

@@ -41,6 +41,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
 
 #include <cstdint>
@@ -54,6 +55,8 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/type_traits/decay.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

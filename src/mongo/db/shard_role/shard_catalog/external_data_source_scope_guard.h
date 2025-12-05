@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
@@ -45,7 +46,7 @@ namespace mongo {
  * This class makes sure that virtual collections that are created for external data sources are
  * dropped when it's destroyed.
  */
-class ExternalDataSourceScopeGuard {
+class MONGO_MOD_NEEDS_REPLACEMENT ExternalDataSourceScopeGuard {
 public:
     // Makes ExternalDataSourceScopeGuard a decoration of ClientCursor.
     static const ClientCursor::Decoration<std::shared_ptr<ExternalDataSourceScopeGuard>> get;

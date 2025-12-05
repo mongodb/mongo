@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
@@ -40,7 +41,7 @@ namespace mongo {
 /**
  * Metadata for external data source.
  */
-struct ExternalDataSourceMetadata {
+struct MONGO_MOD_NEEDS_REPLACEMENT ExternalDataSourceMetadata {
     static constexpr auto kUrlProtocolFile = "file://"_sd;
 
     ExternalDataSourceMetadata(StringData urlStr,
@@ -78,7 +79,7 @@ struct ExternalDataSourceMetadata {
 /**
  * Options for virtual collection.
  */
-struct VirtualCollectionOptions {
+struct MONGO_MOD_NEEDS_REPLACEMENT VirtualCollectionOptions {
     VirtualCollectionOptions() : dataSources() {}
     VirtualCollectionOptions(std::vector<ExternalDataSourceMetadata> dataSources)
         : dataSources(std::move(dataSources)) {}

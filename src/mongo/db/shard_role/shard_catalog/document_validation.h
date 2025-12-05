@@ -35,6 +35,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
@@ -43,11 +44,12 @@
 
 namespace mongo {
 
-inline StringData bypassDocumentValidationCommandOption() {
+MONGO_MOD_NEEDS_REPLACEMENT inline StringData bypassDocumentValidationCommandOption() {
     return "bypassDocumentValidation";
 }
 
-inline bool shouldBypassDocumentValidationForCommand(const BSONObj& cmdObj) {
+MONGO_MOD_NEEDS_REPLACEMENT inline bool shouldBypassDocumentValidationForCommand(
+    const BSONObj& cmdObj) {
     return cmdObj[bypassDocumentValidationCommandOption()].trueValue();
 }
 
@@ -57,7 +59,7 @@ inline bool shouldBypassDocumentValidationForCommand(const BSONObj& cmdObj) {
  * schema and internal) is enabled. DocumentValidationSettings objects are not thread-safe.
  *
  */
-class DocumentValidationSettings {
+class MONGO_MOD_NEEDS_REPLACEMENT DocumentValidationSettings {
 public:
     enum flag : std::uint8_t {
         /*
@@ -123,7 +125,7 @@ private:
  * Disables document validation on a single OperationContext while in scope.
  * Resets to original value when leaving scope so they are safe to nest.
  */
-class DisableDocumentValidation {
+class MONGO_MOD_NEEDS_REPLACEMENT DisableDocumentValidation {
     DisableDocumentValidation(const DisableDocumentValidation&) = delete;
     DisableDocumentValidation& operator=(const DisableDocumentValidation&) = delete;
 
@@ -149,7 +151,7 @@ private:
 /**
  * Disables document schema validation while in scope if the constructor is passed true.
  */
-class DisableDocumentSchemaValidationIfTrue {
+class MONGO_MOD_NEEDS_REPLACEMENT DisableDocumentSchemaValidationIfTrue {
 public:
     DisableDocumentSchemaValidationIfTrue(OperationContext* opCtx,
                                           bool shouldDisableSchemaValidation) {
@@ -163,7 +165,7 @@ private:
     boost::optional<DisableDocumentValidation> _documentSchemaValidationDisabler;
 };
 
-class DisableSafeContentValidationIfTrue {
+class MONGO_MOD_NEEDS_REPLACEMENT DisableSafeContentValidationIfTrue {
 public:
     DisableSafeContentValidationIfTrue(OperationContext* opCtx,
                                        bool shouldDisableSchemaValidation,

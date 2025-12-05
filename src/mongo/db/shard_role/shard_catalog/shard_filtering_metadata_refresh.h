@@ -40,6 +40,7 @@
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 
@@ -50,7 +51,7 @@ namespace mongo {
  * sharding metadata for a given database or collection, and provides the functionality to refresh
  * it when necessary.
  */
-class FilteringMetadataCache {
+class MONGO_MOD_NEEDS_REPLACEMENT FilteringMetadataCache {
 public:
     FilteringMetadataCache() = default;
 
@@ -229,7 +230,9 @@ private:
     std::shared_ptr<ShardServerCatalogCacheLoader> _loader;
 };
 
-extern FailPoint hangInRefreshFilteringMetadataUntilSuccessInterruptible;
-extern FailPoint hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible;
+MONGO_MOD_NEEDS_REPLACEMENT extern FailPoint
+    hangInRefreshFilteringMetadataUntilSuccessInterruptible;
+MONGO_MOD_NEEDS_REPLACEMENT extern FailPoint
+    hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible;
 
 }  // namespace mongo

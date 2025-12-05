@@ -37,6 +37,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
@@ -53,7 +54,7 @@ namespace durable_catalog {
  * Collection metadata persisted in an '_mdb_catalog' entry. Includes metadata details for each
  * 'index' in the collection.
  */
-struct CatalogEntryMetaData {
+struct MONGO_MOD_NEEDS_REPLACEMENT CatalogEntryMetaData {
     /*
      * Metadata for a given index.
      */

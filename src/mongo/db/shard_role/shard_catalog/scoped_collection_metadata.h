@@ -31,6 +31,7 @@
 
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -40,7 +41,7 @@ namespace mongo {
  * CollectionShardingState from which it was derived and because of this it must not be accessed
  * outside of a collection lock.
  */
-class ScopedCollectionDescription {
+class MONGO_MOD_NEEDS_REPLACEMENT ScopedCollectionDescription {
 public:
     class Impl {
     public:
@@ -134,7 +135,7 @@ protected:
  * CollectionShardingState from which it was derived, but it must be allowed to be accessed outside
  * of collection lock.
  */
-class ScopedCollectionFilter : public ScopedCollectionDescription {
+class MONGO_MOD_NEEDS_REPLACEMENT ScopedCollectionFilter : public ScopedCollectionDescription {
 public:
     ScopedCollectionFilter(std::shared_ptr<Impl> impl)
         : ScopedCollectionDescription(std::move(impl)) {}

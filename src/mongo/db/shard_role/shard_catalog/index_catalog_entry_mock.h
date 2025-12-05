@@ -32,6 +32,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -40,7 +41,7 @@ class IndexDescriptor;
 /**
  * This class comprises a mock IndexCatalogEntry for use in unit tests.
  */
-class IndexCatalogEntryMock : public IndexCatalogEntry {
+class MONGO_MOD_NEEDS_REPLACEMENT IndexCatalogEntryMock : public IndexCatalogEntry {
 public:
     IndexCatalogEntryMock(OperationContext*,
                           const CollectionPtr&,

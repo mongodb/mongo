@@ -33,10 +33,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-constexpr inline auto kRawDataFieldName = "rawData"_sd;
+MONGO_MOD_NEEDS_REPLACEMENT constexpr inline auto kRawDataFieldName = "rawData"_sd;
 
 /**
  * Returns a settable boolean indicating whether the given operation context is performing a "raw
@@ -44,13 +45,14 @@ constexpr inline auto kRawDataFieldName = "rawData"_sd;
  * from that in which users interact with, a "raw data" operation will operate directly on the
  * format in which it is stored.
  */
-bool& isRawDataOperation(OperationContext*);
+MONGO_MOD_NEEDS_REPLACEMENT bool& isRawDataOperation(OperationContext*);
 
 /**
  * Returns the rewritten command object, replacing the collection name with the one provided.
  */
 template <class CommandRequest>
-BSONObj rewriteCommandForRawDataOperation(const BSONObj& cmd, StringData coll) {
+MONGO_MOD_NEEDS_REPLACEMENT BSONObj rewriteCommandForRawDataOperation(const BSONObj& cmd,
+                                                                      StringData coll) {
     BSONObjBuilder builder{cmd.objsize()};
     for (auto&& [fieldName, elem] : cmd) {
         if (fieldName == CommandRequest::kCommandName) {
