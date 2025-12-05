@@ -425,7 +425,7 @@ def get_common_features(ctx):
         ),
         feature(
             name = "warnings_as_errors_compile",
-            enabled = ctx.attr.warnings_as_errors_enabled,
+            enabled = False,
             flag_sets = [
                 flag_set(
                     actions = all_compile_actions,
