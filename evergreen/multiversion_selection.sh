@@ -46,7 +46,7 @@ evergreen_args=" -sb \
 local_args="--edition $edition \
   --debug \
   ${last_lts_arg} \
-  ${last_continuous_arg} 6.0"
+  ${last_continuous_arg} 6.0 8.0.16"
 
 remote_invocation="${base_command} ${evergreen_args} ${local_args}"
 eval "${remote_invocation}"
