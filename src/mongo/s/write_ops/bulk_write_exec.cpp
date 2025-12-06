@@ -1041,7 +1041,7 @@ void BulkWriteOp::noteChildBatchResponse(
     int firstTargetedWriteOpIdx = targetedBatch.getWrites().front()->writeOpRef.first;
     bool isWithoutShardKeyWithIdWrite =
         (_writeOps[firstTargetedWriteOpIdx].getWriteType() == WriteType::WithoutShardKeyWithId);
-    bool shouldDeferWriteWithoutShardKeyReponse =
+    bool shouldDeferWriteWithoutShardKeyResponse =
         isWithoutShardKeyWithIdWrite && targetedBatch.getNumOps() > 1;
 
     const auto replyItems =
@@ -1064,12 +1064,12 @@ void BulkWriteOp::noteChildBatchResponse(
     // replies: [1, 3]       -> [1, 3]       -> [1, 3]       -> [1, 3]
     //           ^               ^                  ^               ^
     // Only moving forward in replies when we see a matching write op.
-    int replyIndex = -1;
+    size_t replyIndex = static_cast<size_t>(-1);
     // A batch will fail on an error if the request was sent with ordered:true or we are executing
     // the request within a transaction.
     bool batchWillContinue = !_clientRequest.getOrdered() && !_inTransaction;
     boost::optional<write_ops::WriteError> lastError;
-    for (int writeOpIdx = 0; writeOpIdx < (int)targetedBatch.getWrites().size(); ++writeOpIdx) {
+    for (size_t writeOpIdx = 0; writeOpIdx < targetedBatch.getWrites().size(); ++writeOpIdx) {
         const auto& write = targetedBatch.getWrites()[writeOpIdx];
         WriteOp& writeOp = _writeOps[write->writeOpRef.first];
 
@@ -1078,7 +1078,7 @@ void BulkWriteOp::noteChildBatchResponse(
             tassert(8266001,
                     "bulkWrite should always get replies when not in errorsOnly",
                     _clientRequest.getErrorsOnly());
-            if (shouldDeferWriteWithoutShardKeyReponse) {
+            if (shouldDeferWriteWithoutShardKeyResponse) {
                 if (!_deferredResponses) {
                     _deferredResponses.emplace();
                 }
@@ -1099,7 +1099,7 @@ void BulkWriteOp::noteChildBatchResponse(
         if (!batchWillContinue && lastError) {
             tassert(8266002,
                     "bulkWrite should not see replies after an error when ordered:true",
-                    replyIndex >= (int)replyItems.size());
+                    replyIndex >= replyItems.size());
             writeOp.resetWriteToReady(_opCtx);
             continue;
         }
@@ -1120,7 +1120,7 @@ void BulkWriteOp::noteChildBatchResponse(
              lastError->getStatus().code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
              lastError->getStatus() == ErrorCodes::CannotImplicitlyCreateCollection);
 
-        if (batchWillContinue && isStaleError && (replyIndex == (int)replyItems.size())) {
+        if (batchWillContinue && isStaleError && (replyIndex == replyItems.size())) {
             // Decrement the replyIndex so it keeps pointing to the same error (i.e. the
             // last error, which is a staleness error).
             LOGV2_DEBUG(7695304,
@@ -1133,7 +1133,7 @@ void BulkWriteOp::noteChildBatchResponse(
 
         // If we are out of replyItems but have more write ops then we must be in an ordered:false
         // errorsOnly:true bulkWrite where we have successful results after the last error.
-        if (replyIndex >= (int)replyItems.size()) {
+        if (replyIndex >= replyItems.size()) {
             tassert(8516601,
                     "bulkWrite received more replies than writes",
                     _clientRequest.getErrorsOnly());
@@ -1142,6 +1142,7 @@ void BulkWriteOp::noteChildBatchResponse(
             continue;
         }
 
+        tassert(11491901, "replyIndex out of range of replyItems", replyIndex < replyItems.size());
         auto& reply = replyItems[replyIndex];
 
         // This can only happen when running an errorsOnly:true bulkWrite. We will only receive a
@@ -1151,7 +1152,8 @@ void BulkWriteOp::noteChildBatchResponse(
         // a safe assumption.
         // writeOpIdx can be > than reply.getIdx when we are duplicating the last error
         // as described in the block above.
-        if (writeOpIdx < reply.getIdx()) {
+        tassert(11491902, "reply.getIdx() must not be negative", reply.getIdx() >= 0);
+        if (writeOpIdx < static_cast<size_t>(reply.getIdx())) {
             tassert(8266003,
                     "bulkWrite should get a reply for every write op when not in errorsOnly mode",
                     _clientRequest.getErrorsOnly());
@@ -1169,7 +1171,7 @@ void BulkWriteOp::noteChildBatchResponse(
             _approximateSize += reply.getApproximateSize();
         }
 
-        if (shouldDeferWriteWithoutShardKeyReponse) {
+        if (shouldDeferWriteWithoutShardKeyResponse) {
             if (!_deferredResponses) {
                 _deferredResponses.emplace();
             }
