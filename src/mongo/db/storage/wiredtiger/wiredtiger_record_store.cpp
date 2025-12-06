@@ -1235,8 +1235,8 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx, RecoveryU
                         err_msg));
     } else if (ret != WT_NOTFOUND) {
         if (ret == ENOTSUP) {
-            auto creationMetadata =
-                WiredTigerUtil::getMetadataCreate(sessRaii, getURI()).getValue();
+            auto res = WiredTigerUtil::getMetadataCreate(sessRaii, getURI());
+            const std::string& creationMetadata = res.getValue();
             if (creationMetadata.find("lsm=") != std::string::npos) {
                 LOGV2_FATAL(
                     6627200,
