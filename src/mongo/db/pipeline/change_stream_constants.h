@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace change_stream_constants {

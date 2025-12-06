@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <memory>
@@ -165,6 +166,7 @@ public:
         return accessedFields;
     }
 
+    MONGO_MOD_NEEDS_REPLACEMENT
     const ChangeStreamEventTransformation::SupportedEvents& getSupportedEvents_forTest() const {
         return _defaultEventBuilder->getSupportedEvents_forTest();
     }

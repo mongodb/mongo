@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/util/modules.h"
+
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 

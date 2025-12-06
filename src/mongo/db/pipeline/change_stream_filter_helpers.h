@@ -33,6 +33,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

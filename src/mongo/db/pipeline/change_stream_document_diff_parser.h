@@ -32,6 +32,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/update/document_diff_serialization.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 

@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 #include <vector>

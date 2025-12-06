@@ -41,6 +41,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>

@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <boost/none.hpp>

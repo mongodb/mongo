@@ -31,7 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <map>

@@ -34,6 +34,7 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/util/concurrent_shared_values_map.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <boost/optional/optional.hpp>

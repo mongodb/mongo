@@ -29,6 +29,7 @@
 # Cluster server parameter for change streams configuration options.
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 server_parameters:

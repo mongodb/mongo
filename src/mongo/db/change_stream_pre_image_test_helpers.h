@@ -34,6 +34,7 @@
 #include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace change_stream_pre_image_test_helper {

@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/util/concurrent_shared_values_map.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>

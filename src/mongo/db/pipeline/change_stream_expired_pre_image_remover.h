@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
