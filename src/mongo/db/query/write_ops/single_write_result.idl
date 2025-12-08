@@ -34,6 +34,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/query/client_cursor/cursor_response.idl"
 
 structs:
     singleWriteResult:
@@ -50,3 +51,7 @@ structs:
             upsertedId:
                 type: object
                 description: "The _id value of the object that was upserted."
+            queryStatsMetrics:
+                type: CursorMetrics
+                optional: true
+                description: "Metrics if requested for this single write"

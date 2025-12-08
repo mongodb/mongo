@@ -507,10 +507,6 @@ public:
 
             long long nModified = 0;
 
-            // Tracks the upserted information. The memory of this variable gets moved in the
-            // 'postProcessHandler' and should not be accessed afterwards.
-            std::vector<write_ops::Upserted> upsertedInfoVec;
-
             write_ops_exec::WriteResult reply;
             // For retryable updates on time-series collections, we needs to run them in
             // transactions to ensure the multiple writes are replicated atomically.
@@ -541,11 +537,22 @@ public:
                 reply = write_ops_exec::performUpdates(opCtx, request(), preConditions, source);
             }
 
+            // Tracks the upserted information. The memory of this variable gets moved in the
+            // 'postProcessHandler' and should not be accessed afterwards.
+            std::vector<write_ops::Upserted> upsertedInfoVec;
+
+            // This is populated by 'singleWriteHandler' and moved into the update reply in
+            // 'postProcessHandler'.
+            std::vector<write_ops::StmtQueryStatsMetrics> queryStatsMetricsVec;
+
             // Handler to process each 'SingleWriteResult'.
             auto singleWriteHandler = [&](const SingleWriteResult& opResult, int index) {
                 nModified += opResult.getNModified();
                 if (auto idElement = opResult.getUpsertedId().firstElement())
                     upsertedInfoVec.emplace_back(write_ops::Upserted(index, idElement));
+                if (auto queryStatsMetrics = opResult.getQueryStatsMetrics()) {
+                    queryStatsMetricsVec.emplace_back(index, *queryStatsMetrics);
+                }
             };
 
             // Handler to do the post-processing.
@@ -553,6 +560,9 @@ public:
                 updateReply.setNModified(nModified);
                 if (!upsertedInfoVec.empty())
                     updateReply.setUpserted(std::move(upsertedInfoVec));
+                if (!queryStatsMetricsVec.empty()) {
+                    updateReply.setQueryStatsMetrics(std::move(queryStatsMetricsVec));
+                }
             };
 
             populateReply(opCtx,

@@ -1935,10 +1935,19 @@ WriteResult performUpdates(
         if (source != OperationSource::kTimeseriesInsert) {
             curOp.emplace(cmd);
             curOp->push(opCtx);
+            if (singleOp.getIncludeQueryStatsMetrics()) {
+                curOp->debug().queryStatsInfo.metricsRequested = true;
+            }
         }
         ON_BLOCK_EXIT([&] {
             if (curOp) {
                 finishCurOp(opCtx, &*curOp);
+                // The last SingleWriteResult will be for the operation we just executed. If it
+                // succeeded, and metrics were requested, set them now.
+                if (curOp->debug().queryStatsInfo.metricsRequested && out.results.back().isOK()) {
+                    out.results.back().getValue().setQueryStatsMetrics(
+                        curOp->debug().getCursorMetrics());
+                }
             }
         });
 

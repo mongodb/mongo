@@ -1,6 +1,6 @@
 /**
  * Test the behavior of the includeQueryStatsMetrics option for find, aggregate, getMore, distinct,
- * and count.
+ * count, and update.
  * @tags: [requires_fcv_80]
  *
  * TODO SERVER-84678: move this test into core once mongos supports includeQueryStatsMetrics
@@ -30,11 +30,11 @@ function assertCpuNanosMetricEqual(metrics) {
 }
 
 function assertMetricsEqual(
-    cursor,
+    obj,
     {keysExamined, docsExamined, workingTimeMillis, hasSortStage, usedDisk, fromMultiPlanner, fromPlanCache} = {},
 ) {
-    assert(cursor.hasOwnProperty("metrics"), "cursor is missing metrics field");
-    const metrics = cursor.metrics;
+    assert(obj.hasOwnProperty("metrics"), `object is missing metrics field: ${tojson(obj)}`);
+    const metrics = obj.metrics;
 
     assertMetricEqual(metrics, "keysExamined", keysExamined);
     assertMetricEqual(metrics, "docsExamined", docsExamined);
@@ -50,6 +50,40 @@ function assertMetricsEqual(
     assertMetricEqual(metrics, "totalAcquisitionDelinquencyMillis", 0);
     assertMetricEqual(metrics, "maxAcquisitionDelinquencyMillis", 0);
     assertMetricEqual(metrics, "overdueInterruptApproxMaxMillis", 0);
+}
+
+function assertWriteMetricsEqual(
+    obj,
+    {
+        keysExamined,
+        docsExamined,
+        workingTimeMillis,
+        hasSortStage,
+        usedDisk,
+        fromMultiPlanner,
+        fromPlanCache,
+        nMatched,
+        nUpserted,
+        nModified,
+        nDeleted,
+        nInserted,
+    } = {},
+) {
+    assertMetricsEqual(obj, {
+        keysExamined,
+        docsExamined,
+        workingTimeMillis,
+        hasSortStage,
+        usedDisk,
+        fromMultiPlanner,
+        fromPlanCache,
+    });
+    const metrics = obj.metrics;
+    assertMetricEqual(metrics, "nMatched", nMatched);
+    assertMetricEqual(metrics, "nUpserted", nUpserted);
+    assertMetricEqual(metrics, "nModified", nModified);
+    assertMetricEqual(metrics, "nDeleted", nDeleted);
+    assertMetricEqual(metrics, "nInserted", nInserted);
 }
 
 {
@@ -261,6 +295,83 @@ function assertMetricsEqual(
                 fromMultiPlanner: false,
                 fromPlanCache: false,
             });
+        }
+    }
+
+    // Update command tests
+    if (FeatureFlagUtil.isEnabled(testDB.getMongo(), "QueryStatsUpdateCommand")) {
+        // Set up a collection for update tests.
+        let updateColl = testDB[jsTestName() + "_update"];
+        updateColl.drop();
+        for (let i = 0; i < 5; ++i) {
+            updateColl.insert({_id: i, x: i});
+        }
+
+        {
+            // Update command without metrics requested - no metrics should be included.
+            const result = testDB.runCommand({
+                update: updateColl.getName(),
+                updates: [
+                    {q: {_id: 0}, u: {x: 10}},
+                    {q: {_id: 1}, u: {x: 11}},
+                    {q: {_id: 2}, u: {x: 12}},
+                ],
+            });
+            assert.commandWorked(result);
+            assert.eq(result.n, 3, "expected 3 documents matched");
+            assert.eq(result.nModified, 3, "expected 3 documents modified");
+            assert(
+                !result.hasOwnProperty("queryStatsMetrics"),
+                "queryStatsMetrics should not be present when not requested",
+            );
+        }
+
+        {
+            // Issue a command with 5 update statements, request metrics for indices 1 and 3 only.
+            const result = testDB.runCommand({
+                update: updateColl.getName(),
+                updates: [
+                    {q: {_id: 0}, u: {x: 100}},
+                    {q: {_id: 1}, u: {x: 101}, includeQueryStatsMetrics: true},
+                    {q: {_id: 2}, u: {x: 102}},
+                    {q: {_id: 3}, u: {x: 103}, includeQueryStatsMetrics: true},
+                    {q: {_id: 4}, u: {x: 104}},
+                ],
+            });
+            assert.commandWorked(result);
+            assert.eq(result.n, 5, "expected 5 documents matched");
+            assert.eq(result.nModified, 5, "expected 5 documents modified");
+
+            // Verify queryStatsMetrics is present.
+            assert(
+                result.hasOwnProperty("queryStatsMetrics"),
+                "queryStatsMetrics should be present: " + tojson(result),
+            );
+
+            const metricsArray = result.queryStatsMetrics;
+            assert.eq(metricsArray.length, 2, "expected 2 metrics entries: " + tojson(metricsArray));
+
+            // Collect the indices that have metrics.
+            const metricsIndices = new Set(metricsArray.map((m) => m.index));
+            assert(metricsIndices.has(1), "expected metrics for index 1");
+            assert(metricsIndices.has(3), "expected metrics for index 3");
+            assert.eq(metricsIndices.size, 2, "expected exactly 2 indices with metrics");
+
+            // Verify each metrics entry has the expected structure using the helper.
+            for (const entry of metricsArray) {
+                assertWriteMetricsEqual(entry, {
+                    keysExamined: 1,
+                    docsExamined: 1,
+                    hasSortStage: false,
+                    usedDisk: false,
+                    fromMultiPlanner: false,
+                    nMatched: 1,
+                    nUpserted: 0,
+                    nModified: 1,
+                    nDeleted: 0,
+                    nInserted: 0,
+                });
+            }
         }
     }
 }

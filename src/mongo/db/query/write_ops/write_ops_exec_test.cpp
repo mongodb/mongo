@@ -390,6 +390,54 @@ TEST_F(WriteOpsExecTest, InsertFailsIfTimeseriesCollectionCreatedDuringInsert) {
                        10685100);
 }
 
+TEST_F(WriteOpsExecTest, UpdateAppendsMetricsWhenRequested) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "updateColl");
+    auto opCtx = operationContext();
+
+    // Create the collection and insert 5 documents.
+    ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    std::vector<BSONObj> docsToInsert{fromjson("{_id: 0, x: 0}"),
+                                      fromjson("{_id: 1, x: 1}"),
+                                      fromjson("{_id: 2, x: 2}"),
+                                      fromjson("{_id: 3, x: 3}"),
+                                      fromjson("{_id: 4, x: 4}")};
+    insertCmdReq.setDocuments(docsToInsert);
+    auto insertResult = write_ops_exec::performInserts(
+        opCtx, insertCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
+    ASSERT_EQ(5, insertResult.results.size());
+
+    // Build 5 UpdateOpEntry instances. Request metrics for indices 1 and 3.
+    std::vector<write_ops::UpdateOpEntry> updateOps;
+    for (int i = 0; i < 5; ++i) {
+        auto mod = write_ops::UpdateModification::parseFromClassicUpdate(BSON("x" << (i * 10)));
+        write_ops::UpdateOpEntry entry(BSON("x" << i), std::move(mod));
+        if (i == 1 || i == 3) {
+            entry.setIncludeQueryStatsMetrics(true);
+        }
+        updateOps.push_back(std::move(entry));
+    }
+
+    write_ops::UpdateCommandRequest updateCmdReq{ns, std::move(updateOps)};
+    auto updateResult = write_ops_exec::performUpdates(
+        opCtx, updateCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
+
+    // Verify all 5 updates succeeded.
+    ASSERT_EQ(5, updateResult.results.size());
+    for (size_t i = 0; i < 5; ++i) {
+        ASSERT_OK(updateResult.results[i].getStatus());
+        ASSERT_EQ(1, updateResult.results[i].getValue().getN());
+    }
+
+    // Verify that metrics are present only for indices 1 and 3.
+    ASSERT_FALSE(updateResult.results[0].getValue().getQueryStatsMetrics().has_value());
+    ASSERT_TRUE(updateResult.results[1].getValue().getQueryStatsMetrics().has_value());
+    ASSERT_FALSE(updateResult.results[2].getValue().getQueryStatsMetrics().has_value());
+    ASSERT_TRUE(updateResult.results[3].getValue().getQueryStatsMetrics().has_value());
+    ASSERT_FALSE(updateResult.results[4].getValue().getQueryStatsMetrics().has_value());
+}
+
 class OpObserverMock : public OpObserverNoop {
 public:
     ~OpObserverMock() override {

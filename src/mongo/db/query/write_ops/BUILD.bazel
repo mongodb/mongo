@@ -70,6 +70,7 @@ idl_generator(
     src = "single_write_result.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query/client_cursor:cursor_response_gen",
     ],
 )
 
