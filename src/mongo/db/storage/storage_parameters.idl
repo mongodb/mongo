@@ -89,8 +89,8 @@ server_parameters:
 
     indexMaxNumGeneratedKeysPerDocument:
         description: "Maximum number of index keys a single document is allowed to generate"
-        set_at: [startup]
-        cpp_vartype: int32_t
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gIndexMaxNumGeneratedKeysPerDocument
         default: 100000
         validator:
@@ -127,8 +127,8 @@ server_parameters:
             Maximum number of operations to pack into a single oplog entry, when multi-oplog
             format for batched writes is in use. See batchedDeletesTargetBatchDocs and
             maxNumberOfTransactionOperationsInSingleOplogEntry.
-        set_at: startup
-        cpp_vartype: int
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
         cpp_varname: gMaxNumberOfBatchedOperationsInSingleOplogEntry
         default: 2147483647 # INT_MAX
         validator: {gte: 1}
@@ -139,8 +139,8 @@ server_parameters:
             Maximum size (bytes) of operations to pack into a single oplog entry, when multi-oplog
             format for batched writes is in use.
             See batchedDeletesTargetStagedDocBytes and BSONObjMaxUserSize.
-        set_at: startup
-        cpp_vartype: int
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
         cpp_varname: gMaxSizeOfBatchedOperationsInSingleOplogEntryBytes
         default: 16777216 # 16 MB
         validator: {gte: 1}

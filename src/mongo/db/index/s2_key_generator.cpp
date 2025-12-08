@@ -424,7 +424,7 @@ void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
     size_t posInIdx = 0;
 
     try {
-        size_t maxNumKeys = gIndexMaxNumGeneratedKeysPerDocument;
+        size_t maxNumKeys = gIndexMaxNumGeneratedKeysPerDocument.load();
         // We output keys in the same order as the fields we index.
         for (const auto& keyElem : keyPattern) {
             // First, we get the keys that this field adds.  Either they're added literally from

@@ -1734,7 +1734,7 @@ namespace {
  */
 std::size_t getMaxNumberOfBatchedOperationsInSingleOplogEntry() {
     // IDL validation defined for this startup parameter ensures that we have a positive number.
-    return static_cast<std::size_t>(gMaxNumberOfBatchedOperationsInSingleOplogEntry);
+    return static_cast<std::size_t>(gMaxNumberOfBatchedOperationsInSingleOplogEntry.load());
 }
 
 /**
@@ -1743,7 +1743,7 @@ std::size_t getMaxNumberOfBatchedOperationsInSingleOplogEntry() {
  */
 std::size_t getMaxSizeOfBatchedOperationsInSingleOplogEntryBytes() {
     // IDL validation defined for this startup parameter ensures that we have a positive number.
-    return static_cast<std::size_t>(gMaxSizeOfBatchedOperationsInSingleOplogEntryBytes);
+    return static_cast<std::size_t>(gMaxSizeOfBatchedOperationsInSingleOplogEntryBytes.load());
 }
 
 // Logs one applyOps entry on a prepared transaction, or an unprepared transaction's commit, or on

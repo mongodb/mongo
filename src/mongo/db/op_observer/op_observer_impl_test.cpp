@@ -3920,6 +3920,110 @@ TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
     getNOplogEntries(opCtx, 0);
 }
 
+// TODO SERVER-66577: Remove.
+TEST_F(BatchedWriteOutputsTest, RuntimeOpCountLimitThrowsWithFeatureFlagOff) {
+    RAIIServerParameterControllerForTest featureFlagScope("featureFlagLargeBatchedOperations",
+                                                          false);
+
+    constexpr int kDocsInBatch = 5;
+    constexpr int kOpLimitForTransactionTooLarge = 1;
+    ASSERT_LT(kOpLimitForTransactionTooLarge, kDocsInBatch);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+
+    // Batching is not restricted by default.
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+    {
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        for (int docId = 0; docId < kDocsInBatch; docId++) {
+            OplogDeleteEntryArgs args;
+            auto doc = BSON("_id" << docId);
+            const auto& documentKey = getDocumentKey(*autoColl, doc);
+            opCtx->getServiceContext()->getOpObserver()->onDelete(
+                opCtx, *autoColl, kUninitializedStmtId, doc, documentKey, args);
+        }
+        wuow.commit();
+    }
+    getNOplogEntries(opCtx, 1);
+
+    // With the feature flag off, exceeding maxNumberOfBatchedOperationsInSingleOplogEntry will
+    // throw.
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+    RAIIServerParameterControllerForTest opCountLimit(
+        "maxNumberOfBatchedOperationsInSingleOplogEntry", kOpLimitForTransactionTooLarge);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+    for (int docId = 0; docId < kDocsInBatch; docId++) {
+        OplogDeleteEntryArgs args;
+        auto doc = BSON("_id" << docId);
+        const auto& documentKey = getDocumentKey(*autoColl, doc);
+        opCtx->getServiceContext()->getOpObserver()->onDelete(
+            opCtx, *autoColl, kUninitializedStmtId, doc, documentKey, args);
+    }
+    ASSERT_THROWS_CODE(wuow.commit(), DBException, ErrorCodes::TransactionTooLarge);
+    getNOplogEntries(opCtx, 0);
+}
+
+TEST_F(BatchedWriteOutputsTest, RuntimeLimitsAffectApplyOpsBatchingWithFeatureFlagOn) {
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+
+    constexpr int kDocsInBatch = 2;
+    constexpr int kSmallSizeLimitBytes = 200;
+    constexpr int kLargeSizeLimitBytes = 16 * 1024 * 1024;
+    constexpr int kSmallOpLimit = 1;
+    constexpr int kLargeOpLimit = 10;
+
+    const auto makeDoc = [](int id) {
+        return BSON("_id" << id << "padding" << std::string(170, 'x'));
+    };
+
+    auto verifyOplogEntryCount = [&](int maxOps, int maxBytes, size_t expectedEntries) {
+        reset(opCtx, _nss);
+        reset(opCtx, NamespaceString::kRsOplogNamespace);
+        RAIIServerParameterControllerForTest maxOpsController(
+            "maxNumberOfBatchedOperationsInSingleOplogEntry", maxOps);
+        RAIIServerParameterControllerForTest maxBytesController(
+            "maxSizeOfBatchedOperationsInSingleOplogEntryBytes", maxBytes);
+
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        for (int docId = 0; docId < kDocsInBatch; ++docId) {
+            OplogDeleteEntryArgs args;
+            auto doc = makeDoc(docId);
+            const auto& documentKey = getDocumentKey(*autoColl, doc);
+            opCtx->getServiceContext()->getOpObserver()->onDelete(
+                opCtx, *autoColl, kUninitializedStmtId, doc, documentKey, args);
+        }
+        wuow.commit();
+
+        auto oplogs = getNOplogEntries(opCtx, expectedEntries);
+        for (const auto& oplog : oplogs) {
+            auto parsed = assertGet(repl::OplogEntry::parse(oplog));
+            ASSERT_EQ(repl::OpTypeEnum::kCommand, parsed.getOpType());
+            ASSERT_EQ(repl::OplogEntry::CommandType::kApplyOps, parsed.getCommandType());
+        }
+    };
+
+    // No splitting with large limits.
+    verifyOplogEntryCount(/*maxOps=*/kLargeOpLimit,
+                          /*maxBytes=*/kLargeSizeLimitBytes,
+                          /*expectedEntries=*/1);
+
+    // A small op count or oplog entry size limit will cause the operation to be split.
+    verifyOplogEntryCount(/*maxOps=*/kLargeOpLimit,
+                          /*maxBytes=*/kSmallSizeLimitBytes,
+                          /*expectedEntries=*/2);
+
+    verifyOplogEntryCount(/*maxOps=*/kSmallOpLimit,
+                          /*maxBytes=*/kLargeSizeLimitBytes,
+                          /*expectedEntries=*/2);
+}
+
 // Verifies that a WriteUnitOfWork with groupOplogEntries=kGroupForPossiblyRetryableOperations
 // replicates its writes as a single applyOps. Tests WUOWs batching a range of 1 to 5 inserts
 // (inclusive).
