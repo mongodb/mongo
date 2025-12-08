@@ -43,8 +43,6 @@
 namespace {
 // Copies of OpenSSL 1.1.0 and later define new EVP digest routines. We must
 // polyfill used definitions to interact with older OpenSSL versions.
-#define RSA_PSS_SALTLEN_DIGEST -1
-
 EVP_MD_CTX* EVP_MD_CTX_new() {
     return EVP_MD_CTX_create();
 }
@@ -78,6 +76,11 @@ int RSA_set0_key(RSA* r, BIGNUM* n, BIGNUM* e, BIGNUM* d) {
 }
 
 }  // namespace
+#endif
+
+// Define RSA_PSS_SALTLEN_DIGEST if not defined by OpenSSL headers.
+#ifndef RSA_PSS_SALTLEN_DIGEST
+#define RSA_PSS_SALTLEN_DIGEST -1
 #endif
 
 namespace mongo::crypto {
