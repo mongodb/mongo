@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
+#include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/logv2/log.h"
@@ -62,6 +63,11 @@ DocumentSource::DocumentSource(StringData stageName, const intrusive_ptr<Express
 
 void DocumentSource::unregisterParser_forTest(const std::string& name) {
     parserMap.erase(name);
+}
+
+// TODO SERVER-114343: Remove once parserMap no longer exists.
+bool DocumentSource::isInParserMap(StringData stageName) {
+    return parserMap.find(stageName) != parserMap.end();
 }
 
 void DocumentSource::registerParser(std::string name,
@@ -127,35 +133,39 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
     uassert(16435,
             "A pipeline stage specification object must contain exactly one field.",
             stageObj.nFields() == 1);
-    BSONElement stageSpec = stageObj.firstElement();
-    auto stageName = stageSpec.fieldNameStringData();
 
-    return parseCommon(expCtx, stageSpec, stageName);
+    // Converting the BSONObj to LiteParsed just to immediately convert it to DocumentSource is
+    // convoluted, but this is temporary until we remove the DocumentSource parserMap entirely.
+    auto liteParsed = LiteParsedDocumentSource::parse(expCtx->getNamespaceString(), stageObj);
+    uassert(
+        11458703, "LiteParsedDocumentSource was unable to be initialized from BSONObj", liteParsed);
+    return parseFromLiteParsed(expCtx, *liteParsed);
 }
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSource::parseFromLiteParsed(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const LiteParsedDocumentSource& liteParsed) {
-    return parseCommon(expCtx, liteParsed.getOriginalBson(), liteParsed.getParseTimeName());
-}
+    if (auto ds = buildDocumentSource(liteParsed, expCtx)) {
+        // Note: Validation that stages are not registered in both the old parserMap and the new
+        // StageParams->DocumentSource registry happens at startup during registration in
+        // registerStageParamsToDocumentSourceFn.
+        return {ds.value()};
+    }
 
-std::list<intrusive_ptr<DocumentSource>> DocumentSource::parseCommon(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement stageSpec,
-    StringData stageName) {
-    // Get the registered parser and call that.
-    auto it = parserMap.find(stageName);
+    auto it = parserMap.find(liteParsed.getParseTimeName());
 
     uassert(16436,
-            str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
+            str::stream() << "Unrecognized pipeline stage name: '" << liteParsed.getParseTimeName()
+                          << "'",
             it != parserMap.end());
 
     auto& entry = it->second;
     if (entry.featureFlag) {
-        expCtx->ignoreFeatureInParserOrRejectAndThrow(stageName, *entry.featureFlag);
+        expCtx->ignoreFeatureInParserOrRejectAndThrow(liteParsed.getParseTimeName(),
+                                                      *entry.featureFlag);
     }
 
-    return it->second.parser(stageSpec, expCtx);
+    return it->second.parser(liteParsed.getOriginalBson(), expCtx);
 }
 
 BSONObj DocumentSource::serializeToBSONForDebug() const {

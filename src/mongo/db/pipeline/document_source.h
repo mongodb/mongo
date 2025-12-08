@@ -191,6 +191,28 @@ namespace mongo {
                                            ::mongo::getTestCommandsEnabled())
 
 /**
+ * Registers ONLY the LiteParsedDocumentSource parser, without registering a DocumentSource parser
+ * in the old parserMap.
+ *
+ * Use this macro for stages that have been migrated to use the new StageParams->DocumentSource
+ * registry (via REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING). These stages should NOT be
+ * registered in the old parserMap.
+ *
+ * Usage pattern for migrated stages:
+ *   REGISTER_LITE_PARSED_DOCUMENT_SOURCE(stageName, liteParser, allowedWithApiStrict);
+ *   REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(stageName, kStageName, StageParams::id,
+ * mappingFn);
+ */
+#define REGISTER_LITE_PARSED_DOCUMENT_SOURCE(key, liteParser, allowedWithApiStrict)   \
+    MONGO_INITIALIZER_GENERAL(addToLiteParsedParserMap_##key,                         \
+                              ("BeginDocumentSourceRegistration"),                    \
+                              ("EndDocumentSourceRegistration"))                      \
+    (InitializerContext*) {                                                           \
+        LiteParsedDocumentSource::registerParser(                                     \
+            "$" #key, liteParser, allowedWithApiStrict, AllowedWithClientType::kAny); \
+    }
+
+/**
  * Allocates a new, unique DocumentSource::Id value.
  * Assigns it to a private variable (in an anonymous namespace) based on the given `name`, and
  * declares a const reference named `constName` to the private variable.
@@ -418,6 +440,13 @@ public:
                           << " is not allowed with the current configuration. You may need to "
                              "enable the corresponding feature flag");
     }
+
+    /**
+     * Returns true if a stage with the given name is registered in the parserMap.
+     * Used for validation that stages are not registered in both the old and new registries.
+     * TODO SERVER-114343: Remove once parserMap no longer exists.
+     */
+    static bool isInParserMap(StringData stageName);
 
     /**
      * Registers a DocumentSource with a parsing function, so that when a stage with the given name
@@ -725,11 +754,6 @@ protected:
     MONGO_MOD_NEEDS_REPLACEMENT static void unregisterParser_forTest(const std::string& name);
 
 private:
-    static DocumentSourceContainer parseCommon(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        BSONElement stageSpec,
-        StringData stageName);
-
     // Give access to 'getParserMap()' for the implementation of $listMqlEntities but hiding
     // it from all other stages.
     friend class exec::agg::ListMqlEntitiesStage;

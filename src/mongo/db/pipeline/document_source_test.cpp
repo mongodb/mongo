@@ -36,6 +36,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -45,6 +46,9 @@
 
 namespace mongo {
 namespace {
+
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(MockExtension)
+ALLOCATE_STAGE_PARAMS_ID(mockExtension, MockExtensionStageParams::id);
 
 class DocumentSourceMockExtension : public DocumentSource {
 public:
@@ -102,6 +106,10 @@ protected:
 using DocumentSourceExtensionParserTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceExtensionParserTest, ShouldSuccessfullyregisterParser) {
+    LiteParsedDocumentSource::registerParser("$customExtension",
+                                             MockExtensionLiteParsed::parse,
+                                             AllowedWithApiStrict::kAlways,
+                                             AllowedWithClientType::kAny);
     DocumentSource::registerParser("$customExtension", DocumentSourceMockExtension::createFromBson);
 
     // Verify registration by parsing a stage with the new parser.
@@ -143,6 +151,10 @@ TEST_F(DocumentSourceExtensionParserTest, ShouldAllowVectorSearchOverride) {
 }
 
 TEST_F(DocumentSourceExtensionParserTest, ShouldCreateDocumentSourceFromExtensionParser) {
+    LiteParsedDocumentSource::registerParser("$workingExtension",
+                                             MockExtensionLiteParsed::parse,
+                                             AllowedWithApiStrict::kAlways,
+                                             AllowedWithClientType::kAny);
     DocumentSource::registerParser("$workingExtension",
                                    DocumentSourceMockExtension::createFromBson);
 
@@ -156,6 +168,10 @@ TEST_F(DocumentSourceExtensionParserTest, ShouldCreateDocumentSourceFromExtensio
 }
 
 TEST_F(DocumentSourceExtensionParserTest, ShouldIntegrateWithBuiltinStages) {
+    LiteParsedDocumentSource::registerParser("$integrationTest",
+                                             MockExtensionLiteParsed::parse,
+                                             AllowedWithApiStrict::kAlways,
+                                             AllowedWithClientType::kAny);
     DocumentSource::registerParser("$integrationTest", DocumentSourceMockExtension::createFromBson);
 
     // Check for both built-in and extension parsers using a vector to avoid duplication.

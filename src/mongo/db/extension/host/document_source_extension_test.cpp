@@ -107,7 +107,7 @@ TEST_F(DocumentSourceExtensionTest, ParseTransformSuccess) {
     // Try to parse pipeline with custom extension stage before registering the extension,
     // should fail.
     std::vector<BSONObj> testPipeline{kValidSpec};
-    ASSERT_THROWS_CODE(buildTestPipeline(testPipeline), AssertionException, 16436);
+    ASSERT_THROWS_CODE(buildTestPipeline(testPipeline), AssertionException, 40324);
     // Register the extension stage and try to reparse.
 
     std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();

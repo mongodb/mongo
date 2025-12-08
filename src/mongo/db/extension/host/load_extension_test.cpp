@@ -373,9 +373,9 @@ TEST_F(LoadExtensionsTest, LoadHighestCompatibleVersionSucceeds) {
 
     // Assert that the other extension versions registered aren't available.
     pipeline = {BSON("$extensionV2" << BSONObj())};
-    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
+    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 40324);
     pipeline = {BSON("$extensionV3" << BSONObj())};
-    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
+    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 40324);
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionBothOptionsSucceed) {
@@ -397,7 +397,7 @@ TEST_F(LoadExtensionsTest, LoadExtensionBothOptionsSucceed) {
 
     // Assert that $optionB is unavailable.
     pipeline = {BSON("$optionB" << BSONObj())};
-    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
+    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 40324);
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionParseWithExtensionOptions) {

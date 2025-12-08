@@ -5890,10 +5890,8 @@ TEST_F(PipelineValidateTest, AggregateOneNSValidIfInitialStageIsCollectionless) 
 
 TEST_F(PipelineValidateTest, CollectionNSNotValidIfInitialStageIsCollectionless) {
     auto ctx = getExpCtx({.hasCollectionName = true, .setMockReplCoord = false});
-    auto collectionlessSource = DocumentSourceCollectionlessMock::create(ctx);
-
-    ASSERT_THROWS_CODE(Pipeline::parse({fromjson("{$listLocalSessions: {}}")},
-                                       ctx),  // makePipeline({collectionlessSource}),
+    // Use $querySettings as a collectionless stage.
+    ASSERT_THROWS_CODE(Pipeline::parse({fromjson("{$querySettings: {}}")}, ctx),
                        AssertionException,
                        ErrorCodes::InvalidNamespace);
 }
