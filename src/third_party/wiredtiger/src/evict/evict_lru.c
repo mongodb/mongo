@@ -2707,14 +2707,13 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, u_int max_en
         if (page->evict_pass_gen == 0) {
             const uint64_t gen_gap =
               __wt_atomic_load_uint64_relaxed(&evict->evict_pass_gen) - page->cache_create_gen;
-            __wt_atomic_stats_max_uint64(&evict->evict_max_unvisited_gen_gap, gen_gap);
-            __wt_atomic_stats_max_uint64(
-              &evict->evict_max_unvisited_gen_gap_per_checkpoint, gen_gap);
+            __wt_atomic_stats_max(&evict->evict_max_unvisited_gen_gap, gen_gap);
+            __wt_atomic_stats_max(&evict->evict_max_unvisited_gen_gap_per_checkpoint, gen_gap);
         } else {
             const uint64_t gen_gap =
               __wt_atomic_load_uint64_relaxed(&evict->evict_pass_gen) - page->evict_pass_gen;
-            __wt_atomic_stats_max_uint64(&evict->evict_max_visited_gen_gap, gen_gap);
-            __wt_atomic_stats_max_uint64(&evict->evict_max_visited_gen_gap_per_checkpoint, gen_gap);
+            __wt_atomic_stats_max(&evict->evict_max_visited_gen_gap, gen_gap);
+            __wt_atomic_stats_max(&evict->evict_max_visited_gen_gap_per_checkpoint, gen_gap);
         }
 
         page->evict_pass_gen = __wt_atomic_load_uint64_relaxed(&evict->evict_pass_gen);
@@ -2740,7 +2739,7 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, u_int max_en
 
         /* update number of attempts this page has been evicted */
         ++page->evict_queue_attempts;
-        __wt_atomic_stats_max_uint16(
+        __wt_atomic_stats_max(
           &evict->evict_max_eviction_queue_attempts, page->evict_queue_attempts);
 
         __evict_try_queue_page(
@@ -2998,9 +2997,7 @@ static int
 __evict_page(WT_SESSION_IMPL *session, bool is_server)
 {
     WT_BTREE *btree;
-    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_EVICT *evict;
     WT_REF *ref;
     WT_REF_STATE previous_state;
     WT_TRACK_OP_DECL;
@@ -3009,9 +3006,6 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
     bool page_is_modified;
 
     WT_TRACK_OP_INIT(session);
-
-    conn = S2C(session);
-    evict = conn->evict;
 
     WT_RET_TRACK(__evict_get_ref(session, is_server, &btree, &ref, &previous_state));
     WT_ASSERT(session, WT_REF_GET_STATE(ref) == WT_REF_LOCKED);
@@ -3034,7 +3028,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
             WT_STAT_CONN_INCR(session, eviction_app_dirty_attempt);
         }
         WT_STAT_CONN_INCR(session, eviction_app_attempt);
-        ++evict->app_evicts;
+        S2C(session)->evict->app_evicts++;
         time_start = WT_STAT_ENABLED(session) ? __wt_clock(session) : 0;
     }
 
@@ -3057,11 +3051,6 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
     }
 
     if (WT_UNLIKELY(ret != 0)) {
-        ++ref->page->evict_page_attempts;
-
-        __wt_atomic_stats_max_uint16(
-          &evict->evict_max_evict_page_attempts, ref->page->evict_page_attempts);
-
         if (is_server)
             WT_STAT_CONN_INCR(session, eviction_server_evict_fail);
         else if (F_ISSET(session, WT_SESSION_INTERNAL))

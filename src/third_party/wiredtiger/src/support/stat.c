@@ -2053,7 +2053,6 @@ static const char *const __stats_connection_desc[] = {
   "cache: maximum milliseconds spent at a single eviction",
   "cache: maximum milliseconds spent at a single eviction per checkpoint",
   "cache: maximum number of times a page tried to be added to eviction queue but fail",
-  "cache: maximum number of times a page tried to be evicted",
   "cache: maximum page size seen at eviction",
   "cache: maximum updates page size seen at eviction per checkpoint",
   "cache: modified page evict attempts by application threads",
@@ -2357,6 +2356,8 @@ static const char *const __stats_connection_desc[] = {
   "data-handle: session dhandles swept",
   "data-handle: session sweep attempts",
   "disagg: role leader",
+  "disagg: step down most recent time (msecs)",
+  "disagg: step up most recent time (msecs)",
   "layered: Layered table cursor insert operations",
   "layered: Layered table cursor next operations",
   "layered: Layered table cursor next operations from the ingest btrees",
@@ -3066,7 +3067,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing eviction_maximum_milliseconds */
     /* not clearing eviction_maximum_milliseconds_per_checkpoint */
     /* not clearing eviction_maximum_attempts_to_queue_page */
-    /* not clearing eviction_maximum_attempts_to_evict_page */
     /* not clearing eviction_maximum_page_size */
     /* not clearing eviction_maximum_updates_page_size_per_checkpoint */
     stats->eviction_app_dirty_attempt = 0;
@@ -3364,6 +3364,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->dh_session_handles = 0;
     stats->dh_session_sweeps = 0;
     stats->disagg_role_leader = 0;
+    stats->disagg_step_down_time = 0;
+    stats->disagg_step_up_time = 0;
     stats->layered_curs_insert = 0;
     stats->layered_curs_next = 0;
     stats->layered_curs_next_ingest = 0;
@@ -4125,8 +4127,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, eviction_maximum_milliseconds_per_checkpoint);
     to->eviction_maximum_attempts_to_queue_page +=
       WT_STAT_CONN_READ(from, eviction_maximum_attempts_to_queue_page);
-    to->eviction_maximum_attempts_to_evict_page +=
-      WT_STAT_CONN_READ(from, eviction_maximum_attempts_to_evict_page);
     to->eviction_maximum_page_size += WT_STAT_CONN_READ(from, eviction_maximum_page_size);
     to->eviction_maximum_updates_page_size_per_checkpoint +=
       WT_STAT_CONN_READ(from, eviction_maximum_updates_page_size_per_checkpoint);
@@ -4472,6 +4472,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->dh_session_handles += WT_STAT_CONN_READ(from, dh_session_handles);
     to->dh_session_sweeps += WT_STAT_CONN_READ(from, dh_session_sweeps);
     to->disagg_role_leader += WT_STAT_CONN_READ(from, disagg_role_leader);
+    to->disagg_step_down_time += WT_STAT_CONN_READ(from, disagg_step_down_time);
+    to->disagg_step_up_time += WT_STAT_CONN_READ(from, disagg_step_up_time);
     to->layered_curs_insert += WT_STAT_CONN_READ(from, layered_curs_insert);
     to->layered_curs_next += WT_STAT_CONN_READ(from, layered_curs_next);
     to->layered_curs_next_ingest += WT_STAT_CONN_READ(from, layered_curs_next_ingest);

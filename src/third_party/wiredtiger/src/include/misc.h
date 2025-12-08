@@ -510,21 +510,29 @@ __wt_atomic_decrement_if_positive(uint32_t *valuep)
 }
 
 /*
- *    Calculate max/min statistic values. Currently we use load + store for that purpose since
+ * __wt_atomic_stats_max --
+ *     Calculate max statistic values. Currently we use load + store for that purpose since
  *     statistic is allowed to be fuzzy. FIXME-WT-15755: Consider using relaxed CAS instead to
  *     ensure it is lossless.
  */
-#define WT_ATOMIC_STATS_MFUNC(suffix, _type)                                    \
-    static inline void __wt_atomic_stats_max_##suffix(_type *stat, _type value) \
-    {                                                                           \
-        if (value > __wt_atomic_load_##suffix##_relaxed(stat))                  \
-            __wt_atomic_store_##suffix##_relaxed(stat, value);                  \
-    }                                                                           \
-    static inline void __wt_atomic_stats_min_##suffix(_type *stat, _type value) \
-    {                                                                           \
-        if (value < __wt_atomic_load_##suffix##_relaxed(stat))                  \
-            __wt_atomic_store_##suffix##_relaxed(stat, value);                  \
+static inline void
+__wt_atomic_stats_max(uint64_t *stat, uint64_t value)
+{
+    if (value > __wt_atomic_load_uint64_relaxed(stat)) {
+        __wt_atomic_store_uint64_relaxed(stat, value);
     }
+}
 
-WT_ATOMIC_STATS_MFUNC(uint16, uint16_t)
-WT_ATOMIC_STATS_MFUNC(uint64, uint64_t)
+/*
+ * __wt_atomic_stats_min --
+ *     Calculate min statistic values. Currently we use load + store for that purpose since
+ *     statistic is allowed to be fuzzy. FIXME-WT-15755: Consider using relaxed CAS instead to
+ *     ensure it is lossless.
+ */
+static inline void
+__wt_atomic_stats_min(uint64_t *stat, uint64_t value)
+{
+    if (value < __wt_atomic_load_uint64_relaxed(stat)) {
+        __wt_atomic_store_uint64_relaxed(stat, value);
+    }
+}

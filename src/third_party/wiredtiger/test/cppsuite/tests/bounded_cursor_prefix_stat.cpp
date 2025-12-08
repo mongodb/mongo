@@ -71,7 +71,7 @@ class bounded_cursor_prefix_stat : public test {
             for (uint64_t j = 0; j < ALPHABET.size(); ++j) {
                 for (uint64_t k = 0; k < ALPHABET.size(); ++k) {
                     for (uint64_t count = 0; count < tc->key_count; ++count) {
-                        tc->txn.begin();
+                        tc->begin();
                         /*
                          * Generate the prefix key, and append a random generated key string based
                          * on the key size configuration.
@@ -86,14 +86,14 @@ class bounded_cursor_prefix_stat : public test {
                         if (!tc->insert(cursor, coll.id, prefix_key, value)) {
                             testutil_assert(rollback_retries < MAX_ROLLBACKS);
                             /* We failed to insert, rollback our transaction and retry. */
-                            tc->txn.rollback();
+                            tc->rollback();
                             ++rollback_retries;
                             if (count > 0)
                                 --count;
                         } else {
                             /* Commit txn at commit timestamp 100. */
                             testutil_assert(
-                              tc->txn.commit("commit_timestamp=" + tc->tsm->decimal_to_hex(100)));
+                              tc->commit("commit_timestamp=" + tc->tsm->decimal_to_hex(100)));
                             rollback_retries = 0;
                         }
                     }
@@ -131,12 +131,13 @@ public:
             " number of collections: " + std::to_string(collection_count));
 
         /* Create n collections as per the configuration. */
+        scoped_session session = connection_manager::instance().create_session();
         for (uint64_t i = 0; i < collection_count; ++i)
             /*
              * The database model will call into the API and create the collection, with its own
              * session.
              */
-            database.add_collection();
+            database.add_collection(session);
 
         /* Spawn 26 threads to populate the database. */
         for (uint64_t i = 0; i < ALPHABET.size(); ++i) {
@@ -158,7 +159,6 @@ public:
 
         /* Force evict all the populated keys in all of the collections. */
         int cmpp;
-        scoped_session session = connection_manager::instance().create_session();
         for (uint64_t count = 0; count < collection_count; ++count) {
             collection &coll = database.get_collection(count);
             scoped_cursor evict_cursor =
@@ -200,7 +200,7 @@ public:
          * bounded search near, we expect the search to early exit out of its prefix key range and
          * return WT_NOTFOUND.
          */
-        tc->txn.begin("read_timestamp=" + tc->tsm->decimal_to_hex(10));
+        tc->begin("read_timestamp=" + tc->tsm->decimal_to_hex(10));
         cursor->set_key(cursor.get(), srch_key.c_str());
         bound_set prefix_bounds = bound_set(srch_key);
         prefix_bounds.apply(cursor);
@@ -220,7 +220,7 @@ public:
          */
         if (srch_key == "z" || srch_key == "zz" || srch_key == "zzz")
             ++z_key_searches;
-        tc->txn.rollback();
+        tc->rollback();
     }
 
     void

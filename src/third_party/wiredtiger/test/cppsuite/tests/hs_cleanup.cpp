@@ -69,14 +69,14 @@ public:
             tc->sleep();
 
             /* Start a transaction if possible. */
-            tc->txn.try_begin();
+            tc->try_begin();
 
             auto ret = cursor->next(cursor.get());
             if (ret != 0) {
                 if (ret == WT_NOTFOUND)
                     testutil_check(cursor->reset(cursor.get()));
                 else if (ret == WT_ROLLBACK)
-                    tc->txn.rollback();
+                    tc->rollback();
                 else
                     testutil_die(ret, "Unexpected error returned from cursor->next()");
                 continue;
@@ -93,19 +93,19 @@ public:
             std::string value =
               random_generator::instance().generate_pseudo_random_string(tc->value_size);
             if (tc->update(cursor, coll.id, key_tmp, value)) {
-                if (tc->txn.can_commit()) {
-                    if (tc->txn.commit())
+                if (tc->can_commit()) {
+                    if (tc->commit())
                         rollback_retries = 0;
                     else
                         ++rollback_retries;
                 }
             } else {
-                tc->txn.rollback();
+                tc->rollback();
                 ++rollback_retries;
             }
             testutil_assert(rollback_retries < MAX_ROLLBACKS);
         }
         /* Ensure our last transaction is resolved. */
-        tc->txn.try_rollback();
+        tc->try_rollback();
     }
 };

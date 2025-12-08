@@ -70,10 +70,10 @@ public:
 
         while (tc->running()) {
             testutil_check(write_cursor->reset(write_cursor.get()));
-            tc->txn.begin();
+            tc->begin();
             int ret = write_cursor->next(write_cursor.get());
             if (ret != 0) {
-                tc->txn.rollback();
+                tc->rollback();
                 continue;
             }
             const char *key;
@@ -87,10 +87,10 @@ public:
             std::string end_key = tc->pad_string(std::to_string(end_key_id), tc->key_size);
             /* If we generate an invalid range or our truncate fails rollback the transaction. */
             if (min_key_id == end_key_id || !tc->truncate(coll.id, key_str, end_key, "")) {
-                tc->txn.rollback();
+                tc->rollback();
                 continue;
             }
-            if (tc->txn.commit())
+            if (tc->commit())
                 logger::log_msg(LOG_TRACE,
                   "thread {" + std::to_string(tc->id) + "} committed truncation of " +
                     std::to_string(end_key_id - min_key_id) + " records.");
@@ -111,7 +111,7 @@ public:
             tc->sync();
         }
         /* Make sure the last transaction is rolled back now the work is finished. */
-        tc->txn.try_rollback();
+        tc->try_rollback();
     }
 };
 } // namespace test_harness

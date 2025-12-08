@@ -49,6 +49,7 @@ typedef struct {
 /*! [key provider struct implementation] */
 typedef struct {
     WT_KEY_PROVIDER kp; /* Must come first */
+    WT_EXTENSION_API *wtext;
 
     /* This example stores a fixed size blob in the key provider struct. It is not required. */
     MY_CRYPT_DATA *encryption_data;
@@ -60,8 +61,9 @@ typedef struct {
  *     A simple example of set_key call.
  */
 static int
-my_load_key(WT_KEY_PROVIDER *kp, const WT_CRYPT_KEYS *key)
+my_load_key(WT_KEY_PROVIDER *kp, WT_SESSION *session, const WT_CRYPT_KEYS *keys)
 {
+    WT_UNUSED(session);
     MY_KEY_PROVIDER *my_kp = (MY_KEY_PROVIDER *)kp;
 
     /* Update the returned LSN and copy the encryption key data. */
@@ -73,7 +75,7 @@ my_load_key(WT_KEY_PROVIDER *kp, const WT_CRYPT_KEYS *key)
     free(my_kp->encryption_data);
 
     /* Assign new encryption data. */
-    memcpy((uint8_t *)encryption_data, key->data, key->size);
+    memcpy((uint8_t *)encryption_data, keys->data, keys->size);
     my_kp->encryption_data = encryption_data;
     return (0);
 }
@@ -83,22 +85,23 @@ my_load_key(WT_KEY_PROVIDER *kp, const WT_CRYPT_KEYS *key)
  *     An simple example of key rotation done on get_key call.
  */
 static int
-my_get_key(WT_KEY_PROVIDER *kp, WT_CRYPT_KEYS *key)
+my_get_key(WT_KEY_PROVIDER *kp, WT_SESSION *session, WT_CRYPT_KEYS **keysp)
 {
+    WT_UNUSED(session);
     MY_KEY_PROVIDER *my_kp = (MY_KEY_PROVIDER *)kp;
 
-    if ((key = calloc(1, sizeof(WT_CRYPT_KEYS) + sizeof(MY_CRYPT_DATA))) == NULL)
+    if ((*keysp = calloc(1, sizeof(WT_CRYPT_KEYS) + sizeof(MY_CRYPT_DATA))) == NULL)
         return (ENOMEM);
 
     /* Populate the data field in the WT_CRYPT_KEYS structure. */
-    MY_CRYPT_DATA *crypt_data = (MY_CRYPT_DATA *)key->data;
+    MY_CRYPT_DATA *crypt_data = (MY_CRYPT_DATA *)(*keysp)->data;
 
     /* Set fields in the MY_CRYPT_DATA structure. */
     crypt_data->data = my_kp->encryption_data->data;
     crypt_data->id = my_kp->encryption_data->id;
 
     /* Set the WT_CRYPT_KEYS size field to match the allocation. */
-    key->size = sizeof(MY_CRYPT_DATA);
+    (*keysp)->size = sizeof(MY_CRYPT_DATA);
     return (0);
 }
 
@@ -107,18 +110,22 @@ my_get_key(WT_KEY_PROVIDER *kp, WT_CRYPT_KEYS *key)
  *     A simple example of on_key_update call.
  */
 static int
-my_on_key_update(WT_KEY_PROVIDER *kp, WT_CRYPT_KEYS *key)
+my_on_key_update(WT_KEY_PROVIDER *kp, WT_SESSION *session, WT_CRYPT_KEYS *keys)
 {
     MY_KEY_PROVIDER *my_kp = (MY_KEY_PROVIDER *)kp;
+    WT_EXTENSION_API *wtext = my_kp->wtext;
 
     /* Check size field to determine that the key was successfully persisted. */
-    if (key->size != 0) {
-        my_kp->returned_lsn = key->r.lsn;
+    if (keys->size != 0)
+        my_kp->returned_lsn = keys->r.lsn;
+    else
+        /* Handle error */
+        (void)wtext->err_printf(
+          wtext, session, "on_key_update: %s", wtext->strerror(wtext, session, keys->r.error));
 
-        /* On success, free the allocated key. */
-        free(key);
-    } else
-        return (key->r.error);
+    /* Free the allocated key. */
+    free(keys);
+
     return (0);
 }
 
@@ -129,24 +136,25 @@ my_on_key_update(WT_KEY_PROVIDER *kp, WT_CRYPT_KEYS *key)
 int
 set_my_key_provider(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 {
-    MY_KEY_PROVIDER *kps;
-    WT_KEY_PROVIDER *wt;
+    MY_KEY_PROVIDER *my_kp;
+    WT_KEY_PROVIDER *kp;
     WT_EXTENSION_API *wtext;
 
     WT_UNUSED(config);
     wtext = conn->get_extension_api(conn);
     /* Initialize our key provider system. */
-    if ((kps = calloc(1, sizeof(MY_KEY_PROVIDER))) == NULL) {
+    if ((my_kp = calloc(1, sizeof(MY_KEY_PROVIDER))) == NULL) {
         (void)wtext->err_printf(
           wtext, NULL, "set_my_key_provider: %s", wtext->strerror(wtext, NULL, ENOMEM));
         return (ENOMEM);
     }
-    wt = (WT_KEY_PROVIDER *)&kps->kp;
-    wt->load_key = my_load_key;
-    wt->get_key = my_get_key;
-    wt->on_key_update = my_on_key_update;
+    my_kp->wtext = wtext;
+    kp = (WT_KEY_PROVIDER *)&my_kp->kp;
+    kp->load_key = my_load_key;
+    kp->get_key = my_get_key;
+    kp->on_key_update = my_on_key_update;
 
-    error_check(conn->set_key_provider(conn, (WT_KEY_PROVIDER *)kps, NULL));
+    error_check(conn->set_key_provider(conn, (WT_KEY_PROVIDER *)my_kp, NULL));
     return (0);
 }
 
