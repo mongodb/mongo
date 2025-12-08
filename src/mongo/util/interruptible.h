@@ -129,6 +129,13 @@ public:
     }
 
     /**
+     * Raises an AssertionException if this operation's deadline has expired as of 'now'.
+     */
+    void checkForDeadlineExpired(Date_t now) {
+        iassert(checkForDeadlineExpiredNoAssert(now));
+    }
+
+    /**
      * Waits on condition "cv" for "pred" until "pred" returns true, or the given "deadline"
      * expires, or this operation is interrupted, or this operation's own deadline expires.
      *
@@ -305,6 +312,13 @@ public:
     virtual Status checkForInterruptNoAssert() noexcept = 0;
 
     /**
+     * Checks if this operation's deadline has expired as of 'now'. Use this function when the
+     * current time is retrieved from a clock source different from the one used by this
+     * Interruptible in checkForInterruptNoAssert (e.g., system_clock vs FastClockSource).
+     */
+    virtual Status checkForDeadlineExpiredNoAssert(Date_t now) noexcept = 0;
+
+    /**
      * Pushes a subsidiary deadline into the Interruptible. Until an associated
      * popArtificialDeadline() is invoked, the Interruptible will fail checkForInterrupt() and
      * waitForConditionOrInterrupt() calls with the passed error code if the deadline has passed.
@@ -365,6 +379,10 @@ private:
     }
 
     Status checkForInterruptNoAssert() noexcept override {
+        return Status::OK();
+    }
+
+    Status checkForDeadlineExpiredNoAssert(Date_t now) noexcept override {
         return Status::OK();
     }
 

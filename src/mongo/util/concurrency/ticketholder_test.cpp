@@ -131,6 +131,24 @@ public:
         ASSERT(false);
     }
 
+    OperationContext* opCtx() {
+        return _opCtx.get();
+    }
+
+    /**
+     * Helper function that tests ticket wait timeout behavior.
+     *
+     * Sets up a TicketHolder with 1 ticket, acquires it, then spawns a thread that attempts
+     * to acquire a ticket with a deadline. Verifies the timeout occurs within expected bounds.
+     *
+     * @param maxTimeMS The deadline to set on the waiting operation
+     * @param lowerBoundSlack Allowed timing variation below maxTimeMS
+     * @param upperBoundSlack Allowed timing variation above maxTimeMS
+     */
+    void runTicketWaitTimeoutTest(Milliseconds maxTimeMS,
+                                  Milliseconds lowerBoundSlack,
+                                  Milliseconds upperBoundSlack);
+
 protected:
     class Stats;
     class Hotel;
@@ -247,6 +265,58 @@ struct TicketHolderTest::MockAdmission {
     boost::optional<ScopedAdmissionPriorityBase> admissionPriority;
     boost::optional<Ticket> ticket;
 };
+
+void TicketHolderTest::runTicketWaitTimeoutTest(Milliseconds maxTimeMS,
+                                                Milliseconds lowerBoundSlack,
+                                                Milliseconds upperBoundSlack) {
+    auto holder = std::make_unique<TicketHolder>(
+        getServiceContext(), 1, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
+
+    // Acquire the only available ticket so subsequent attempts will block
+    MockAdmissionContext admCtx1{};
+    auto ticket1 = holder->waitForTicket(_opCtx.get(), &admCtx1);
+    ASSERT_EQ(holder->used(), 1);
+    ASSERT_EQ(holder->available(), 0);
+
+    MockAdmission timedOutAdmission{getServiceContext(), AdmissionContext::Priority::kNormal};
+    timedOutAdmission.opCtx->setDeadlineAfterNowBy(maxTimeMS, ErrorCodes::MaxTimeMSExpired);
+
+    // Spawn a thread that will try to acquire a ticket and should timeout
+    AtomicWord<bool> didTimeout{false};
+    AtomicWord<ErrorCodes::Error> errorCode{ErrorCodes::OK};
+    Future<void> ticketFuture = spawn([&]() {
+        try {
+            holder->waitForTicket(timedOutAdmission.opCtx.get(), &timedOutAdmission.admCtx);
+        } catch (const DBException& ex) {
+            didTimeout.store(true);
+            errorCode.store(ex.code());
+        }
+    });
+
+    // Wait until the thread is actually queued waiting for a ticket
+    ASSERT_TRUE(timedOutAdmission.waitUntilQueued(kDefaultTimeout));
+
+    // Record the start time (after queued, to measure only wait time)
+    Timer timer;
+
+    // Wait for the future to complete
+    _opCtx->runWithDeadline(
+        getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] { ticketFuture.get(_opCtx.get()); });
+
+    auto actualDuration = Milliseconds{timer.millis()};
+
+    // Verify that the operation timed out with MaxTimeMSExpired
+    ASSERT_TRUE(didTimeout.load());
+    ASSERT_EQ(errorCode.load(), ErrorCodes::MaxTimeMSExpired);
+
+    // Verify the timeout happened within expected bounds
+    ASSERT_GTE(actualDuration, maxTimeMS - lowerBoundSlack);
+    ASSERT_LTE(actualDuration, maxTimeMS + upperBoundSlack);
+
+    // Verify ticket holder stats
+    ASSERT_EQ(holder->used(), 1);
+    ASSERT_EQ(holder->available(), 0);
+}
 
 TEST_F(TicketHolderTest, BasicTimeout) {
     auto holder = std::make_unique<TicketHolder>(
@@ -1056,5 +1126,29 @@ TEST_F(TicketHolderTestTick, TotalTimeQueueMicrosAccumulated) {
     ASSERT_EQ(holder->used(), 0);
     ASSERT_EQ(holder->available(), 1);
     ASSERT_EQ(holder->outof(), 1);
+}
+
+TEST_F(TicketHolderTestTick, WaitForTicketDeadlineBetweenTimeoutWindows) {
+    // This test verifies that when waiting for a ticket, the operation times out due to maxTimeMS
+    // and that the timeout duration is close to the specified maxTimeMS value.
+    //
+    // Note: This test waits for real time because TicketHolder uses OS-level synchronization
+    // primitives that cannot be mocked.
+    //
+    // Currently with the 500ms base interval and jitter, the first timeout happens between 400 -
+    // 600ms. The second timeout happens between 800 - 1200 ms. So picking 650 checks whether the
+    // ticket wait finishes between 650ms +- 1ms which has no overlap with the first or second
+    // timeout window.
+    runTicketWaitTimeoutTest(Milliseconds{650},  // maxTimeMS
+                             Milliseconds{1},    // lowerBoundSlack
+                             Milliseconds{1});   // upperBoundSlack
+}
+
+TEST_F(TicketHolderTestTick, WaitForTicketWithShortDeadline) {
+    // This test verifies that short deadlines (much less than the 500ms base interval) are
+    // respected.
+    runTicketWaitTimeoutTest(Milliseconds{50},  // maxTimeMS - much less than 500ms base interval
+                             Milliseconds{1},   // lowerBoundSlack
+                             Milliseconds{1});  // upperBoundSlack
 }
 }  // namespace
