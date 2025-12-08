@@ -178,9 +178,7 @@ public:
             _svcCtx, std::unique_ptr<repl::ReplicationCoordinator>(_replCoord));
 
         catalog::startUpStorageEngineAndCollectionCatalog(
-            _svcCtx,
-            &cc(),
-            StorageEngineInitFlags::kAllowNoLockFile | StorageEngineInitFlags::kSkipMetadataFile);
+            _svcCtx, &cc(), StorageEngineInitFlags::kSkipMetadataFile);
 
         DatabaseHolder::set(_svcCtx, std::make_unique<DatabaseHolderImpl>());
         repl::StorageInterface::set(_svcCtx, std::make_unique<repl::StorageInterfaceImpl>());
@@ -264,8 +262,7 @@ public:
         catalog::startUpStorageEngineAndCollectionCatalog(
             _svcCtx,
             &cc(),
-            StorageEngineInitFlags::kAllowNoLockFile | StorageEngineInitFlags::kSkipMetadataFile |
-                StorageEngineInitFlags::kForRestart);
+            StorageEngineInitFlags::kSkipMetadataFile | StorageEngineInitFlags::kForRestart);
     }
 
     ServiceContext* getSvcCtx() {

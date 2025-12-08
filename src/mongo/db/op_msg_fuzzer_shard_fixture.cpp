@@ -126,9 +126,7 @@ OpMsgFuzzerShardFixture::OpMsgFuzzerShardFixture(bool skipGlobalInitializers)
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 
     catalog::startUpStorageEngineAndCollectionCatalog(
-        _serviceContext,
-        clientGuard.get(),
-        StorageEngineInitFlags::kAllowNoLockFile | StorageEngineInitFlags::kSkipMetadataFile);
+        _serviceContext, clientGuard.get(), StorageEngineInitFlags::kSkipMetadataFile);
     StorageControl::startStorageControls(_serviceContext, true /*forTestOnly*/);
 
     ShardingState::create(_serviceContext);

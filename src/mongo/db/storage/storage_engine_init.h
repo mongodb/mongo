@@ -50,9 +50,8 @@ namespace mongo {
  * Valid flags to pass to initializeStorageEngine. Used as a bitfield.
  */
 enum class StorageEngineInitFlags {
-    kAllowNoLockFile = 1 << 0,
-    kSkipMetadataFile = 1 << 1,
-    kForRestart = 1 << 2,  // Used by reinitialzeStorageEngine only.
+    kSkipMetadataFile = 1 << 0,
+    kForRestart = 1 << 1,  // Used by reinitialzeStorageEngine only.
 };
 
 constexpr StorageEngineInitFlags operator&(StorageEngineInitFlags a, StorageEngineInitFlags b) {

@@ -50,7 +50,7 @@ namespace mongo {
 class MongoDScopedGlobalServiceContextForTest : public ScopedGlobalServiceContextForTest {
 public:
     constexpr static StorageEngineInitFlags kDefaultStorageEngineInitFlags =
-        StorageEngineInitFlags::kAllowNoLockFile | StorageEngineInitFlags::kSkipMetadataFile;
+        StorageEngineInitFlags::kSkipMetadataFile;
 
     enum class RepairAction { kNoRepair, kRepair };
 
