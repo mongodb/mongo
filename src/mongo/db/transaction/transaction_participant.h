@@ -658,6 +658,14 @@ public:
             OperationContext* opCtx, boost::optional<repl::OpTime> prepareOptime);
 
         /**
+         * Given a session transaction record, this updates in-memory state to match the state
+         * represented by that record. Must only be called as part of recovering a transaction from
+         * a precise checkpoint.
+         */
+        void refreshPreparedTransactionFromTxnRecord(OperationContext* opCtx,
+                                                     SessionTxnRecord txnRecord);
+
+        /**
          * Sets the prepare optime used for recovery.
          */
         void setPrepareOpTimeForRecovery(OperationContext* opCtx, repl::OpTime prepareOpTime);
