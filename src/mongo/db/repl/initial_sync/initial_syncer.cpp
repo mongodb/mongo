@@ -1216,7 +1216,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         beginFetchingOpTime,
         _syncSource,
         config,
-        initialSyncOplogFetcherBatchSize,
+        initialSyncOplogFetcherBatchSize.load(),
         OplogFetcher::RequireFresherSyncSource::kDontRequireFresherSyncSource);
     oplogFetcherConfig.startingPoint = OplogFetcher::StartingPoint::kEnqueueFirstDoc;
     _oplogFetcher = (*_createOplogFetcherFn)(

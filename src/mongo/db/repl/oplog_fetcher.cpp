@@ -622,7 +622,7 @@ Status OplogFetcher::_createNewCursor(bool initialFind) {
 
     auto findCmd = _makeFindCmdRequest(maxTimeMs);
     _cursor = std::make_unique<DBClientCursor>(
-        _conn.get(), std::move(findCmd), ReadPreferenceSetting{}, oplogFetcherUsesExhaust);
+        _conn.get(), std::move(findCmd), ReadPreferenceSetting{}, oplogFetcherUsesExhaust.load());
 
     _firstBatch = true;
 

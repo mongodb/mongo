@@ -125,7 +125,7 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
       _sourceNss(sourceNss),
       _collectionOptions(collectionOptions),
       _sourceDbAndUuid(NamespaceString::kEmpty),
-      _collectionClonerBatchSize(collectionClonerBatchSize),
+      _collectionClonerBatchSize(collectionClonerBatchSize.load()),
       _collStatsStage("collStats", this, &CollectionCloner::collStatsStage),
       _countStage("count", this, &CollectionCloner::countStage),
       _listIndexesStage("listIndexes", this, &CollectionCloner::listIndexesStage),
@@ -447,7 +447,8 @@ void CollectionCloner::runQuery() {
         findCmd.setRawData(true);
     }
 
-    ExhaustMode exhaustMode = collectionClonerUsesExhaust ? ExhaustMode::kOn : ExhaustMode::kOff;
+    ExhaustMode exhaustMode =
+        collectionClonerUsesExhaust.load() ? ExhaustMode::kOn : ExhaustMode::kOff;
 
     if (_collectionOptions.recordIdsReplicated) {
         // The below projection returns a stream of documents in the format

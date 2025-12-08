@@ -148,12 +148,12 @@ class SetSteadyStateConstraints : public T {
 protected:
     void setUp() override {
         T::setUp();
-        _constraintsEnabled = oplogApplicationEnforcesSteadyStateConstraints;
-        oplogApplicationEnforcesSteadyStateConstraints = enable;
+        _constraintsEnabled = oplogApplicationEnforcesSteadyStateConstraints.load();
+        oplogApplicationEnforcesSteadyStateConstraints.store(enable);
     }
 
     void tearDown() override {
-        oplogApplicationEnforcesSteadyStateConstraints = _constraintsEnabled;
+        oplogApplicationEnforcesSteadyStateConstraints.store(_constraintsEnabled);
         T::tearDown();
     }
 

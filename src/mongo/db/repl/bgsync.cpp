@@ -515,8 +515,10 @@ void BackgroundSync::_produce() {
                 return this->_enqueueDocuments(a1, a2, a3);
             },
             onOplogFetcherShutdownCallbackFn,
-            OplogFetcher::Config(
-                lastOpTimeFetched, source, _replCoord->getConfig(), bgSyncOplogFetcherBatchSize));
+            OplogFetcher::Config(lastOpTimeFetched,
+                                 source,
+                                 _replCoord->getConfig(),
+                                 bgSyncOplogFetcherBatchSize.load()));
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_state != ProducerState::Running) {
             return;
@@ -655,7 +657,7 @@ Status BackgroundSync::_enqueueDocuments(OplogFetcher::Documents::const_iterator
     }
 
     // Check some things periodically (whenever we run out of items in the current cursor batch).
-    if (!oplogFetcherUsesExhaust && info.networkDocumentBytes > 0 &&
+    if (!oplogFetcherUsesExhaust.load() && info.networkDocumentBytes > 0 &&
         info.networkDocumentBytes < kSmallBatchLimitBytes) {
         // On a very low latency network, if we don't wait a little, we'll be
         // getting ops to write almost one at a time.  This will both be expensive

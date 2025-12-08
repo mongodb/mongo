@@ -67,7 +67,7 @@ OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx,
     boost::optional<long long> termWhenExhausted;
     auto now = opCtx->fastClockSource().now();
     auto delaySecsLatestTimestamp = _calculateSecondaryDelaySecsLatestTimestamp(opCtx, now);
-    auto delayMillis = Milliseconds(oplogBatchDelayMillis);
+    auto delayMillis = Milliseconds(oplogBatchDelayMillis.load());
     Date_t waitForDataDeadline = now + maxWaitTime;
     // We expect oplogBatchDelayMillis to be tens of milliseconds so we cap it at
     // maxWaitTime to avoid unexpected behavior. Therefore, secondaryDelaySecs won't be affected by

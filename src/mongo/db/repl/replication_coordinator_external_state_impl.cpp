@@ -1144,7 +1144,7 @@ void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
 }
 
 double ReplicationCoordinatorExternalStateImpl::getElectionTimeoutOffsetLimitFraction() const {
-    return replElectionTimeoutOffsetLimitFraction;
+    return replElectionTimeoutOffsetLimitFraction.load();
 }
 
 

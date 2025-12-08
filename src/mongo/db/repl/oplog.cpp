@@ -1720,7 +1720,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                 opObj,
                                 boost::none /* status */);
 
-                            if (oplogApplicationEnforcesSteadyStateConstraints) {
+                            if (oplogApplicationEnforcesSteadyStateConstraints.load()) {
                                 return status;
                             }
                         } else if (inStableRecovery) {
@@ -1945,7 +1945,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                             // We shouldn't be doing upserts in secondary mode when enforcing steady
                             // state constraints.
-                            invariant(!oplogApplicationEnforcesSteadyStateConstraints);
+                            invariant(!oplogApplicationEnforcesSteadyStateConstraints.load());
                         } else if (inStableRecovery) {
                             repl::OplogApplication::checkOnOplogFailureForRecovery(
                                 opCtx,
@@ -2166,7 +2166,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                         << "Applied a delete which did not delete anything in "
                                            "steady state replication : "
                                         << redact(op.toBSONForLogging()),
-                                    !oplogApplicationEnforcesSteadyStateConstraints);
+                                    !oplogApplicationEnforcesSteadyStateConstraints.load());
                         }
                     }
                     wuow.commit();
@@ -2482,7 +2482,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 // ephemeral entity that can be created or destroyed (if no collections exist)
                 // without an oplog entry.
                 if ((mode == OplogApplication::Mode::kSecondary &&
-                     oplogApplicationEnforcesSteadyStateConstraints &&
+                     oplogApplicationEnforcesSteadyStateConstraints.load() &&
                      status.code() != ErrorCodes::IndexNotFound &&
                      opsMapIt->first != "dropDatabase") ||
                     !curOpToApply.acceptableErrors.count(status.code())) {

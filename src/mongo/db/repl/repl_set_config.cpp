@@ -252,7 +252,7 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
         const MemberConfig& memberI = getMembers()[i];
 
         // Check that no horizon mappings contain IP addresses
-        if (!disableSplitHorizonIPCheck && !allowSplitHorizonIP) {
+        if (!disableSplitHorizonIPCheck.load() && !allowSplitHorizonIP) {
             for (auto&& mapping : memberI.getHorizonMappings()) {
                 // Ignore the default horizon -- this can be an IP
                 if (mapping.first == SplitHorizon::kDefaultHorizon) {

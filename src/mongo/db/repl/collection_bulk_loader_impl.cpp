@@ -212,7 +212,7 @@ Status CollectionBulkLoaderImpl::insertDocuments(std::span<BSONObj> objs,
                     locs.clear();
 
                     while (insertIter != objs.end() &&
-                           bytesInBlock < collectionBulkLoaderBatchSizeInBytes) {
+                           bytesInBlock < collectionBulkLoaderBatchSizeInBytes.load()) {
                         const auto& [replRid, doc] = fn(*insertIter++);
                         bytesInBlock += doc.objsize();
                         // Insert the documents without updating indexes because we're building the

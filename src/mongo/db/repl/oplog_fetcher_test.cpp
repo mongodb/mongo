@@ -452,7 +452,7 @@ void OplogFetcherTest::setUp() {
 
     // Always enable oplogFetcherUsesExhaust at the beginning of each unittest in case some
     // unittests disable it in the test.
-    oplogFetcherUsesExhaust = true;
+    oplogFetcherUsesExhaust.store(true);
 }
 
 std::unique_ptr<OplogFetcher> OplogFetcherTest::makeOplogFetcher() {
@@ -1594,7 +1594,7 @@ TEST_F(OplogFetcherTest, OplogFetcherWorksWithoutExhaust) {
 
     ShutdownState shutdownState;
 
-    oplogFetcherUsesExhaust = false;
+    oplogFetcherUsesExhaust.store(false);
 
     // Create an oplog fetcher with one retry.
     auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);

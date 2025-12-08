@@ -516,7 +516,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                 // In initial sync and recovery modes we always ignore errors about missing
                 // documents on update, so there is no reason to convert the updates to upsert.
 
-                bool shouldAlwaysUpsert = !oplogApplicationEnforcesSteadyStateConstraints &&
+                bool shouldAlwaysUpsert = !oplogApplicationEnforcesSteadyStateConstraints.load() &&
                     oplogApplicationMode == OplogApplication::Mode::kSecondary;
                 Status status = applyOperation_inlock(opCtx,
                                                       *coll,
@@ -539,7 +539,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                 // only for deletes, on the grounds that deleting from a non-existent collection
                 // is a no-op.
                 if (opType == OpTypeEnum::kDelete &&
-                    !oplogApplicationEnforcesSteadyStateConstraints &&
+                    !oplogApplicationEnforcesSteadyStateConstraints.load() &&
                     oplogApplicationMode == OplogApplication::Mode::kSecondary) {
                     LOGV2_DEBUG(8994800,
                                 1,
