@@ -87,3 +87,40 @@ sudo docker push "$antithesis_repo/workload:$tag"
 
 # Logout
 sudo docker logout https://us-central1-docker.pkg.dev
+
+# Skip triggering tests for patch builds
+if [ "${is_patch}" != "true" ]; then
+    exit 0
+fi
+
+# Parameter was not passed to schedule antithesis tests
+if [ "${schedule_antithesis_tests}" != "true" ]; then
+    exit 0
+fi
+
+params=$(jq -n \
+    --arg config_image "${task_name}:$tag" \
+    --arg images "mongo-binaries:$tag;workload:$tag" \
+    --arg description "Patch Test: ${task_name} for ${tag}" \
+    --arg author_email "${author_email}" \
+    '{
+    params: {
+      "antithesis.description": $description,
+      "custom.duration": "1",
+      "antithesis.config_image": $config_image,
+      "antithesis.images": $images,
+      "antithesis.report.recipients": $author_email,
+      "antithesis.is_ephemeral": "true"
+    }
+  }')
+
+echo "Calling Antithesis API endpoint: https://mongo.antithesis.com/api/v1/launch/${antithesis_endpoint}"
+echo "With parameters:"
+echo "$params" | jq .
+
+curl --fail -u "mongodb:${antithesis_api_password}" \
+    -X POST "https://mongo.antithesis.com/api/v1/launch/${antithesis_endpoint}" \
+    -H "Content-Type: application/json" \
+    -d "$params"
+
+echo -e "\nSuccessfully triggered Antithesis ${antithesis_endpoint} test"

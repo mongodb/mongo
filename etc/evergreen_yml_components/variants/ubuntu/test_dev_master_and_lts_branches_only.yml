@@ -34,6 +34,7 @@ buildvariants:
     expansions:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       compile_variant: *enterprise-ubuntu2204-64-libvoidstar
+      antithesis_endpoint: core_server_vanilla
       bazel_compile_flags: >-
         ${antithesis_bazel_compile_flags}
         --define=MONGO_DISTMOD=ubuntu2204
@@ -51,6 +52,7 @@ buildvariants:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       antithesis_build_type: aubsan
       compile_variant: *enterprise-ubuntu2204-64-aubsan-libvoidstar
+      antithesis_endpoint: core_server_aubsan
       bazel_compile_flags: >-
         ${antithesis_bazel_compile_flags}
         --config=dbg_aubsan
@@ -77,6 +79,7 @@ buildvariants:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       antithesis_build_type: tsan
       compile_variant: *enterprise-ubuntu2204-64-tsan-libvoidstar
+      antithesis_endpoint: core_server_tsan
       bazel_compile_flags: >-
         ${antithesis_bazel_compile_flags}
         --config=dbg_tsan

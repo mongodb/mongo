@@ -191,6 +191,14 @@ This should be done with care to ensure we are using our limited resources effic
 
 Create a new task extending the `antithesis_task_template`, tagged with `antithesis`, passing the specified `suite` to the `antithesis image build and push` task. See other examples to get started.
 
+## How do I test my suite in antithesis?
+
+If you provide the evergreen parameter `schedule_antithesis_tests` to your evergreen patch, once we build the antithesis images in your evergreen patch we send antithesis an api request to run your newly created images for an hour. You will get emailed the report when it finishes running in antithesis.
+
+Important Note: This will happen for every antithesis task you schedule in your patch. Please do not schedule more than 1 or 2 tasks with this parameter at a time or it will use up a lot of our testing time allocated with antithesis.
+
+`evergreen patch --param schedule_antithesis_tests=true`
+
 ## Additional Resources
 
 If you are interested in leveraging Antithesis feel free to reach out to #server-testing on Slack.

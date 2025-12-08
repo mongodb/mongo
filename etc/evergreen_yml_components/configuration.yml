@@ -54,6 +54,11 @@ parameters:
     description: >-
       Automatically disables symbolizing stack traces from Resmoke tasks. If this is set to false, the steps on how to manually symbolize the unsymbolized stacktraces will not be generated.
 
+  - key: schedule_antithesis_tests
+    description: >-
+      Automatically schedules your antithesis tasks to run in antithesis.
+      Please only schedule one or two antithesis tasks when specifying this parameter.
+
   ## Cron parameters.
   - key: project_required_suggested_cron
     value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC
