@@ -691,10 +691,14 @@ void checkLocalCatalogCollectionOptions(OperationContext* opCtx,
             "expected the target collection to exist",
             targetColl.has_value() && targetColl->exists());
 
+    uassert(ErrorCodes::IllegalOperation,
+            "Can't register a temporary collection in the sharding catalog.",
+            !targetColl->getCollectionPtr()->isTemporary());
+
     assertTimeseriesLocalCatalogConsistency(opCtx, targetColl->getCollectionPtr().get());
 
     if (request.getRegisterExistingCollectionInGlobalCatalog()) {
-        // No need to check for collection options when registering an existing collection
+        // No need to check for further collection options when registering an existing collection
         return;
     }
 
@@ -921,14 +925,14 @@ boost::optional<CreateCollectionResponse> checkIfCollectionExistsWithSameOptions
             "Expected optTargetCollUUID to be set unless creating system.sessions",
             optTargetCollUUID || missingSessionsCollectionLocally);
 
-    // 2. Make sure we're not trying to track a temporary collection upon moveCollection
+    // 2. Make sure we're not trying to track a temporary aggregation collection upon moveCollection
     if (request.getRegisterExistingCollectionInGlobalCatalog()) {
         DBDirectClient client(opCtx);
-        const auto isTemporaryCollection =
+        const auto isTemporaryAggregationCollection =
             client.count(NamespaceString::kAggTempCollections,
                          BSON("_id" << NamespaceStringUtil::serialize(
                                   *optTargetNss, SerializationContext::stateDefault())));
-        if (isTemporaryCollection) {
+        if (isTemporaryAggregationCollection) {
             // Return UNTRACKED version for the coordinator to gracefully terminate without
             // registering the collection
             return CreateCollectionResponse{ShardVersion::UNTRACKED()};

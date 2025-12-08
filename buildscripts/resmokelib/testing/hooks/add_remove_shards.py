@@ -346,7 +346,7 @@ class _AddRemoveShardThread(threading.Thread):
         if err.code == self._ILLEGAL_OPERATION:
             if "Can't move an internal resharding collection" in str(err):
                 return True
-            if "Can't reshard a timeseries collection" in str(err):
+            if "Can't register a temporary collection" in str(err):
                 return True
             for regex in self._UNMOVABLE_NAMESPACE_REGEXES:
                 if re.search(regex, namespace):

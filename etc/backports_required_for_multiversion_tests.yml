@@ -93,6 +93,8 @@ last-continuous:
       ticket: SERVER-114005
     - test_file: jstests/sharding/move_collection_stale_mongos.js
       ticket: SERVER-109322
+    - test_file: jstests/core_sharding/ddl/cannot_track_temporary_collection.js
+      ticket: SERVER-114666
     - test_file: jstests/sharding/unshard_collection_stale_mongos.js
       ticket: SERVER-109322
     - test_file: jstests/sharding/reshard_collection_with_zones_stale_mongos.js
@@ -696,6 +698,8 @@ last-lts:
       ticket: SERVER-114005
     - test_file: jstests/sharding/move_collection_stale_mongos.js
       ticket: SERVER-109322
+    - test_file: jstests/core_sharding/ddl/cannot_track_temporary_collection.js
+      ticket: SERVER-114666
     - test_file: jstests/sharding/unshard_collection_stale_mongos.js
       ticket: SERVER-109322
     - test_file: jstests/sharding/reshard_collection_with_zones_stale_mongos.js
