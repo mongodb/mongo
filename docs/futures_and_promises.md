@@ -174,7 +174,7 @@ SemiFuture<Work> SomeAsyncService::requestWork() {
 
 // Code consuming a `SemiFuture`
 SemiFuture<Work> sf = SomeAsyncService::requestWork();
-// sf.then(...) wont' compile because sf is a SemiFuture, which doesn't allow chaining continuations
+// sf.then(...) won't compile because sf is a SemiFuture, which doesn't allow chaining continuations
 // sf.onError(...) won't compile for the same reason
 auto res = sf.get(); // OK; get blocks until sf is ready
 ```

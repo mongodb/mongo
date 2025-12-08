@@ -18,6 +18,9 @@ filters:
   - "exception_architecture.md":
     approvers:
       - 10gen/server-programmability
+  - "futures_and_promises.md":
+    approvers:
+      - 10gen/server-programmability
   - "golden_data_test_framework.md":
     approvers:
       - 10gen/query-optimization

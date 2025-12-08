@@ -351,6 +351,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /docs/**/devcontainer-setup.md @10gen/devprod-correctness @svc-auto-approve-bot
 /docs/devcontainer/** @10gen/devprod-correctness @svc-auto-approve-bot
 /docs/**/exception_architecture.md @10gen/server-programmability @svc-auto-approve-bot
+/docs/**/futures_and_promises.md @10gen/server-programmability @svc-auto-approve-bot
 /docs/**/golden_data_test_framework.md @10gen/query-optimization @svc-auto-approve-bot
 /docs/**/idl.md @10gen/server-programmability @svc-auto-approve-bot
 /docs/**/linting.md @10gen/devprod-build @svc-auto-approve-bot
