@@ -72,7 +72,7 @@ protected:
 /**
  * This class serves as the public interface to the functionality described in the Service Discovery
  * and Monitoring spec:
- *   https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst
+ *   https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.md
  */
 class TopologyManagerImpl final : public TopologyManager {
     TopologyManagerImpl() = delete;
@@ -92,7 +92,7 @@ public:
      *
      * Multiple threads may call this function concurrently. However, the manager will process the
      * HelloOutcomes serially, as required by:
-     *   https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#process-one-ismaster-outcome-at-a-time
+     *   https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.md#process-one-hello-or-legacy-hello-outcome-at-a-time
      */
     bool onServerDescription(const HelloOutcome& helloOutcome) override;
 
