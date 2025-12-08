@@ -180,7 +180,8 @@ boost::optional<Maxterm> quineMcCluskey(const BitsetTreeNode& tree,
     // The simplifications using the Quine-McCluskey algorithm (x&y | x&~y = x). The QMC works only
     // for expressions with negations.
     if (settings.applyQuineMcCluskey && containsNegations(*maxterm)) {
-        maxterm = boolean_simplification::quineMcCluskey(std::move(*maxterm));
+        maxterm = boolean_simplification::quineMcCluskey(std::move(*maxterm),
+                                                         settings.maxNumPrimeImplicants);
     }
 
     return maxterm;

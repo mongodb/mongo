@@ -99,6 +99,8 @@ last-continuous:
       ticket: SERVER-109322
     - test_file: jstests/core/query/regex/regex_max_pattern_length.js
       ticket: SERVER-86326
+    - test_file: jstests/core/query/boolean_simplifier_stress.js
+      ticket: SERVER-114126
   suites: null
 last-lts:
   all:
@@ -700,4 +702,6 @@ last-lts:
       ticket: SERVER-109322
     - test_file: jstests/core/query/regex/regex_max_pattern_length.js
       ticket: SERVER-86326
+    - test_file: jstests/core/query/boolean_simplifier_stress.js
+      ticket: SERVER-114126
   suites: null

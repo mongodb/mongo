@@ -46,7 +46,7 @@ void petrick_classic(benchmark::State& state) {
     };
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(petricksMethod(data));
+        benchmark::DoNotOptimize(petricksMethod(data, 1000));
     }
 }
 
@@ -63,7 +63,7 @@ void petrick_noSimplifications(benchmark::State& state) {
     }
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(petricksMethod(data));
+        benchmark::DoNotOptimize(petricksMethod(data, 1000));
     }
 }
 
@@ -83,7 +83,7 @@ void petrick_essentialWithSimplications(benchmark::State& state) {
     };
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(petricksMethod(data));
+        benchmark::DoNotOptimize(petricksMethod(data, 1000));
     }
 }
 

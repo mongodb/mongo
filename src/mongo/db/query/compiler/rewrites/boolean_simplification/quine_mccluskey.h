@@ -66,7 +66,10 @@ std::pair<Maxterm, std::vector<CoveredOriginalMinterms>> findPrimeImplicants(Max
  * predicates and the second one prepresents mask (see Maxtern and Minterm documentation for
  * details). This expression can be simplified to A~BCD | ~ABD | ~A~C, or [(1011, 1111), (0101,
  * 1101), (0000, 1010)] in maxterm/minterm representation.
+ *
+ * 'maxNumPrimeImplicants' specifies a threshold for the maximum number of prime implicants we may
+ * produce during the application of Petrick's method.
  */
-Maxterm quineMcCluskey(Maxterm maxterm);
+Maxterm quineMcCluskey(Maxterm maxterm, size_t maxNumPrimeImplicants);
 
 }  // namespace mongo::boolean_simplification

@@ -59,7 +59,7 @@ TEST(PetrickTest, ClassicExample) {
         {0, 2, 3, 5},
     };
 
-    const auto result = petricksMethod(data);
+    const auto result = petricksMethod(data, 1000);
     ASSERT_EQ(expectedResult, result);
 }
 
@@ -74,7 +74,7 @@ TEST(PetrickTest, OneCoverage) {
         {0, 2},
     };
 
-    const auto result = petricksMethod(data);
+    const auto result = petricksMethod(data, 1000);
     ASSERT_EQ(expectedResult, result);
 }
 
@@ -90,7 +90,7 @@ TEST(PetrickTest, TwoCoverages) {
         {0, 2},
     };
 
-    const auto result = petricksMethod(data);
+    const auto result = petricksMethod(data, 1000);
     ASSERT_EQ(expectedResult, result);
 }
 
@@ -106,7 +106,7 @@ TEST(PetrickTest, NoSimplifications) {
         {0, 1, 2, 3},
     };
 
-    const auto result = petricksMethod(data);
+    const auto result = petricksMethod(data, 1000);
     ASSERT_EQ(expectedResult, result);
 }
 
@@ -125,7 +125,7 @@ TEST(PetrickTest, ManyEssentialsWithSimplifications) {
         {0, 2, 3, 4, 5},
     };
 
-    const auto result = petricksMethod(data);
+    const auto result = petricksMethod(data, 1000);
     ASSERT_EQ(expectedResult, result);
 }
 
@@ -143,7 +143,7 @@ TEST(PetrickTest, ReorderingMultipleEssentialsWithSimplifications) {
         {0, 1, 3, 5},
     };
 
-    const auto result = petricksMethod(data);
+    const auto result = petricksMethod(data, 1000);
     ASSERT_EQ(expectedResult, result);
 }
 
@@ -156,7 +156,7 @@ TEST(PetrickTest, OneMinterm) {
         {0},
     };
 
-    const auto result = petricksMethod(data);
+    const auto result = petricksMethod(data, 1000);
     ASSERT_EQ(expectedResult, result);
 }
 
@@ -165,7 +165,7 @@ TEST(PetrickTest, NoMinterms) {
 
     std::vector<PrimeImplicantIndices> expectedResult{};
 
-    const auto result = petricksMethod(data);
+    const auto result = petricksMethod(data, 1000);
     ASSERT_EQ(expectedResult, result);
 }
 }  // namespace mongo::boolean_simplification

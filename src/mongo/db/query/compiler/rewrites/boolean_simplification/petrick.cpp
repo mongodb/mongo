@@ -207,11 +207,13 @@ private:
  */
 class TabularPetrick {
 public:
-    explicit TabularPetrick(const std::vector<CoveredOriginalMinterms>& data)
-        : _numberOfBits(data.size()), _essentialImplicants(PrimeImplicant(data.size())) {
+    explicit TabularPetrick(const std::vector<CoveredOriginalMinterms>& data,
+                            size_t maxNumPrimeImplicants)
+        : _numberOfBits(data.size()),
+          _maxNumPrimeImplicants{maxNumPrimeImplicants},
+          _essentialImplicants(PrimeImplicant(data.size())) {
         for (size_t implicantIndex = 0; implicantIndex < data.size(); ++implicantIndex) {
-            for (auto mintermIndex = data[implicantIndex].findFirst(); mintermIndex != Bitset::npos;
-                 mintermIndex = data[implicantIndex].findNext(mintermIndex)) {
+            for (auto mintermIndex : makePopulationView(data[implicantIndex])) {
                 insert(mintermIndex, implicantIndex);
             }
         }
@@ -225,8 +227,17 @@ public:
             return std::vector<PrimeImplicantIndices>{_essentialImplicants.getListOfSetBits()};
         }
 
+        size_t cumulativePrimeImplicants = 0;
         while (_table.size() > 1) {
             const size_t size = _table.size();
+
+            const size_t nextProductSize = _table[size - 1].size() * _table[size - 2].size();
+            if (cumulativePrimeImplicants + nextProductSize > _maxNumPrimeImplicants) {
+                return {};
+            } else {
+                cumulativePrimeImplicants += nextProductSize;
+            }
+
             auto productResult = _table[size - 1].product(_table[size - 2]);
             _table.pop_back();
             _table[_table.size() - 1].swap(productResult);
@@ -265,17 +276,18 @@ private:
     }
 
     const size_t _numberOfBits;
+    const size_t _maxNumPrimeImplicants;
     std::vector<ImplicantSum> _table;
     PrimeImplicant _essentialImplicants;
 };
 }  // namespace
 
-std::vector<PrimeImplicantIndices> petricksMethod(
-    const std::vector<CoveredOriginalMinterms>& data) {
+std::vector<PrimeImplicantIndices> petricksMethod(const std::vector<CoveredOriginalMinterms>& data,
+                                                  size_t maxNumPrimeImplicants) {
     if (data.empty()) {
         return {};
     }
-    TabularPetrick table{data};
+    TabularPetrick table{data, maxNumPrimeImplicants};
     return table.getMinimalCoverages();
 }
 }  // namespace mongo::boolean_simplification

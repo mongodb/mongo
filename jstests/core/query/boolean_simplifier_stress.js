@@ -1,5 +1,6 @@
 /**
  * Test to stress the boolean simplifier.
+ * @tags: [requires_getmore]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
@@ -15,12 +16,14 @@ const n2_0 = {n2: 0};
 const n3_0 = {n3: 0};
 const n4_0 = {n4: 0};
 const n5_0 = {n5: 0};
+const n6_0 = {n6: 0};
 const n0_1 = {n0: {$not: {$eq: 0}}};
 const n1_1 = {n1: {$not: {$eq: 0}}};
 const n2_1 = {n2: {$not: {$eq: 0}}};
 const n3_1 = {n3: {$not: {$eq: 0}}};
 const n4_1 = {n4: {$not: {$eq: 0}}};
 const n5_1 = {n5: {$not: {$eq: 0}}};
+const n6_1 = {n6: {$not: {$eq: 0}}};
 const qmcQuery = {
     "$or": [
         {"$and": [n0_1, n1_1, n2_1, n3_1, n4_0, n5_1]},
@@ -661,23 +664,145 @@ assertArrayEq({
     expected: [],
 });
 
+// This query should cause us to bail before we enter Petrick's method.
+const petrickQuery = {
+    "$or": [
+        {"$and": [n0_1, n1_0, n2_1, n3_0, n4_1, n5_0, n6_1]},
+        {"$and": [n0_0, n1_0, n2_1, n3_1, n4_1, n5_0, n6_1]},
+        {"$and": [n0_1, n1_1, n2_0, n3_0, n4_1, n5_1, n6_0]},
+        {"$and": [n0_1, n1_0, n2_1, n3_1, n4_1, n5_0, n6_0]},
+        {"$and": [n0_1, n1_1, n2_0, n3_1, n4_1, n5_0, n6_0]},
+        {"$and": [n0_1, n1_0, n2_1, n3_0, n4_1, n5_1, n6_0]},
+        {"$and": [n0_1, n1_0, n2_1, n3_0, n4_1, n5_1, n6_0]},
+        {"$and": [n0_0, n1_1, n2_1, n3_0, n4_0, n5_1, n6_1]},
+        {"$and": [n0_0, n1_1, n2_0, n3_1, n4_0, n5_1, n6_1]},
+        {"$and": [n0_0, n1_1, n2_1, n3_0, n4_0, n5_1, n6_1]},
+        {"$and": [n0_0, n1_1, n2_1, n3_1, n4_1, n5_0, n6_0]},
+        {"$and": [n0_1, n1_1, n2_1, n3_0, n4_0, n5_0, n6_1]},
+        {"$and": [n0_0, n1_1, n2_1, n3_0, n4_1, n5_1, n6_0]},
+        {"$and": [n0_1, n1_1, n2_1, n3_0, n4_1, n5_0, n6_0]},
+        {"$and": [n0_0, n1_1, n2_0, n3_1, n4_0, n5_1, n6_1]},
+        {"$and": [n0_1, n1_0, n2_1, n3_1, n4_1, n5_0, n6_0]},
+        {"$and": [n0_1, n1_1, n2_0, n3_1, n4_1, n5_0, n6_0]},
+        {"$and": [n0_1, n1_0, n2_1, n3_1, n4_0, n5_0, n6_1]},
+        {"$and": [n0_1, n1_1, n2_1, n3_1, n4_0, n5_0, n6_0]},
+        {"$and": [n0_1, n1_0, n2_0, n3_1, n4_1, n5_1, n6_0]},
+        {"$and": [n0_0, n1_0, n2_1, n3_1, n4_0, n5_0, n6_1]},
+        {"$and": [n0_0, n1_1, n2_1, n3_1, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_1, n2_0, n3_0, n4_1, n5_1, n6_0]},
+        {"$and": [n0_0, n1_0, n2_1, n3_0, n4_1, n5_0, n6_1]},
+        {"$and": [n0_1, n1_0, n2_0, n3_0, n4_0, n5_1, n6_1]},
+        {"$and": [n0_0, n1_0, n2_1, n3_1, n4_0, n5_0, n6_1]},
+        {"$and": [n0_1, n1_0, n2_0, n3_0, n4_0, n5_1, n6_1]},
+        {"$and": [n0_0, n1_0, n2_0, n3_1, n4_1, n5_0, n6_1]},
+        {"$and": [n0_0, n1_1, n2_0, n3_0, n4_1, n5_1, n6_0]},
+        {"$and": [n0_1, n1_0, n2_0, n3_0, n4_1, n5_0, n6_1]},
+        {"$and": [n0_1, n1_1, n2_1, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_1, n1_0, n2_0, n3_1, n4_1, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_1, n3_0, n4_0, n5_1, n6_1]},
+        {"$and": [n0_0, n1_1, n2_0, n3_0, n4_0, n5_1, n6_1]},
+        {"$and": [n0_1, n1_0, n2_0, n3_1, n4_0, n5_0, n6_1]},
+        {"$and": [n0_0, n1_1, n2_0, n3_0, n4_1, n5_0, n6_1]},
+        {"$and": [n0_0, n1_0, n2_0, n3_1, n4_1, n5_1, n6_0]},
+        {"$and": [n0_1, n1_0, n2_1, n3_0, n4_0, n5_0, n6_1]},
+        {"$and": [n0_1, n1_0, n2_1, n3_1, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_1, n2_1, n3_1, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_1, n5_0, n6_1]},
+        {"$and": [n0_0, n1_1, n2_1, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_1, n2_1, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_1, n2_1, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_1, n2_0, n3_0, n4_0, n5_0, n6_1]},
+        {"$and": [n0_1, n1_0, n2_0, n3_1, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_1, n2_0, n3_0, n4_1, n5_0, n6_0]},
+        {"$and": [n0_1, n1_0, n2_0, n3_1, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_1, n4_1, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_1, n6_1]},
+        {"$and": [n0_1, n1_0, n2_0, n3_0, n4_1, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_1, n3_0, n4_0, n5_0, n6_1]},
+        {"$and": [n0_0, n1_0, n2_0, n3_1, n4_1, n5_0, n6_0]},
+        {"$and": [n0_1, n1_1, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_1, n2_0, n3_0, n4_0, n5_1, n6_0]},
+        {"$and": [n0_1, n1_0, n2_0, n3_0, n4_0, n5_0, n6_1]},
+        {"$and": [n0_0, n1_0, n2_0, n3_1, n4_0, n5_0, n6_1]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_1, n5_0, n6_1]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_1, n5_0, n6_1]},
+        {"$and": [n0_0, n1_0, n2_1, n3_0, n4_0, n5_1, n6_0]},
+        {"$and": [n0_0, n1_0, n2_1, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_1, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_1, n5_0, n6_0]},
+        {"$and": [n0_0, n1_1, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_1, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_1, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_1, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_1, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_1, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_1, n6_0]},
+        {"$and": [n0_0, n1_1, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_1, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_1, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_1, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_1, n6_0]},
+        {"$and": [n0_1, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_1, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_1, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_1, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_1, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+        {"$and": [n0_0, n1_0, n2_0, n3_0, n4_0, n5_0, n6_0]},
+    ],
+};
+
+assertArrayEq({
+    actual: coll.find(petrickQuery).toArray(),
+    expected: [],
+});
+
 // Insert documents and try again.
 const docs = [];
-for (let i = 0; i < 64; i++) {
+for (let i = 0; i < 128; i++) {
     docs.push({
         _id: i,
-        n0: NumberInt(i / 2),
-        n1: NumberInt(i / 4),
-        n2: NumberInt(i / 8),
-        n3: NumberInt(i / 16),
-        n4: NumberInt(i / 32),
-        n5: NumberInt(i / 64),
+        n0: NumberInt(i & 1),
+        n1: NumberInt((i & 2) >> 1),
+        n2: NumberInt((i & 4) >> 2),
+        n3: NumberInt((i & 8) >> 3),
+        n4: NumberInt((i & 16) >> 4),
+        n5: NumberInt((i & 32) >> 5),
+        n6: NumberInt((i & 64) >> 6),
     });
 }
 assert.commandWorked(coll.insertMany(docs));
 
-// Will match everything!
+// Will match everything except a few _ids.
 assertArrayEq({
     actual: coll.find(qmcQuery).toArray(),
-    expected: docs,
+    expected: Array.from(docs.filter((x) => x._id != NumberInt(127) && x._id != NumberInt(63))),
+});
+
+// Will match only the following _ids.
+const expectedIds = [
+    0, 1, 2, 3, 4, 6, 7, 8, 9, 13, 14, 15, 16, 17, 18, 23, 24, 25, 27, 29, 30, 32, 34, 36, 50, 51, 53, 54, 56, 57, 65,
+    66, 68, 69, 71, 72, 73, 76, 77, 80, 81, 82, 84, 85, 88, 92, 96, 97, 98, 100, 102, 106,
+];
+assertArrayEq({
+    actual: coll.find(petrickQuery).toArray(),
+    expected: Array.from(docs.filter((doc) => expectedIds.includes(doc._id))),
 });

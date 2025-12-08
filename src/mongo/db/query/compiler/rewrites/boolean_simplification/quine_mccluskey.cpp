@@ -189,15 +189,17 @@ std::pair<Maxterm, std::vector<CoveredOriginalMinterms>> findPrimeImplicants(Max
     return result;
 }
 
-Maxterm quineMcCluskey(Maxterm inputMaxterm) {
+Maxterm quineMcCluskey(Maxterm inputMaxterm, size_t maxNumPrimeImplicants) {
     auto [maxterm, maxtermCoverage] = findPrimeImplicants(std::move(inputMaxterm));
     const bool allEssential = std::all_of(maxtermCoverage.begin(),
                                           maxtermCoverage.end(),
                                           [](const auto& cov) { return cov.size() == 1; });
+
     if (allEssential) {
         return maxterm;
     }
-    const auto& primeImplicantCoverages = petricksMethod(maxtermCoverage);
+
+    const auto& primeImplicantCoverages = petricksMethod(maxtermCoverage, maxNumPrimeImplicants);
     if (primeImplicantCoverages.size() < 2) {
         return maxterm;
     }
