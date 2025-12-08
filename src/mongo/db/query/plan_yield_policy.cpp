@@ -142,8 +142,6 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
         try {
             saveState(opCtx);
 
-            boost::optional<ScopeGuard<std::function<void()>>> exitGuard;
-
             // TODO SERVER-103267: Remove setAbandonSnapshotMode() and related.
 
             if (getPolicy() == PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY) {
