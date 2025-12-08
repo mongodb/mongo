@@ -494,7 +494,7 @@ address `192.168.70.80` will satisfy (or not) the following individual rules.
 // Fails as the client source is in range, but the serverAddress is not.
 { clientSource: "172.16.0.0/12", serverAddress: "10.0.0.0/8" }
 
-// Succeeds as both addresses are in rage.
+// Succeeds as both addresses are in range.
 { clientSource: "172.16.70.0/25", serverAddress: "192.168.70.80" }
 
 // Succeeds as client address is in one of the allowed ranges.

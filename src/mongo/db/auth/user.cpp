@@ -234,65 +234,6 @@ Status User::validateRestrictions(OperationContext* opCtx) const {
     return Status::OK();
 }
 
-void User::reportForUsersInfo(BSONObjBuilder* builder,
-                              bool showCredentials,
-                              bool showPrivileges,
-                              bool showAuthenticationRestrictions) const {
-    builder->append(kIdFieldName, getName().getUnambiguousName());
-    UUID::fromCDR(ConstDataRange(_id)).appendToBuilder(builder, kUserIdFieldName);
-    builder->append(kUserFieldName, getName().getUser());
-    builder->append(kDbFieldName, getName().getDB());
-
-    BSONArrayBuilder mechanismNamesBuilder(builder->subarrayStart(kMechanismsFieldName));
-    for (StringData mechanism : _credentials.toMechanismsVector()) {
-        mechanismNamesBuilder.append(mechanism);
-    }
-    mechanismNamesBuilder.doneFast();
-
-    BSONArrayBuilder rolesBuilder(builder->subarrayStart(kRolesFieldName));
-    for (const auto& role : _roles) {
-        role.serializeToBSON(&rolesBuilder);
-    }
-    rolesBuilder.doneFast();
-
-    if (showCredentials) {
-        BSONObjBuilder credentialsBuilder(builder->subobjStart(kCredentialsFieldName));
-        _credentials.toBSON(&credentialsBuilder);
-        credentialsBuilder.doneFast();
-    }
-
-    if (showPrivileges || showAuthenticationRestrictions) {
-        BSONArrayBuilder inheritedRolesBuilder(builder->subarrayStart(kInheritedRolesFieldName));
-        for (const auto& indirectRole : _indirectRoles) {
-            indirectRole.serializeToBSON(&inheritedRolesBuilder);
-        }
-        inheritedRolesBuilder.doneFast();
-
-        BSONArrayBuilder privsBuilder(builder->subarrayStart(kInheritedPrivilegesFieldName));
-        for (const auto& resourceToPrivilege : _privileges) {
-            privsBuilder.append(resourceToPrivilege.second.toBSON());
-        }
-        privsBuilder.doneFast();
-
-        BSONArray indirectRestrictionsArr = _indirectRestrictions.toBSON();
-        builder->append(kInheritedAuthenticationRestrictionsFieldName, indirectRestrictionsArr);
-    }
-
-    if (showAuthenticationRestrictions) {
-        // The user document parser expects an array of documents, where each document represents
-        // a restriction. Since _restrictions is of type RestrictionDocuments, its serialization
-        // logic supports multiple arrays of documents rather than just one. Therefore, we only
-        // should append the first array here.
-        BSONArray authenticationRestrictionsArr = _restrictions.toBSON();
-        if (authenticationRestrictionsArr.nFields() == 0) {
-            builder->append(kAuthenticationRestrictionsFieldName, BSONArray());
-        } else {
-            builder->append(kAuthenticationRestrictionsFieldName,
-                            BSONArray(authenticationRestrictionsArr.begin()->Obj()));
-        }
-    }
-}
-
 bool User::hasDifferentRoles(const User& otherUser) const {
     // If the number of direct or indirect roles in the users' are not the same, they have
     // different roles.

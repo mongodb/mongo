@@ -450,15 +450,6 @@ public:
     Status validateRestrictions(OperationContext* opCtx) const;
 
     /**
-     * Generates a BSON representation of the User object with all the information needed for
-     * usersInfo.
-     */
-    void reportForUsersInfo(BSONObjBuilder* builder,
-                            bool showCredentials,
-                            bool showPrivileges,
-                            bool showAuthenticationRestrictions) const;
-
-    /**
      * Returns true if the User object has at least one different direct or indirect role from the
      * otherUser.
      */
