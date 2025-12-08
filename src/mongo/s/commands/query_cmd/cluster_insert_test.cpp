@@ -58,7 +58,7 @@ protected:
 
     void expectInspectRequest(int shardIndex, InspectionCallback cb) override {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-            if (internalQueryUnifiedWriteExecutor.load()) {
+            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
                 cb(request);
                 BulkWriteReplyItem item(0, Status::OK());
                 item.setN(1);
@@ -82,7 +82,7 @@ protected:
 
     void expectReturnsSuccess(int shardIndex) override {
         onCommandForPoolExecutor([this, shardIndex](const executor::RemoteCommandRequest& request) {
-            if (internalQueryUnifiedWriteExecutor.load()) {
+            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
                 auto cmd = request.cmdObj;
                 auto ops = cmd["ops"].Array();
                 auto size = ops.size();
@@ -112,7 +112,7 @@ protected:
 
 TEST_F(ClusterInsertTest, NoErrors) {
     for (auto uweKnobValue : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
                                                            uweKnobValue);
         testNoErrors(kInsertCmdTargeted, kInsertCmdScatterGather);
     }
@@ -138,7 +138,7 @@ TEST_F(ClusterInsertTest, CorrectMetricsSingleInsert) {
     const BSONObj obj = b.obj();
 
     for (auto uweKnobValue : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
                                                            uweKnobValue);
         testOpcountersAreCorrect(kInsertCmdTargeted, /* expectedValue */ obj);
     }
@@ -158,7 +158,7 @@ TEST_F(ClusterInsertTest, CorrectMetricsBulkInsert) {
     const BSONObj obj = b.obj();
 
     for (auto uweKnobValue : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
                                                            uweKnobValue);
         testOpcountersAreCorrect(bulkInsertCmd, /* expectedValue */ obj);
     }

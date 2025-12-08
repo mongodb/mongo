@@ -34,11 +34,11 @@ executor:
       set_parameters:
         coordinateCommitReturnImmediatelyAfterPersistingDecision: true
         enableTestCommands: 1
-        internalQueryUnifiedWriteExecutor: true
+        featureFlagUnifiedWriteExecutor: true
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-        internalQueryUnifiedWriteExecutor: true
+        featureFlagUnifiedWriteExecutor: true
     num_rs_nodes_per_shard: 2
   hooks:
     - class: DropSessionsCollection

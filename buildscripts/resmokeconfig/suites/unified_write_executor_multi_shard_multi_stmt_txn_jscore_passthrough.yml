@@ -282,7 +282,7 @@ executor:
           defaultTransactionReadConcernLevel: "snapshot"
           defaultTransactionWriteConcernW: "majority"
           defaultWriteConcernW: "majority"
-          internalQueryUnifiedWriteExecutor: true
+          featureFlagUnifiedWriteExecutor: true
           networkErrorAndTxnOverrideConfig:
             wrapCRUDinTransactions: true
           sessionOptions:
@@ -306,7 +306,7 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-        internalQueryUnifiedWriteExecutor: true
+        featureFlagUnifiedWriteExecutor: true
     mongod_options:
       set_parameters:
         logComponentVerbosity:
@@ -323,6 +323,6 @@ executor:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
         coordinateCommitReturnImmediatelyAfterPersistingDecision: true
-        internalQueryUnifiedWriteExecutor: true
+        featureFlagUnifiedWriteExecutor: true
     num_rs_nodes_per_shard: 2
     num_shards: 2

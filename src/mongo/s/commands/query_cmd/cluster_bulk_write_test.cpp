@@ -95,14 +95,14 @@ protected:
 
 TEST_F(ClusterBulkWriteTest, NoErrors) {
     RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
-    RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor", false);
+    RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor", false);
 
     testNoErrors(kBulkWriteCmdTargeted, kBulkWriteCmdScatterGather);
 }
 
 TEST_F(ClusterBulkWriteTest, AttachesAtClusterTimeForSnapshotReadConcern) {
     RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
-    RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor", false);
+    RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor", false);
 
     testAttachesAtClusterTimeForSnapshotReadConcern(kBulkWriteCmdTargeted,
                                                     kBulkWriteCmdScatterGather);
@@ -110,14 +110,14 @@ TEST_F(ClusterBulkWriteTest, AttachesAtClusterTimeForSnapshotReadConcern) {
 
 TEST_F(ClusterBulkWriteTest, SnapshotReadConcernWithAfterClusterTime) {
     RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
-    RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor", false);
+    RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor", false);
 
     testSnapshotReadConcernWithAfterClusterTime(kBulkWriteCmdTargeted, kBulkWriteCmdScatterGather);
 }
 
 TEST_F(ClusterBulkWriteTest, FireAndForgetRequestGetsReplyWithOnlyOkStatus) {
     RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
-    RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor", false);
+    RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor", false);
 
     auto asFireAndForgetRequest = [](const BSONObj& cmdObj) {
         BSONObjBuilder bob(cmdObj);

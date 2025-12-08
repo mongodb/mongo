@@ -34,9 +34,9 @@
         shell_options:
           global_vars:
             TestData:
-              internalQueryUnifiedWriteExecutor: true
+              featureFlagUnifiedWriteExecutor: true
               setParametersMongos:
-                internalQueryUnifiedWriteExecutor: true
+                featureFlagUnifiedWriteExecutor: true
 
 - name: unified_write_executor_sharding_jscore_passthrough
   value:
@@ -45,16 +45,16 @@
         shell_options:
           global_vars:
             TestData:
-              internalQueryUnifiedWriteExecutor: true
+              featureFlagUnifiedWriteExecutor: true
       fixture:
         class: ShardedClusterFixture
         mongod_options:
           set_parameters:
             enableTestCommands: 1
-            internalQueryUnifiedWriteExecutor: true
+            featureFlagUnifiedWriteExecutor: true
         mongos_options:
           set_parameters:
             enableTestCommands: 1
-            internalQueryUnifiedWriteExecutor: true
+            featureFlagUnifiedWriteExecutor: true
         num_rs_nodes_per_shard: 1
         num_shards: 2

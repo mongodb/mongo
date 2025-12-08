@@ -36,7 +36,7 @@ executor:
       eval: "globalThis.testingReplication = true;"
       global_vars:
         TestData:
-          internalQueryUnifiedWriteExecutor: true
+          featureFlagUnifiedWriteExecutor: true
   hooks:
     # We don't execute dbHash or oplog consistency checks since there is only a single replica set
     # node.
@@ -50,8 +50,8 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-        internalQueryUnifiedWriteExecutor: true
+        featureFlagUnifiedWriteExecutor: true
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        internalQueryUnifiedWriteExecutor: true
+        featureFlagUnifiedWriteExecutor: true

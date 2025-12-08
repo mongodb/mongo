@@ -59,7 +59,7 @@ protected:
 
     void expectInspectRequest(int shardIndex, InspectionCallback cb) override {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-            if (internalQueryUnifiedWriteExecutor.load()) {
+            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
                 cb(request);
                 BulkWriteCommandReply reply(
                     BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, kNss),
@@ -90,7 +90,7 @@ protected:
 
     void expectReturnsSuccess(int shardIndex) override {
         onCommandForPoolExecutor([this, shardIndex](const executor::RemoteCommandRequest& request) {
-            if (internalQueryUnifiedWriteExecutor.load()) {
+            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
                 BulkWriteCommandReply reply(
                     BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, kNss),
                     0,
@@ -120,7 +120,7 @@ protected:
 
 TEST_F(ClusterUpdateTest, NoErrors) {
     for (auto uweKnobValue : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
                                                            uweKnobValue);
         testNoErrors(kUpdateCmdTargeted, kUpdateCmdScatterGather);
     }
@@ -145,7 +145,7 @@ TEST_F(ClusterUpdateTest, CorrectMetrics) {
 
     const BSONObj obj = b.obj();
     for (auto uweKnobValue : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
                                                            uweKnobValue);
         testOpcountersAreCorrect(kUpdateCmdTargeted, /* expectedValue */ obj);
     }
