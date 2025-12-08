@@ -71,6 +71,12 @@ selector:
     # The resharding core tests expect the sharding topology to remain constant.
     - jstests/core_sharding/resharding/**/*.js
 
+    # This test uses benchRun which does not use runCommand and index creation can fail.
+    - jstests/core/shell/bench_test1.js
+
+    # TODO SERVER-114826 Investigate the possibility to re-enable excluded tests with random_migrations
+    - jstests/core/query/run_all_plans_pbt.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
@@ -111,7 +117,6 @@ executor:
             retryWrites: true
   hooks:
     - class: ContinuousAddRemoveShard
-      random_balancer_on: false
       transition_configsvr: true
       add_remove_random_shards: true
       move_primary_comment: *movePrimaryComment
@@ -143,3 +148,5 @@ executor:
             comment: *movePrimaryComment
           mode: alwaysOn
     num_rs_nodes_per_shard: 1
+    enable_balancer: true
+    random_migrations: true

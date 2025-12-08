@@ -166,6 +166,16 @@ selector:
     - src/mongo/db/modules/enterprise/jstests/fle2/find_and_modify_replace.js
     # TODO SERVER-113662 Re-enable this test once the cause for timeout is found and fixed.
     - src/mongo/db/modules/enterprise/jstests/fle2/bulk_write_update.js
+    # TODO SERVER-114065 isIxscanMultikey checks the first shard only, which may not be accurate in a sharded with migrations.
+    - jstests/core/query/array/array_index_and_nonIndex_consistent.js
+    # TODO SERVER-114826 Investigate the possibility to re-enable excluded tests with random_migrations
+    - jstests/core/query/run_all_plans_pbt.js
+    - jstests/core/index/index_partial_create_drop.js
+    - jstests/core/query/json_schema/items.js
+    - jstests/core/query/exists/existsb.js
+    - jstests/core/timeseries/query/agg_stage_coverage.js
+    - jstests/core/index/geo/geo_near_random1.js
+    - jstests/core/index/geo/geo_exactfetch.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
@@ -221,7 +231,6 @@ executor:
             retryWrites: true
   hooks:
     - class: ContinuousAddRemoveShard
-      random_balancer_on: false
       transition_configsvr: true
       add_remove_random_shards: true
     - class: CheckReplDBHash
@@ -252,3 +261,5 @@ executor:
       parameter: pauseMigrationsDuringMultiUpdates
       value:
         enabled: True
+    enable_balancer: true
+    random_migrations: true
