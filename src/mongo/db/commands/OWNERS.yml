@@ -39,6 +39,9 @@ filters:
   - "sleep_command.*":
     approvers:
       - 10gen/server-programmability
+  - "test_commands.*":
+    approvers:
+      - 10gen/server-storage-engine-integration
   - "test_commands_enabled.*":
     approvers:
       - 10gen/server-programmability

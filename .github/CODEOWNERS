@@ -1937,6 +1937,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/killoperations* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/commands/**/shutdown* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/commands/**/sleep_command.* @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/db/commands/**/test_commands.* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/commands/**/test_commands_enabled.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/commands/**/user_management_commands* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/search_* @10gen/query-integration-search @svc-auto-approve-bot

@@ -129,7 +129,7 @@ core.commands:
     - src/mongo/db/commands/shutdown.*
     - src/mongo/db/commands/shutdown_d.cpp
     - src/mongo/db/commands/sleep_command.cpp
-    - src/mongo/db/commands/test_commands[._]*
+    - src/mongo/db/commands/test_commands_enabled*
     - src/mongo/db/commands/generic.*
     - src/mongo/db/commands/generic_servers.*
     - src/mongo/db/commands/parameters.*
@@ -857,6 +857,7 @@ storage_engine_integration:
     - src/mongo/db/index_repair*
     - src/mongo/db/commands/fsync*
     - src/mongo/db/commands/dbcommands*
+    - src/mongo/db/commands/test_commands.*
     - src/mongo/db/commands/resize_oplog*
     - src/mongo/db/op_observer/batched_write*
     - src/mongo/db/stats/storage_stats*
