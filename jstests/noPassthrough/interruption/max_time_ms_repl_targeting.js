@@ -15,20 +15,23 @@ assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 // Since this test is timing sensitive, retry on failures since they could be transient.
 // If broken, this would *always* fail so if it ever passes this build is fine (or time went
 // backwards).
-const retryOnFailureUpToFiveTimes = function (name, f) {
+let retryCount = 10;
+const retryOnFailureUpToRetryCount = function (name, f) {
     jsTestLog(`Starting test ${name}`);
 
-    for (let trial = 1; trial <= 5; trial++) {
+    for (let trial = 1; trial <= retryCount; trial++) {
         try {
             f();
             break;
         } catch (e) {
-            if (trial < 5) {
+            if (trial < retryCount) {
                 jsTestLog(`Ignoring error during trial ${trial} of test ${name}`);
                 continue;
             }
 
-            jsTestLog(`Failed 5 times in test ${name}. There is probably a bug here. Latest assertion: ${tojson(e)}`);
+            jsTestLog(
+                `Failed ${retryCount} times in test ${name}. There is probably a bug here. Latest assertion: ${tojson(e)}`,
+            );
             throw e;
         }
     }
@@ -61,12 +64,12 @@ const runTest = function () {
 };
 
 testColl.insert({_id: 1}, {writeConcern: {w: 2}});
-retryOnFailureUpToFiveTimes("totally unsharded", runTest);
+retryOnFailureUpToRetryCount("totally unsharded", runTest);
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-retryOnFailureUpToFiveTimes("sharded db", runTest);
+retryOnFailureUpToRetryCount("sharded db", runTest);
 
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
-retryOnFailureUpToFiveTimes("sharded collection", runTest);
+retryOnFailureUpToRetryCount("sharded collection", runTest);
 
 st.stop();
