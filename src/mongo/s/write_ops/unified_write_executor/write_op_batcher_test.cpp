@@ -31,6 +31,7 @@
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/s/session_catalog_router.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_producer.h"
 #include "mongo/unittest/unittest.h"
@@ -664,6 +665,81 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherAttachesSampleIdToB
     ASSERT_TRUE(result5.batch.isEmptyBatch());
 }
 
+TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherTxnAnalysisError) {
+    // Necessary for TransactionRouter::get to be non-null for this opCtx.
+    auto* opCtx = getOperationContext();
+    auto lsid = LogicalSessionId(UUID::gen(), SHA256Block());
+    opCtx->setLogicalSessionId(lsid);
+    TxnNumber txnNumber = 0;
+    opCtx->setTxnNumber(txnNumber);
+    opCtx->setInMultiDocumentTransaction();
+    RouterOperationContextSession rocs(opCtx);
+
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSONObj()),
+                                     BulkWriteInsertOp(1, BSONObj()),
+                                     BulkWriteInsertOp(0, BSONObj())},
+                                    {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+    WriteOpProducer producer(request);
+    const Status error(ErrorCodes::BadValue, "bad analysis :(");
+    WriteOpAnalyzerMock analyzer({
+        {0, Analysis{kSingleShard, {nss0Shard0}}},
+        {1, Analysis{kSingleShard, {nss1Shard1}}},
+        {2, StatusWith<Analysis>(error)},
+    });
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = OrderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
+
+    // Output batches: [0], <error>.
+    // First batch references first write op.
+    WriteOpId expectedOpId = 0;
+    auto result1 = batcher.getNextBatch(opCtx, *routingCtx);
+    ASSERT_FALSE(result1.batch.isEmptyBatch());
+    assertSingleShardSimpleWriteBatch(result1.batch,
+                                      {expectedOpId},
+                                      {nss0Shard0},
+                                      {nss0IsViewfulTimeseries, nss1IsViewfulTimeseries});
+
+    // Next batch is empty because we encounter an error.
+    auto result2 = batcher.getNextBatch(opCtx, *routingCtx);
+    ASSERT_TRUE(result2.batch.isEmptyBatch());
+    ASSERT_EQ(result2.opsWithErrors.size(), 1);
+    std::pair<WriteOp, Status> opWithError = std::make_pair(WriteOp(request, 2), error);
+    ASSERT_EQ(result2.opsWithErrors[0], opWithError);
+    ASSERT_FALSE(result2.transientTxnError);
+
+    // Try again, but this time, with a transient txn error.
+    WriteOpProducer transientProducer(request);
+    const Status transientError(ErrorCodes::PreparedTransactionInProgress,
+                                "prepared txn in progress");
+    analyzer = WriteOpAnalyzerMock({
+        {0, Analysis{kSingleShard, {nss0Shard0}}},
+        {1, Analysis{kSingleShard, {nss1Shard1}}},
+        {2, StatusWith<Analysis>(error)},
+    });
+    routingCtx = RoutingContext::createSynthetic({});
+    auto transitentBatcher =
+        OrderedWriteOpBatcher(transientProducer, analyzer, WriteCommandRef{request});
+
+    // First batch references first write op.
+    result1 = transitentBatcher.getNextBatch(opCtx, *routingCtx);
+    ASSERT_FALSE(result1.batch.isEmptyBatch());
+    assertSingleShardSimpleWriteBatch(result1.batch,
+                                      {expectedOpId},
+                                      {nss0Shard0},
+                                      {nss0IsViewfulTimeseries, nss1IsViewfulTimeseries});
+
+    // Next batch is empty because we encounter an error.
+    result2 = transitentBatcher.getNextBatch(opCtx, *routingCtx);
+    ASSERT_TRUE(result2.batch.isEmptyBatch());
+    ASSERT_EQ(result2.opsWithErrors.size(), 1);
+    opWithError = std::make_pair(WriteOp(request, 2), error);
+    ASSERT_EQ(result2.opsWithErrors[0], opWithError);
+
+    // The OrderedBatcher does distinguish between transient txn errors and other errors.
+    ASSERT_FALSE(result2.transientTxnError);
+}
+
 TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherSkipsDoneBatches) {
     BulkWriteCommandRequest request(
         {
@@ -997,13 +1073,10 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherTargetErrorsTra
     auto routingCtx = RoutingContext::createSynthetic({});
     auto batcher = UnorderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
 
-    ASSERT_TRUE(batcher.getRetryOnTargetError());
-
     auto result1 = batcher.getNextBatch(getOperationContext(), *routingCtx);
 
     ASSERT_TRUE(result1.batch.isEmptyBatch());
     ASSERT_TRUE(result1.opsWithErrors.empty());
-    ASSERT_FALSE(batcher.getRetryOnTargetError());
 
     analyzer.setOpAnalysis({
         {0, Analysis{kSingleShard, {nss0Shard0}}},
@@ -1050,13 +1123,10 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherTargetErrorsNon
     auto routingCtx = RoutingContext::createSynthetic({});
     auto batcher = UnorderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
 
-    ASSERT_TRUE(batcher.getRetryOnTargetError());
-
     auto result1 = batcher.getNextBatch(getOperationContext(), *routingCtx);
 
     ASSERT_TRUE(result1.batch.isEmptyBatch());
     ASSERT_TRUE(result1.opsWithErrors.empty());
-    ASSERT_FALSE(batcher.getRetryOnTargetError());
 
     SimpleWriteBatch::ShardRequest shardRequest2{
         {{nss0, nss0Shard0}}, nssIsViewfulTimeseries, {WriteOp(request, 0), WriteOp(request, 3)}};
@@ -1281,6 +1351,69 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherDoesNotStopOnWr
 
     auto result3 = batcher.getNextBatch(getOperationContext(), *routingCtx);
     ASSERT_TRUE(result3.batch.isEmptyBatch());
+}
+
+TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherTxnAnalysisError) {
+    // Necessary for TransactionRouter::get to be non-null for this opCtx.
+    auto* opCtx = getOperationContext();
+    auto lsid = LogicalSessionId(UUID::gen(), SHA256Block());
+    opCtx->setLogicalSessionId(lsid);
+    TxnNumber txnNumber = 0;
+    opCtx->setTxnNumber(txnNumber);
+    opCtx->setInMultiDocumentTransaction();
+    RouterOperationContextSession rocs(opCtx);
+
+    BulkWriteCommandRequest request(
+        {
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(1, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+        },
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+    WriteOpProducer producer(request);
+
+    const Status error(ErrorCodes::BadValue, "bad analysis :(");
+    WriteOpAnalyzerMock analyzer({
+        {0, Analysis{kSingleShard, {nss0Shard0}}},
+        {1, Analysis{kSingleShard, {nss1Shard0}}},
+        {2, StatusWith<Analysis>(error)},
+    });
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = UnorderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
+
+    // Single empty batch because we encounter an error.
+    auto result = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_TRUE(result.batch.isEmptyBatch());
+    ASSERT_EQ(result.opsWithErrors.size(), 1);
+    std::pair<WriteOp, Status> opWithError = std::make_pair(WriteOp(request, 2), error);
+    ASSERT_EQ(result.opsWithErrors[0], opWithError);
+    ASSERT_FALSE(result.transientTxnError);
+
+    WriteOpProducer transientProducer(request);
+    const Status transientError(ErrorCodes::PreparedTransactionInProgress,
+                                "prepared txn in progress");
+
+    // Try again, but this time, with a transient txn error.
+    analyzer = WriteOpAnalyzerMock({
+        {0, Analysis{kSingleShard, {nss0Shard0}}},
+        {1, Analysis{kSingleShard, {nss1Shard0}}},
+        {2, StatusWith<Analysis>(transientError)},
+    });
+
+    routingCtx = RoutingContext::createSynthetic({});
+    auto transitentBatcher =
+        UnorderedWriteOpBatcher(transientProducer, analyzer, WriteCommandRef{request});
+
+    // Single empty batch because we encounter an error.
+    result = transitentBatcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_TRUE(result.batch.isEmptyBatch());
+    ASSERT_EQ(result.opsWithErrors.size(), 1);
+    opWithError = std::make_pair(WriteOp(request, 2), transientError);
+    ASSERT_EQ(result.opsWithErrors[0], opWithError);
+
+    // The UnorderedBatcher doesn't distinguish between transient txn errors and other errors.
+    ASSERT_FALSE(result.transientTxnError);
 }
 
 TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherSkipsDoneBatches) {

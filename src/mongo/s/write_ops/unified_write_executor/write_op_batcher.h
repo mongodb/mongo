@@ -272,14 +272,6 @@ public:
         _producer.stopProducingOps();
     }
 
-    bool getRetryOnTargetError() const {
-        return _retryOnTargetError;
-    }
-
-    void setRetryOnTargetError(bool b) {
-        _retryOnTargetError = b;
-    }
-
     /**
      * Marks the shards that ops already succeeded in case we only need to retry parts
      * of any ops.

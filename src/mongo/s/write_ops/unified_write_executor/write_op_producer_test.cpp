@@ -534,7 +534,6 @@ TEST(UnifiedWriteExecutorProducerTest, BatchWriteOpProducerUpdateContents) {
 }
 
 TEST(UnifiedWriteExecutorProducerTest, BatchWriteOpProducerDeleteContents) {
-
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll2");
     auto deleteRequest = createDeleteRequest(nss);
 
@@ -566,6 +565,73 @@ TEST(UnifiedWriteExecutorProducerTest, BatchWriteOpProducerDeleteContents) {
 
     auto noop = producer.peekNext();
     ASSERT_FALSE(noop.has_value());
+}
+
+TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerConsumeAllOps) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll2");
+    auto updateRequest = createDeleteRequest(nss);
+
+    WriteOpProducer producer(*updateRequest);
+
+    auto op0 = producer.peekNext();
+    ASSERT_TRUE(op0.has_value());
+    ASSERT_EQ(op0->getId(), 0);
+    ASSERT_EQ(op0->getNss(), nss);
+    ASSERT_BSONOBJ_EQ(op0->getItemRef().getDeleteOp().getFilter(),
+                      BSON("x" << GTE << -1 << LT << 2));
+    producer.advance();
+
+    auto op1 = producer.peekNext();
+    ASSERT_TRUE(op1.has_value());
+    ASSERT_EQ(op1->getId(), 1);
+    ASSERT_EQ(op1->getNss(), nss);
+    ASSERT_BSONOBJ_EQ(op1->getItemRef().getDeleteOp().getFilter(),
+                      BSON("x" << GTE << -2 << LT << 1));
+
+    auto remainingOps = producer.consumeAllRemainingOps();
+    ASSERT_EQ(remainingOps.size(), 2);
+    ASSERT_EQ(remainingOps[0], op1);
+
+    auto op2 = remainingOps[1];
+    ASSERT_EQ(op2.getId(), 2);
+    ASSERT_EQ(op2.getNss(), nss);
+    ASSERT_BSONOBJ_EQ(op2.getItemRef().getDeleteOp().getFilter(),
+                      BSON("x" << GTE << -3 << LT << 0));
+
+    auto noop = producer.peekNext();
+    ASSERT_FALSE(noop.has_value());
+
+    // Now, it should be empty.
+    remainingOps = producer.consumeAllRemainingOps();
+    ASSERT_EQ(remainingOps.size(), 0);
+}
+
+TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerConsumeAllOpsStopProducingOps) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll2");
+    auto updateRequest = createDeleteRequest(nss);
+
+    WriteOpProducer producer(*updateRequest);
+
+    auto op0 = producer.peekNext();
+    ASSERT_TRUE(op0.has_value());
+    ASSERT_EQ(op0->getId(), 0);
+    ASSERT_EQ(op0->getNss(), nss);
+    ASSERT_BSONOBJ_EQ(op0->getItemRef().getDeleteOp().getFilter(),
+                      BSON("x" << GTE << -1 << LT << 2));
+    producer.advance();
+
+    auto op1 = producer.peekNext();
+    ASSERT_TRUE(op1.has_value());
+    ASSERT_EQ(op1->getId(), 1);
+    ASSERT_EQ(op1->getNss(), nss);
+    ASSERT_BSONOBJ_EQ(op1->getItemRef().getDeleteOp().getFilter(),
+                      BSON("x" << GTE << -2 << LT << 1));
+
+    // Marking the producer as not producing ops should make 'consumeAllRemainingOps' return an
+    // empty vector.
+    producer.stopProducingOps();
+    auto remainingOps = producer.consumeAllRemainingOps();
+    ASSERT_EQ(remainingOps.size(), 0);
 }
 
 }  // namespace
