@@ -1479,6 +1479,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetada
                                        std::move(sbeYieldPolicy),
                                        false /* planIsFromCache */,
                                        boost::none /* cachedPlanHash */,
+                                       false /* usedJoinOpt*/,
                                        std::move(remoteCursors));
 }
 

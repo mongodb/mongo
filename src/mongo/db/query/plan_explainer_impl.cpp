@@ -240,6 +240,11 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     if (isCached) {
         bob->append("isCached", *isCached);
     }
+    // The join optimization feature is incompatible with the classic engine. If the knob is
+    // enabled, note that the join optmization was not used to make debugging easier.
+    if (internalEnableJoinOptimization.load()) {
+        bob->append("usedJoinOptimization", false);
+    }
 
     // Stage name.
     bob->append("stage", stats.common.stageTypeStr);

@@ -85,6 +85,7 @@ export function outputAggregationPlanAndResults(
     options = {},
     shouldSortResults = true,
     shouldFlatten = true,
+    noLineBreak = false,
 ) {
     const results = coll.aggregate(pipeline, options).toArray();
     const explain = coll.explain().aggregate(pipeline, options);
@@ -106,7 +107,11 @@ export function outputAggregationPlanAndResults(
         line("Execution Engine: " + getEngine(explain));
     }
     code(tojsonMultiLineSortKeys(flatPlan));
-
+    if (noLineBreak) {
+        // Omitting the line break allows the caller function to output additional information
+        // relevant to this aggregation pipeline.
+        return;
+    }
     linebreak();
 }
 

@@ -66,7 +66,8 @@ public:
                          bool isCachedPlan,
                          boost::optional<size_t> cachedPlanHash,
                          std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
-                         RemoteExplainVector* remoteExplains);
+                         RemoteExplainVector* remoteExplains,
+                         bool usedJoinOpt = false);
 
     bool isMultiPlan() const final {
         return _isMultiPlan;
@@ -116,6 +117,7 @@ protected:
 
     const bool _isMultiPlan{false};
     const bool _isFromPlanCache{false};
+    const bool _usedJoinOpt{false};
     const boost::optional<size_t> _cachedPlanHash{boost::none};
     // Pre-computed debugging info so we don't necessarily have to collect them from QuerySolution.
     // All plans recovered from the same cached entry share the same debug info.
@@ -133,7 +135,8 @@ public:
         boost::optional<size_t> cachedPlanHash,
         std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
         std::unique_ptr<PlanStage> classicRuntimePlannerStage,
-        RemoteExplainVector* remoteExplains);
+        RemoteExplainVector* remoteExplains,
+        bool usedJoinOpt = false);
 
     PlanStatsDetails getWinningPlanTrialStats() const final;
     std::vector<PlanStatsDetails> getRejectedPlansStats(

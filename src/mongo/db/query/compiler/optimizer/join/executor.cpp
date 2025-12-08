@@ -225,7 +225,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                                             mca.getMainCollection()->ns(),
                                                             std::move(sbeYieldPolicy),
                                                             false /* isFromPlanCache */,
-                                                            false /* cachedPlanHash */));
+                                                            false /* cachedPlanHash */,
+                                                            true /*usedJoinOpt*/));
 
     return JoinReorderedExecutorResult{.executor = std::move(exec), .model = std::move(model)};
 }

@@ -73,7 +73,8 @@ std::unique_ptr<PlanExplainer> make(
     boost::optional<size_t> cachedPlanHash,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfoSBE,
     std::unique_ptr<PlanStage> classicRuntimePlannerStage,
-    RemoteExplainVector* remoteExplains) {
+    RemoteExplainVector* remoteExplains,
+    bool usedJoinOpt) {
     if (!debugInfoSBE) {
         debugInfoSBE = std::make_shared<const plan_cache_debug_info::DebugInfoSBE>(
             plan_cache_util::buildDebugInfo(nss, solution));
@@ -87,6 +88,7 @@ std::unique_ptr<PlanExplainer> make(
         cachedPlanHash,
         debugInfoSBE,
         std::move(classicRuntimePlannerStage),
-        remoteExplains);
+        remoteExplains,
+        usedJoinOpt);
 }
 }  // namespace mongo::plan_explainer_factory

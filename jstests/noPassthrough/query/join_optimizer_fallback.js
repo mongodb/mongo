@@ -4,15 +4,21 @@
  *   requires_fcv_83,
  * ]
  */
-import {getWinningPlanFromExplain, getAllPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, getQueryPlanner, getAllPlanStages} from "jstests/libs/query/analyze_plan.js";
 
-function joinOptimizedUsed(explain) {
+function joinOptimizedUsed(explain, expectedJoinOptimizer) {
     const stages = getAllPlanStages(getWinningPlanFromExplain(explain)).map((stage) => stage.stage);
     const joinOptimzierStages = [
         "NESTED_LOOP_JOIN_EMBEDDING",
         "HASH_JOIN_EMBEDDING",
         "INDEXED_NESTED_LOOP_JOIN_EMBEDDING",
     ];
+    const winningPlanStats = getQueryPlanner(explain).winningPlan;
+    assert(
+        winningPlanStats.hasOwnProperty("usedJoinOptimization") &&
+            winningPlanStats.usedJoinOptimization == expectedJoinOptimizer,
+        winningPlanStats,
+    );
     return stages.some((stage) => joinOptimzierStages.includes(stage));
 }
 
@@ -46,7 +52,7 @@ function runTestCase({pipeline, expectedCount, expectedJoinOptimizer}) {
     const explain = coll1.explain().aggregate(pipeline);
     assert.eq(
         expectedJoinOptimizer,
-        joinOptimizedUsed(explain),
+        joinOptimizedUsed(explain, expectedJoinOptimizer),
         "Expected join optimizer and actual usage differ: " + tojson(explain),
     );
 }

@@ -206,7 +206,8 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const boost::optional<BSONObj>& queryParams,
     const boost::optional<BSONArray>& remotePlanInfo,
     ExplainOptions::Verbosity verbosity,
-    bool isCached) {
+    bool isCached,
+    bool usedJoinOpt = false) {
     BSONObjBuilder bob;
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -240,6 +241,12 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     }
 
     plan.append("isCached", isCached);
+    // Only include information about join optimization in explain output if the relevant knob is
+    // enabled.
+    if (internalEnableJoinOptimization.load()) {
+        plan.append("usedJoinOptimization", usedJoinOpt);
+    }
+
     plan.append("queryPlan", bob.obj());
 
     int explainThresholdBytes = internalQueryExplainSizeThresholdBytes.loadRelaxed();
@@ -593,12 +600,14 @@ PlanExplainerSBEBase::PlanExplainerSBEBase(
     bool isCachedPlan,
     boost::optional<size_t> cachedPlanHash,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
-    RemoteExplainVector* remoteExplains)
+    RemoteExplainVector* remoteExplains,
+    bool usedJoinOpt)
     : PlanExplainer{solution},
       _root{root},
       _rootData{data},
       _isMultiPlan{isMultiPlan},
       _isFromPlanCache{isCachedPlan},
+      _usedJoinOpt{usedJoinOpt},
       _cachedPlanHash{cachedPlanHash},
       _debugInfo{debugInfo},
       _remoteExplains{remoteExplains} {
@@ -679,7 +688,8 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStats(
                                  boost::none /* queryParams */,
                                  buildRemotePlanInfo(),
                                  verbosity,
-                                 matchesCachedPlan());
+                                 matchesCachedPlan(),
+                                 _usedJoinOpt);
 }
 
 boost::optional<BSONArray> PlanExplainerSBEBase::buildRemotePlanInfo() const {
@@ -702,7 +712,8 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
     boost::optional<size_t> cachedPlanHash,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
     std::unique_ptr<PlanStage> classicRuntimePlannerStage,
-    RemoteExplainVector* remoteExplains)
+    RemoteExplainVector* remoteExplains,
+    bool usedJoinOpt)
     : PlanExplainerSBEBase{root,
                            data,
                            solution,
@@ -710,7 +721,8 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
                            isCachedPlan,
                            cachedPlanHash,
                            std::move(debugInfo),
-                           remoteExplains},
+                           remoteExplains,
+                           usedJoinOpt},
       _classicRuntimePlannerStage{std::move(classicRuntimePlannerStage)},
       _classicRuntimePlannerExplainer{
           _classicRuntimePlannerStage  // If there were no multi-planning, this will be nullptr.

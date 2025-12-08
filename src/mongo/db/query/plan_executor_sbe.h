@@ -92,7 +92,8 @@ public:
                     std::unique_ptr<RemoteCursorMap> remoteCursors,
                     std::unique_ptr<RemoteExplainVector> remoteExplains,
                     std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage,
-                    const MultipleCollectionAccessor& mca);
+                    const MultipleCollectionAccessor& mca,
+                    bool usedJoinOpt = false);
 
     CanonicalQuery* getCanonicalQuery() const override {
         return _cq.get();

@@ -169,6 +169,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (right-deep)
 ### Pipeline
@@ -260,6 +261,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (zig-zag)
 ### Pipeline
@@ -351,6 +353,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, nested loop joins
 ### Pipeline
@@ -442,6 +445,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, hash join enabled
 ### Pipeline
@@ -533,6 +537,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, nested loop joins
 ### Pipeline
@@ -624,6 +629,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, hash join enabled
 ### Pipeline
@@ -715,6 +721,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With fixed order, index join
 ### Pipeline
@@ -814,6 +821,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ## 2. Basic example with two joins and suffix
 ### No join opt
@@ -1040,6 +1048,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (right-deep)
 ### Pipeline
@@ -1161,6 +1170,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (zig-zag)
 ### Pipeline
@@ -1282,6 +1292,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, nested loop joins
 ### Pipeline
@@ -1403,6 +1414,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, hash join enabled
 ### Pipeline
@@ -1524,6 +1536,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, nested loop joins
 ### Pipeline
@@ -1645,6 +1658,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, hash join enabled
 ### Pipeline
@@ -1766,6 +1780,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With fixed order, index join
 ### Pipeline
@@ -1895,6 +1910,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ## 3. Example with two joins, suffix, and sub-pipeline with un-correlated $match
 ### No join opt
@@ -2187,6 +2203,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (right-deep)
 ### Pipeline
@@ -2331,6 +2348,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (zig-zag)
 ### Pipeline
@@ -2475,6 +2493,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, nested loop joins
 ### Pipeline
@@ -2619,6 +2638,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, hash join enabled
 ### Pipeline
@@ -2763,6 +2783,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, nested loop joins
 ### Pipeline
@@ -2907,6 +2928,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, hash join enabled
 ### Pipeline
@@ -3051,6 +3073,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With fixed order, index join
 ### Pipeline
@@ -3221,6 +3244,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ## 4. Example with two joins and sub-pipeline with un-correlated $match
 ### No join opt
@@ -3453,6 +3477,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (right-deep)
 ### Pipeline
@@ -3564,6 +3589,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (zig-zag)
 ### Pipeline
@@ -3675,6 +3701,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, nested loop joins
 ### Pipeline
@@ -3786,6 +3813,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, hash join enabled
 ### Pipeline
@@ -3897,6 +3925,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, nested loop joins
 ### Pipeline
@@ -4008,6 +4037,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, hash join enabled
 ### Pipeline
@@ -4119,6 +4149,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With fixed order, index join
 ### Pipeline
@@ -4256,6 +4287,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ## 5. Example with two joins, suffix, and sub-pipeline with un-correlated $match and $match prefix
 ### No join opt
@@ -4567,6 +4599,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (right-deep)
 ### Pipeline
@@ -4719,6 +4752,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (zig-zag)
 ### Pipeline
@@ -4871,6 +4905,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, nested loop joins
 ### Pipeline
@@ -5023,6 +5058,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, hash join enabled
 ### Pipeline
@@ -5175,6 +5211,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, nested loop joins
 ### Pipeline
@@ -5327,6 +5364,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, hash join enabled
 ### Pipeline
@@ -5479,6 +5517,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ### With fixed order, index join
 ### Pipeline
@@ -5657,6 +5696,7 @@ Execution Engine: sbe
 	]
 }
 ```
+usedJoinOptimization: true
 
 ## 6. Example with two joins and sub-pipeline with un-correlated $match and $match prefix
 ### No join opt
@@ -5906,6 +5946,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (right-deep)
 ### Pipeline
@@ -6024,6 +6065,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (zig-zag)
 ### Pipeline
@@ -6142,6 +6184,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, nested loop joins
 ### Pipeline
@@ -6260,6 +6303,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, hash join enabled
 ### Pipeline
@@ -6378,6 +6422,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, nested loop joins
 ### Pipeline
@@ -6496,6 +6541,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, hash join enabled
 ### Pipeline
@@ -6614,6 +6660,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With fixed order, index join
 ### Pipeline
@@ -6758,6 +6805,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ## 7. Basic example with referencing field from previous lookup
 ### No join opt
@@ -6926,6 +6974,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (right-deep)
 ### Pipeline
@@ -7015,6 +7064,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (zig-zag)
 ### Pipeline
@@ -7104,6 +7154,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, nested loop joins
 ### Pipeline
@@ -7193,6 +7244,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, hash join enabled
 ### Pipeline
@@ -7282,6 +7334,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, nested loop joins
 ### Pipeline
@@ -7371,6 +7424,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, hash join enabled
 ### Pipeline
@@ -7460,6 +7514,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With fixed order, index join
 ### Pipeline
@@ -7549,6 +7604,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ## 8. Basic example with 3 joins & subsequent join referencing fields from previous lookups
 ### No join opt
@@ -7772,6 +7828,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (right-deep)
 ### Pipeline
@@ -7892,6 +7949,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (zig-zag)
 ### Pipeline
@@ -8012,6 +8070,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, nested loop joins
 ### Pipeline
@@ -8132,6 +8191,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, hash join enabled
 ### Pipeline
@@ -8252,6 +8312,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, nested loop joins
 ### Pipeline
@@ -8372,6 +8433,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, hash join enabled
 ### Pipeline
@@ -8492,6 +8554,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With fixed order, index join
 ### Pipeline
@@ -8620,6 +8683,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ## 9. Basic example with 3 joins & subsequent join referencing nested paths
 ### No join opt
@@ -8833,6 +8897,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (right-deep)
 ### Pipeline
@@ -8948,6 +9013,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With bottom-up plan enumeration (zig-zag)
 ### Pipeline
@@ -9063,6 +9129,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, nested loop joins
 ### Pipeline
@@ -9178,6 +9245,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 44, hash join enabled
 ### Pipeline
@@ -9293,6 +9361,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, nested loop joins
 ### Pipeline
@@ -9408,6 +9477,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With random order, seed 420, hash join enabled
 ### Pipeline
@@ -9523,6 +9593,7 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 
 ### With fixed order, index join
 ### Pipeline
@@ -9638,4 +9709,5 @@ Execution Engine: sbe
 	}
 }
 ```
+usedJoinOptimization: true
 

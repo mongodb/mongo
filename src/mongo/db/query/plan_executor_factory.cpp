@@ -150,6 +150,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     bool planIsFromCache,
     boost::optional<size_t> cachedPlanHash,
+    bool usedJoinOpt,
     std::unique_ptr<RemoteCursorMap> remoteCursors,
     std::unique_ptr<RemoteExplainVector> remoteExplains,
     std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage) {
@@ -177,7 +178,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                  std::move(remoteCursors),
                                  std::move(remoteExplains),
                                  std::move(classicRuntimePlannerStage),
-                                 collections),
+                                 collections,
+                                 usedJoinOpt),
              PlanExecutor::Deleter{opCtx}}};
 }
 
