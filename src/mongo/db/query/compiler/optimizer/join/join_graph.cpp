@@ -50,12 +50,6 @@ BSONObj canonicalQueryToBSON(const std::unique_ptr<CanonicalQuery>& cq) {
     return accessPathBSON.obj();
 }
 
-void order(NodeSet& u, NodeSet& v) {
-    if (bitsetLess(v, u)) {
-        swap(u, v);
-    }
-}
-
 static void swapPredicateSides(JoinEdge::PredicateList& predicates) {
     std::for_each(predicates.begin(), predicates.end(), [](JoinPredicate& pred) {
         tassert(11233806,
@@ -87,8 +81,8 @@ BSONObj JoinEdge::toBSON() const {
         }
         result.append("predicates", ab.arr());
     }
-    result.append("left", left.to_string());
-    result.append("right", right.to_string());
+    result.append("left", left);
+    result.append("right", right);
     return result.obj();
 }
 
@@ -117,8 +111,7 @@ std::vector<EdgeId> JoinGraph::getJoinEdges(NodeSet left, NodeSet right) const {
 
     for (size_t edgeIndex = 0; edgeIndex < _edges.size(); ++edgeIndex) {
         const auto& edge = _edges[edgeIndex];
-        if (((left & edge.left).any() && (right & edge.right).any()) ||
-            ((left & edge.right).any() && (right & edge.left).any())) {
+        if ((left[edge.left] && right[edge.right]) || (left[edge.right] && right[edge.left])) {
             result.push_back(static_cast<EdgeId>(edgeIndex));
         }
     }
@@ -128,10 +121,10 @@ std::vector<EdgeId> JoinGraph::getJoinEdges(NodeSet left, NodeSet right) const {
 NodeSet JoinGraph::getNeighbors(NodeId nodeIndex) const {
     NodeSet neighbors;
     for (const JoinEdge& edge : _edges) {
-        if (edge.left.test(nodeIndex)) {
-            neighbors |= edge.right;
-        } else if (edge.right.test(nodeIndex)) {
-            neighbors |= edge.left;
+        if (edge.left == nodeIndex) {
+            neighbors.set(edge.right);
+        } else if (edge.right == nodeIndex) {
+            neighbors.set(edge.left);
         }
     }
     return neighbors;
@@ -148,15 +141,12 @@ boost::optional<NodeId> JoinGraph::addNode(NamespaceString collectionName,
     return static_cast<NodeId>(_nodes.size()) - 1;
 }
 
-boost::optional<EdgeId> JoinGraph::addEdge(NodeSet left,
-                                           NodeSet right,
+boost::optional<EdgeId> JoinGraph::addEdge(NodeId left,
+                                           NodeId right,
                                            JoinEdge::PredicateList predicates) {
     // Self-edges are not permitted; when joining a collection to itself, we should use a different
     // node for each instance of the collection.
-    if (const auto common = (left & right); common.any()) {
-        tasserted(11180001,
-                  "Self edges are not permitted, but both sides contain " + common.to_string());
-    }
+    tassert(11180001, "Self edges are not permitted", left != right);
 
     if (auto edgeId = findEdge(left, right); edgeId.has_value()) {
         auto&& edge = _edges[*edgeId];
@@ -170,21 +160,9 @@ boost::optional<EdgeId> JoinGraph::addEdge(NodeSet left,
     return makeEdge(left, right, std::move(predicates));
 }
 
-boost::optional<EdgeId> JoinGraph::addSimpleEqualityEdge(NodeId leftNode,
-                                                         NodeId rightNode,
-                                                         PathId leftPathId,
-                                                         PathId rightPathId) {
-
-    NodeSet leftNodeSet{};
-    leftNodeSet.set(leftNode);
-    NodeSet rightNodeSet{};
-    rightNodeSet.set(rightNode);
-    return addEdge(leftNodeSet, rightNodeSet, {{JoinPredicate::Eq, leftPathId, rightPathId}});
-}
-
-boost::optional<EdgeId> JoinGraph::findEdge(NodeSet u, NodeSet v) const {
-    order(u, v);  // make sure that u <= v
-    auto pos = _edgeMap.find(std::make_pair(u, v));
+boost::optional<EdgeId> JoinGraph::findEdge(NodeId u, NodeId v) const {
+    NodeSet key = makeNodeSet(u, v);
+    auto pos = _edgeMap.find(key);
     if (pos == _edgeMap.end()) {
         return boost::none;
     }
@@ -211,15 +189,15 @@ BSONObj JoinGraph::toBSON() const {
     return result.obj();
 }
 
-boost::optional<EdgeId> JoinGraph::makeEdge(NodeSet left,
-                                            NodeSet right,
+boost::optional<EdgeId> JoinGraph::makeEdge(NodeId left,
+                                            NodeId right,
                                             JoinEdge::PredicateList predicates) {
-    if (bitsetLess(right, left)) {
-        swap(left, right);
+    if (right < left) {
+        std::swap(left, right);
         swapPredicateSides(predicates);
     }
 
-    auto key = std::make_pair(left, right);
+    NodeSet key = makeNodeSet(left, right);
     tassert(11116501, "The edge has been already added", !_edgeMap.contains(key));
 
     EdgeId edgeId = static_cast<EdgeId>(_edges.size());

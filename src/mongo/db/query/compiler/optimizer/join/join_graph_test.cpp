@@ -65,17 +65,17 @@ TEST(JoinGraphTests, AddEdge) {
     ASSERT_TRUE(firstSecond.has_value());
     ASSERT_TRUE(secondThird.has_value());
 
-    ASSERT_EQ(graph.getEdge(*firstSecond).left, 1 << first);
-    ASSERT_EQ(graph.getEdge(*firstSecond).right, 1 << second);
-    ASSERT_EQ(graph.getEdge(*secondThird).left, 1 << second);
-    ASSERT_EQ(graph.getEdge(*secondThird).right, 1 << third);
+    ASSERT_EQ(graph.getEdge(*firstSecond).left, first);
+    ASSERT_EQ(graph.getEdge(*firstSecond).right, second);
+    ASSERT_EQ(graph.getEdge(*secondThird).left, second);
+    ASSERT_EQ(graph.getEdge(*secondThird).right, third);
 
-    ASSERT_EQ(graph.findSimpleEdge(first, second), firstSecond);
-    ASSERT_EQ(graph.findSimpleEdge(second, first), firstSecond);
-    ASSERT_EQ(graph.findSimpleEdge(second, third), secondThird);
-    ASSERT_EQ(graph.findSimpleEdge(third, second), secondThird);
-    ASSERT_EQ(graph.findSimpleEdge(first, third), boost::none);
-    ASSERT_EQ(graph.findSimpleEdge(third, first), boost::none);
+    ASSERT_EQ(graph.findEdge(first, second), firstSecond);
+    ASSERT_EQ(graph.findEdge(second, first), firstSecond);
+    ASSERT_EQ(graph.findEdge(second, third), secondThird);
+    ASSERT_EQ(graph.findEdge(third, second), secondThird);
+    ASSERT_EQ(graph.findEdge(first, third), boost::none);
+    ASSERT_EQ(graph.findEdge(third, first), boost::none);
 }
 
 DEATH_TEST(JoinGraphTestsDeathTest,
@@ -88,19 +88,6 @@ DEATH_TEST(JoinGraphTestsDeathTest,
 
     // Try adding a self-edge (a) -- (a).
     graph.addSimpleEqualityEdge(a, a, 0, 1);
-}
-
-DEATH_TEST(JoinGraphTestsDeathTest,
-           AddEdgeComplexSelfEdgeForbidden,
-           "Self edges are not permitted") {
-    JoinGraph graph{};
-
-    auto a = *graph.addNode(makeNSS("a"), nullptr, boost::none);
-    auto b = *graph.addNode(makeNSS("b"), nullptr, boost::none);
-    auto c = *graph.addNode(makeNSS("c"), nullptr, boost::none);
-
-    // Try adding a complex self-edge (a,b) -- (b,c).
-    graph.addEdge(makeNodeSetFromIds({a, b}), makeNodeSetFromIds({b, c}), {});
 }
 
 TEST(JoinGraphTests, getJoinEdges) {
@@ -140,16 +127,16 @@ TEST(JoinGraph, MultiplePredicatesSameEdge) {
     ASSERT_EQ(ab, ab2);
     ASSERT_EQ(ab2, ab3);
 
-    auto edges = graph.getJoinEdges(makeNodeSetFromId(a), makeNodeSetFromId(b));
+    auto edges = graph.getJoinEdges(makeNodeSet(a), makeNodeSet(b));
 
     ASSERT_EQ(1, edges.size());
     // Edge returned when order of nodes reversed
-    ASSERT_EQ(edges, graph.getJoinEdges(makeNodeSetFromId(b), makeNodeSetFromId(a)));
+    ASSERT_EQ(edges, graph.getJoinEdges(makeNodeSet(b), makeNodeSet(a)));
 
     auto edge = graph.getEdge(edges[0]);
 
-    ASSERT_EQ(edge.left, makeNodeSetFromId(a));
-    ASSERT_EQ(edge.right, makeNodeSetFromId(b));
+    ASSERT_EQ(edge.left, a);
+    ASSERT_EQ(edge.right, b);
     ASSERT_BSONOBJ_EQ_AUTO(
         R"({
             "predicates": [
@@ -169,8 +156,8 @@ TEST(JoinGraph, MultiplePredicatesSameEdge) {
                     "right": 5
                 }
             ],
-            "left": "0000000000000000000000000000000000000000000000000000000000000001",
-            "right": "0000000000000000000000000000000000000000000000000000000000000010"
+            "left": {"$numberInt":"0"},
+            "right": {"$numberInt":"1"}
         })",
         edge.toBSON());
 }
@@ -197,39 +184,11 @@ TEST(JoinGraphTests, GetNeighborsSimpleEqualityEdges) {
     graph.addSimpleEqualityEdge(c, d, 4, 5);
 
     // A connected to b,c. B connected to a. C connected to a,d. D connected to c. E not connected.
-    ASSERT_EQ(graph.getNeighbors(a), makeNodeSetFromIds({b, c}));
-    ASSERT_EQ(graph.getNeighbors(b), makeNodeSetFromIds({a}));
-    ASSERT_EQ(graph.getNeighbors(c), makeNodeSetFromIds({a, d}));
-    ASSERT_EQ(graph.getNeighbors(d), makeNodeSetFromIds({c}));
+    ASSERT_EQ(graph.getNeighbors(a), makeNodeSet(b, c));
+    ASSERT_EQ(graph.getNeighbors(b), makeNodeSet(a));
+    ASSERT_EQ(graph.getNeighbors(c), makeNodeSet(a, d));
+    ASSERT_EQ(graph.getNeighbors(d), makeNodeSet(c));
     ASSERT_EQ(graph.getNeighbors(e), NodeSet{});
-}
-
-TEST(JoinGraphTests, GetNeighborsComplexEdge) {
-    JoinGraph graph{};
-
-    auto a = *graph.addNode(makeNSS("a"), nullptr, boost::none);
-    auto b = *graph.addNode(makeNSS("b"), nullptr, boost::none);
-    auto c = *graph.addNode(makeNSS("c"), nullptr, boost::none);
-    auto d = *graph.addNode(makeNSS("d"), nullptr, boost::none);
-    auto e = *graph.addNode(makeNSS("e"), nullptr, boost::none);
-
-    // Add a complex edge (a,b) <-> (c,d) which could represent, for example, the predicate (a.a=c.c
-    // AND b.b=d.d). Also add simple edge d -- e.
-    graph.addEdge(makeNodeSetFromIds({a, b}),
-                  makeNodeSetFromIds({c, d}),
-                  {
-                      {JoinPredicate::Eq, 0, 1},
-                      {JoinPredicate::Eq, 2, 3},
-                  });
-    graph.addEdge(makeNodeSetFromIds({d}), makeNodeSetFromIds({e}), {});
-
-    // A connected to c,d. B connected to c,d. C connected to a,b. D connected to a,b. E connected
-    // to d. Note: a and b are not connected.
-    ASSERT_EQ(graph.getNeighbors(a), makeNodeSetFromIds({c, d}));
-    ASSERT_EQ(graph.getNeighbors(b), makeNodeSetFromIds({c, d}));
-    ASSERT_EQ(graph.getNeighbors(c), makeNodeSetFromIds({a, b}));
-    ASSERT_EQ(graph.getNeighbors(d), makeNodeSetFromIds({a, b, e}));
-    ASSERT_EQ(graph.getNeighbors(e), makeNodeSetFromIds({d}));
 }
 
 TEST(JoinGraph, GetNeighborsMultiEdges) {
@@ -241,12 +200,12 @@ TEST(JoinGraph, GetNeighborsMultiEdges) {
 
     // Now add two edges between "a" and "b". These could in theory be simplified into a single
     // complex edge with multiple predicates, but this demonstrates that getNeighbors supports it.
-    graph.addEdge(makeNodeSetFromIds({a}), makeNodeSetFromIds({b}), {});
-    graph.addEdge(makeNodeSetFromIds({b}), makeNodeSetFromIds({a}), {});
+    graph.addEdge(a, b, {});
+    graph.addEdge(b, a, {});
 
     // A connected to b. B connected to a.
-    ASSERT_EQ(graph.getNeighbors(a), makeNodeSetFromIds({b}));
-    ASSERT_EQ(graph.getNeighbors(b), makeNodeSetFromIds({a}));
+    ASSERT_EQ(graph.getNeighbors(a), makeNodeSet(b));
+    ASSERT_EQ(graph.getNeighbors(b), makeNodeSet(a));
     ASSERT_EQ(graph.getNeighbors(c), NodeSet{});
 }
 
@@ -259,15 +218,15 @@ TEST(JoinGraph, GetNeighborsCycle) {
     auto d = *graph.addNode(makeNSS("d"), nullptr, boost::none);
 
     // Introduce a cycle involving all four nodes.
-    graph.addEdge(makeNodeSetFromIds({a}), makeNodeSetFromIds({b}), {});
-    graph.addEdge(makeNodeSetFromIds({b}), makeNodeSetFromIds({c}), {});
-    graph.addEdge(makeNodeSetFromIds({c}), makeNodeSetFromIds({d}), {});
-    graph.addEdge(makeNodeSetFromIds({d}), makeNodeSetFromIds({a}), {});
+    graph.addEdge(a, b, {});
+    graph.addEdge(b, c, {});
+    graph.addEdge(c, d, {});
+    graph.addEdge(d, a, {});
 
     // Each node is connected to only two others.
-    ASSERT_EQ(graph.getNeighbors(a), makeNodeSetFromIds({b, d}));
-    ASSERT_EQ(graph.getNeighbors(b), makeNodeSetFromIds({a, c}));
-    ASSERT_EQ(graph.getNeighbors(c), makeNodeSetFromIds({b, d}));
-    ASSERT_EQ(graph.getNeighbors(d), makeNodeSetFromIds({a, c}));
+    ASSERT_EQ(graph.getNeighbors(a), makeNodeSet(b, d));
+    ASSERT_EQ(graph.getNeighbors(b), makeNodeSet(a, c));
+    ASSERT_EQ(graph.getNeighbors(c), makeNodeSet(b, d));
+    ASSERT_EQ(graph.getNeighbors(d), makeNodeSet(a, c));
 }
 }  // namespace mongo::join_ordering

@@ -84,15 +84,6 @@ JoinPredicateEstimator::JoinPredicateEstimator(const JoinGraph& graph,
       _samplingEstimators(samplingEstimators),
       _tableCards(tableCards) {}
 
-namespace {
-
-// Given a NodeSet with a single bit set, return the index of that bit.
-std::size_t getIndexOfBit(const NodeSet& ns) {
-    return std::countr_zero(ns.to_ullong());
-}
-
-}  // namespace
-
 // This function makes a number of assumptions:
 // * Join predicate are independent from single table predicates. This allows us to estimate them
 // separately, which can be seen by our use of NDV(join key) over the entire collection, as opposed
@@ -136,12 +127,9 @@ std::size_t getIndexOfBit(const NodeSet& ns) {
 // both sides reference the primary key. Again, we use the side with the smaller CE for simplicity.
 cost_based_ranker::SelectivityEstimate JoinPredicateEstimator::joinPredicateSel(
     const JoinEdge& edge) {
-    tassert(11352501,
-            "join predicate selectivity estimation only supports single collection on both sides",
-            edge.left.count() == 1 && edge.right.count() == 1);
 
-    auto& leftNode = _graph.getNode(getIndexOfBit(edge.left));
-    auto& rightNode = _graph.getNode(getIndexOfBit(edge.right));
+    auto& leftNode = _graph.getNode(edge.left);
+    auto& rightNode = _graph.getNode(edge.right);
 
     // Extract the cardinality estimates for left and right nodes before single table predicates are
     // applied.

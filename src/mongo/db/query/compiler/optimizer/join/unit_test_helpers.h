@@ -123,16 +123,4 @@ private:
  * Small utility function to make a namepace string from collection name.
  */
 NamespaceString makeNSS(StringData collName);
-
-/**
- * Creates a join graph node from the set of ids.
- */
-NodeSet makeNodeSetFromIds(std::set<NodeId> ids);
-
-/**
- * Creates a join graph node from a single id.
- */
-inline NodeSet makeNodeSetFromId(NodeId id) {
-    return makeNodeSetFromIds({id});
-}
 }  // namespace mongo::join_ordering

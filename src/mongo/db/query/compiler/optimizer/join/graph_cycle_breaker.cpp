@@ -97,7 +97,7 @@ boost::optional<EdgeId> GraphCycleBreaker::findEdgeId(NodeId u,
                                                       const std::vector<EdgeId>& edges) const {
     for (auto edgeId : edges) {
         const auto& edge = _graph.getEdge(edgeId);
-        if ((edge.left[u] && edge.right[v]) || (edge.left[v] && edge.right[u])) {
+        if ((edge.left == u && edge.right == v) || (edge.left == v && edge.right == u)) {
             return edgeId;
         }
     }

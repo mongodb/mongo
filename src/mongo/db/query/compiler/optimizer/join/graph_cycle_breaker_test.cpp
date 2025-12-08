@@ -51,7 +51,7 @@ public:
     }
 
     EdgeId addEdge(NodeId u, NodeId v) {
-        return *graph.addEdge(makeNodeSetFromId(u), makeNodeSetFromId(v), {});
+        return *graph.addEdge(u, v, {});
     }
 
     template <typename... EdgeIds>

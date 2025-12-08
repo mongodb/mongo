@@ -116,8 +116,6 @@ public:
 
     std::vector<IndexedJoinPredicate> makeIndexedJoinPreds(const JoinEdge& edge,
                                                            NodeId currentNode) const {
-        tassert(11233804, "left edge expected only one node", edge.left.count() == 1);
-        tassert(11233805, "right edge expected only one node", edge.right.count() == 1);
         std::vector<IndexedJoinPredicate> res;
         for (auto&& pred : edge.predicates) {
             res.push_back({
@@ -174,7 +172,7 @@ public:
         // members. We are exploiting this implementation detail to avoid doing duplicate work
         // of determining the orientation in making the 'IndexedJoinPredicate' and the
         // 'QSNJoinPredicate' below.
-        if ((edge.left & right).any()) {
+        if (right.test(edge.left)) {
             edge = edge.reverseEdge();
         }
 
