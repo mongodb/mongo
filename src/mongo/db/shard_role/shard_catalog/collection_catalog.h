@@ -328,17 +328,6 @@ public:
                                                      boost::optional<Timestamp> commitTime);
 
     /**
-     * Create a temporary record of an uncommitted view namespace to aid in detecting a
-     * simultaneous attempt to create a collection with the same namespace.
-     */
-    void registerUncommittedView(OperationContext* opCtx, const NamespaceString& nss);
-
-    /**
-     * Remove the temporary record for an uncommitted view namespace, either on commit or rollback.
-     */
-    void deregisterUncommittedView(const NamespaceString& nss);
-
-    /**
      * Deregister all the collection objects and view namespaces.
      */
     void deregisterAllCollectionsAndViews(ServiceContext* svcCtx);

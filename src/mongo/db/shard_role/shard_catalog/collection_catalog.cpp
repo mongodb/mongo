@@ -445,8 +445,10 @@ public:
         auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
         const auto& entries = uncommittedCatalogUpdates.entries();
 
-        if (std::none_of(
-                entries.begin(), entries.end(), UncommittedCatalogUpdates::isTwoPhaseCommitEntry)) {
+        if (std::none_of(entries.begin(), entries.end(), [](const auto& entry) {
+                return UncommittedCatalogUpdates::isTwoPhaseCommitEntry(entry) ||
+                    entry.action == UncommittedCatalogUpdates::Entry::Action::kAddViewResource;
+            })) {
             // Nothing to do, avoid calling CollectionCatalog::write.
             return;
         }
@@ -457,11 +459,41 @@ public:
                 if (entry.action == UncommittedCatalogUpdates::Entry::Action::kCreatedCollection) {
                     catalog._ensureNamespaceDoesNotExist(
                         opCtx, entry.collection->ns(), NamespaceType::kAll);
+                } else if (entry.action ==
+                           UncommittedCatalogUpdates::Entry::Action::kAddViewResource) {
+                    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                        NamespaceString::makeSystemDotViewsNamespace(entry.nss.dbName()), MODE_X));
+
+                    // Allow registering the view if there is an uncommitted collection rename/drop
+                    // on that NSS. Skip `_ensureNamespaceDoesNotExist`, which pessimistically
+                    // reports the rename/drop as a conflict. This is used during viewless
+                    // timeseries downgrade (SERVER-114505) to atomically rename 'tscoll' ->
+                    // 'system.buckets.tscoll', then create a timeseries view 'tscoll'.
+                    // TODO(SERVER-114573): Remove since it's only for viewless timeseries downgrade
+                    auto [found, existingColl, newColl] =
+                        UncommittedCatalogUpdates::lookupCollection(opCtx, entry.nss);
+                    if (found) {
+                        tassert(11454300,
+                                "Should not create a view on a NSS with an uncommited creation",
+                                !existingColl);
+                        continue;
+                    }
+
+                    // Since writing to system.views requires an X lock, we only need to cross-check
+                    // collection namespaces here.
+                    catalog._ensureNamespaceDoesNotExist(
+                        opCtx, entry.nss, NamespaceType::kCollection);
                 }
             }
 
             // We did not conflict with any namespace, mark all the collections as pending commit.
             for (auto&& entry : entries) {
+                // Create a temporary record of an uncommitted view namespace to aid in detecting
+                // a simultaneous attempt to create a collection with the same namespace.
+                if (entry.action == UncommittedCatalogUpdates::Entry::Action::kAddViewResource) {
+                    catalog._uncommittedViews = catalog._uncommittedViews.insert(entry.nss);
+                }
+
                 if (!UncommittedCatalogUpdates::isTwoPhaseCommitEntry(entry)) {
                     continue;
                 }
@@ -601,7 +633,7 @@ public:
                 case UncommittedCatalogUpdates::Entry::Action::kAddViewResource: {
                     writeJobs.push_back([opCtx, &viewName = entry.nss](CollectionCatalog& catalog) {
                         ResourceCatalog::get().add({RESOURCE_COLLECTION, viewName}, viewName);
-                        catalog.deregisterUncommittedView(viewName);
+                        catalog._uncommittedViews = catalog._uncommittedViews.erase(viewName);
                     });
                     break;
                 }
@@ -633,14 +665,20 @@ public:
             return;
         }
 
-        if (std::none_of(
-                entries.begin(), entries.end(), UncommittedCatalogUpdates::isTwoPhaseCommitEntry)) {
+        if (std::none_of(entries.begin(), entries.end(), [](const auto& entry) {
+                return UncommittedCatalogUpdates::isTwoPhaseCommitEntry(entry) ||
+                    entry.action == UncommittedCatalogUpdates::Entry::Action::kAddViewResource;
+            })) {
             // Nothing to do, avoid calling CollectionCatalog::write.
             return;
         }
 
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
             for (auto&& entry : entries) {
+                if (entry.action == UncommittedCatalogUpdates::Entry::Action::kAddViewResource) {
+                    catalog._uncommittedViews = catalog._uncommittedViews.erase(entry.nss);
+                }
+
                 if (!UncommittedCatalogUpdates::isTwoPhaseCommitEntry(entry)) {
                     continue;
                 }
@@ -774,7 +812,7 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
-    if (viewsForDb.lookup(viewName) || _collections.find(viewName))
+    if (viewsForDb.lookup(viewName) || lookupCollectionByNamespace(opCtx, viewName))
         return Status(ErrorCodes::NamespaceExists, "Namespace already exists");
 
     if (!NamespaceString::validCollectionName(viewOn.coll()))
@@ -2302,22 +2340,6 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
     }
 
     return coll;
-}
-
-void CollectionCatalog::registerUncommittedView(OperationContext* opCtx,
-                                                const NamespaceString& nss) {
-    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
-        NamespaceString::makeSystemDotViewsNamespace(nss.dbName()), MODE_X));
-
-    // Since writing to system.views requires an X lock, we only need to cross-check collection
-    // namespaces here.
-    _ensureNamespaceDoesNotExist(opCtx, nss, NamespaceType::kCollection);
-
-    _uncommittedViews = _uncommittedViews.insert(nss);
-}
-
-void CollectionCatalog::deregisterUncommittedView(const NamespaceString& nss) {
-    _uncommittedViews = _uncommittedViews.erase(nss);
 }
 
 void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,

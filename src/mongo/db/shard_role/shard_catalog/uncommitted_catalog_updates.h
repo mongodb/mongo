@@ -138,8 +138,6 @@ public:
 
     /**
      * Determine if an entry uses two-phase commit to write into the CollectionCatalog.
-     * kCreatedCollection is also committed using two-phase commit but using a separate system and
-     * is excluded from this list.
      */
     static bool isTwoPhaseCommitEntry(const Entry& entry) {
         return (entry.action == Entry::Action::kCreatedCollection ||

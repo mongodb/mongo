@@ -2253,6 +2253,91 @@ TEST_F(CollectionCatalogTimestampTest,
         });
 }
 
+/**
+ * Validates the possibility to replace a collection with a view within a single WriteUnitOfWork.
+ * TODO(SERVER-114573): Remove this which is only needed for viewless timeseries downgrade.
+ */
+TEST_F(CollectionCatalogTimestampTest, DropCollectionAndCreateViewOnSameNSS) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString viewOnNs = NamespaceString::createNamespaceString_forTest("a.target");
+
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp dropCollectionTs = Timestamp(20, 20);
+
+    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+    autoDb.ensureDbExists(opCtx.get())->createSystemDotViewsIfNecessary(opCtx.get());
+    createCollection(opCtx.get(), nss, createCollectionTs);
+
+    // Start a thread that will drop the collection & create the view on a single WriteUnitOfWork;
+    // we hang it at certain points to verify the visiblity of the catalog changes.
+    SharedPromise<void> updatedCatalogInWuowAndReadyToCommit;
+    SharedPromise<void> commitWuow;
+
+    stdx::thread t([&, svcCtx = getServiceContext()] {
+        ThreadClient client(svcCtx->getService());
+        auto newOpCtx = client->makeOperationContext();
+
+        boost::optional<WriteUnitOfWork> wuow;
+        dropCollectionAndLeaveUncommitted(opCtx.get(), nss, dropCollectionTs, wuow);
+        uassertStatusOK(CollectionCatalog::get(opCtx.get())
+                            ->createView(
+                                opCtx.get(),
+                                nss,
+                                viewOnNs,
+                                BSONArray() /* pipeline */,
+                                [](auto&&...) {
+                                    return stdx::unordered_set<NamespaceString>{};
+                                } /* validatePipeline */,
+                                BSONObj() /* collation */));
+
+        // Signal that we're ready to commit and wait until we are signaled to actually commit
+        updatedCatalogInWuowAndReadyToCommit.emplaceValue();
+        commitWuow.getFuture().get();
+
+        wuow->commit();
+
+        // The state is visible after the WUOW is committed
+        ASSERT(!CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss));
+        ASSERT(CollectionCatalog::get(opCtx.get())->lookupView(opCtx.get(), nss));
+    });
+
+    auto assertCatalogChangesVisiblity = [svcCtx = opCtx->getServiceContext(), &nss](bool visible) {
+        auto newClient = svcCtx->getService()->makeClient("AlternativeClient");
+        auto newOpCtx = newClient->makeOperationContext();
+        auto catalog = CollectionCatalog::get(newOpCtx.get());
+        if (visible) {
+            ASSERT(!catalog->lookupCollectionByNamespace(newOpCtx.get(), nss));
+            ASSERT(catalog->lookupView(newOpCtx.get(), nss));
+        } else {
+            ASSERT(catalog->lookupCollectionByNamespace(newOpCtx.get(), nss));
+            ASSERT(!catalog->lookupView(newOpCtx.get(), nss));
+        }
+    };
+
+    // No catalog change should not yet be visible before commit.
+    updatedCatalogInWuowAndReadyToCommit.getFuture().get();
+    assertCatalogChangesVisiblity(false);
+
+    // Verify changes are not visible after pre-commit.
+    auto hangPreCommit = globalFailPointRegistry().find("hangAfterPreCommittingCatalogUpdates");
+    auto hangPreCommitInitialTimesEntered = hangPreCommit->setMode(FailPoint::alwaysOn);
+    commitWuow.emplaceValue();
+    hangPreCommit->waitForTimesEntered(hangPreCommitInitialTimesEntered + 1);
+    assertCatalogChangesVisiblity(false);
+
+    // Verify changes are not visible after committing to storage, but before updating the catalog.
+    auto hangCommit = globalFailPointRegistry().find("hangBeforePublishingCatalogUpdates");
+    auto hangCommitInitialTimesEntered = hangCommit->setMode(FailPoint::alwaysOn);
+    hangPreCommit->setMode(FailPoint::off);
+    hangCommit->waitForTimesEntered(hangCommitInitialTimesEntered + 1);
+    assertCatalogChangesVisiblity(false);
+
+    // Verify changes are visible after commit.
+    hangCommit->setMode(FailPoint::off);
+    t.join();
+    assertCatalogChangesVisiblity(true);
+}
+
 using CollectionCatalogTimestampTestDeathTest = CollectionCatalogTimestampTest;
 #ifdef MONGO_CONFIG_DEBUG_BUILD
 DEATH_TEST_F(CollectionCatalogTimestampTestDeathTest,

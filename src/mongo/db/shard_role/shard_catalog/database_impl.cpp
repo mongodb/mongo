@@ -1074,4 +1074,17 @@ Status DatabaseImpl::userCreateVirtualNS(OperationContext* opCtx,
     return Status::OK();
 }
 
+void DatabaseImpl::createSystemDotViewsIfNecessary(OperationContext* opCtx) const {
+    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(_viewsName, MODE_X));
+    dassert(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+
+    if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, _viewsName)) {
+        return;
+    }
+
+    WriteUnitOfWork wuow(opCtx);
+    invariant(createCollection(opCtx, _viewsName));
+    wuow.commit();
+}
+
 }  // namespace mongo

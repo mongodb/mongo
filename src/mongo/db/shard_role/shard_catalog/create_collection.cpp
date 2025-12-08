@@ -416,17 +416,6 @@ Status _performCollectionCreationChecks(OperationContext* opCtx,
     return Status::OK();
 }
 
-
-void _createSystemDotViewsIfNecessary(OperationContext* opCtx, const Database* db) {
-    // Create 'system.views' in a separate WUOW if it does not exist.
-    if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
-                                                                    db->getSystemViewsName())) {
-        WriteUnitOfWork wuow(opCtx);
-        invariant(db->createCollection(opCtx, db->getSystemViewsName()));
-        wuow.commit();
-    }
-}
-
 Status _createView(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const CollectionOptions& collectionOptions) {
@@ -483,7 +472,7 @@ Status _createView(OperationContext* opCtx,
                           "option not supported on a view: changeStreamPreAndPostImages");
         }
 
-        _createSystemDotViewsIfNecessary(opCtx, db);
+        db->createSystemDotViewsIfNecessary(opCtx);
 
         WriteUnitOfWork wunit(opCtx);
 

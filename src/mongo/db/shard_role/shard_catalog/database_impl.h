@@ -123,6 +123,8 @@ public:
         return _viewsName;
     }
 
+    void createSystemDotViewsIfNecessary(OperationContext* opCtx) const final;
+
 private:
     StatusWith<std::unique_ptr<CollatorInterface>> _validateCollator(OperationContext* opCtx,
                                                                      CollectionOptions& opts) const;

@@ -150,6 +150,13 @@ public:
                                     bool stayTemp) const = 0;
 
     virtual const NamespaceString& getSystemViewsName() const = 0;
+
+    /**
+     * Create 'system.views' in a separate WriteUnitOfWork, if it does not exist.
+     * A MODE_X lock on 'system.views' must be held for this call.
+     * The caller must not be in a WriteUnitOfWork when calling this method.
+     */
+    virtual void createSystemDotViewsIfNecessary(OperationContext* opCtx) const = 0;
 };
 
 }  // namespace mongo

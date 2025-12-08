@@ -184,16 +184,6 @@ void UncommittedCatalogUpdates::replaceViewsForDatabase(const DatabaseName& dbNa
 }
 
 void UncommittedCatalogUpdates::addView(OperationContext* opCtx, const NamespaceString& nss) {
-    shard_role_details::getRecoveryUnit(opCtx)->registerPreCommitHook(
-        [nss](OperationContext* opCtx) {
-            CollectionCatalog::write(opCtx, [opCtx, nss](CollectionCatalog& catalog) {
-                catalog.registerUncommittedView(opCtx, nss);
-            });
-        });
-    shard_role_details::getRecoveryUnit(opCtx)->onRollback([nss](OperationContext* opCtx) {
-        CollectionCatalog::write(
-            opCtx, [&](CollectionCatalog& catalog) { catalog.deregisterUncommittedView(nss); });
-    });
     _entries.push_back({Entry::Action::kAddViewResource, nullptr, nss});
 }
 
