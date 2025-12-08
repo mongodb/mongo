@@ -100,3 +100,25 @@ export function isSlowBuild(conn) {
         (rawBuildInfo.hasOwnProperty("buildEnvironment") && rawBuildInfo.buildEnvironment.target_os == "windows")
     );
 }
+
+/**
+ * Builds a MinKey or MaxKey object based on shard key structure.
+ * @param {Object} shardKey - The shard key pattern object (e.g., {x: 1, y: 1})
+ * @param {Object} keyType - Either MinKey or MaxKey
+ * @returns {Object} An object with the same keys as shardKey, but values set to keyType
+ */
+export function buildShardKeyBoundary(shardKey, keyType) {
+    const boundary = {};
+    Object.keys(shardKey).forEach((key) => {
+        boundary[key] = keyType;
+    });
+    return boundary;
+}
+
+export function buildMinKey(shardKey) {
+    return buildShardKeyBoundary(shardKey, MinKey);
+}
+
+export function buildMaxKey(shardKey) {
+    return buildShardKeyBoundary(shardKey, MaxKey);
+}
