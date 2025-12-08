@@ -32,6 +32,7 @@
 
 #ifdef MONGO_CONFIG_OTEL
 
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metrics_settings_gen.h"
 #include "mongo/stdx/chrono.h"
@@ -122,6 +123,12 @@ Status initializeFile(const std::string& name, const std::string& directory) {
 
 Status initialize(const std::string& name) {
     try {
+        uassert(ErrorCodes::InvalidOptions,
+                "featureFlagOtelMetrics must be enabled in order to export OpenTelemetry metrics",
+                gFeatureFlagOtelMetrics.isEnabled() ||
+                    (gOpenTelemetryMetricsHttpEndpoint.empty() &&
+                     gOpenTelemetryMetricsDirectory.empty()));
+
         uassert(
             ErrorCodes::InvalidOptions,
             "gOpenTelemetryMetricsHttpEndpoint and gOpenTelemetryMetricsDirectory cannot be set "

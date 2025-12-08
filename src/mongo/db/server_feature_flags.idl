@@ -236,3 +236,8 @@ feature_flags:
         default: false
         fcv_gated: false
         incremental_rollout_phase: in_development
+    featureFlagOtelMetrics:
+        description: "Feature flag to enable exporting OpenTelemetry metrics"
+        cpp_varname: gFeatureFlagOtelMetrics
+        default: false
+        fcv_gated: false

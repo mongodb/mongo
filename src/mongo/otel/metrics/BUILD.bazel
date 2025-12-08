@@ -31,6 +31,7 @@ mongo_cc_library(
         {
             "@//bazel/config:build_otel_enabled": [
                 "//src/mongo/base:system_error",
+                "//src/mongo/db:server_feature_flags",
                 "//src/third_party/opentelemetry-cpp/api",
                 # Consider moving otlp_metric_.*_exporter's into their own standalone libraries
                 "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_file_exporter",

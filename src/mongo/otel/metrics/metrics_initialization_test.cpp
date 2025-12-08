@@ -31,6 +31,7 @@
 
 #ifdef MONGO_CONFIG_OTEL
 
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/metrics/metrics_initialization.h"
 #include "mongo/otel/metrics/metrics_settings_gen.h"
 #include "mongo/unittest/unittest.h"
@@ -47,13 +48,14 @@ public:
     void setUp() override {
         opentelemetry::metrics::Provider::SetMeterProvider(
             std::make_shared<opentelemetry::metrics::NoopMeterProvider>());
-        metrics::gOpenTelemetryMetricsHttpEndpoint.clear();
-        metrics::gOpenTelemetryMetricsDirectory.clear();
     }
 
     void tearDown() override {
         opentelemetry::metrics::Provider::SetMeterProvider({});
     }
+
+private:
+    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagOtelMetrics", true};
 };
 
 bool isNoop(opentelemetry::metrics::MeterProvider* provider) {
@@ -68,7 +70,7 @@ TEST_F(OtelMetricsInitializationTest, NoMeterProvider) {
 }
 
 TEST_F(OtelMetricsInitializationTest, Shutdown) {
-    metrics::gOpenTelemetryMetricsDirectory = "/tmp/";
+    RAIIServerParameterControllerForTest param{"openTelemetryMetricsDirectory", "/tmp/"};
     ASSERT_OK(metrics::initialize("mongod"));
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
     ASSERT_FALSE(isNoop(provider.get()));
@@ -80,7 +82,7 @@ TEST_F(OtelMetricsInitializationTest, Shutdown) {
 }
 
 TEST_F(OtelMetricsInitializationTest, FileMeterProvider) {
-    metrics::gOpenTelemetryMetricsDirectory = "/tmp/";
+    RAIIServerParameterControllerForTest param{"openTelemetryMetricsDirectory", "/tmp/"};
     ASSERT_OK(metrics::initialize("mongod"));
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
@@ -88,7 +90,8 @@ TEST_F(OtelMetricsInitializationTest, FileMeterProvider) {
 }
 
 TEST_F(OtelMetricsInitializationTest, HttpMeterProvider) {
-    metrics::gOpenTelemetryMetricsHttpEndpoint = "http://localhost:4318/v1/traces";
+    RAIIServerParameterControllerForTest param{"openTelemetryMetricsHttpEndpoint",
+                                               "http://localhost:4318/v1/traces"};
     ASSERT_OK(metrics::initialize("mongod"));
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
@@ -96,12 +99,38 @@ TEST_F(OtelMetricsInitializationTest, HttpMeterProvider) {
 }
 
 TEST_F(OtelMetricsInitializationTest, HttpAndDirectory) {
-    metrics::gOpenTelemetryMetricsHttpEndpoint = "http://localhost:4318/v1/traces";
-    metrics::gOpenTelemetryMetricsDirectory = "/tmp/";
+    RAIIServerParameterControllerForTest httpParam{"openTelemetryMetricsHttpEndpoint",
+                                                   "http://localhost:4318/v1/traces"};
+    RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory", "/tmp/"};
     auto status = metrics::initialize("mongod");
     ASSERT_FALSE(status.isOK());
     ASSERT_EQ(status.codeString(), "InvalidOptions");
 
+    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+    ASSERT_TRUE(isNoop(provider.get()));
+}
+
+TEST_F(OtelMetricsInitializationTest, FeatureFlagDisabledNoParams) {
+    RAIIServerParameterControllerForTest featureFlagController{"featureFlagOtelMetrics", false};
+    ASSERT_OK(metrics::initialize("mongod"));
+
+    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+    ASSERT_TRUE(isNoop(provider.get()));
+}
+
+TEST_F(OtelMetricsInitializationTest, FeatureFlagDisabledDirectorySet) {
+    RAIIServerParameterControllerForTest featureFlagController{"featureFlagOtelMetrics", false};
+    RAIIServerParameterControllerForTest param{"openTelemetryMetricsDirectory", "/tmp/"};
+    ASSERT_EQ(metrics::initialize("mongod").code(), ErrorCodes::InvalidOptions);
+    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+    ASSERT_TRUE(isNoop(provider.get()));
+}
+
+TEST_F(OtelMetricsInitializationTest, FeatureFlagDisabledHttpSet) {
+    RAIIServerParameterControllerForTest featureFlagController{"featureFlagOtelMetrics", false};
+    RAIIServerParameterControllerForTest param{"openTelemetryMetricsHttpEndpoint",
+                                               "http://localhost:4318/v1/traces"};
+    ASSERT_EQ(metrics::initialize("mongod").code(), ErrorCodes::InvalidOptions);
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
     ASSERT_TRUE(isNoop(provider.get()));
 }
