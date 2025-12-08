@@ -2,10 +2,14 @@
 
 ## Overview
 
-After an aggregate command issued by a user is parsed into a `Pipeline`, it undergoes **heuristic rewrites** to transform the whole pipeline as well as individual stages within the pipeline into a more efficient form. The entrypoint to pipeline optimization is the [`Pipeline::optimizePipeline()`](https://github.com/mongodb/mongo/blob/65b9efd4861b9f0d61f8b29843d29febcba91bcb/src/mongo/db/pipeline/pipeline.cpp#L359) function, which is comprised of two primary steps:
+After an aggregate command issued by a user is parsed into a `Pipeline`, it undergoes **heuristic rewrites** to transform the whole pipeline as well as individual stages within the pipeline into a more efficient form. The entrypoint to pipeline optimization is the [`pipeline_optimization::optimizePipeline()`](https://github.com/mongodb/mongo/blob/f072451dc0301232b4748410242565f53f8cb6cf/src/mongo/db/pipeline/optimization/optimize.cpp#L59) function, which is comprised of two primary steps:
 
 1. [**Inter-stage Optimization**](#inter-stage-optimization): optimizes the entire `Pipeline` object, which is represented internally as a container of `DocumentSource`s. This modifies the container by combining, swapping, dropping, and/or inserting stages.
 1. [**Stage-specific Optimization**](#stage-specific-optimization): optimizes each stage, or `DocumentSource` individually.
+
+<!-- TODO(SERVER-110110): Add links to RBR docs where applicable. -->
+
+For information on how to register new rewrites, see [Registering new rewrites](#registering-new-rewrites).
 
 > ### Aside: Disabling Optimizations
 >
@@ -21,14 +25,12 @@ After an aggregate command issued by a user is parsed into a `Pipeline`, it unde
 
 ## Inter-stage Optimization
 
-First, we attempt to optimize the overall `Pipeline` by modifying stages in relation with each other. The entrypoint is [`Pipeline::optimizeContainer()`](https://github.com/mongodb/mongo/blob/65b9efd4861b9f0d61f8b29843d29febcba91bcb/src/mongo/db/pipeline/pipeline.cpp#L368), which subsequently iterates through the underlying `SourceContainer` and calls [`DocumentSource::optimizeAt()`](https://github.com/mongodb/mongo/blob/65b9efd4861b9f0d61f8b29843d29febcba91bcb/src/mongo/db/pipeline/document_source.cpp#L315) for each stage. This attempts to perform some generic optimizations such as pushing `$match`, `$sample`, `$project`, and `$redact` stages as early in the pipeline as possible.
-
-Each stage can optionally override the [`DocumentSource::doOptimizeAt()`](https://github.com/mongodb/mongo/blob/65b9efd4861b9f0d61f8b29843d29febcba91bcb/src/mongo/db/pipeline/document_source.h#L493) function to implement stage-specific optimizations. This function takes in an iterator that points to the stage's location within the pipeline, as well as a container that refers to the entire pipeline. It returns an iterator over the same container pointing to the first location in the container where an optimization may be possible, or the end of the container. This allows us to perform optimizations that are made possible by earlier optimizations. For example, if a stage swap takes place, the returned iterator will point to the stage directly preceding the stage, since the stage at that position may be able to perform further optimizations with its new neighbor. This iterative approach ensures that we perform optimizations until we've exhausted all the possibile changes, i.e., when we've reached the end of the container.
+First, we attempt to optimize the overall `Pipeline` by modifying stages in relation with each other. The entrypoint is [`pipeline_optimization::optimizeContainer()`](https://github.com/mongodb/mongo/blob/f072451dc0301232b4748410242565f53f8cb6cf/src/mongo/db/pipeline/optimization/optimize.cpp#L82), which invokes the [rule-based rewrite engine](https://github.com/mongodb/mongo/blob/787278f00ef495a4311c69b7b913fdc3fd32e4cd/src/mongo/db/pipeline/optimization/rule_based_rewriter.h#L196) to run all rules that may combine or re-order adjacent stages, or otherwise modify the structure of the pipeline. Currently all inter-stage rewrites, except for `$match`, `$sample`, `$project`, and `$redact` pushdowns, are implemented inside a public `optimizeAt()` method on each `DocumentSource` and registered as [unconditional rules](https://github.com/mongodb/mongo/blob/787278f00ef495a4311c69b7b913fdc3fd32e4cd/src/mongo/db/pipeline/optimization/rule_based_rewriter.h#L90) (see [qo_rules_to_move.cpp](https://github.com/mongodb/mongo/blob/787278f00ef495a4311c69b7b913fdc3fd32e4cd/src/mongo/db/pipeline/optimization/qo_rules_to_move.cpp#L46-L68) for an example).
 
 These are the general classes of optimizations we attempt to make:
 
 1. **Swapping stages**:
-   `$match` pushdown is a prime example. Generally, we want to filter documents before passing them into a more computationally-heavy stage to minimize the amount of work that needs to be done. If the user writes a pipeline that specifies a `$match` after a stage like a `$sort`, we will push it down when possible in order to minimize the number of documents to sort. For example, if the user specified this pipeline:
+   [`$match` pushdown](https://github.com/mongodb/mongo/blob/f072451dc0301232b4748410242565f53f8cb6cf/src/mongo/db/pipeline/optimization/match_rules.cpp#L230-L236) is a prime example. Generally, we want to filter documents before passing them into a more computationally-heavy stage to minimize the amount of work that needs to be done. If the user writes a pipeline that specifies a `$match` after a stage like a `$sort`, we will push it down when possible in order to minimize the number of documents to sort. For example, if the user specified this pipeline:
 
 ```
 { $sort: { age : -1 } },
@@ -174,50 +176,73 @@ These optimizations may seem obvious, but oftentimes, the aggregation pipelines 
 graph TD
     %% Definitions
     B@{shape: das, label: Pipeline}
-    C["Pipeline::optimizePipeline()"]
-    E["Pipeline::<br>optimizeContainer()"]
-    G@{shape: processes, label: "DocumentSource::<br>optimizeAt()"}
-    H@{ shape: div-rect, label: Generic Optimizations}
-    I([Push $match, $sample,<br>$project, $redact stages])
+    C["pipeline_optimization::<br>optimizePipeline()"]
+    E["pipeline_optimization::<br>optimizeContainer()"]
+    RBRReordering["PipelineRewriteEngine::<br>applyRules(Tags::Reordering)"]
+    RBRInPlace["PipelineRewriteEngine::<br>applyRules(Tags::InPlace)"]
+    G@{shape: processes, label: "Rule::transform()"}
+    I([Push down $match, $sample,<br>$project and $redact])
     J([Combine, Swap, Drop,<br>or Insert Stages])
-    L@{shape: subproc, label: "DocumentSource::<br>doOptimizeAt()"}
+    L@{shape: subproc, label: "DocumentSource::<br>optimizeAt()"}
     M@{shape: lean-r, label: Optimized Container}
-    O["Pipeline::<br>optimizeEachStage()"]
+    O["pipeline_optimization::<br>optimizeEachStage()"]
     P@{shape: processes, label: "DocumentSource::<br>optimize()"}
     Q([Remove No-op Stage])
     R([Constant Folding])
     U@{shape: lean-r, label: Final Optimized Container}
+    W@{shape: processes, label: "Rule::transform()"}
 
     %% Workflow
     B --> C
     C --> E
+    E --> RBRReordering
 
     subgraph Inter_Stage_Optimization [Inter-Stage Optimization]
-        E -->|Iterate through SourceContainer| G
-        G -.-> H
-        H -.-> I
-        H -.-> J
+        RBRReordering -->|Iterate through SourceContainer| G
+        G -.->|High-priority pushdowns| I
 
-        G -.->|Stage-specific overrides| L
+        G -.->|Stage-specific rewrites| L
+        L -.-> J
     end
 
     E --> M
-    C--> O
+    C --> O
+    O --> RBRInPlace
     M --> O
 
     subgraph Stage_Specific_Optimization [Stage-specific Optimization]
-        O -->|Iterate through SourceContainer| P
+        RBRInPlace -->|Iterate through SourceContainer| W
+        W -.-> P
         P -.-> Q
 
         P -.-> R
     end
     O --> U
-    U --> C
 
     I ~~~ O
     I ~~~ M
     R ~~~ U
 ```
+
+## Registering new rewrites
+
+All pipeline rewrites are invoked through the [rule-based rewrite engine](https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/pipeline/optimization/rule_based_rewriter.h#L196). While most rewrites are still implemented inside `DocumentSource::optimizeAt()` and `optimize()` and registered as unconditional rules (i.e., rules where the precondition is always true), new rewrites should be implemented and registered as their own, separate rules. A rule is defined by a name, precondition and transform functions, a priority and a set of tags: https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/query/compiler/rewrites/rule_based_rewriter.h#L51-L81
+
+### Rule registry and registration macros
+
+The [rule registry](https://github.com/mongodb/mongo/blob/f072451dc0301232b4748410242565f53f8cb6cf/src/mongo/db/pipeline/optimization/rule_based_rewriter.cpp#L159-L160) is a mapping between `DocumentSource` subtypes and rules that are applicable to them. It lives as a decoration on the service context. This means rule registrations [get called](https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/pipeline/optimization/rule_based_rewriter.h#L61) on service context creation, i.e. when a new mongod or mongos process is started. Whenever the rewrite engine advances to a new element, [`PipelineRewriteContext::enqueueRules()`](https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/pipeline/optimization/rule_based_rewriter.cpp#L169-L185) is called, which looks up the current `DocumentSource`'s type in the registry and enqueues all applicable rules to be attempted on the current element.
+
+Rules can be registered using the [`REGISTER_RULES`](https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/pipeline/optimization/rule_based_rewriter.h#L49) macro. It accepts a `DocumentSource` subclass as its first argument, and then a comma-separated list of rules to register for that type. See the rule registration for `DocumentSourceMatch` for an example: https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/pipeline/optimization/match_rules.cpp#L227-L236
+
+To gate rules behind a feature flag, use the [`REGISTER_RULES_WITH_FEATURE_FLAG`](https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/pipeline/optimization/rule_based_rewriter.h#L60) macro. It's similar to `REGISTER_RULES`, but accepts a feature flag as its second argument.
+
+Another way to make a rule get called conditionally is to enqueue it from another rule's precondition or transform function by calling [`PipelineRewriteContext::addRule()`](https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/query/compiler/rewrites/rule_based_rewriter.h#L122). One caveat to be aware of is that if the rewrite engine is invoked to only run a certain group of rewrites, the dynamically-enqueued rule will only run if it also belongs to that group. See the rule [`PUSH_MATCH_BEFORE_CHANGE_STREAMS`](https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/pipeline/optimization/match_rules.cpp#L113) for an example: https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/pipeline/optimization/match_rules.cpp#L147
+
+### Tags
+
+Some of our current rewrites rely on the assumption that all inter-stage optimizations are applied to the whole pipeline before any in-place optimizations are attempted. If this assumption is broken, some rewrites may interfere with each other. Hence our current pipeline rewrites are divided into [two categories](https://github.com/mongodb/mongo/blob/f072451dc0301232b4748410242565f53f8cb6cf/src/mongo/db/pipeline/optimization/rule_based_rewriter.h#L94-L99): `Reordering` and `InPlace`. Both groups of rewrites are run against the pipeline separately.
+
+If your rule may change any other stages except the current one, it should have the `Reordering` tag. Otherwise, it should have the `InPlace` tag.
 
 ---
 
