@@ -51,7 +51,7 @@ executor:
         await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
       global_vars:
         TestData:
-          featureFlagUnifiedWriteExecutor: true
+          internalQueryUnifiedWriteExecutor: true
   hooks:
     # We don't execute dbHash or oplog consistency checks since there is only a single replica set
     # node.
@@ -65,9 +65,9 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-        featureFlagUnifiedWriteExecutor: true
+        internalQueryUnifiedWriteExecutor: true
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        featureFlagUnifiedWriteExecutor: true
+        internalQueryUnifiedWriteExecutor: true
     num_shards: 2

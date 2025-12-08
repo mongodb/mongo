@@ -68,6 +68,7 @@ const expectedParamDefaults = {
     internalQueryDisablePlanCache: false,
     internalQueryFindCommandBatchSize: 101,
     internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "inDebug",
+    internalQueryUnifiedWriteExecutor: false,
 };
 
 function assertDefaultParameterValues() {
@@ -305,6 +306,9 @@ assertSetParameterSucceeds("internalQuerySlotBasedExecutionHashAggIncreasedSpill
 assertSetParameterSucceeds("internalQuerySlotBasedExecutionHashAggIncreasedSpilling", "always");
 assertSetParameterSucceeds("internalQuerySlotBasedExecutionHashAggIncreasedSpilling", "inDebug");
 assertSetParameterFails("internalQuerySlotBasedExecutionHashAggIncreasedSpilling", "random");
+
+assertSetParameterSucceeds("internalQueryUnifiedWriteExecutor", true);
+assertSetParameterSucceeds("internalQueryUnifiedWriteExecutor", false);
 
 assertSetParameterSucceeds("internalOrStageMaxMemoryBytes", 11);
 assertSetParameterFails("internalOrStageMaxMemoryBytes", 0);

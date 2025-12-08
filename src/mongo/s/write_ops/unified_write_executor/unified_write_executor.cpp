@@ -146,8 +146,9 @@ FindAndModifyCommandResponse findAndModify(OperationContext* opCtx,
         executeWriteCommand(opCtx, WriteCommandRef{request}, originalCommand));
 }
 
+// TODO SERVER-106306: Convert the knob below to an IFR flag.
 bool isEnabled(OperationContext* opCtx) {
-    return feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled();
+    return internalQueryUnifiedWriteExecutor.load();
 }
 
 }  // namespace unified_write_executor

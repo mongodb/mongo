@@ -23,11 +23,11 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        featureFlagUnifiedWriteExecutor: true
+        internalQueryUnifiedWriteExecutor: true
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-        featureFlagUnifiedWriteExecutor: true
+        internalQueryUnifiedWriteExecutor: true
     num_shards: 2
   hooks:
     - class: CheckReplDBHash

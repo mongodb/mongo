@@ -88,9 +88,9 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionOKTest) {
     // Set up routing table for the logical sessions collection.
     loadRoutingTableWithTwoChunksAndTwoShardsImpl(NamespaceString::kLogicalSessionsNamespace,
                                                   BSON("_id" << 1));
-    for (auto uweFlag : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
-                                                           uweFlag);
+    for (auto uweKnobValue : {false, true}) {
+        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+                                                           uweKnobValue);
         auto future = launchAsync([&] {
             auto now = Date_t::now();
             auto thePast = now - Minutes(5);
@@ -100,7 +100,7 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionOKTest) {
         });
 
         onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
+            if (internalQueryUnifiedWriteExecutor.load()) {
                 BulkWriteCommandReply reply(
                     BulkWriteCommandResponseCursor(0,
                                                    {BulkWriteReplyItem{0, Status::OK()}},
@@ -173,9 +173,9 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionWriteErrTest) {
     // Set up routing table for the logical sessions collection.
     loadRoutingTableWithTwoChunksAndTwoShardsImpl(NamespaceString::kLogicalSessionsNamespace,
                                                   BSON("_id" << 1));
-    for (auto uweFlag : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
-                                                           uweFlag);
+    for (auto uweKnobValue : {false, true}) {
+        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+                                                           uweKnobValue);
 
         auto future = launchAsync([&] {
             auto now = Date_t::now();
@@ -186,7 +186,7 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionWriteErrTest) {
         });
 
         onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
+            if (internalQueryUnifiedWriteExecutor.load()) {
                 BulkWriteCommandReply reply(
                     BulkWriteCommandResponseCursor(
                         0,
@@ -219,16 +219,17 @@ TEST_F(SessionsCollectionShardedTest, RemoveOneSessionOKTest) {
     loadRoutingTableWithTwoChunksAndTwoShardsImpl(NamespaceString::kLogicalSessionsNamespace,
                                                   BSON("_id" << 1));
 
-    for (auto uweFlag : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
-                                                           uweFlag);
+    for (auto uweKnobValue : {false, true}) {
+        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+                                                           uweKnobValue);
 
         auto future = launchAsync([&] {
             _collection.removeRecords(operationContext(), {makeLogicalSessionIdForTest()});
         });
 
         onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
+            // TODO lol
+            if (internalQueryUnifiedWriteExecutor.load()) {
                 BulkWriteCommandReply reply(
                     BulkWriteCommandResponseCursor(0,
                                                    {BulkWriteReplyItem{0, Status::OK()}},
@@ -272,16 +273,17 @@ TEST_F(SessionsCollectionShardedTest, RemoveOneSessionWriteErrTest) {
     loadRoutingTableWithTwoChunksAndTwoShardsImpl(NamespaceString::kLogicalSessionsNamespace,
                                                   BSON("_id" << 1));
 
-    for (auto uweFlag : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
-                                                           uweFlag);
+    for (auto uweKnobValue : {false, true}) {
+        RAIIServerParameterControllerForTest uweController("internalQueryUnifiedWriteExecutor",
+                                                           uweKnobValue);
 
         auto future = launchAsync([&] {
             _collection.removeRecords(operationContext(), {makeLogicalSessionIdForTest()});
         });
 
         onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
+            // TODO
+            if (internalQueryUnifiedWriteExecutor.load()) {
                 BulkWriteCommandReply reply(
                     BulkWriteCommandResponseCursor(
                         0,

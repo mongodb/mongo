@@ -15,9 +15,9 @@ executor:
       global_vars:
         TestData:
           doNotUseRawDataOperations: true
-          featureFlagUnifiedWriteExecutor: true
+          internalQueryUnifiedWriteExecutor: true
           setParametersMongos:
-            featureFlagUnifiedWriteExecutor: true
+            internalQueryUnifiedWriteExecutor: true
       nodb: ""
 matrix_suite: true
 selector:

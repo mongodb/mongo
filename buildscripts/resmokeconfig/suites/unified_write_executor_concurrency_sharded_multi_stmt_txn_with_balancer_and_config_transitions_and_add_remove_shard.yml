@@ -132,7 +132,7 @@ executor:
           implicitlyShardOnCreateCollectionOnly: true
           useActionPermittedFile: [ContinuousAddRemoveShard]
           shardCollectionProbability: 0.5
-          featureFlagUnifiedWriteExecutor: true
+          internalQueryUnifiedWriteExecutor: true
   hooks:
     - class: ContinuousAddRemoveShard
       transition_configsvr: true
@@ -159,7 +159,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
-        featureFlagUnifiedWriteExecutor: true
+        internalQueryUnifiedWriteExecutor: true
     shard_options:
       mongod_options:
         oplogSize: 1024
@@ -172,7 +172,7 @@ executor:
         skipDroppingHashedShardKeyIndex: true
         reshardingMinimumOperationDurationMillis: 0
         balancerMigrationsThrottlingMs: 250
-        featureFlagUnifiedWriteExecutor: true
+        internalQueryUnifiedWriteExecutor: true
         failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
           data:
             comment: *movePrimaryComment

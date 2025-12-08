@@ -5,11 +5,11 @@ export function isUweEnabled(db) {
     return !!assert.commandWorkedOrFailedWithCode(
         db.adminCommand({
             getParameter: 1,
-            featureFlagUnifiedWriteExecutor: 1,
+            internalQueryUnifiedWriteExecutor: 1,
         }),
         // Allow the error when the query knob is not present.
         ErrorCodes.InvalidOptions,
-    ).featureFlagUnifiedWriteExecutor;
+    ).internalQueryUnifiedWriteExecutor;
 }
 
 /**
