@@ -763,6 +763,7 @@ collection_write_path: # authoritative: @10gen/server-collection-write-path
   meta:
     slack: server-storage-execution
     jira: Storage Execution
+    fully_marked: true
   files:
     - src/mongo/db/collection_crud
     - src/mongo/db/commands/collection_to_capped*

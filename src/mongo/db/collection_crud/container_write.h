@@ -34,8 +34,11 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/modules.h"
 
 #include <span>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo::container_write {
 
