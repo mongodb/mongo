@@ -4,6 +4,7 @@
 import {getPython3Binary} from "jstests/libs/python.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 export function checkPlatformCompatibleWithExtensions() {
     if (!isLinux()) {
@@ -87,7 +88,7 @@ export function deleteExtensionConfigs(names) {
  * Runs a test function in environments with one or more extension loaded, ensuring proper
  * generation and cleanup of .conf files.
  */
-export function withExtensions(extToOptionsMap, testFn) {
+export function withExtensions(extToOptionsMap, testFn, topologiesToTest = ["standalone", "sharded"]) {
     const extensionsToLoad = [];
 
     for (const [extLib, extensionOptions] of Object.entries(extToOptionsMap)) {
@@ -100,13 +101,13 @@ export function withExtensions(extToOptionsMap, testFn) {
         loadExtensions: extensionsToLoad,
     };
 
-    try {
-        {
-            const mongodConn = MongoRunner.runMongod(options);
-            testFn(mongodConn);
-            MongoRunner.stopMongod(mongodConn);
-        }
+    function runStandaloneTest(func) {
+        const mongodConn = MongoRunner.runMongod(options);
+        func(mongodConn);
+        MongoRunner.stopMongod(mongodConn);
+    }
 
+    function runShardedTest(func) {
         {
             const shardingTest = new ShardingTest({
                 shards: 1,
@@ -114,9 +115,30 @@ export function withExtensions(extToOptionsMap, testFn) {
                 config: 1,
                 mongosOptions: options,
             });
-            testFn(shardingTest.s);
+            func(shardingTest.s);
             shardingTest.stop();
         }
+    }
+
+    function runReplicaSetTest(func) {
+        const rst = new ReplSetTest({nodes: 1});
+        rst.startSet(options);
+        rst.initiate();
+        rst.awaitReplication();
+        func(rst.getPrimary());
+        rst.stopSet();
+    }
+
+    try {
+        topologiesToTest.forEach(function (topology) {
+            if (topology === "standalone") {
+                runStandaloneTest(testFn);
+            } else if (topology === "sharded") {
+                runShardedTest(testFn);
+            } else if (topology === "replica_set") {
+                runReplicaSetTest(testFn);
+            }
+        });
     } finally {
         deleteExtensionConfigs(extensionsToLoad);
     }
