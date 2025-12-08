@@ -45,11 +45,15 @@ public:
     PersistenceProvider& getPersistenceProvider();
     void setPersistenceProvider(std::unique_ptr<PersistenceProvider>&&);
 
+    PersistenceProvider& getSpillPersistenceProvider();
+    void setSpillPersistenceProvider(std::unique_ptr<PersistenceProvider>&&);
+
     ServiceLifecycle& getServiceLifecycle();
     void setServiceLifecycle(std::unique_ptr<ServiceLifecycle>&&);
 
 private:
     std::unique_ptr<PersistenceProvider> _provider;
+    std::unique_ptr<PersistenceProvider> _spillProvider;
     std::unique_ptr<ServiceLifecycle> _lifecycle;
 };
 

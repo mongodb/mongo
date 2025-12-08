@@ -51,6 +51,15 @@ void ReplicatedStorageService::setPersistenceProvider(std::unique_ptr<Persistenc
     _provider = std::move(p);
 }
 
+PersistenceProvider& ReplicatedStorageService::getSpillPersistenceProvider() {
+    invariant(_spillProvider);
+    return *_spillProvider;
+}
+void ReplicatedStorageService::setSpillPersistenceProvider(
+    std::unique_ptr<PersistenceProvider>&& p) {
+    _spillProvider = std::move(p);
+}
+
 ServiceLifecycle& ReplicatedStorageService::getServiceLifecycle() {
     invariant(_lifecycle);
     return *_lifecycle;

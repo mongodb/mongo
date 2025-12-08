@@ -42,6 +42,7 @@ ServiceContext::ConstructorActionRegisterer registerAttachedPersistenceProvider{
     "AttachedPersistenceProvider", [](ServiceContext* service) {
         auto& rss = ReplicatedStorageService::get(service);
         rss.setPersistenceProvider(std::make_unique<AttachedPersistenceProvider>());
+        rss.setSpillPersistenceProvider(std::make_unique<AttachedPersistenceProvider>());
     }};
 
 }  // namespace
@@ -131,6 +132,10 @@ multiversion::FeatureCompatibilityVersion AttachedPersistenceProvider::getMinimu
     const {
     // (Generic FCV reference): Attached storage can operate at any FCV.
     return multiversion::GenericFCV::kLastLTS;
+}
+
+const char* AttachedPersistenceProvider::getWTMemoryPageMaxForOplogStrValue() const {
+    return "10m";  // 10MB
 }
 
 }  // namespace mongo::rss

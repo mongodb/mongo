@@ -231,9 +231,7 @@ std::string WiredTigerRecordStore::generateCreateString(
     // override values in the prefix, but not values in the suffix.
     str::stream ss;
     ss << "type=file,";
-    // Setting this larger than 10m can hurt latencies and throughput degradation if this
-    // is the oplog.  See SERVER-16247
-    ss << "memory_page_max=10m,";
+    ss << "memory_page_max=" << wtTableConfig.memoryPageMax << ",";
     // Choose a higher split percent, since most usage is append only. Allow some space
     // for workloads where updates increase the size of documents.
     ss << "split_pct=90,";

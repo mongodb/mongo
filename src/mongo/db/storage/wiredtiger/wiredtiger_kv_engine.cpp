@@ -1659,6 +1659,10 @@ Status WiredTigerKVEngine::_createRecordStore(const rss::PersistenceProvider& pr
     wtTableConfig.extraCreateOptions = str::stream()
         << _rsOptions << "," << customConfigString.getValue();
 
+    if (nss.isOplog()) {
+        wtTableConfig.memoryPageMax = provider.getWTMemoryPageMaxForOplogStrValue();
+    }
+
     std::string config = WiredTigerRecordStore::generateCreateString(
         NamespaceStringUtil::serializeForCatalog(nss), wtTableConfig, nss.isOplog());
     string uri = WiredTigerUtil::buildTableUri(ident);

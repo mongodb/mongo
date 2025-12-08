@@ -139,9 +139,15 @@ public:
     bool shouldDisableTransactionUpdateCoalescing() const override;
 
     /**
-     * The minumum FCV required for disaggregated storage clusters.
+     * The minimum FCV required for disaggregated storage clusters.
      */
     multiversion::FeatureCompatibilityVersion getMinimumRequiredFCV() const override;
+
+
+    /**
+     * The default memory_page_max value to set on WT for the oplog in string format.
+     */
+    const char* getWTMemoryPageMaxForOplogStrValue() const override;
 };
 
 }  // namespace mongo::rss

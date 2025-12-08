@@ -104,6 +104,10 @@ public:
         bool logEnabled{true};
         // This specifies the value for the block_compressor configuration parameter.
         std::string blockCompressor{"snappy"};
+        // Max memory page size.
+        // Setting this larger than 10m can hurt latencies and throughput degradation if this
+        // is the oplog. See SERVER-16247.
+        std::string memoryPageMax{"10M"};
         // Any additional configuration parameters for WT_SESSION::create() in the configuration
         // string format.
         std::string extraCreateOptions;
