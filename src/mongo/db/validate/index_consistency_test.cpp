@@ -91,6 +91,7 @@ void clearIndexOfEntriesFoundInCollection(OperationContext* opCtx,
                      record->id);
         ASSERT_OK(iam->removeKeys(opCtx,
                                   *shard_role_details::getRecoveryUnit(opCtx),
+                                  coll.get(),
                                   entry,
                                   std::move(keys),
                                   InsertDeleteOptions{.dupsAllowed = true},

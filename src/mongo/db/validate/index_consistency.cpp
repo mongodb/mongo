@@ -389,11 +389,13 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
                 InsertDeleteOptions options;
                 options.dupsAllowed = !indexInfo->unique;
                 int64_t numDeleted = 0;
+                auto nss = entry->getNSSFromCatalog(opCtx);
                 writeConflictRetry(opCtx, "removingExtraIndexEntries", _validateState->nss(), [&] {
                     WriteUnitOfWork wunit(opCtx);
                     Status status = indexInfo->accessMethod->asSortedData()->removeKeys(
                         opCtx,
                         *shard_role_details::getRecoveryUnit(opCtx),
+                        _validateState->getCollection(),
                         entry,
                         {ks},
                         options,

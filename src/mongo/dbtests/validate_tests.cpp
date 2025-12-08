@@ -1030,6 +1030,7 @@ public:
 
             auto removeStatus = iam->removeKeys(&_opCtx,
                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                coll(),
                                                 entry,
                                                 {keys.begin(), keys.end()},
                                                 options,
@@ -1453,6 +1454,7 @@ public:
                 rid);
             auto removeStatus = iam->removeKeys(&_opCtx,
                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                coll(),
                                                 entry,
                                                 {keys.begin(), keys.end()},
                                                 options,
@@ -1832,6 +1834,7 @@ public:
                 rid);
             auto removeStatus = iam->removeKeys(&_opCtx,
                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                coll(),
                                                 entry,
                                                 {keys.begin(), keys.end()},
                                                 options,
@@ -2724,6 +2727,7 @@ public:
                     rid1);
                 auto removeStatus = iam->removeKeys(&_opCtx,
                                                     *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                    coll(),
                                                     entry,
                                                     {keys.begin(), keys.end()},
                                                     options,
@@ -3080,6 +3084,7 @@ public:
                 int64_t numDeleted;
                 auto removeStatus = iam->removeKeys(&_opCtx,
                                                     *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                    coll(),
                                                     entry,
                                                     {keys.begin(), keys.end()},
                                                     options,
@@ -3285,6 +3290,7 @@ public:
                 rid);
             auto removeStatus = iam->removeKeys(&_opCtx,
                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                coll(),
                                                 entry,
                                                 {keys.begin(), keys.end()},
                                                 options,
@@ -3327,6 +3333,7 @@ public:
                 rid);
             auto removeStatus = iam->removeKeys(&_opCtx,
                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                coll(),
                                                 entry,
                                                 {keys.begin(), keys.end()},
                                                 options,
@@ -3870,6 +3877,7 @@ public:
                 int64_t numDeleted;
                 auto removeStatus = iam->removeKeys(&_opCtx,
                                                     *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                    coll(),
                                                     entry,
                                                     {keys.begin(), keys.end()},
                                                     options,
@@ -4110,6 +4118,7 @@ public:
                 int64_t numDeleted;
                 auto removeStatus = iam->removeKeys(&_opCtx,
                                                     *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                    coll(),
                                                     entry,
                                                     {keys.begin(), keys.end()},
                                                     options,

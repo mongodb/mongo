@@ -40,6 +40,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/duplicate_key_tracker.h"
@@ -230,7 +231,16 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         // build starting from scratch. A "resumed" index build does not use a majority read
         // concern. And thus will observe data that can be rolled back via replication.
         shard_role_details::getRecoveryUnit(opCtx)->allowOneUntimestampedWrite();
-        WriteUnitOfWork wuow(opCtx);
+
+        // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
+        auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        bool primaryDrivenFeatureFlagEnabled = fcvSnapshot.isVersionInitialized() &&
+            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                VersionContext::getDecoration(opCtx), fcvSnapshot);
+        WriteUnitOfWork wuow(opCtx,
+                             primaryDrivenFeatureFlagEnabled
+                                 ? WriteUnitOfWork::kGroupForPossiblyRetryableOperations
+                                 : WriteUnitOfWork::kDontGroup);
 
         int32_t batchSize = 0;
         int64_t batchSizeBytes = 0;
@@ -291,8 +301,23 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         // Delete documents from the side table as soon as they have been inserted into the index.
         // This ensures that no key is ever inserted twice and no keys are skipped.
         for (const auto& recordId : recordsAddedToIndex) {
-            _sideWritesTable->rs()->deleteRecord(
-                opCtx, *shard_role_details::getRecoveryUnit(opCtx), recordId);
+            if (primaryDrivenFeatureFlagEnabled) {
+                IntegerKeyedContainer& container =
+                    std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                        _sideWritesTable->rs()->getContainer())
+                        .get();
+                auto status = container_write::remove(opCtx,
+                                                      *shard_role_details::getRecoveryUnit(opCtx),
+                                                      coll,
+                                                      container,
+                                                      recordId.getLong());
+                if (!status.isOK()) {
+                    return status;
+                }
+            } else {
+                _sideWritesTable->rs()->deleteRecord(
+                    opCtx, *shard_role_details::getRecoveryUnit(opCtx), recordId);
+            }
         }
 
         if (batchSize == 0) {

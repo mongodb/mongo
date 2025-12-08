@@ -430,6 +430,11 @@ public:
                  const ShouldRelaxConstraintsFn& shouldRelaxConstraints = nullptr) const;
 
     /**
+     * Specifies whether container write oplog entries need to be generated.
+     */
+    enum class ContainerWriteBehavior { kReplicate, kUnreplicated };
+
+    /**
      * Inserts the specified keys into the index. Does not attempt to determine whether the
      * insertion of these keys should cause the index to become multikey. The 'numInserted' output
      * parameter, if non-nullptr, will be reset to the number of keys inserted by this function
@@ -444,7 +449,8 @@ public:
         const InsertDeleteOptions& options,
         KeyHandlerFn&& onDuplicateKey,
         int64_t* numInserted,
-        IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff);
+        IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff,
+        ContainerWriteBehavior containerWriteBehavior = ContainerWriteBehavior::kUnreplicated);
 
     /**
      * Inserts the specified keys into the index. and determines whether these keys should cause the
@@ -462,7 +468,8 @@ public:
         const InsertDeleteOptions& options,
         KeyHandlerFn&& onDuplicateKey,
         int64_t* numInserted,
-        IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff);
+        IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff,
+        ContainerWriteBehavior containerWriteBehavior = ContainerWriteBehavior::kUnreplicated);
 
     /**
      * Analogous to insertKeys above, but remove the keys instead of inserting them.
@@ -470,10 +477,13 @@ public:
      */
     Status removeKeys(OperationContext* opCtx,
                       RecoveryUnit& ru,
+                      const CollectionPtr& coll,
                       const IndexCatalogEntry* entry,
                       const KeyStringSet& keys,
                       const InsertDeleteOptions& options,
-                      int64_t* numDeleted) const;
+                      int64_t* numDeleted,
+                      ContainerWriteBehavior containerWriteBehavior =
+                          ContainerWriteBehavior::kUnreplicated) const;
 
     /**
      * Gets the keys of the documents 'from' and 'to' and prepares them for the update.
@@ -669,9 +679,11 @@ private:
      */
     void removeOneKey(OperationContext* opCtx,
                       RecoveryUnit& ru,
+                      const CollectionPtr& coll,
                       const IndexCatalogEntry* entry,
                       const key_string::Value& keyString,
-                      bool dupsAllowed) const;
+                      bool dupsAllowed,
+                      ContainerWriteBehavior containerWriteBehavior) const;
 
     Status _indexKeysOrWriteToSideTable(OperationContext* opCtx,
                                         const CollectionPtr& coll,
@@ -684,7 +696,7 @@ private:
                                         int64_t* keysInsertedOut);
 
     void _unindexKeysOrWriteToSideTable(OperationContext* opCtx,
-                                        const NamespaceString& ns,
+                                        const CollectionPtr& coll,
                                         const IndexCatalogEntry* entry,
                                         const KeyStringSet& keys,
                                         const BSONObj& obj,

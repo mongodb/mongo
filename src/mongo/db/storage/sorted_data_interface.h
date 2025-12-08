@@ -209,7 +209,7 @@ public:
                          bool dupsAllowed) = 0;
 
     /**
-     * Retuns the RecordId of the first key whose prefix matches this KeyString.
+     * Returns the RecordId of the first key whose prefix matches this KeyString.
      *
      * This will not accept a KeyString with a Discriminator other than kInclusive.
      */

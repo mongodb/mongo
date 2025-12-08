@@ -331,7 +331,7 @@ void SortedDataIndexAccessMethod::remove(OperationContext* opCtx,
             loc);
 
     _unindexKeysOrWriteToSideTable(
-        opCtx, coll->ns(), entry, *keys, obj, logIfError, numDeleted, options, checkRecordId);
+        opCtx, coll, entry, *keys, obj, logIfError, numDeleted, options, checkRecordId);
 }
 
 Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
@@ -351,7 +351,7 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
     if (entry->sideWritesAllowed() || !entry->isReady()) {
         bool logIfError = false;
         _unindexKeysOrWriteToSideTable(opCtx,
-                                       coll->ns(),
+                                       coll,
                                        entry,
                                        updateTicket.removed,
                                        oldDoc,
@@ -384,7 +384,8 @@ Status SortedDataIndexAccessMethod::insertKeysAndUpdateMultikeyPaths(
     const InsertDeleteOptions& options,
     KeyHandlerFn&& onDuplicateKey,
     int64_t* numInserted,
-    IncludeDuplicateRecordId includeDuplicateRecordId) {
+    IncludeDuplicateRecordId includeDuplicateRecordId,
+    ContainerWriteBehavior containerWriteBehavior) {
     // Insert the specified data keys into the index.
     auto status = insertKeys(opCtx,
                              ru,
@@ -394,7 +395,8 @@ Status SortedDataIndexAccessMethod::insertKeysAndUpdateMultikeyPaths(
                              options,
                              std::move(onDuplicateKey),
                              numInserted,
-                             includeDuplicateRecordId);
+                             includeDuplicateRecordId,
+                             containerWriteBehavior);
     if (!status.isOK()) {
         return status;
     }
@@ -418,7 +420,8 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
                                                const InsertDeleteOptions& options,
                                                KeyHandlerFn&& onDuplicateKey,
                                                int64_t* numInserted,
-                                               IncludeDuplicateRecordId includeDuplicateRecordId) {
+                                               IncludeDuplicateRecordId includeDuplicateRecordId,
+                                               ContainerWriteBehavior containerWriteBehavior) {
     // Initialize the 'numInserted' out-parameter to zero in case the caller did not already do so.
     if (numInserted) {
         *numInserted = 0;
@@ -445,33 +448,69 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
     }
     // Add all new keys into the index. The RecordId for each is already encoded in the KeyString.
     for (const auto& keyString : keys) {
-        auto result =
-            _newInterface->insert(opCtx, ru, keyString, dupsAllowed, includeDuplicateRecordId);
+        std::variant<Status, SortedDataInterface::DuplicateKey> result = Status::OK();
+        if (containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
+            bool insertDup = false;
+            if (!dupsAllowed &&
+                _newInterface->findLoc(opCtx, ru, keyString.getViewWithoutRecordId())) {
+                if (!options.dupsAllowed || prepareUnique) {
+                    return buildDupKeyErrorStatus(keyString,
+                                                  coll->ns(),
+                                                  entry->descriptor()->indexName(),
+                                                  entry->descriptor()->keyPattern(),
+                                                  entry->descriptor()->collation(),
+                                                  _newInterface->getOrdering());
+                }
 
-        // When duplicates are encountered and allowed, retry with dupsAllowed. Call
-        // onDuplicateKey() with the inserted duplicate key.
-        if (std::holds_alternative<SortedDataInterface::DuplicateKey>(result) &&
-            options.dupsAllowed && !prepareUnique) {
-            invariant(unique);
+                // Although conceptually duplicate keys are not allowed hence dupsAllowed==false,
+                // there are cases where we'll still allow inserting duplicate keys on unique
+                // indexes when options.dupsAllowed==true. In those cases, try inserting it and call
+                // onDuplicateKey() with the inserted duplicate key.
+                invariant(unique);
+                insertDup = true;
+            }
 
-            result = _newInterface->insert(
-                opCtx, ru, keyString, true /* dupsAllowed */, includeDuplicateRecordId);
-            if (auto status = std::get_if<Status>(&result)) {
-                if (status->isOK() && onDuplicateKey) {
-                    result = onDuplicateKey(coll, keyString);
+            result = container_write::insert(opCtx,
+                                             ru,
+                                             coll,
+                                             _newInterface->getContainer(),
+                                             keyString.getView(),
+                                             keyString.getTypeBitsView());
+            if (auto status = std::get_if<Status>(&result);
+                insertDup && status->isOK() && onDuplicateKey) {
+                result = onDuplicateKey(coll, keyString);
+            }
+        } else {
+            result =
+                _newInterface->insert(opCtx, ru, keyString, dupsAllowed, includeDuplicateRecordId);
+
+            // When duplicates are encountered and allowed, retry with dupsAllowed. Call
+            // onDuplicateKey() with the inserted duplicate key.
+            if (std::holds_alternative<SortedDataInterface::DuplicateKey>(result) &&
+                options.dupsAllowed && !prepareUnique) {
+                invariant(unique);
+
+                result = _newInterface->insert(
+                    opCtx, ru, keyString, true /* dupsAllowed */, includeDuplicateRecordId);
+                if (auto status = std::get_if<Status>(&result)) {
+                    if (status->isOK() && onDuplicateKey) {
+                        result = onDuplicateKey(coll, keyString);
+                    }
                 }
             }
+            if (auto duplicate = std::get_if<SortedDataInterface::DuplicateKey>(&result)) {
+                insertFailedDueToDuplicateKeyError.increment();
+                return buildDupKeyErrorStatus(duplicate->key,
+                                              coll->ns(),
+                                              entry->descriptor()->indexName(),
+                                              entry->descriptor()->keyPattern(),
+                                              entry->descriptor()->collation(),
+                                              std::move(duplicate->foundValue),
+                                              std::move(duplicate->id));
+            }
         }
-        if (auto duplicate = std::get_if<SortedDataInterface::DuplicateKey>(&result)) {
-            insertFailedDueToDuplicateKeyError.increment();
-            return buildDupKeyErrorStatus(duplicate->key,
-                                          coll->ns(),
-                                          entry->descriptor()->indexName(),
-                                          entry->descriptor()->keyPattern(),
-                                          entry->descriptor()->collation(),
-                                          std::move(duplicate->foundValue),
-                                          std::move(duplicate->id));
-        } else if (auto& status = std::get<Status>(result); !status.isOK()) {
+
+        if (auto& status = std::get<Status>(result); !status.isOK()) {
             return status;
         }
     }
@@ -481,14 +520,26 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
     return Status::OK();
 }
 
-void SortedDataIndexAccessMethod::removeOneKey(OperationContext* opCtx,
-                                               RecoveryUnit& ru,
-                                               const IndexCatalogEntry* entry,
-                                               const key_string::Value& keyString,
-                                               bool dupsAllowed) const {
+void SortedDataIndexAccessMethod::removeOneKey(
+    OperationContext* opCtx,
+    RecoveryUnit& ru,
+    const CollectionPtr& coll,
+    const IndexCatalogEntry* entry,
+    const key_string::Value& keyString,
+    bool dupsAllowed,
+    ContainerWriteBehavior containerWriteBehavior) const {
 
     try {
-        _newInterface->unindex(opCtx, ru, keyString, dupsAllowed);
+        if (containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
+            auto status = container_write::remove(
+                opCtx, ru, coll, _newInterface->getContainer(), keyString.getView());
+            // Ignore NoSuchKey errors as they are effectively noops
+            if (status.code() != ErrorCodes::NoSuchKey) {
+                uassertStatusOK(status);
+            }
+        } else {
+            _newInterface->unindex(opCtx, ru, keyString, dupsAllowed);
+        }
     } catch (AssertionException& e) {
         if (e.code() == ErrorCodes::DataCorruptionDetected) {
             // DataCorruptionDetected errors are expected to have logged an error and added an entry
@@ -499,7 +550,7 @@ void SortedDataIndexAccessMethod::removeOneKey(OperationContext* opCtx,
 
         NamespaceString ns = entry->getNSSFromCatalog(opCtx);
         LOGV2(20683,
-              "Assertion failure: _unindex failed",
+              "Assertion failure: failed to remove index key",
               "error"_attr = redact(e),
               "keyString"_attr = keyString,
               logAttrs(ns),
@@ -513,15 +564,18 @@ std::unique_ptr<SortedDataInterface::Cursor> SortedDataIndexAccessMethod::newCur
     return _newInterface->newCursor(opCtx, ru, isForward);
 }
 
-Status SortedDataIndexAccessMethod::removeKeys(OperationContext* opCtx,
-                                               RecoveryUnit& ru,
-                                               const IndexCatalogEntry* entry,
-                                               const KeyStringSet& keys,
-                                               const InsertDeleteOptions& options,
-                                               int64_t* numDeleted) const {
+Status SortedDataIndexAccessMethod::removeKeys(
+    OperationContext* opCtx,
+    RecoveryUnit& ru,
+    const CollectionPtr& coll,
+    const IndexCatalogEntry* entry,
+    const KeyStringSet& keys,
+    const InsertDeleteOptions& options,
+    int64_t* numDeleted,
+    ContainerWriteBehavior containerWriteBehavior) const {
 
     for (const auto& key : keys) {
-        removeOneKey(opCtx, ru, entry, key, options.dupsAllowed);
+        removeOneKey(opCtx, ru, coll, entry, key, options.dupsAllowed, containerWriteBehavior);
     }
 
     *numDeleted = keys.size();
@@ -810,6 +864,12 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     const KeyStringSet keySet{keyString};
+
+    // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
+    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    bool primaryDrivenFeatureFlagEnabled = fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot);
     if (opType == IndexBuildInterceptor::Op::kInsert) {
         int64_t numInserted;
         auto status = insertKeysAndUpdateMultikeyPaths(opCtx,
@@ -821,7 +881,11 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
                                                        MultikeyPaths{},
                                                        options,
                                                        std::move(onDuplicateKey),
-                                                       &numInserted);
+                                                       &numInserted,
+                                                       IncludeDuplicateRecordId::kOff,
+                                                       primaryDrivenFeatureFlagEnabled
+                                                           ? ContainerWriteBehavior::kReplicate
+                                                           : ContainerWriteBehavior::kUnreplicated);
         if (!status.isOK()) {
             return status;
         }
@@ -832,7 +896,15 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
     } else {
         int64_t numDeleted;
         Status s =
-            removeKeys(opCtx, ru, entry, {keySet.begin(), keySet.end()}, options, &numDeleted);
+            removeKeys(opCtx,
+                       ru,
+                       coll,
+                       entry,
+                       {keySet.begin(), keySet.end()},
+                       options,
+                       &numDeleted,
+                       primaryDrivenFeatureFlagEnabled ? ContainerWriteBehavior::kReplicate
+                                                       : ContainerWriteBehavior::kUnreplicated);
         if (!s.isOK()) {
             return s;
         }
@@ -1671,7 +1743,7 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
 
 void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     OperationContext* opCtx,
-    const NamespaceString& ns,
+    const CollectionPtr& coll,
     const IndexCatalogEntry* entry,
     const KeyStringSet& keys,
     const BSONObj& obj,
@@ -1716,13 +1788,13 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     int64_t removed = 0;
-    Status status = removeKeys(opCtx, ru, entry, keys, options, &removed);
+    Status status = removeKeys(opCtx, ru, coll, entry, keys, options, &removed);
 
     if (!status.isOK()) {
         LOGV2(20362,
               "Couldn't unindex record",
               "record"_attr = redact(obj),
-              logAttrs(ns),
+              logAttrs(coll->ns()),
               "error"_attr = redact(status));
     }
 
