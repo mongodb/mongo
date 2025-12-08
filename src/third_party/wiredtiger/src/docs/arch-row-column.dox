@@ -7,13 +7,6 @@ internally by a B-Tree. Keys and values in row-stores can be of variable length.
 are explicitly stored. Column-stores use a 64-bit unsigned integer record id as keys and they are
 implied given the row's position in the B-Tree.
 
-There are two types of column-stores in WiredTiger:
-- The fixed length column-store, as its name implies, the value has a fixed length, and furthermore
-the value is restricted to between 1 and 8 bits in length. The bit length is specified when the
-column store is created. The fixed length column store has specialized use cases like bitmaps.
-- The variable length is a more general case which allows for values to have any length similarly to
-row-stores.
-
 Please refer to @ref arch-data-file "Data File Format" to learn more about the on-disk format for
 row-stores and column-stores.
 
@@ -36,14 +29,6 @@ WiredTiger, the run-length encoding is used to replace any sequence of the same 
 and value indicator. However, this makes the access to a specific record more complicated, it makes
 it impossible to jump to a record in a leaf page.
 
-@section row_column_flcs Fixed length column-stores
-
-Fixed length column stores are very different internally and usually serve specific purposes as it
-is a <a href="https://en.wikipedia.org/wiki/Bitmap"><b>Bitmap</b></a>. It makes fixed length
-column-stores efficient to retrieve a value at a given offset, the use of
-<a href="https://en.wikipedia.org/wiki/Bloom_filter"><b>Bloom filter</b></a> is probably one of the
-best examples.
-
 @section row_column_internal_use Internal usage
 
 Internally, row-stores and column-stores use a common \c WT_BTREE structure. The fundamental
@@ -52,20 +37,20 @@ difference is that the \c WT_BTREE->type field is set to \c BTREE_ROW for row-st
 code sprinkled throughout that is conditional on \c WT_BTREE->type.
 
 <table>
-@hrow{, Row Store, Column Store - Variable Length, Column Store - Fixed Length}
+@hrow{, Row Store, Column Store - Variable Length}
 @row{Characteristics,,,,}
-@row{Internal representation, B-Tree (\c WT_BTREE), B-Tree (\c WT_BTREE), B-Tree (\c WT_BTREE)}
-@row{B-Tree type, Generalized (\c BTREE_ROW), Specialized (\c BTREE_COL_VAR), Specialized (\c BTREE_COL_FIX)}
-@row{Leaf pages, Key count equal to half the number of physical entries (unless all empty values flag is set where key count is equal to the number of physical entries), Only the first key is stored, Only the first key is stored}
-@row{Record key, Anything (byte-string) prefix compressed or overflow objects, Record id (64 bit unsigned integer), Record id (64 bit unsigned integer)}
-@row{Record value, Variable byte string length, Variable byte string length, Fixed bit string length (up to 8 bits)}
-@row{Features,,,,}
-@row{Random cursor, Yes, No, No}
-@row{Block compression, Yes, Yes, Yes}
-@row{Dictionary compression, Yes, Yes, No}
-@row{Fast truncate, Yes, No, No}
-@row{Prefix and suffix compression, Yes, No, No}
-@row{RLE compression, No, Yes, No}
+@row{Internal representation, B-Tree (\c WT_BTREE), B-Tree (\c WT_BTREE)}
+@row{B-Tree type, Generalized (\c BTREE_ROW), Specialized (\c BTREE_COL_VAR)}
+@row{Leaf pages, Key count equal to half the number of physical entries (unless all empty values flag is set where key count is equal to the number of physical entries), Only the first key is stored}
+@row{Record key, Anything (byte-string) prefix compressed or overflow objects, Record id (64 bit unsigned integer)}
+@row{Record value, Variable byte string length, Variable byte string length}
+@row{Features,,,}
+@row{Random cursor, Yes, No}
+@row{Block compression, Yes, Yes}
+@row{Dictionary compression, Yes, Yes}
+@row{Fast truncate, Yes, No}
+@row{Prefix and suffix compression, Yes, No}
+@row{RLE compression, No, Yes}
 </table>
 
 */

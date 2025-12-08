@@ -41,9 +41,8 @@ file_create(const char *name)
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    testutil_snprintf(config, sizeof(config),
-      "key_format=%s,internal_page_max=%d,leaf_page_max=%d,%s", ftype == ROW ? "u" : "r", 16 * 1024,
-      128 * 1024, ftype == FIX ? ",value_format=3t" : "");
+    testutil_snprintf(config, sizeof(config), "key_format=%s,internal_page_max=%d,leaf_page_max=%d",
+      ftype == ROW ? "u" : "r", 16 * 1024, 128 * 1024);
 
     if ((ret = session->create(session, name, config)) != 0)
         if (ret != EEXIST)
@@ -82,14 +81,10 @@ load(const char *name)
             cursor->set_key(cursor, key);
         } else
             cursor->set_key(cursor, keyno);
-        if (ftype == FIX)
-            cursor->set_value(cursor, 0x01);
-        else {
-            testutil_snprintf_len_set(valuebuf, sizeof(valuebuf), &len, "%37" PRIu64, keyno);
-            value->data = valuebuf;
-            value->size = (uint32_t)len;
-            cursor->set_value(cursor, value);
-        }
+        testutil_snprintf_len_set(valuebuf, sizeof(valuebuf), &len, "%37" PRIu64, keyno);
+        value->data = valuebuf;
+        value->size = (uint32_t)len;
+        cursor->set_value(cursor, value);
         testutil_check(cursor->insert(cursor));
     }
 

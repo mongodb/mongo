@@ -15,5 +15,4 @@ src/include/wt_internal.h
 src/log/log_auto.c
 src/os_posix/os_getopt.c
 src/support/hash_city.c
-src/support/hash_fnv.c
 src/support/stat.c

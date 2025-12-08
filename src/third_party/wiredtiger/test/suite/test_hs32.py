@@ -35,11 +35,11 @@ from wiredtiger import stat
 class test_hs32(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=500MB,statistics=(all)'
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column-fix', dict(key_format='r', value_format='8t')),
-        ('integer-row', dict(key_format='i', value_format='S')),
-        ('string-row', dict(key_format='S', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('integer-row', dict(key_format='i')),
+        ('string-row', dict(key_format='S')),
     ]
+    value_format='S'
     update_type_values = [
         ('deletion', dict(update_type='deletion')),
         ('update', dict(update_type='update'))
@@ -79,12 +79,8 @@ class test_hs32(wttest.WiredTigerTestCase):
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
-        if self.value_format == '8t':
-            value1 = 97
-            value2 = 98
-        else:
-            value1 = 'a' * 500
-            value2 = 'b' * 500
+        value1 = 'a' * 500
+        value2 = 'b' * 500
 
         # Apply a series of updates from timestamps 1-4.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
@@ -141,11 +137,7 @@ class test_hs32(wttest.WiredTigerTestCase):
                     if i % 2 == 0:
                         if self.update_type == 'deletion':
                             cursor.set_key(self.create_key(i))
-                            if self.value_format == '8t':
-                                self.assertEqual(cursor.search(), 0)
-                                self.assertEqual(cursor.get_value(), 0)
-                            else:
-                                self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+                            self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
                         else:
                             self.assertEqual(cursor[self.create_key(i)], value2)
                     else:

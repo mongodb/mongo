@@ -20,9 +20,9 @@
  * WT_REF_DELETED. Pages ineligible for this fast path ("fast-truncate" or "fast-delete") include
  * pages that are already in the cache and can not be evicted, records in the pages that are
  * not visible to the transaction, pages containing overflow items, pages containing prepared
- * values, or pages that belong to FLCS trees. Ineligible pages are read and have their rows
- * updated/deleted individually ("slow-truncate"). The transaction for the delete operation is
- * stored in memory referenced by the WT_REF.page_del field.
+ * values. Ineligible pages are read and have their rows updated/deleted individually
+ * ("slow-truncate"). The transaction for the delete operation is stored in memory referenced by the
+ * WT_REF.page_del field.
  *
  * Future cursor walks of the tree will skip the deleted page based on the transaction stored for
  * the delete, but it gets more complicated if a read is done using a random key, or a cursor walk
@@ -54,24 +54,6 @@
  * WT_REF.page_del field since the page contains no data. These pages are always skipped during
  * cursor traversal, and if read is forced to instantiate such a page, it creates an empty page from
  * scratch.
- *
- * This feature is not available for FLCS objects. While most of the machinery exists (it is mostly
- * a property of column-store internal pages) there is a showstopper problem. For VLCS, truncate
- * introduces gaps in the namespace, and we can just skip over those gaps when iterating and
- * instantiate fresh pages if rows in the gap are updated. For FLCS, because there are no deleted
- * values (deleted values read back as 0) we have to iterate _through_ gaps, and that means knowing
- * how many rows each gap contains. This knowledge is encoded in the internal page tree structure,
- * but it is not _available_ there; we would have to carry it around during tree-walk. (Basically,
- * every descent would need to remember the starting key of the next page, and since in general the
- * depth is more than 2 this requires a stack, and there's no place to keep it except passing it in
- * from the caller, and it would make an ugly mess and is generally a non-starter.) We can't just
- * declare that gaps are skipped, because gaps happen not where the user truncates things but at
- * nearby (and arbitrary) page boundaries and also the whim of eviction and which pages are in and
- * out of cache. Furthermore, if the end of the tree gets truncated either we have to let that move
- * the end of the table backwards (also arbitrarily and confusingly, and which is also possibly
- * problematic in its own right) or we don't know where to stop when iterating. The latter problems
- * could conceivably be avoided by never fast-deleting the last page in the tree, but there's no
- * good way to know when we're on the last page.
  *
  * For VLCS trees, there is a complication. If we create gaps in the namespace, we can fill those
  * gaps by using the append list of the next leaf page to the left. That is, if an internal page has
@@ -662,7 +644,7 @@ err:
 
 /*
  * __wti_delete_page_instantiate --
- *     Instantiate an entirely deleted leaf page. Note that FLCS is not supported.
+ *     Instantiate an entirely deleted leaf page.
  */
 int
 __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
@@ -692,7 +674,7 @@ __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
     page_del = ref->page_del;
     update_list = NULL;
 
-    /* Fast-truncate only happens to leaf pages, and FLCS isn't supported. */
+    /* Fast-truncate only happens to leaf pages. */
     WT_ASSERT(session, page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_COL_VAR);
 
     /* Empty pages should get skipped before reaching this point. */

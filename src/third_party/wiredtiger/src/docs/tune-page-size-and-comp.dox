@@ -152,9 +152,6 @@ An example of such a configuration string is as follows:
 The maximum page size for the reconciled on-disk leaf pages of the B-Tree, in
 bytes. When a leaf page grows past this size, it splits into multiple pages.
  - An integer, with acceptable values between 512B and 512MB
-(fixed-length column store pages are limited to 128KB; the configured
-size does not include the additional size of timestamp information
-when timestamps are in use)
  - Default size: 32 KB (*appropriate for applications with relatively small keys
 and values)
  - Additionally constrained by the condition: must be a multiple of the
@@ -169,16 +166,6 @@ reference in the application's access pattern).
 increase leaf_page_max to transfer more data per I/O.
    - Applications focused on read/write amplification might decrease the page
 size to better match the underlying storage block size.
-   - In fixed-length column stores, a relatively large number of
-items fit on a single page; this can occasionally lead to contention
-issues that can be mitigated by making the pages smaller.
-   - For fixed-length column stores, the much-larger size of in-memory
-pending changes relative to on-disk values can lead to adverse
-eviction behavior if a large number of uncommitted changes are present
-on the same page. Applications that expect to update large numbers of
-adjacent values at once, especially in long-running transactions, may
-want to decrease \c leaf_page_max or, alternatively, increase \c
-memory_page_max.
  - Configuration:
 \n Specified as leaf_page_max configuration option to WT_SESSION::create. An
 example of such a configuration string is as follows:
@@ -383,12 +370,11 @@ different compression options.
 @subsection table_compress Table summarizing compression in WiredTiger
 
 <table>
-@hrow{Compression Type, Supported by row-store, Supported by variable col-store,
-      Supported by fixed col-store, Default config, Reduces in-mem size,
-      Reduces on-disk size, CPU and Memory cost}
-@row{Key-prefix, yes, no, no, disabled, yes, yes, minor}
-@row{Dictionary, yes, yes, no, disabled, yes, yes, minor}
-@row{Block, yes, yes, yes, disabled, no, yes, can be high}
+@hrow{Compression Type, Supported by row-store, Supported by variable col-store, Default config,
+      Reduces in-mem size, Reduces on-disk size, CPU and Memory cost}
+@row{Key-prefix, yes, no, disabled, yes, yes, minor}
+@row{Dictionary, yes, yes, disabled, yes, yes, minor}
+@row{Block, yes, yes, disabled, no, yes, can be high}
 </table>
 
 */

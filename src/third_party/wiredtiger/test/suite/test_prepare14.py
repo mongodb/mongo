@@ -42,10 +42,11 @@ class test_prepare14(wttest.WiredTigerTestCase):
     ]
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     scenarios = make_scenarios(in_memory_values, format_values)
 
@@ -66,10 +67,7 @@ class test_prepare14(wttest.WiredTigerTestCase):
             create_config += ',log=(enabled=false)'
         self.session.create(uri, create_config)
 
-        if self.value_format == '8t':
-            value = 97 # 'a'
-        else:
-            value = 'a'
+        value = 'a'
 
         # Pin oldest and stable timestamps to 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
@@ -93,12 +91,7 @@ class test_prepare14(wttest.WiredTigerTestCase):
         # Search for the key so we position our cursor on the page that we want to evict.
         self.session.begin_transaction("ignore_prepare = true")
         evict_cursor.set_key(key)
-        if self.value_format == '8t':
-            # In FLCS deleted values read back as 0.
-            self.assertEqual(evict_cursor.search(), 0)
-            self.assertEqual(evict_cursor.get_value(), 0)
-        else:
-            self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
+        self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
         self.session.commit_transaction()
@@ -106,10 +99,5 @@ class test_prepare14(wttest.WiredTigerTestCase):
         self.session.begin_transaction("ignore_prepare = true")
         cursor2 = self.session.open_cursor(uri)
         cursor2.set_key(key)
-        if self.value_format == '8t':
-            # In FLCS deleted values read back as 0.
-            self.assertEqual(cursor2.search(), 0)
-            self.assertEqual(cursor2.get_value(), 0)
-        else:
-            self.assertEqual(cursor2.search(), WT_NOTFOUND)
+        self.assertEqual(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()

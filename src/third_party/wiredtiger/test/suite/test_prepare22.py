@@ -34,10 +34,11 @@ from wtscenario import make_scenarios
 class test_prepare22(wttest.WiredTigerTestCase):
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     delete = [
         ('delete', dict(delete=True)),
@@ -50,14 +51,9 @@ class test_prepare22(wttest.WiredTigerTestCase):
         uri = "table:test_prepare22"
         self.session.create(uri, 'key_format=' + self.key_format + ',value_format=' + self.value_format)
 
-        if self.value_format == '8t':
-             value_a = 97
-             value_b = 98
-             value_c = 99
-        else:
-             value_a = "a"
-             value_b = "b"
-             value_c = "c"
+        value_a = "a"
+        value_b = "b"
+        value_c = "c"
 
         # Pin oldest timestamp to 1
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
@@ -126,9 +122,6 @@ class test_prepare22(wttest.WiredTigerTestCase):
         # Verify we can still read back the deletion
         if self.delete:
             self.session.begin_transaction('read_timestamp=' + self.timestamp_str(30))
-            if self.value_format == '8t':
-                self.assertEqual(cursor[1], 0)
-            else:
-                cursor.set_key(1)
-                self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+            cursor.set_key(1)
+            self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
             self.session.rollback_transaction()

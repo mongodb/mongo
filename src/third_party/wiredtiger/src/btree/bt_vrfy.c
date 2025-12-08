@@ -44,8 +44,6 @@ typedef struct {
 
 static void __verify_checkpoint_reset(WT_VSTUFF *);
 static int __verify_compare_page_id(const void *, const void *);
-static int __verify_page_content_fix(
-  WT_SESSION_IMPL *, WT_REF *, WT_CELL_UNPACK_ADDR *, WT_VSTUFF *);
 static int __verify_page_content_int(
   WT_SESSION_IMPL *, WT_REF *, WT_CELL_UNPACK_ADDR *, WT_VSTUFF *);
 static int __verify_page_content_leaf(
@@ -456,7 +454,6 @@ __verify_addr_ts(WT_SESSION_IMPL *session, WT_REF *ref, WT_CELL_UNPACK_ADDR *unp
 static const char *__page_types[] = {
   "WT_PAGE_INVALID",
   "WT_PAGE_BLOCK_MANAGER",
-  "WT_PAGE_COL_FIX",
   "WT_PAGE_COL_INT",
   "WT_PAGE_COL_VAR",
   "WT_PAGE_OVFL",
@@ -602,12 +599,6 @@ __verify_tree(
 
     /* Make sure the page we got belongs in this kind of tree. */
     switch (btree->type) {
-    case BTREE_COL_FIX:
-        if (page->type != WT_PAGE_COL_INT && page->type != WT_PAGE_COL_FIX)
-            WT_RET_MSG(session, WT_ERROR,
-              "page at %s is a %s, which does not belong in a fixed-length column-store tree",
-              __verify_addr_string(session, ref, vs->tmp1), __wt_page_type_string(page->type));
-        break;
     case BTREE_COL_VAR:
         if (page->type != WT_PAGE_COL_INT && page->type != WT_PAGE_COL_VAR)
             WT_RET_MSG(session, WT_ERROR,
@@ -624,20 +615,9 @@ __verify_tree(
 
     /* Column-store key order checks: check the page's record number. */
     switch (page->type) {
-    case WT_PAGE_COL_FIX:
     case WT_PAGE_COL_INT:
     case WT_PAGE_COL_VAR:
-        /*
-         * FLCS trees can have WT_PAGE_COL_INT or WT_PAGE_COL_FIX pages, and gaps in the namespace
-         * are not allowed; VLCS trees can have WT_PAGE_COL_INT or WT_PAGE_COL_VAR pages, and gaps
-         * in the namespace *are* allowed. Use the tree type to pick the check logic.
-         */
-        if (btree->type == BTREE_COL_FIX && ref->ref_recno != vs->records_so_far + 1)
-            WT_RET_MSG(session, WT_ERROR,
-              "page at %s has a starting record of %" PRIu64
-              " when the expected starting record is %" PRIu64,
-              __verify_addr_string(session, ref, vs->tmp1), ref->ref_recno, vs->records_so_far + 1);
-        else if (btree->type == BTREE_COL_VAR && ref->ref_recno < vs->records_so_far + 1)
+        if (ref->ref_recno < vs->records_so_far + 1)
             WT_RET_MSG(session, WT_ERROR,
               "page at %s has a starting record of %" PRIu64
               " when the expected starting record is at least %" PRIu64,
@@ -674,9 +654,6 @@ __verify_tree(
               page->dsk->write_gen, ref->home->dsk->write_gen);
 
         switch (page->type) {
-        case WT_PAGE_COL_FIX:
-            WT_RET(__verify_page_content_fix(session, ref, addr_unpack, vs));
-            break;
         case WT_PAGE_COL_INT:
         case WT_PAGE_ROW_INT:
             WT_RET(__verify_page_content_int(session, ref, addr_unpack, vs));
@@ -693,7 +670,6 @@ __verify_tree(
                                                             "UNKNOWN");
             /* see __wti_page_inmem */
             switch (page->dsk->type) {
-            case WT_PAGE_COL_FIX:
             case WT_PAGE_COL_VAR:
             case WT_PAGE_COL_INT:
                 printf("  entries: %" PRIu32, page->dsk->u.entries);
@@ -722,10 +698,6 @@ __verify_tree(
 
     /* Compare the address type against the page type. */
     switch (page->type) {
-    case WT_PAGE_COL_FIX:
-        if (addr_unpack->raw != WT_CELL_ADDR_LEAF_NO)
-            goto celltype_err;
-        break;
     case WT_PAGE_COL_VAR:
     case WT_PAGE_ROW_LEAF:
         if (addr_unpack->raw != WT_CELL_ADDR_DEL && addr_unpack->raw != WT_CELL_ADDR_LEAF &&
@@ -759,19 +731,9 @@ celltype_err:
 
             /*
              * It's a depth-first traversal: this entry's starting record number should be 1 more
-             * than the total records reviewed to this point. However, for VLCS fast-truncate can
-             * introduce gaps; allow a gap but not overlapping ranges. For FLCS, gaps are not
-             * permitted.
+             * than the total records reviewed to this point.
              */
-            if (btree->type == BTREE_COL_FIX && child_ref->ref_recno != vs->records_so_far + 1) {
-                WT_RET_MSG(session, WT_ERROR,
-                  "the starting record number in entry %" PRIu32
-                  " of the column internal page at %s is %" PRIu64
-                  " and the expected starting record number is %" PRIu64,
-                  entry, __verify_addr_string(session, child_ref, vs->tmp1), child_ref->ref_recno,
-                  vs->records_so_far + 1);
-            } else if (btree->type == BTREE_COL_VAR &&
-              child_ref->ref_recno < vs->records_so_far + 1) {
+            if (child_ref->ref_recno < vs->records_so_far + 1) {
                 WT_RET_MSG(session, WT_ERROR,
                   "the starting record number in entry %" PRIu32
                   " of the column internal page at %s is %" PRIu64
@@ -1220,87 +1182,6 @@ __verify_page_content_int(
         }
     }
     WT_CELL_FOREACH_END;
-
-    return (0);
-}
-
-/*
- * __verify_page_content_fix --
- *     Verify the page's content. Like __verify_page_content_leaf but for FLCS pages.
- */
-static int
-__verify_page_content_fix(
-  WT_SESSION_IMPL *session, WT_REF *ref, WT_CELL_UNPACK_ADDR *parent, WT_VSTUFF *vs)
-{
-    WT_CELL *cell;
-    WT_CELL_UNPACK_KV unpack;
-    WT_DECL_RET;
-    WT_PAGE *page;
-    uint64_t start_ts;
-    uint32_t cell_num, numtws, recno_offset, tw;
-    uint8_t *p;
-
-    page = ref->page;
-
-    /* Count the keys. */
-    vs->records_so_far += page->entries;
-
-    /* Examine each row; iterate the keys and time windows in parallel. */
-    /* Walk the time windows, if there are any. */
-    numtws = WT_COL_FIX_TWS_SET(page) ? page->pg_fix_numtws : 0;
-    for (recno_offset = 0, tw = 0; recno_offset < page->entries; recno_offset++) {
-        if (tw < numtws && page->pg_fix_tws[tw].recno_offset == recno_offset) {
-            /* This row has a time window. */
-
-            /* The printable cell number for the value is 2x the entry number (tw) plus 1. */
-            cell_num = tw * 2 + 1;
-
-            cell = WT_COL_FIX_TW_CELL(page, &page->pg_fix_tws[tw]);
-            __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
-
-            /* We are supposed to see only values (not keys) and only plain values belong. */
-            if (unpack.type != WT_CELL_VALUE)
-                WT_RET_MSG(session, EINVAL,
-                  "cell %" PRIu32 " for key %" PRIu64 " on page at %s has wrong type %s", cell_num,
-                  ref->ref_recno + page->pg_fix_tws[tw].recno_offset,
-                  __verify_addr_string(session, ref, vs->tmp1),
-                  __wti_cell_type_string(unpack.type));
-
-            /* The value cell should contain only a time window. */
-            if (unpack.size != 0)
-                WT_RET_MSG(session, EINVAL,
-                  "cell %" PRIu32 " for key %" PRIu64 " on page at %s has nonempty value", cell_num,
-                  ref->ref_recno + page->pg_fix_tws[tw].recno_offset,
-                  __verify_addr_string(session, ref, vs->tmp1));
-
-            if ((ret = __wt_time_value_validate(session, &unpack.tw, &parent->ta, false)) != 0)
-                WT_RET_MSG(session, ret,
-                  "cell %" PRIu32 " for key %" PRIu64 " on page at %s failed timestamp validation",
-                  cell_num, ref->ref_recno + page->pg_fix_tws[tw].recno_offset,
-                  __verify_addr_string(session, ref, vs->tmp1));
-
-            if (vs->stable_timestamp != WT_TS_NONE)
-                WT_RET(__verify_ts_stable_cmp(
-                  session, NULL, ref, cell_num, unpack.tw.start_ts, unpack.tw.stop_ts, vs));
-
-            start_ts = unpack.tw.start_ts;
-            tw++;
-        } else
-            start_ts = WT_TS_NONE;
-
-        /*
-         * Verify key-associated history-store entries. Note that while a WT_COL_FIX_VERSION_NIL
-         * page written by a build that does not support FLCS timestamps and history will have no
-         * history store entries, such pages can also be written by newer builds; so we should
-         * always validate the history entries.
-         */
-        p = vs->tmp1->mem;
-        WT_RET(__wt_vpack_uint(&p, 0, ref->ref_recno + recno_offset));
-        vs->tmp1->size = WT_PTRDIFF(p, vs->tmp1->mem);
-        WT_RET(__verify_key_hs(session, vs->tmp1, start_ts, vs));
-    }
-
-    /* The caller checks that the address cell pointing to us is no-overflow, so we needn't. */
 
     return (0);
 }

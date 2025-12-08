@@ -41,7 +41,6 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
     table_ts_nolog   = 'table:ts06_ts_nologged'
 
     types = [
-        ('col_fix', dict(empty=1, extra_config=',key_format=r,value_format=8t')),
         ('col_var', dict(empty=0, extra_config=',key_format=r')),
         ('row', dict(empty=0, extra_config='',)),
     ]

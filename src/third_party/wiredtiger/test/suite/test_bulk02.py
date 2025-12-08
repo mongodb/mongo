@@ -43,7 +43,6 @@ class test_bulkload_checkpoint(wttest.WiredTigerTestCase, suite_subprocess):
         ('table', dict(uri='table:data')),
     ]
     configs = [
-        ('fix', dict(keyfmt='r', valfmt='8t')),
         ('var', dict(keyfmt='r', valfmt='S')),
         ('row', dict(keyfmt='S', valfmt='S')),
     ]
@@ -88,7 +87,6 @@ class test_bulkload_backup(wttest.WiredTigerTestCase, suite_subprocess):
         ('table', dict(uri='table:data')),
     ]
     configs = [
-        ('fix', dict(keyfmt='r', valfmt='8t')),
         ('var', dict(keyfmt='r', valfmt='S')),
         ('row', dict(keyfmt='S', valfmt='S')),
     ]

@@ -41,10 +41,11 @@ class test_prepare15(wttest.WiredTigerTestCase):
     ]
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     txn_end_values = [
         ('commit', dict(commit=True)),
@@ -71,12 +72,8 @@ class test_prepare15(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
 
-        if self.value_format == '8t':
-            valuea = 97 # 'a'
-            valueb = 98 # 'b'
-        else:
-            valuea = 'a'
-            valueb = 'b'
+        valuea = 'a'
+        valueb = 'b'
 
         # Perform an update and remove.
         cursor = self.session.open_cursor(uri)
@@ -107,12 +104,7 @@ class test_prepare15(wttest.WiredTigerTestCase):
         # Search for the key so we position our cursor on the page that we want to evict.
         self.session.begin_transaction('ignore_prepare = true')
         evict_cursor.set_key(1)
-        if self.value_format == '8t':
-            # In FLCS, deleted values read back as 0.
-            self.assertEqual(evict_cursor.search(), 0)
-            self.assertEqual(evict_cursor.get_value(), 0)
-        else:
-            self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
+        self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
         self.session.commit_transaction()
@@ -131,12 +123,7 @@ class test_prepare15(wttest.WiredTigerTestCase):
         # Search for the key so we position our cursor on the page that we want to evict.
         self.session.begin_transaction()
         evict_cursor.set_key(1)
-        if self.value_format == '8t':
-            # In FLCS, deleted values read back as 0.
-            self.assertEqual(evict_cursor.search(), 0)
-            self.assertEqual(evict_cursor.get_value(), 0)
-        else:
-            self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
+        self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
         self.session.commit_transaction()
@@ -160,14 +147,9 @@ class test_prepare15(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
 
-        if self.value_format == '8t':
-            valuea = 97 # 'a'
-            valueb = 98 # 'b'
-            valuec = 99 # 'c'
-        else:
-            valuea = 'a'
-            valueb = 'b'
-            valuec = 'c'
+        valuea = 'a'
+        valueb = 'b'
+        valuec = 'c'
 
         # Perform an update.
         cursor = self.session.open_cursor(uri)
@@ -244,12 +226,7 @@ class test_prepare15(wttest.WiredTigerTestCase):
         cursor2 = self.session.open_cursor(uri)
         cursor2.set_key(1)
         if self.commit:
-            if self.value_format == '8t':
-                # In FLCS, deleted values read back as 0.
-                self.assertEqual(cursor2.search(), 0)
-                self.assertEqual(cursor2.get_value(), 0)
-            else:
-                self.assertEqual(cursor2.search(), WT_NOTFOUND)
+            self.assertEqual(cursor2.search(), WT_NOTFOUND)
         else:
             self.assertEqual(cursor2.search(), 0)
             self.assertEqual(cursor2.get_value(), valuea)
@@ -267,10 +244,7 @@ class test_prepare15(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
 
-        if self.value_format == '8t':
-            value = 97 # 'a'
-        else:
-            value = 'a'
+        value = 'a'
 
         # Perform an update and remove.
         s = self.conn.open_session()
@@ -289,12 +263,7 @@ class test_prepare15(wttest.WiredTigerTestCase):
         # Search for the key so we position our cursor on the page that we want to evict.
         self.session.begin_transaction("ignore_prepare = true")
         evict_cursor.set_key(1)
-        if self.value_format == '8t':
-            # In FLCS, deleted values read back as 0.
-            self.assertEqual(evict_cursor.search(), 0)
-            self.assertEqual(evict_cursor.get_value(), 0)
-        else:
-            self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
+        self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
         self.session.commit_transaction()
@@ -309,10 +278,5 @@ class test_prepare15(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         cursor2 = self.session.open_cursor(uri)
         cursor2.set_key(1)
-        if self.value_format == '8t':
-            # In FLCS, deleted values read back as 0.
-            self.assertEqual(cursor2.search(), 0)
-            self.assertEqual(cursor2.get_value(), 0)
-        else:
-            self.assertEqual(cursor2.search(), WT_NOTFOUND)
+        self.assertEqual(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()

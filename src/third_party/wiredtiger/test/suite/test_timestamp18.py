@@ -41,9 +41,8 @@ class test_timestamp18(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
 
     format_values = [
-        ('string-row', dict(key_format='S', value_format='S')),
-        ('column', dict(key_format='r', value_format='S')),
-        ('column-fix', dict(key_format='r', value_format='8t')),
+        ('string-row', dict(key_format='S')),
+        ('column', dict(key_format='r')),
     ]
     non_ts_writes = [
         ('insert', dict(delete=False)),
@@ -56,21 +55,15 @@ class test_timestamp18(wttest.WiredTigerTestCase):
 
     def test_ts_writes_with_non_ts_write(self):
         uri = 'table:test_timestamp18'
-        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={}'.format(self.key_format, 'S')
         self.session.create(uri, format)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
 
-        if self.value_format == '8t':
-            value1 = 97 # 'a'
-            value2 = 98 # 'b'
-            value3 = 99 # 'c'
-            value4 = 100 # 'd'
-        else:
-            value1 = 'a' * 500
-            value2 = 'b' * 500
-            value3 = 'c' * 500
-            value4 = 'd' * 500
+        value1 = 'a' * 500
+        value2 = 'b' * 500
+        value3 = 'c' * 500
+        value4 = 'd' * 500
 
         # A series of timestamped writes on each key.
         for i in range(1, 10000):
@@ -107,15 +100,11 @@ class test_timestamp18(wttest.WiredTigerTestCase):
             self.session.begin_transaction('read_timestamp=' + self.timestamp_str(ts))
             for i in range(1, 10000):
                 # The non-timestamped delete should cover all the previous writes and make them
-                # effectively invisible. (For FLCS, this means they read back as zero.)
+                # effectively invisible.
                 if i % 2 == 0:
                     if self.delete:
                         cursor.set_key(self.get_key(i))
-                        if self.value_format == '8t':
-                            self.assertEqual(cursor.search(), 0)
-                            self.assertEqual(cursor.get_value(), 0)
-                        else:
-                            self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+                        self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
                     else:
                         self.assertEqual(cursor[self.get_key(i)], value4)
                 # Otherwise, expect one of the timestamped writes.

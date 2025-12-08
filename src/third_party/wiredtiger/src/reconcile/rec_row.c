@@ -575,7 +575,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
     cell = NULL;
     build_delta = WT_BUILD_DELTA_INT(session, r);
 
-    WT_RET(__wti_rec_split_init(session, r, page, 0, btree->maxintlpage_precomp, 0));
+    WT_RET(__wti_rec_split_init(session, r, 0, btree->maxintlpage_precomp));
     WT_RET(__rec_build_delta_int(session, r, build_delta));
 
     /*
@@ -1100,7 +1100,7 @@ __wti_rec_row_leaf(
     cbt = &r->update_modify_cbt;
     cbt->iface.session = (WT_SESSION *)session;
 
-    WT_RET(__wti_rec_split_init(session, r, page, 0, btree->maxleafpage_precomp, 0));
+    WT_RET(__wti_rec_split_init(session, r, 0, btree->maxleafpage_precomp));
 
     /*
      * Write any K/V pairs inserted into the page before the first from-disk key on the page.

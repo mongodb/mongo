@@ -151,7 +151,6 @@ snap_track(TINFO *tinfo, thread_op op)
     SNAP_OPS *snap;
     TABLE *table;
     WT_ITEM *ip;
-    u_int mask;
 
     table = tinfo->table;
 
@@ -163,7 +162,6 @@ snap_track(TINFO *tinfo, thread_op op)
     snap->ts = WT_TS_NONE;
     snap->repeatable = false;
     snap->last = 0;
-    snap->bitv = FIX_VALUE_WRONG;
     snap->key.data = snap->value.data = NULL;
     snap->key.size = snap->value.size = 0;
 
@@ -175,18 +173,8 @@ snap_track(TINFO *tinfo, thread_op op)
     case MODIFY:
     case READ:
     case UPDATE:
-        if (table->type == FIX) {
-            /*
-             * At this point we should have a value the right size for this table, even for mirror
-             * tables. If we messed up, bail now rather than waiting for a repeatable read to fail.
-             */
-            mask = (1u << TV(BTREE_BITCNT)) - 1;
-            testutil_assert((tinfo->bitv & mask) == tinfo->bitv);
-            snap->bitv = tinfo->bitv;
-        } else {
-            ip = op == READ ? tinfo->value : tinfo->new_value;
-            testutil_check(__wt_buf_set(NULL, &snap->value, ip->data, ip->size));
-        }
+        ip = op == READ ? tinfo->value : tinfo->new_value;
+        testutil_check(__wt_buf_set(NULL, &snap->value, ip->data, ip->size));
         break;
     case REMOVE:
         break;
@@ -230,8 +218,6 @@ snap_verify_callback(WT_CURSOR *cursor, int ret, void *arg)
     TINFO *tinfo;
     WT_ITEM *key, *value;
     uint64_t keyno;
-    uint8_t bitv;
-    char ret_buf[10], snap_buf[10];
 
     /* We only handle success and not-found. */
     if (ret != 0 && ret != WT_NOTFOUND)
@@ -253,36 +239,18 @@ snap_verify_callback(WT_CURSOR *cursor, int ret, void *arg)
     keyno = callback->keyno;
 
     value = tinfo->value;
-    bitv = FIX_VALUE_WRONG; /* -Wconditional-uninitialized */
 
     /* Get the value and check for matches. */
     if (ret == 0) {
-        if (table->type == FIX) {
-            testutil_check(cursor->get_value(cursor, &bitv));
-            if (snap->op != REMOVE && bitv == snap->bitv)
-                return;
-        } else {
-            testutil_check(cursor->get_value(cursor, value));
-            if (snap->op != REMOVE && value->size == snap->value.size &&
-              (value->size == 0 || memcmp(value->data, snap->value.data, snap->value.size) == 0))
-                return;
-        }
+        testutil_check(cursor->get_value(cursor, value));
+        if (snap->op != REMOVE && value->size == snap->value.size &&
+          (value->size == 0 || memcmp(value->data, snap->value.data, snap->value.size) == 0))
+            return;
     }
 
     /* Check for missing records matching delete operations. */
     if (ret == WT_NOTFOUND && snap->op == REMOVE)
         return;
-
-    /*
-     * In fixed length stores, zero values at the end of the key space are returned as not-found,
-     * and not-found row reads are saved as zero values. Map back-and-forth for simplicity.
-     */
-    if (table->type == FIX) {
-        if (ret == WT_NOTFOUND && snap->bitv == 0)
-            return;
-        if (snap->op == REMOVE && bitv == 0)
-            return;
-    }
 
     /*
      * Things went pear-shaped.
@@ -293,18 +261,6 @@ snap_verify_callback(WT_CURSOR *cursor, int ret, void *arg)
     fprintf(stderr, "%s: WiredTiger trace ID: %u\n", table->uri,
       (u_int)((WT_BTREE *)((WT_CURSOR_BTREE *)cursor)->dhandle->handle)->id);
     switch (table->type) {
-    case FIX:
-        if (snap->op == REMOVE)
-            strcpy(snap_buf, "remove");
-        else
-            testutil_snprintf(snap_buf, sizeof(snap_buf), "0x%02x", (u_int)snap->bitv);
-        if (ret == WT_NOTFOUND)
-            strcpy(ret_buf, "notfound");
-        else
-            testutil_snprintf(ret_buf, sizeof(ret_buf), "0x%02x", (u_int)bitv);
-        fprintf(stderr, "snapshot-isolation: %" PRIu64 " search: expected {%s}, found {%s}\n",
-          keyno, snap_buf, ret_buf);
-        break;
     case ROW:
         fprintf(
           stderr, "snapshot-isolation %.*s search mismatch\n", (int)key->size, (char *)key->data);
@@ -367,9 +323,6 @@ snap_verify(TINFO *tinfo, SNAP_OPS *snap)
             trace_uri_op(tinfo, table->uri, "repeat {%.*s} ts=%" PRIu64 " {%.*s}",
               (int)snap->key.size, (char *)snap->key.data, snap->ts, (int)snap->value.size,
               (char *)snap->value.data);
-        else if (table->type == FIX)
-            trace_uri_op(tinfo, table->uri, "repeat %" PRIu64 " ts=%" PRIu64 " {0x%02" PRIx8 "}",
-              keyno, snap->ts, snap->bitv);
         else
             trace_uri_op(tinfo, table->uri, "repeat %" PRIu64 " ts=%" PRIu64 " {%.*s}", keyno,
               snap->ts, (int)snap->value.size, (char *)snap->value.data);
@@ -380,7 +333,6 @@ snap_verify(TINFO *tinfo, SNAP_OPS *snap)
      * else generate the key from the key number.
      */
     switch (table->type) {
-    case FIX:
     case VAR:
         cursor->set_key(cursor, keyno);
         break;

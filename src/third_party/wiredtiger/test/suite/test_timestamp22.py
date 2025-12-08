@@ -51,7 +51,6 @@ class test_timestamp22(wttest.WiredTigerTestCase):
     format_values = [
         ('integer-row', dict(key_format='i', value_format='S')),
         ('column', dict(key_format='r', value_format='S')),
-        ('column-fix', dict(key_format='r', value_format='8t')),
     ]
     scenarios = make_scenarios(format_values)
 
@@ -99,8 +98,6 @@ class test_timestamp22(wttest.WiredTigerTestCase):
 
     # Create a predictable value based on the iteration number and timestamp.
     def gen_value(self, iternum, ts):
-        if self.value_format == '8t':
-            return (iternum * 7 + ts * 13) % 255
         return str(iternum) + '_' + str(ts) + '_' + 'x' * 1000
 
     # Given a number representing an "approximate timestamp", generate a timestamp

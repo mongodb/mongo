@@ -47,8 +47,6 @@ class test_txn03(wttest.WiredTigerTestCase):
                 key = "TEST_KEY1", data1 = "VAL", data2 = "TEST_VAL1")),
         ('var', dict(create_params = "key_format=r,value_format=S",
                 key = 123, data1 = "VAL", data2 = "TEST_VAL1")),
-        ('fix', dict(create_params = "key_format=r,value_format=8t",
-                key = 123, data1 = 0x17, data2 = 0xaa)),
     ])
 
     def test_ops(self):

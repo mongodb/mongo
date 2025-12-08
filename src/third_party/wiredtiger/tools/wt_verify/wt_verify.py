@@ -32,7 +32,6 @@
 # such as pretty printed output and visualization options.
 
 # This script only supports Row store and Variable Length Column Store (VLCS).
-# Fixed Length Column Store (FLCS) is not supported.
 
 import argparse
 from operator import itemgetter

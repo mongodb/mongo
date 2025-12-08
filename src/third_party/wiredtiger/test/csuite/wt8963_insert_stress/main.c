@@ -38,7 +38,7 @@
 #define THREAD_NUM_ITERATIONS (200 * WT_THOUSAND)
 #define NUM_THREADS 110
 #define KEY_MAX UINT32_MAX
-#define TABLE_CONFIG_FMT "key_format=%s,value_format=%s,memory_page_image_max=50MB"
+#define TABLE_CONFIG_FMT "key_format=%s,value_format=Q,memory_page_image_max=50MB"
 
 static const char *const conn_config =
   "create,cache_size=4G,statistics=(all),statistics_log=(json,on_close,wait=1)";
@@ -62,12 +62,9 @@ set_key(WT_CURSOR *c, uint64_t value)
  *     Wrapper providing the correct typing for the WT_CURSOR::set_value variadic argument.
  */
 static void
-set_value(TEST_OPTS *opts, WT_CURSOR *c, uint64_t value)
+set_value(WT_CURSOR *c, uint64_t value)
 {
-    if (opts->table_type == TABLE_FIX)
-        c->set_value(c, (uint8_t)value);
-    else
-        c->set_value(c, value);
+    c->set_value(c, value);
 }
 
 /*
@@ -94,8 +91,8 @@ main(int argc, char *argv[])
 
     testutil_check(wiredtiger_open(opts->home, NULL, conn_config, &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_snprintf(tableconf, sizeof(tableconf), TABLE_CONFIG_FMT,
-      opts->table_type == TABLE_ROW ? "Q" : "r", opts->table_type == TABLE_FIX ? "8t" : "Q");
+    testutil_snprintf(
+      tableconf, sizeof(tableconf), TABLE_CONFIG_FMT, opts->table_type == TABLE_ROW ? "Q" : "r");
     testutil_check(session->create(session, opts->uri, tableconf));
 
     cs = clock();
@@ -166,7 +163,7 @@ thread_insert_race(void *arg)
         /* Generate random values from [1, KEY_MAX] */
         key = ((uint64_t)__wt_random(&rnd) % KEY_MAX) + 1;
         set_key(cursor, key);
-        set_value(opts, cursor, key);
+        set_value(cursor, key);
         testutil_check(cursor->insert(cursor));
     }
 

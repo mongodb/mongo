@@ -37,10 +37,11 @@ from wtscenario import make_scenarios
 class test_rollback_to_stable17(wttest.WiredTigerTestCase):
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     in_memory_values = [
         ('no_inmem', dict(in_memory=False)),
@@ -94,10 +95,7 @@ class test_rollback_to_stable17(wttest.WiredTigerTestCase):
         nrows = 200
         start_row = 1
         ts = [2,5,7,9]
-        if self.value_format == '8t':
-            values = [97, 98, 99, 100]
-        else:
-            values = ["aaaa", "bbbb", "cccc", "dddd"]
+        values = ["aaaa", "bbbb", "cccc", "dddd"]
 
         # Create a table.
         config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)

@@ -44,23 +44,11 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
     keyfmt = [
         ('integer', dict(keyfmt='i', valfmt='S')),
         ('recno', dict(keyfmt='r', valfmt='S')),
-        ('recno-fix', dict(keyfmt='r', valfmt='8t')),
         ('string', dict(keyfmt='S', valfmt='S'))
     ]
 
-    # Discard invalid or unhelpful scenario combinations.
-    def keep(name, d):
-        if d['keyfmt'] == 'r':
-            # Skip complex data sets with FLCS.
-            if d['valfmt'] == '8t' and d['dataset'] != SimpleDataSet:
-                return False
-        else:
-            # Skip byte data with row-store.
-            if d['valfmt'] == '8t':
-                return False
-        return True
 
-    scenarios = make_scenarios(types, keyfmt, include=keep)
+    scenarios = make_scenarios(types, keyfmt)
 
     def test_cursor_comparison(self):
         uri = self.type + 'compare'

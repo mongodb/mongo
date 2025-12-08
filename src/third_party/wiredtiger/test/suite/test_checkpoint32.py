@@ -39,7 +39,6 @@ from wiredtiger import stat
 class test_checkpoint32(wttest.WiredTigerTestCase):
 
     format_values = [
-        # FLCS doesn't support skipping pages based on aggregated time.
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
     ]

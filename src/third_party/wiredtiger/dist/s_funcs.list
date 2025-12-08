@@ -14,13 +14,6 @@ __wt_4b_size_posint2
 __wt_4b_unpack_array
 __wt_4b_unpack_posint1
 __wt_4b_unpack_posint2
-__wt_bloom_create
-__wt_bloom_drop
-__wt_bloom_finalize
-__wt_bloom_get
-__wt_bloom_insert
-__wt_bloom_open
-__wt_bulk_insert_fix
 __wt_bulk_insert_row
 __wt_bulk_insert_var
 __wt_config_getone

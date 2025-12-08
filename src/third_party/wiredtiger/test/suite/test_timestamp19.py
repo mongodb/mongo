@@ -36,9 +36,8 @@ class test_timestamp19(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
 
     format_values = [
-        ('integer-row', dict(key_format='i', value_format='S')),
-        ('column', dict(key_format='r', value_format='S')),
-        ('column-fix', dict(key_format='r', value_format='8t')),
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
     ]
     scenarios = make_scenarios(format_values)
 
@@ -53,21 +52,16 @@ class test_timestamp19(wttest.WiredTigerTestCase):
 
     def test_timestamp(self):
         uri = "table:test_timestamp19"
-        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        create_params = 'key_format={},value_format={}'.format(self.key_format, 'S')
         self.session.create(uri, create_params)
 
         ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format="S")
         ds.populate()
 
         nrows = 1000
-        if self.value_format == '8t':
-           value_x = 120 # 'x'
-           value_y = 121 # 'y'
-           value_z = 122 # 'z'
-        else:
-           value_x = 'x' * 1000
-           value_y = 'y' * 1000
-           value_z = 'z' * 1000
+        value_x = 'x' * 1000
+        value_y = 'y' * 1000
+        value_z = 'z' * 1000
 
         # Set the oldest and stable timestamps to 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +

@@ -44,8 +44,6 @@ class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
                     create_params = 'key_format=i,value_format=i')),
         ('var', dict(tabletype='var',
                     create_params = 'key_format=r,value_format=i')),
-        ('fix', dict(tabletype='fix',
-                    create_params = 'key_format=r,value_format=8t')),
     ]
     op1s = [
         ('i4', dict(op1=('insert', 4))),

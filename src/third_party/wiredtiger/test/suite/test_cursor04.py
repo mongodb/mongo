@@ -41,7 +41,6 @@ class test_cursor04(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
         ('row', dict(tablekind='row', uri='table')),
         ('col', dict(tablekind='col', uri='table')),
-        ('fix', dict(tablekind='fix', uri='table'))
     ])
 
     def config_string(self):
@@ -67,11 +66,7 @@ class test_cursor04(wttest.WiredTigerTestCase):
             keyformat = 'key_format=S'
         else:
             keyformat = 'key_format=r'  # record format
-        if self.tablekind == 'fix':
-            valformat = 'value_format=8t'
-        else:
-            valformat = 'value_format=S'
-        create_args = keyformat + ',' + valformat + self.config_string()
+        create_args = keyformat + ',value_format=S' + self.config_string()
         self.pr('creating session: ' + create_args)
         self.session_create(tablearg, create_args)
         self.pr('creating cursor')
@@ -84,23 +79,14 @@ class test_cursor04(wttest.WiredTigerTestCase):
             return self.recno(i+1)
 
     def genvalue(self, i):
-        if self.tablekind == 'fix':
-            return int(i & 0xff)
-        else:
-            return 'value' + str(i)
+        return 'value' + str(i)
 
     def expect_either(self, cursor, lt, gt):
         origkey = cursor.get_key()
         direction = cursor.search_near()
         self.assertNotEqual(direction, wiredtiger.WT_NOTFOUND)
 
-        # Deletions for 'fix' clear the value, they
-        # do not remove the key, so we expect '0' direction
-        # (that is key found) for fix.
-        if self.tablekind != 'fix':
-            self.assertTrue(direction == 1 or direction == -1)
-        else:
-            self.assertEqual(direction, 0)
+        self.assertTrue(direction == 1 or direction == -1)
 
         if direction == 1:
             self.assertEqual(cursor.get_key(), self.genkey(gt))
@@ -147,8 +133,6 @@ class test_cursor04(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.get_value(), self.genvalue(7))
 
         # 3. Delete some keys
-        # Deletions for 'fix' clear the value, they
-        # do not remove the key
         cursor.set_key(self.genkey(0))
         cursor.remove()
         cursor.set_key(self.genkey(5))
@@ -165,14 +149,9 @@ class test_cursor04(wttest.WiredTigerTestCase):
 
         cursor.set_key(self.genkey(0))
         cmp = cursor.search_near()
-        if self.tablekind != 'fix':
-            self.assertEqual(cmp, 1)
-            self.assertEqual(cursor.get_key(), self.genkey(1))
-            self.assertEqual(cursor.get_value(), self.genvalue(1))
-        else:
-            self.assertEqual(cmp, 0)
-            self.assertEqual(cursor.get_key(), self.genkey(0))
-            self.assertEqual(cursor.get_value(), 0)
+        self.assertEqual(cmp, 1)
+        self.assertEqual(cursor.get_key(), self.genkey(1))
+        self.assertEqual(cursor.get_value(), self.genvalue(1))
 
         cursor.set_key(self.genkey(5))
         self.expect_either(cursor, 4, 6)

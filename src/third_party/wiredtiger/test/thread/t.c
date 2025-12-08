@@ -113,9 +113,6 @@ main(int argc, char *argv[])
             break;
         case 't':
             switch (__wt_optarg[0]) {
-            case 'f':
-                ftype = FIX;
-                break;
             case 'r':
                 ftype = ROW;
                 break;
@@ -267,7 +264,7 @@ usage(void)
     fprintf(stderr,
       "usage: %s "
       "[-FLSv] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
-      "[-n ops] [-R readers] [-r runs] [-t f|r|v] [-W writers]\n",
+      "[-n ops] [-R readers] [-r runs] [-t r|v] [-W writers]\n",
       progname);
     fprintf(stderr, "%s",
       "\t-C specify wiredtiger_open configuration arguments\n"
@@ -279,7 +276,7 @@ usage(void)
       "\t-R set number of reading threads\n"
       "\t-r set number of runs (0 for continuous)\n"
       "\t-S open/close a session on every operation\n"
-      "\t-t set a file type (fix | row | var)\n"
+      "\t-t set a file type (row | var)\n"
       "\t-v do a different number of operations on different tables\n"
       "\t-W set number of writing threads\n");
     return (EXIT_FAILURE);

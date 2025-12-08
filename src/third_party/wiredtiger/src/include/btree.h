@@ -71,7 +71,6 @@
 #define WT_NPOS_IS_INVALID(pos) ((pos) < 0.0)
 
 typedef enum __wt_btree_type {
-    BTREE_COL_FIX = 1, /* Fixed-length column store */
     BTREE_COL_VAR = 2, /* Variable-length column store */
     BTREE_ROW = 3      /* Row-store */
 } WT_BTREE_TYPE;

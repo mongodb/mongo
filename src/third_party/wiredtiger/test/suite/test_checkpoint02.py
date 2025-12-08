@@ -40,7 +40,6 @@ from wtscenario import make_scenarios
 #   operations in another thread
 class test_checkpoint02(wttest.WiredTigerTestCase):
     format_values = [
-        ('column_fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='S')),
         ('u32_row', dict(key_format='L', value_format='S')),
     ]
@@ -69,11 +68,7 @@ class test_checkpoint02(wttest.WiredTigerTestCase):
         self.session.create(self.uri,
             "key_format={},value_format={}".format(self.key_format, self.value_format))
 
-        if self.value_format == '8t':
-            self.nops *= 2
-            my_data = 97
-        else:
-            my_data = 'a' * self.dsize
+        my_data = 'a' * self.dsize
 
         ckpt = checkpoint_thread(self.conn, done)
         work_queue = queue.Queue()

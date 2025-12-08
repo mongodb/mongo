@@ -41,7 +41,6 @@ static void config_disagg_storage(void);
 static void config_encryption(void);
 static bool config_explicit(TABLE *, const char *);
 static const char *config_file_type(u_int);
-static bool config_fix(TABLE *);
 static void config_in_memory(void);
 static void config_in_memory_reset(void);
 static void config_map_backup_incr(const char *, bool *);
@@ -200,8 +199,8 @@ config_table_am(TABLE *table)
 
     /*
      * The runs.type configuration allows more than a single type, for example, choosing from either
-     * RS and VLCS but not FLCS. If there's no table value but there was a global value, re-evaluate
-     * the original global specification, not the choice set for the global table.
+     * RS and VLCS. If there's no table value but there was a global value, re-evaluate the original
+     * global specification, not the choice set for the global table.
      */
     if (!table->v[V_TABLE_RUNS_TYPE].set && tables[0]->v[V_TABLE_RUNS_TYPE].set) {
         testutil_snprintf(buf, sizeof(buf), "runs.type=%s", g.runs_type);
@@ -215,15 +214,10 @@ config_table_am(TABLE *table)
             switch (mmrand(&g.data_rnd, 1, 10)) {
             case 1:
             case 2:
-            case 3: /* 30% */
+            case 3:
+            case 4: /* 40% */
                 if (config_var(table)) {
                     config_single(table, "runs.type=var", false);
-                    break;
-                }
-                /* FALLTHROUGH */
-            case 4: /* 10% */
-                if (config_fix(table)) {
-                    config_single(table, "runs.type=fix", false);
                     break;
                 }
                 /* FALLTHROUGH */ /* 60% */
@@ -941,21 +935,6 @@ config_encryption(void)
 }
 
 /*
- * config_fix --
- *     Fixed-length column-store configuration.
- */
-static bool
-config_fix(TABLE *table)
-{
-    /*
-     * Fixed-length column stores don't support modify operations, and can't be used with
-     * predictable replay with insertions.
-     */
-    return (!config_explicit(table, "ops.pct.modify") &&
-      (!GV(RUNS_PREDICTABLE_REPLAY) || !config_explicit(table, "ops.pct.insert")));
-}
-
-/*
  * config_var --
  *     Variable-length column-store configuration.
  */
@@ -1096,9 +1075,9 @@ config_mirrors(void)
     for (already_set = false, i = 1; i <= ntables; ++i)
         if (NTV(tables[i], RUNS_MIRROR)) {
             already_set = tables[i]->mirror = true;
-            if (tables[i]->type == FIX || tables[i]->type == VAR)
+            if (tables[i]->type == VAR)
                 g.mirror_col_store = true;
-            if (g.base_mirror == NULL && tables[i]->type != FIX)
+            if (g.base_mirror == NULL)
                 g.base_mirror = tables[i];
         }
     if (already_set) {
@@ -1132,12 +1111,9 @@ config_mirrors(void)
         return;
     }
 
-    /*
-     * We can't mirror if we don't have enough tables. A FLCS table can be a mirror, but it can't be
-     * the source of the bulk-load mirror records. Find the first table we can use as a base.
-     */
+    /* We can't mirror if we don't have enough tables. Find the first table we can use as a base. */
     for (i = 1; i <= ntables; ++i)
-        if (tables[i]->type != FIX && !NT_EXPLICIT_OFF(tables[i], RUNS_MIRROR))
+        if (!NT_EXPLICIT_OFF(tables[i], RUNS_MIRROR))
             break;
 
     if (i > ntables) {
@@ -1167,9 +1143,9 @@ config_mirrors(void)
     /* A custom collator would complicate the cursor traversal when comparing tables. */
     config_mirrors_disable_reverse();
 
-    /* Good to go: pick the first non-FLCS table that allows mirroring as our base. */
+    /* Good to go: pick the first table that allows mirroring as our base. */
     for (i = 1; i <= ntables; ++i)
-        if (tables[i]->type != FIX && !NT_EXPLICIT_OFF(tables[i], RUNS_MIRROR))
+        if (!NT_EXPLICIT_OFF(tables[i], RUNS_MIRROR))
             break;
     tables[i]->mirror = true;
     config_single(tables[i], "runs.mirror=1", false);
@@ -1186,7 +1162,7 @@ config_mirrors(void)
         if (tables[i] != g.base_mirror) {
             tables[i]->mirror = true;
             config_single(tables[i], "runs.mirror=1", false);
-            if (tables[i]->type == FIX || tables[i]->type == VAR)
+            if (tables[i]->type == VAR)
                 g.mirror_col_store = true;
             if (--mirrors == 0)
                 break;
@@ -2190,16 +2166,14 @@ config_map_file_type(const char *s, u_int *vp)
 {
     uint32_t v;
     const char *arg;
-    bool fix, row, var;
+    bool row, var;
 
     arg = s;
 
     /* Accumulate choices. */
-    fix = row = var = false;
+    row = var = false;
     while (*s != '\0') {
-        if (WT_PREFIX_SKIP(s, "fixed-length column-store") || WT_PREFIX_SKIP(s, "fix"))
-            fix = true;
-        else if (WT_PREFIX_SKIP(s, "row-store") || WT_PREFIX_SKIP(s, "row"))
+        if (WT_PREFIX_SKIP(s, "row-store") || WT_PREFIX_SKIP(s, "row"))
             row = true;
         else if (WT_PREFIX_SKIP(s, "variable-length column-store") || WT_PREFIX_SKIP(s, "var"))
             var = true;
@@ -2209,34 +2183,24 @@ config_map_file_type(const char *s, u_int *vp)
         if (*s == ',') /* Allow, but don't require, comma-separators. */
             ++s;
     }
-    if (!fix && !row && !var)
+    if (!row && !var)
         testutil_die(EINVAL, "illegal file type configuration: %s", arg);
 
     /* Check for a single configuration. */
-    if (fix && !row && !var) {
-        *vp = FIX;
-        return;
-    }
-    if (!fix && row && !var) {
+    if (row && !var) {
         *vp = ROW;
         return;
     }
-    if (!fix && !row && var) {
+    if (!row && var) {
         *vp = VAR;
         return;
     }
 
     /*
-     * Handle multiple configurations.
-     *
-     * Fixed-length column-store is 10% in all cases.
-     *
-     * Variable-length column-store is 90% vs. fixed, 30% vs. fixed and row, and 40% vs row.
+     * Handle multiple configurations. Variable-length column-store is 40% vs row.
      */
     v = mmrand(&g.data_rnd, 1, 10);
-    if (fix && v == 1)
-        *vp = FIX;
-    else if (var && (v < 5 || !row))
+    if (var && (v < 5 || !row))
         *vp = VAR;
     else
         *vp = ROW;
@@ -2321,8 +2285,6 @@ static const char *
 config_file_type(u_int type)
 {
     switch (type) {
-    case FIX:
-        return ("fixed-length column-store");
     case VAR:
         return ("variable-length column-store");
     case ROW:

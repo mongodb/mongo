@@ -42,10 +42,8 @@ class test_stat_cursor_reset(wttest.WiredTigerTestCase):
     uri = [
         ('file-simple-row', dict(uri='file:' + pfx, dataset=SimpleDataSet, kf='S', vf='S')),
         ('file-simple-var', dict(uri='file:' + pfx, dataset=SimpleDataSet, kf='r', vf='S')),
-        ('file-simple-fix', dict(uri='file:' + pfx, dataset=SimpleDataSet, kf='r', vf='8t')),
         ('table-simple-row', dict(uri='table:' + pfx, dataset=SimpleDataSet, kf='S', vf='S')),
         ('table-simple-var', dict(uri='table:' + pfx, dataset=SimpleDataSet, kf='r', vf='S')),
-        ('table-simple-fix', dict(uri='table:' + pfx, dataset=SimpleDataSet, kf='r', vf='8t')),
         # The complex data sets ignore any passed-in value format.
         ('table-complex-row', dict(uri='table:' + pfx, dataset=ComplexDataSet, kf='S', vf=None)),
         ('table-complex-var', dict(uri='table:' + pfx, dataset=ComplexDataSet, kf='r', vf=None)),

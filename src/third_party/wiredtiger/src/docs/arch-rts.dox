@@ -201,11 +201,11 @@ updates. They are still read into the cache in order to navigate to their leaf p
 
 @section iterating-over-updates Iterating over updates
 
-While the details of what happens here depends on the page type (row-store, VLCS or FLCS), the
-overall idea is the same: we start by looking at the insert list (i.e. any items inserted before the
-first key on the page), iterate over all of the keys on the page, then look at the append list
-(i.e. any items inserted after the last key on the page). We mark the page as dirty so that we
-reconcile it in future.
+While the details of what happens here depends on the page type (row-store or VLCS), the overall
+idea is the same: we start by looking at the insert list (i.e. any items inserted before the first
+key on the page), iterate over all of the keys on the page, then look at the append list (i.e. any
+items inserted after the last key on the page). We mark the page as dirty so that we reconcile it in
+future.
 
 The mechanics of deleting items (or inserting tombstones) from these places are quite involved, and
 out of scope for the architecture guide.

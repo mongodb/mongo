@@ -48,9 +48,8 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
             'transaction_sync=(method=%s),' % self.conn_method
 
     format_values = [
-        ('integer-row', dict(key_format='i', value_format='i')),
-        ('column', dict(key_format='r', value_format='i')),
-        ('column-fix', dict(key_format='r', value_format='8t')),
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
     ]
     conn_sync_enabled = [
         ('en_off', dict(conn_enable='false')),
@@ -79,8 +78,6 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
         begin_sync, commit_sync)
 
     def mkvalue(self, i):
-        if self.value_format == '8t':
-            return i % 256
         return i
 
     # Given the different configuration settings determine if this group
@@ -120,7 +117,7 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
         if self.begin_sync != None and self.commit_sync != None:
             return
 
-        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        create_params = 'key_format={},value_format={}'.format(self.key_format, 'i')
         self.session.create(self.uri, create_params)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)

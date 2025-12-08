@@ -37,10 +37,11 @@ from wtscenario import make_scenarios
 # inconsistent checkpoint.
 class test_hs24(wttest.WiredTigerTestCase):
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     checkpoint_stress_scenarios = [
         ('checkpoint_slow_stress', dict(checkpoint_stress='checkpoint_slow')),
@@ -57,16 +58,10 @@ class test_hs24(wttest.WiredTigerTestCase):
 
     def moresetup(self):
         self.format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
-        if self.value_format == '8t':
-            self.value1 = 97
-            self.value2 = 98
-            self.value3 = 99
-            self.value4 = 100
-        else:
-            self.value1 = 'a' * 500
-            self.value2 = 'b' * 500
-            self.value3 = 'c' * 500
-            self.value4 = 'd' * 500
+        self.value1 = 'a' * 500
+        self.value2 = 'b' * 500
+        self.value3 = 'c' * 500
+        self.value4 = 'd' * 500
 
     def test_missing_ts(self):
         self.moresetup()
@@ -105,13 +100,6 @@ class test_hs24(wttest.WiredTigerTestCase):
             cursor2.set_key(i)
             ret = cursor.search()
             ret2 = cursor2.search()
-
-            # In FLCS, deleted values read back as 0. Adjust accordingly.
-            if self.value_format == '8t':
-                if ret == 0 and cursor.get_value() == 0:
-                    ret = wiredtiger.WT_NOTFOUND
-                if ret2 == 0 and cursor2.get_value() == 0:
-                    ret2 = wiredtiger.WT_NOTFOUND
 
             if not newer_data_visible:
                 newer_data_visible = ret != wiredtiger.WT_NOTFOUND

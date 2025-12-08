@@ -333,17 +333,6 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                 WT_ERR(WT_NOTFOUND);
             }
             break;
-        case WT_PAGE_COL_FIX:
-            /*
-             * If search returned an insert, we might be past the end of page in the append list, so
-             * there's no on-disk value.
-             */
-            if (cbt->recno >= cbt->ref->ref_recno + page->entries) {
-                F_SET(version_cursor, WT_CURVERSION_ON_DISK_EXHAUSTED);
-                F_SET(version_cursor, WT_CURVERSION_HS_EXHAUSTED);
-                WT_ERR(WT_NOTFOUND);
-            }
-            break;
         case WT_PAGE_COL_VAR:
             /* Empty page doesn't have any on page value. */
             if (page->entries == 0) {
@@ -688,7 +677,6 @@ __curversion_skip_starting_updates(WT_SESSION_IMPL *session, WT_CURSOR_VERSION *
             upd = WT_ROW_UPDATE(page, rip);
         }
         break;
-    case WT_PAGE_COL_FIX:
     case WT_PAGE_COL_VAR:
         if (cbt->ins != NULL)
             upd = cbt->ins->upd;

@@ -9,12 +9,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_struct_check --
+ * __struct_check --
  *     Check that the specified packing format is valid, and whether it fits into a fixed-sized
  *     bitfield.
  */
-int
-__wt_struct_check(
+static int
+__struct_check(
   WT_SESSION_IMPL *session, const char *fmt, size_t len, bool *fixedp, uint32_t *fixed_lenp)
 {
     WT_DECL_PACK_VALUE(pv);
@@ -48,7 +48,7 @@ __wt_struct_check(
 int
 __wt_struct_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v)
 {
-    return (__wt_struct_check(session, v->str, v->len, NULL, NULL));
+    return (__struct_check(session, v->str, v->len, NULL, NULL));
 }
 
 /*

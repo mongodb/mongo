@@ -37,10 +37,11 @@ from rollback_to_stable_util import test_rollback_to_stable_base
 class test_rollback_to_stable20(test_rollback_to_stable_base):
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     scenarios = make_scenarios(format_values)
 
@@ -56,10 +57,7 @@ class test_rollback_to_stable20(test_rollback_to_stable_base):
         ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        if self.value_format == '8t':
-            valuea = 97
-        else:
-            valuea = "aaaaa" * 100
+        valuea = "aaaaa" * 100
 
         # Pin oldest and stable timestamp to 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +

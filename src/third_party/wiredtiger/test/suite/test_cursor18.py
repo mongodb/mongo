@@ -41,7 +41,6 @@ class test_cursor18(wttest.WiredTigerTestCase):
     types = [
         ('row', dict(keyformat='i', valueformat='i')),
         ('var', dict(keyformat='r', valueformat='i')),
-        ('fix', dict(keyformat='r', valueformat='8t')),
     ]
 
     cross_key_config = [
@@ -146,10 +145,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         evict_cursor = self.session.open_cursor(self.uri, None, "debug=(release_evict)")
         self.session.begin_transaction()
         evict_cursor.set_key(1)
-        if self.valueformat == '8t':
-            self.assertEqual(evict_cursor.search(), 0)
-        else:
-            self.assertEqual(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
+        self.assertEqual(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
         evict_cursor.reset()
         self.session.rollback_transaction()
 
@@ -822,10 +818,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         evict_cursor = self.session.open_cursor(self.uri, None, "debug=(release_evict)")
         self.session.begin_transaction()
         evict_cursor.set_key(1)
-        if self.valueformat == '8t':
-            self.assertEqual(evict_cursor.search(), 0)
-        else:
-            self.assertEqual(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
+        self.assertEqual(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
         evict_cursor.reset()
         self.session.rollback_transaction()
 
@@ -857,10 +850,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         evict_cursor = self.session.open_cursor(self.uri, None, "debug=(release_evict)")
         self.session.begin_transaction()
         evict_cursor.set_key(1)
-        if self.valueformat == '8t':
-            self.assertEqual(evict_cursor.search(), 0)
-        else:
-            self.assertEqual(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
+        self.assertEqual(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
         evict_cursor.reset()
         self.session.rollback_transaction()
 

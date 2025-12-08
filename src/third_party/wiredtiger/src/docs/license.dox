@@ -43,7 +43,6 @@ of the WiredTiger library should comply with these copyrights.
 @row{\c src/include/queue.h, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
 @row{\c src/os_common/os_getopt.c, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
 @row{\c src/support/hash_city.c, Google\, Inc., <a href="http://www.opensource.org/licenses/MIT">The MIT License</a>}
-@row{\c src/support/hash_fnv.c, Authors, Public Domain}
 </table>
 
 @section license_crc32-power8 3rd party software optionally included in the WiredTiger library: PPC64

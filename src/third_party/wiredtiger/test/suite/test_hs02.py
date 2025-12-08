@@ -37,10 +37,10 @@ class test_hs02(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
 
     format_values = [
-        ('string-row', dict(key_format='S', value_format='S')),
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t'))
+        ('string-row', dict(key_format='S')),
+        ('column', dict(key_format='r')),
     ]
+    value_format='S'
     scenarios = make_scenarios(format_values)
 
     def large_updates(self, uri, value, ds, nrows, commit_ts):
@@ -86,12 +86,8 @@ class test_hs02(wttest.WiredTigerTestCase):
             self, uri2, 0, key_format=self.key_format, value_format=self.value_format)
         ds2.populate()
 
-        if self.value_format == '8t':
-            bigvalue = 97
-            bigvalue2 = 100
-        else:
-            bigvalue = "aaaaa" * 100
-            bigvalue2 = "ddddd" * 100
+        bigvalue = "aaaaa" * 100
+        bigvalue2 = "ddddd" * 100
 
         # Commit at timestamp 1.
         self.large_updates(uri, bigvalue, ds, nrows // 3, 1)
@@ -108,9 +104,6 @@ class test_hs02(wttest.WiredTigerTestCase):
 
         # Check that the new updates are only seen after the update timestamp
         expect_1 = [(bigvalue, nrows // 3)]
-        # In FLCS zeros appear under uncommitted/non-visible updates at the end of the table.
-        if self.value_format == '8t':
-            expect_1.append((0, nrows - nrows // 3))
         self.check(uri, expect_1, 1)
         self.check(uri, [(bigvalue2, nrows)], 100)
 
@@ -126,10 +119,7 @@ class test_hs02(wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(200))
 
         # Check that the truncate is visible after commit
-        if self.value_format == '8t':
-            expect_200 = [(0, nrows // 2), (bigvalue2, nrows // 2)]
-        else:
-            expect_200 = [(bigvalue2, nrows // 2)]
+        expect_200 = [(bigvalue2, nrows // 2)]
         self.check(uri, expect_200, 200)
 
         # Repeat earlier checks

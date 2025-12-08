@@ -51,9 +51,6 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     types = [
-        # FLCS does not yet work in a timestamp world.
-        ('col_fix', dict(empty=1, \
-          cacheSize='cache_size=20MB', extra_config=',key_format=r,value_format=8t')),
         ('row', dict(empty=0, cacheSize='cache_size=20MB', extra_config='',)),
         ('row-smallcache', dict(empty=0, cacheSize='cache_size=2MB', extra_config='',)),
         ('var', dict(empty=0, cacheSize='cache_size=20MB', extra_config=',key_format=r')),
@@ -81,11 +78,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
                     " expected " + str(v) + ", got " + str(cur[k]))
             else:
                 cur.set_key(k)
-                if self.empty:
-                    # Fixed-length column-store rows always exist.
-                    self.assertEqual(cur.search(), 0)
-                else:
-                    self.assertEqual(cur.search(), wiredtiger.WT_NOTFOUND)
+                self.assertEqual(cur.search(), wiredtiger.WT_NOTFOUND)
         cur.close()
         if txn_config:
             session.commit_transaction()

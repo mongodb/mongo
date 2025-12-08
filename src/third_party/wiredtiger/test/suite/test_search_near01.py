@@ -36,9 +36,8 @@ class test_search_near01(wttest.WiredTigerTestCase):
     uri = 'file:test_search_near01'
 
     key_format_values = [
-        ('fix', dict(key_format='r', value_format='8t')),
-        ('var', dict(key_format='r', value_format='I')),
-        ('row', dict(key_format='Q', value_format='I')),
+        ('var', dict(key_format='r')),
+        ('row', dict(key_format='Q')),
     ]
 
     ops = [
@@ -58,7 +57,7 @@ class test_search_near01(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
     def test_implicit_record_cursor_insert_next(self):
-        self.session.create(self.uri, 'key_format={},value_format={}'.format(self.key_format, self.value_format))
+        self.session.create(self.uri, 'key_format={},value_format={}'.format(self.key_format, 'I'))
         cursor = self.session.open_cursor(self.uri)
         value1 = 1
         value2 = 2
@@ -84,12 +83,8 @@ class test_search_near01(wttest.WiredTigerTestCase):
         cursor.search_near()
 
         if self.delete:
-            if self.value_format == "8t":
-                self.assertEqual(cursor.get_key(), 1000)
-                self.assertEqual(cursor.get_value(), 0)
-            else:
-                self.assertEqual(cursor.get_key(), 999)
-                self.assertEqual(cursor.get_value(), value1)
+            self.assertEqual(cursor.get_key(), 999)
+            self.assertEqual(cursor.get_value(), value1)
         else:
             self.assertEqual(cursor.get_key(), 1000)
             self.assertEqual(cursor.get_value(), value2)

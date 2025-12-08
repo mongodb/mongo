@@ -51,7 +51,6 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
     types = [
         ('row', dict(tabletype='row', create_params = 'key_format=i,value_format=S')),
         ('var', dict(tabletype='var', create_params = 'key_format=r,value_format=S')),
-        ('fix', dict(tabletype='fix', create_params = 'key_format=r,value_format=8t')),
     ]
     op1s = [
         ('trunc-all', dict(op1=('all', 0))),
@@ -132,11 +131,8 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
         # Set up the table with entries for 1-5.
         # We then truncate starting or ending in various places.
         c = self.session.open_cursor(self.uri, None)
-        if self.tabletype == 'fix':
-            value = 1
-        else:
-            # Choose large compressible values for the string cases.
-            value = 'abc' * 1000000
+        # Choose large compressible values for the string cases.
+        value = 'abc' * 1000000
         current = {1:value, 2:value, 3:value, 4:value, 5:value}
         for k in current:
             c[k] = value

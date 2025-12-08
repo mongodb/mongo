@@ -46,7 +46,6 @@ class test_timestamp26_wtu_never(wttest.WiredTigerTestCase):
         ('no', dict(with_ts=False)),
     ]
     types = [
-        ('fix', dict(key_format='r', value_format='8t')),
         ('row', dict(key_format='S', value_format='S')),
         ('var', dict(key_format='r', value_format='S')),
     ]
@@ -96,7 +95,6 @@ class test_timestamp26_read_timestamp(wttest.WiredTigerTestCase):
         ('none', dict(read_ts='none')),
     ]
     types = [
-        ('fix', dict(key_format='r', value_format='8t')),
         ('row', dict(key_format='S', value_format='S')),
         ('var', dict(key_format='r', value_format='S')),
     ]
@@ -154,7 +152,6 @@ class test_timestamp26_read_timestamp(wttest.WiredTigerTestCase):
 # Test alter of timestamp settings.
 class test_timestamp26_alter(wttest.WiredTigerTestCase):
     types = [
-        ('fix', dict(key_format='r', value_format='8t')),
         ('row', dict(key_format='S', value_format='S')),
         ('var', dict(key_format='r', value_format='S')),
     ]
@@ -203,7 +200,6 @@ class test_timestamp26_alter(wttest.WiredTigerTestCase):
 # Test timestamp settings with alter and inconsistent updates.
 class test_timestamp26_alter_inconsistent_update(wttest.WiredTigerTestCase):
     types = [
-        ('fix', dict(key_format='r', value_format='8t')),
         ('row', dict(key_format='S', value_format='S')),
         ('var', dict(key_format='r', value_format='S')),
     ]
@@ -285,7 +281,6 @@ class test_timestamp26_alter_inconsistent_update(wttest.WiredTigerTestCase):
 # Test timestamp settings with inconsistent updates.
 class test_timestamp26_inconsistent_update(wttest.WiredTigerTestCase):
     types = [
-        ('fix', dict(key_format='r', value_format='8t')),
         ('row', dict(key_format='S', value_format='S')),
         ('var', dict(key_format='r', value_format='S')),
     ]
@@ -442,7 +437,6 @@ class test_timestamp26_log_ts(wttest.WiredTigerTestCase, DisaggConfigMixin):
     conn_config = 'log=(enabled=true)'
 
     types = [
-        ('fix', dict(key_format='r', value_format='8t')),
         ('row', dict(key_format='S', value_format='S')),
         ('var', dict(key_format='r', value_format='S')),
     ]
@@ -488,7 +482,6 @@ class test_timestamp26_log_ts(wttest.WiredTigerTestCase, DisaggConfigMixin):
 # override.
 class test_timestamp26_in_memory_ts(wttest.WiredTigerTestCase):
     types = [
-        ('fix', dict(key_format='r', value_format='8t')),
         ('row', dict(key_format='S', value_format='S')),
         ('var', dict(key_format='r', value_format='S')),
     ]

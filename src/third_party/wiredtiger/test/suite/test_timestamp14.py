@@ -41,7 +41,6 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
     format_values = [
         ('integer-row', dict(key_format='i', value_format='i')),
         ('column', dict(key_format='r', value_format='i')),
-        ('column-fix', dict(key_format='r', value_format='8t')),
     ]
     scenarios = make_scenarios(format_values)
 

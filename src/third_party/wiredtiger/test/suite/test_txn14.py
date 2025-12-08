@@ -46,16 +46,12 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
         ('sync', dict(sync='on')),
     ]
     format_values = [
-        ('integer-row', dict(key_format='i', value_format='i')),
-        ('column', dict(key_format='r', value_format='i')),
-        ('column-fix', dict(key_format='r', value_format='8t')),
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
     ]
     scenarios = make_scenarios(sync_list, format_values)
 
     def mkvalue(self, i):
-        if self.value_format == '8t':
-            # Use 255 instead of 256 just for variety.
-            return i % 255
         return i
 
     def test_log_flush(self):
@@ -67,7 +63,7 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
         #    - Make recovery run.
         #    - Confirm flushed data is in the table.
         #
-        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        create_params = 'key_format={},value_format={}'.format(self.key_format, 'i')
         self.session.create(self.t1, create_params)
         c = self.session.open_cursor(self.t1, None, None)
         for i in range(1, self.entries + 1):

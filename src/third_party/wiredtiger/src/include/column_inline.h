@@ -249,10 +249,7 @@ __col_insert_search(
         /*
          * When no exact match is found, the search returns the smallest key larger than the
          * searched-for key, or the largest key smaller than the searched-for key, if there is no
-         * larger key. Our callers depend on that: specifically, the fixed-length column store
-         * cursor code interprets returning a key smaller than the searched-for key to mean the
-         * searched-for key is larger than any key on the page. Don't change that behavior, things
-         * will break.
+         * larger key.
          */
         ins_recno = WT_INSERT_RECNO(ret_ins);
         cmp = (recno == ins_recno) ? 0 : (recno < ins_recno) ? -1 : 1;
@@ -298,24 +295,6 @@ __col_var_last_recno(WT_REF *ref)
 
     repeat = &page->pg_var_repeats[page->pg_var_nrepeats - 1];
     return ((repeat->recno + repeat->rle) - 1 + (page->entries - (repeat->indx + 1)));
-}
-
-/*
- * __col_fix_last_recno --
- *     Return the last record number for a fixed-length column-store page.
- */
-static WT_INLINE uint64_t
-__col_fix_last_recno(WT_REF *ref)
-{
-    WT_PAGE *page;
-
-    page = ref->page;
-
-    /*
-     * If there's an append list, there may be more records on the page. This function ignores those
-     * records, our callers must handle that explicitly, if they care.
-     */
-    return (page->entries == 0 ? WT_RECNO_OOB : ref->ref_recno + (page->entries - 1));
 }
 
 /*

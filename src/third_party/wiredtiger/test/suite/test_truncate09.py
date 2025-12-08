@@ -36,7 +36,6 @@ from wtscenario import make_scenarios
 # FIXME-WT-15430: Re-enable once disaggregated storage works with fast truncate tests.
 @wttest.skip_for_hook("disagg", "fast truncate is not supported yet")
 class test_truncate09(wttest.WiredTigerTestCase):
-    # We don't test FLCS, missing records return as 0 values.
     format_values = [
         ('column', dict(key_format='r')),
         ('row_integer', dict(key_format='i')),

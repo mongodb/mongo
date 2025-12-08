@@ -65,7 +65,6 @@ class test_chunkcache01(wttest.WiredTigerTestCase):
     uri = 'table:test_chunkcache01'
 
     format_values = [
-        ('column-fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='u')),
         ('row_string', dict(key_format='S', value_format='u')),
     ]

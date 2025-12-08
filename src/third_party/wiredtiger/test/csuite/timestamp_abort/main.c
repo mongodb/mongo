@@ -1490,7 +1490,6 @@ main(int argc, char *argv[])
             use_backups = true;
             break;
         case 'c':
-            /* Variable-length columns only (for now) */
             columns = true;
             break;
         case 'F':

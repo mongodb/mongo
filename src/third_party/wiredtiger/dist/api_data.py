@@ -199,8 +199,7 @@ format_meta = common_meta + [
     Config('value_format', 'u', r'''
         the format of the data packed into value items. See @ref schema_format_types for details.
         By default, the value_format is \c 'u' and applications use a WT_ITEM structure to
-        manipulate raw byte arrays. Value items of type 't' are bitfields, and when configured
-        with record number type keys, will be stored using a fixed-length store''',
+        manipulate raw byte arrays. Value items of type 't' are bitfields.''',
         type='format', func='__wt_struct_confchk'),
 ]
 
@@ -401,9 +400,7 @@ file_config = format_meta + file_runtime_config + tiered_config + file_disaggreg
         the maximum page size for leaf nodes, in bytes; the size must be a multiple of the
         allocation size, and is significant for applications wanting to maximize sequential data
         transfer from a storage device. The page maximum is the bytes of uncompressed data,
-        that is, the limit is applied before any block compression is done. For fixed-length
-        column store, the size includes only the bitmap data; pages containing timestamp
-        information can be larger, and the size is limited to 128KB rather than 512MB''',
+        that is, the limit is applied before any block compression is done.''',
         min='512B', max='512MB'),
     Config('leaf_value_max', '0', r'''
         the largest value stored in a leaf node, in bytes. If set, values larger than the
@@ -1673,13 +1670,7 @@ methods = {
         configure the cursor for bulk-loading, a fast, initial load path (see @ref tune_bulk_load
         for more information). Bulk-load may only be used for newly created objects and
         applications should use the WT_CURSOR::insert method to insert rows. When bulk-loading,
-        rows must be loaded in sorted order. The value is usually a true/false flag; when
-        bulk-loading fixed-length column store objects, the special value \c bitmap allows
-        chunks of a memory resident bitmap to be loaded directly into a file by passing a
-        \c WT_ITEM to WT_CURSOR::set_value where the \c size field indicates the number of
-        records in the bitmap (as specified by the object's \c value_format configuration).
-        Bulk-loaded bitmap values must end on a byte boundary relative to the bit count (except
-        for the last set of values loaded)'''),
+        rows must be loaded in sorted order.'''),
     Config('checkpoint', '', r'''
         the name of a checkpoint to open. (The reserved name "WiredTigerCheckpoint" opens
         the most recent checkpoint taken for the object.) The cursor does not support data

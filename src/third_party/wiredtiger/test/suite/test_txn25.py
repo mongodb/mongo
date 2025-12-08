@@ -36,9 +36,8 @@ from wtscenario import make_scenarios
 class test_txn25(wttest.WiredTigerTestCase):
     base_config = 'create,cache_size=50MB'
     format_values = [
-        ('fix', dict(key_format='r', usestrings=False, value_format='8t')),
-        ('row', dict(key_format='S', usestrings=True, value_format='S')),
-        ('var', dict(key_format='r', usestrings=False, value_format='S')),
+        ('row', dict(key_format='S', usestrings=True)),
+        ('var', dict(key_format='r', usestrings=False)),
     ]
     log_config = [
         ('logging', dict(conn_config=base_config + ',log=(enabled)')),
@@ -51,22 +50,14 @@ class test_txn25(wttest.WiredTigerTestCase):
 
     def test_txn25(self):
         uri = 'file:test_txn25'
-        create_config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        create_config = 'key_format={},value_format={}'.format(self.key_format, 'S')
         self.session.create(uri, 'allocation_size=512,' + create_config)
 
         # Populate the file and ensure that we start seeing some high transaction IDs in the system.
         nrows = 1000
-        if self.value_format == '8t':
-            # Values are 1/500 the size, but for this we don't need to generate a lot of data,
-            # just a lot of transactions, so we can keep the same nrows. This will generate only
-            # one page, but that shouldn't affect the test criteria.
-            value1 = 97
-            value2 = 98
-            value3 = 99
-        else:
-            value1 = 'aaaaa' * 100
-            value2 = 'bbbbb' * 100
-            value3 = 'ccccc' * 100
+        value1 = 'aaaaa' * 100
+        value2 = 'bbbbb' * 100
+        value3 = 'ccccc' * 100
 
         # Keep transaction ids around.
         session2 = self.conn.open_session()

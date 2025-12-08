@@ -37,15 +37,12 @@
 #define ERR_KEY_MISMATCH 0x200001
 #define ERR_DATA_MISMATCH 0x200002
 
-/* Magic value to store in FLCS if we have lost track of the corresponding string value. */
-#define FLCS_UNKNOWN 255
-
 /*
- * There are three different table types in the test, and a 'special' type of mixed (i.e a mixture
- * of the other three types.
+ * There are two different table types in the test, and a 'special' type of mixed (i.e a mixture of
+ * the other two types.
  */
-#define MAX_TABLE_TYPE 3
-typedef enum { MIX = 0, COL, FIX, ROW } table_type; /* File type */
+#define MAX_TABLE_TYPE 2
+typedef enum { MIX = 0, ROW, COL } table_type; /* File type */
 
 /*
  * For a predictable run we reserve timestamps for each thread for the entire run. The timestamp for
@@ -123,8 +120,6 @@ extern GLOBAL g;
 #define log_print_err(m, e, fatal) log_print_err_worker(__func__, __LINE__, m, e, fatal)
 
 void end_threads(void);
-uint8_t flcs_encode(const char *);
-uint8_t flcs_modify(WT_MODIFY *, int, uint8_t);
 int disagg_switch_roles(void);
 int log_print_err_worker(const char *, int, const char *, int, int);
 void set_flush_tier_delay(WT_RAND_STATE *);

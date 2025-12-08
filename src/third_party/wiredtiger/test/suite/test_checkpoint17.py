@@ -43,8 +43,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
 
     format_values = [
-        ('column-fix', dict(key_format='r', value_format='8t',
-            extraconfig=',allocation_size=512,leaf_page_max=512')),
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
     ]
@@ -90,14 +88,9 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         count = 0
         zerocount = 0
         for k, v in cursor:
-            if self.value_format == '8t' and v == 0:
-                zerocount += 1
-            else:
-                self.assertEqual(v, value)
-                count += 1
+            self.assertEqual(v, value)
+            count += 1
         self.assertEqual(count, nrows)
-        if self.value_format == '8t':
-            self.assertEqual(zerocount, zeros)
         #self.session.rollback_transaction()
         cursor.close()
 
@@ -111,16 +104,10 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             config=self.extraconfig)
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-            value_c = 99
-            value_d = 100
-        else:
-            value_a = "aaaaa" * 100
-            value_b = "bbbbb" * 100
-            value_c = "ccccc" * 100
-            value_d = "ddddd" * 100
+        value_a = "aaaaa" * 100
+        value_b = "bbbbb" * 100
+        value_c = "ccccc" * 100
+        value_d = "ddddd" * 100
 
         # Set oldest and stable to 5.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5) +

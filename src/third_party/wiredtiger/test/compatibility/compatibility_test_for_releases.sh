@@ -371,9 +371,7 @@ run_test_checkpoint()
     for am in $2; do
         dir="RUNDIR.$am"
         echo "./t running $am access method..."
-        if [ "$am" == "fix" ]; then
-            ./$test_bin -t f $flags -h $dir
-        elif [ "$am" == "var" ]; then
+        if [ "$am" == "var" ]; then
             ./$test_bin -t c $flags -h $dir
         else
             ./$test_bin -t r $flags -h $dir
@@ -456,9 +454,7 @@ verify_test_checkpoint()
         echo "$1/$test_bin verifying $2 access method $am..."
         dir="$top_dir/$2/build/test/checkpoint/RUNDIR.$am"
         cp -fr "$dir" "$dir.backup"
-        if [ "$am" = "fix" ]; then
-            ./$test_bin -t f -D -v -h "$dir"
-        elif [ "$am" = "var" ]; then
+        if [ "$am" = "var" ]; then
             ./$test_bin -t c -D -v -h "$dir"
         else
             ./$test_bin -t r -D -v -h "$dir"
@@ -1138,8 +1134,6 @@ fi
 
 if [ "$older" = true ]; then
     for b in ${older_release_branches[@]}; do
-        # FLCS scenarios are not added as they only work from 6.0+. This should be updated when the
-        # tested older branches support FLCS.
         (run_format $b "row var")
     done
 fi
@@ -1168,8 +1162,6 @@ fi
 
 if [ "$older" = true ]; then
     for i in ${!older_release_branches[@]}; do
-        # FLCS scenarios are not added as they only work from 6.0+. This should be updated when the
-        # tested older branches support FLCS.
         [[ $((i+1)) < ${#older_release_branches[@]} ]] && \
         (verify_test_format ${older_release_branches[$i]} ${older_release_branches[$((i+1))]} "row var" true)
     done

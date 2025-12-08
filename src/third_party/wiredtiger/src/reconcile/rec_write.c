@@ -292,9 +292,6 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
 
     /* Reconcile the page. */
     switch (page->type) {
-    case WT_PAGE_COL_FIX:
-        ret = __wti_rec_col_fix(session, r, ref, salvage);
-        break;
     case WT_PAGE_COL_INT:
         WT_WITH_PAGE_INDEX(session, ret = __wti_rec_col_int(session, r, ref));
         break;
@@ -1033,45 +1030,11 @@ __rec_leaf_page_max_slvg(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
 
     btree = S2BT(session);
     page = r->page;
-
-    page_size = 0;
-    switch (page->type) {
-    case WT_PAGE_COL_FIX:
-        /*
-         * Column-store pages can grow if there are missing records (that is, we lost a chunk of the
-         * range, and have to write deleted records). Fixed-length objects are a problem, if there's
-         * a big missing range, we could theoretically have to write large numbers of missing
-         * objects.
-         *
-         * The code in rec_col.c already figured this out for us, including both space for missing
-         * chunks of the namespace and space for time windows, so we will take what it says. Thus,
-         * we shouldn't come here.
-         */
-        WT_ASSERT(session, false);
-        break;
-    case WT_PAGE_COL_VAR:
-        /*
-         * Column-store pages can grow if there are missing records (that is, we lost a chunk of the
-         * range, and have to write deleted records). Variable-length objects aren't usually a
-         * problem because we can write any number of deleted records in a single page entry because
-         * of the RLE, we just need to ensure that additional entry fits.
-         */
-        break;
-    case WT_PAGE_ROW_LEAF:
-    default:
-        /*
-         * Row-store pages can't grow, salvage never does anything other than reduce the size of a
-         * page read from disk.
-         */
-        break;
-    }
-
     /*
      * Default size for variable-length column-store and row-store pages during salvage is the
      * maximum leaf page size.
      */
-    if (page_size < btree->maxleafpage)
-        page_size = btree->maxleafpage;
+    page_size = btree->maxleafpage;
 
     /*
      * The page we read from the disk should be smaller than the page size we just calculated, check
@@ -1148,16 +1111,6 @@ __rec_split_chunk_init(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK
     WT_RET(__wt_buf_init(session, &chunk->image, r->disk_img_buf_size));
     memset(chunk->image.mem, 0, WT_PAGE_HEADER_SIZE);
 
-#ifdef HAVE_DIAGNOSTIC
-    /*
-     * For fixed-length column-store, poison the rest of the buffer. This helps verify ensure that
-     * all the bytes in the buffer are explicitly set and not left uninitialized.
-     */
-    if (r->page->type == WT_PAGE_COL_FIX)
-        memset((uint8_t *)chunk->image.mem + WT_PAGE_HEADER_SIZE, 0xa9,
-          r->disk_img_buf_size - WT_PAGE_HEADER_SIZE);
-#endif
-
     return (0);
 }
 
@@ -1166,8 +1119,8 @@ __rec_split_chunk_init(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK
  *     Initialization for the reconciliation split functions.
  */
 int
-__wti_rec_split_init(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page, uint64_t recno,
-  uint64_t primary_size, uint32_t auxiliary_size)
+__wti_rec_split_init(
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint64_t recno, uint64_t primary_size)
 {
     /* FUTURE: primary_size should probably also be 32 bits. */
 
@@ -1185,36 +1138,13 @@ __wti_rec_split_init(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page, 
      * pages; however, salvage can't be allowed to split, there's no parent page yet. If we're doing
      * salvage, override the caller's selection of a maximum page size, choosing a page size that
      * ensures we won't split.
-     *
-     * For FLCS, the salvage page size can get very large indeed if pieces of the namespace have
-     * vanished, so don't second-guess the caller, who's figured it out for us.
      */
-    if (r->salvage != NULL && page->type != WT_PAGE_COL_FIX)
+    if (r->salvage != NULL)
         primary_size = __rec_leaf_page_max_slvg(session, r);
 
-    /*
-     * Set the page sizes.
-     *
-     * Only fixed-length column store pages use auxiliary space; this is where time windows are
-     * placed. r->page_size is the complete page size; we'll use r->space_avail to track how much
-     * more primary space is remaining, and r->aux_space_avail to track how much more auxiliary
-     * space there is.
-     *
-     * Because (for FLCS) we need to start writing time windows into the auxiliary space before we
-     * know for sure how much bitmap data there is, we always start the time window data at a fixed
-     * offset from the page start: the place where it goes naturally if the page is full. If the
-     * page is not full (and there was at least one timestamp to write), we waste the intervening
-     * unused space. Odd-sized pages are supposed to be rare (ideally only the last page in the
-     * tree, though currently there are some other ways they can appear) so only a few KB is wasted
-     * and not enough to be particularly concerned about.
-     *
-     * For FLCS, primary_size will always be the tree's configured maximum leaf page size, except
-     * for pages created or rewritten during salvage, which might be larger. (This is not ideal,
-     * because once created larger they cannot be split again later, but for the moment at least it
-     * isn't readily avoided.)
-     */
-    WT_ASSERT(session, auxiliary_size == 0 || page->type == WT_PAGE_COL_FIX);
-    r->page_size = (uint32_t)(primary_size + auxiliary_size);
+    /* Set the page size. */
+    WT_ASSERT(session, primary_size < UINT32_MAX);
+    r->page_size = (uint32_t)(primary_size);
 
     /*
      * If we have to split, we want to choose a smaller page size for the split pages, because
@@ -1240,20 +1170,10 @@ __wti_rec_split_init(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page, 
      * the penultimate chunk to the last chunk, hence increasing the size of the last page written
      * without decreasing the penultimate page size beyond the minimum split size.
      *
-     * FLCS pages are different, because they have two pieces: bitmap data ("primary") and time
-     * window data ("auxiliary"); the bitmap data is supposed to be a fixed amount per page. FLCS
-     * pages therefore split based on the bitmap size, and the time window data comes along for the
-     * ride no matter how large it is. If the time window data gets larger than expected (it can at
-     * least in theory get rather large), we have to realloc the page image.
-     *
      * Finally, all this doesn't matter at all for salvage; as noted above, in salvage we can't
      * split at all.
      */
-    if (page->type == WT_PAGE_COL_FIX) {
-        r->split_size = r->salvage != NULL ? 0 : btree->maxleafpage;
-        r->space_avail = primary_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
-        r->aux_space_avail = auxiliary_size - WT_COL_FIX_AUXHEADER_RESERVATION;
-    } else if (r->salvage != NULL) {
+    if (r->salvage != NULL) {
         r->split_size = 0;
         r->space_avail = r->page_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
     } else {
@@ -1294,12 +1214,6 @@ __wti_rec_split_init(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page, 
     r->recno = recno;
     r->entries = 0;
     r->first_free = WT_PAGE_HEADER_BYTE(btree, r->cur_ptr->image.mem);
-
-    if (page->type == WT_PAGE_COL_FIX) {
-        r->aux_start_offset = (uint32_t)(primary_size + WT_COL_FIX_AUXHEADER_RESERVATION);
-        r->aux_entries = 0;
-        r->aux_first_free = (uint8_t *)r->cur_ptr->image.mem + r->aux_start_offset;
-    }
 
     /* New page, compression off. */
     r->key_pfx_compress = r->key_sfx_compress = false;
@@ -1454,109 +1368,47 @@ err:
 }
 
 /*
- * __wti_rec_split_grow --
+ * __rec_split_grow --
  *     Grow the split buffer.
  */
-int
-__wti_rec_split_grow(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t add_len)
+static int
+__rec_split_grow(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t add_len)
 {
     WT_BM *bm;
     WT_BTREE *btree;
-    size_t aux_first_free, corrected_page_size, first_free, inuse;
+    size_t corrected_page_size, first_free;
 
-    aux_first_free = 0; /* gcc -Werror=maybe-uninitialized, with -O3 */
     btree = S2BT(session);
     bm = btree->bm;
 
     /* The free space is tracked with a pointer; convert to an integer. */
     first_free = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
-    if (r->page->type == WT_PAGE_COL_FIX)
-        aux_first_free = WT_PTRDIFF(r->aux_first_free, r->cur_ptr->image.mem);
-
-    inuse = r->page->type == WT_PAGE_COL_FIX ? aux_first_free : first_free;
-    corrected_page_size = inuse + add_len;
+    corrected_page_size = first_free + add_len;
 
     WT_RET(bm->write_size(bm, session, &corrected_page_size));
     WT_RET(__wt_buf_grow(session, &r->cur_ptr->image, corrected_page_size));
 
-    WT_ASSERT(session, corrected_page_size >= inuse);
+    WT_ASSERT(session, corrected_page_size >= first_free);
 
     /* Convert the free space back to pointers. */
     r->first_free = (uint8_t *)r->cur_ptr->image.mem + first_free;
-    if (r->page->type == WT_PAGE_COL_FIX)
-        r->aux_first_free = (uint8_t *)r->cur_ptr->image.mem + aux_first_free;
-
     /* Adjust the available space. */
-    if (r->page->type == WT_PAGE_COL_FIX) {
-        /* Reallocating an FLCS page increases the auxiliary space. */
-        r->aux_space_avail = corrected_page_size - aux_first_free;
-        WT_ASSERT(session, r->aux_space_avail >= add_len);
-    } else {
-        r->space_avail = corrected_page_size - first_free;
-        WT_ASSERT(session, r->space_avail >= add_len);
-    }
+    r->space_avail = corrected_page_size - first_free;
+    WT_ASSERT(session, r->space_avail >= add_len);
 
     return (0);
-}
-
-/*
- * __rec_split_fix_shrink --
- *     Consider eliminating the empty space on an FLCS page.
- */
-static void
-__rec_split_fix_shrink(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
-{
-    uint32_t auxsize, emptysize, primarysize, totalsize;
-    uint8_t *dst, *src;
-
-    /* Total size of page. */
-    totalsize = WT_PTRDIFF32(r->aux_first_free, r->cur_ptr->image.mem);
-
-    /* Size of the entire primary data area, including headers. */
-    primarysize = WT_PTRDIFF32(r->first_free, r->cur_ptr->image.mem);
-
-    /* Size of the empty space. */
-    emptysize = r->aux_start_offset - (primarysize + WT_COL_FIX_AUXHEADER_RESERVATION);
-
-    /* Size of the auxiliary data. */
-    auxsize = totalsize - r->aux_start_offset;
-
-    /*
-     * Arbitrary criterion: if the empty space is bigger than the auxiliary data, memmove the
-     * auxiliary data, on the assumption that the cost of the memmove is outweighed by the cost of
-     * taking checksums of, writing out, and reading back in a bunch of useless empty space.
-     */
-    if (emptysize > auxsize) {
-        /* Source: current auxiliary start. */
-        src = (uint8_t *)r->cur_ptr->image.mem + r->aux_start_offset;
-
-        /* Destination: immediately after the primary data with space for the auxiliary header. */
-        dst = r->first_free + WT_COL_FIX_AUXHEADER_RESERVATION;
-
-        /* The move span should be the empty data size. */
-        WT_ASSERT(session, src == dst + emptysize);
-
-        /* Do the move. */
-        memmove(dst, src, auxsize);
-
-        /* Update the tracking information. */
-        r->aux_start_offset -= emptysize;
-        r->aux_first_free -= emptysize;
-        r->space_avail -= emptysize;
-        r->aux_space_avail += emptysize;
-    }
 }
 
 /* The minimum number of entries before we'll split a row-store internal page. */
 #define WT_PAGE_INTL_MINIMUM_ENTRIES 20
 
 /*
- * __wti_rec_split --
+ * __rec_split --
  *     Handle the page reconciliation bookkeeping. (Did you know "bookkeeper" has 3 doubled letters
  *     in a row? Sweet-tooth does, too.)
  */
-int
-__wti_rec_split(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t next_len)
+static int
+__rec_split(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t next_len)
 {
     WT_BTREE *btree;
     WTI_REC_CHUNK *tmp;
@@ -1574,19 +1426,15 @@ __wti_rec_split(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t next_len)
 
     /*
      * We can get here if the first key/value pair won't fit. Grow the buffer to contain the current
-     * item if we haven't already consumed a reasonable portion of a split chunk. This logic should
-     * not trigger for FLCS, because FLCS splits happen at very definite places; and if it does, the
-     * interaction between here and there will corrupt the database, so assert otherwise.
+     * item if we haven't already consumed a reasonable portion of a split chunk.
      *
      * If we're promoting huge keys into an internal page, we might be about to write an internal
      * page with too few items, which isn't good for tree depth or search. Grow the buffer to
      * contain the current item if we don't have enough items to split an internal page.
      */
     inuse = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
-    if (inuse < r->split_size / 2 && !__wti_rec_need_split(r, 0)) {
-        WT_ASSERT(session, r->page->type != WT_PAGE_COL_FIX);
+    if (inuse < r->split_size / 2 && !__wti_rec_need_split(r, 0))
         goto done;
-    }
 
     if (r->page->type == WT_PAGE_ROW_INT && r->entries < WT_PAGE_INTL_MINIMUM_ENTRIES)
         goto done;
@@ -1596,18 +1444,7 @@ __wti_rec_split(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t next_len)
 
     /* Set the entries, timestamps and size for the just finished chunk. */
     r->cur_ptr->entries = r->entries;
-    if (r->page->type == WT_PAGE_COL_FIX) {
-        if ((r->cur_ptr->auxentries = r->aux_entries) != 0) {
-            __rec_split_fix_shrink(session, r);
-            /* This must come after the shrink call, which can change the offset. */
-            r->cur_ptr->aux_start_offset = r->aux_start_offset;
-            r->cur_ptr->image.size = WT_PTRDIFF(r->aux_first_free, r->cur_ptr->image.mem);
-        } else {
-            r->cur_ptr->aux_start_offset = r->aux_start_offset;
-            r->cur_ptr->image.size = inuse;
-        }
-    } else
-        r->cur_ptr->image.size = inuse;
+    r->cur_ptr->image.size = inuse;
 
     /*
      * Normally we keep two chunks in memory at a given time, and we write the previous chunk at
@@ -1639,28 +1476,9 @@ __wti_rec_split(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t next_len)
     r->entries = 0;
     r->first_free = WT_PAGE_HEADER_BYTE(btree, r->cur_ptr->image.mem);
 
-    if (r->page->type == WT_PAGE_COL_FIX) {
-        /*
-         * In the first chunk, we use the passed-in primary size, whatever it is, as the size for
-         * the bitmap data; the auxiliary space follows it. It might be larger than the configured
-         * maximum leaf page size if we're in salvage. For the second and subsequent chunks, we
-         * aren't in salvage so always use the maximum leaf page size; that will produce the fixed
-         * size pages we want.
-         */
-        r->aux_start_offset = btree->maxleafpage + WT_COL_FIX_AUXHEADER_RESERVATION;
-        r->aux_entries = 0;
-        r->aux_first_free = (uint8_t *)r->cur_ptr->image.mem + r->aux_start_offset;
-    }
-
-    /*
-     * Set the space available to another split-size and minimum split-size chunk. For FLCS,
-     * min_space_avail and min_split_size are both left as zero.
-     */
+    /* Set the space available to another split-size and minimum split-size chunk. */
     r->space_avail = r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
-    if (r->page->type == WT_PAGE_COL_FIX) {
-        r->aux_space_avail = r->page_size - btree->maxleafpage - WT_COL_FIX_AUXHEADER_RESERVATION;
-    } else
-        r->min_space_avail = r->min_split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
+    r->min_space_avail = r->min_split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 
 done:
     /*
@@ -1679,7 +1497,7 @@ done:
      * won't necessarily happen that way.
      */
     if (r->space_avail < next_len)
-        WT_RET(__wti_rec_split_grow(session, r, next_len));
+        WT_RET(__rec_split_grow(session, r, next_len));
 
     return (0);
 }
@@ -1725,7 +1543,7 @@ __wti_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t 
     }
 
     /* We are crossing a split boundary */
-    return (__wti_rec_split(session, r, next_len));
+    return (__rec_split(session, r, next_len));
 }
 
 /*
@@ -1758,9 +1576,6 @@ __rec_split_finish_process_prev(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
     combined_size = prev_ptr->image.size + (cur_ptr->image.size - WT_PAGE_HEADER_BYTE_SIZE(btree));
 
     if (combined_size <= r->page_size) {
-        /* This won't work for FLCS pages, so make sure we don't get here by accident. */
-        WT_ASSERT(session, r->page->type != WT_PAGE_COL_FIX);
-
         /*
          * We have two boundaries, but the data in the buffers can fit a single page. Merge the
          * boundaries and create a single chunk.
@@ -1783,9 +1598,6 @@ __rec_split_finish_process_prev(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
     }
 
     if (prev_ptr->min_offset != 0 && cur_ptr->image.size < r->min_split_size) {
-        /* This won't work for FLCS pages, so make sure we don't get here by accident. */
-        WT_ASSERT(session, r->page->type != WT_PAGE_COL_FIX);
-
         /*
          * The last chunk, pointed to by the current image pointer, has less than the minimum data.
          * Let's move any data more than the minimum from the previous image into the current.
@@ -1794,7 +1606,7 @@ __rec_split_finish_process_prev(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
          */
         len_to_move = prev_ptr->image.size - prev_ptr->min_offset;
         if (r->space_avail < len_to_move)
-            WT_RET(__wti_rec_split_grow(session, r, len_to_move));
+            WT_RET(__rec_split_grow(session, r, len_to_move));
         cur_dsk_start = WT_PAGE_HEADER_BYTE(btree, r->cur_ptr->image.mem);
 
         /*
@@ -1861,35 +1673,11 @@ __wti_rec_split_finish(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
 
     /* Set the number of entries and size for the just finished chunk. */
     r->cur_ptr->entries = r->entries;
-    if (r->page->type == WT_PAGE_COL_FIX) {
-        if ((r->cur_ptr->auxentries = r->aux_entries) != 0) {
-            __rec_split_fix_shrink(session, r);
-            /* This must come after the shrink call, which can change the offset. */
-            r->cur_ptr->aux_start_offset = r->aux_start_offset;
-            r->cur_ptr->image.size = WT_PTRDIFF(r->aux_first_free, r->cur_ptr->image.mem);
-        } else {
-            r->cur_ptr->aux_start_offset = r->aux_start_offset;
-            r->cur_ptr->image.size = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
-        }
-    } else
-        r->cur_ptr->image.size = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
+    r->cur_ptr->image.size = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
 
-    /*
-     *  Potentially reconsider a previous chunk.
-     *
-     * Skip for FLCS because (a) pages can be combined only if the combined bitmap data size is in
-     * range, not the overall page size (which requires entirely different logic) and (b) this
-     * cannot happen because we only split when we've fully filled the previous page. This is true
-     * even when in-memory splits give us odd page sizes to work with -- some of those might be
-     * mergeable (though more likely not) but we can't see them on this code path. So instead just
-     * write the previous chunk out.
-     */
-    if (r->prev_ptr != NULL) {
-        if (r->page->type != WT_PAGE_COL_FIX)
-            WT_RET(__rec_split_finish_process_prev(session, r));
-        else
-            WT_RET(__rec_split_write(session, r, r->prev_ptr, false));
-    }
+    /*  Potentially reconsider a previous chunk. */
+    if (r->prev_ptr != NULL)
+        WT_RET(__rec_split_finish_process_prev(session, r));
 
     /* Write the remaining data/last page. */
     return (__rec_split_write(session, r, r->cur_ptr, true));
@@ -2599,9 +2387,6 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
     WT_TIME_AGGREGATE_COPY(&multi->addr.ta, &chunk->ta);
 
     switch (page->type) {
-    case WT_PAGE_COL_FIX:
-        multi->addr.type = WT_ADDR_LEAF_NO;
-        break;
     case WT_PAGE_COL_VAR:
     case WT_PAGE_ROW_LEAF:
         multi->addr.type = r->ovfl_items ? WT_ADDR_LEAF : WT_ADDR_LEAF_NO;
@@ -2646,10 +2431,6 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
 
     /* Initialize the page header(s). */
     __rec_split_write_header(session, r, chunk, multi, chunk->image.mem);
-    if (r->page->type == WT_PAGE_COL_FIX)
-        __wti_rec_col_fix_write_auxheader(session, chunk->entries, chunk->aux_start_offset,
-          chunk->auxentries, chunk->image.mem, chunk->image.size);
-
     /*
      * If we are writing the whole page in our first/only attempt, it might be a checkpoint
      * (checkpoints are only a single page, by definition). Checkpoints aren't written here, the
@@ -2828,7 +2609,7 @@ __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 
     recno = btree->type == BTREE_ROW ? WT_RECNO_OOB : 1;
 
-    return (__wti_rec_split_init(session, r, cbulk->leaf, recno, btree->maxleafpage_precomp, 0));
+    return (__wti_rec_split_init(session, r, recno, btree->maxleafpage_precomp));
 }
 
 /*
@@ -2848,14 +2629,6 @@ __wt_bulk_wrapup(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
         return (0);
 
     switch (btree->type) {
-    case BTREE_COL_FIX:
-        if (cbulk->entry != 0) {
-            __wti_rec_incr(
-              session, r, cbulk->entry, __bitstr_size((size_t)cbulk->entry * btree->bitcnt));
-            __bit_clear_end(
-              WT_PAGE_HEADER_BYTE(btree, r->cur_ptr->image.mem), cbulk->entry, btree->bitcnt);
-        }
-        break;
     case BTREE_COL_VAR:
         if (cbulk->rle != 0)
             WT_ERR(__wt_bulk_insert_var(session, cbulk, false));

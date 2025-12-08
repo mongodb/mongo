@@ -1107,7 +1107,6 @@ main(int argc, char *argv[])
     while ((ch = __wt_getopt(progname, argc, argv, "Cch:lmpP:Ss:T:t:vxz")) != EOF)
         switch (ch) {
         case 'c':
-            /* Variable-length columns only; fixed would require considerable changes */
             use_columns = true;
             break;
         case 'l':

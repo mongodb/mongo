@@ -39,11 +39,12 @@ from wtthread import checkpoint_thread
 class test_rollback_to_stable10(test_rollback_to_stable_base):
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S', prepare_extraconfig='')),
-        ('column_fix', dict(key_format='r', value_format='8t',
-            prepare_extraconfig=',allocation_size=512,leaf_page_max=512')),
-        ('row_integer', dict(key_format='i', value_format='S', prepare_extraconfig='')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
+    prepare_extraconfig=''
 
     prepare_values = [
         ('no_prepare', dict(prepare=False)),
@@ -97,20 +98,12 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             self, uri_2, 0, key_format=self.key_format, value_format=self.value_format)
         ds_2.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-            value_c = 99
-            value_d = 100
-            value_e = 101
-            value_f = 102
-        else:
-            value_a = "aaaaa" * 100
-            value_b = "bbbbb" * 100
-            value_c = "ccccc" * 100
-            value_d = "ddddd" * 100
-            value_e = "eeeee" * 100
-            value_f = "fffff" * 100
+        value_a = "aaaaa" * 100
+        value_b = "bbbbb" * 100
+        value_c = "ccccc" * 100
+        value_d = "ddddd" * 100
+        value_e = "eeeee" * 100
+        value_f = "fffff" * 100
 
         # Pin oldest and stable to timestamp 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
@@ -129,15 +122,15 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.large_updates(uri_2, value_a, ds_2, nrows, self.prepare, 50)
 
         # Verify data is visible and correct.
-        self.check(value_d, uri_1, nrows, None, 21 if self.prepare else 20)
-        self.check(value_c, uri_1, nrows, None, 31 if self.prepare else 30)
-        self.check(value_b, uri_1, nrows, None, 41 if self.prepare else 40)
-        self.check(value_a, uri_1, nrows, None, 51 if self.prepare else 50)
+        self.check(value_d, uri_1, nrows, 21 if self.prepare else 20)
+        self.check(value_c, uri_1, nrows, 31 if self.prepare else 30)
+        self.check(value_b, uri_1, nrows, 41 if self.prepare else 40)
+        self.check(value_a, uri_1, nrows, 51 if self.prepare else 50)
 
-        self.check(value_d, uri_2, nrows, None, 21 if self.prepare else 20)
-        self.check(value_c, uri_2, nrows, None, 31 if self.prepare else 30)
-        self.check(value_b, uri_2, nrows, None, 41 if self.prepare else 40)
-        self.check(value_a, uri_2, nrows, None, 51 if self.prepare else 50)
+        self.check(value_d, uri_2, nrows, 21 if self.prepare else 20)
+        self.check(value_c, uri_2, nrows, 31 if self.prepare else 30)
+        self.check(value_b, uri_2, nrows, 41 if self.prepare else 40)
+        self.check(value_a, uri_2, nrows, 51 if self.prepare else 50)
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:
@@ -179,18 +172,18 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.pr("restart complete")
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_a, uri_1, nrows, None, 50)
-        self.check(value_a, uri_1, nrows, None, 80)
-        self.check(value_b, uri_1, nrows, None, 40)
-        self.check(value_c, uri_1, nrows, None, 30)
-        self.check(value_d, uri_1, nrows, None, 20)
+        self.check(value_a, uri_1, nrows, 50)
+        self.check(value_a, uri_1, nrows, 80)
+        self.check(value_b, uri_1, nrows, 40)
+        self.check(value_c, uri_1, nrows, 30)
+        self.check(value_d, uri_1, nrows, 20)
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_c, uri_2, nrows, None, 30)
-        self.check(value_a, uri_2, nrows, None, 50)
-        self.check(value_a, uri_2, nrows, None, 80)
-        self.check(value_b, uri_2, nrows, None, 40)
-        self.check(value_d, uri_2, nrows, None, 20)
+        self.check(value_c, uri_2, nrows, 30)
+        self.check(value_a, uri_2, nrows, 50)
+        self.check(value_a, uri_2, nrows, 80)
+        self.check(value_b, uri_2, nrows, 40)
+        self.check(value_d, uri_2, nrows, 20)
 
         self.check_hs_stats()
 
@@ -212,19 +205,11 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             config=self.prepare_extraconfig)
         ds_2.populate()
 
-        if self.value_format == '8t':
-            nrows *= 2
-            value_a = 97
-            value_b = 98
-            value_c = 99
-            value_d = 100
-            value_e = 101
-        else:
-            value_a = "aaaaa" * 100
-            value_b = "bbbbb" * 100
-            value_c = "ccccc" * 100
-            value_d = "ddddd" * 100
-            value_e = "eeeee" * 100
+        value_a = "aaaaa" * 100
+        value_b = "bbbbb" * 100
+        value_c = "ccccc" * 100
+        value_d = "ddddd" * 100
+        value_e = "eeeee" * 100
 
         # Pin oldest and stable to timestamp 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
@@ -243,15 +228,15 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.large_updates(uri_2, value_a, ds_2, nrows, self.prepare, 50)
 
         # Verify data is visible and correct.
-        self.check(value_d, uri_1, nrows, None, 21 if self.prepare else 20)
-        self.check(value_c, uri_1, nrows, None, 31 if self.prepare else 30)
-        self.check(value_b, uri_1, nrows, None, 41 if self.prepare else 40)
-        self.check(value_a, uri_1, nrows, None, 51 if self.prepare else 50)
+        self.check(value_d, uri_1, nrows, 21 if self.prepare else 20)
+        self.check(value_c, uri_1, nrows, 31 if self.prepare else 30)
+        self.check(value_b, uri_1, nrows, 41 if self.prepare else 40)
+        self.check(value_a, uri_1, nrows, 51 if self.prepare else 50)
 
-        self.check(value_d, uri_2, nrows, None, 21 if self.prepare else 20)
-        self.check(value_c, uri_2, nrows, None, 31 if self.prepare else 30)
-        self.check(value_b, uri_2, nrows, None, 41 if self.prepare else 40)
-        self.check(value_a, uri_2, nrows, None, 51 if self.prepare else 50)
+        self.check(value_d, uri_2, nrows, 21 if self.prepare else 20)
+        self.check(value_c, uri_2, nrows, 31 if self.prepare else 30)
+        self.check(value_b, uri_2, nrows, 41 if self.prepare else 40)
+        self.check(value_a, uri_2, nrows, 51 if self.prepare else 50)
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:
@@ -262,7 +247,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         # Do an explicit checkpoint first, before starting the background checkpointer.
         # Otherwise (depending on timing and load) because there's a lot to write for the
         # first checkpoint there's a tendency for the background checkpointer to only
-        # manage to do the one checkpoint; and sometimes (especially on FLCS) it ends up
+        # manage to do the one checkpoint; and sometimes it ends up
         # not containing any of the concurrent updates, and then the test fails because
         # RTS correctly notices it has no work to do and doesn't visit any of the pages
         # or update anything in the history store.
@@ -348,17 +333,17 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.assertGreater(cache_hs_ondisk, 0)
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_a, uri_1, nrows, None, 50)
-        self.check(value_a, uri_1, nrows, None, 80)
-        self.check(value_b, uri_1, nrows, None, 40)
-        self.check(value_c, uri_1, nrows, None, 30)
-        self.check(value_d, uri_1, nrows, None, 20)
+        self.check(value_a, uri_1, nrows, 50)
+        self.check(value_a, uri_1, nrows, 80)
+        self.check(value_b, uri_1, nrows, 40)
+        self.check(value_c, uri_1, nrows, 30)
+        self.check(value_d, uri_1, nrows, 20)
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_a, uri_2, nrows, None, 50)
-        self.check(value_a, uri_2, nrows, None, 80)
-        self.check(value_b, uri_2, nrows, None, 40)
-        self.check(value_c, uri_2, nrows, None, 30)
-        self.check(value_d, uri_2, nrows, None, 20)
+        self.check(value_a, uri_2, nrows, 50)
+        self.check(value_a, uri_2, nrows, 80)
+        self.check(value_b, uri_2, nrows, 40)
+        self.check(value_c, uri_2, nrows, 30)
+        self.check(value_d, uri_2, nrows, 20)
 
         self.check_hs_stats()

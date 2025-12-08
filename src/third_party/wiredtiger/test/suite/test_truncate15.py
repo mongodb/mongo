@@ -50,12 +50,8 @@ class test_truncate15(wttest.WiredTigerTestCase):
     ]
 
     format_values = [
-        # Do not run against FLCS until/unless it gets fast-truncate support.
-        # The issue at hand is specific to fast-truncate pages and is not relevant to slow-truncate.
-        #('column_fix', dict(key_format='r', value_format='8t',
-        #    extraconfig=',allocation_size=512,leaf_page_max=512')),
-        ('column', dict(key_format='r', value_format='S', extraconfig='')),
-        ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
+        ('column', dict(key_format='r', extraconfig='')),
+        ('integer_row', dict(key_format='i', extraconfig='')),
     ]
 
     scenarios = make_scenarios(trunc_values, format_values)
@@ -98,13 +94,10 @@ class test_truncate15(wttest.WiredTigerTestCase):
         seen = 0
         zseen = 0
         for k, v in cursor:
-            if self.value_format == '8t' and v == 0:
-                zseen += 1
-            else:
-                self.assertEqual(v, value)
-                seen += 1
+            self.assertEqual(v, value)
+            seen += 1
         self.assertEqual(seen, nrows)
-        self.assertEqual(zseen, nzeros if self.value_format == '8t' else 0)
+        self.assertEqual(zseen, 0)
         self.session.rollback_transaction()
         cursor.close()
 
@@ -126,14 +119,11 @@ class test_truncate15(wttest.WiredTigerTestCase):
 
         uri = "table:truncate15"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            self, uri, 0, key_format=self.key_format, value_format='S',
             config='log=(enabled=false)' + self.extraconfig)
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-        else:
-            value_a = "aaaaa" * 500
+        value_a = "aaaaa" * 500
 
         # Pin oldest and stable timestamps to 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
@@ -160,16 +150,13 @@ class test_truncate15(wttest.WiredTigerTestCase):
         self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(25))
         self.session.commit_transaction('durable_timestamp=' + self.timestamp_str(30))
 
-        # Make sure we did at least one fast-delete. For FLCS, there's no fast-delete
-        # support, so assert we didn't.
+        # Make sure we did at least one fast-delete.
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
         if self.runningHook('tiered'):
             # There's no way the test can guess whether fast delete is possible when
             # flush_tier calls are "randomly" inserted.
             pass
-        elif self.value_format == '8t':
-            self.assertEqual(fastdelete_pages, 0)
         else:
             self.assertGreater(fastdelete_pages, 0)
 
@@ -191,11 +178,11 @@ class test_truncate15(wttest.WiredTigerTestCase):
             self.check(ds.uri, ds.key, nrows, 0, value_a, 20)
             #self.evict_cursor(ds.uri, ds, nrows, 20)
 
-            # At time 25 we should still see half value_a, and for FLCS, half zeros.
+            # At time 25 we should still see half value_a.
             self.check(ds.uri, ds.key, nrows // 2, nrows // 2, value_a, 25)
             #self.evict_cursor(ds.uri, ds, nrows // 2, 25)
 
-            # At time 30 we should also see half value_a, and for FLCS, half zeros.
+            # At time 30 we should also see half value_a.
             self.check(ds.uri, ds.key, nrows // 2, nrows // 2, value_a, 30)
             #self.evict_cursor(ds.uri, ds, nrows // 2, 30)
         except WiredTigerError as e:

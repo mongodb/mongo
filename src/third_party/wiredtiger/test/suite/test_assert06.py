@@ -37,7 +37,6 @@ from wtdataset import SimpleDataSet
 
 class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
     key_format_values = [
-        ('fix', dict(key_format='r', value_format='8t')),
         ('row', dict(key_format='S', value_format='S')),
         ('var', dict(key_format='r', value_format='S')),
     ]

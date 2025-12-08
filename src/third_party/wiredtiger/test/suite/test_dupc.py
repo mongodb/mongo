@@ -40,10 +40,8 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
     nentries = 1000
 
     scenarios = make_scenarios([
-        ('file-f', dict(uri='file:', keyfmt='r', valfmt='8t')),
         ('file-r', dict(uri='file:', keyfmt='r', valfmt='S')),
         ('file-S', dict(uri='file:', keyfmt='S', valfmt='S')),
-        ('table-f', dict(uri='table:', keyfmt='r', valfmt='8t')),
         ('table-r', dict(uri='table:', keyfmt='r', valfmt='S')),
         ('table-S', dict(uri='table:', keyfmt='S', valfmt='S'))
     ])
@@ -83,7 +81,7 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
         self.dropUntilSuccess(self.session, uri)
 
         # A complex, multi-file table object.
-        if self.uri == "table:" and self.valfmt != '8t':
+        if self.uri == "table:":
             ds = ComplexDataSet(self, uri, self.nentries, \
                     key_format=self.keyfmt, value_format=self.valfmt)
             ds.populate()

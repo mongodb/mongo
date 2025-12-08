@@ -59,10 +59,11 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
     # is corrupted by the 'string-row' test is much larger, as that increases the chance of interactions
     # with, for example, the results of combining timestamp hooks into the test.
     format_values = [
-        ('column', dict(key_format='r', value_format='u', data_to_corrupt_with='Bad!' * 1024)),
-        ('column-fix', dict(key_format='r', value_format='8t', data_to_corrupt_with='Bad!' * 1024)),
-        ('string-row', dict(key_format='S', value_format='u', data_to_corrupt_with='Bad!' * 100 * 1024)),
+        ('column', dict(key_format='r', data_to_corrupt_with='Bad!' * 1024)),
+        ('string-row', dict(key_format='S', data_to_corrupt_with='Bad!' * 100 * 1024)),
     ]
+
+    value_format='u'
 
     scenarios = make_scenarios(corrupt_values, format_values)
 
@@ -135,12 +136,8 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
             return 1, 2, 3
 
     def prepare_updates(self, ds, nrows, nsessions, nkeys):
-        if self.value_format == '8t':
-            commit_value = 98
-            prepare_value = 99
-        else:
-            commit_value = b"bbbbb" * 100
-            prepare_value = b"ccccc" * 100
+        commit_value = b"bbbbb" * 100
+        prepare_value = b"ccccc" * 100
 
         # Three timestamps are required for this test, and they must be in the sequence 'early', 'middle' & 'later'.
         timestamps = self.get_timestamps()
@@ -241,10 +238,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
             self, self.uri, nrows, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        if self.value_format == '8t':
-            bigvalue = 97
-        else:
-            bigvalue = b"aaaaa" * 100
+        bigvalue = b"aaaaa" * 100
 
         # Initially load huge data
         cursor = self.session.open_cursor(self.uri)

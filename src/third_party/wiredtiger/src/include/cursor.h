@@ -240,12 +240,6 @@ struct __wt_cursor_btree {
     uint64_t checkpoint_write_gen;
     uint64_t checkpoint_id;
 
-    /*
-     * Fixed-length column-store items are a single byte, and it's simpler and cheaper to allocate
-     * the space for it now than keep checking to see if we need to grow the buffer.
-     */
-    uint8_t v; /* Fixed-length return value */
-
     uint8_t append_tree; /* Cursor appended to the tree */
 
     /*
@@ -331,14 +325,6 @@ struct __wt_cursor_bulk {
      */
     uint64_t recno; /* Record number */
     uint64_t rle;   /* Variable-length RLE counter */
-
-    /*
-     * Additional fixed-length column store bitmap bulk load support: current entry in memory chunk
-     * count, and the maximum number of records per chunk.
-     */
-    bool bitmap;    /* Bitmap bulk load */
-    uint32_t entry; /* Entry count */
-    uint32_t nrecs; /* Max records per chunk */
 
     void *reconcile; /* Reconciliation support */
     WT_REF *ref;     /* The leaf page */

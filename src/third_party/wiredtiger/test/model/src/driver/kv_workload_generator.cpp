@@ -51,7 +51,6 @@ kv_workload_generator_spec::kv_workload_generator_spec()
     max_recno = 100'000;
     max_value_uint64 = 1'000'000;
 
-    column_fix = 0.1;
     column_var = 0.1;
 
     finish_transaction = 0.08;
@@ -401,12 +400,6 @@ kv_workload_generator::create_table()
 
     probability_switch(_random.next_float())
     {
-        probability_case(_spec.column_fix)
-        {
-            key_format = "r";
-            value_format = "8t";
-            type = kv_table_type::column_fix;
-        }
         probability_case(_spec.column_var)
         {
             key_format = "r";
@@ -480,13 +473,6 @@ kv_workload_generator::generate_transaction(size_t seq_no)
             probability_case(_spec.get)
             {
                 table_context_ptr table = choose_table(txn_ptr);
-                /*
-                 * FIXME-WT-14903 Under FLCS, get operations expose some relatively complex effects.
-                 * For instance, eviction changes implicit records to explicit. To re-enable this,
-                 * check that all FLCS interactions are accounted for.
-                 */
-                if (table->type() == kv_table_type::column_fix)
-                    break;
 
                 data_value key = generate_key(table, op_category::get);
                 /* A get operation shouldn't affect context. */
@@ -516,23 +502,6 @@ kv_workload_generator::generate_transaction(size_t seq_no)
             {
                 table_context_ptr table = choose_table(txn_ptr);
 
-                /*
-                 * FIXME-WT-13232 Don't use truncate on FLCS tables, because a truncate on an FLCS
-                 * table can conflict with operations adjacent to the truncation range's key range.
-                 * For example, if a user wants to truncate range 10-12 on a table with keys [10,
-                 * 11, 12, 13, 14], a concurrent update to key 13 would result in a conflict (while
-                 * an update to 14 would be able proceed).
-                 *
-                 * FIXME-WT-13350 Similarly, truncating an implicitly created range of keys in an
-                 * FLCS table conflicts with a concurrent insert operation that caused this range of
-                 * keys to be created.
-                 *
-                 * The workload generator cannot currently account for this, so don't use truncate
-                 * with FLCS tables for now.
-                 */
-                if (table->type() == kv_table_type::column_fix)
-                    break;
-
                 data_value start = generate_key(table);
                 data_value stop = generate_key(table);
                 if (start > stop)
@@ -559,7 +528,6 @@ kv_workload_generator::run()
         _workload << operation::config("database", "disaggregated=true");
 
         /* Adjust the specs based on what's not supported. */
-        _spec.column_fix = 0;
         _spec.column_var = 0;
         _spec.rollback_to_stable = 0;
 

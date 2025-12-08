@@ -38,8 +38,6 @@ from helper import simulate_crash_restart
 class test_checkpoint35(wttest.WiredTigerTestCase):
 
     format_values = [
-        ('column-fix', dict(key_format='r', value_format='8t',
-            extraconfig=',allocation_size=512,leaf_page_max=512')),
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
     ]
@@ -60,14 +58,8 @@ class test_checkpoint35(wttest.WiredTigerTestCase):
             config=self.extraconfig)
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 1
-        else:
-            value_a =  "aaaaa" * 100
-        if self.value_format == '8t':
-            value_b = 2
-        else:
-            value_b = "bbbbb" * 100
+        value_a =  "aaaaa" * 100
+        value_b = "bbbbb" * 100
 
         ts = 2
 

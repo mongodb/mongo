@@ -141,18 +141,6 @@ class BaseDataSet(object):
             return bytes((str(i) + ': abcdefghijklmnopqrstuvwxyz').encode())
         elif value_format == 'S':
             return str(i) + ': abcdefghijklmnopqrstuvwxyz'
-        elif value_format == '8t':
-            value = (
-                0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xaa, 0xab,
-                0xac, 0xad, 0xae, 0xaf, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6,
-                0xb7, 0xb8, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf)
-            return value[i % len(value)]
-        elif value_format == '6t':
-            value = (
-                0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2a, 0x2b,
-                0x2c, 0x2d, 0x2e, 0x2f, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36,
-                0x37, 0x38, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f)
-            return value[i % len(value)]
         else:
             raise AssertionError(
                 'value: object has unexpected format: ' + value_format)
@@ -191,8 +179,6 @@ class SimpleDataSet(BaseDataSet):
         for key, val in cursor:
             i += 1
             self.testcase.assertEqual(key, self.key(i))
-            if cursor.value_format == '8t' and val == 0:    # deleted
-                continue
             self.testcase.assertEqual(val, self.value(i, variant))
         self.testcase.assertEqual(i, self.rows)
 

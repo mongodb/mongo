@@ -43,10 +43,11 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
     # probably still worthwhile. However, if cutting back on test time becomes desirable it
     # is probably reasonable to run only one of these unless -l is given.
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     prepare_values = [
         ('no_prepare', dict(prepare=False)),
@@ -68,12 +69,8 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
             config='split_pct=50')
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-        else:
-            value_a = "aaaaa" * 100
-            value_b = "bbbbb" * 100
+        value_a = "aaaaa" * 100
+        value_b = "bbbbb" * 100
 
         # Pin oldest and stable to timestamp 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
@@ -83,7 +80,7 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
         self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_a, uri, nrows, 21 if self.prepare else 20)
 
         # Pin stable to timestamp 28 if prepare otherwise 20.
         # We prepare at commit_ts - 1 (so 29) and this is required to be strictly
@@ -113,7 +110,7 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
         simulate_crash_restart(self, ".", "RESTART")
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_a, uri, nrows, None, 30)
+        self.check(value_a, uri, nrows, 30)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]

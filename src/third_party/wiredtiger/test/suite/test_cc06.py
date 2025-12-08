@@ -39,8 +39,6 @@ class test_cc06(test_cc_base):
 
     format_values = [
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
-        ('column_fix', dict(key_format='r', value_format='8t',
-            extraconfig=',allocation_size=512,leaf_page_max=512')),
         ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
     ]
     scenarios = make_scenarios(format_values)

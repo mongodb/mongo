@@ -37,11 +37,11 @@ class test_hs03(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=50MB,statistics=(fast)'
     format_values = [
-        ('column', dict(key_format='r', value_format='u')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer-row', dict(key_format='i', value_format='u')),
-        ('string-row', dict(key_format='S', value_format='u'))
+        ('column', dict(key_format='r')),
+        ('integer-row', dict(key_format='i')),
+        ('string-row', dict(key_format='S'))
     ]
+    value_format='u'
     scenarios = make_scenarios(format_values)
 
     def get_stat(self, stat):
@@ -67,12 +67,8 @@ class test_hs03(wttest.WiredTigerTestCase):
         ds = SimpleDataSet(self, uri, nrows, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        if self.value_format == '8t':
-            bigvalue = 97
-            bigvalue2 = 100
-        else:
-            bigvalue = b"aaaaa" * 100
-            bigvalue2 = b"ddddd" * 100
+        bigvalue = b"aaaaa" * 100
+        bigvalue2 = b"ddddd" * 100
 
         # Initially load huge data.
         cursor = self.session.open_cursor(uri)

@@ -134,30 +134,6 @@ table_mirror_fail_msg(WT_SESSION *session, const char *checkpoint, TABLE *base, 
 }
 
 /*
- * table_mirror_fail_msg_flcs --
- *     Messages on failure, for when the table is FLCS.
- */
-static void
-table_mirror_fail_msg_flcs(WT_SESSION *session, const char *checkpoint, TABLE *base,
-  uint64_t base_keyno, WT_ITEM *base_key, WT_ITEM *base_value, uint8_t base_bitv, TABLE *table,
-  uint64_t table_keyno, uint8_t table_bitv)
-{
-    testutil_assert(table->type == FIX);
-    trace_msg(session,
-      "mirror: %" PRIu64 "/%" PRIu64 " mismatch: %s: {%.*s}/{%.*s} [%#x], %s: {#}/{%#x} %s%s%s\n",
-      base_keyno, table_keyno, base->uri, base->type == ROW ? (int)base_key->size : 1,
-      base->type == ROW ? (char *)base_key->data : "#", (int)base_value->size,
-      (char *)base_value->data, base_bitv, table->uri, table_bitv,
-      checkpoint ? " (checkpoint " : "", checkpoint ? checkpoint : "", checkpoint ? ")" : "");
-    fprintf(stderr,
-      "mirror: %" PRIu64 "/%" PRIu64 " mismatch: %s: {%.*s}/{%.*s} [%#x], %s: {#}/{%#x} %s%s%s\n",
-      base_keyno, table_keyno, base->uri, base->type == ROW ? (int)base_key->size : 1,
-      base->type == ROW ? (char *)base_key->data : "#", (int)base_value->size,
-      (char *)base_value->data, base_bitv, table->uri, table_bitv,
-      checkpoint ? " (checkpoint " : "", checkpoint ? checkpoint : "", checkpoint ? ")" : "");
-}
-
-/*
  * position_cursor_before --
  *     Place a cursor on the key directly preceding the target key.
  */
@@ -171,7 +147,6 @@ position_cursor_before(TABLE *table, WT_CURSOR *cursor, uint64_t target_keyno)
     key_gen_init(&key);
 
     switch (table->type) {
-    case FIX:
     case VAR:
         cursor->set_key(cursor, target_keyno);
         break;
@@ -211,14 +186,12 @@ table_verify_mirror(
     WT_ITEM base_key, base_value, table_key, table_value;
     WT_SESSION *session;
     uint64_t base_id, base_keyno, last_match, table_id, table_keyno, rows;
-    uint8_t base_bitv, table_bitv;
     u_int failures, i, last_failures;
     int base_ret, pinned_ret, table_ret;
     uint64_t range_begin, range_end;
     char buf[256], tagbuf[128];
 
     base_id = base_keyno = table_id = table_keyno = 0; /* -Wconditional-uninitialized */
-    base_bitv = table_bitv = FIX_VALUE_WRONG;          /* -Wconditional-uninitialized */
     base_ret = table_ret = 0;
     last_match = 0;
     failures = 0;
@@ -298,9 +271,6 @@ table_verify_mirror(
     for (rows = range_begin; rows <= range_end; ++rows) {
         last_failures = failures;
         switch (base->type) {
-        case FIX:
-            testutil_assert(base->type != FIX);
-            break;
         case VAR:
             base_ret = read_op(base_cursor, NEXT, NULL);
             testutil_assert(base_ret == 0 || base_ret == WT_NOTFOUND);
@@ -313,25 +283,6 @@ table_verify_mirror(
         }
 
         switch (table->type) {
-        case FIX:
-            /*
-             * RS and VLCS skip over removed entries, FLCS returns a value of 0. Skip to the next
-             * matching key number or the next nonzero value. If the latter comes early, we'll visit
-             * the mismatch logic below.
-             */
-            for (;;) {
-                table_ret = read_op(table_cursor, NEXT, NULL);
-                testutil_assert(table_ret == 0 || table_ret == WT_NOTFOUND);
-                if (table_ret != 0)
-                    break;
-                testutil_check(table_cursor->get_key(table_cursor, &table_keyno));
-                if (table_keyno >= base_keyno || table_keyno > TV(RUNS_ROWS))
-                    break;
-                testutil_check(table_cursor->get_value(table_cursor, &table_bitv));
-                if (table_bitv != 0)
-                    break;
-            }
-            break;
         case VAR:
             table_ret = read_op(table_cursor, NEXT, NULL);
             testutil_assert(table_ret == 0 || table_ret == WT_NOTFOUND);
@@ -345,7 +296,7 @@ table_verify_mirror(
 
         /*
          * Tables run out of keys at different times as RS inserts between the initial table rows
-         * and VLCS/FLCS inserts after the initial table rows. There's not much to say about the
+         * and VLCS inserts after the initial table rows. There's not much to say about the
          * relationships between them (especially as we skip deleted rows in RS and VLCS, so our
          * last successful check can be before the end of the original rows). If we run out of keys,
          * we're done. If both keys are past the end of the original keys, we're done. There are
@@ -365,59 +316,44 @@ table_verify_mirror(
         rows = base_keyno;
 
         testutil_check(base_cursor->get_value(base_cursor, &base_value));
-        if (table->type == FIX) {
-            val_to_flcs(table, &base_value, &base_bitv);
-            testutil_check(table_cursor->get_value(table_cursor, &table_bitv));
+        testutil_check(table_cursor->get_value(table_cursor, &table_value));
 
-            if (base_keyno != table_keyno || base_bitv != table_bitv) {
-                table_mirror_fail_msg_flcs(session, checkpoint, base, base_keyno, &base_key,
-                  &base_value, base_bitv, table, table_keyno, table_bitv);
-                goto page_dump;
-            }
-        } else {
-            testutil_check(table_cursor->get_value(table_cursor, &table_value));
+        if (base_keyno != table_keyno || base_value.size != table_value.size ||
+          (table_value.size != 0 &&
+            memcmp(base_value.data, table_value.data, base_value.size) != 0)) {
+            table_mirror_fail_msg(session, checkpoint, base, base_keyno, &base_key, &base_value,
+              table, table_keyno, &table_key, &table_value, last_match);
 
-            if (base_keyno != table_keyno || base_value.size != table_value.size ||
-              (table_value.size != 0 &&
-                memcmp(base_value.data, table_value.data, base_value.size) != 0)) {
-                table_mirror_fail_msg(session, checkpoint, base, base_keyno, &base_key, &base_value,
-                  table, table_keyno, &table_key, &table_value, last_match);
-
-page_dump:
-                /* Dump the cursor pages for the first failure. */
-                if (++failures == 1) {
-                    testutil_snprintf(
-                      tagbuf, sizeof(tagbuf), "mirror error: base cursor (table %u)", base->id);
-                    cursor_dump_page(base_cursor, tagbuf);
-                    testutil_snprintf(
-                      tagbuf, sizeof(tagbuf), "mirror error: table cursor (table %u)", table->id);
-                    cursor_dump_page(table_cursor, tagbuf);
-                    for (i = 1; i <= ntables; ++i) {
-                        if (!tables[i]->mirror)
-                            continue;
-                        if (tables[i] != base &&
-                          (tables[i] != table || table_keyno != base_keyno)) {
-                            testutil_snprintf(tagbuf, sizeof(tagbuf),
-                              "mirror error: base key number %" PRIu64 " in table %u", base_keyno,
-                              i);
-                            table_dump_page(session, checkpoint, tables[i], base_keyno, tagbuf);
-                        }
-                        if (tables[i] != table && table_keyno != base_keyno) {
-                            testutil_snprintf(tagbuf, sizeof(tagbuf),
-                              "mirror error: table key number %" PRIu64 " in table %u", table_keyno,
-                              i);
-                            table_dump_page(session, checkpoint, tables[i], table_keyno, tagbuf);
-                        }
+            /* Dump the cursor pages for the first failure. */
+            if (++failures == 1) {
+                testutil_snprintf(
+                  tagbuf, sizeof(tagbuf), "mirror error: base cursor (table %u)", base->id);
+                cursor_dump_page(base_cursor, tagbuf);
+                testutil_snprintf(
+                  tagbuf, sizeof(tagbuf), "mirror error: table cursor (table %u)", table->id);
+                cursor_dump_page(table_cursor, tagbuf);
+                for (i = 1; i <= ntables; ++i) {
+                    if (!tables[i]->mirror)
+                        continue;
+                    if (tables[i] != base && (tables[i] != table || table_keyno != base_keyno)) {
+                        testutil_snprintf(tagbuf, sizeof(tagbuf),
+                          "mirror error: base key number %" PRIu64 " in table %u", base_keyno, i);
+                        table_dump_page(session, checkpoint, tables[i], base_keyno, tagbuf);
+                    }
+                    if (tables[i] != table && table_keyno != base_keyno) {
+                        testutil_snprintf(tagbuf, sizeof(tagbuf),
+                          "mirror error: table key number %" PRIu64 " in table %u", table_keyno, i);
+                        table_dump_page(session, checkpoint, tables[i], table_keyno, tagbuf);
                     }
                 }
-
-                /*
-                 * We can't continue if the keys don't match, otherwise, optionally continue showing
-                 * failures, up to 20.
-                 */
-                testutil_assert(base_keyno == table_keyno ||
-                  (FLD_ISSET(g.trace_flags, TRACE_MIRROR_FAIL) && failures < 20));
             }
+
+            /*
+             * We can't continue if the keys don't match, otherwise, optionally continue showing
+             * failures, up to 20.
+             */
+            testutil_assert(base_keyno == table_keyno ||
+              (FLD_ISSET(g.trace_flags, TRACE_MIRROR_FAIL) && failures < 20));
         }
 
         /* Report progress (unless verifying checkpoints which happens during live operations). */

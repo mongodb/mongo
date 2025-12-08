@@ -52,10 +52,8 @@ class test_truncate06(wttest.WiredTigerTestCase):
     ]
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S', extraconfig='')),
-        ('column_fix', dict(key_format='r', value_format='8t',
-            extraconfig=',allocation_size=512,leaf_page_max=512')),
-        ('row_integer', dict(key_format='i', value_format='S', extraconfig='')),
+        ('column', dict(key_format='r', extraconfig='')),
+        ('row_integer', dict(key_format='i', extraconfig='')),
     ]
     munge_values = [
         ('update', dict(munge_with_update=True)),
@@ -131,17 +129,13 @@ class test_truncate06(wttest.WiredTigerTestCase):
 
         table_uri = 'table:truncate06'
         ds = SimpleDataSet(
-            self, table_uri, 0, key_format=self.key_format, value_format=self.value_format,
+            self, table_uri, 0, key_format=self.key_format, value_format='S',
             config=self.extraconfig)
         ds.populate()
         self.session.checkpoint()
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-        else:
-            value_a = 'a' * 500
-            value_b = 'b' * 500
+        value_a = 'a' * 500
+        value_b = 'b' * 500
 
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +

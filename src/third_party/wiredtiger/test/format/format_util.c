@@ -293,7 +293,6 @@ table_dump_page(
     wt_wrap_open_cursor(session, tbl->uri, checkpoint == NULL ? NULL : cfg, &cursor);
 
     switch (tbl->type) {
-    case FIX:
     case VAR:
         cursor->set_key(cursor, keyno);
         break;
@@ -311,7 +310,6 @@ table_dump_page(
         fprintf(stderr, "%s: Not dumping (error %d from search_near)\n", tag, ret);
 
     switch (tbl->type) {
-    case FIX:
     case VAR:
         break;
     case ROW:

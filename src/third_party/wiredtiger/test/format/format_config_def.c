@@ -38,9 +38,6 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
 
   {"block_cache.size", "block cache size (MB)", 0x0, 1, 100, 100 * 1024, V_GLOBAL_BLOCK_CACHE_SIZE},
 
-  {"btree.bitcnt", "fixed-length column-store object size (number of bits)", C_TABLE | C_TYPE_FIX,
-    1, 8, 8, V_TABLE_BTREE_BITCNT},
-
   {"btree.compression", "data compression (off | lz4 | snappy | zlib | zstd)",
     C_IGNORE | C_STRING | C_TABLE, 0, 0, 0, V_TABLE_BTREE_COMPRESSION},
 
@@ -342,7 +339,7 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
 
   {"runs.timer", "run time (minutes)", C_IGNORE, 0, 0, UINT_MAX, V_GLOBAL_RUNS_TIMER},
 
-  {"runs.type", "object type (fix | row | var)", C_IGNORE | C_STRING | C_TABLE, 0, 0, 0,
+  {"runs.type", "object type (row | var)", C_IGNORE | C_STRING | C_TABLE, 0, 0, 0,
     V_TABLE_RUNS_TYPE},
 
   {"runs.verify_failure_dump", "configure page dump on repeatable read error", C_BOOL | C_IGNORE, 0,

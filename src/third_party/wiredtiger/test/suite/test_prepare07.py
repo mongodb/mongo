@@ -41,10 +41,11 @@ class test_prepare07(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
 
     format_values = [
-        ('column', dict(key_format='r', value_format='u')),
-        ('column-fix', dict(key_format='r', value_format='8t')),
-        ('string-row', dict(key_format='S', value_format='u')),
+        ('column', dict(key_format='r')),
+        ('string-row', dict(key_format='S')),
     ]
+
+    value_format='u'
 
     scenarios = make_scenarios(format_values)
 
@@ -151,12 +152,8 @@ class test_prepare07(wttest.WiredTigerTestCase):
             self, uri, nrows, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-        else:
-            value_a = b"aaaaa" * 100
-            value_b = b"bbbbb" * 100
+        value_a = b"aaaaa" * 100
+        value_b = b"bbbbb" * 100
 
         # Initially load huge data
         cursor = self.session.open_cursor(uri)

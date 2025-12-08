@@ -37,10 +37,11 @@ from wtscenario import make_scenarios
 class test_recovery01(wttest.WiredTigerTestCase):
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     restart_values = [
         ('crash', dict(crash=True)),
@@ -100,12 +101,8 @@ class test_recovery01(wttest.WiredTigerTestCase):
             config='log=(enabled=false)')
         ds_2.populate()
 
-        if self.value_format == '8t':
-            valuea = 97
-            valueb = 98
-        else:
-            valuea = "aaaaa" * 100
-            valueb = "bbbbb" * 100
+        valuea = "aaaaa" * 100
+        valueb = "bbbbb" * 100
 
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +

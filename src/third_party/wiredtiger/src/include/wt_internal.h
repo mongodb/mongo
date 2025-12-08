@@ -99,10 +99,6 @@ struct __wt_block_disagg_header;
 typedef struct __wt_block_disagg_header WT_BLOCK_DISAGG_HEADER;
 struct __wt_block_header;
 typedef struct __wt_block_header WT_BLOCK_HEADER;
-struct __wt_bloom;
-typedef struct __wt_bloom WT_BLOOM;
-struct __wt_bloom_hash;
-typedef struct __wt_bloom_hash WT_BLOOM_HASH;
 struct __wt_bm;
 typedef struct __wt_bm WT_BM;
 struct __wt_btree;
@@ -159,12 +155,6 @@ struct __wt_ckpt_snapshot;
 typedef struct __wt_ckpt_snapshot WT_CKPT_SNAPSHOT;
 struct __wt_col;
 typedef struct __wt_col WT_COL;
-struct __wt_col_fix_auxiliary_header;
-typedef struct __wt_col_fix_auxiliary_header WT_COL_FIX_AUXILIARY_HEADER;
-struct __wt_col_fix_tw;
-typedef struct __wt_col_fix_tw WT_COL_FIX_TW;
-struct __wt_col_fix_tw_entry;
-typedef struct __wt_col_fix_tw_entry WT_COL_FIX_TW_ENTRY;
 struct __wt_col_rle;
 typedef struct __wt_col_rle WT_COL_RLE;
 struct __wt_col_var_repeat;
@@ -581,7 +571,6 @@ typedef uint64_t wt_timestamp_t;
 #include "block.h"
 #include "block_cache.h"
 #include "block_chunkcache.h"
-#include "bloom.h"
 #include "btmem.h"
 #include "btree.h"
 #include "cache.h"

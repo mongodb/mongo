@@ -37,9 +37,8 @@ from wtscenario import make_scenarios
 @wttest.skip_for_hook("disagg", "fast truncate is not supported yet")
 class test_truncate08(wttest.WiredTigerTestCase):
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
 
     scenarios = make_scenarios(format_values)
@@ -47,13 +46,10 @@ class test_truncate08(wttest.WiredTigerTestCase):
     def test_truncate08(self):
         # Create a large table with lots of pages.
         uri = "table:test_truncate08"
-        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={}'.format(self.key_format, 'S')
         self.session.create(uri, 'allocation_size=512,leaf_page_max=512,' + format)
 
-        if self.value_format == '8t':
-            replacement_value = 199
-        else:
-            replacement_value = "replacement_value"
+        replacement_value = "replacement_value"
 
         cursor = self.session.open_cursor(uri)
         for i in range(1, 80000):

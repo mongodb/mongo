@@ -51,7 +51,7 @@ kv_table::type_by_key_value_format(const std::string &key_format, const std::str
         const char *f = value_format.c_str();
         if (isdigit(f[0]))
             (void)parse_uint64(f, &f);
-        return strcmp(f, "t") == 0 ? kv_table_type::column_fix : kv_table_type::column;
+        return kv_table_type::column;
     }
 
     return kv_table_type::row;
@@ -110,7 +110,7 @@ kv_table::get(const data_value &key, timestamp_t timestamp) const
     const kv_table_item *item = item_if_exists(key);
     if (item == nullptr)
         return NONE;
-    return fix_get(item->get(t));
+    return std::move(item->get(t));
 }
 
 /*
@@ -128,7 +128,7 @@ kv_table::get(kv_checkpoint_ptr ckpt, const data_value &key, timestamp_t timesta
     const kv_table_item *item = item_if_exists(key);
     if (item == nullptr)
         return NONE;
-    return fix_get(item->get(std::move(ckpt), t));
+    return std::move(item->get(std::move(ckpt), t));
 }
 
 /*
@@ -142,7 +142,7 @@ kv_table::get(kv_transaction_ptr txn, const data_value &key) const
     const kv_table_item *item = item_if_exists(key);
     if (item == nullptr)
         return NONE;
-    return fix_get(timestamped() ? item->get(std::move(txn)) : item->get_latest(std::move(txn)));
+    return std::move(timestamped() ? item->get(std::move(txn)) : item->get_latest(std::move(txn)));
 }
 
 /*
@@ -245,17 +245,7 @@ kv_table::remove(kv_transaction_ptr txn, const data_value &key)
     if (item == nullptr)
         return WT_NOTFOUND;
 
-    /*
-     * If the table keys are recnos and the item only has the implicit 0 value required by recno
-     * semantics, then the item we found isn't actually in the database. It should continue to be 0,
-     * as that is what removals look like with recnos, and this remove should succeed while doing
-     * nothing.
-     */
-    if (_config.type == kv_table_type::column_fix && item->implicit())
-        return 0;
-
-    std::shared_ptr<kv_update> update = fix_timestamps(
-      std::make_shared<kv_update>(_config.type == kv_table_type::column_fix ? ZERO : NONE, txn));
+    std::shared_ptr<kv_update> update = fix_timestamps(std::make_shared<kv_update>(NONE, txn));
     try {
         item->add_update(update, true, false);
         txn->add_update(*this, key, std::move(update));
@@ -291,24 +281,23 @@ kv_table::truncate(kv_transaction_ptr txn, const data_value &start, const data_v
     auto stop_iter = stop == model::NONE ? _data.end() : _data.upper_bound(stop);
 
     try {
-        /* FIXME-WT-13232 Disable this check or make it FLCS only (depending on the fix). */
         /*
+         * FIXME-WT-13232 Disable this check.
+         *
          * WiredTiger's implementation of truncate returns a prepare conflict if the key following
-         * (or, in some cases, preceding) the truncate range belongs to a prepared transaction. In
-         * the case of FLCS, skip all implicitly created items before and after the truncation
-         * range.
+         * (or, in some cases, preceding) the truncate range belongs to a prepared transaction.
          */
         for (auto i = stop_iter; i != _data.end(); i++) {
             if (i->second.has_prepared())
                 throw known_issue_exception("WT-13232");
-            if (!i->second.exists(txn) || i->second.implicit())
+            if (!i->second.exists(txn))
                 continue;
             break;
         }
         for (auto i = std::reverse_iterator(start_iter); i != _data.rend(); i++) {
             if (i->second.has_prepared())
                 throw known_issue_exception("WT-13232");
-            if (!i->second.exists(txn) || i->second.implicit())
+            if (!i->second.exists(txn))
                 continue;
             break;
         }
@@ -321,8 +310,8 @@ kv_table::truncate(kv_transaction_ptr txn, const data_value &start, const data_v
             if (!i->second.exists(txn))
                 continue;
 
-            std::shared_ptr<kv_update> update = fix_timestamps(std::make_shared<kv_update>(
-              _config.type == kv_table_type::column_fix ? ZERO : NONE, txn));
+            std::shared_ptr<kv_update> update =
+              fix_timestamps(std::make_shared<kv_update>(NONE, txn));
             i->second.add_update(update, false, false);
             txn->add_update(*this, i->first, std::move(update));
         }
@@ -423,67 +412,6 @@ kv_table_verify_cursor
 kv_table::verify_cursor()
 {
     return std::move(kv_table_verify_cursor(_data));
-}
-
-/*
- * kv_table::highest_recno --
- *     Get the highest recno in the table. Return 0 if the table is empty.
- */
-uint64_t
-kv_table::highest_recno() const
-{
-    std::lock_guard lock_guard(_lock);
-    if (_config.type != kv_table_type::column && _config.type != kv_table_type::column_fix)
-        throw model_exception("Not a column store table");
-    if (_data.empty())
-        return 0;
-    const data_value &last = _data.rbegin()->first;
-    if (!std::holds_alternative<uint64_t>(last))
-        throw model_exception("The last key in the table is not a valid recno");
-    return std::get<uint64_t>(last);
-}
-
-/*
- * kv_table::truncate_recnos_after --
- *     Truncate all recnos higher than the given recno on a fixed-length column store table.
- */
-void
-kv_table::truncate_recnos_after(uint64_t recno)
-{
-    std::lock_guard lock_guard(_lock);
-    if (_config.type != kv_table_type::column_fix)
-        throw model_exception("Not a fixed-length column store table");
-
-    data_value r(recno);
-    auto i = _data.upper_bound(r);
-    if (i != _data.end())
-        _data.erase(i, _data.end());
-}
-
-/*
- * kv_table::fill_missing_column_fix_recnos --
- *     Fill in missing recnos for FLCS to ensure that key ranges are contiguous.
- */
-void
-kv_table::fill_missing_column_fix_recnos_nolock(const data_value &key)
-{
-    if (_config.type != kv_table_type::column_fix)
-        return;
-
-    if (!std::holds_alternative<uint64_t>(key))
-        throw model_exception("The key is not compatible with a column store: Not a recno.");
-    uint64_t recno = std::get<uint64_t>(key);
-
-    uint64_t last = 0;
-    if (!_data.empty()) {
-        if (!std::holds_alternative<uint64_t>(_data.begin()->first))
-            throw model_exception("Invalid keys in a column store: Not a recno.");
-        last = std::get<uint64_t>(_data.rbegin()->first);
-    }
-
-    for (uint64_t i = last + 1; i <= recno; i++)
-        _data[data_value(i)].add_update(
-          std::make_shared<kv_update>(ZERO, k_timestamp_none, true /* implicit */), false, false);
 }
 
 /*

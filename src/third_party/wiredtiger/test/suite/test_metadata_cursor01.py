@@ -51,10 +51,7 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
             return self.recno(i+1)
 
     def genvalue(self, i):
-        if self.tablekind == 'fix':
-            return int(i & 0xff)
-        else:
-            return 'value' + str(i)
+        return 'value' + str(i)
 
     def assertCursorHasNoKeyValue(self, cursor):
         keymsg = '/requires key be set/'

@@ -1,5 +1,22 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_develop Upgrading to Version 12.0.0
+<dl>
+<dt>Fixed-length column-store is removed</dt>
+<dd>
+The storage format fixed-length column-store is no longer supported. This means that if you have a
+fixed-length column-store table it will not be readable as of 12.0.0, opening the database will
+return an error. In order to upgrade to this release you must re-write the table as either
+variable-length column-store, or row-store. However we will also be removing support for
+variable-length column-store so it is recommended to re-write the table as row-store.
+
+The steps are as follows:
+-# Create a row store table with integer keys (key_format=i), and fixed-length bit values.
+-# Open a cursor on your FLCS table.
+-# For every key in the FLCS table read it in, and write it back to the row store table.
+-# Finally drop the FLCS table.
+
+</dd>
 @section version_1131 Upgrading to Version 11.3.1
 <dl>
 

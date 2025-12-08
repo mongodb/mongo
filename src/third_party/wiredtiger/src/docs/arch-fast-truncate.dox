@@ -486,36 +486,6 @@ empty; instead they reconcile with a single deleted-value cell, possibly with a 
 count.
 These pages are detected at the end of leaf reconciliation and converted to empty pages.
 
-@section ft_flcs FLCS and deleted pages
-
-Fast-truncate and deleted pages in general are not supported in FLCS.
-Most of the code is in place (since deleted and instantiated page handling mostly occurs in
-the internal page code and this is shared with VLCS) but there's a showstopper problem:
-because there are no deleted values (deleted values read back as zero) there are also no
-gaps in the namespace.
-In particular, if we truncate a range, discard the pages, and then read through the gap we
-need to read back the entire truncated namespace as zero one entry at a time.
-That requires knowing how big the gaps are; and while that information is encoded in the
-internal page structure, it is not <i>available</i> from the internal page structure.
-Currently this looks infeasible to support, though it's possible that there's some clever
-solution nobody's thought of yet.
-
-This is perhaps unfortunate because slow-truncating FLCS pages (which contain large
-numbers of rows with very small values) is particularly expensive.
-
-For FLCS, fast-truncate is inhibited by checking for it and clearing \c WT_READ_TRUNCATE
-in the page-walk code; similarly, checkpoint cleanup avoids discarding FLCS pages.
-Because values are never deleted, pages never become empty; no special handling is needed
-to prevent deleted pages appearing via that mechanism.
-However, there is still a bit of FLCS-specific code there to avoid examining pages that
-are not in memory (unlike in row-store and VLCS) because this is not useful.
-
-The empty deleted page attached to a new tree is still created; it will turn into an empty
-in-memory page on the first search, and in principle can change back to a deleted page if
-then evicted immediately.
-However, once an update is posted to it (even if later rolled back) it will not reconcile
-empty.
-
 @section ft_visibility Notes on visibility
 
 As mentioned previously, for deleted page purposes prepared transactions must be treated
@@ -741,7 +711,7 @@ For VLCS trees\, avoid discarding the leftmost child even if it's deleted.}
 Allow for deleted-address cells when checking the cell type in the address against the
 page type.}
 @row{bt_vrfy.c, Hook, in \c __verify_tree,
-Allow namespace gaps in VLCS but not in FLCS.}
+Allow namespace gaps in VLCS.}
 @row{bt_vrfy.c, Hook, in \c __verify_page_content_int,
 Handle deleted-address cells.}
 
@@ -749,8 +719,6 @@ Handle deleted-address cells.}
 Validate and crosscheck the page deletion information discovered in on-disk address
 cells.}
 
-@row{bt_walk.c, Hook, in \c __tree_walk_internal,
-Disable fast-truncate for FLCS.}
 @row{bt_walk.c, Hook, in \c __tree_walk_internal,
 Call \c __wt_delete_page_skip when \c WT_READ_SEE_DELETED is not set.}
 @row{bt_walk.c, Hook, in \c __tree_walk_internal,

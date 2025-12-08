@@ -189,17 +189,6 @@ public:
     bool has_prepared(timestamp_t timestamp = k_timestamp_max) const;
 
     /*
-     * kv_table_item::implicit --
-     *     Check if the item has been created implicitly and exists only implicitly.
-     */
-    inline bool
-    implicit() const
-    {
-        std::lock_guard lock_guard(_lock);
-        return _updates.size() == 1 && (*_updates.begin())->implicit();
-    }
-
-    /*
      * kv_table_item::rollback_to_stable --
      *     Roll back the table item to the latest stable timestamp and transaction snapshot.
      */

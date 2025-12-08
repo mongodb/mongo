@@ -37,9 +37,7 @@ def mod_val(value, char, location, nbytes=1):
 
 # test_rollback_to_stable23.py
 # Test to verify that search operation uses proper base update while returning modifies from
-# the history store after the on-disk update is removed by the rollback to stable. Since FLCS
-# inherently doesn't support modify, there's no need to run this on FLCS. (Note that
-# self.value_format needs to exist anyway for the base class to use.)
+# the history store after the on-disk update is removed by the rollback to stable.
 class test_rollback_to_stable23(test_rollback_to_stable_base):
 
     key_format_values = [
@@ -96,11 +94,11 @@ class test_rollback_to_stable23(test_rollback_to_stable_base):
         self.large_modifies(uri, 'T', ds, 3, 1, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
-        self.check(value_modQ, uri, nrows, None, 31 if self.prepare else 30)
-        self.check(value_modR, uri, nrows, None, 41 if self.prepare else 40)
-        self.check(value_modS, uri, nrows, None, 51 if self.prepare else 50)
-        self.check(value_modT, uri, nrows, None, 61 if self.prepare else 60)
+        self.check(value_a, uri, nrows, 21 if self.prepare else 20)
+        self.check(value_modQ, uri, nrows, 31 if self.prepare else 30)
+        self.check(value_modR, uri, nrows, 41 if self.prepare else 40)
+        self.check(value_modS, uri, nrows, 51 if self.prepare else 50)
+        self.check(value_modT, uri, nrows, 61 if self.prepare else 60)
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:

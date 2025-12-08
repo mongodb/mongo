@@ -29,13 +29,6 @@ The 'r' key format indicates keys are \c uint64_t typed record numbers.
 In this case, cursor methods will be passed and/or return a record
 number in the \c recno field of the WT_CURSOR structure.
 
-Cursor methods for data sources supporting fixed-length bit field
-column-stores (that is, a store with an 'r' type key and 't' type value)
-should accept and/or return a single byte in the value field of the
-WT_CURSOR structure, where between 1 and 8 of the low-order bits of
-that byte contain the bit-field's value.  For example, if the value
-format is "3t", the key's value is the bottom 3 bits.
-
 @section custom_ds_cursor_methods WT_CURSOR methods
 
 The WT_DATA_SOURCE::open_cursor method is responsible for allocating and
@@ -85,12 +78,6 @@ When an application configures \c overwrite to \c false, WT_CURSOR::insert
 should fail with ::WT_DUPLICATE_KEY if the record previously exists, and
 WT_CURSOR::update and WT_CURSOR::remove will fail with ::WT_NOTFOUND if the
 record does not previously exist.
-
-Custom data sources supporting fixed-length bit field column-stores (that
-is, a store with an 'r' type key and 't' type value) may, but are not
-required to, support the semantic that inserting a new record after the
-current maximum record in a store implicitly creates the missing records
-as records with a value of 0.
 
 @section custom_ds_cursor_fields WT_CURSOR key/value fields
 

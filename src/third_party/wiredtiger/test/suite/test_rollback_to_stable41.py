@@ -34,10 +34,11 @@ from rollback_to_stable_util import test_rollback_to_stable_base
 # Test that the dry-run config for RTS only applies to a single call.
 class test_rollback_to_stable41(test_rollback_to_stable_base):
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     worker_thread_values = [
         ('0', dict(threads=0)),
@@ -54,12 +55,8 @@ class test_rollback_to_stable41(test_rollback_to_stable_base):
         uri = 'table:test_rollback_to_stable41'
         nrows = 1000
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-        else:
-            value_a = 'a' * 10
-            value_b = 'b' * 10
+        value_a = 'a' * 10
+        value_b = 'b' * 10
 
         # Create our table.
         ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
@@ -67,16 +64,16 @@ class test_rollback_to_stable41(test_rollback_to_stable_base):
 
         # Insert some data either side of the stable timestamp we set below.
         self.large_updates(uri, value_a, ds, nrows, False, 10)
-        self.check(value_a, uri, nrows, None, 10)
+        self.check(value_a, uri, nrows, 10)
         self.large_updates(uri, value_b, ds, nrows, False, 30)
-        self.check(value_b, uri, nrows, None, 30)
+        self.check(value_b, uri, nrows, 30)
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
 
         # Fake RTS, newer data should still exist.
         self.conn.rollback_to_stable('dryrun=true' + ', threads=' + str(self.threads))
-        self.check(value_b, uri, nrows, None, 30)
+        self.check(value_b, uri, nrows, 30)
 
         # Real RTS, newer data should vanish.
         self.conn.rollback_to_stable('threads=' + str(self.threads))
-        self.check(value_a, uri, nrows, None, 30)
+        self.check(value_a, uri, nrows, 30)

@@ -38,11 +38,11 @@ from wtscenario import make_scenarios
 class test_reserve(wttest.WiredTigerTestCase):
 
     format_values = [
-        ('integer', dict(keyfmt='i', valfmt='S')),
-        ('recno', dict(keyfmt='r', valfmt='S')),
-        ('fix', dict(keyfmt='r', valfmt='8t')),
-        ('string', dict(keyfmt='S', valfmt='S')),
+        ('integer', dict(keyfmt='i')),
+        ('recno', dict(keyfmt='r')),
+        ('string', dict(keyfmt='S')),
     ]
+    valfmt = 'S'
     types = [
         ('file', dict(uri='file', ds=SimpleDataSet)),
         ('table-complex', dict(uri='table', ds=ComplexDataSet)),
@@ -50,13 +50,7 @@ class test_reserve(wttest.WiredTigerTestCase):
         ('table-simple', dict(uri='table', ds=SimpleDataSet)),
     ]
 
-    def keep(name, d):
-        # The complex data sets have their own built-in value schemas that are not FLCS.
-        if d['valfmt'] == '8t' and d['ds'] == ComplexDataSet:
-            return False
-        return True
-
-    scenarios = make_scenarios(types, format_values, include=keep)
+    scenarios = make_scenarios(types, format_values)
 
     def test_reserve(self):
         uri = self.uri + ':test_reserve'

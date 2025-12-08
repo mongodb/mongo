@@ -37,9 +37,8 @@ class test_search_near02(wttest.WiredTigerTestCase):
     uri = 'file:test_search_near02'
 
     key_format_values = [
-        ('fix', dict(key_format='r', value_format='8t')),
-        ('var', dict(key_format='r', value_format='I')),
-        ('row', dict(key_format='Q', value_format='I')),
+        ('var', dict(key_format='r')),
+        ('row', dict(key_format='Q')),
     ]
 
     ops = [
@@ -59,7 +58,7 @@ class test_search_near02(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
     def test_implicit_record_cursor_insert_next(self):
-        self.session.create(self.uri, 'key_format={},value_format={}'.format(self.key_format, self.value_format))
+        self.session.create(self.uri, 'key_format={},value_format={}'.format(self.key_format, 'I'))
         cursor = self.session.open_cursor(self.uri)
         value1 = 1
         value2 = 2

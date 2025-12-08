@@ -64,10 +64,10 @@ class test_hs30(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
     ]
+    value_format='S'
     logging_values = [
         ('nolog', dict(logging=False, conn_config='statistics=(all)')),
         ('log', dict(logging=True, conn_config='statistics=(all),log=(enabled)')),
@@ -115,18 +115,11 @@ class test_hs30(wttest.WiredTigerTestCase):
 
         nrows = 100
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-            value_c = 99
-            value_d = 100
-            value_e = 101
-        else:
-            value_a = 'aaaaa' * 10
-            value_b = 'bbbbb' * 10
-            value_c = 'ccccc' * 10
-            value_d = 'ddddd' * 10
-            value_e = 'eeeee' * 10
+        value_a = 'aaaaa' * 10
+        value_b = 'bbbbb' * 10
+        value_c = 'ccccc' * 10
+        value_d = 'ddddd' * 10
+        value_e = 'eeeee' * 10
 
         session2 = self.conn.open_session()
         cursor2 = session2.open_cursor(uri)

@@ -42,7 +42,6 @@ class test_cursor17(wttest.WiredTigerTestCase):
         ('table-row', dict(type='table:', keyformat='i', valueformat='i', dataset=SimpleDataSet)),
         ('file-var', dict(type='file:', keyformat='r', valueformat='i', dataset=SimpleDataSet)),
         ('table-var', dict(type='table:', keyformat='r', valueformat='i', dataset=SimpleDataSet)),
-        ('file-fix', dict(type='file:', keyformat='r', valueformat='8t', dataset=SimpleDataSet)),
         ('table-r-complex', dict(type='table:', keyformat='r', valueformat=None,
             dataset=ComplexDataSet)),
     ]
@@ -70,10 +69,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         # Verify the key is not visible.
         self.session.begin_transaction()
         cursor.set_key(100)
-        if self.valueformat != '8t':
-            self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
-        else:
-            self.assertEqual(cursor.search(), 0)
+        self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
         self.session.rollback_transaction()
 
         # Verify the largest key.
@@ -85,28 +81,19 @@ class test_cursor17(wttest.WiredTigerTestCase):
         # Verify the key is still not visible after the largest call.
         self.session.begin_transaction()
         cursor.set_key(100)
-        if self.valueformat != '8t':
-            self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
-        else:
-            self.assertEqual(cursor.search(), 0)
+        self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
         self.session.rollback_transaction()
 
         # Use evict cursor to evict the key from memory.
         evict_cursor = self.ds.open_cursor(self.type + self.tablename, None, "debug=(release_evict)")
         evict_cursor.set_key(100)
-        if self.valueformat != '8t':
-            self.assertEqual(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
-        else:
-            self.assertEqual(evict_cursor.search(), 0)
+        self.assertEqual(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
         evict_cursor.close()
 
         # Verify the largest key changed.
         self.session.begin_transaction()
         self.assertEqual(cursor.largest_key(), 0)
-        if self.valueformat != '8t':
-            self.assertEqual(cursor.get_key(), 99)
-        else:
-            self.assertEqual(cursor.get_key(), 100)
+        self.assertEqual(cursor.get_key(), 99)
         self.session.rollback_transaction()
 
     def test_uncommitted_insert(self):

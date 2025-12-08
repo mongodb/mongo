@@ -77,8 +77,6 @@ from wtscenario import make_scenarios
 class test_checkpoint(wttest.WiredTigerTestCase):
 
     format_values = [
-        ('column-fix', dict(key_format='r', value_format='8t',
-            extraconfig=',allocation_size=512,leaf_page_max=512')),
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
     ]
@@ -140,21 +138,16 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             config=self.extraconfig)
         ds2.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-            value_c = 99
-        else:
-            value_a = "aaaaa" * 100
-            value_b = "bbbbb" * 100
-            value_c = "ccccc" * 100
+        value_a = "aaaaa" * 100
+        value_b = "bbbbb" * 100
+        value_c = "ccccc" * 100
 
         # Write some initial data, and then write more, to crank up the txnid counter.
         cursor = self.session.open_cursor(ds.uri, None, None)
         for i in range(10000 // nrows):
             for k in range(1, nrows + 1):
                 self.session.begin_transaction()
-                cursor[ds.key(k)] = 40 + i if self.value_format == '8t' else str(i) + value_a
+                cursor[ds.key(k)] = str(i) + value_a
                 self.session.commit_transaction()
 
         # Put some material in the second table too to keep things from being degenerate.

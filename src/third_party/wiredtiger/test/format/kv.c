@@ -297,99 +297,16 @@ val_gen_teardown(WT_ITEM *value)
 }
 
 /*
- * val_to_flcs --
- *     Take a RS or VLCS value, and choose an FLCS value in a reproducible way.
- */
-void
-val_to_flcs(TABLE *table, WT_ITEM *value, uint8_t *bitvp)
-{
-    uint32_t i, max_check;
-    uint8_t bitv;
-    const char *p;
-
-    /* Use the first random byte of the key being cautious around the length of the value. */
-    bitv = FIX_MIRROR_DNE;
-    max_check = (uint32_t)WT_MIN(PREFIX_LEN_CONFIG_MIN + 10, value->size);
-    for (p = value->data, i = 0; i < max_check; ++p, ++i)
-        if (p[0] == '/' && i < max_check - 1) {
-            bitv = (uint8_t)p[1];
-            break;
-        }
-
-    switch (TV(BTREE_BITCNT)) {
-    case 8:
-        break;
-    case 7:
-        bitv &= 0x7f;
-        break;
-    case 6:
-        bitv &= 0x3f;
-        break;
-    case 5:
-        bitv &= 0x1f;
-        break;
-    case 4:
-        bitv &= 0x0f;
-        break;
-    case 3:
-        bitv &= 0x07;
-        break;
-    case 2:
-        bitv &= 0x03;
-        break;
-    case 1:
-        bitv &= 0x01;
-        break;
-    }
-    *bitvp = bitv;
-}
-
-/*
  * val_gen --
  *     Generate a new value.
  */
 void
-val_gen(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *value, uint8_t *bitvp, uint64_t keyno)
+val_gen(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
 {
     char *p;
 
     value->data = NULL;
     value->size = 0;
-    *bitvp = FIX_VALUE_WRONG;
-
-    if (table->type == FIX) {
-        /*
-         * FLCS remove is the same as storing a zero value, so where there are more than a couple of
-         * bits to work with, stay away from 0 values.
-         */
-        switch (TV(BTREE_BITCNT)) {
-        case 8:
-            *bitvp = (u_int8_t)mmrand(rnd, 1, 0xff);
-            break;
-        case 7:
-            *bitvp = (u_int8_t)mmrand(rnd, 1, 0x7f);
-            break;
-        case 6:
-            *bitvp = (u_int8_t)mmrand(rnd, 1, 0x3f);
-            break;
-        case 5:
-            *bitvp = (u_int8_t)mmrand(rnd, 1, 0x1f);
-            break;
-        case 4:
-            *bitvp = (u_int8_t)mmrand(rnd, 1, 0x0f);
-            break;
-        case 3:
-            *bitvp = (u_int8_t)mmrand(rnd, 1, 0x07);
-            break;
-        case 2:
-            *bitvp = (u_int8_t)mmrand(rnd, 0, 0x03);
-            break;
-        case 1:
-            *bitvp = (u_int8_t)mmrand(rnd, 0, 1);
-            break;
-        }
-        return;
-    }
 
     /*
      * WiredTiger doesn't store zero-length data items in row-store files, test that by inserting a
@@ -417,8 +334,5 @@ val_gen(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *value, uint8_t *bitvp, uint64
         memcpy(p, table->val_base, value->size);
         u64_to_string_zf(keyno, p, 11);
         p[10] = '/';
-
-        /* Randomize the first character, we use it for FLCS values. */
-        p[11] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"[mmrand(rnd, 0, 51)];
     }
 }

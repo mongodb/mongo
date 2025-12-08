@@ -2658,7 +2658,6 @@ __wt_btcur_skip_page(
   WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool visible_all, bool *skipp)
 {
     WT_ADDR_COPY addr;
-    WT_BTREE *btree;
     WT_PAGE_WALK_SKIP_STATS *walk_skip_stats;
     WT_REF_STATE previous_state;
     WT_TIME_AGGREGATE *ta;
@@ -2669,15 +2668,9 @@ __wt_btcur_skip_page(
 
     *skipp = false; /* Default to reading */
 
-    btree = S2BT(session);
     walk_skip_stats = (WT_PAGE_WALK_SKIP_STATS *)context;
     ta = NULL;
     clean_page = false;
-
-    /* Don't skip pages in FLCS trees; deleted records need to read back as 0. */
-    if (btree->type == BTREE_COL_FIX)
-        return (0);
-
     /*
      * Determine if all records on the page have been deleted and all the tombstones are visible to
      * our transaction. If so, we can avoid reading the records on the page and move to the next

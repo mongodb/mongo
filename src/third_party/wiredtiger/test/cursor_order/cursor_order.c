@@ -105,9 +105,6 @@ main(int argc, char *argv[])
             break;
         case 't':
             switch (__wt_optarg[0]) {
-            case 'f':
-                cfg->ftype = FIX;
-                break;
             case 'r':
                 cfg->ftype = ROW;
                 break;
@@ -264,7 +261,7 @@ usage(void)
     fprintf(stderr,
       "usage: %s "
       "[-FLv] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
-      "[-n ops] [-R reverse_scanners] [-r runs] [-t f|r|v] "
+      "[-n ops] [-R reverse_scanners] [-r runs] [-t r|v] "
       "[-W append_inserters]\n",
       progname);
     fprintf(stderr, "%s",
@@ -276,7 +273,7 @@ usage(void)
       "\t-n set number of operations each thread does\n"
       "\t-R set number of reverse scanner threads\n"
       "\t-r set number of runs (0 for continuous)\n"
-      "\t-t set a file type (fix | row | var)\n"
+      "\t-t set a file type (row | var)\n"
       "\t-v do a different number of operations on different tables\n"
       "\t-w set number of items to walk in a reverse scan\n"
       "\t-W set number of threads doing append inserts\n");

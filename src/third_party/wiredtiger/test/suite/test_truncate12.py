@@ -54,8 +54,6 @@ class test_truncate12(wttest.WiredTigerTestCase):
     ]
     format_values = [
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
-        ('column_fix', dict(key_format='r', value_format='8t',
-            extraconfig=',allocation_size=512,leaf_page_max=512')),
         ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
     ]
     scenarios = make_scenarios(trunc_values, format_values)
@@ -99,12 +97,7 @@ class test_truncate12(wttest.WiredTigerTestCase):
         def expectNone(lo, hi):
             for i in range(lo, hi):
                 cursor.set_key(ds.key(i))
-                if self.value_format == '8t' and i <= nrows:
-                    # In FLCS, deleted values read back as zero. Except past end-of-table.
-                    self.assertEqual(cursor.search(), 0)
-                    self.assertEqual(cursor.get_value(), 0)
-                else:
-                    self.assertEqual(cursor.search(), WT_NOTFOUND)
+                self.assertEqual(cursor.search(), WT_NOTFOUND)
 
         # Expect 1..keep+1 to have values, and the rest not.
         expect(1, keep + 1)
@@ -126,14 +119,9 @@ class test_truncate12(wttest.WiredTigerTestCase):
         ds1.populate()
         ds2.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-            value_small = 42
-        else:
-            value_a = "aaaaa" * 100
-            value_b = "bbbbb" * 100
-            value_small = "***"
+        value_a = "aaaaa" * 100
+        value_b = "bbbbb" * 100
+        value_small = "***"
 
         # Pin oldest and stable timestamps to 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
@@ -171,15 +159,14 @@ class test_truncate12(wttest.WiredTigerTestCase):
         self.assertEqual(err, 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
 
-        # Make sure we did at least one fast-delete. (Unless we specifically didn't want to,
-        # or running on FLCS where it isn't supported.)
+        # Make sure we did at least one fast-delete. (Unless we specifically didn't want to)
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
         if self.runningHook('tiered'):
             # There's no way the test can guess whether fast delete is possible when
             # flush_tier calls are "randomly" inserted.
             pass
-        elif self.value_format == '8t' or self.trunc_with_remove:
+        elif self.trunc_with_remove:
             self.assertEqual(fastdelete_pages, 0)
         else:
             self.assertGreater(fastdelete_pages, 0)

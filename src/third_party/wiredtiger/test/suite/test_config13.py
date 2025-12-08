@@ -27,31 +27,14 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from wtdataset import SimpleDataSet
 
-# test_flcs04.py
-#
-# Make sure modify fails cleanly on FLCS tables.
+# test_config13.py
+#    Test creating a fixed-length column-store table, should fail since FLCS is not supported.
+class test_config13(wttest.WiredTigerTestCase):
 
-class test_flcs04(wttest.WiredTigerTestCase):
-    conn_config = 'in_memory=false'
-
-    def test_flcs(self):
-        uri = "table:test_flcs04"
-        nrows = 10
-        ds = SimpleDataSet(
-            self, uri, nrows, key_format='r', value_format='6t', config='leaf_page_max=4096')
-        ds.populate()
-
-
-        cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-
-        cursor.set_key(5)
-        mods = [wiredtiger.Modify('Q', 100, 1)]
+    def test_create_flcs(self):
+        uri = "table:flcs"
+        key_format_values = "value_format=8t,key_format=r"
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: cursor.modify(mods),
-            "/WT_CURSOR.modify only supported for/")
-
-        self.session.rollback_transaction()
-        cursor.close()
+            lambda: self.session.create(uri, key_format_values),
+            '/Fixed-length column-stores are no longer supported in WiredTiger/')

@@ -43,7 +43,6 @@ class test_cursor16(wttest.WiredTigerTestCase):
     conn_config = 'cache_cursors=true,statistics=(fast),in_memory=true'
 
     scenarios = make_scenarios([
-        ('fix', dict(keyfmt='r',valfmt='8t')),
         ('var', dict(keyfmt='r',valfmt='S')),
         ('row', dict(keyfmt='S',valfmt='S')),
     ])
@@ -51,11 +50,6 @@ class test_cursor16(wttest.WiredTigerTestCase):
     def getkey(self, n):
         if self.keyfmt == 'r':
             return n + 1
-        return str(n)
-
-    def getval(self, n):
-        if self.valfmt == '8t':
-            return n
         return str(n)
 
     # Returns the number of cursors cached
@@ -80,7 +74,7 @@ class test_cursor16(wttest.WiredTigerTestCase):
             # cursors won't get swept.
             cursors.append(cursor)
             for j in range(0, 10):
-                cursor[self.getkey(j)] = self.getval(j)
+                cursor[self.getkey(j)] = str(j)
 
         self.assertEqual(0, self.cached_stats())
 
@@ -94,7 +88,7 @@ class test_cursor16(wttest.WiredTigerTestCase):
             for uri in uris:
                 cursor = session.open_cursor(uri)
                 # spot check, and leaves the cursor positioned
-                self.assertEqual(cursor[self.getkey(3)], self.getval(3))
+                self.assertEqual(cursor[self.getkey(3)], str(3))
                 cursor.close()
 
         #self.tty('max cursors cached=' + str(self.cached_stats()))

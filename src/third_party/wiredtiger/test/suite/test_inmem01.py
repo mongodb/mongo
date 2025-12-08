@@ -40,10 +40,11 @@ class test_inmem01(wttest.WiredTigerTestCase):
     table_config = ',memory_page_max=32k,leaf_page_max=4k'
 
     scenarios = make_scenarios([
-        ('col', dict(keyfmt='r', valuefmt='S')),
-        ('fix', dict(keyfmt='r', valuefmt='8t')),
-        ('row', dict(keyfmt='S', valuefmt='S')),
+        ('col', dict(keyfmt='r')),
+        ('row', dict(keyfmt='S')),
     ])
+
+    valuefmt = 'S'
 
     # Smoke-test in-memory configurations, add a small amount of data and
     # ensure it's visible.
@@ -100,46 +101,6 @@ class test_inmem01(wttest.WiredTigerTestCase):
         cursor = ds.open_cursor(self.uri, None)
         cursor.prev()
         last_key = int(cursor.get_key())
-
-        # This test fails on FLCS when the machine is under heavy load: it gets WT_CACHE_FULL
-        # forever in the bottom loop and eventually fails there. This is at least partly because
-        # in FLCS removing values does not recover space (deleted values are stored as 0).
-        #
-        # I think what happens is that under sufficient load the initial fill doesn't fail until
-        # all the pages in it have already been reconciled. Then since removing some of the rows
-        # in the second step doesn't free any space up, there's no space for more updates and
-        # the bottom loop eventually fails. When not under load, at least one page in the
-        # initial fill isn't reconciled until after the initial fill stops; it gets reconciled
-        # afterwards and that frees up enough space to do the rest of the writes. (Because
-        # update structures are much larger than FLCS values, which are one byte, reconciling a
-        # page with pending updates recovers a lot of space.)
-        #
-        # There does not seem to currently be any way to keep this from happening. (If we get a
-        # mechanism to prevent reconciling pages, using that on the first page of the initialn
-        # fill should solve the problem.)
-        #
-        # However, because the cache size is fixed, the number of rows that the initial fill
-        # generates can be used as an indicator: more rows mean that more updates were already
-        # reconciled and there's less space to work with later. So, if we see enough rows that
-        # there's not going to be any space for the later updates, skip the test on the grounds
-        # that it's probably going to break. (Skip rather than fail because it's not wrong that
-        # this happens; skip conditionally rather than disable the test because it does work an
-        # appreciable fraction of the time and it's better to run it when possible.)
-        #
-        # I've picked an threshold based on some initial experiments. 141676 rows succeeds,
-        # 143403 fails, so I picked 141677. Hopefully this will not need to be conditionalized
-        # on the OS or machine type.
-        #
-        # Note that with 141676 rows there are several retries in the bottom loop, so things are
-        # working as designed and the desired scenario is being tested.
-
-        # While I'm pretty sure the above analysis is sound, the threshold is not as portable as
-        # I'd hoped, so just skip the test entirely until someone has the patience to track down
-        # a suitable threshold value for the test environment.
-        #if self.valuefmt == '8t' and last_key >= 141677:
-        #    self.skipTest('Load too high; test will get stuck')
-        if self.valuefmt == '8t':
-            self.skipTest('Gets stuck and fails sometimes under load')
 
         # Now that the database contains as much data as will fit into
         # the configured cache, verify removes succeed.
@@ -201,10 +162,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
         ds = SimpleDataSet(self, self.uri, last_key, key_format=self.keyfmt,
             value_format=self.valuefmt, config=self.table_config)
 
-        # This test is *much* slower for fixed-length column stores: we fit
-        # many more records into the cache, so don't do as many passes through
-        # the data.
-        checks = 10 if self.valuefmt.endswith('t') else 100
+        checks = 100
         for run in range(checks):
             ds.check()
             self.pr('Finished check ' + str(run))

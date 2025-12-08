@@ -38,7 +38,6 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
         ('row-string', dict(keyfmt='S', valfmt='S')),
         ('row-int', dict(keyfmt='i', valfmt='S')),
         ('column', dict(keyfmt='r', valfmt='S')),
-        ('column-fix', dict(keyfmt='r', valfmt='8t')),
     ]
     types = [
         ('file', dict(uri='file', ds=SimpleDataSet)),

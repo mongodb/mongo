@@ -38,11 +38,11 @@ from wtscenario import make_scenarios
 class test_hs01(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=200MB,statistics=(all)'
     format_values = [
-        ('column', dict(key_format='r', value_format='u')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='u')),
-        ('row_string', dict(key_format='S', value_format='u'))
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
+        ('row_string', dict(key_format='S'))
     ]
+    value_format='u'
     scenarios = make_scenarios(format_values)
 
     def get_stat(self, stat):
@@ -71,15 +71,10 @@ class test_hs01(wttest.WiredTigerTestCase):
             session.begin_transaction()
             cursor.set_key(ds.key(i))
 
-            # FLCS doesn't allow modify (it doesn't make sense) so just update to 'j' then 'k'.
-            if self.value_format == '8t':
-                cursor.set_value(106 + offset)
-                self.assertEqual(cursor.update(), 0)
-            else:
-                mods = []
-                mod = wiredtiger.Modify('A', offset, 1)
-                mods.append(mod)
-                self.assertEqual(cursor.modify(mods), 0)
+            mods = []
+            mod = wiredtiger.Modify('A', offset, 1)
+            mods.append(mod)
+            self.assertEqual(cursor.modify(mods), 0)
 
             if timestamp == True:
                 session.commit_transaction('commit_timestamp=' + self.timestamp_str(i + 1))
@@ -109,17 +104,11 @@ class test_hs01(wttest.WiredTigerTestCase):
         ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        if self.value_format == '8t':
-            bigvalue = 97
-            bigvalue2 = 98
-            bigvalue3 = 107
-            bigvalue4 = 100
-        else:
-            bigvalue = b"aaaaa" * 100
-            bigvalue2 = b"ccccc" * 100
-            bigvalue3 = b"ccccc" * 100
-            bigvalue3 = b'AA' + bigvalue3[2:]
-            bigvalue4 = b"ddddd" * 100
+        bigvalue = b"aaaaa" * 100
+        bigvalue2 = b"ccccc" * 100
+        bigvalue3 = b"ccccc" * 100
+        bigvalue3 = b'AA' + bigvalue3[2:]
+        bigvalue4 = b"ddddd" * 100
 
         # Initially insert a lot of data.
         nrows = 10000

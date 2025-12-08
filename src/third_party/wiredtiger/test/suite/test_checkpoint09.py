@@ -36,7 +36,6 @@ from wtscenario import make_scenarios
 
 class test_checkpoint09(wttest.WiredTigerTestCase):
     format_values = [
-        ('column-fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='u')),
         ('row_string', dict(key_format='S', value_format='u')),
     ]
@@ -105,14 +104,9 @@ class test_checkpoint09(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
             ',stable_timestamp=' + self.timestamp_str(1))
 
-        if self.value_format == '8t':
-            value1 = 86
-            value2 = 87
-            value3 = 88
-        else:
-            value1 = b"aaaaa" * 100
-            value2 = b"bbbbb" * 100
-            value3 = b"ccccc" * 100
+        value1 = b"aaaaa" * 100
+        value2 = b"bbbbb" * 100
+        value3 = b"ccccc" * 100
 
         self.large_updates(uri, value1, ds, nrows, 1, 10)
         self.check(value1, uri, nrows)

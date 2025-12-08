@@ -34,8 +34,6 @@ static const char *const __stats_dsrc_desc[] = {
   "btree: btree expected number of compact pages rewritten",
   "btree: btree number of pages reconciled during checkpoint",
   "btree: btree skipped by compaction as process would not reduce size",
-  "btree: column-store fixed-size leaf pages",
-  "btree: column-store fixed-size time windows",
   "btree: column-store internal pages",
   "btree: column-store variable-size RLE encoded values",
   "btree: column-store variable-size deleted values",
@@ -485,8 +483,6 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     /* not clearing btree_compact_pages_rewritten_expected */
     /* not clearing btree_checkpoint_pages_reconciled */
     /* not clearing btree_compact_skipped */
-    stats->btree_column_fix = 0;
-    stats->btree_column_tws = 0;
     stats->btree_column_internal = 0;
     stats->btree_column_rle = 0;
     stats->btree_column_deleted = 0;
@@ -890,8 +886,6 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->btree_compact_pages_rewritten_expected += from->btree_compact_pages_rewritten_expected;
     to->btree_checkpoint_pages_reconciled += from->btree_checkpoint_pages_reconciled;
     to->btree_compact_skipped += from->btree_compact_skipped;
-    to->btree_column_fix += from->btree_column_fix;
-    to->btree_column_tws += from->btree_column_tws;
     to->btree_column_internal += from->btree_column_internal;
     to->btree_column_rle += from->btree_column_rle;
     to->btree_column_deleted += from->btree_column_deleted;
@@ -1326,8 +1320,6 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->btree_checkpoint_pages_reconciled +=
       WT_STAT_DSRC_READ(from, btree_checkpoint_pages_reconciled);
     to->btree_compact_skipped += WT_STAT_DSRC_READ(from, btree_compact_skipped);
-    to->btree_column_fix += WT_STAT_DSRC_READ(from, btree_column_fix);
-    to->btree_column_tws += WT_STAT_DSRC_READ(from, btree_column_tws);
     to->btree_column_internal += WT_STAT_DSRC_READ(from, btree_column_internal);
     to->btree_column_rle += WT_STAT_DSRC_READ(from, btree_column_rle);
     to->btree_column_deleted += WT_STAT_DSRC_READ(from, btree_column_deleted);

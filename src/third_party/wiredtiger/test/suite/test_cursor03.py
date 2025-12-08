@@ -42,7 +42,6 @@ class test_cursor03(TestCursorTracker):
     scenarios = make_scenarios([
             ('row', dict(tablekind='row', keysize=None, valsize=None, uri='table')),
             ('col', dict(tablekind='col', keysize=None, valsize=None, uri='table')),
-            ('fix', dict(tablekind='fix', keysize=None, valsize=None, uri='table')),
             ('row.val10k', dict(tablekind='row', keysize=None, valsize=[10, 10000], uri='table')),
             ('col.val10k', dict(tablekind='col', keysize=None, valsize=[10, 10000], uri='table')),
             ('row.keyval10k', dict(tablekind='row', keysize=[10,10000], valsize=[10, 10000], uri='table')),
@@ -57,11 +56,7 @@ class test_cursor03(TestCursorTracker):
             keyformat = 'key_format=S'
         else:
             keyformat = 'key_format=r'  # record format
-        if self.tablekind == 'fix':
-            valformat = 'value_format=8t'
-        else:
-            valformat = 'value_format=S'
-        create_args = keyformat + ',' + valformat + self.config_string()
+        create_args = keyformat + ',value_format=S' + self.config_string()
         self.session_create(tablearg, create_args)
         self.pr('creating cursor')
         self.cur_initial_conditions(self.table_name1, self.tablecount, self.tablekind, self.keysize, self.valsize, self.uri)

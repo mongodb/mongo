@@ -46,9 +46,8 @@ class test_stat01(wttest.WiredTigerTestCase):
         ('table', dict(uri='table:test_stat01.wt'))
     ]
     keyfmt = [
-        ('column', dict(keyfmt='r', valfmt='S')),
-        ('column-fix', dict(keyfmt='r', valfmt='8t')),
-        ('string-row', dict(keyfmt='S', valfmt='S')),
+        ('column', dict(keyfmt='r')),
+        ('string-row', dict(keyfmt='S')),
     ]
     scenarios = make_scenarios(types, keyfmt)
 
@@ -91,7 +90,7 @@ class test_stat01(wttest.WiredTigerTestCase):
     def test_basic_conn_stats(self):
         # Build an object and force some writes.
         ds = SimpleDataSet(self, self.uri, 1000,
-                      config=self.config, key_format=self.keyfmt, value_format = self.valfmt)
+                      config=self.config, key_format=self.keyfmt, value_format = 'S')
         ds.populate()
         self.session.checkpoint(None)
 

@@ -42,8 +42,7 @@ def append_val(value, char):
 
 # test_rollback_to_stable14.py
 # Test the rollback to stable operation uses proper base update while restoring modifies from
-# history store. Since FLCS inherently doesn't support modify, there's no need to run this on
-# FLCS. (Note that self.value_format needs to exist anyway for the base class to use.)
+# history store.
 class test_rollback_to_stable14(test_rollback_to_stable_base):
 
     key_format_values = [
@@ -96,11 +95,11 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.large_modifies(uri, 'T', ds, 3, 1, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
-        self.check(value_modQ, uri, nrows, None, 31 if self.prepare else 30)
-        self.check(value_modR, uri, nrows, None, 41 if self.prepare else 40)
-        self.check(value_modS, uri, nrows, None, 51 if self.prepare else 50)
-        self.check(value_modT, uri, nrows, None, 61 if self.prepare else 60)
+        self.check(value_a, uri, nrows, 21 if self.prepare else 20)
+        self.check(value_modQ, uri, nrows, 31 if self.prepare else 30)
+        self.check(value_modR, uri, nrows, 41 if self.prepare else 40)
+        self.check(value_modS, uri, nrows, 51 if self.prepare else 50)
+        self.check(value_modT, uri, nrows, 61 if self.prepare else 60)
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:
@@ -170,10 +169,10 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.assertGreaterEqual(hs_removed + hs_sweep, nrows)
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_modQ, uri, nrows, None, 30)
-        self.check(value_modR, uri, nrows, None, 40)
-        self.check(value_modS, uri, nrows, None, 50)
+        self.check(value_a, uri, nrows, 20)
+        self.check(value_modQ, uri, nrows, 30)
+        self.check(value_modR, uri, nrows, 40)
+        self.check(value_modS, uri, nrows, 50)
 
     def test_rollback_to_stable_same_ts(self):
         nrows = 100
@@ -214,9 +213,9 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
             self.large_modifies(uri, 'T', ds, 3, 1, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
-        self.check(value_modQ, uri, nrows, None, 31 if self.prepare else 30)
-        self.check(value_modT, uri, nrows, None, 61 if self.prepare else 60)
+        self.check(value_a, uri, nrows, 21 if self.prepare else 20)
+        self.check(value_modQ, uri, nrows, 31 if self.prepare else 30)
+        self.check(value_modT, uri, nrows, 61 if self.prepare else 60)
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
 
@@ -282,8 +281,8 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.assertGreaterEqual(hs_removed + hs_sweep, nrows * 3)
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_modQ, uri, nrows, None, 30)
+        self.check(value_a, uri, nrows, 20)
+        self.check(value_modQ, uri, nrows, 30)
 
     def test_rollback_to_stable_same_ts_append(self):
         nrows = 100
@@ -324,9 +323,9 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
             self.large_modifies(uri, 'T', ds, len(value_modS), 1, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
-        self.check(value_modQ, uri, nrows, None, 31 if self.prepare else 30)
-        self.check(value_modT, uri, nrows, None, 61 if self.prepare else 60)
+        self.check(value_a, uri, nrows, 21 if self.prepare else 20)
+        self.check(value_modQ, uri, nrows, 31 if self.prepare else 30)
+        self.check(value_modT, uri, nrows, 61 if self.prepare else 60)
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
 
@@ -390,5 +389,5 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.assertGreaterEqual(hs_removed + hs_sweep, nrows * 3)
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_modQ, uri, nrows, None, 30)
+        self.check(value_a, uri, nrows, 20)
+        self.check(value_modQ, uri, nrows, 30)

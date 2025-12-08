@@ -39,7 +39,6 @@ class test_cursor11(wttest.WiredTigerTestCase):
     keyfmt = [
         ('integer', dict(keyfmt='i', valfmt='S')),
         ('recno', dict(keyfmt='r', valfmt='S')),
-        ('recno-fix', dict(keyfmt='r', valfmt='8t')),
         ('string', dict(keyfmt='S', valfmt='S')),
     ]
     types = [
@@ -49,15 +48,7 @@ class test_cursor11(wttest.WiredTigerTestCase):
         ('table-simple', dict(uri='table', ds=SimpleDataSet)),
     ]
 
-    # Discard invalid or unhelpful scenario combinations.
-    def keep(name, d):
-        if d['valfmt'] == '8t' and d['keyfmt'] != 'r':
-            return False
-        if d['valfmt'] == '8t' and d['ds'] == ComplexDataSet:
-            return False
-        return True
-
-    scenarios = make_scenarios(types, keyfmt, include=keep)
+    scenarios = make_scenarios(types, keyfmt)
 
     # Do a remove using the cursor after setting a position, and confirm
     # the key and position remain set but no value.

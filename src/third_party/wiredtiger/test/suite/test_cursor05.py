@@ -38,9 +38,8 @@ class test_cursor05(wttest.WiredTigerTestCase):
     """
 
     type_values = [
-        ('row', dict(usecolumns=False, usefixed=False)),
-        ('col', dict(usecolumns=True, usefixed=False)),
-        ('fix', dict(usecolumns=True, usefixed=True)),
+        ('row', dict(usecolumns=False)),
+        ('col', dict(usecolumns=True)),
     ]
 
     nentries_values = [
@@ -54,13 +53,7 @@ class test_cursor05(wttest.WiredTigerTestCase):
         ('four_colgroups', dict(colgroups=["(S1)","(i2)","(S3)","(i4)"])),
     ]
 
-    # For fix, skip cases that won't use it. (The 8t column has to be standing alone.)
-    def checkfix(name, d):
-        if d['usefixed'] and (d['colgroups'] is None or len(d['colgroups']) < 4):
-            return False
-        return True
-
-    scenarios = make_scenarios(type_values, nentries_values, colgroups_values, include=checkfix)
+    scenarios = make_scenarios(type_values, nentries_values, colgroups_values)
 
     def makekey(self, i):
         if self.usecolumns:
@@ -186,12 +179,11 @@ class test_cursor05(wttest.WiredTigerTestCase):
 
     def test_cursor(self):
         usecolumns = self.usecolumns
-        usefixed = self.usefixed
         nentries = self.nentries
         colgroups = self.colgroups
 
         key_format = 'key_format={}'.format('r' if usecolumns else 'iS')
-        value_format = ',value_format={}'.format('S8tS8t' if usefixed else 'SiSi')
+        value_format = ',value_format={}'.format('SiSi')
         columns = ',columns=({},S1,i2,S3,i4)'.format('rkey' if usecolumns else 'ikey,Skey')
 
         if colgroups is None:

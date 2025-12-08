@@ -36,7 +36,6 @@ from helper import copy_wiredtiger_home
 class test_bug014(wttest.WiredTigerTestCase):
     key_format_values = [
         ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
         ('row_string', dict(key_format='S', value_format='S')),
     ]
 

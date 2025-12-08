@@ -53,7 +53,6 @@ static int __debug_col_skip(WT_DBG *, WT_INSERT_HEAD *, const char *, bool, WT_C
 static int __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *, uint32_t);
 static int __debug_modify(WT_DBG *, const uint8_t *);
 static int __debug_page(WT_DBG *, WT_REF *);
-static int __debug_page_col_fix(WT_DBG *, WT_REF *);
 static int __debug_page_col_int(WT_DBG *, WT_PAGE *);
 static int __debug_page_col_var(WT_DBG *, WT_REF *);
 static int __debug_page_metadata(WT_DBG *, WT_REF *);
@@ -654,8 +653,6 @@ __debug_cell_kv(
 
     /* Dump per-disk page type information. */
     switch (page_type) {
-    case WT_PAGE_COL_FIX:
-        break;
     case WT_PAGE_COL_VAR:
         WT_RET(ds->f(ds, " | rle: %" PRIu64, __wt_cell_rle(unpack)));
         break;
@@ -736,54 +733,6 @@ __debug_dsk_kv(WT_DBG *ds, const WT_PAGE_HEADER *dsk)
 }
 
 /*
- * __debug_dsk_col_fix --
- *     Dump a WT_PAGE_COL_FIX disk image.
- */
-static int
-__debug_dsk_col_fix(WT_DBG *ds, const WT_PAGE_HEADER *dsk)
-{
-    WT_BTREE *btree;
-    WT_CELL_UNPACK_KV unpack;
-    WT_COL_FIX_AUXILIARY_HEADER auxhdr;
-    uint32_t i;
-    uint8_t v;
-
-    btree = S2BT(ds->session);
-
-    WT_RET(__wti_col_fix_read_auxheader(ds->session, dsk, &auxhdr));
-
-    WT_RET(ds->f(ds, "\t> "));
-    switch (auxhdr.version) {
-    case WT_COL_FIX_VERSION_NIL:
-        WT_RET(ds->f(ds, "page version 0, no auxiliary data\n"));
-        break;
-    case WT_COL_FIX_VERSION_TS:
-        WT_RET(ds->f(ds, "page version 1, %" PRIu32 " time windows\n", auxhdr.entries));
-        break;
-    default:
-        WT_RET(ds->f(ds, "unknown page version %" PRIu32 "\n", auxhdr.version));
-        break;
-    }
-
-    WT_COL_FIX_FOREACH_BITS (btree, dsk, v, i) {
-        WT_RET(ds->f(ds, "\t{"));
-        WT_RET(__debug_hex_byte(ds, v));
-        WT_RET(ds->f(ds, "}\n"));
-    }
-
-    if (auxhdr.dataoffset > dsk->mem_size)
-        /* Print something useful instead of crashing or failing. */
-        WT_RET(ds->f(ds, "page is corrupt: offset to time windows is past end of page"));
-    else if (auxhdr.version == WT_COL_FIX_VERSION_TS) {
-        WT_CELL_FOREACH_FIX_TIMESTAMPS (ds->session, dsk, &auxhdr, unpack)
-            WT_RET(__debug_cell_kv(ds, NULL, dsk->type, NULL, &unpack));
-        WT_CELL_FOREACH_END;
-    }
-
-    return (0);
-}
-
-/*
  * __wti_debug_disk --
  *     Dump a disk page in debugging mode.
  */
@@ -808,7 +757,6 @@ __wti_debug_disk(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, const char
     switch (dsk->type) {
     case WT_PAGE_BLOCK_MANAGER:
         break;
-    case WT_PAGE_COL_FIX:
     case WT_PAGE_COL_INT:
     case WT_PAGE_COL_VAR:
         WT_ERR(ds->f(ds, "recno: %" PRIu64 " | ", dsk->recno));
@@ -857,9 +805,6 @@ __wti_debug_disk(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, const char
 
     switch (dsk->type) {
     case WT_PAGE_BLOCK_MANAGER:
-        break;
-    case WT_PAGE_COL_FIX:
-        WT_ERR(__debug_dsk_col_fix(ds, dsk));
         break;
     case WT_PAGE_COL_INT:
     case WT_PAGE_ROW_INT:
@@ -1162,10 +1107,6 @@ __debug_page(WT_DBG *ds, WT_REF *ref)
 
     /* Dump the page. */
     switch (ref->page->type) {
-    case WT_PAGE_COL_FIX:
-        if (F_ISSET(ds, WT_DEBUG_TREE_LEAF))
-            WT_ERR(__debug_page_col_fix(ds, ref));
-        break;
     case WT_PAGE_COL_INT:
         WT_WITH_PAGE_INDEX(session, ret = __debug_page_col_int(ds, ref->page));
         WT_ERR(ret);
@@ -1220,10 +1161,6 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
         WT_INTL_INDEX_GET(session, page, pindex);
         entries = pindex->entries;
         split_gen = page->pg_intl_split_gen;
-        break;
-    case WT_PAGE_COL_FIX:
-        WT_RET(ds->f(ds, "recno: %" PRIu64 " | ", ref->ref_recno));
-        entries = page->entries;
         break;
     case WT_PAGE_COL_VAR:
         WT_RET(ds->f(ds, "recno: %" PRIu64 " | ", ref->ref_recno));
@@ -1315,77 +1252,6 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
         WT_RET(ds->f(ds, " | delta_count: %" PRIu8, page->disagg_info->block_meta.delta_count));
     }
     return (ds->f(ds, "\n"));
-}
-
-/*
- * __debug_page_col_fix --
- *     Dump an in-memory WT_PAGE_COL_FIX page.
- */
-static int
-__debug_page_col_fix(WT_DBG *ds, WT_REF *ref)
-{
-    WT_BTREE *btree;
-    WT_CELL *cell;
-    WT_CELL_UNPACK_KV unpack;
-    WT_INSERT *ins;
-    WT_PAGE *page;
-    const WT_PAGE_HEADER *dsk;
-    WT_SESSION_IMPL *session;
-    uint64_t recno;
-    uint32_t curtw, i, numtws;
-    uint8_t v;
-    char time_string[WT_TIME_STRING_SIZE];
-
-    WT_ASSERT(ds->session, S2BT_SAFE(ds->session) != NULL);
-
-    session = ds->session;
-    btree = S2BT(session);
-    page = ref->page;
-    dsk = page->dsk;
-    recno = ref->ref_recno;
-
-    if (dsk != NULL) {
-        ins = WT_SKIP_FIRST(WT_COL_UPDATE_SINGLE(page));
-        curtw = 0;
-        numtws = WT_COL_FIX_TWS_SET(page) ? page->pg_fix_numtws : 0;
-
-        WT_COL_FIX_FOREACH_BITS (btree, dsk, v, i) {
-            if (F_ISSET(ds, WT_DEBUG_UNREDACT_ALL)) {
-                WT_RET(ds->f(ds, "\t%" PRIu64 ": ", recno));
-                WT_RET(__debug_hex_byte(ds, v));
-            } else
-                WT_RET(ds->f(ds, "\t%" PRIu64 ": {REDACTED}", recno));
-            if (curtw < numtws && recno - ref->ref_recno == page->pg_fix_tws[curtw].recno_offset) {
-                cell = WT_COL_FIX_TW_CELL(page, &page->pg_fix_tws[curtw]);
-                __wt_cell_unpack_kv(ds->session, page->dsk, cell, &unpack);
-                if (!WT_TIME_WINDOW_IS_EMPTY(&unpack.tw))
-                    WT_RET(ds->f(ds, " | %s", __wt_time_window_to_string(&unpack.tw, time_string)));
-                curtw++;
-            }
-            WT_RET(ds->f(ds, "\n"));
-
-            /* Check for a match on the update list. */
-            if (ins != NULL && WT_INSERT_RECNO(ins) == recno) {
-                if (F_ISSET(ds, WT_DEBUG_UNREDACT_ALL))
-                    WT_RET(ds->f(ds, "\tupdate: %" PRIu64 "\n", WT_INSERT_RECNO(ins)));
-                else
-                    WT_RET(ds->f(ds, "\tupdate: {REDACTED}\n"));
-                WT_RET(__debug_update(ds, ins->upd, true));
-                ins = WT_SKIP_NEXT(ins);
-            }
-            ++recno;
-        }
-    }
-
-    if (WT_COL_UPDATE_SINGLE(page) != NULL) {
-        WT_RET(ds->f(ds, "%s", sep));
-        WT_RET(__debug_col_skip(ds, WT_COL_UPDATE_SINGLE(page), "update", true, NULL));
-    }
-    if (WT_COL_APPEND(page) != NULL) {
-        WT_RET(ds->f(ds, "%s", sep));
-        WT_RET(__debug_col_skip(ds, WT_COL_APPEND(page), "append", true, NULL));
-    }
-    return (0);
 }
 
 /*

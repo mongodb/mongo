@@ -42,8 +42,6 @@ from wtscenario import make_scenarios
 class test_checkpoint(wttest.WiredTigerTestCase):
 
     format_values = [
-        ('column-fix', dict(key_format='r', value_format='8t',
-            extraconfig=',allocation_size=512,leaf_page_max=512')),
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
     ]
@@ -129,12 +127,8 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             config=self.extraconfig)
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-        else:
-            value_a = "aaaaa" * 100
-            value_b = "bbbbb" * 100
+        value_a = "aaaaa" * 100
+        value_b = "bbbbb" * 100
 
         # Pin oldest and stable timestamps to 5.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5) +

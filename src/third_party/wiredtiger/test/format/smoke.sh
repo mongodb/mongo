@@ -14,6 +14,5 @@ args="$args runs.threads=6 "
 args="$args runs.timer=1 "
 args="$args transaction.timestamps=1 "
 
-$TEST_WRAPPER ./t $args runs.type=fix
 $TEST_WRAPPER ./t $args runs.type=row
 $TEST_WRAPPER ./t $args runs.type=var

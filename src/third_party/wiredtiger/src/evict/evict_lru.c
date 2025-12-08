@@ -3331,8 +3331,8 @@ done:
  *     priority unless eviction is in an aggressive state and the Btree is significantly utilizing
  *     the cache.
  *
- *     At present, it is exclusively called for metadata and bloom filter files, as these are meant
- *     to be retained in the cache.
+ *     At present, it is exclusively called for metadata file as this is meant to be retained in the
+ *     cache.
  *
  *     Input parameter:
  *       `v`: An integer that denotes the priority level.

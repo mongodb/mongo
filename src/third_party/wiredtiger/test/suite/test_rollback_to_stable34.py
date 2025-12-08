@@ -41,12 +41,12 @@ class test_rollback_to_stable34(test_rollback_to_stable_base):
     conn_config = 'cache_size=50MB,statistics=(all),log=(enabled=false),verbose=(rts:5)'
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S', extraconfig='')),
-        ('column_fix', dict(key_format='r', value_format='8t',
-            extraconfig=',allocation_size=512,leaf_page_max=512')),
-        ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
-        ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
+        ('string_row', dict(key_format='S')),
     ]
+    value_format='S'
+    extraconfig=''
     prepare_values = [
         ('no_prepare', dict(prepare=False)),
         ('prepare', dict(prepare=True)),
@@ -71,8 +71,6 @@ class test_rollback_to_stable34(test_rollback_to_stable_base):
 
     # Make all the values different so it's easier to see what happens if ranges go missing.
     def mkdata(self, basevalue, i):
-        if self.value_format == '8t':
-            return basevalue
         return basevalue + str(i)
 
     def evict(self, ds, lo, hi, basevalue):
@@ -118,12 +116,8 @@ class test_rollback_to_stable34(test_rollback_to_stable_base):
             config='log=(enabled=false)' + self.extraconfig)
         ds.populate()
 
-        if self.value_format == '8t':
-            valuea = 97
-            valueb = 98
-        else:
-            valuea = "aaaaa" * 100
-            valueb = "bbbbb" * 100
+        valuea = "aaaaa" * 100
+        valueb = "bbbbb" * 100
 
         # Pin oldest and stable timestamps to 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
@@ -180,13 +174,9 @@ class test_rollback_to_stable34(test_rollback_to_stable_base):
         lo_cursor.close()
 
         # Check stats to make sure we fast-deleted at least one page.
-        # (Except for FLCS, where it's not supported and we should fast-delete zero pages.)
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
-        if self.value_format == '8t':
-            self.assertEqual(fastdelete_pages, 0)
-        else:
-            self.assertGreater(fastdelete_pages, 0)
+        self.assertGreater(fastdelete_pages, 0)
 
         if self.second_checkpoint:
             # Checkpoint again with the deletion.

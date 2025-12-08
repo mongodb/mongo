@@ -38,9 +38,8 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
     uri = 'file:test_truncate'
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
 
     scenarios = make_scenarios(format_values)
@@ -56,15 +55,12 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
     def address_deleted(self):
         # Create the object, force it to disk, and verify the object.
         ds = SimpleDataSet(self, self.uri, self.nentries,
-            key_format=self.key_format, value_format = self.value_format, config=self.config)
+            key_format=self.key_format, value_format = 'S', config=self.config)
         ds.populate()
         self.reopen_conn()
         self.verifyUntilSuccess()
 
-        if self.value_format == '8t':
-            changed_value = 0xfe
-        else:
-            changed_value = "changed value"
+        changed_value = "changed value"
 
         # Create a new session and start a transaction to force the upcoming
         # checkpoint operation to write address-deleted cells to disk.
@@ -132,17 +128,11 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
         cursor = ds.open_cursor(self.uri, None)
         for i in range(3000, 7000, 137):
             k = ds.key(i)
-            if self.value_format == '8t':
-                v = ds.value(i) + 37
-            else:
-                v = 'changed value: ' + str(i)
+            v = 'changed value: ' + str(i)
             cursor[k] = v
         for i in range(3000, 7000, 137):
             k = ds.key(i)
-            if self.value_format == '8t':
-                v = ds.value(i) + 37
-            else:
-                v = 'changed value: ' + str(i)
+            v = 'changed value: ' + str(i)
             cursor.set_key(k)
             self.assertEqual(cursor.search(), 0)
             self.assertEqual(cursor.get_value(), v)
@@ -155,10 +145,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
         cursor = ds.open_cursor(self.uri, None)
         for i in range(3000, 7000, 137):
             k = ds.key(i)
-            if self.value_format == '8t':
-                v = ds.value(i) + 37
-            else:
-                v = 'changed value: ' + str(i)
+            v = 'changed value: ' + str(i)
             cursor.set_key(k)
             self.assertEqual(cursor.search(), 0)
             self.assertEqual(cursor.get_value(), v)

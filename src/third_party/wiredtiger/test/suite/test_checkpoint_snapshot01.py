@@ -45,7 +45,6 @@ class test_checkpoint_snapshot01(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
 
     format_values = [
-        ('column-fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='u')),
         ('row_string', dict(key_format='S', value_format='u')),
     ]
@@ -63,10 +62,7 @@ class test_checkpoint_snapshot01(wttest.WiredTigerTestCase):
                 key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        if self.value_format == '8t':
-            value = 86
-        else:
-            value = b"aaaaa" * 100
+        value = b"aaaaa" * 100
 
         sessions = [0] * self.nsessions
         cursors = [0] * self.nsessions

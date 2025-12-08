@@ -73,13 +73,10 @@ __wt_col_search(
     uint64_t recno;
     uint32_t base, indx, limit, read_flags;
     int depth;
-    /* Whenever there is a greater record in the tree, FLCS should return the requested record. */
-    bool greater_recno_exists_flcs;
 
     session = CUR2S(cbt);
     btree = S2BT(session);
     current = NULL;
-    greater_recno_exists_flcs = false;
 
     /*
      * Assert the session and cursor have the right relationship (not search specific, but search is
@@ -141,11 +138,6 @@ restart:
         WT_INTL_INDEX_GET(session, page, pindex);
         base = pindex->entries;
         descent = pindex->index[base - 1];
-
-        /* For FLCS, save if we have encountered a record number greater than the requested one. */
-        if (btree->type == BTREE_COL_FIX && !greater_recno_exists_flcs &&
-          descent->ref_recno > recno)
-            greater_recno_exists_flcs = true;
 
         /* Fast path appends. */
         if (recno >= descent->ref_recno) {
@@ -240,49 +232,29 @@ leaf_only:
      * tree; in that case, we get here with a record that's impossibly large for the page. We do
      * have additional setup to do in that case, the record may be appended to the page.
      */
-    if (page->type == WT_PAGE_COL_FIX) {
-        if (recno < current->ref_recno) {
-            cbt->recno = current->ref_recno;
-            cbt->slot = 0;
-            cbt->compare = 1;
-            return (0);
-        }
-        if (recno >= current->ref_recno + page->entries) {
-            cbt->recno = current->ref_recno + page->entries;
-            cbt->slot = 0;
-            goto past_end;
-        } else {
-            cbt->recno = recno;
-            cbt->slot = 0;
-            cbt->compare = 0;
-            ins_head = WT_COL_UPDATE_SINGLE(page);
-        }
+    if (recno < current->ref_recno) {
+        cbt->recno = current->ref_recno;
+        cbt->slot = 0;
+        cbt->compare = 1;
+        return (0);
+    }
+    if ((cip = __col_var_search(current, recno, NULL)) == NULL) {
+        cbt->recno = __col_var_last_recno(current);
+        cbt->slot = page->entries == 0 ? 0 : page->entries - 1;
+        goto past_end;
     } else {
-        if (recno < current->ref_recno) {
-            cbt->recno = current->ref_recno;
-            cbt->slot = 0;
-            cbt->compare = 1;
-            return (0);
-        }
-        if ((cip = __col_var_search(current, recno, NULL)) == NULL) {
-            cbt->recno = __col_var_last_recno(current);
-            cbt->slot = page->entries == 0 ? 0 : page->entries - 1;
-            goto past_end;
-        } else {
-            cbt->recno = recno;
-            cbt->slot = WT_COL_SLOT(page, cip);
-            cbt->compare = 0;
-            ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
-            F_SET(cbt, WT_CBT_VAR_ONPAGE_MATCH);
-        }
+        cbt->recno = recno;
+        cbt->slot = WT_COL_SLOT(page, cip);
+        cbt->compare = 0;
+        ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
+        F_SET(cbt, WT_CBT_VAR_ONPAGE_MATCH);
     }
 
     /*
-     * We have a match on the page, check for an update. Check the page's update list
-     * (fixed-length), or slot's update list (variable-length) for a better match. The only better
-     * match we can find is an exact match, otherwise the existing match on the page is the one we
-     * want. For that reason, don't set the cursor's WT_INSERT_HEAD/WT_INSERT pair until we know we
-     * have a useful entry.
+     * We have a match on the page, check for an update. Check the slot's update list for a better
+     * match. The only better match we can find is an exact match, otherwise the existing match on
+     * the page is the one we want. For that reason, don't set the cursor's WT_INSERT_HEAD/WT_INSERT
+     * pair until we know we have a useful entry.
      */
     if ((ins = __col_insert_search(ins_head, cbt->ins_stack, cbt->next_stack, recno)) != NULL)
         if (recno == WT_INSERT_RECNO(ins)) {
@@ -311,17 +283,12 @@ past_end:
          * have been closer to the search record).
          */
         if (cbt->recno != WT_RECNO_OOB) {
-            if (page->type == WT_PAGE_COL_FIX)
-                ins_head = WT_COL_UPDATE_SINGLE(page);
-            else {
-                ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
-
-                /*
-                 * Set this, otherwise the code in cursor_valid will assume there's no on-disk value
-                 * underneath ins_head.
-                 */
-                F_SET(cbt, WT_CBT_VAR_ONPAGE_MATCH);
-            }
+            ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
+            /*
+             * Set this, otherwise the code in cursor_valid will assume there's no on-disk value
+             * underneath ins_head.
+             */
+            F_SET(cbt, WT_CBT_VAR_ONPAGE_MATCH);
 
             ins = WT_SKIP_LAST(ins_head);
             if (ins != NULL && cbt->recno == WT_INSERT_RECNO(ins)) {
@@ -332,7 +299,7 @@ past_end:
 
         cbt->compare = -1;
     } else {
-        WT_ASSERT(session, page->type == WT_PAGE_COL_FIX || !F_ISSET(cbt, WT_CBT_VAR_ONPAGE_MATCH));
+        WT_ASSERT(session, !F_ISSET(cbt, WT_CBT_VAR_ONPAGE_MATCH));
 
         cbt->ins_head = ins_head;
         cbt->ins = ins;
@@ -340,12 +307,6 @@ past_end:
         if (recno == cbt->recno)
             cbt->compare = 0;
         else if (recno < cbt->recno)
-            cbt->compare = 1;
-        /*
-         * Special case for FLCS: the requested record number is greater than the record the cursor
-         * is positioned on but a greater record number exists.
-         */
-        else if (greater_recno_exists_flcs)
             cbt->compare = 1;
         else
             cbt->compare = -1;

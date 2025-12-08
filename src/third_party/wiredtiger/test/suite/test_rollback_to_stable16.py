@@ -47,8 +47,6 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
     ]
 
     value_format_values = [
-        # Fixed length
-        ('fixed', dict(value_format='8t')),
         # Variable length
         ('variable', dict(value_format='S')),
     ]
@@ -64,14 +62,8 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
         ('8', dict(threads=8))
     ]
 
-    def keep(name, d):
-        if d['key_format'] == 'i' and d['value_format'] == '8t':
-            # Fixed-length format is only special for column-stores.
-            return False
-        return True
-
     scenarios = make_scenarios(key_format_values, value_format_values, in_memory_values,
-        worker_thread_values, include=keep)
+        worker_thread_values)
 
     # Don't raise errors for these, the expectation is that the RTS verifier will
     # run on the test output.
@@ -165,8 +157,8 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
 
         self.check(values[0], uri, nrows, 1, 2)
         self.check(values[1], uri, nrows, 201, 5)
-        self.check(0 if self.value_format == '8t' else None, uri, nrows, 401, 7)
-        self.check(0 if self.value_format == '8t' else None, uri, nrows, 601, 9)
+        self.check(None, uri, nrows, 401, 7)
+        self.check(None, uri, nrows, 601, 9)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]

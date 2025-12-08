@@ -518,12 +518,6 @@ __checkpoint_cleanup_walk_btree(WT_SESSION_IMPL *session, WT_ITEM *uri)
     /* Ignore tables that are empty or is currently in a bulk-load phase. */
     if (btree->original)
         goto err;
-    /*
-     * FLCS pages cannot be discarded and must be rewritten as implicitly filling in missing chunks
-     * of FLCS namespace is problematic.
-     */
-    if (btree->type == BTREE_COL_FIX)
-        goto err;
 
     /* Walk the tree. */
     while ((ret = __wt_tree_walk_custom_skip(

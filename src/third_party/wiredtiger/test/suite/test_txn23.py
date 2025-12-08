@@ -40,8 +40,6 @@ class test_txn23(wttest.WiredTigerTestCase):
     format_values = [
         ('integer-row', dict(key_format='i', value_format='S', extraconfig='')),
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
-        ('column-fix', dict(key_format='r', value_format='8t',
-                    extraconfig='allocation_size=512,leaf_page_max=512')),
     ]
     scenarios = make_scenarios(format_values)
 
@@ -82,23 +80,11 @@ class test_txn23(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
 
-        if self.value_format == '8t':
-            # Values are 1/500 the size, so in principle maybe we should use 500x as many rows.
-            # However, that takes a really long time, and to some extent we should also take the
-            # in-memory size of updates into account, so what I've done is pick a number of rows
-            # that makes it take about 2x the time of the VLCS and row-store versions. Hopefully
-            # that's enough memory usage to exercise the intended code paths.
-            nrows = 8000
-            value_a = 97
-            value_b = 98
-            value_c = 99
-            value_d = 100
-        else:
-            nrows = 2000
-            value_a = "aaaaa" * 100
-            value_b = "bbbbb" * 100
-            value_c = "ccccc" * 100
-            value_d = "ddddd" * 100
+        nrows = 2000
+        value_a = "aaaaa" * 100
+        value_b = "bbbbb" * 100
+        value_c = "ccccc" * 100
+        value_d = "ddddd" * 100
 
         # Perform several updates.
         self.large_updates(uri_1, value_d, ds_1, nrows, 20)

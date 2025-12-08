@@ -217,11 +217,7 @@ class test_cursor_random_column(wttest.WiredTigerTestCase):
         ('file', dict(uri='file:random')),
         ('table', dict(uri='table:random'))
     ]
-    valfmt_values = [
-        ('string', dict(valfmt='S')),
-        ('fix', dict(valfmt='8t')),
-    ]
-    scenarios = make_scenarios(type_values, valfmt_values)
+    scenarios = make_scenarios(type_values, [('string', dict(valfmt='S'))])
 
     def test_cursor_random_column(self):
         self.session.create(self.uri, 'key_format=r,value_format={}'.format(self.valfmt))

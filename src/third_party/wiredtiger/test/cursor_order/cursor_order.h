@@ -34,7 +34,7 @@
 
 #define FNAME "file:cursor_order.%03d" /* File name */
 
-typedef enum { FIX, ROW, VAR } __ftype; /* File type */
+typedef enum { ROW, VAR } __ftype; /* File type */
 
 typedef struct {
     uint64_t append_inserters; /* Number of append threads */

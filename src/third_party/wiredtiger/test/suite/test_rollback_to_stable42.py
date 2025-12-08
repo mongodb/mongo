@@ -76,10 +76,11 @@ class test_rollback_to_stable42(test_rollback_to_stable_base):
         return 'verbose=(rts:1)'
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     scenarios = make_scenarios(format_values)
 
@@ -96,10 +97,7 @@ class test_rollback_to_stable42(test_rollback_to_stable_base):
         uri = 'table:test_rollback_to_stable42'
         nrows = 1000
 
-        if self.value_format == '8t':
-            value = 97
-        else:
-            value = 'a' * 10
+        value = 'a' * 10
 
         # Create our table.
         ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)

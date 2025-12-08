@@ -39,10 +39,10 @@ class test_prepare20(wttest.WiredTigerTestCase):
     conn_config = 'log=(enabled),transaction_sync=(enabled=true,method=none)'
 
     format_values = [
-        ('integer-row', dict(key_format='i', usestrings=True, value_format='S')),
-        ('column', dict(key_format='r', usestrings=False, value_format='S')),
-        ('column-fix', dict(key_format='r', usestrings=False, value_format='8t')),
+        ('integer-row', dict(key_format='i', usestrings=True)),
+        ('column', dict(key_format='r', usestrings=False)),
     ]
+    value_format='S'
     ckpt_values = [
         ('none', dict(first_ckpt=None, second_ckpt=None)),
         ('1-21', dict(first_ckpt=21, second_ckpt=None)),
@@ -212,16 +212,10 @@ class test_prepare20(wttest.WiredTigerTestCase):
             self.value_format, self.value_format))
 
         nrows = 1000
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-            value_c = 99
-            self.nullvalue = 255
-        else:
-            value_a = 'aaaaa' * 100
-            value_b = 'bbbbb' * 100
-            value_c = 'ccccc' * 100
-            self.nullvalue = ''
+        value_a = 'aaaaa' * 100
+        value_b = 'bbbbb' * 100
+        value_c = 'ccccc' * 100
+        self.nullvalue = ''
 
         dcursor = self.session.open_cursor(data_uri)
 

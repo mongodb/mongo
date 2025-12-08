@@ -140,13 +140,6 @@ __tree_walk_internal(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp
     if (!F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE) && !LF_ISSET(WT_READ_SEE_DELETED))
         LF_SET(WT_READ_SKIP_DELETED);
 
-    /*
-     * !!!
-     * Fast-truncate does not currently work for FLCS trees.
-     */
-    if (btree->type == BTREE_COL_FIX)
-        LF_CLR(WT_READ_TRUNCATE);
-
     prev = LF_ISSET(WT_READ_PREV) ? 1 : 0;
 
     /*

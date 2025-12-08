@@ -286,12 +286,8 @@ class test_truncate_cursor(test_truncate_base):
     name = 'test_truncate'
 
     # Use a small page size because we want to create lots of pages.
-    # The underlying table routines don't easily support 8t value types, limit
-    # those tests to file objects.
     types = [
         ('file', dict(type='file:', valuefmt='S',
-            config='allocation_size=512,leaf_page_max=512', P=0.25)),
-        ('file8t', dict(type='file:', valuefmt='8t',
             config='allocation_size=512,leaf_page_max=512', P=0.25)),
         ('table', dict(type='table:', valuefmt='S',
             config='allocation_size=512,leaf_page_max=512', P=0.5)),
@@ -350,11 +346,7 @@ class test_truncate_cursor(test_truncate_base):
             expected[ds.key(i)] = [0]
         for k, v in expected.items():
             cursor.set_key(k)
-            if v == [0] and \
-              cursor.key_format == 'r' and cursor.value_format == '8t':
-                cursor.search()
-                self.assertEqual(cursor.get_values(), [0])
-            elif v == [0]:
+            if v == [0]:
                 self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
             else:
                 cursor.search()

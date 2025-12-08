@@ -613,7 +613,6 @@ __rec_hs_pack_key(WT_SESSION_IMPL *session, WT_BTREE *btree, WTI_RECONCILE *r, W
     page = r->page;
 
     switch (page->type) {
-    case WT_PAGE_COL_FIX:
     case WT_PAGE_COL_VAR:
         p = key->mem;
         WT_RET(__wt_vpack_uint(&p, 0, WT_INSERT_RECNO(ins)));

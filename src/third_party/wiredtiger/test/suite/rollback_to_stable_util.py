@@ -60,9 +60,6 @@ def verify_rts_logs():
 
 # rollback_to_stable_util.py
 # Shared base class used by rollback to stable tests.
-#
-# Note: this class now expects self.value_format to have been set for some of the
-# operations (those that need to specialize themselves for FLCS).
 class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
     # Don't raise errors for these, the expectation is that the RTS verifier will
     # run on the test output.
@@ -132,14 +129,8 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
             session.begin_transaction()
             for i in range(1, nrows + 1):
                 cursor.set_key(i)
-                # FLCS doesn't support modify (for obvious reasons) so just update.
-                # Use the first character of the passed-in value.
-                if self.value_format == '8t':
-                    cursor.set_value(bytes(value, encoding='utf-8')[0])
-                    self.assertEqual(cursor.update(), 0)
-                else:
-                    mods = [wiredtiger.Modify(value, location, nbytes)]
-                    self.assertEqual(cursor.modify(mods), 0)
+                mods = [wiredtiger.Modify(value, location, nbytes)]
+                self.assertEqual(cursor.modify(mods), 0)
 
             if commit_ts == 0:
                 session.commit_transaction()
@@ -182,11 +173,7 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
                 session.rollback_transaction()
             raise(e)
 
-    def check(self, check_value, uri, nrows, flcs_extrarows, read_ts):
-        # In FLCS, deleted values read back as 0, and (at least for now) uncommitted appends
-        # cause zeros to appear under them. If flcs_extrarows isn't None, expect that many
-        # rows of zeros following the regular data.
-        flcs_tolerance = self.value_format == '8t' and flcs_extrarows is not None
+    def check(self, check_value, uri, nrows, read_ts):
 
         session = self.session
         if read_ts == 0:
@@ -196,13 +183,10 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
         cursor = session.open_cursor(uri)
         count = 0
         for k, v in cursor:
-            if flcs_tolerance and count >= nrows:
-                self.assertEqual(v, 0)
-            else:
-                self.assertEqual(v, check_value)
+            self.assertEqual(v, check_value)
             count += 1
         session.commit_transaction()
-        self.assertEqual(count, nrows + flcs_extrarows if flcs_tolerance else nrows)
+        self.assertEqual(count, nrows)
         cursor.close()
 
     def evict_cursor(self, uri, nrows, check_value):

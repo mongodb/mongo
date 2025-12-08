@@ -35,10 +35,11 @@ class test_prepare11(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB'
 
     format_values = [
-        ('column', dict(key_format='r', key1=17, value_format='S')),
-        ('column-fix', dict(key_format='r', key1=17, value_format='8t')),
-        ('string-row', dict(key_format='S', key1='key1', value_format='S')),
+        ('column', dict(key_format='r', key1=17)),
+        ('string-row', dict(key_format='S', key1='key1')),
     ]
+
+    value_format = 'S'
 
     commit_values = [
         ('commit', dict(commit=True)),
@@ -52,12 +53,8 @@ class test_prepare11(wttest.WiredTigerTestCase):
         format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
 
-        if self.value_format == '8t':
-            value_x = 120
-            value_y = 121
-        else:
-            value_x = 'xxxx'
-            value_y = 'yyyy'
+        value_x = 'xxxx'
+        value_y = 'yyyy'
 
         self.session.begin_transaction()
 

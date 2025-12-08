@@ -38,11 +38,9 @@ class test_txn20(wttest.WiredTigerTestCase):
 
     format_values = [
         ('string-row', dict(key_format='S', key='key', \
-                            value_format='S', old_value='value:old', new_value='value:new')),
+                            old_value='value:old', new_value='value:new')),
         ('column', dict(key_format='r', key=12, \
-                            value_format='S', old_value='value:old', new_value='value:new')),
-        ('column-fix', dict(key_format='r', key=12, \
-                            value_format='8t', old_value=89, new_value=167)),
+                            old_value='value:old', new_value='value:new')),
     ]
     iso_types = [
         ('isolation_read_uncommitted', dict(isolation='read-uncommitted')),
@@ -54,7 +52,7 @@ class test_txn20(wttest.WiredTigerTestCase):
     new_value = 'value: new'
 
     def test_isolation_level(self):
-        config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        config = 'key_format={},value_format={}'.format(self.key_format, 'S')
         self.session.create(self.uri, config)
         cursor = self.session.open_cursor(self.uri, None)
         cursor[self.key] = self.old_value

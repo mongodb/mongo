@@ -22,7 +22,6 @@ they are used in other settings.
 <tr><td>block<td>block manager<td>the smallest granularity of data that is read from or written to a Btree file.  A btree page, when it appears on disk, may consist of one or more blocks.
 <tr><td>block compression<td>btree<td>after pages of btrees are encoded to be written, they may be compressed according to a configured algorithm.  Compressors may be added to WiredTiger via the extension mechanism.
 <tr><td>block manager<td>block manager<td>an internal API that abstracts writing, reading and allocating blocks to and from files.  A block manager is associated with a Btree.
-<tr><td>Bloom filter<td>general<td>a data structure that identifies that a key cannot be present.
 <tr><td>btcur<td>btree<td>a b-tree cursor.
 <tr><td>btree<td>btree<td>a data structure on disk or in memory that stores keys, it with its associated value. In WiredTiger, all btrees are in fact B+trees, meaning that adjacent keys and values are grouped into pages.
 <tr><td>bulk insert<td>btree<td>the capability to rapidly insert a set of ordered key value pairs into a Btree. In WiredTiger, a Btree's dhandle must be obtained exclusively, guaranteeing that the inserts can be done single threaded.

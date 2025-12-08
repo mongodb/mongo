@@ -675,8 +675,6 @@ main(int argc, char *argv[])
     argv += __wt_optind;
     if (opts->nrecords == 0)
         opts->nrecords = 50 * WT_THOUSAND;
-    if (opts->table_type == TABLE_FIX)
-        testutil_die(ENOTSUP, "Fixed-length column store not supported");
 
     while (argc > 0) {
         if (strcmp(argv[0], "subtest") == 0) {

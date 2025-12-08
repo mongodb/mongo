@@ -35,9 +35,8 @@ from wtscenario import make_scenarios
 #   cache stuck issue.
 class test_txn24(wttest.WiredTigerTestCase):
     table_params_values = [
-        ('integer-row', dict(key_format='i', value_format='S', extraconfig='')),
-        ('column', dict(key_format='r', value_format='S', extraconfig='')),
-        ('column-fix', dict(key_format='r', value_format='8t', extraconfig=',leaf_page_max=4096')),
+        ('integer-row', dict(key_format='i', extraconfig='')),
+        ('column', dict(key_format='r', extraconfig='')),
     ]
     scenarios = make_scenarios(table_params_values)
 
@@ -58,24 +57,11 @@ class test_txn24(wttest.WiredTigerTestCase):
     def test_snapshot_isolation_and_eviction(self):
         # Create and populate a table.
         uri = "table:test_txn24"
-        table_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        table_params = 'key_format={},value_format={}'.format(self.key_format, 'S')
 
-        if self.value_format == '8t':
-            '''
-            Values are 1/240 the size, but as in-memory updates are considerably larger, we
-            shouldn't just use 240x the number of rows. For now go with 3x, a number pulled from
-            thin air that also makes it just about 3x slower than the VLCS case. It isn't clear
-            whether it's really working as intended, and should maybe check deeper or use some
-            kind of stats feedback to figure out how many rows to pump out instead of choosing
-            in advance.
-            '''
-            default_val = 45
-            new_val = 101
-            n_rows = 480000 * 3
-        else:
-            default_val = 'ABCD' * 60
-            new_val = 'YYYY' * 60
-            n_rows = 480000
+        default_val = 'ABCD' * 60
+        new_val = 'YYYY' * 60
+        n_rows = 480000
 
         # Populate
         self.session.create(uri, table_params + self.extraconfig)

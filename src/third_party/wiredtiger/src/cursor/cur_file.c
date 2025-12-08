@@ -956,9 +956,6 @@ __curfile_bound(WT_CURSOR *cursor, const char *config)
     WT_ERR(__wt_conf_compile_api_call(session, WT_CONFIG_REF(session, WT_CURSOR_bound),
       WT_CONFIG_ENTRY_WT_CURSOR_bound, config, &_conf, sizeof(_conf), &conf));
 
-    if (CUR2BT(cursor)->type == BTREE_COL_FIX)
-        WT_ERR_MSG(session, EINVAL, "setting bounds is not compatible with fixed column store");
-
     /* It is illegal to set a bound on a positioned cursor (it's fine to clear one) */
     WT_ERR(__wt_conf_gets(session, conf, action, &cval));
     if (WT_CONF_STRING_MATCH(set, cval) && WT_CURSOR_IS_POSITIONED(cbt))
@@ -1024,7 +1021,7 @@ err:
  */
 static int
 __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], bool bulk,
-  bool bitmap, WT_DATA_HANDLE *hs_dhandle, WT_CKPT_SNAPSHOT *ckpt_snapshot, WT_CURSOR **cursorp)
+  WT_DATA_HANDLE *hs_dhandle, WT_CKPT_SNAPSHOT *ckpt_snapshot, WT_CURSOR **cursorp)
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __wt_cursor_get_value,                          /* get-value */
@@ -1106,7 +1103,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
 
         /* Optionally skip the validation of each bulk-loaded key. */
         WT_ERR(__wt_config_gets_def(session, cfg, "skip_sort_check", 0, &cval));
-        WT_ERR(__wti_curbulk_init(session, cbulk, bitmap, cval.val == 0 ? 0 : 1));
+        WT_ERR(__wti_curbulk_init(session, cbulk, cval.val == 0 ? 0 : 1));
     }
 
     /*
@@ -1191,10 +1188,10 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, c
     WT_DATA_HANDLE *hs_dhandle;
     WT_DECL_RET;
     uint32_t flags;
-    bool bitmap, bulk, checkpoint_use_history, checkpoint_wait;
+    bool bulk, checkpoint_use_history, checkpoint_wait;
 
     hs_dhandle = NULL;
-    bitmap = bulk = false;
+    bulk = false;
     checkpoint_wait = true;
     flags = 0;
 
@@ -1206,18 +1203,15 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, c
     if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
         WT_RET(__wt_config_gets_def(session, cfg, "bulk", 0, &cval));
         if (cval.type == WT_CONFIG_ITEM_BOOL ||
-          (cval.type == WT_CONFIG_ITEM_NUM && (cval.val == 0 || cval.val == 1))) {
-            bitmap = false;
+          (cval.type == WT_CONFIG_ITEM_NUM && (cval.val == 0 || cval.val == 1)))
             bulk = cval.val != 0;
-        } else if (WT_CONFIG_LIT_MATCH("bitmap", cval))
-            bitmap = bulk = true;
         /*
          * Unordered bulk insert is a special case used internally by index creation on existing
          * tables. It doesn't enforce any special semantics at the file level. It primarily exists
          * to avoid some locking problems between LSM and index creation.
          */
         else if (!WT_CONFIG_LIT_MATCH("unordered", cval))
-            WT_RET_MSG(session, EINVAL, "Value for 'bulk' must be a boolean or 'bitmap'");
+            WT_RET_MSG(session, EINVAL, "Value for 'bulk' must be a boolean");
 
         if (bulk) {
             if (F_ISSET(session->txn, WT_TXN_RUNNING))
@@ -1283,8 +1277,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, c
         ret = __wt_session_get_btree_ckpt(session, uri, cfg, flags, NULL, NULL);
     WT_RET(ret);
 
-    WT_ERR(
-      __curfile_create(session, owner, cfg, bulk, bitmap, hs_dhandle, &ckpt_snapshot, cursorp));
+    WT_ERR(__curfile_create(session, owner, cfg, bulk, hs_dhandle, &ckpt_snapshot, cursorp));
 
     return (0);
 

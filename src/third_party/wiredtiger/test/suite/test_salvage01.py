@@ -42,9 +42,8 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
     nentries = 1000
 
     format_values = [
-        ('string-row', dict(key_format='S', value_format='S')),
-        ('column', dict(key_format='r', value_format='S')),
-        ('column-fix', dict(key_format='r', value_format='8t')),
+        ('string-row', dict(key_format='S')),
+        ('column', dict(key_format='r')),
     ]
 
     failpoint_enabled = [
@@ -61,40 +60,18 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
             return ''
 
     def moreinit(self):
-        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        format = 'key_format={},value_format={}'.format(self.key_format, 'S')
         if self.key_format == 'r':
             # VLCS requires smaller pages or the workload fits on one page, which then gets
             # zapped by the damage operation and the table comes out empty, which isn't what
             # we want.
             format += ',leaf_page_max=4096'
         self.session_params = format
-
-        if self.value_format == '8t':
-            # For FLCS, we write out a sequence of known bytes in adjacent rows and search for
-            # that sequence when we want to corrupt the table. This eliminates the problem
-            # earlier versions of this test had where it was looking for a single row value,
-            # namely a single byte, and would sometimes find it in unintended places, such as
-            # the root page, resulting in unsalvageable corruption and test failure. However,
-            # it's still possible for the test to fail arbitrarily if the target sequence ends
-            # up spanning a page boundary. Make it only 8 bytes long to reduce the chance of
-            # this while still making false matches unlikely. If the test starts failing for
-            # no obvious reason, try changing uniquepos by offsets of 8; if that fixes it, the
-            # problem is almost certainly this (accidentally spanning a page boundary) and not
-            # a real bug.
-
-            # This spells '<taRGet>', and in hex is: 3c 74 61 52 47 65 74 3e.
-            # Note that it should not be changed to contain values >= 127 or the Python trip
-            # through UTF-8 will break things.
-            self.unique = [92, 53, 34, 114, 103, 38, 53, 94]
-            self.uniquelen = len(self.unique)
-            self.uniquebytes = bytes(self.unique)
-
-        else:
-            # For VLCS and row-store, write out a single known value in one row as the target
-            # for intentional corruption. Don't set self.uniquelen; nothing should refer to it.
-            # (But if something needs to in the future, the correct value is 1.)
-            self.unique = 'SomeUniqueString'
-            self.uniquebytes = self.unique.encode()
+        # For VLCS and row-store, write out a single known value in one row as the target
+        # for intentional corruption. Don't set self.uniquelen; nothing should refer to it.
+        # (But if something needs to in the future, the correct value is 1.)
+        self.unique = 'SomeUniqueString'
+        self.uniquebytes = self.unique.encode()
 
         self.uniquepos = self.nentries // 2
 
@@ -104,50 +81,26 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
         return ''
 
     def nextkey(self, key, i):
-        if self.value_format == '8t':
-            # Use key + i to create gaps. This makes the actual number of rows larger, but
-            # since the rows are small that doesn't make the table excessively large. Don't
-            # insert gaps between the bytes in the match string, though, since that makes it
-            # excessively likely that the match string spans pages and then we won't be able
-            # to find it.
-            if i >= self.uniquepos and i <= self.uniquepos + self.uniquelen:
-                return key + 1
-            else:
-                return key + i
-        elif self.key_format == 'r':
+        if self.key_format == 'r':
             # Use key + i to create gaps.
             return key + i
         else:
             return key + str(i)
 
     def uniqueval(self):
-        if self.value_format == '8t':
-            # Note that this is a list.
-            return self.unique
-        else:
-            return self.unique + '0'
+        return self.unique + '0'
 
     def ordinaryval(self, key):
-        if self.value_format == '8t':
-            return key % 181 + 33
-        elif self.key_format == 'r':
+        if self.key_format == 'r':
             return str(key) + str(key)
         else:
             return key + key
 
     def getval(self, entry, key):
-        if self.value_format == '8t':
-            if entry >= self.uniquepos and entry < self.uniquepos + self.uniquelen:
-                # Get the proper byte from the corruption target string.
-                val = self.uniqueval()
-                val = val[entry - self.uniquepos]
-            else:
-                val = self.ordinaryval(key)
+        if entry == self.uniquepos:
+            # Get the corruption target string.
+            val = self.uniqueval()
         else:
-            if entry == self.uniquepos:
-                # Get the corruption target string.
-                val = self.uniqueval()
-            else:
                 val = self.ordinaryval(key)
         return val
 
@@ -173,12 +126,6 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
         for gotkey, gotval in cursor:
             nextkey = self.nextkey(wantkey, i)
 
-            # In FLCS the values between the keys we wrote will read as zero. Count them.
-            if gotkey < nextkey and self.value_format == '8t':
-                self.assertEqual(gotval, 0)
-                zeros += 1
-                continue
-
             wantkey = nextkey
             wantval = self.getval(i, wantkey)
 
@@ -186,9 +133,6 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
             self.assertEqual(gotval, wantval)
             i += 1
         self.assertEqual(i, self.nentries)
-        if self.value_format == '8t':
-            # We should have visited every key, so the total row count should match the last key.
-            self.assertEqual(self.nentries + zeros, wantkey)
         cursor.close()
 
     def check_damaged(self, tablename):

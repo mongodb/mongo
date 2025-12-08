@@ -41,11 +41,11 @@ class test_rollback_to_stable39(test_rollback_to_stable_base):
     restart_config = False
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S', prepare_extraconfig='')),
-        ('column_fix', dict(key_format='r', value_format='8t',
-            prepare_extraconfig=',allocation_size=512,leaf_page_max=512')),
-        ('row_integer', dict(key_format='i', value_format='S', prepare_extraconfig='')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+    value_format='S'
+    prepare_extraconfig=''
 
     prepare_values = [
         ('no_prepare', dict(prepare=False)),
@@ -71,14 +71,9 @@ class test_rollback_to_stable39(test_rollback_to_stable_base):
             self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-            value_c = 99
-        else:
-            value_a = "aaaaa" * 100
-            value_b = "bbbbb" * 100
-            value_c = "ccccc" * 100
+        value_a = "aaaaa" * 100
+        value_b = "bbbbb" * 100
+        value_c = "ccccc" * 100
 
         # Pin oldest and stable to timestamp 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
@@ -87,11 +82,11 @@ class test_rollback_to_stable39(test_rollback_to_stable_base):
         # Perform several updates.
         self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_a, uri, nrows, 21 if self.prepare else 20)
 
         self.large_removes(uri, ds, nrows, self.prepare, 30)
         # Verify no data is visible.
-        self.check(value_a, uri, 0, nrows, 31 if self.prepare else 30)
+        self.check(value_a, uri, 0, 31 if self.prepare else 30)
 
         # Pin stable to timestamp 40 if prepare otherwise 30.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40 if self.prepare else 30))
@@ -124,8 +119,8 @@ class test_rollback_to_stable39(test_rollback_to_stable_base):
         simulate_crash_restart(self, ".", "RESTART")
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
-        self.check(value_a, uri, 0, nrows, 40)
+        self.check(value_a, uri, nrows, 21 if self.prepare else 20)
+        self.check(value_a, uri, 0, 40)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
@@ -145,7 +140,7 @@ class test_rollback_to_stable39(test_rollback_to_stable_base):
         self.large_updates(uri, value_c, ds, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_c, uri, nrows, None, 61 if self.prepare else 60)
+        self.check(value_c, uri, nrows, 61 if self.prepare else 60)
 
         # Create a checkpoint thread
         done = threading.Event()

@@ -46,7 +46,6 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
     backup_dir2 = "BACKUP2"
 
     format_values = [
-        ('column_fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='S')),
         ('row_integer', dict(key_format='i', value_format='S')),
     ]
@@ -63,15 +62,9 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         return config
 
     def moresetup(self):
-        if self.value_format == '8t':
-            # Rig to use more than one page; otherwise the inconsistent checkpoint assertions fail.
-            self.extraconfig = ',leaf_page_max=4096'
-            self.nrows = 5000
-            self.valuea = 97
-        else:
-            self.extraconfig = ''
-            self.nrows = 1000
-            self.valuea = "aaaaa" * 100
+        self.extraconfig = ''
+        self.nrows = 1000
+        self.valuea = "aaaaa" * 100
 
     def take_full_backup(self, fromdir, todir):
         # Open up the backup cursor, and copy the files.  Do a full backup.
@@ -103,14 +96,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
                 session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
         cursor.close()
 
-    def check(self, check_value, uri, nrows, read_ts, more_invisible_rows_exist):
-        # In FLCS the existence of the invisible extra set of rows causes the table to
-        # extend under them. Until that's fixed, expect (not just allow) those rows to
-        # exist and demand that they read back as zero and not as check_value. When it
-        # is fixed (so the end of the table updates transactionally) the special-case
-        # logic can just be removed.
-        flcs_tolerance = more_invisible_rows_exist and self.value_format == '8t'
-
+    def check(self, check_value, uri, nrows, read_ts):
         session = self.session
         if read_ts == 0:
             session.begin_transaction()
@@ -125,13 +111,10 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             elif k < last_key:
                 print(f"Keys out of order: {last_key} to {k}")
             last_key = k
-            if flcs_tolerance and count >= nrows:
-                self.assertEqual(v, 0)
-            else:
-                self.assertEqual(v, check_value)
+            self.assertEqual(v, check_value)
             count += 1
         session.commit_transaction()
-        targetCount = nrows * 2 if flcs_tolerance else nrows
+        targetCount = nrows
         if count != targetCount and count != 2*targetCount: print(f"Counted {count} out of {nrows} rows. Last key: {k}.")
         if not self.runningHook('disagg'):
             self.assertEqual(count, targetCount)
@@ -181,7 +164,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         ds.populate()
 
         self.large_updates(self.uri, self.valuea, ds, self.nrows, 0)
-        self.check(self.valuea, self.uri, self.nrows, 0, False)
+        self.check(self.valuea, self.uri, self.nrows, 0)
 
         session1 = self.conn.open_session()
         session1.begin_transaction()
@@ -197,7 +180,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         self.perform_backup_or_crash_restart(".", self.backup_dir)
 
         # Check the table contains the last checkpointed value.
-        self.check(self.valuea, self.uri, self.nrows, 0, True)
+        self.check(self.valuea, self.uri, self.nrows, 0)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         inconsistent_ckpt = stat_cursor[stat.conn.txn_rts_inconsistent_ckpt][2]
@@ -222,7 +205,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             ',stable_timestamp=' + self.timestamp_str(10))
 
         self.large_updates(self.uri, self.valuea, ds, self.nrows, 20)
-        self.check(self.valuea, self.uri, self.nrows, 20, False)
+        self.check(self.valuea, self.uri, self.nrows, 20)
 
         session1 = self.conn.open_session()
         session1.begin_transaction()
@@ -242,7 +225,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         self.perform_backup_or_crash_restart(".", self.backup_dir)
 
         # Check the table contains the last checkpointed value.
-        self.check(self.valuea, self.uri, self.nrows, 30, True)
+        self.check(self.valuea, self.uri, self.nrows, 30)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         inconsistent_ckpt = stat_cursor[stat.conn.txn_rts_inconsistent_ckpt][2]
@@ -270,7 +253,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         session1.begin_transaction()
 
         self.large_updates(self.uri, self.valuea, ds, self.nrows, 20)
-        self.check(self.valuea, self.uri, self.nrows, 20, False)
+        self.check(self.valuea, self.uri, self.nrows, 20)
 
         session2 = self.conn.open_session()
         session2.begin_transaction()
@@ -292,7 +275,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         self.perform_backup_or_crash_restart(".", self.backup_dir)
 
         # Check the table contains the last checkpointed value.
-        self.check(self.valuea, self.uri, self.nrows, 30, True)
+        self.check(self.valuea, self.uri, self.nrows, 30)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         inconsistent_ckpt = stat_cursor[stat.conn.txn_rts_inconsistent_ckpt][2]
@@ -306,7 +289,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         self.perform_backup_or_crash_restart(self.backup_dir, self.backup_dir2)
 
         # Check the table contains the last checkpointed value.
-        self.check(self.valuea, self.uri, self.nrows, 30, True)
+        self.check(self.valuea, self.uri, self.nrows, 30)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         inconsistent_ckpt = stat_cursor[stat.conn.txn_rts_inconsistent_ckpt][2]

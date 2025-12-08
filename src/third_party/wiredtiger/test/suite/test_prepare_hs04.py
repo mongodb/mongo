@@ -54,10 +54,11 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
 
     format_values = [
         # Note: commit_key must exceed nrows to give behavior comparable to the row case.
-        ('column', dict(key_format='r', commit_key=1000, value_format='u')),
-        ('column-fix', dict(key_format='r', commit_key=1000, value_format='8t')),
-        ('string-row', dict(key_format='S', commit_key='C', value_format='u')),
+        ('column', dict(key_format='r', commit_key=1000)),
+        ('string-row', dict(key_format='S', commit_key='C')),
     ]
+
+    value_format='u'
 
     scenarios = make_scenarios(commit_values, format_values)
 
@@ -78,12 +79,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
             if conflict == True:
                 self.assertRaisesException(wiredtiger.WiredTigerError, lambda:cursor.search(), expected_value)
             elif expected_value == None:
-                if self.value_format == '8t':
-                    # In FLCS, deleted values read back as 0.
-                    self.assertEqual(cursor.search(), 0)
-                    self.assertEqual(cursor.get_value(), 0)
-                else:
-                    self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+                self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
             else:
                 self.assertEqual(cursor.search(), 0)
                 self.assertEqual(cursor.get_value(), expected_value)
@@ -93,12 +89,8 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
     def prepare_updates(self, ds):
 
         commit_key = self.commit_key
-        if self.value_format == '8t':
-            commit_value = 98
-            prepare_value = 99
-        else:
-            commit_value = b"bbbbb" * 100
-            prepare_value = b"ccccc" * 100
+        commit_value = b"bbbbb" * 100
+        prepare_value = b"ccccc" * 100
 
         # Set oldest and stable timestamp for the database.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
@@ -231,10 +223,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
             self, self.uri, self.nrows, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        if self.value_format == '8t':
-            bigvalue = 97
-        else:
-            bigvalue = b"aaaaa" * 100
+        bigvalue = b"aaaaa" * 100
 
         # Initially load huge data
         cursor = self.session.open_cursor(self.uri)

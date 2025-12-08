@@ -34,10 +34,10 @@ from wtscenario import make_scenarios
 # Smoke test RTS on in-memory databases.
 class test_rollback_to_stable33(wttest.WiredTigerTestCase):
     format_values = [
-        ('fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
-        ('var', dict(key_format='r', value_format='S')),
+        ('row_integer', dict(key_format='i')),
+        ('var', dict(key_format='r')),
     ]
+    value_format='S'
     logged = [
         ('no', dict(logged=False)),
         ('yes', dict(logged=True))

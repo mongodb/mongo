@@ -137,10 +137,6 @@ struct __wti_rec_chunk {
     size_t min_offset; /* byte offset */
 
     WT_ITEM image; /* disk-image */
-
-    /* For fixed-length column store, track where the time windows start and how many we have. */
-    uint32_t aux_start_offset;
-    uint32_t auxentries;
 };
 
 /*
@@ -238,8 +234,7 @@ struct __wti_reconcile {
      * Reconciliation gets tricky if we have to split a page, which happens when the disk image we
      * create exceeds the page type's maximum disk image size.
      *
-     * First, the target size of the page we're building. In FLCS, this is the size of both the
-     * primary and auxiliary portions.
+     * First, the target size of the page we're building.
      */
     uint32_t page_size; /* Page size */
 
@@ -281,15 +276,6 @@ struct __wti_reconcile {
     uint8_t *first_free;    /* Current first free byte */
     size_t space_avail;     /* Remaining space in this chunk */
     size_t min_space_avail; /* Remaining space in this chunk to put a minimum size boundary */
-
-    /*
-     * Fixed-length column store divides the disk image into two sections, primary and auxiliary,
-     * and we need to track both of them.
-     */
-    uint32_t aux_start_offset; /* First auxiliary byte */
-    uint32_t aux_entries;      /* Current number of auxiliary entries */
-    uint8_t *aux_first_free;   /* Current first free auxiliary byte */
-    size_t aux_space_avail;    /* Current remaining auxiliary space */
 
     /*
      * Counters tracking how much time information is included in reconciliation for each page that
@@ -454,13 +440,6 @@ struct __wti_update_select {
         WT_TIME_WINDOW_INIT(&(upd_select)->tw); \
     } while (0)
 
-/*
- * Macros from fixed-length entries to/from bytes.
- */
-#define WTI_COL_FIX_BYTES_TO_ENTRIES(btree, bytes) ((uint32_t)((((bytes)*8) / (btree)->bitcnt)))
-#define WTI_COL_FIX_ENTRIES_TO_BYTES(btree, entries) \
-    ((uint32_t)WT_ALIGN((entries) * (btree)->bitcnt, 8))
-
 #define WT_REC_RESULT_SINGLE_PAGE(session, r)                                    \
     (((r)->ref->page->modify->rec_result == 0 && (r)->ref->page->dsk != NULL) || \
       (r)->ref->page->modify->rec_result == WT_PM_REC_REPLACE ||                 \
@@ -507,8 +486,6 @@ extern int __wti_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WTI_RECONCILE *r,
   uint8_t type, WT_TIME_WINDOW *tw, uint64_t rle) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_child_modify(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *ref,
   WTI_CHILD_MODIFY_STATE *cmsp, bool *build_delta) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wti_rec_col_fix(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref,
-  WT_SALVAGE_COOKIE *salvage) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_col_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_col_var(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref,
@@ -532,22 +509,15 @@ extern int __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_row_leaf(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref,
   WT_SALVAGE_COOKIE *salvage) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wti_rec_split(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t next_len)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t next_len)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_split_finish(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wti_rec_split_grow(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t add_len)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wti_rec_split_init(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page,
-  uint64_t recno, uint64_t primary_size, uint32_t auxiliary_size)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_rec_split_init(WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint64_t recno,
+  uint64_t primary_size) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
   WT_ROW *rip, WT_CELL_UNPACK_KV *vpack, WTI_UPDATE_SELECT *upd_select)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern void __wti_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, uint32_t entries,
-  uint32_t aux_start_offset, uint32_t auxentries, uint8_t *image, size_t size);
 extern void __wti_rec_dictionary_free(WT_SESSION_IMPL *session, WTI_RECONCILE *r);
 extern void __wti_rec_dictionary_reset(WTI_RECONCILE *r);
 static WT_INLINE bool __wti_rec_need_split(WTI_RECONCILE *r, size_t len)
@@ -561,14 +531,10 @@ static WT_INLINE int __wti_rec_dict_replace(
 static WT_INLINE int __wti_rec_get_row_leaf_key(WT_SESSION_IMPL *session, WT_BTREE *btree,
   WTI_RECONCILE *r, WT_INSERT *ins, WT_ROW *rip, WT_ITEM *key)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-static WT_INLINE void __wti_rec_auximage_copy(
-  WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint32_t count, WTI_REC_KV *kv);
 static WT_INLINE void __wti_rec_cell_build_addr(WT_SESSION_IMPL *session, WTI_RECONCILE *r,
   WT_ADDR *addr, WT_CELL_UNPACK_ADDR *vpack, uint64_t recno, WT_PAGE_DELETED *page_del);
 static WT_INLINE void __wti_rec_image_copy(
   WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV *kv);
-static WT_INLINE void __wti_rec_incr(
-  WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint32_t v, size_t size);
 static WT_INLINE void __wti_rec_kv_copy(WT_SESSION_IMPL *session, uint8_t *p, WTI_REC_KV *kv);
 static WT_INLINE void __wti_rec_time_window_clear_obsolete(WT_SESSION_IMPL *session,
   WTI_UPDATE_SELECT *upd_select, WT_CELL_UNPACK_KV *vpack, WTI_RECONCILE *r);

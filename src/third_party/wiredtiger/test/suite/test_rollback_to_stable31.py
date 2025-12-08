@@ -37,10 +37,10 @@ from wtscenario import make_scenarios
 class test_rollback_to_stable31(test_rollback_to_stable_base):
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+    value_format='S'
     checkpoint_modes = [
         ('no-checkpoint', dict(checkpoint=False)),
         ('checkpoint', dict(checkpoint=True)),
@@ -69,14 +69,9 @@ class test_rollback_to_stable31(test_rollback_to_stable_base):
         ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-            value_c = 99
-        else:
-            value_a = "aaaaa" * 10
-            value_b = "bbbbb" * 10
-            value_c = "ccccc" * 10
+        value_a = "aaaaa" * 10
+        value_b = "bbbbb" * 10
+        value_c = "ccccc" * 10
 
         # Do not set stable. (Don't set oldest either as it can't be later than stable.)
 
@@ -102,19 +97,19 @@ class test_rollback_to_stable31(test_rollback_to_stable_base):
         if self.crash:
             if self.checkpoint:
                 # Recovery-time RTS does nothing when no stable timestamp is set.
-                self.check(0, uri, 0, nrows, 5)
-                self.check(value_a, uri, nrows, 0, 15)
-                self.check(value_b, uri, nrows, 0, 25)
-                self.check(value_c, uri, nrows, 0, 35)
+                self.check(0, uri, 0, 5)
+                self.check(value_a, uri, nrows, 15)
+                self.check(value_b, uri, nrows, 25)
+                self.check(value_c, uri, nrows, 35)
             else:
                 # If we crashed without a checkpoint, everything should disappear entirely.
-                self.check(0, uri, 0, 0, 5)
-                self.check(value_a, uri, 0, 0, 15)
-                self.check(value_b, uri, 0, 0, 25)
-                self.check(value_c, uri, 0, 0, 35)
+                self.check(0, uri, 0, 5)
+                self.check(value_a, uri, 0, 15)
+                self.check(value_b, uri, 0, 25)
+                self.check(value_c, uri, 0, 35)
         else:
             # With an explicit runtime RTS, the RTS does not do anything.
-            self.check(0, uri, 0, nrows, 5)
-            self.check(value_a, uri, nrows, 0, 15)
-            self.check(value_b, uri, nrows, 0, 25)
-            self.check(value_c, uri, nrows, 0, 35)
+            self.check(0, uri, 0, 5)
+            self.check(value_a, uri, nrows, 15)
+            self.check(value_b, uri, nrows, 25)
+            self.check(value_c, uri, nrows, 35)

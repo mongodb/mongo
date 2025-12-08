@@ -84,7 +84,6 @@ table_load(TABLE *base, TABLE *table)
     WT_ITEM key, value;
     WT_SESSION *session;
     uint32_t committed_keyno, keyno, rows_current, v;
-    uint8_t bitv;
     char config[100], track_buf[128];
     bool is_bulk, report_progress;
 
@@ -125,22 +124,14 @@ table_load(TABLE *base, TABLE *table)
         if (table->type == ROW)
             key_gen(table, &key, keyno);
         if (base == NULL)
-            val_gen(table, &g.data_rnd, &value, &bitv, keyno);
+            val_gen(table, &g.data_rnd, &value, keyno);
         else {
             testutil_check(read_op(base_cursor, NEXT, NULL));
             testutil_check(base_cursor->get_value(base_cursor, &value));
-            val_to_flcs(table, &value, &bitv);
         }
 
         /* Insert the key/value pair into the new table. */
         switch (table->type) {
-        case FIX:
-            if (!is_bulk)
-                cursor->set_key(cursor, keyno);
-            cursor->set_value(cursor, bitv);
-            if (FLD_ISSET(g.trace_flags, TRACE_BULK))
-                trace_msg(session, "bulk %" PRIu32 " {0x%02" PRIx8 "}", keyno, bitv);
-            break;
         case VAR:
             if (!is_bulk)
                 cursor->set_key(cursor, keyno);

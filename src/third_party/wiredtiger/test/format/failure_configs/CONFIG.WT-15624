@@ -356,4 +356,4 @@ table8.ops.truncate=1
 table8.runs.mirror=0
 table8.runs.rows=116559
 table8.runs.source=table
-table8.runs.type=fixed-length column-store
+table8.runs.type=variable-length column-store

@@ -36,10 +36,11 @@ class test_hs25(wttest.WiredTigerTestCase):
     uri = 'table:test_hs25'
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     scenarios = make_scenarios(format_values)
 
@@ -50,14 +51,9 @@ class test_hs25(wttest.WiredTigerTestCase):
         self.session.create(self.uri, format)
         s = self.conn.open_session()
 
-        if self.value_format == '8t':
-            valuea = 97
-            valueb = 98
-            valuec = 99
-        else:
-            valuea = 'a'
-            valueb = 'b'
-            valuec = 'c'
+        valuea = 'a'
+        valueb = 'b'
+        valuec = 'c'
 
         # Update the first key.
         cursor1 = self.session.open_cursor(self.uri)

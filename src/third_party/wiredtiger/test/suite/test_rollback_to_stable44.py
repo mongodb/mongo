@@ -37,10 +37,11 @@ from wtscenario import make_scenarios
 class test_rollback_to_stable44(test_rollback_to_stable_base):
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     scenarios = make_scenarios(format_values)
 
@@ -63,12 +64,8 @@ class test_rollback_to_stable44(test_rollback_to_stable_base):
         ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-        else:
-            value_a = "aaaaa" * 10
-            value_b = "bbbbb" * 10
+        value_a = "aaaaa" * 10
+        value_b = "bbbbb" * 10
 
         # Do not set the stable and the oldest timestamps.
 
@@ -90,6 +87,6 @@ class test_rollback_to_stable44(test_rollback_to_stable_base):
         simulate_crash_restart(self, '.', 'RESTART')
 
         # Check that the prepare operation did not have any effect.
-        self.check(0, uri, 0, nrows, 5)
-        self.check(value_a, uri, nrows, 0, 15)
-        self.check(value_a, uri, nrows, 0, 25)
+        self.check(0, uri, 0, 5)
+        self.check(value_a, uri, nrows, 15)
+        self.check(value_a, uri, nrows, 25)

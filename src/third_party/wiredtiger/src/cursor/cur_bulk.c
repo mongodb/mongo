@@ -28,83 +28,6 @@ __bulk_col_keycmp_err(WT_CURSOR_BULK *cbulk)
 }
 
 /*
- * __curbulk_insert_fix --
- *     Fixed-length column-store bulk cursor insert.
- */
-static int
-__curbulk_insert_fix(WT_CURSOR *cursor)
-{
-    WT_CURSOR_BULK *cbulk;
-    WT_DECL_RET;
-    WT_SESSION_IMPL *session;
-    uint64_t recno;
-
-    cbulk = (WT_CURSOR_BULK *)cursor;
-
-    /*
-     * Bulk cursor inserts are updates, but don't need auto-commit transactions because they are
-     * single-threaded and not visible until the bulk cursor is closed.
-     */
-    CURSOR_API_CALL(cursor, session, ret, insert, cbulk->cbt.dhandle);
-    WT_STAT_CONN_DSRC_INCR(session, cursor_insert_bulk);
-
-    /*
-     * If the "append" flag was configured, the application doesn't have to supply a key, else
-     * require a key.
-     */
-    if (F_ISSET(cursor, WT_CURSTD_APPEND))
-        recno = cbulk->recno + 1;
-    else {
-        WT_ERR(__cursor_checkkey(cursor));
-        if ((recno = cursor->recno) <= cbulk->recno)
-            WT_ERR(__bulk_col_keycmp_err(cbulk));
-    }
-    WT_ERR(__cursor_checkvalue(cursor));
-
-    /*
-     * Insert any skipped records as deleted records, update the current record count.
-     */
-    for (; recno != cbulk->recno + 1; ++cbulk->recno)
-        WT_ERR(__wt_bulk_insert_fix(session, cbulk, true));
-    cbulk->recno = recno;
-
-    /* Insert the current record. */
-    ret = __wt_bulk_insert_fix(session, cbulk, false);
-
-err:
-    API_END_RET(session, ret);
-}
-
-/*
- * __curbulk_insert_fix_bitmap --
- *     Fixed-length column-store bulk cursor insert for bitmaps.
- */
-static int
-__curbulk_insert_fix_bitmap(WT_CURSOR *cursor)
-{
-    WT_CURSOR_BULK *cbulk;
-    WT_DECL_RET;
-    WT_SESSION_IMPL *session;
-
-    cbulk = (WT_CURSOR_BULK *)cursor;
-
-    /*
-     * Bulk cursor inserts are updates, but don't need auto-commit transactions because they are
-     * single-threaded and not visible until the bulk cursor is closed.
-     */
-    CURSOR_API_CALL(cursor, session, ret, insert, cbulk->cbt.dhandle);
-    WT_STAT_CONN_DSRC_INCR(session, cursor_insert_bulk);
-
-    WT_ERR(__cursor_checkvalue(cursor));
-
-    /* Insert the current record. */
-    ret = __wt_bulk_insert_fix_bitmap(session, cbulk);
-
-err:
-    API_END_RET(session, ret);
-}
-
-/*
  * __curbulk_insert_var --
  *     Variable-length column-store bulk cursor insert.
  */
@@ -287,8 +210,7 @@ err:
  *     Initialize a bulk cursor.
  */
 int
-__wti_curbulk_init(
-  WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool bitmap, bool skip_sort_check)
+__wti_curbulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool skip_sort_check)
 {
     WT_CURSOR *cursor;
     WT_CURSOR_BTREE *cbt;
@@ -299,9 +221,6 @@ __wti_curbulk_init(
     /* Bulk cursors only support insert and close (reset is a no-op). */
     __wti_cursor_set_notsup(cursor);
     switch (CUR2BT(cbt)->type) {
-    case BTREE_COL_FIX:
-        cursor->insert = bitmap ? __curbulk_insert_fix_bitmap : __curbulk_insert_fix;
-        break;
     case BTREE_COL_VAR:
         cursor->insert = __curbulk_insert_var;
         break;
@@ -316,9 +235,6 @@ __wti_curbulk_init(
 
     cbulk->first_insert = true;
     cbulk->recno = 0;
-    cbulk->bitmap = bitmap;
-    if (bitmap)
-        F_SET(cursor, WT_CURSTD_RAW);
 
     /*
      * The bulk last buffer is used to detect out-of-order keys in row-store to avoid corruption,

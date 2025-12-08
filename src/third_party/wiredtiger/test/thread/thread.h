@@ -37,7 +37,7 @@
 
 extern WT_CONNECTION *conn; /* WiredTiger connection */
 
-typedef enum { FIX, ROW, VAR } __ftype; /* File type */
+typedef enum { ROW, VAR } __ftype; /* File type */
 extern __ftype ftype;
 
 extern int log_print;      /* Log print per operation */

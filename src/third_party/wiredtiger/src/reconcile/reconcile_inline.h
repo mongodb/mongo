@@ -205,11 +205,11 @@ __wti_rec_need_split(WTI_RECONCILE *r, size_t len)
 }
 
 /*
- * __wti_rec_incr --
+ * __rec_incr --
  *     Update the memory tracking structure for a set of new entries.
  */
 static WT_INLINE void
-__wti_rec_incr(WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint32_t v, size_t size)
+__rec_incr(WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint32_t v, size_t size)
 {
     /*
      * The buffer code is fragile and prone to off-by-one errors -- check for overflow in diagnostic
@@ -270,60 +270,7 @@ static WT_INLINE void
 __wti_rec_image_copy(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV *kv)
 {
     __wti_rec_kv_copy(session, r->first_free, kv);
-    __wti_rec_incr(session, r, 1, kv->len);
-}
-
-/*
- * __rec_auxincr --
- *     Update the memory tracking structure for a set of new entries in the auxiliary image.
- */
-static WT_INLINE void
-__rec_auxincr(WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint32_t v, size_t size)
-{
-    /*
-     * The buffer code is fragile and prone to off-by-one errors -- check for overflow in diagnostic
-     * mode.
-     */
-    WT_ASSERT(session, r->aux_space_avail >= size);
-    WT_ASSERT(session,
-      WT_BLOCK_FITS(r->aux_first_free, size, r->cur_ptr->image.mem, r->cur_ptr->image.memsize));
-
-    r->aux_entries += v;
-    r->aux_space_avail -= size;
-    r->aux_first_free += size;
-}
-
-/*
- * __wti_rec_auximage_copy --
- *     Copy a key/value cell and buffer pair into the new auxiliary image.
- */
-static WT_INLINE void
-__wti_rec_auximage_copy(WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint32_t count, WTI_REC_KV *kv)
-{
-    size_t len;
-    uint8_t *p;
-    const uint8_t *t;
-
-    /* Make sure we didn't run out of space. */
-    WT_ASSERT(session, kv->len <= r->aux_space_avail);
-
-    /*
-     * If there's only one chunk of data to copy (because the cell and data are being copied from
-     * the original disk page), the cell length won't be set, the WT_ITEM data/length will reference
-     * the data to be copied.
-     *
-     * WT_CELLs are typically small, 1 or 2 bytes -- don't call memcpy, do the copy in-line.
-     */
-    for (p = r->aux_first_free, t = (const uint8_t *)&kv->cell, len = kv->cell_len; len > 0; --len)
-        *p++ = *t++;
-
-    /* Here the data is also small, when not entirely empty. */
-    if (kv->buf.size != 0)
-        for (t = (const uint8_t *)kv->buf.data, len = kv->buf.size; len > 0; --len)
-            *p++ = *t++;
-
-    WT_ASSERT(session, kv->len == kv->cell_len + kv->buf.size);
-    __rec_auxincr(session, r, count, kv->len);
+    __rec_incr(session, r, 1, kv->len);
 }
 
 /*

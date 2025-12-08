@@ -38,7 +38,6 @@ from wtscenario import make_scenarios
 class test_bug_030(wttest.WiredTigerTestCase):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
         ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
@@ -52,12 +51,8 @@ class test_bug_030(wttest.WiredTigerTestCase):
         nrows = 10
         uri = "table:test_bug030"
 
-        if self.value_format == '8t':
-            valuea = 97
-            valueb = 98
-        else:
-            valuea = "abcdef" * 3
-            valueb = "ghijkl" * 3
+        valuea = "abcdef" * 3
+        valueb = "ghijkl" * 3
 
         self.session.create(uri, 'key_format={},value_format={}'.format(
             self.key_format, self.value_format))

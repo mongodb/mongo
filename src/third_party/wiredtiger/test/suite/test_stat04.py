@@ -37,9 +37,8 @@ class test_stat04(wttest.WiredTigerTestCase, suite_subprocess):
     uripfx = 'table:test_stat04.'
 
     keyfmt = [
-        ('col', dict(keyfmt='r', valuefmt='S', storekind='col')),
-        ('fix', dict(keyfmt='r', valuefmt='8t', storekind='fix')),
-        ('row', dict(keyfmt='S', valuefmt='S', storekind='row')),
+        ('col', dict(keyfmt='r', storekind='col')),
+        ('row', dict(keyfmt='S', storekind='row')),
     ]
     nentries = [
         ('small', dict(nentries=100, valuesize=50)),
@@ -60,10 +59,7 @@ class test_stat04(wttest.WiredTigerTestCase, suite_subprocess):
             return n + 1
 
     def genvalue(self, n):
-        if self.valuefmt == 'S':
-            return self.valuepfx + str(n)
-        else:
-            return n & 0xff
+        return self.valuepfx + str(n)
 
     def checkcount(self, uri, expectpairs):
         statcursor = self.session.open_cursor(
@@ -79,7 +75,7 @@ class test_stat04(wttest.WiredTigerTestCase, suite_subprocess):
         self.init_test()
         uri = self.uripfx + self.storekind + '.' + str(self.nentries)
         self.session.create(uri, 'key_format=' + self.keyfmt +
-                            ',value_format=' + self.valuefmt)
+                            ',value_format=' + 'S')
         cursor = self.session.open_cursor(uri, None, None)
 
         count = 0
@@ -93,7 +89,7 @@ class test_stat04(wttest.WiredTigerTestCase, suite_subprocess):
         # Remove a number of entries, at each step checking that stats match.
         for i in range(0, self.nentries // 37):
             cursor.set_key(self.genkey(i*11 % self.nentries))
-            if cursor.remove() == 0 and self.valuefmt != '8t':
+            if cursor.remove() == 0:
                 count -= 1
             self.checkcount(uri, count)
         cursor.close()

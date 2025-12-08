@@ -289,7 +289,6 @@ update_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
         UPDATE_SPEC(max_recno, uint64);
         UPDATE_SPEC(max_value_uint64, uint64);
 
-        UPDATE_SPEC(column_fix, float);
         UPDATE_SPEC(column_var, float);
 
         UPDATE_SPEC(use_set_commit_timestamp, float);

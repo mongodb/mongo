@@ -42,10 +42,11 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
     ]
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     restart_options = [
         ('shutdown', dict(crash=False)),
@@ -71,10 +72,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
             key_format=self.key_format, value_format=self.value_format, config=ds_config)
         ds.populate()
 
-        if self.value_format == '8t':
-            valuea = 97
-        else:
-            valuea = "aaaaa" * 100
+        valuea = "aaaaa" * 100
 
         # Pin oldest and stable timestamps to 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
@@ -98,25 +96,16 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         # Search for the key so we position our cursor on the page that we want to evict.
         self.session.begin_transaction("ignore_prepare = true")
         evict_cursor.set_key(1)
-        if self.value_format == '8t':
-            # In FLCS deleted values read back as 0.
-            self.assertEqual(evict_cursor.search(), 0)
-            self.assertEqual(evict_cursor.get_value(), 0)
-        else:
-            self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
+        self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
         self.session.commit_transaction()
 
-        # Search to make sure the data is not visible (or, in FLCS, that it's zero)
+        # Search to make sure the data is not visible
         self.session.begin_transaction("ignore_prepare = true")
         cursor2 = self.session.open_cursor(uri)
         cursor2.set_key(1)
-        if self.value_format == '8t':
-            self.assertEqual(cursor2.search(), 0)
-            self.assertEqual(cursor2.get_value(), 0)
-        else:
-            self.assertEqual(cursor2.search(), WT_NOTFOUND)
+        self.assertEqual(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()
         cursor2.close()
 
@@ -135,8 +124,8 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
             s.rollback_transaction()
 
         # Verify data is not visible.
-        self.check(valuea, uri, 0, nrows, 20)
-        self.check(valuea, uri, 0, nrows, 30)
+        self.check(valuea, uri, 0, 20)
+        self.check(valuea, uri, 0, 30)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
@@ -164,12 +153,8 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
             key_format=self.key_format, value_format=self.value_format, config=ds_config)
         ds.populate()
 
-        if self.value_format == '8t':
-            valuea = 97
-            valueb = 98
-        else:
-            valuea = "aaaaa" * 100
-            valueb = "bbbbb" * 100
+        valuea = "aaaaa" * 100
+        valueb = "bbbbb" * 100
 
         # Pin oldest and stable timestamps to 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
@@ -199,25 +184,16 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         # Search for the key so we position our cursor on the page that we want to evict.
         self.session.begin_transaction("ignore_prepare = true")
         evict_cursor.set_key(1)
-        if self.value_format == '8t':
-            # In FLCS deleted values read back as 0.
-            self.assertEqual(evict_cursor.search(), 0)
-            self.assertEqual(evict_cursor.get_value(), 0)
-        else:
-            self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
+        self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
         self.session.commit_transaction()
 
-        # Search to make sure the data is not visible (or, in FLCS, that it's zero)
+        # Search to make sure the data is not visible
         self.session.begin_transaction("ignore_prepare = true")
         cursor2 = self.session.open_cursor(uri)
         cursor2.set_key(1)
-        if self.value_format == '8t':
-            self.assertEqual(cursor2.search(), 0)
-            self.assertEqual(cursor2.get_value(), 0)
-        else:
-            self.assertEqual(cursor2.search(), WT_NOTFOUND)
+        self.assertEqual(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()
         cursor2.close()
 
@@ -236,9 +212,9 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
             s.rollback_transaction()
 
         # Verify data.
-        self.check(valuea, uri, nrows, None, 20)
-        self.check(valuea, uri, 0, nrows, 30)
-        self.check(valuea, uri, 0, nrows, 40)
+        self.check(valuea, uri, nrows, 20)
+        self.check(valuea, uri, 0, 30)
+        self.check(valuea, uri, 0, 40)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]

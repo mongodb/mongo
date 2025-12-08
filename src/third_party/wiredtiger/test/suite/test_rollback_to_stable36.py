@@ -53,8 +53,6 @@ class test_rollback_to_stable36(wttest.WiredTigerTestCase):
     ]
     format_values = [
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
-        ('column_fix', dict(key_format='r', value_format='8t',
-            extraconfig=',allocation_size=512,leaf_page_max=512')),
         ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
     ]
     rollback_modes = [
@@ -128,10 +126,7 @@ class test_rollback_to_stable36(wttest.WiredTigerTestCase):
             config=self.extraconfig)
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-        else:
-            value_a = "aaaaa" * 100
+        value_a = "aaaaa" * 100
 
         # Pin oldest and stable timestamps to 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
@@ -161,11 +156,10 @@ class test_rollback_to_stable36(wttest.WiredTigerTestCase):
         self.assertEqual(err, 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
 
-        # Make sure we did at least one fast-delete. (Unless we specifically didn't want to,
-        # or running on FLCS where it isn't supported.)
+        # Make sure we did at least one fast-delete. (Unless we specifically didn't want to)
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
-        if self.value_format == '8t' or self.trunc_with_remove:
+        if self.trunc_with_remove:
             self.assertEqual(fastdelete_pages, 0)
         else:
             self.assertGreater(fastdelete_pages, 0)
@@ -182,10 +176,9 @@ class test_rollback_to_stable36(wttest.WiredTigerTestCase):
 
         # Currently rolling back a fast-truncate works by instantiating the pages and
         # rolling back the instantiated updates, so we should see some page instantiations.
-        # (But not for FLCS.)
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         read_deleted = stat_cursor[stat.conn.cache_read_deleted][2]
-        if self.value_format == '8t' or self.trunc_with_remove:
+        if self.trunc_with_remove:
             self.assertEqual(read_deleted, 0)
         else:
             self.assertGreater(read_deleted, 0)

@@ -39,10 +39,11 @@ class test_rollback_to_stable29(test_rollback_to_stable_base):
     conn_config = 'cache_size=5MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true),verbose=(rts:5)'
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     scenarios = make_scenarios(format_values)
 
@@ -50,16 +51,10 @@ class test_rollback_to_stable29(test_rollback_to_stable_base):
         uri = 'table:test_rollback_to_stable29'
         nrows = 1000
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-            value_c = 99
-            value_d = 100
-        else:
-            value_a = 'a' * 100
-            value_b = 'b' * 100
-            value_c = 'c' * 100
-            value_d = 'd' * 100
+        value_a = 'a' * 100
+        value_b = 'b' * 100
+        value_c = 'c' * 100
+        value_d = 'd' * 100
 
         # Create our table.
         ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
@@ -81,29 +76,29 @@ class test_rollback_to_stable29(test_rollback_to_stable_base):
 
         self.large_removes(uri, ds, nrows, False, 30)
         self.large_updates(uri, value_b, ds, nrows, False, 40)
-        self.check(value_b, uri, nrows, None, 40)
+        self.check(value_b, uri, nrows, 40)
 
         self.session.checkpoint()
         self.evict_cursor(uri, nrows, value_b)
 
         self.large_updates(uri, value_c, ds, nrows, False, 50)
-        self.check(value_c, uri, nrows, None, 50)
+        self.check(value_c, uri, nrows, 50)
         self.evict_cursor(uri, nrows, value_c)
 
         # Insert update without a timestamp.
         self.large_updates(uri, value_d, ds, nrows, False, 0)
 
-        self.check(value_d, uri, nrows, None, 10)
-        self.check(value_d, uri, nrows, None, 40)
-        self.check(value_d, uri, nrows, None, 50)
-        self.check(value_d, uri, nrows, None, 20)
+        self.check(value_d, uri, nrows, 10)
+        self.check(value_d, uri, nrows, 40)
+        self.check(value_d, uri, nrows, 50)
+        self.check(value_d, uri, nrows, 20)
 
         self.session.checkpoint()
 
         # Simulate a crash by copying to a new directory(RESTART).
         simulate_crash_restart(self, ".", "RESTART")
 
-        self.check(value_d, uri, nrows, None, 10)
+        self.check(value_d, uri, nrows, 10)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]

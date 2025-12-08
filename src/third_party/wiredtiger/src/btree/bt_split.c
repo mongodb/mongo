@@ -1619,7 +1619,6 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
         last_upd = NULL;
 
         switch (orig->type) {
-        case WT_PAGE_COL_FIX:
         case WT_PAGE_COL_VAR:
             /* Build a key. */
             recno = WT_INSERT_RECNO(supd->ins);
@@ -2050,16 +2049,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
         child->ref_recno = WT_INSERT_RECNO(moved_ins);
 
     /*
-     * Allocation operations completed, we're going to split.
-     *
-     * Record the fixed-length column-store split page record, used in reconciliation.
-     */
-    if (type == WT_PAGE_COL_FIX) {
-        WT_ASSERT(session, page->modify->mod_col_split_recno == WT_RECNO_OOB);
-        page->modify->mod_col_split_recno = child->ref_recno;
-    }
-
-    /*
      * Calculate how much memory we're moving: figure out how deep the skip list stack is for the
      * element we are moving, and the memory used by the item's list of updates.
      */
@@ -2182,14 +2171,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
         WT_STAT_CONN_DSRC_INCR(session, cache_inmem_split);
         return (0);
     }
-
-    /*
-     * Failure.
-     *
-     * Reset the fixed-length column-store split page record.
-     */
-    if (type == WT_PAGE_COL_FIX)
-        page->modify->mod_col_split_recno = WT_RECNO_OOB;
 
     /*
      * Clear the allocated page's reference to the moved insert list element so it's not freed when

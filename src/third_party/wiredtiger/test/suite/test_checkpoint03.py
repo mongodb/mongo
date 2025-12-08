@@ -44,7 +44,6 @@ class test_checkpoint03(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
 
     format_values = [
-        ('column-fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='i')),
         ('row_integer', dict(key_format='i', value_format='i')),
     ]

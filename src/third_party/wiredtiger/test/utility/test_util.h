@@ -114,9 +114,8 @@ typedef struct {
 
     enum {
         TABLE_NOT_SET = 0, /* Not explicitly set */
-        TABLE_COL = 1,     /* Fixed-length column store */
-        TABLE_FIX = 2,     /* Variable-length column store */
-        TABLE_ROW = 3      /* Row-store */
+        TABLE_COL = 1,     /* Variable-length column store */
+        TABLE_ROW = 2      /* Row-store */
     } table_type;
 
     FILE *progress_fp; /* Progress tracking file */

@@ -38,7 +38,6 @@ class test_cursor20(wttest.WiredTigerTestCase, suite_subprocess):
     format_values = [
         ('row', dict(key_format = 'S', value_format='S')),
         ('var', dict(key_format = 'r', value_format='S')),
-        ('fix', dict(key_format = 'r', value_format='8t')),
     ]
     reopen = [
         ('in-memory', dict(reopen=False)),

@@ -41,10 +41,11 @@ from wtscenario import make_scenarios
 class test_rollback_to_stable18(test_rollback_to_stable_base):
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        # ('column_fix', dict(key_format='r', value_format='8t')),  # FIXME-WT-14972
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     prepare_values = [
         ('no_prepare', dict(prepare=False)),
@@ -74,10 +75,7 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
             key_format=self.key_format, value_format=self.value_format, config=ds_config)
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-        else:
-            value_a = "aaaaa" * 100
+        value_a = "aaaaa" * 100
 
         # Pin oldest and stable to timestamp 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
@@ -90,8 +88,8 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
         self.large_removes(uri, ds, nrows, self.prepare, 30)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
-        self.check(None, uri, 0, nrows, 31 if self.prepare else 30)
+        self.check(value_a, uri, nrows, 21 if self.prepare else 20)
+        self.check(None, uri, 0, 31 if self.prepare else 30)
 
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
@@ -114,7 +112,7 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
         self.conn.rollback_to_stable('threads=' + str(self.threads))
 
         # Verify data is not visible.
-        self.check(value_a, uri, nrows, None, 30)
+        self.check(value_a, uri, nrows, 30)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]

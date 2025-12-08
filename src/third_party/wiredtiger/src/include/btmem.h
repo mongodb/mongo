@@ -451,27 +451,14 @@ struct __wt_page_modify {
 
             /*
              * Updated items in column-stores: variable-length RLE entries can expand to multiple
-             * entries which requires some kind of list we can expand on demand. Updated items in
-             * fixed-length files could be done based on an WT_UPDATE array as in row-stores, but
-             * there can be a very large number of bits on a single page, and the cost of the
-             * WT_UPDATE array would be huge.
+             * entries which requires some kind of list we can expand on demand.
              */
             wt_shared WT_INSERT_HEAD **update;
-
-            /*
-             * Split-saved last column-store page record. If a fixed-length column-store page is
-             * split, we save the first record number moved so that during reconciliation we know
-             * the page's last record and can write any implicitly created deleted records for the
-             * page. No longer used by VLCS.
-             */
-            uint64_t split_recno;
         } column_leaf;
 #undef mod_col_append
 #define mod_col_append u2.column_leaf.append
 #undef mod_col_update
 #define mod_col_update u2.column_leaf.update
-#undef mod_col_split_recno
-#define mod_col_split_recno u2.column_leaf.split_recno
         struct {
             /* Inserted items for row-store. */
             wt_shared WT_INSERT_HEAD **insert;
@@ -581,30 +568,6 @@ struct __wt_col_var_repeat {
     uint32_t nrepeats;     /* repeat slots */
     WT_COL_RLE repeats[0]; /* lookup RLE array */
 };
-
-/*
- * WT_COL_FIX_TW_ENTRY --
- *     This is a single entry in the WT_COL_FIX_TW array. It stores the offset from the page's
- * starting recno and the offset into the page to find the value cell containing the time window.
- */
-struct __wt_col_fix_tw_entry {
-    uint32_t recno_offset;
-    uint32_t cell_offset;
-};
-
-/*
- * WT_COL_FIX_TW --
- *     Fixed-length column-store pages carry an array of page entries that have time windows. This
- * is built when reading the page to avoid the need to walk the page to find a specific entry. We
- * can do a binary search in this array instead.
- */
-struct __wt_col_fix_tw {
-    uint32_t numtws;            /* number of time window slots */
-    WT_COL_FIX_TW_ENTRY tws[0]; /* lookup array */
-};
-
-/* WT_COL_FIX_TW_CELL gets the cell pointer from a WT_COL_FIX_TW_ENTRY. */
-#define WT_COL_FIX_TW_CELL(page, entry) ((WT_CELL *)((uint8_t *)(page)->dsk + (entry)->cell_offset))
 
 #ifdef HAVE_DIAGNOSTIC
 /*
@@ -734,20 +697,6 @@ struct __wt_page {
         WT_ROW *row; /* Key/value pairs */
 #undef pg_row
 #define pg_row u.row
-
-        /* Fixed-length column-store leaf page. */
-        struct {
-            uint8_t *fix_bitf;     /* Values */
-            WT_COL_FIX_TW *fix_tw; /* Time window index */
-#define WT_COL_FIX_TWS_SET(page) ((page)->u.col_fix.fix_tw != NULL)
-        } col_fix;
-#undef pg_fix_bitf
-#define pg_fix_bitf u.col_fix.fix_bitf
-#undef pg_fix_numtws
-#define pg_fix_numtws u.col_fix.fix_tw->numtws
-#undef pg_fix_tws
-#define pg_fix_tws u.col_fix.fix_tw->tws
-
         /* Variable-length column-store leaf page. */
         struct {
             WT_COL *col_var;            /* Values */
@@ -794,16 +743,16 @@ struct __wt_page {
 
 #define WT_PAGE_IS_INTERNAL(page) \
     ((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
-#define WT_PAGE_INVALID 0       /* Invalid page */
-#define WT_PAGE_BLOCK_MANAGER 1 /* Block-manager page */
-#define WT_PAGE_COL_FIX 2       /* Col-store fixed-len leaf */
-#define WT_PAGE_COL_INT 3       /* Col-store internal page */
-#define WT_PAGE_COL_VAR 4       /* Col-store var-length leaf page */
-#define WT_PAGE_OVFL 5          /* Overflow page */
-#define WT_PAGE_ROW_INT 6       /* Row-store internal page */
-#define WT_PAGE_ROW_LEAF 7      /* Row-store leaf page */
-#define WT_PAGE_TYPE_COUNT 8    /* First value beyond valid for checks */
-    uint8_t type;               /* Page type */
+#define WT_PAGE_INVALID 0            /* Invalid page */
+#define WT_PAGE_BLOCK_MANAGER 1      /* Block-manager page */
+#define WT_PAGE_COL_FIX_DEPRECATED 2 /* Col-store fixed-len leaf */
+#define WT_PAGE_COL_INT 3            /* Col-store internal page */
+#define WT_PAGE_COL_VAR 4            /* Col-store var-length leaf page */
+#define WT_PAGE_OVFL 5               /* Overflow page */
+#define WT_PAGE_ROW_INT 6            /* Row-store internal page */
+#define WT_PAGE_ROW_LEAF 7           /* Row-store leaf page */
+#define WT_PAGE_TYPE_COUNT 8         /* First value beyond valid for checks */
+    uint8_t type;                    /* Page type */
 
     /* 1 byte hole expected. */
 
@@ -1834,75 +1783,12 @@ struct __wt_insert_head {
 #define WT_COL_UPDATE(page, ip) WT_COL_UPDATE_SLOT(page, WT_COL_SLOT(page, ip))
 
 /*
- * WT_COL_UPDATE_SINGLE is a single WT_INSERT list, used for any fixed-length column-store updates
- * for a page.
- */
-#define WT_COL_UPDATE_SINGLE(page) WT_COL_UPDATE_SLOT(page, 0)
-
-/*
- * WT_COL_APPEND is an WT_INSERT list, used for fixed- and variable-length appends.
+ * WT_COL_APPEND is an WT_INSERT list, used for variable-length appends.
  */
 #define WT_COL_APPEND(page)                                             \
     ((page)->modify == NULL || (page)->modify->mod_col_append == NULL ? \
         NULL :                                                          \
         (page)->modify->mod_col_append[0])
-
-/* WT_COL_FIX_FOREACH_BITS walks fixed-length bit-fields on a disk page. */
-#define WT_COL_FIX_FOREACH_BITS(btree, dsk, v, i)                            \
-    for ((i) = 0,                                                            \
-        (v) = (i) < (dsk)->u.entries ?                                       \
-           __bit_getv(WT_PAGE_HEADER_BYTE(btree, dsk), 0, (btree)->bitcnt) : \
-           0;                                                                \
-         (i) < (dsk)->u.entries; ++(i),                                      \
-        (v) = (i) < (dsk)->u.entries ?                                       \
-           __bit_getv(WT_PAGE_HEADER_BYTE(btree, dsk), i, (btree)->bitcnt) : \
-           0)
-
-/*
- * FLCS pages with time information have a small additional header after the main page data that
- * holds a version number and cell count, plus the byte offset to the start of the cell data. The
- * latter values are limited by the page size, so need only be 32 bits. One hopes we'll never need
- * 2^32 versions.
- *
- * This struct is the in-memory representation. The number of entries is the number of time windows
- * (there are twice as many cells) and the offsets is from the beginning of the page. The space
- * between the empty offset and the data offset is not used and is expected to be zeroed.
- *
- * This structure is only used when handling on-disk pages; once the page is read in, one should
- * instead use the time window index in the page structure, which is a different type found above.
- */
-struct __wt_col_fix_auxiliary_header {
-    uint32_t version;
-    uint32_t entries;
-    uint32_t emptyoffset;
-    uint32_t dataoffset;
-};
-
-/*
- * The on-disk auxiliary header uses a 1-byte version (the header must always begin with a nonzero
- * byte) and packed integers for the entry count and offset. To make the size of the offset entry
- * predictable (rather than dependent on the total page size) and also as small as possible, we
- * store the distance from the auxiliary data. To avoid complications computing the offset, we
- * include the offset's own storage space in the offset, and to make things simpler all around, we
- * include the whole auxiliary header in the offset; that is, the position of the auxiliary data is
- * computed as the position of the start of the auxiliary header plus the decoded stored offset.
- *
- * Both the entry count and the offset are limited to 32 bits because pages may not exceed 4G, so
- * their maximum encoded lengths are 5 each, so the maximum size of the on-disk header is 11 bytes.
- * It can be as small as 3 bytes, though.
- *
- * We reserve 7 bytes for the header on a full page (not 11) because on a full page the encoded
- * offset is the reservation size, and 7 encodes in one byte. This is enough for all smaller pages:
- * obviously if there's at least 4 extra bytes in the bitmap space any header will fit (4 + 7 = 11)
- * and if there's less the encoded offset is less than 11, which still encodes to one byte.
- */
-
-#define WT_COL_FIX_AUXHEADER_RESERVATION 7
-#define WT_COL_FIX_AUXHEADER_SIZE_MAX 11
-
-/* Values for ->version. Version 0 never appears in an on-disk header. */
-#define WT_COL_FIX_VERSION_NIL 0 /* Original page format with no timestamp data */
-#define WT_COL_FIX_VERSION_TS 1  /* Upgraded format with cells carrying timestamp info */
 
 /*
  * Manage split generation numbers. Splits walk the list of sessions to check when it is safe to

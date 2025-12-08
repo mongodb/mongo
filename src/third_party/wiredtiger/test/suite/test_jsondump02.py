@@ -100,8 +100,6 @@ class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
             'internal_page_max=16384,leaf_page_max=131072'
         self.session.create(self.table_uri1,
             'key_format=S,value_format=S' + extra_params)
-        self.session.create(self.table_uri2,
-            'key_format=S,value_format=8tS' + extra_params)
         self.session.create(self.table_uri3,
             'key_format=r,value_format=u' + extra_params)
         self.session.create(self.table_uri4,

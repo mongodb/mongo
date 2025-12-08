@@ -36,10 +36,11 @@ from wtscenario import make_scenarios
 class test_prepare29(wttest.WiredTigerTestCase):
 
     format_values = [
-        ('column', dict(key_format='r', key=1, value_format='S')),
-        ('column-fix', dict(key_format='r', key=1, value_format='8t')),
-        ('string-row', dict(key_format='S', key=str(1), value_format='S')),
+        ('column', dict(key_format='r', key=1)),
+        ('string-row', dict(key_format='S', key=str(1))),
     ]
+
+    value_format='S'
 
     scenarios = make_scenarios(format_values)
 
@@ -58,10 +59,7 @@ class test_prepare29(wttest.WiredTigerTestCase):
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
-        if self.value_format == '8t':
-            value1 = 97
-        else:
-            value1 = 'a' * 5
+        value1 = 'a' * 5
 
         # Pin oldest timestamp.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))

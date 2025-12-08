@@ -1859,15 +1859,6 @@ tasks:
         vars:
           directory: examples/c
 
-  - name: bloom-test
-    tags: ["pull_request"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-      - func: "make check directory"
-        vars:
-          directory: test/bloom
-
   - name: checkpoint-test
     tags: ["pull_request"]
     commands:
@@ -3832,12 +3823,6 @@ tasks:
       # extended test/thread runs
       - func: "thread test"
         vars:
-          thread_test_args: -t f
-      - func: "thread test"
-        vars:
-          thread_test_args: -S -F -n 100000 -t f
-      - func: "thread test"
-        vars:
           thread_test_args: -t r
       - func: "thread test"
         vars:
@@ -3876,9 +3861,6 @@ tasks:
           test_name: random_abort
 
       # format test
-      - func: "format test"
-        vars:
-          test_format_extra_args: file_type=fix runs.rows=1000000:2500000
       - func: "format test"
         vars:
           test_format_extra_args: file_type=row runs.rows=1000000:2500000

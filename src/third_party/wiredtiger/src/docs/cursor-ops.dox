@@ -189,7 +189,7 @@ traverses outside of the bounded range the \c search_near logic can early exit r
 Clearing the bounds can be done through resetting the cursor with \c cursor->reset or by passing a clear config to the bounds API call.
 This will unconditionally clear both bounds.
 
-Bounds API is supported with row-store and variable length column store. Bounds API is not supported with fixed length column store.
+Bounds API is supported with row-store and variable-length column-store.
 
 The bounds API supports these cursor types:
 - File cursor

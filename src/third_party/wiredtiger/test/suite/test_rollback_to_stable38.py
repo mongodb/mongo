@@ -44,11 +44,11 @@ class test_rollback_to_stable38(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S', extraconfig='')),
-        ('column_fix', dict(key_format='r', value_format='8t',
-            extraconfig='')),
-        ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
     ]
+    value_format='S'
+    extraconfig=''
     scenarios = make_scenarios(format_values)
 
     # Don't raise errors for these, the expectation is that the RTS verifier will
@@ -85,10 +85,7 @@ class test_rollback_to_stable38(wttest.WiredTigerTestCase):
             config=self.extraconfig)
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-        else:
-            value_a = "aaaaa" * 100
+        value_a = "aaaaa" * 100
 
         # Pin a transaction
         session2 = self.conn.open_session()

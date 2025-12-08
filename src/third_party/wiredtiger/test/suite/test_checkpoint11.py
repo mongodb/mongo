@@ -46,8 +46,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
     rollbacks_allowed = 10
 
     format_values = [
-        ('column-fix', dict(key_format='r', value_format='8t',
-            extraconfig=',allocation_size=512,leaf_page_max=512')),
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
     ]
@@ -105,9 +103,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
                     seen[v] += 1
                 else:
                     seen[v] = 1
-            #for v in seen:
-            #    pv = v if self.value_format == '8t' else v[0]
-            #    self.prout("at {} seen {}: {}".format(ts, pv, seen[v]))
             ts_seen[ts] = seen
             #self.session.rollback_transaction()
             cursor.close()
@@ -129,15 +124,9 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             config=self.extraconfig)
         ds.populate()
 
-        if self.value_format == '8t':
-            morerows *= 5
-            value_a = 97
-            value_b = 98
-            value_c = 99
-        else:
-            value_a = "aaaaa" * 100
-            value_b = "bbbbb" * 100
-            value_c = "ccccc" * 100
+        value_a = "aaaaa" * 100
+        value_b = "bbbbb" * 100
+        value_c = "ccccc" * 100
 
         # Pin oldest and stable timestamps to 5.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5) +
@@ -215,29 +204,13 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         # the stable timestamp when the checkpoint was taken.
         expected[None] = expected[self.stable_ts]
 
-        # For FLCS, because the table expands under uncommitted data, we should
-        # see zeros once the additional data's been written (that is, always strictly
-        # before the checkpoint) if we don't see the actual values.
-        expected_5_flcs = { 0: nrows + morerows }
-        expected_15_flcs = { value_a: nrows, 0: morerows }
-        expected_25_flcs = { value_b: nrows, 0: morerows }
-        expected_35_flcs_a = { value_b: nrows, 0: morerows }
-        expected_35_flcs_b = { value_b: nrows - overlap, value_c: overlap + morerows }
-        expected_flcs = {
-            5: [expected_5_flcs],
-            15: [expected_15_flcs],
-            25: [expected_25_flcs],
-            35: [expected_35_flcs_a, expected_35_flcs_b]
-        }
-        expected_flcs[None] = expected_flcs[self.stable_ts]
-
         if self.do_advance:
             # Move oldest up in case that interferes with handling the checkpoint.
             self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
             self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(50))
 
         # Now read the checkpoint.
-        self.check(ds, self.second_checkpoint, expected_flcs if self.value_format == '8t' else expected)
+        self.check(ds, self.second_checkpoint, expected)
 
         # If we haven't died yet, pretend to crash and run RTS to see if the
         # checkpoint was inconsistent.

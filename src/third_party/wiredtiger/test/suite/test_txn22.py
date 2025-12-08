@@ -39,13 +39,9 @@ class test_txn22(wttest.WiredTigerTestCase, suite_subprocess):
     base_config = 'cache_size=1GB'
     conn_config = base_config
 
-    # Generate more rows for FLCS because otherwise it all fits on one page even with the
-    # smaller page size.
     format_values = [
-        ('integer-row', dict(key_format='i', value_format='S', extraconfig='', nrecords=1000)),
-        ('column', dict(key_format='r', value_format='S', extraconfig='', nrecords=1000)),
-        ('column-fix', dict(key_format='r', value_format='8t', extraconfig=',leaf_page_max=4096',
-            nrecords=10000)),
+        ('integer-row', dict(key_format='i', extraconfig='', nrecords=1000)),
+        ('column', dict(key_format='r', extraconfig='', nrecords=1000)),
     ]
 
     # File to be corrupted
@@ -75,8 +71,6 @@ class test_txn22(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:test_txn22'
 
     def valuegen(self, i):
-        if self.value_format == '8t':
-            return i % 256
         return str(i) + 'A' * 1024
 
     # Insert a list of keys
@@ -114,7 +108,7 @@ class test_txn22(wttest.WiredTigerTestCase, suite_subprocess):
         expect = list(range(1, self.nrecords + 1))
         salvage_config = self.base_config + ',salvage=true'
 
-        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        create_params = 'key_format={},value_format={}'.format(self.key_format, 'S')
         self.session.create(self.uri, create_params + self.extraconfig)
         self.inserts(expect)
 

@@ -37,7 +37,6 @@ class test_prepare43(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare43'
 
     format_values = [
-        ('column-fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='S')),
         ('row', dict(key_format='r', value_format='S')),
     ]
@@ -58,7 +57,7 @@ class test_prepare43(test_prepare_preserve_prepare_base):
         cursor = self.session.open_cursor(self.uri)
         self.session.begin_transaction()
         for i in range(1, 100):
-            value = i if self.value_format == '8t' else "commit_value"
+            value = "commit_value"
             cursor[i] = value
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(21))
 
@@ -93,6 +92,6 @@ class test_prepare43(test_prepare_preserve_prepare_base):
             if ret != 0:
                 break
             self.assertEqual(cursor.get_key(), i)
-            self.assertEqual(cursor.get_value(), i if self.value_format == '8t' else "commit_value")
+            self.assertEqual(cursor.get_value(), "commit_value")
             i += 1
         self.assertEqual(i, 100)

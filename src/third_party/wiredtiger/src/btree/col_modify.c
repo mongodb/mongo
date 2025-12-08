@@ -18,7 +18,6 @@ int
 __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_UPDATE **updp_arg,
   u_int modify_type, bool exclusive, bool restore)
 {
-    WT_BTREE *btree;
     WT_DECL_RET;
     WT_INSERT *ins;
     WT_INSERT_HEAD *ins_head, **ins_headp;
@@ -31,7 +30,6 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
     u_int i, skipdepth;
     bool added_to_txn, append, inserted_to_update_chain;
 
-    btree = CUR2BT(cbt);
     ins = NULL;
     page = cbt->ref->page;
     session = CUR2S(cbt);
@@ -71,9 +69,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
          */
         WT_ASSERT(session, recno != WT_RECNO_OOB || cbt->compare != 0);
         if (cbt->compare != 0 &&
-          (recno == WT_RECNO_OOB ||
-            recno > (btree->type == BTREE_COL_VAR ? __col_var_last_recno(cbt->ref) :
-                                                    __col_fix_last_recno(cbt->ref)))) {
+          (recno == WT_RECNO_OOB || recno > __col_var_last_recno(cbt->ref))) {
             append = true;
             cbt->ins = NULL;
             cbt->ins_head = NULL;
@@ -83,9 +79,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
         WT_ASSERT_ALWAYS(
           session, recno != WT_RECNO_OOB, "Out-of-bound recno provided for a non-append operation");
         WT_ASSERT_OPTIONAL(session, WT_DIAGNOSTIC_KEY_OUT_OF_ORDER,
-          cbt->compare == 0 ||
-            recno <= (btree->type == BTREE_COL_VAR ? __col_var_last_recno(cbt->ref) :
-                                                     __col_fix_last_recno(cbt->ref)),
+          cbt->compare == 0 || recno <= __col_var_last_recno(cbt->ref),
           "Out-of-bound recno provided for a non-append operation");
     }
 
@@ -185,9 +179,6 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
         if (append) {
             WT_PAGE_ALLOC_AND_SWAP(session, page, mod->mod_col_append, ins_headp, 1);
             ins_headp = &mod->mod_col_append[0];
-        } else if (page->type == WT_PAGE_COL_FIX) {
-            WT_PAGE_ALLOC_AND_SWAP(session, page, mod->mod_col_update, ins_headp, 1);
-            ins_headp = &mod->mod_col_update[0];
         } else {
             WT_PAGE_ALLOC_AND_SWAP(session, page, mod->mod_col_update, ins_headp, page->entries);
             ins_headp = &mod->mod_col_update[cbt->slot];
@@ -207,14 +198,6 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
         WT_ERR(__col_insert_alloc(session, recno, skipdepth, &ins, &ins_size));
         cbt->ins_head = ins_head;
         cbt->ins = ins;
-
-        /*
-         * Check for insert split and checkpoint races in column-store: it's easy (as opposed to in
-         * row-store) and a difficult bug to otherwise diagnose.
-         */
-        WT_ASSERT(session,
-          mod->mod_col_split_recno == WT_RECNO_OOB ||
-            (recno != WT_RECNO_OOB && mod->mod_col_split_recno > recno));
 
         if (upd_arg == NULL) {
             WT_ERR(__wt_upd_alloc(session, value, modify_type, &upd, &upd_size));

@@ -38,7 +38,6 @@ from wtscenario import make_scenarios
 class test_salvage02(wttest.WiredTigerTestCase):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
         ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
@@ -71,12 +70,8 @@ class test_salvage02(wttest.WiredTigerTestCase):
     def test_hs_removed(self):
         nrows = 1000
 
-        if self.value_format == '8t':
-            valuea = 97
-            valueb = 98
-        else:
-            valuea = "aaaaa" * 100
-            valueb = "bbbbb" * 100
+        valuea = "aaaaa" * 100
+        valueb = "bbbbb" * 100
 
         # Start normally, insert data
         ds = SimpleDataSet(self, self.uri, 0, key_format=self.key_format, value_format=self.value_format)

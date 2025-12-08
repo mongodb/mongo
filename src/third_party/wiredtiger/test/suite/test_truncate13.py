@@ -48,10 +48,8 @@ class test_truncate13(wttest.WiredTigerTestCase):
         #('remove', dict(trunc_with_remove=True)),
     ]
     format_values = [
-        ('column', dict(key_format='r', value_format='S', extraconfig='')),
-        ('column_fix', dict(key_format='r', value_format='8t',
-            extraconfig=',allocation_size=512,leaf_page_max=512')),
-        ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
+        ('column', dict(key_format='r', extraconfig='')),
+        ('integer_row', dict(key_format='i', extraconfig='')),
     ]
     range_values = [
         ('start', dict(where="start")),
@@ -71,8 +69,6 @@ class test_truncate13(wttest.WiredTigerTestCase):
 
     # Make all the values different to avoid having VLCS RLE condense the table.
     def mkdata(self, basevalue, i):
-        if self.value_format == '8t':
-            return basevalue
         return basevalue + str(i)
 
     def evict(self, uri, lo, hi, basevalue):
@@ -132,21 +128,15 @@ class test_truncate13(wttest.WiredTigerTestCase):
         count = 0
         key = 1
         for k, v in cursor:
-            if self.value_format == '8t':
-                if key >= first and key < first + skipped:
-                    value = 0
-                else:
-                    value = self.mkdata(basevalue, k)
-            else:
-                if key == first:
-                    key += skipped
-                value = self.mkdata(basevalue, k)
+            if key == first:
+                key += skipped
+            value = self.mkdata(basevalue, k)
             self.assertEqual(k, key)
             self.assertEqual(v, value)
             count += 1
             key += 1
         self.session.commit_transaction()
-        self.assertEqual(count, skipped + nrows if self.value_format == '8t' else nrows)
+        self.assertEqual(count, nrows)
         cursor.close()
 
     def test_truncate(self):
@@ -155,18 +145,13 @@ class test_truncate13(wttest.WiredTigerTestCase):
         # Create a table without logging.
         uri = "table:truncate13"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            self, uri, 0, key_format=self.key_format, value_format='S',
             config='log=(enabled=false)' + self.extraconfig)
         ds.populate()
 
-        if self.value_format == '8t':
-            valuea = 97
-            valueb = 98
-            valuec = 99
-        else:
-            valuea = "aaaaa" * 100
-            valueb = "bbbbb" * 100
-            valuec = "ccccc" * 100
+        valuea = "aaaaa" * 100
+        valueb = "bbbbb" * 100
+        valuec = "ccccc" * 100
 
         # Pin oldest and stable timestamps to 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
@@ -220,15 +205,14 @@ class test_truncate13(wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(35))
 
         # Check stats to make sure we fast-deleted at least one page.
-        # (Except for FLCS, where it's not supported and we should fast-delete zero pages.)
-        # (Or if we are running with trunc_with_remove.)
+        # (Except if we are running with trunc_with_remove.)
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
         if self.runningHook('tiered'):
             # There's no way the test can guess whether fast delete is possible when
             # flush_tier calls are "randomly" inserted.
             pass
-        elif self.value_format == '8t' or self.trunc_with_remove:
+        elif self.trunc_with_remove:
             self.assertEqual(fastdelete_pages, 0)
         else:
             self.assertGreater(fastdelete_pages, 0)

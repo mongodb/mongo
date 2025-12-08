@@ -57,7 +57,7 @@ _E
 
 1. Patch the source processed by THIS script with the following line:
 
-perl -i -npE 's/(?<!case\s{1,30})\b((EACCES|EAGAIN|EBUSY|ECANCELED|EEXIST|EFBIG|EINTR|EINVAL|EIO|ENOENT|ENOMEM|ENOSPC|ENOTSUP|EPERM|ERANGE|ETIMEDOUT|WT_CACHE_FULL|WT_DUPLICATE_KEY|WT_ERROR|WT_GETOPT_BAD_ARGUMENT|WT_GETOPT_BAD_OPTION|WT_NOTFOUND|WT_PANIC|WT_PREPARE_CONFLICT|WT_RESTART|WT_ROLLBACK|WT_RUN_RECOVERY|WT_TRY_SALVAGE)_AT_\w*)/__wt_set_return(session, $1)/g' `find src -name \*.[ch] | fgrep -v -e bt_debug.c -e bloom.c -e bt_vrfy_dsk.c -e api_calc_modify.c -e config.c -e conn_api.c -e log_auto.c -e os_ -e util_ -e intpack_inline.h -e packing_inline.h`
+perl -i -npE 's/(?<!case\s{1,30})\b((EACCES|EAGAIN|EBUSY|ECANCELED|EEXIST|EFBIG|EINTR|EINVAL|EIO|ENOENT|ENOMEM|ENOSPC|ENOTSUP|EPERM|ERANGE|ETIMEDOUT|WT_CACHE_FULL|WT_DUPLICATE_KEY|WT_ERROR|WT_GETOPT_BAD_ARGUMENT|WT_GETOPT_BAD_OPTION|WT_NOTFOUND|WT_PANIC|WT_PREPARE_CONFLICT|WT_RESTART|WT_ROLLBACK|WT_RUN_RECOVERY|WT_TRY_SALVAGE)_AT_\w*)/__wt_set_return(session, $1)/g' `find src -name \*.[ch] | fgrep -v -e bt_debug.c -e bt_vrfy_dsk.c -e api_calc_modify.c -e config.c -e conn_api.c -e log_auto.c -e os_ -e util_ -e intpack_inline.h -e packing_inline.h`
 
 2. Run CMake.
 

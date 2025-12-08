@@ -37,8 +37,6 @@ from rollback_to_stable_util import test_rollback_to_stable_base
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_rollback_to_stable09(test_rollback_to_stable_base):
 
-    # Don't bother testing FLCS tables as well as they're highly unlikely to
-    # behave differently at this level.
     colstore_values = [
         ('column', dict(use_columns=True)),
         ('row', dict(use_columns=False)),

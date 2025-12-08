@@ -44,7 +44,6 @@ static void *thread_insert(void *);
 static void *thread_get(void *);
 static void create_perf_json(bool, int, int);
 
-#define BLOOM false
 #define GAP_WARNINGS 3 /* Threshold for seconds of gap to be displayed */
 #define N_RECORDS (10 * WT_THOUSAND)
 #define N_INSERT WT_MILLION
@@ -57,7 +56,6 @@ typedef struct {
     char posturi[256];
     char baluri[256];
     char flaguri[256];
-    bool bloom;
     bool usecolumns;
 } SHARED_OPTS;
 
@@ -98,10 +96,7 @@ main(int argc, char *argv[])
     memset(get_args, 0, sizeof(get_args));
     njoins = nwarnings = 0;
 
-    sharedopts->bloom = BLOOM;
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    if (opts->table_type == TABLE_FIX)
-        testutil_die(ENOTSUP, "Fixed-length column store not supported");
     sharedopts->usecolumns = (opts->table_type == TABLE_COL);
 
     testutil_recreate_dir(opts->home);

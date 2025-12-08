@@ -40,10 +40,11 @@ from rollback_to_stable_util import test_rollback_to_stable_base
 class test_rollback_to_stable35(test_rollback_to_stable_base):
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     scenarios = make_scenarios(format_values)
 
@@ -97,14 +98,9 @@ class test_rollback_to_stable35(test_rollback_to_stable_base):
             self, uri_2, 0, key_format=self.key_format, value_format=self.value_format)
         ds_2.populate()
 
-        if self.value_format == '8t':
-            valuea = 97
-            valueb = 98
-            valuec = 99
-        else:
-            valuea = "aaaaa" * 100
-            valueb = "bbbbb" * 100
-            valuec = "ccccc" * 100
+        valuea = "aaaaa" * 100
+        valueb = "bbbbb" * 100
+        valuec = "ccccc" * 100
 
         self.large_updates(uri_1, uri_2, valuea, ds_1, ds_2, nrows)
         self.check(valuea, uri_1, uri_2, nrows)

@@ -65,8 +65,7 @@ struct kv_workload_generator_spec {
     uint64_t max_recno;
     uint64_t max_value_uint64;
 
-    /* Probabilities for table types. */
-    float column_fix;
+    /* Probability for table type. */
     float column_var;
 
     /* The probability of allowing the use of "set commit timestamp" in a transaction. */

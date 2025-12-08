@@ -363,9 +363,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     int64_t maj_version, min_version;
-    uint32_t bitcnt;
     const char **cfg;
-    bool fixed;
 
     btree = S2BT(session);
     cfg = btree->dhandle->cfg;
@@ -405,18 +403,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
             WT_RET(__wt_config_gets(session, cfg, "app_metadata", &metadata));
             WT_RET(__wt_collator_config(session, btree->dhandle->name, &cval, &metadata,
               &btree->collator, &btree->collator_owned));
-        }
-    }
-
-    /* Column-store: check for fixed-size data. */
-    if (btree->type == BTREE_COL_VAR) {
-        WT_RET(__wt_struct_check(session, cval.str, cval.len, &fixed, &bitcnt));
-        if (fixed) {
-            if (bitcnt == 0 || bitcnt > 8)
-                WT_RET_MSG(session, EINVAL,
-                  "fixed-width field sizes must be greater than 0 and less than or equal to 8");
-            btree->bitcnt = (uint8_t)bitcnt;
-            btree->type = BTREE_COL_FIX;
         }
     }
 
@@ -561,8 +547,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
      *	Suffix compression (row-store)
      */
     switch (btree->type) {
-    case BTREE_COL_FIX:
-        break;
     case BTREE_ROW:
         WT_RET(__wt_config_gets(session, cfg, "internal_key_truncate", &cval));
         btree->internal_key_truncate = cval.val != 0;
@@ -582,22 +566,16 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     WT_RET(__wt_compressor_config(session, &cval, &btree->compressor));
 
     /*
-     * Configure compression adjustment.
-     * When doing compression, assume compression rates that will result in
-     * pages larger than the maximum in-memory images allowed. If we're
-     * wrong, we adjust downward (but we're almost certainly correct, the
-     * maximum in-memory images allowed are only 4x the maximum page size,
-     * and compression always gives us more than 4x).
-     *	Don't do compression adjustment for fixed-size column store, the
-     * leaf page sizes don't change. (We could adjust internal pages but not
-     * leaf pages, but that seems an unlikely use case.)
+     * Configure compression adjustment. When doing compression, assume compression rates that will
+     * result in pages larger than the maximum in-memory images allowed. If we're wrong, we adjust
+     * downward (but we're almost certainly correct, the maximum in-memory images allowed are only
+     * 4x the maximum page size, and compression always gives us more than 4x).
      */
     btree->intlpage_compadjust = false;
     btree->maxintlpage_precomp = btree->maxintlpage;
     btree->leafpage_compadjust = false;
     btree->maxleafpage_precomp = btree->maxleafpage;
-    if (btree->compressor != NULL && btree->compressor->compress != NULL &&
-      btree->type != BTREE_COL_FIX) {
+    if (btree->compressor != NULL && btree->compressor->compress != NULL) {
         /*
          * Don't do compression adjustment when on-disk page sizes are less than 16KB. There's not
          * enough compression going on to fine-tune the size, all we end up doing is hammering
@@ -838,7 +816,6 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
      * we require a correct page setup at each point where we might fail.
      */
     switch (btree->type) {
-    case BTREE_COL_FIX:
     case BTREE_COL_VAR:
         WT_ERR(__wt_page_alloc(session, WT_PAGE_COL_INT, 1, true, &root, 0));
         root->pg_intl_parent_ref = &btree->root;
@@ -901,9 +878,6 @@ __wti_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_REF *ref)
     btree = S2BT(session);
 
     switch (btree->type) {
-    case BTREE_COL_FIX:
-        WT_RET(__wt_page_alloc(session, WT_PAGE_COL_FIX, 0, false, &ref->page, 0));
-        break;
     case BTREE_COL_VAR:
         WT_RET(__wt_page_alloc(session, WT_PAGE_COL_VAR, 0, false, &ref->page, 0));
         break;
@@ -971,7 +945,6 @@ static int
 __btree_get_last_recno(WT_SESSION_IMPL *session)
 {
     WT_BTREE *btree;
-    WT_PAGE *page;
     WT_REF *next_walk;
     uint64_t last_recno;
     uint32_t flags;
@@ -1000,9 +973,7 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
     if (next_walk == NULL)
         return (WT_NOTFOUND);
 
-    page = next_walk->page;
-    last_recno = page->type == WT_PAGE_COL_VAR ? __col_var_last_recno(next_walk) :
-                                                 __col_fix_last_recno(next_walk);
+    last_recno = __col_var_last_recno(next_walk);
 
     /*
      * If the right-most page is deleted and globally visible, we skip reading the page from disk
@@ -1062,20 +1033,6 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
         WT_RET_MSG(session, EINVAL,
           "page sizes must be a multiple of the page allocation size (%" PRIu32 "B)",
           btree->allocsize);
-
-    /*
-     * FLCS leaf pages have a lower size limit than the default, because the size configures the
-     * bitmap data size and the timestamp data adds on to that. Each time window can be up to 63
-     * bytes and the total page size must not exceed 4G. Thus for an 8t table there can be 64M
-     * entries (so 64M of bitmap data and up to 63*64M == 4032M of time windows), less a bit for
-     * headers. For a 1t table there can be (64 7/8)M entries because the bitmap takes less space,
-     * but that corresponds to a configured page size of a bit over 8M. Consequently the absolute
-     * limit on the page size is 8M, but since pages this large make no sense and perform poorly
-     * even if they don't get bloated out with timestamp data, we'll cut down by a factor of 16 and
-     * set the limit to 128KB.
-     */
-    if (btree->type == BTREE_COL_FIX && btree->maxleafpage > 128 * WT_KILOBYTE)
-        WT_RET_MSG(session, EINVAL, "page size for fixed-length column store is limited to 128KB");
 
     /*
      * Default in-memory page image size for compression is 4x the maximum internal or leaf page

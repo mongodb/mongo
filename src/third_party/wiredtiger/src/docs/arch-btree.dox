@@ -20,8 +20,8 @@ write data as needed to and from the data file. It also contains the specific WT
 type, a reference to the root page on disk for access to the underlying data, and
 information used to maintain the B-Tree structure. The different B-Tree types support
 different access methods; row-store is most commonly used (\c WT_BTREE_ROW), and
-column-store is available with either fixed-length records (\c WT_BTREE_COL_FIX) or
-variable-length records (\c WT_BTREE_COL_VAR) (see @ref arch-row-column for more details).
+column-store is available with variable-length records (\c WT_BTREE_COL_VAR)
+(see @ref arch-row-column for more details).
 
 @section btree_btree_in_memory_representation B-Tree In-Memory Representation
 

@@ -45,8 +45,8 @@ create_table(WT_SESSION *session, COOKIE *cookie)
     char config[256];
     const char *kf, *vf;
 
-    kf = cookie->type == COL || cookie->type == FIX ? "r" : "q";
-    vf = cookie->type == FIX ? "8t" : "S";
+    kf = cookie->type == COL ? "r" : "q";
+    vf = "S";
 
     /*
      * If we're using timestamps, turn off logging for the table.
@@ -180,27 +180,13 @@ worker_no_ts_delete(WT_CURSOR *cursor, uint64_t keyno)
 }
 
 /*
- * cursor_fix_at_zero --
- *     Check if we're on a zero (deleted) value. FLCS only.
- */
-static bool
-cursor_fix_at_zero(WT_CURSOR *cursor)
-{
-    uint8_t val;
-
-    testutil_check(cursor->get_value(cursor, &val));
-    return (val == 0);
-}
-
-/*
  * worker_op --
  *     Write operation.
  */
 static inline int
-worker_op(WT_CURSOR *cursor, table_type type, uint64_t keyno, u_int new_val)
+worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
 {
     WT_MODIFY entries[MAX_MODIFY_ENTRIES];
-    uint8_t val8;
     int cmp, ret;
     int nentries;
     char valuebuf[64];
@@ -234,16 +220,6 @@ worker_op(WT_CURSOR *cursor, table_type type, uint64_t keyno, u_int new_val)
                     return (WT_ROLLBACK);
                 return (log_print_err("cursor.next", ret, 1));
             }
-        } else if (type == FIX) {
-            /* To match what happens in VAR and ROW, advance to the next nonzero key. */
-            while (cursor_fix_at_zero(cursor))
-                if ((ret = cursor->next(cursor)) != 0) {
-                    if (ret == WT_NOTFOUND)
-                        return (0);
-                    if (ret == WT_ROLLBACK)
-                        return (WT_ROLLBACK);
-                    return (log_print_err("cursor.next", ret, 1));
-                }
         }
 
         for (int i = 10; i > 0; i--) {
@@ -261,17 +237,6 @@ worker_op(WT_CURSOR *cursor, table_type type, uint64_t keyno, u_int new_val)
                     return (WT_ROLLBACK);
                 return (log_print_err("cursor.next", ret, 1));
             }
-            if (type == FIX) {
-                /* To match what happens in VAR and ROW, advance to the next nonzero key. */
-                while (cursor_fix_at_zero(cursor))
-                    if ((ret = cursor->next(cursor)) != 0) {
-                        if (ret == WT_NOTFOUND)
-                            return (0);
-                        if (ret == WT_ROLLBACK)
-                            return (WT_ROLLBACK);
-                        return (log_print_err("cursor.next", ret, 1));
-                    }
-            }
         }
         if (g.sweep_stress)
             testutil_check(cursor->reset(cursor));
@@ -288,17 +253,9 @@ worker_op(WT_CURSOR *cursor, table_type type, uint64_t keyno, u_int new_val)
         if (new_val % 39 < 30 && !g.opts.disagg_storage) {
             /* Do modify. */
             ret = cursor->search(cursor);
-            if (ret == 0 && (type != FIX || !cursor_fix_at_zero(cursor))) {
+            if (ret == 0) {
                 modify_build(entries, &nentries, new_val);
-                if (type == FIX) {
-                    /* Deleted (including not-yet-written) values read back as 0; accommodate. */
-                    ret = cursor->get_value(cursor, &val8);
-                    if (ret != 0)
-                        return (log_print_err("cursor.get_value", ret, 1));
-                    cursor->set_value(cursor, flcs_modify(entries, nentries, val8));
-                    ret = cursor->update(cursor);
-                } else
-                    ret = cursor->modify(cursor, entries, nentries);
+                ret = cursor->modify(cursor, entries, nentries);
                 if (ret != 0) {
                     if (ret == WT_ROLLBACK)
                         return (WT_ROLLBACK);
@@ -314,10 +271,7 @@ worker_op(WT_CURSOR *cursor, table_type type, uint64_t keyno, u_int new_val)
 
         /* If key doesn't exist, turn modify into an insert. */
         testutil_snprintf(valuebuf, sizeof(valuebuf), "%052u", new_val);
-        if (type == FIX)
-            cursor->set_value(cursor, flcs_encode(valuebuf));
-        else
-            cursor->set_value(cursor, valuebuf);
+        cursor->set_value(cursor, valuebuf);
         if ((ret = cursor->insert(cursor)) != 0) {
             if (ret == WT_ROLLBACK)
                 return (WT_ROLLBACK);
@@ -449,7 +403,7 @@ real_worker(THREAD_DATA *td)
             new_txn = false;
 
         for (j = 0; ret == 0 && j < g.ntables; j++)
-            ret = worker_op(cursors[j], g.cookies[j].type, keyno, i);
+            ret = worker_op(cursors[j], keyno, i);
         if (ret != 0 && ret != WT_ROLLBACK) {
             (void)log_print_err("worker op failed", ret, 1);
             goto err;

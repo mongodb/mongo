@@ -42,7 +42,6 @@
 
 void build(int, int, int);
 void copy(u_int, u_int);
-void empty(int);
 void print_res(int, int, int);
 void process(void);
 void run(int);
@@ -79,9 +78,7 @@ main(int argc, char *argv[])
                 return (usage());
             break;
         case 't':
-            if (strcmp(__wt_optarg, "fix") == 0)
-                ptype = WT_PAGE_COL_FIX;
-            else if (strcmp(__wt_optarg, "var") == 0)
+            if (strcmp(__wt_optarg, "var") == 0)
                 ptype = WT_PAGE_COL_VAR;
             else if (strcmp(__wt_optarg, "row") == 0)
                 ptype = WT_PAGE_ROW_LEAF;
@@ -121,9 +118,6 @@ t(int r, u_int ptype, int unique)
 #define NTESTS 24
     if (r == 0) {
         if (ptype == 0) {
-            page_type = WT_PAGE_COL_FIX;
-            for (r = 1; r <= NTESTS; ++r)
-                run(r);
 
             page_type = WT_PAGE_COL_VAR;
             for (r = 1; r <= NTESTS; ++r)
@@ -138,8 +132,6 @@ t(int r, u_int ptype, int unique)
                 run(r);
         }
     } else if (ptype == 0) {
-        page_type = WT_PAGE_COL_FIX;
-        run(r);
         page_type = WT_PAGE_COL_VAR;
         run(r);
         page_type = WT_PAGE_ROW_LEAF;
@@ -157,7 +149,7 @@ t(int r, u_int ptype, int unique)
 int
 usage(void)
 {
-    (void)fprintf(stderr, "usage: %s [-v] [-r run] [-t fix|var|row]\n", progname);
+    (void)fprintf(stderr, "usage: %s [-v] [-r run] [-t var|row]\n", progname);
     return (EXIT_FAILURE);
 }
 
@@ -455,7 +447,6 @@ run(int r)
          */
         build(100, 100, 10);
         copy(1, 100);
-        empty(99);
         print_res(100, 100, 10);
         break;
     case 24:
@@ -467,7 +458,6 @@ run(int r)
         build(138, 138, 10);
         copy(1, 48);
         print_res(100, 100, 10);
-        empty(37);
         print_res(138, 138, 10);
         break;
     default:
@@ -519,12 +509,6 @@ build(int ikey, int ivalue, int cnt)
     testutil_check(session->drop(session, LOAD_URI, "force"));
 
     switch (page_type) {
-    case WT_PAGE_COL_FIX:
-        testutil_snprintf(config, sizeof(config),
-          "key_format=r,value_format=7t,allocation_size=%d,internal_page_max=%d,leaf_page_max=%d,"
-          "leaf_key_max=%d,leaf_value_max=%d",
-          PSIZE, PSIZE, PSIZE, OSIZE, OSIZE);
-        break;
     case WT_PAGE_COL_VAR:
         testutil_snprintf(config, sizeof(config),
           "key_format=r,allocation_size=%d,internal_page_max=%d,leaf_page_max=%d,leaf_key_max=%d,"
@@ -543,29 +527,20 @@ build(int ikey, int ivalue, int cnt)
     testutil_check(session->create(session, LOAD_URI, config));
     testutil_check(session->open_cursor(session, LOAD_URI, NULL, "bulk,append", &cursor));
     for (; cnt > 0; --cnt, ++ikey, ++ivalue) {
-        switch (page_type) { /* Build the key. */
-        case WT_PAGE_COL_FIX:
-        case WT_PAGE_COL_VAR:
-            break;
-        case WT_PAGE_ROW_LEAF:
+
+        if (page_type == WT_PAGE_ROW_LEAF) {
+            /* Build the key. */
             testutil_snprintf(kbuf, sizeof(kbuf), "%010d KEY------", ikey);
             key.data = kbuf;
             key.size = 20;
             cursor->set_key(cursor, &key);
-            break;
         }
 
-        switch (page_type) { /* Build the value. */
-        case WT_PAGE_COL_FIX:
-            cursor->set_value(cursor, ivalue & 0x7f);
-            break;
-        case WT_PAGE_COL_VAR:
-        case WT_PAGE_ROW_LEAF:
-            testutil_snprintf(vbuf, sizeof(vbuf), "%010d VALUE----", value_unique ? ivalue : 37);
-            value.data = vbuf;
-            value.size = 20;
-            cursor->set_value(cursor, &value);
-        }
+        /* Build the value. */
+        testutil_snprintf(vbuf, sizeof(vbuf), "%010d VALUE----", value_unique ? ivalue : 37);
+        value.data = vbuf;
+        value.size = 20;
+        cursor->set_value(cursor, &value);
         testutil_check(cursor->insert(cursor));
     }
 
@@ -732,57 +707,17 @@ process(void)
 }
 
 /*
- * empty --
- *     Print empty print_res, for fixed-length column-store files.
- */
-void
-empty(int cnt)
-{
-    int i;
-
-    if (page_type == WT_PAGE_COL_FIX)
-        for (i = 0; i < cnt; ++i)
-            testutil_assert(fputs("\\00\n", res_fp) != EOF);
-}
-
-/*
  * print_res --
  *     Write results file.
  */
 void
 print_res(int key, int value, int cnt)
 {
-    static const char hex[] = "0123456789abcdef";
-    int ch;
 
     for (; cnt > 0; ++key, ++value, --cnt) {
-        switch (page_type) { /* Print key */
-        case WT_PAGE_COL_FIX:
-        case WT_PAGE_COL_VAR:
-            break;
-        case WT_PAGE_ROW_LEAF:
-            fprintf(res_fp, "%010d KEY------\n", key);
-            break;
-        }
 
-        switch (page_type) { /* Print value */
-        case WT_PAGE_COL_FIX:
-            ch = value & 0x7f;
-            if (__wt_isprint((u_char)ch)) {
-                if (ch == '\\')
-                    fputc('\\', res_fp);
-                fputc(ch, res_fp);
-            } else {
-                fputc('\\', res_fp);
-                fputc(hex[(ch & 0xf0) >> 4], res_fp);
-                fputc(hex[ch & 0x0f], res_fp);
-            }
-            fputc('\n', res_fp);
-            break;
-        case WT_PAGE_COL_VAR:
-        case WT_PAGE_ROW_LEAF:
-            fprintf(res_fp, "%010d VALUE----\n", value_unique ? value : 37);
-            break;
-        }
+        if (page_type == WT_PAGE_ROW_LEAF)
+            fprintf(res_fp, "%010d KEY------\n", key);                   /* Print key */
+        fprintf(res_fp, "%010d VALUE----\n", value_unique ? value : 37); /* Print value */
     }
 }

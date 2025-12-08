@@ -36,10 +36,11 @@ from wtscenario import make_scenarios
 # Test that rollback to stable clears the remove operation.
 class test_rollback_to_stable01(test_rollback_to_stable_base):
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        #('column_fix', dict(key_format='r', value_format='8t')),  # FIXME-WT-14972
-        ('row_integer', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('row_integer', dict(key_format='i')),
     ]
+
+    value_format='S'
 
     in_memory_values = [
         ('no_inmem', dict(in_memory=False)),
@@ -82,10 +83,7 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
             key_format=self.key_format, value_format=self.value_format, config=ds_config)
         ds.populate()
 
-        if self.value_format == '8t':
-            valuea = 97
-        else:
-            valuea = "aaaaa" * 100
+        valuea = "aaaaa" * 100
 
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
@@ -93,12 +91,12 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
 
         self.large_updates(uri, valuea, ds, nrows, self.prepare, 10)
         # Check that all updates are seen.
-        self.check(valuea, uri, nrows, None, 11 if self.prepare else 10)
+        self.check(valuea, uri, nrows, 11 if self.prepare else 10)
 
         # Remove all keys with newer timestamp.
         self.large_removes(uri, ds, nrows, self.prepare, 20)
         # Check that the no keys should be visible.
-        self.check(valuea, uri, 0, nrows, 21 if self.prepare else 20)
+        self.check(valuea, uri, 0, 21 if self.prepare else 20)
 
         # Pin stable to timestamp 20 if prepare otherwise 10.
         if self.prepare:
@@ -113,9 +111,9 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         # Check that the new updates are only seen after the update timestamp.
         self.session.breakpoint()
         if self.dryrun:
-            self.check(0, uri, nrows if self.value_format == '8t' else 0, None, 20)
+            self.check(0, uri, 0, 20)
         else:
-            self.check(valuea, uri, nrows, None, 20)
+            self.check(valuea, uri, nrows, 20)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]

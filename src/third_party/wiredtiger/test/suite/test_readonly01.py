@@ -61,14 +61,10 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
                     create_params = 'key_format=i,value_format=i')),
         ('file-var', dict(tabletype='var', uri='file',
                     create_params = 'key_format=r,value_format=i')),
-        ('file-fix', dict(tabletype='fix', uri='file',
-                    create_params = 'key_format=r,value_format=8t')),
         ('table-row', dict(tabletype='row', uri='table',
                     create_params = 'key_format=i,value_format=i')),
         ('table-var', dict(tabletype='var', uri='table',
                     create_params = 'key_format=r,value_format=i')),
-        ('table-fix', dict(tabletype='fix', uri='table',
-                    create_params = 'key_format=r,value_format=8t')),
     ]
 
     scenarios = make_scenarios(basecfg_list, dir_list, log_list, types)

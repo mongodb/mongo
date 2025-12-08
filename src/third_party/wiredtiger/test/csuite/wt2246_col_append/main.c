@@ -62,14 +62,10 @@ page_init(uint64_t n)
     vrecno = 0;
     buf[0] = '\2';
     for (recno = 1;; ++recno) {
-        if (opts->table_type == TABLE_FIX)
-            cursor->set_value(cursor, buf[0]);
-        else {
-            if (recno % 3 == 0)
-                ++vrecno;
-            testutil_snprintf(buf, sizeof(buf), "%" PRIu64 " VALUE ------", vrecno);
-            cursor->set_value(cursor, buf);
-        }
+        if (recno % 3 == 0)
+            ++vrecno;
+        testutil_snprintf(buf, sizeof(buf), "%" PRIu64 " VALUE ------", vrecno);
+        cursor->set_value(cursor, buf);
         testutil_check(cursor->insert(cursor));
         testutil_check(cursor->get_key(cursor, &opts->max_inserted_id));
         if (opts->max_inserted_id >= n)
@@ -113,14 +109,12 @@ main(int argc, char *argv[])
     testutil_recreate_dir(opts->home);
 
     testutil_snprintf(buf, sizeof(buf),
-      "create,cache_size=%s,eviction=(threads_max=5),statistics=(all),"
-      "statistics_log=(json,on_close,wait=1)",
-      opts->table_type == TABLE_FIX ? "500MB" : "2GB");
+      "create,cache_size=2GB,eviction=(threads_max=5),statistics=(all),"
+      "statistics_log=(json,on_close,wait=1)");
     testutil_check(wiredtiger_open(opts->home, NULL, buf, &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_snprintf(buf, sizeof(buf),
-      "key_format=r,value_format=%s,allocation_size=4K,leaf_page_max=64K",
-      opts->table_type == TABLE_FIX ? "8t" : "S");
+    testutil_snprintf(
+      buf, sizeof(buf), "key_format=r,value_format=S,allocation_size=4K,leaf_page_max=64K");
     testutil_check(session->create(session, opts->uri, buf));
     testutil_check(session->close(session, NULL));
 

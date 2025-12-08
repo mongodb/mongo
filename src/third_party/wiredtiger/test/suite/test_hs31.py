@@ -35,11 +35,12 @@ from wiredtiger import stat
 class test_hs31(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=5MB,statistics=(all)'
     format_values = [
-        ('column', dict(key_format='r', value_format='S')),
-        ('column-fix', dict(key_format='r', value_format='8t')),
-        ('integer-row', dict(key_format='i', value_format='S')),
-        ('string-row', dict(key_format='S', value_format='S')),
+        ('column', dict(key_format='r')),
+        ('integer-row', dict(key_format='i')),
+        ('string-row', dict(key_format='S')),
     ]
+
+    value_format='S'
 
     globally_visible_before_ckpt_values = [
         ('globally_visible_before_ckpt', dict(globally_visible_before_ckpt=True)),
@@ -65,12 +66,8 @@ class test_hs31(wttest.WiredTigerTestCase):
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
-        if self.value_format == '8t':
-            value1 = 97
-            value2 = 98
-        else:
-            value1 = 'a' * 500
-            value2 = 'b' * 500
+        value1 = 'a' * 500
+        value2 = 'b' * 500
 
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
@@ -140,10 +137,7 @@ class test_hs31(wttest.WiredTigerTestCase):
         cursor2 = self.session.open_cursor(uri, None, "debug=(release_evict=true)")
         for i in range(1, self.nrows):
             cursor2.set_key(self.create_key(i))
-            if self.value_format == '8t':
-                self.assertEqual(cursor2.search(), 0)
-            else:
-                self.assertEqual(cursor2.search(), wiredtiger.WT_NOTFOUND)
+            self.assertEqual(cursor2.search(), wiredtiger.WT_NOTFOUND)
             cursor2.reset()
         self.session.rollback_transaction()
 
@@ -158,11 +152,7 @@ class test_hs31(wttest.WiredTigerTestCase):
             self.session.begin_transaction('read_timestamp=' + self.timestamp_str(ts))
             for i in range(1, self.nrows):
                 cursor.set_key(self.create_key(i))
-                if self.value_format == '8t':
-                    self.assertEqual(cursor.search(), 0)
-                    self.assertEqual(cursor.get_value(), 0)
-                else:
-                    self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+                self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
             self.session.rollback_transaction()
 
         hs_truncate = self.get_stat(stat.conn.cache_hs_key_truncate_onpage_removal)

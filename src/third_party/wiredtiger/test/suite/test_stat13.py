@@ -38,9 +38,8 @@ class test_stat13(wttest.WiredTigerTestCase):
     uri = 'table:test_stat13'
 
     keyfmt = [
-        ('column', dict(keyfmt='r', valfmt='S')),
-        ('column-fix', dict(keyfmt='r', valfmt='8t')),
-        ('string-row', dict(keyfmt='S', valfmt='S')),
+        ('column', dict(keyfmt='r')),
+        ('string-row', dict(keyfmt='S')),
     ]
     scenarios = make_scenarios(keyfmt)
 
@@ -58,7 +57,7 @@ class test_stat13(wttest.WiredTigerTestCase):
         # an additional level
         nentries = 100
         ds = SimpleDataSet(self, self.uri, nentries,
-            key_format=self.keyfmt, value_format=self.valfmt)
+            key_format=self.keyfmt, value_format='S')
         ds.populate()
         self.session.checkpoint()
 

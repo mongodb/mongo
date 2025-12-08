@@ -49,7 +49,6 @@ class test_cursor_bound01(bound_base, DisaggConfigMixin):
     format_values = [
         ('string', dict(key_format='S',value_format='S')),
         ('var', dict(key_format='r',value_format='S')),
-        ('fix', dict(key_format='r',value_format='8t'))
     ]
 
     disagg_storages = gen_disagg_storages('test_cursor_bound01', disagg_only = True)
@@ -91,11 +90,6 @@ class test_cursor_bound01(bound_base, DisaggConfigMixin):
             cursor = self.session.open_cursor("index:" + self.file_name + ":i0")
         else:
             cursor = self.session.open_cursor(uri)
-
-        if self.value_format == '8t':
-            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: cursor.bound("action=set,bound=lower"),
-                '/Invalid argument/')
-            return
 
         # Cursor bound API should return EINVAL if no configurations are passed in.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: cursor.bound(),

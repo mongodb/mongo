@@ -33,7 +33,7 @@ from wtscenario import make_scenarios
 
 # test_rollback_to_stable15.py
 # Test that roll back to stable handles updates present in the
-# update-list for both fixed length and variable length column store.
+# update-list for variable length column store.
 # Eviction is set to false, so that everything persists in memory.
 class test_rollback_to_stable15(wttest.WiredTigerTestCase):
     key_format_values = [
@@ -41,8 +41,6 @@ class test_rollback_to_stable15(wttest.WiredTigerTestCase):
         ('integer-row', dict(key_format='i')),
     ]
     value_format_values = [
-        # Fixed length
-        ('fixed', dict(value_format='8t')),
         # Variable length
         ('variable', dict(value_format='i')),
     ]

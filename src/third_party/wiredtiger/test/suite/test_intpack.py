@@ -135,8 +135,6 @@ class test_intpack(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
         ('int8_t_b', dict(formatcode='b', low=-128, high=127, nbits=8)),
         ('uint8_t_B', dict(formatcode='B', low=0, high=255, nbits=8)),
-        ('fix_len_8t', dict(formatcode='8t', low=0, high=255, nbits=8)),
-        ('fix_len_5t', dict(formatcode='5t', low=0, high=31, nbits=5)),
         ('int16_t_h', dict(formatcode='h', low=-32768, high=32767, nbits=16)),
         ('uint16_t_H', dict(formatcode='H', low=0, high=65535, nbits=16)),
         ('int32_t_i', dict(formatcode='i', low=-2147483648, high=2147483647,

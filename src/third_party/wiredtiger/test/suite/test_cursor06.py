@@ -39,10 +39,8 @@ from wtscenario import make_scenarios
 class test_cursor06(wttest.WiredTigerTestCase):
     name = 'reconfigure'
     scenarios = make_scenarios([
-        ('file-f', dict(type='file:', keyfmt='r', valfmt='8t', dataset=SimpleDataSet)),
         ('file-r', dict(type='file:', keyfmt='r', valfmt='S', dataset=SimpleDataSet)),
         ('file-S', dict(type='file:', keyfmt='S', valfmt='S', dataset=SimpleDataSet)),
-        ('table-f', dict(type='table:', keyfmt='r', valfmt='8t', dataset=SimpleDataSet)),
         ('table-r', dict(type='table:', keyfmt='r', valfmt='S', dataset=SimpleDataSet)),
         ('table-S', dict(type='table:', keyfmt='S', valfmt='S', dataset=SimpleDataSet)),
         ('table-r-complex', dict(type='table:', keyfmt='r', valfmt=None,

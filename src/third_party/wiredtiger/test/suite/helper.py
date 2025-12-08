@@ -89,22 +89,14 @@ def confirm_does_not_exist(testcase, uri):
 def confirm_empty(testcase, uri):
     testcase.pr('confirm_empty: ' + uri)
     cursor = testcase.session.open_cursor(uri, None)
-    if cursor.value_format == '8t':
-        for key,val in cursor:
-            testcase.assertEqual(val, 0)
-    else:
-        testcase.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+    testcase.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
     cursor.close()
 
 # Confirm a URI exists and is not empty.
 def confirm_nonempty(testcase, uri):
     testcase.pr('confirm_nonempty: ' + uri)
     cursor = testcase.session.open_cursor(uri, None)
-    if cursor.value_format == '8t':
-        for key,val in cursor:
-            testcase.assertNotEqual(val, 0)
-    else:
-        testcase.assertNotEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+    testcase.assertNotEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
     cursor.close()
 
 # Copy a WT home directory.

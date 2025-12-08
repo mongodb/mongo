@@ -49,7 +49,6 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         ('string', dict(keyfmt='S')),
     ]
     valfmt = [
-        ('fixed', dict(valfmt='8t')),
         ('integer', dict(valfmt='i')),
         ('string', dict(valfmt='S')),
     ]
@@ -79,7 +78,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
 
     # Test a bulk-load triggers variable-length column-store RLE correctly.
     def test_bulk_load_var_rle(self):
-        if self.keyfmt != 'r' or self.valfmt == '8t':
+        if self.keyfmt != 'r':
                 return
 
         # We can't directly test RLE, it's internal to WiredTiger. However,
@@ -136,16 +135,13 @@ class test_bulk_load(wttest.WiredTigerTestCase):
             if i % 7 == 0:
                 cursor.search()
                 self.assertEqual(cursor.get_value(), simple_value(cursor, i))
-            elif cursor.value_format == '8t':
-                cursor.search()
-                self.assertEqual(cursor.get_value(), 0)
             else:
                 self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
 
     # Test that variable-length column-store bulk-load efficiently creates big
     # records.
     def test_bulk_load_col_big(self):
-        if self.keyfmt != 'r' or self.valfmt == '8t':
+        if self.keyfmt != 'r':
                 return
 
         uri = self.type + self.name

@@ -40,7 +40,6 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
         ('row-string', dict(keyfmt='S', valfmt='S')),
         ('row-int', dict(keyfmt='i', valfmt='S')),
         ('column', dict(keyfmt='r', valfmt='S')),
-        ('column-fix', dict(keyfmt='r', valfmt='8t')),
     ]
     types = [
         ('file', dict(uri='file', ds=SimpleDataSet)),

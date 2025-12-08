@@ -15,7 +15,6 @@ class UpdateType(Enum):
 class PageType(Enum):
     WT_PAGE_INVALID = 0
     WT_PAGE_BLOCK_MANAGER = 1
-    WT_PAGE_COL_FIX = 2
     WT_PAGE_COL_INT = 3
     WT_PAGE_COL_VAR = 4
     WT_PAGE_OVFL = 5

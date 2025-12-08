@@ -41,8 +41,6 @@ class test_checkpoint37(wttest.WiredTigerTestCase):
 
     format_values = [
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
-        ('column_fix', dict(key_format='r', value_format='8t',
-            extraconfig=',allocation_size=512,leaf_page_max=512')),
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
     ]
 
@@ -84,18 +82,11 @@ class test_checkpoint37(wttest.WiredTigerTestCase):
             config=self.extraconfig)
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-            value_c = 99
-            value_d = 100
-            value_e = 101
-        else:
-            value_a = "aaaaa" * 10
-            value_b = "bbbbb" * 10
-            value_c = "ccccc" * 10
-            value_d = "ddddd" * 10
-            value_e = "eeeee" * 10
+        value_a = "aaaaa" * 10
+        value_b = "bbbbb" * 10
+        value_c = "ccccc" * 10
+        value_d = "ddddd" * 10
+        value_e = "eeeee" * 10
 
         # Write some initial data.
         self.large_updates(ds.uri, ds, nrows, value_a, 5)

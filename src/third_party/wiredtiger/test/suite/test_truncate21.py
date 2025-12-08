@@ -39,9 +39,7 @@ class test_truncate21(wttest.WiredTigerTestCase):
     dir = "newdir"
     nentries = 1000
 
-    uri_fix = 'table:trunc_fix'
     uri_row = 'table:trunc_row'
-    create_fix = 'key_format=r,value_format=8t'
     create_row = 'key_format=i,value_format=S'
 
     start_key = nentries // 4
@@ -50,40 +48,28 @@ class test_truncate21(wttest.WiredTigerTestCase):
     insert_key = (start_key + end_key) // 2
 
     def trunc_range(self):
-        # In a transaction, truncate the same range from all three tables.
+        # In a transaction, truncate the same range from both tables.
         # Then truncate the same range again, also inserting one key into the range for
         # the row-store table. Delete a range from the middle of the table.
-        cfix_start = self.session.open_cursor(self.uri_fix)
         crow_start = self.session.open_cursor(self.uri_row)
-        cfix_end = self.session.open_cursor(self.uri_fix)
         crow_end = self.session.open_cursor(self.uri_row)
-        cfix_start.set_key(self.start_key)
         crow_start.set_key(self.start_key)
-        cfix_end.set_key(self.end_key)
         crow_end.set_key(self.end_key)
         # Do the truncate on teach table.
-        self.session.truncate(None, cfix_start, cfix_end, None)
         self.session.truncate(None, crow_start, crow_end, None)
-        cfix_start.close()
         crow_start.close()
-        cfix_end.close()
         crow_end.close()
 
     def test_truncate21(self):
 
-        # Create one table of each type: FLCS, row-store and VLCS.
-        # Put the same data into each (per allowed by type).
-        self.session.create(self.uri_fix, self.create_fix)
+        # Create one table and populate data.
         self.session.create(self.uri_row, self.create_row)
 
-        cfix = self.session.open_cursor(self.uri_fix)
         crow = self.session.open_cursor(self.uri_row)
         for i in range(1, self.nentries):
             self.session.begin_transaction()
-            cfix[i] = 97
             crow[i] = 'rowval'
             self.session.commit_transaction()
-        cfix.close()
         crow.close()
         self.session.checkpoint()
 
@@ -95,7 +81,7 @@ class test_truncate21(wttest.WiredTigerTestCase):
         self.session.commit_transaction()
 
         # Open a second session and transaction. In one we truncate the same range again.
-        # In the other we insert into the FLCS and row-store tables. (The VLCS table will be
+        # In the other we insert into the row-store table. (The VLCS table will be
         # used in a later test.)
         session2 = self.conn.open_session()
 
@@ -104,17 +90,14 @@ class test_truncate21(wttest.WiredTigerTestCase):
         # In the other session, truncate the same range again.
         self.trunc_range()
         # Commit the insert.
-        # With overlapping transactions, insert into the key range for FLCS and row.
-        cfix = session2.open_cursor(self.uri_fix)
+        # With overlapping transactions, insert into the key range for row.
         crow = session2.open_cursor(self.uri_row)
-        cfix[self.insert_key] = 98
         crow[self.insert_key] = 'newval'
 
         session2.commit_transaction()
         # Commit the truncate.
         self.session.commit_transaction()
 
-        cfix.close()
         crow.close()
         session2.close()
 
@@ -128,19 +111,11 @@ class test_truncate21(wttest.WiredTigerTestCase):
 
         new_conn = self.wiredtiger_open(self.dir, self.conn_config)
         new_sess = self.setUpSessionOpen(new_conn)
-        cfix = new_sess.open_cursor(self.uri_fix)
         crow = new_sess.open_cursor(self.uri_row)
-        cfix.set_key(self.insert_key)
         crow.set_key(self.insert_key)
-        ret_fix = cfix.search()
         ret_row = crow.search()
-        # The key should not exist in both. In FLCS the record number always exists but the value
-        # should be zero.
-        val_fix = cfix.get_value()
+        # The key should not exist in both.
         self.pr('ret_row ' + str(ret_row))
-        self.pr('val_fix ' + str(val_fix))
         self.assertEqual(ret_row, wiredtiger.WT_NOTFOUND)
-        self.assertEqual(val_fix, 0)
-        cfix.close()
         crow.close()
         new_conn.close()

@@ -246,13 +246,9 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
     } else {
         ++s->update;
         value->data = valuebuf;
-        if (ftype == FIX)
-            cursor->set_value(cursor, 0x10);
-        else {
-            testutil_snprintf_len_set(valuebuf, sizeof(valuebuf), &len, "XXX %37" PRIu64, keyno);
-            value->size = (uint32_t)len;
-            cursor->set_value(cursor, value);
-        }
+        testutil_snprintf_len_set(valuebuf, sizeof(valuebuf), &len, "XXX %37" PRIu64, keyno);
+        value->size = (uint32_t)len;
+        cursor->set_value(cursor, value);
         testutil_check(cursor->update(cursor));
     }
     if (log_print)

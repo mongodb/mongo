@@ -644,9 +644,6 @@ create_object(TABLE *table, void *arg)
         CONFIG_APPEND(p, ",leaf_value_max=%" PRIu32, maxleafvalue);
 
     switch (table->type) {
-    case FIX:
-        CONFIG_APPEND(p, ",value_format=%" PRIu32 "t", TV(BTREE_BITCNT));
-        break;
     case ROW:
         CONFIG_APPEND(p, ",prefix_compression=%s,prefix_compression_min=%" PRIu32,
           TV(BTREE_PREFIX_COMPRESSION) == 0 ? "false" : "true", TV(BTREE_PREFIX_COMPRESSION_MIN));

@@ -259,7 +259,6 @@ main(int argc, char *argv[])
     while ((ch = __wt_getopt(progname, argc, argv, "ch:")) != EOF)
         switch (ch) {
         case 'c':
-            /* Variable-length columns only (for now) */
             use_columns = true;
             break;
         case 'h':

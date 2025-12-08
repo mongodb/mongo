@@ -35,7 +35,6 @@ from wtscenario import make_scenarios
 
 class test_timestamp27_preserve_prepared_off(wttest.WiredTigerTestCase):
     types = [
-        ('fix', dict(key_format='r', value_format='8t')),
         ('row', dict(key_format='S', value_format='S')),
         ('var', dict(key_format='r', value_format='S')),
     ]
@@ -56,7 +55,6 @@ class test_timestamp27_preserve_prepared_on(wttest.WiredTigerTestCase):
     conn_config = "precise_checkpoint=true,preserve_prepared=true"
 
     types = [
-        ('fix', dict(key_format='r', value_format='8t')),
         ('row', dict(key_format='S', value_format='S')),
         ('var', dict(key_format='r', value_format='S')),
     ]

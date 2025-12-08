@@ -36,7 +36,6 @@ class test_checkpoint06(wttest.WiredTigerTestCase):
     conn_config = 'create,cache_size=10MB'
 
     format_values = [
-        ('column-fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='S')),
         ('row_integer', dict(key_format='i', value_format='S')),
     ]
@@ -56,10 +55,7 @@ class test_checkpoint06(wttest.WiredTigerTestCase):
         self.session.create(self.uri, config)
         self.session.create(self.uri_evict, config)
 
-        if self.value_format == '8t':
-            value = 72
-        else:
-            value = "abcdefghijklmnopqrstuvwxyz" * 3
+        value = "abcdefghijklmnopqrstuvwxyz" * 3
 
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)

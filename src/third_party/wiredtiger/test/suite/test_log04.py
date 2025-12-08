@@ -36,10 +36,10 @@ class test_log04(wttest.WiredTigerTestCase):
     conn_config = 'log=(enabled)'
 
     types = [
-        ('col', dict(key_format='r',value_format='S')),
-        ('fix', dict(key_format='r',value_format='8t')),
-        ('row', dict(key_format='S',value_format='S')),
+        ('col', dict(key_format='r')),
+        ('row', dict(key_format='S')),
     ]
+    value_format='S'
     ckpt = [
         ('ckpt', dict(ckpt=True)),
         ('no-ckpt', dict(ckpt=False)),

@@ -40,7 +40,6 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
     format_values = [
         ('integer-row', dict(key_format='i', value_format='S')),
         ('column', dict(key_format='r', value_format='S')),
-        ('column-fix', dict(key_format='r', value_format='8t')),
     ]
     scenarios = make_scenarios(format_values)
 
@@ -48,7 +47,7 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
         s = self.session
         conn = self.conn
 
-        new_value = 71 if self.value_format == '8t' else 'new value'
+        new_value = 'new value'
 
         # Start timestamps at 50
         conn.set_timestamp('oldest_timestamp=50,stable_timestamp=50')
@@ -71,8 +70,8 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
         s = self.session
         conn = self.conn
 
-        some_value = 66 if self.value_format == '8t' else 'some value'
-        new_value = 71 if self.value_format == '8t' else 'new value'
+        some_value = 'some value'
+        new_value = 'new value'
 
         s.create(self.uri, 'key_format={},value_format={}'.format(self.key_format, self.value_format))
         c = s.open_cursor(self.uri, None, 'bulk')

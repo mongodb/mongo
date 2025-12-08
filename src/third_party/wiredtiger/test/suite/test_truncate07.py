@@ -48,10 +48,8 @@ class test_truncate07(wttest.WiredTigerTestCase):
     ]
 
     format_values = [
-        ('column', dict(key_format='r', value_format='S', extraconfig='')),
-        ('column_fix', dict(key_format='r', value_format='8t',
-            extraconfig=',allocation_size=512,leaf_page_max=512')),
-        ('row_integer', dict(key_format='i', value_format='S', extraconfig='')),
+        ('column', dict(key_format='r', extraconfig='')),
+        ('row_integer', dict(key_format='i', extraconfig='')),
     ]
     munge_values = [
         ('update', dict(munge_with_update=True)),
@@ -74,8 +72,6 @@ class test_truncate07(wttest.WiredTigerTestCase):
 
     # Make all the values different so it's easier to see what happens if ranges go missing.
     def mkdata(self, basevalue, i):
-        if self.value_format == '8t':
-            return basevalue
         return basevalue + str(i)
 
     def evict(self, uri, key, value):
@@ -127,16 +123,12 @@ class test_truncate07(wttest.WiredTigerTestCase):
 
         uri = "table:truncate07"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            self, uri, 0, key_format=self.key_format, value_format='S',
             config=self.extraconfig)
         ds.populate()
 
-        if self.value_format == '8t':
-            value_a = 97
-            value_b = 98
-        else:
-            value_a = "aaaaa" * 100
-            value_b = "bbbbb" * 100
+        value_a = "aaaaa" * 100
+        value_b = "bbbbb" * 100
 
         # Pin oldest and stable timestamps to 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +

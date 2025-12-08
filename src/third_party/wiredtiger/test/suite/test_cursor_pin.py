@@ -38,7 +38,6 @@ class test_cursor_pin(wttest.WiredTigerTestCase):
     nentries = 10000
     config = 'allocation_size=512,leaf_page_max=512'
     scenarios = make_scenarios([
-        ('recno-fix', dict(keyfmt='r', valfmt='8t')),
         ('recno', dict(keyfmt='r', valfmt='S')),
         ('string', dict(keyfmt='S', valfmt='S')),
     ])

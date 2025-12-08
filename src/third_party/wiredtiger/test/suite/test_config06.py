@@ -46,8 +46,6 @@ class test_config06(wttest.WiredTigerTestCase):
         self.bad_session_config('key_format=S,value_format=A')
         self.bad_session_config('key_format=0s,value_format=s')
         self.bad_session_config('key_format=s,value_format=0s')
-        self.bad_session_config('key_format=0t,value_format=4t')
-        self.bad_session_config('key_format=4t,value_format=0t')
 
     # Smoke-test the string formats with length specifiers; both formats should
     # ignore trailing bytes, verify that.

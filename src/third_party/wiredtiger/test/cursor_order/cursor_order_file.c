@@ -48,10 +48,8 @@ file_create(SHARED_CONFIG *cfg, const char *name)
       "key_format=%s,"
       "internal_page_max=%d,"
       "split_deepen_min_child=200,"
-      "leaf_page_max=%d,"
-      "%s",
-      cfg->ftype == ROW ? "S" : "r", 16 * 1024, 128 * 1024,
-      cfg->ftype == FIX ? ",value_format=3t" : "");
+      "leaf_page_max=%d",
+      cfg->ftype == ROW ? "S" : "r", 16 * 1024, 128 * 1024);
 
     if ((ret = session->create(session, name, config)) != 0)
         if (ret != EEXIST)
@@ -91,13 +89,9 @@ load(SHARED_CONFIG *cfg, const char *name)
         } else
             cursor->set_key(cursor, (uint32_t)keyno);
         value->data = valuebuf;
-        if (cfg->ftype == FIX)
-            cursor->set_value(cursor, 0x01);
-        else {
-            testutil_snprintf_len_set(valuebuf, sizeof(valuebuf), &len, "%37" PRIu64, keyno);
-            value->size = (uint32_t)len;
-            cursor->set_value(cursor, value);
-        }
+        testutil_snprintf_len_set(valuebuf, sizeof(valuebuf), &len, "%37" PRIu64, keyno);
+        value->size = (uint32_t)len;
+        cursor->set_value(cursor, value);
         testutil_check(cursor->insert(cursor));
     }
 
