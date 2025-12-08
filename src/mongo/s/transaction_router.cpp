@@ -1050,7 +1050,12 @@ std::vector<ShardId> TransactionRouter::Router::_getPendingParticipants() const 
 void TransactionRouter::Router::_clearPendingParticipants(OperationContext* opCtx,
                                                           boost::optional<Status> optStatus) {
     const auto pendingParticipants = _getPendingParticipants();
-
+    LOGV2_DEBUG(11362503,
+                3,
+                "Clearing pending participants",
+                "pendingParticipantList"_attr = pendingParticipants,
+                "sessionId"_attr = _sessionId(),
+                "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber());
     // If there was a stale shard or db routing error and the transaction is retryable then we don't
     // send abort to any participant to prevent a race between the aborts and the commands retried
     if (!o().subRouter && (!optStatus || !_errorAllowsRetryOnStaleShardOrDb(*optStatus))) {
@@ -1313,6 +1318,11 @@ void TransactionRouter::Router::_continueTxn(OperationContext* opCtx,
             // is a retry coming from the parent router where the parent router picked a new
             // clusterTime for the transaction.
             if (o().participants.empty()) {
+                LOGV2_DEBUG(11362504,
+                            3,
+                            "Transaction was retried at the router level",
+                            "sessionId"_attr = _sessionId(),
+                            "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber());
                 invariant(opCtx->isActiveTransactionParticipant());
                 tassert(8980602,
                         "Transaction sub-router tried to continue a transaction without any "

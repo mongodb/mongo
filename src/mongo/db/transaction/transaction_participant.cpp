@@ -879,14 +879,34 @@ bool TransactionParticipant::Participant::_shouldRestartTransactionOnReuseActive
                               << " in state " << txnParticipant.o().txnState,
                 txnParticipant.transactionIsAbortedWithoutPrepare());
         }
-
+        LOGV2_DEBUG(
+            11362500,
+            3,
+            "Restarting transaction and reusing active txnNumber because transaction state is "
+            "None.",
+            "sessionId"_attr = _sessionId(),
+            "txnNumber"_attr = o().activeTxnNumberAndRetryCounter.getTxnNumber());
         return true;
     } else if (o().txnState.isInSet(TransactionState::kAbortedWithoutPrepare)) {
+        LOGV2_DEBUG(
+            11362501,
+            3,
+            "Restarting transaction and reusing active txnNumber because transaction was aborted "
+            "and not part of a two phase transaction.",
+            "sessionId"_attr = _sessionId(),
+            "txnNumber"_attr = o().activeTxnNumberAndRetryCounter.getTxnNumber());
         return true;
     } else if (_isInternalSessionForRetryableWrite() &&
                o().txnState.isInSet(TransactionState::kCommitted)) {
         // We won't actually restart the transaction, we'll early return later on and skip resetting
         // any state and metrics
+        LOGV2_DEBUG(
+            11362502,
+            3,
+            "Restarting transaction and reusing active txnNumber because transaction participant "
+            "is in retryable write mode and TransactionState is Committed.",
+            "sessionId"_attr = _sessionId(),
+            "txnNumber"_attr = o().activeTxnNumberAndRetryCounter.getTxnNumber());
         return true;
     } else {
         uassert(
