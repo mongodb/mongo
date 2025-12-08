@@ -66,7 +66,6 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/sbe_pushdown.h"
-#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -91,12 +90,10 @@
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_params_diagnostic_printer.h"
-#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
@@ -106,14 +103,12 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/logv2/log.h"
@@ -1334,13 +1329,15 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         // Add the stages that are candidates for SBE lowering from the 'pipeline' into the
         // 'canonicalQuery'. This must be done _before_ checking shouldUseRegularSbe() or
         // creating the planner.
-        attachPipelineStages(collections, pipeline, needsMerge, canonicalQuery.get());
+        auto plannerParams = makeQueryPlannerParams(plannerOptions);
+        attachPipelineStages(
+            collections, pipeline, needsMerge, canonicalQuery.get(), std::move(plannerParams));
 
         const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled();
         return sbeFull || shouldUseRegularSbe(opCtx, *canonicalQuery, mainColl, sbeFull);
     }();
 
-    // If distinct multiplanning is enabled and we have a distinct property, we may not be able to
+    // If distinct multi-planning is enabled and we have a distinct property, we may not be able to
     // commit to SBE yet.
     auto canCommitToSbe = [&canonicalQuery]() {
         return !canonicalQuery->getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled() ||

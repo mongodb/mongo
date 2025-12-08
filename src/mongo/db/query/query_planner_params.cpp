@@ -434,13 +434,10 @@ void QueryPlannerParams::applyQuerySettingsOrIndexFiltersForMainCollection(
     }
 }
 
-void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
+void QueryPlannerParams::fillOutSecondaryCollectionsInfo(
     OperationContext* opCtx,
     const CanonicalQuery& canonicalQuery,
     const MultipleCollectionAccessor& collections) {
-    if (canonicalQuery.cqPipeline().empty()) {
-        return;
-    }
     auto fillOutSecondaryInfo = [&](const NamespaceString& nss,
                                     const CollectionPtr& secondaryColl) {
         CollectionInfo secondaryInfo;
@@ -488,6 +485,17 @@ void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
                                             coll->getTimeseriesOptions());
         }
     }
+}
+
+void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
+    OperationContext* opCtx,
+    const CanonicalQuery& canonicalQuery,
+    const MultipleCollectionAccessor& collections) {
+    if (canonicalQuery.cqPipeline().empty()) {
+        return;
+    }
+
+    fillOutSecondaryCollectionsInfo(opCtx, canonicalQuery, collections);
 }
 
 void QueryPlannerParams::fillOutMainCollectionPlannerParams(

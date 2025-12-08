@@ -45,6 +45,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/index_path_projection.h"
+#include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
@@ -944,6 +946,42 @@ std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideO
     }
 
     return {boost::none, false};
+}
+
+// static
+bool QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+    const std::string& foreignField, const std::vector<IndexEntry>& fullIndexList) {
+
+    bool hasOnlyClassicEligibleIndex = false;
+
+    for (size_t i = 0; i < fullIndexList.size(); ++i) {
+        const auto& index = fullIndexList[i];
+        LOGV2_DEBUG(
+            6408200, 3, "Relevant index", "indexNumber"_attr = i, "index"_attr = index.toString());
+
+        if (isIndexEligibleForRightSideOfLookupPushdown(index, foreignField)) {
+            // If the index has compatible collation then INLJ will be used.
+            // If the index has non-compatible collation and the query cannot spill DINLJ will be
+            // used. If the index has non-compatible collation and the query can spill HJ will be
+            // used.
+            return false;
+        } else if (index.type == INDEX_WILDCARD) {
+            // Obtain the projection executor from the parent wildcard IndexEntry.
+            auto* wildcardProjection = index.indexPathProjection;
+            tassert(6408201,
+                    "wildcardProjection must be non-null for Wildcard Indexes",
+                    wildcardProjection);
+
+            if (projection_executor_utils::applyProjectionToOneField(wildcardProjection->exec(),
+                                                                     foreignField)) {
+                // The wildCardProjection part of the index does not exclude the field, so classic
+                // can potentially use it
+                hasOnlyClassicEligibleIndex = true;
+            }
+        }
+    }
+
+    return hasOnlyClassicEligibleIndex;
 }
 
 // static

@@ -178,6 +178,12 @@ public:
         const CollatorInterface* collator);
 
     /**
+     * Returns true if the available indexes can only be used in classic engine.
+     */
+    static bool canUseIndexForRightSideOfLookupOnlyInClassic(
+        const std::string& foreignField, const std::vector<IndexEntry>& fullIndexList);
+
+    /**
      * Checks if the foreign collection is eligible for the hash join algorithm. We conservatively
      * choose the hash join algorithm for cases when the hash table is unlikely to spill to disk.
      */

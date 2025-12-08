@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/util/assert_util.h"
@@ -53,6 +54,8 @@
 #include <cstdlib>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace {
@@ -148,6 +151,7 @@ bool pushDownPipelineStageIfCompatible(
     const boost::intrusive_ptr<DocumentSource>& stage,
     SbeCompatibility minRequiredCompatibility,
     const CompatiblePipelineStages& allowedStages,
+    const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
     std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown,
     const MultipleCollectionAccessor& collections) {
 
@@ -169,16 +173,30 @@ bool pushDownPipelineStageIfCompatible(
         stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (stageId == DocumentSourceLookUp::id) {
-        DocumentSourceLookUp* lookup = static_cast<DocumentSourceLookUp*>(stage.get());
-        if (!allowedStages.lookup || lookup->sbeCompatibility() < minRequiredCompatibility) {
+        DocumentSourceLookUp* lookupStage = static_cast<DocumentSourceLookUp*>(stage.get());
+        if (!allowedStages.lookup || lookupStage->sbeCompatibility() < minRequiredCompatibility) {
             return false;
         }
+
         const auto& secondaryCollections = collections.getSecondaryCollections();
-        if (const auto& coll = secondaryCollections.find(lookup->getFromNs());
+        if (const auto& coll = secondaryCollections.find(lookupStage->getFromNs());
             coll != secondaryCollections.end() && coll->second &&
             coll->second->isTimeseriesCollection()) {
             return false;
         }
+
+        // Do not push the stage if it has an index that can be used in classic but not in SBE.
+        auto foreignCollItr = collectionsInfo.find(lookupStage->getFromNs());
+        if (foreignCollItr != collectionsInfo.end() && foreignCollItr->second.exists &&
+            QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+                lookupStage->getForeignField()->fullPath(), foreignCollItr->second.indexes)) {
+            LOGV2_DEBUG(6408202,
+                        3,
+                        "Lookup is not pushed to SBE because classic can use index",
+                        "lookupStage"_attr = lookupStage->getFromNs());
+            return false;
+        }
+
         stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (stageId == DocumentSourceUnwind::id) {
@@ -482,6 +500,7 @@ bool findSbeCompatibleStagesForPushdown(
     const CanonicalQuery* cq,
     bool needsMerge,
     const Pipeline* pipeline,
+    std::unique_ptr<QueryPlannerParams> plannerParams,
     std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown) {
     const auto& queryKnob = cq->getExpCtx()->getQueryKnobConfiguration();
 
@@ -503,7 +522,7 @@ bool findSbeCompatibleStagesForPushdown(
     const SbeCompatibility minRequiredCompatibility = getMinRequiredSbeCompatibility(
         queryKnob.getInternalQueryFrameworkControlForOp(), sbeFullEnabled);
 
-    auto meetsRequirements = [&minRequiredCompatibility, &cq](SbeCompatibility stageCompatibility) {
+    auto meetsRequirements = [&minRequiredCompatibility](SbeCompatibility stageCompatibility) {
         return stageCompatibility >= minRequiredCompatibility;
     };
 
@@ -560,10 +579,21 @@ bool findSbeCompatibleStagesForPushdown(
             break;
         }
 
+        // If the pipeline has a lookup stage, we check if the foreign collection has an index that
+        // can be used in both classic and sbe. We do not push to sbe if the classic engine might
+        // use an index for the foreign collection but sbe cannot. In such a case, executing the
+        // lookup in classic might provide better performance.
+        if ((*itr)->getId() == DocumentSourceLookUp::id &&
+            plannerParams->secondaryCollectionsInfo.empty()) {
+            plannerParams->fillOutSecondaryCollectionsInfo(
+                pipeline->getContext()->getOperationContext(), *cq, collections);
+        }
+
         if (!pushDownPipelineStageIfCompatible(pipeline->getContext()->getOperationContext(),
                                                *itr,
                                                minRequiredCompatibility,
                                                allowedStages,
+                                               plannerParams->secondaryCollectionsInfo,
                                                stagesForPushdown,
                                                collections)) {
             // Stop pushing stages down once we hit an incompatible stage.
@@ -597,7 +627,8 @@ void finalizePipelineStages(Pipeline* pipeline, CanonicalQuery* canonicalQuery) 
 void attachPipelineStages(const MultipleCollectionAccessor& collections,
                           const Pipeline* pipeline,
                           bool needsMerge,
-                          CanonicalQuery* canonicalQuery) {
+                          CanonicalQuery* canonicalQuery,
+                          std::unique_ptr<QueryPlannerParams> plannerParams) {
     tassert(9298700,
             "attachPipelineStages() must not be called multiple times on a query",
             canonicalQuery->cqPipeline().empty());
@@ -606,8 +637,12 @@ void attachPipelineStages(const MultipleCollectionAccessor& collections,
     }
 
     std::vector<boost::intrusive_ptr<DocumentSource>> stagesForPushdown;
-    bool allStagesPushedDown = findSbeCompatibleStagesForPushdown(
-        collections, canonicalQuery, needsMerge, pipeline, stagesForPushdown);
+    bool allStagesPushedDown = findSbeCompatibleStagesForPushdown(collections,
+                                                                  canonicalQuery,
+                                                                  needsMerge,
+                                                                  pipeline,
+                                                                  std::move(plannerParams),
+                                                                  stagesForPushdown);
     canonicalQuery->setCqPipeline(std::move(stagesForPushdown), allStagesPushedDown);
 };
 

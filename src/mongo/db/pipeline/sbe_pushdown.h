@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -51,7 +52,8 @@ void finalizePipelineStages(Pipeline* pipeline, CanonicalQuery* canonicalQuery);
 void attachPipelineStages(const MultipleCollectionAccessor& collections,
                           const Pipeline* pipeline,
                           bool needsMerge,
-                          CanonicalQuery* canonicalQuery);
+                          CanonicalQuery* canonicalQuery,
+                          std::unique_ptr<QueryPlannerParams> plannerParams);
 
 /**
  * Set the minimum required compatibility based on the 'featureFlagSbeFull' and the

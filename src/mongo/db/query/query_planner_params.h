@@ -308,11 +308,19 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
     QueryPlannerParams& operator=(QueryPlannerParams&& other) = default;
 
     /**
-     * Fills planner parameters for the secondary collections.
+     * Fills planner parameters for the secondary collections if there is a pipeline in
+     * canonicalQuery.
      */
     void fillOutSecondaryCollectionsPlannerParams(OperationContext* opCtx,
                                                   const CanonicalQuery& canonicalQuery,
                                                   const MultipleCollectionAccessor& collections);
+
+    /**
+     * Fills planner parameters for the secondary collections.
+     */
+    void fillOutSecondaryCollectionsInfo(OperationContext* opCtx,
+                                         const CanonicalQuery& canonicalQuery,
+                                         const MultipleCollectionAccessor& collections);
 
     /**
      * This method updates this QueryPlannerParams object as needed so that it can be used with

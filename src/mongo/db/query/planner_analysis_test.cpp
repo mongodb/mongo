@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
@@ -54,7 +55,7 @@ namespace {
 /**
  * Make a minimal IndexEntry from just a key pattern. A dummy name will be added.
  */
-IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
+IndexEntry buildSimpleIndexEntry(const BSONObj& kp, WildcardProjection* wcProjection = nullptr) {
     return {kp,
             IndexNames::nameToType(IndexNames::findPluginName(kp)),
             IndexConfig::kLatestIndexVersion,
@@ -65,7 +66,55 @@ IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
             false,
             CoreIndexInfo::Identifier("test_foo"),
             {},
-            nullptr};
+            wcProjection};
+}
+
+TEST(QueryPlannerAnalysis, CanUseIndexForRightSideOfLookupOnlyInClassic) {
+    std::string foreignField = "b";
+    std::vector<IndexEntry> indexList;
+    BSONObj keyPattern = BSON("$**" << 1);
+
+    auto wcProjection = WildcardKeyGenerator::createProjectionExecutor(keyPattern, BSONObj());
+    auto compatibleWcIndex = buildSimpleIndexEntry(keyPattern, &wcProjection);
+
+    auto wcProjectionExclude =
+        WildcardKeyGenerator::createProjectionExecutor(keyPattern, BSON("b" << 0));
+    auto incompatibleWcIndex = buildSimpleIndexEntry(keyPattern, &wcProjectionExclude);
+
+    auto sbeIndex = buildSimpleIndexEntry(BSON("b" << 1));
+
+    // There are no indexes.
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
+                                                                                    indexList));
+    // A single index that is wildcard index that can be used only in classic.
+    indexList.push_back(compatibleWcIndex);
+    ASSERT_TRUE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
+                                                                                   indexList));
+
+    // A single index that is a  wildcard index that excludes the foreignField, thus it is not
+    // eligible for the query.
+    indexList.clear();
+    indexList.push_back(incompatibleWcIndex);
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
+                                                                                    indexList));
+
+    // A second index that can be used in SBE.
+    indexList.push_back(sbeIndex);
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
+                                                                                    indexList));
+
+    // A wildcard index that can be used in classic and a second index that can be used in SBE.
+    indexList.clear();
+    indexList.push_back(compatibleWcIndex);
+    indexList.push_back(sbeIndex);
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
+                                                                                    indexList));
+
+    // A single index that can be used in SBE.
+    indexList.clear();
+    indexList.push_back(sbeIndex);
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
+                                                                                    indexList));
 }
 
 TEST(QueryPlannerAnalysis, GetSortPatternBasic) {

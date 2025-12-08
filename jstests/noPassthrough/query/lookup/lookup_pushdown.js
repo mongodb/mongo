@@ -78,6 +78,7 @@ function getJoinAlgorithmStrategyName(joinAlgorithm) {
         case JoinAlgorithm.NonExistentForeignCollection:
             return "NonExistentForeignCollection";
         case JoinAlgorithm.Classic:
+            return "Classic";
         default:
             assert(false, "No strategy for JoinAlgorithm: " + joinAlgorithm);
     }
@@ -98,20 +99,24 @@ function runTest(
 
     if (expectedJoinAlgorithm === JoinAlgorithm.Classic) {
         assert.commandWorked(response);
-        const explain = coll.explain().aggregate(pipeline, aggOptions);
+        const explain = coll.explain("executionStats").aggregate(pipeline, aggOptions);
         const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
 
         // In the classic case, verify that $lookup was not lowered into SBE. Note that we don't
         // check for the presence of $lookup agg stages because in the sharded case, $lookup will
         // not execute on each shard and will not show up in the output of 'getAggPlanStages'.
         assert.eq(eqLookupNodes.length, 0, "there should be no lowered EQ_LOOKUP stages; got " + tojson(explain));
+
+        if (indexKeyPattern) {
+            assert.eq(explain.stages[1].indexesUsed[0], indexKeyPattern, explain);
+        }
     } else {
         assert.commandWorked(response);
         const explain = coll.explain().aggregate(pipeline, aggOptions);
         const expectedStrategy = getJoinAlgorithmStrategyName(expectedJoinAlgorithm);
         verifyEqLookupNodeStrategy(explain, eqLookupNodeIndex, expectedStrategy, indexKeyPattern);
 
-        // Verify that multiplanning took place by verifying that there was at least one
+        // Verify that multi-planning took place by verifying that there was at least one
         // rejected plan.
         if (checkMultiPlanning) {
             assert(hasRejectedPlans(explain), explain);
@@ -123,7 +128,7 @@ let db = conn.getDB(name);
 const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
 if (!sbeEnabled) {
-    jsTestLog("Skipping test because SBE is disabled");
+    jsTest.log.info("Skipping test because SBE is disabled");
     MongoRunner.stopMongod(conn);
     quit();
 }
@@ -369,11 +374,22 @@ function setLookupPushdownDisabled(value) {
     assert.commandWorked(foreignColl.dropIndexes());
 })();
 
-// Build a wildcard index on the foreign collection that matches the foreignField. Nested loop join
-// strategy should be used.
-(function testWildcardIndexInhibitsIndexNestedLoopJoin() {
+(function testWildcardIndex() {
+    // A compatible wildcard index on the foreign collection that matches the foreignField. In this case, it
+    // should not be pushed to SBE.
     assert.commandWorked(foreignColl.dropIndexes());
-    assert.commandWorked(foreignColl.createIndex({"$**": 1}));
+    assert.commandWorked(foreignColl.createIndex({"$**": 1}, {name: "wcidx"}));
+    runTest(
+        coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        "wcidx" /* indexKeyPattern */,
+    );
+
+    // A wildcard index on the foreign collection that excludes the foreignField. In this case, it
+    // should use HJ.
+    assert.commandWorked(foreignColl.dropIndexes());
+    assert.commandWorked(foreignColl.createIndex({"$**": 1}, {wildcardProjection: {b: 0}}));
     runTest(
         coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
@@ -382,44 +398,56 @@ function setLookupPushdownDisabled(value) {
 
     // Insert a document with multikey paths in the foreign collection that will be used for testing
     // wildcard indexes.
-    const mkDoc = {b: [3, 4], c: [5, 6, {d: [7, 8]}]};
+    const mkDoc = {b: [3, 4, {c: [5, 6]}], c: [5, 6, {d: [7, 8]}]};
     assert.commandWorked(foreignColl.insert(mkDoc));
 
-    // An incompatible wildcard index should result in using NLJ.
+    // An incompatible wildcard index should result in using HJ.
     assert.commandWorked(foreignColl.dropIndexes());
-    assert.commandWorked(foreignColl.createIndex({"b.$**": 1}));
+    assert.commandWorked(foreignColl.createIndex({"b.$**": 1}, {name: "wcidx"}));
     runTest(
         coll,
         [
             {
-                $lookup: {from: foreignCollName, localField: "a", foreignField: "not a match", as: "out"},
+                $lookup: {from: foreignCollName, localField: "a", foreignField: "c", as: "out"},
             },
         ],
         JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
     );
 
-    // A compatible wildcard index with no other SBE compatible indexes should result in NLJ.
+    // A compatible wildcard index with no other SBE compatible indexes should use classic.
     runTest(
         coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
+        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        "wcidx" /* indexKeyPattern */,
     );
 
     runTest(
         coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b.c", as: "out"}}],
-        JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
+        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        "wcidx" /* indexKeyPattern */,
     );
 
-    assert.commandWorked(foreignColl.dropIndexes());
-    assert.commandWorked(foreignColl.createIndex({"$**": 1}, {wildcardProjection: {b: 1}}));
+    // A compatible index with incompatible collations should use HJ
+    assert.commandWorked(foreignColl.createIndex({b: 1}, {collation: {locale: "fr"}}));
     runTest(
         coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
         JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
     );
 
-    // Create a regular index over the foreignField. We should now use INLJ.
+    assert.commandWorked(foreignColl.dropIndexes());
+    assert.commandWorked(foreignColl.createIndex({"$**": 1}, {name: "wcidx", wildcardProjection: {b: 1}}));
+    runTest(
+        coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        "wcidx" /* indexKeyPattern */,
+    );
+
+    // A compatible wildcard index with a compatible regular index over the foreignField. We should
+    // now use INLJ.
     assert.commandWorked(foreignColl.createIndex({b: 1}));
     runTest(
         coll,
@@ -429,12 +457,13 @@ function setLookupPushdownDisabled(value) {
     );
     assert.commandWorked(foreignColl.dropIndexes());
 
-    // Verify that a leading $match won't filter out a legitimate wildcard index.
-    assert.commandWorked(foreignColl.createIndex({"$**": 1}, {wildcardProjection: {b: 1, c: 1}}));
+    // The index can be used in classic so lookup is not pushed but classic does not use it at the end.
+    assert.commandWorked(foreignColl.createIndex({"$**": 1}, {name: "wcidx", wildcardProjection: {b: 1, c: 1}}));
     runTest(
         coll,
         [{$match: {"c.d": 1}}, {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
+        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        null /* indexKeyPattern */,
     );
     assert.commandWorked(foreignColl.deleteOne(mkDoc));
     assert.commandWorked(foreignColl.dropIndexes());
