@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:a973a3fe-5abe-4432-91fa-cc30c1034545",
-  "version": 9,
+  "version": 10,
   "metadata": {
-    "timestamp": "2025-11-27T07:21:13Z",
+    "timestamp": "2025-12-08T06:08:24Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -63,7 +63,7 @@
       "services": [
         {
           "name": "Endor Labs Inc",
-          "version": "v1.7.671"
+          "version": "v1.7.697"
         }
       ]
     }
@@ -2202,7 +2202,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/protocolbuffers/protobuf@v25.0",
+      "bom-ref": "pkg:github/protocolbuffers/protobuf@v4.25.0",
       "supplier": {
         "name": "Google LLC",
         "url": [
@@ -2212,7 +2212,7 @@
       "author": "Google LLC",
       "group": "google.opensource",
       "name": "Protobuf",
-      "version": "v25.0",
+      "version": "4.25.0",
       "description": "Protocol Buffers - Google's data interchange format",
       "licenses": [
         {
@@ -2222,8 +2222,8 @@
         }
       ],
       "copyright": "Copyright 2008 Google Inc. Copyright 2023 Google LLC. All rights reserved.",
-      "cpe": "cpe:2.3:a:google:protobuf:v25.0:*:*:*:*:*:*:*",
-      "purl": "pkg:github/protocolbuffers/protobuf@v25.0",
+      "cpe": "cpe:2.3:a:google:protobuf-cpp:4.25.0:*:*:*:*:*:*:*",
+      "purl": "pkg:github/protocolbuffers/protobuf@v4.25.0",
       "externalReferences": [
         {
           "url": "https://github.com/protocolbuffers/protobuf.git",
@@ -2633,7 +2633,7 @@
         "pkg:pypi/ocspbuilder@0.10.2",
         "pkg:pypi/ocspresponder@0.5.0",
         "pkg:github/pcre2project/pcre2@pcre2-10.40",
-        "pkg:github/protocolbuffers/protobuf@v25.0",
+        "pkg:github/protocolbuffers/protobuf@v4.25.0",
         "pkg:github/roaringbitmap/croaring@v3.0.1",
         "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
         "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
@@ -2788,7 +2788,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/protocolbuffers/protobuf@v25.0",
+      "ref": "pkg:github/protocolbuffers/protobuf@v4.25.0",
       "dependsOn": []
     },
     {

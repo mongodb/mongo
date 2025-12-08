@@ -57,7 +57,7 @@ a notice will be included in
 | [opentelemetry-cpp]                                  | Apache-2.0                                     | 1.17.0                                   | ✗                    |                                 |
 | [opentelemetry-proto]                                | Apache-2.0                                     | 1.3.2                                    | ✗                    |                                 |
 | [PCRE2 - Perl-Compatible Regular Expressions]        | BSD-3-Clause WITH PCRE2-exception              | 10.40                                    |                      | ✗                               |
-| [Protobuf]                                           | BSD-3-Clause                                   | v25.0                                    |                      | ✗                               |
+| [Protobuf]                                           | BSD-3-Clause                                   | 4.25.0                                   |                      | ✗                               |
 | [pypi/ocspbuilder]                                   | MIT                                            | 0.10.2                                   |                      |                                 |
 | [pypi/ocspresponder]                                 | Apache-2.0                                     | 0.5.0                                    |                      |                                 |
 | [re2]                                                | BSD-3-Clause                                   | 2025-08-05                               |                      | ✗                               |
