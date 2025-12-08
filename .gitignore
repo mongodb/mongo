@@ -15,6 +15,7 @@
 /merged_decls.json
 /modules_dump.yaml
 /.tmp
+!/.tmp/_placeholder_
 venv
 
 *~
@@ -304,6 +305,7 @@ buildozer
 .compiledb
 .bazelrc.xcode
 .bazelrc.bazelisk
+.bazelrc.exec_log_file
 *.bazel_info_for_ninja.txt
 .ninja_last_command_line_targets.txt
 bazel/coverity/analysis/BUILD.bazel

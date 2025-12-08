@@ -54,6 +54,9 @@ fi
 
 echo "common --//bazel/config:running_through_bazelisk" > $REPO_ROOT/.bazelrc.bazelisk
 
+# Write a compressed execution log to a file for EngFlow to pick up for more detailed analysis.
+echo "common --execution_log_compact_file=$REPO_ROOT/.tmp/bazel_execution_log.binpb.zst" > $REPO_ROOT/.bazelrc.exec_log_file
+
 if [[ $MONGO_BAZEL_WRAPPER_DEBUG == 1 ]]; then
     wrapper_start_time="$(date -u +%s.%N)"
 fi

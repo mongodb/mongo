@@ -36,6 +36,7 @@ README.third_party.md @10gen/code-review-team-ssdlc @svc-auto-approve-bot
 sbom.json @10gen/code-review-team-ssdlc @svc-auto-approve-bot
 MODULE.bazel* @10gen/devprod-build @svc-auto-approve-bot
 WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
+.tmp/* @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./.cursor/rules/OWNERS.yml
 /.cursor/rules/**/cs-* @10gen/server-cluster-scalability @svc-auto-approve-bot

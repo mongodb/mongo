@@ -582,6 +582,10 @@ common --experimental_repository_downloader_retries=3
 # Place golden test output files where buildscripts/golden_tests.py can find them
 common --test_env=GOLDEN_TEST_CONFIG_PATH
 
+# Upload build events to EngFlow
+common --experimental_build_event_upload_strategy=remote
+
+
 # TODO(WT-12780): delete this once wiredtiger switches to /.bazelrc.evergreen.
 try-import %workspace%/.bazelrc.evergreen_engflow_creds
 
@@ -605,3 +609,6 @@ try-import %workspace%/.bazelrc.bazelisk
 
 # Flags synced from Flag Sync
 try-import %workspace%/.bazelrc.sync
+
+# Repository root absolute path to set --execution_log_compact_file
+try-import %workspace%/.bazelrc.exec_log_file

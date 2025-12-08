@@ -31,9 +31,12 @@ set "VT_SCRIPT=%TEMP%\bazel_vt_%RANDOM%.ps1"
 >nul 2>&1 powershell -NoProfile -ExecutionPolicy Bypass -File "%VT_SCRIPT%"
 del "%VT_SCRIPT%" >nul 2>&1
 
+set REPO_ROOT=%~dp0..
+
 echo common --//bazel/config:running_through_bazelisk > .bazelrc.bazelisk
 
-set REPO_ROOT=%~dp0..
+REM Write a compressed execution log to a file for EngFlow to pick up for more detailed analysis.
+echo common --execution_log_compact_file=%REPO_ROOT:\=/%/.tmp/bazel_execution_log.binpb.zst > .bazelrc.exec_log_file
 
 for %%I in (%REPO_ROOT%) do set cur_dir=%%~nxI
 
