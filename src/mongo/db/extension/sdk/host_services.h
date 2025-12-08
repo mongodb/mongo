@@ -86,6 +86,7 @@ public:
     }
 
     IdleThreadBlockHandle markIdleThread(const char* location) {
+        assertValid();
         ::MongoExtensionIdleThreadBlock* idleThreadBlock = nullptr;
         invokeCAndConvertStatusToException(
             [&] { return vtable().mark_idle_thread_block(&idleThreadBlock, location); });
@@ -101,6 +102,7 @@ public:
     }
 
     AggStageParseNodeHandle createHostAggStageParseNode(BSONObj spec) const {
+        assertValid();
         ::MongoExtensionAggStageParseNode* result = nullptr;
         invokeCAndConvertStatusToException([&] {
             return vtable().create_host_agg_stage_parse_node(objAsByteView(spec), &result);
@@ -109,6 +111,7 @@ public:
     }
 
     AggStageAstNodeHandle createIdLookup(BSONObj spec) const {
+        assertValid();
         ::MongoExtensionAggStageAstNode* result = nullptr;
         invokeCAndConvertStatusToException(
             [&] { return vtable().create_id_lookup(objAsByteView(spec), &result); });
@@ -116,6 +119,7 @@ public:
     }
 
     LoggerHandle getLogger() const {
+        assertValid();
         return LoggerHandle(vtable().get_logger());
     }
 

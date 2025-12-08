@@ -38,11 +38,13 @@
 namespace mongo::extension {
 
 StringData LogicalAggStageHandle::getName() const {
+    assertValid();
     auto stringView = byteViewAsStringView(vtable().get_name(get()));
     return StringData{stringView.data(), stringView.size()};
 }
 
 BSONObj LogicalAggStageHandle::serialize() const {
+    assertValid();
     ::MongoExtensionByteBuf* buf{nullptr};
     invokeCAndConvertStatusToException([&]() { return vtable().serialize(get(), &buf); });
 
@@ -58,6 +60,7 @@ BSONObj LogicalAggStageHandle::serialize() const {
 }
 
 BSONObj LogicalAggStageHandle::explain(mongo::ExplainOptions::Verbosity verbosity) const {
+    assertValid();
     ::MongoExtensionByteBuf* buf{nullptr};
     auto extVerbosity = convertHostVerbosityToExtVerbosity(verbosity);
     invokeCAndConvertStatusToException(
@@ -73,6 +76,7 @@ BSONObj LogicalAggStageHandle::explain(mongo::ExplainOptions::Verbosity verbosit
 }
 
 ExecAggStageHandle LogicalAggStageHandle::compile() const {
+    assertValid();
     ::MongoExtensionExecAggStage* execAggStage{nullptr};
     invokeCAndConvertStatusToException([&]() { return vtable().compile(get(), &execAggStage); });
 
@@ -80,6 +84,7 @@ ExecAggStageHandle LogicalAggStageHandle::compile() const {
 }
 
 DistributedPlanLogicHandle LogicalAggStageHandle::getDistributedPlanLogic() const {
+    assertValid();
     ::MongoExtensionDistributedPlanLogic* dpl{nullptr};
     invokeCAndConvertStatusToException(
         [&]() { return vtable().get_distributed_plan_logic(get(), &dpl); });

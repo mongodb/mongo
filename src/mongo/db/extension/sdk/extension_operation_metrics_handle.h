@@ -44,6 +44,7 @@ public:
     }
 
     void update(const MongoExtensionByteView& byteView) {
+        assertValid();
         // Note that it is safe to call this without invokeC... because this is not crossing the API
         // boundary - this is called from extension side -> extension side.
         vtable().update(get(), byteView);

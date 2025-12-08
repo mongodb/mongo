@@ -37,6 +37,7 @@
 namespace mongo::extension {
 
 std::vector<VariantDPLHandle> DistributedPlanLogicHandle::getShardsPipeline() const {
+    assertValid();
     ::MongoExtensionDPLArrayContainer* container = nullptr;
     invokeCAndConvertStatusToException(
         [&]() { return vtable().get_shards_pipeline(get(), &container); });
@@ -50,6 +51,7 @@ std::vector<VariantDPLHandle> DistributedPlanLogicHandle::getShardsPipeline() co
 }
 
 std::vector<VariantDPLHandle> DistributedPlanLogicHandle::getMergingPipeline() const {
+    assertValid();
     ::MongoExtensionDPLArrayContainer* container = nullptr;
     invokeCAndConvertStatusToException(
         [&]() { return vtable().get_merging_pipeline(get(), &container); });
@@ -63,6 +65,7 @@ std::vector<VariantDPLHandle> DistributedPlanLogicHandle::getMergingPipeline() c
 }
 
 BSONObj DistributedPlanLogicHandle::getSortPattern() const {
+    assertValid();
     ::MongoExtensionByteBuf* buf = nullptr;
     invokeCAndConvertStatusToException([&]() { return vtable().get_sort_pattern(get(), &buf); });
 
@@ -75,4 +78,3 @@ BSONObj DistributedPlanLogicHandle::getSortPattern() const {
 }
 
 }  // namespace mongo::extension
-

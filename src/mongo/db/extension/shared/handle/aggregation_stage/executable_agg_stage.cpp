@@ -34,6 +34,7 @@
 namespace mongo::extension {
 
 void ExecAggStageHandle::setSource(const ExecAggStageHandle& input) {
+    assertValid();
     invokeCAndConvertStatusToException([&]() { return vtable().set_source(get(), input.get()); });
 }
 
@@ -67,43 +68,53 @@ host_connector::HostOperationMetricsHandle _internalCreateMetrics(
 
 ExtensionGetNextResult ExecAggStageHandle::getNext(
     MongoExtensionQueryExecutionContext* execCtxPtr) {
+    assertValid();
     return _internalGetNext(vtable(), get(), execCtxPtr);
 }
 
 std::string_view ExecAggStageHandle::getName() const {
+    assertValid();
     return _internalGetName(vtable(), get());
 }
 
 host_connector::HostOperationMetricsHandle ExecAggStageHandle::createMetrics() const {
+    assertValid();
     return _internalCreateMetrics(vtable(), get());
 }
 
 std::string_view UnownedExecAggStageHandle::getName() const {
+    assertValid();
     return _internalGetName(vtable(), get());
 }
 
 host_connector::HostOperationMetricsHandle UnownedExecAggStageHandle::createMetrics() const {
+    assertValid();
     return _internalCreateMetrics(vtable(), get());
 }
 
 ExtensionGetNextResult UnownedExecAggStageHandle::getNext(
     MongoExtensionQueryExecutionContext* execCtxPtr) {
+    assertValid();
     return _internalGetNext(vtable(), get(), execCtxPtr);
 }
 
 void ExecAggStageHandle::open() {
+    assertValid();
     invokeCAndConvertStatusToException([&]() { return vtable().open(get()); });
 }
 
 void ExecAggStageHandle::reopen() {
+    assertValid();
     invokeCAndConvertStatusToException([&]() { return vtable().reopen(get()); });
 }
 
 void ExecAggStageHandle::close() {
+    assertValid();
     invokeCAndConvertStatusToException([&]() { return vtable().close(get()); });
 }
 
 BSONObj ExecAggStageHandle::explain(mongo::ExplainOptions::Verbosity verbosity) const {
+    assertValid();
     ::MongoExtensionByteBuf* buf;
     auto extVerbosity = convertHostVerbosityToExtVerbosity(verbosity);
     invokeCAndConvertStatusToException(

@@ -35,6 +35,7 @@
 namespace mongo::extension {
 
 MongoExtensionStaticProperties AggStageAstNodeHandle::getProperties() const {
+    assertValid();
     ::MongoExtensionByteBuf* buf{nullptr};
     invokeCAndConvertStatusToException([&]() { return vtable().get_properties(get(), &buf); });
 
@@ -49,6 +50,7 @@ MongoExtensionStaticProperties AggStageAstNodeHandle::getProperties() const {
 }
 
 LogicalAggStageHandle AggStageAstNodeHandle::bind() const {
+    assertValid();
     ::MongoExtensionLogicalAggStage* logicalStagePtr{nullptr};
 
     // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.

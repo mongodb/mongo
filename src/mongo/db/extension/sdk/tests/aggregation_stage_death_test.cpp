@@ -674,5 +674,15 @@ DEATH_TEST_F(AggStageDeathTest, GetSourceOnSourceStageFails, "10957208") {
     [[maybe_unused]] auto source = sourceStage._getSource();
 }
 
+DEATH_TEST_F(AggStageDeathTest, GetNameOnMovedHandleFails, "10596403") {
+    auto sourceHandle = extension::ExecAggStageHandle{new extension::sdk::ExtensionExecAggStage(
+        shared_test_stages::AddFruitsToDocumentsExecAggStage::make())};
+
+    auto sourceHandle2 = std::move(sourceHandle);
+
+    // Calling getName on a source handle should fail.
+    [[maybe_unused]] auto source = sourceHandle.getName();
+}
+
 }  // namespace
 }  // namespace mongo::extension::sdk

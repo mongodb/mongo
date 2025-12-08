@@ -33,6 +33,7 @@
 namespace mongo::extension {
 
 AggStageParseNodeHandle AggStageDescriptorHandle::parse(BSONObj stageBson) const {
+    assertValid();
     ::MongoExtensionAggStageParseNode* parseNodePtr{nullptr};
     // The API's contract mandates that parseNodePtr will only be allocated if status is OK.
     invokeCAndConvertStatusToException(

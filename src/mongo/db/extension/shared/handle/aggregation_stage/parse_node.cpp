@@ -41,11 +41,11 @@ MONGO_FAIL_POINT_DEFINE(failExtensionDPL);
 
 BSONObj AggStageParseNodeHandle::getQueryShape(
     const ::MongoExtensionHostQueryShapeOpts& opts) const {
+    assertValid();
     ::MongoExtensionByteBuf* buf{nullptr};
-    const auto& vtbl = vtable();
-    auto* ptr = get();
 
-    invokeCAndConvertStatusToException([&]() { return vtbl.get_query_shape(ptr, &opts, &buf); });
+    invokeCAndConvertStatusToException(
+        [&]() { return vtable().get_query_shape(get(), &opts, &buf); });
 
     tassert(11188203, "buffer returned from get_query_shape must not be null", buf != nullptr);
 
@@ -89,6 +89,7 @@ struct ArrayElemAsRaii<::MongoExtensionExpandedArrayElement> {
 };
 
 std::vector<VariantNodeHandle> AggStageParseNodeHandle::expand() const {
+    assertValid();
     // Host allocates buffer with the expected size.
     const auto expandedSize = getExpandedSize();
     tassert(11113803, "AggStageParseNode getExpandedSize() must be >= 1", expandedSize >= 1);

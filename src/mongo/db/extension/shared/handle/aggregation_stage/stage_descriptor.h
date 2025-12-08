@@ -46,7 +46,7 @@ namespace mongo::extension {
  */
 class AggStageDescriptorHandle : public UnownedHandle<const ::MongoExtensionAggStageDescriptor> {
 public:
-    AggStageDescriptorHandle(absl::Nonnull<const ::MongoExtensionAggStageDescriptor*> descriptor)
+    AggStageDescriptorHandle(const ::MongoExtensionAggStageDescriptor* descriptor)
         : UnownedHandle<const ::MongoExtensionAggStageDescriptor>(descriptor) {
         _assertValidVTable();
     }
@@ -55,6 +55,7 @@ public:
      * Returns a StringData containing the name of this aggregation stage.
      */
     StringData getName() const {
+        assertValid();
         auto stringView = byteViewAsStringView(vtable().get_name(get()));
         return StringData{stringView.data(), stringView.size()};
     }
