@@ -321,7 +321,9 @@ OplogApplierBatcher::BatchAction OplogApplierBatcher::_getBatchActionForEntry(
 
     if (entry.getCommandType() == OplogEntry::CommandType::kTruncateRange) {
         const auto& cmd = entry.getObject();
-        const auto& ns = OplogApplication::extractNsFromCmd(entry.getNss().dbName(), cmd);
+        const auto& ns = NamespaceStringUtil::deserialize(boost::none,
+                                                          cmd.firstElement().valueStringData(),
+                                                          SerializationContext::stateDefault());
         if (ns.isChangeStreamPreImagesCollection()) {
             auto truncateRangeEntry = TruncateRangeOplogEntry::parse(cmd);
             const auto& maxRecordId = truncateRangeEntry.getMaxRecordId();

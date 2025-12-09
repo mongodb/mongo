@@ -784,4 +784,112 @@ TEST_F(CollectionMarkersTest, ScanningWorksWithTruncate) {
     yieldNotifier.join();
 }
 
+void checkMarker(const RecordId& expected,
+                 OperationContext* opCtx,
+                 RecordStore& rs,
+                 RecordId pin,
+                 Date_t expiryTime) {
+    auto marker = CollectionTruncateMarkers::newestExpiredRecord(opCtx, rs, pin, expiryTime);
+    // the first three of these are always the same regardless of the record store contents:
+    ASSERT_EQ(0, marker->records);
+    ASSERT_EQ(0, marker->bytes);
+    ASSERT_EQ(expiryTime, marker->wallTime);
+    // this is the assertion that might ever fail, so add some info about the other inputs
+    ASSERT_EQ(expected, marker->lastRecord) << " with expiry=" << expiryTime << " and pin=" << pin;
+}
+
+TEST_F(CollectionMarkersTest, TimeBasedMarkerConstruction) {
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
+    auto opCtx = getClient()->makeOperationContext();
+    createCollection(opCtx.get(), collNs);
+    std::vector<RecordIdAndWall> elements;
+    std::vector<RecordId> pins;  // representing one second after each element
+    Date_t wallTime = Date_t::now();
+    // no truncatable record if oplog is empty
+    {
+        AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+        ASSERT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
+            opCtx.get(), *coll->getRecordStore(), RecordId(), wallTime));
+        Timestamp ts(durationCount<Seconds>(wallTime.toDurationSinceEpoch()), 0);
+        ASSERT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
+            opCtx.get(), *coll->getRecordStore(), RecordId(ts.getSecs(), 0), wallTime));
+    }
+    // for this test we need real sequence numbers
+    {
+        AutoGetCollection coll(opCtx.get(), collNs, MODE_IX);
+        RecordStore& rs = *coll->getRecordStore();
+        const auto insertedData = std::string(50, 'a');
+        WriteUnitOfWork wuow(opCtx.get());
+        for (size_t i = 0; i < 20; ++i) {
+            Timestamp ts(durationCount<Seconds>(wallTime.toDurationSinceEpoch()), 0);
+            RecordId recordId = RecordId(ts.getSecs(), 0);
+            auto recordIdStatus = rs.insertRecord(opCtx.get(),
+                                                  *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                                  recordId,
+                                                  insertedData.data(),
+                                                  insertedData.length(),
+                                                  ts);
+            ASSERT_OK(recordIdStatus);
+            ASSERT_EQ(recordId, recordIdStatus.getValue());
+            elements.emplace_back(recordId, wallTime);
+            pins.emplace_back(RecordId(ts.getSecs() + 1, 0));
+            wallTime += Seconds(2);
+        }
+        wuow.commit();
+    }
+    AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+    RecordStore& rs = *coll->getRecordStore();
+    // first, check when expiry time is the limiting factor, with and without pins
+    for (size_t i = 1; i < elements.size(); ++i) {
+        const RecordIdAndWall& element = elements.at(i);
+        RecordId expected = element.recordId;
+        // don't completely empty out the oplog! instead, test that looking up the newest wall time
+        // returns the second-newest recordId.
+        if (expected == elements.back().recordId) {
+            expected = elements[elements.size() - 2].recordId;
+        }
+        // exact match with no pin
+        checkMarker(expected, opCtx.get(), rs, RecordId(), element.wallTime);
+        // in between records with no pin should match older record,
+        // and expiry time newer than newest record should match newest record
+        checkMarker(expected, opCtx.get(), rs, RecordId(), element.wallTime + Seconds(1));
+        // check various pins when the expiry time is the limiting factor
+        // pin equal to expiry is covered below with pin-limited truncation
+        // note that pins require one unpinned entry to be retained, so don't start j equal to i
+        for (size_t j = i + 1; j < elements.size(); ++j) {
+            checkMarker(expected, opCtx.get(), rs, elements.at(j).recordId, element.wallTime);
+            checkMarker(expected, opCtx.get(), rs, pins.at(j), element.wallTime);
+            checkMarker(
+                expected, opCtx.get(), rs, elements.at(j).recordId, element.wallTime + Seconds(1));
+            checkMarker(expected, opCtx.get(), rs, pins.at(j), element.wallTime + Seconds(1));
+        }
+    }
+    // check various expiry times when pin is the limiting factor (or pin and expiry retain equally)
+    for (size_t i = 1; i < elements.size(); ++i) {
+        for (int j = 0; j < 4; ++j) {
+            // don't truncate the mayTruncateUpTo point if the pin is an exact match for an entry
+            checkMarker(elements.at(i - 1).recordId,
+                        opCtx.get(),
+                        rs,
+                        elements.at(i).recordId,
+                        elements.at(i).wallTime + Seconds(j));
+            // leave an entry before the mayTruncateUpTo point if the pin has no exact match
+            checkMarker(elements.at(i - 1).recordId,
+                        opCtx.get(),
+                        rs,
+                        pins.at(i),
+                        elements.at(i).wallTime + Seconds(j));
+        }
+    }
+    // corner cases not covered in the above for loops:
+    // no truncatable record if expiry time is older than oldest record
+    ASSERT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
+        opCtx.get(), rs, RecordId(), elements.at(0).wallTime - Seconds(1)));
+    // no truncatable record if oplog is all pinned
+    ASSERT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
+        opCtx.get(), rs, elements.at(0).recordId, wallTime + Seconds(25)));
+    // no truncatable record if all but one oplog entry is pinned, but not as an exact match
+    ASSERT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
+        opCtx.get(), rs, pins.at(0), wallTime + Seconds(25)));
+}
 }  // namespace mongo

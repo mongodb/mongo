@@ -60,48 +60,6 @@
 namespace mongo {
 
 namespace {
-/**
- * Responsible for deleting oplog truncate markers once their max capacity has been reached.
- */
-class OplogCapMaintainerThread final : public BackgroundJob {
-public:
-    OplogCapMaintainerThread() : BackgroundJob(false /* deleteSelf */) {}
-
-    static OplogCapMaintainerThread* get(ServiceContext* serviceCtx);
-    static OplogCapMaintainerThread* get(OperationContext* opCtx);
-    static void set(ServiceContext* serviceCtx,
-                    std::unique_ptr<OplogCapMaintainerThread> oplogCapMaintainerThread);
-
-    std::string name() const override {
-        return _name;
-    }
-
-    void run() override;
-
-    /**
-     * Waits until the maintainer thread finishes. Must not be called concurrently with start().
-     */
-    void shutdown(const Status& reason);
-
-private:
-    /**
-     * Returns true iff there was an oplog to delete from.
-     */
-    bool _deleteExcessDocuments(OperationContext* opCtx);
-
-    // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
-    mutable stdx::mutex _opCtxMutex;
-
-    // Saves a reference to the cap maintainer thread's operation context.
-    boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
-
-    mutable stdx::mutex _stateMutex;
-    bool _shuttingDown = false;
-    Status _shutdownReason = Status::OK();
-
-    std::string _name = std::string("OplogCapMaintainerThread-") +
-        toStringForLogging(NamespaceString::kRsOplogNamespace);
-};
 
 const auto getMaintainerThread =
     ServiceContext::declareDecoration<std::unique_ptr<OplogCapMaintainerThread>>();
@@ -247,6 +205,13 @@ void OplogCapMaintainerThread::set(
     maintainerThread = std::move(oplogCapMaintainerThread);
 }
 
+Lock::GlobalLockOptions OplogCapMaintainerThread::_getOplogTruncationLockOptions() {
+    return {.skipFlowControlTicket = true,
+            .skipRSTLLock = true,
+            .skipDirectConnectionChecks = false,
+            .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite};
+}
+
 bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
     // A Global IX lock should be good enough to protect the oplog truncation from
     // interruptions such as replication rollback. Database lock or collection lock is not
@@ -282,10 +247,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
                                   MODE_IX,
                                   Date_t::max(),
                                   Lock::InterruptBehavior::kThrow,
-                                  {false,
-                                   true /* skipRstl */,
-                                   false,
-                                   rss::consensus::IntentRegistry::Intent::LocalWrite});
+                                  _getOplogTruncationLockOptions());
         auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
         if (!rs) {
             LOGV2_DEBUG(9064300, 2, "oplog collection does not exist");
@@ -295,7 +257,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
         auto mayTruncateUpTo = opCtx->getServiceContext()->getStorageEngine()->getPinnedOplog();
 
         Timer timer;
-        oplog_truncation::reclaimOplog(opCtx, *rs, RecordId(mayTruncateUpTo.asULL()));
+        _reclaimOplog(opCtx, *rs, RecordId(mayTruncateUpTo.asULL()));
 
         auto elapsedMicros = timer.micros();
         totalTimeTruncating.fetchAndAdd(elapsedMicros);
@@ -313,9 +275,15 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
     return true;
 }
 
+void OplogCapMaintainerThread::_reclaimOplog(OperationContext* opCtx,
+                                             RecordStore& rs,
+                                             RecordId mayTruncateUpTo) {
+    oplog_truncation::reclaimOplog(opCtx, rs, mayTruncateUpTo);
+}
+
 void OplogCapMaintainerThread::run() {
-    LOGV2(5295000, "Oplog cap maintainer thread started", "threadName"_attr = _name);
-    ThreadClient tc(_name,
+    LOGV2(5295000, "Oplog cap maintainer thread started", "threadName"_attr = name());
+    ThreadClient tc(name(),
                     getGlobalServiceContext()->getService(ClusterRole::ShardServer),
                     Client::noSession(),
                     ClientOperationKillableByStepdown{false});
@@ -353,7 +321,9 @@ void OplogCapMaintainerThread::run() {
         }
     });
 
-    if (gOplogSamplingAsyncEnabled) {
+    // asynchronously regenerate truncation markers, if they are still needed when we get here.
+    auto& provider = rss::ReplicatedStorageService::get(_uniqueCtx->get()).getPersistenceProvider();
+    if (gOplogSamplingAsyncEnabled && provider.supportsOplogSampling()) {
         try {
             {
                 stdx::unique_lock<stdx::mutex> lk(_stateMutex);

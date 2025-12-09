@@ -40,8 +40,8 @@ structs:
         strict: false
         fields:
             truncateRange:
-                description: "Name of the collection being truncated"
-                type: string
+                description: "Full namespace for the collection being truncated"
+                type: namespacestring
             minRecordId:
                 description: "Inclusive lower bound of the range to truncate"
                 type: RecordId

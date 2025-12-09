@@ -120,6 +120,20 @@ public:
 
     boost::optional<Marker> peekOldestMarkerIfNeeded(OperationContext* opCtx) const;
 
+    /**
+     * Creates a new marker object representing the newest oplog that may be truncated, if any.
+     * A record may be truncated if it is older than the expiry time, and if truncating would
+     * not remove all unpinned records.
+     * Returns a marker with the record to be truncated but without byte or record
+     * truncation counts.
+     * The marker queue is not used and popOldestMarker() should not be called after the use of
+     * this function.
+     */
+    static boost::optional<Marker> newestExpiredRecord(OperationContext* opCtx,
+                                                       RecordStore& recordStore,
+                                                       const RecordId& mayTruncateUpTo,
+                                                       Date_t expiryTime);
+
     void popOldestMarker();
 
     void createNewMarkerIfNeeded(const RecordId& lastRecord,

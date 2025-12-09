@@ -519,7 +519,7 @@ OplogEntry makeLargeRetryableWriteOplogEntries(int t,
  * Generates a truncateRange oplog entry
  */
 OplogEntry makeTruncateRangeEntry(int t, const NamespaceString& nss, const RecordId& maxRecordId) {
-    TruncateRangeOplogEntry oField(std::string(nss.coll()), RecordId(), maxRecordId, 0, 0);
+    TruncateRangeOplogEntry oField(nss, RecordId(), maxRecordId, 0, 0);
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                               OpTypeEnum::kCommand,        // op type
                               nss.getCommandNS(),          // namespace

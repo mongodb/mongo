@@ -45,7 +45,7 @@ namespace MONGO_MOD_PUBLIC mongo {
 
 // Keep "milestones" against the oplog to efficiently remove the old records when the collection
 // grows beyond its desired maximum size.
-class OplogTruncateMarkers final : public CollectionTruncateMarkers {
+class MONGO_MOD_OPEN OplogTruncateMarkers : public CollectionTruncateMarkers {
 public:
     OplogTruncateMarkers(std::deque<CollectionTruncateMarkers::Marker> markers,
                          int64_t partialMarkerRecords,
@@ -68,6 +68,11 @@ public:
     void kill();
 
     /**
+     * The time after which oplog is retained by policy.
+     */
+    static Date_t newestExpiredWallTime(OperationContext* opCtx);
+
+    /**
      * Waits for excess oplog space to be available for reclamation.
      * Returns true if we can proceed to reclaim space in the oplog.
      * Otherwise, returns false if the containing record store instance is being destroyed
@@ -76,6 +81,16 @@ public:
      * See 'oplogTruncationCheckPeriodSeconds' server parameter.
      */
     bool awaitHasExcessMarkersOrDead(OperationContext* opCtx) override;
+
+    /**
+     * Waits for expired oplog entries to be eligible for reclamation by time-based retention only.
+     * Returns true if we can proceed to reclaim space in the oplog by time.
+     * Otherwise, returns false if the containing record store instance is being destroyed
+     * or if we reached the deadline for waiting.
+     * Throws exception if interrupted.
+     * See 'oplogTruncationCheckPeriodSeconds' server parameter.
+     */
+    bool awaitHasExpiredOplogOrDead(OperationContext* opCtx, RecordStore& rs);
 
     // Clears all the markers of the instance whenever the current WUOW commits.
     void clearMarkersOnCommit(OperationContext* opCtx);

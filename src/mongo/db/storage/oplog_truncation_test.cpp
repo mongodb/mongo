@@ -47,6 +47,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
@@ -922,6 +923,15 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_Duplicates) {
         ASSERT_EQ(1, rs->numRecords());
         ASSERT_EQ(100, rs->dataSize());
     }
+}
+
+TEST_F(OplogTruncationTest, OplogTruncateMarkers_NewestExpiredWallTime) {
+    storageGlobalParams.oplogMinRetentionHours.store(24.0);
+    Date_t expected = Date_t::now() - Hours(24);
+    Date_t actual = OplogTruncateMarkers::newestExpiredWallTime(getOperationContext());
+    ASSERT_APPROX_EQUAL(expected.toMillisSinceEpoch(), actual.toMillisSinceEpoch(), 1000);
+    storageGlobalParams.oplogMinRetentionHours.store(0.0);
+    ASSERT_EQ(Date_t(), OplogTruncateMarkers::newestExpiredWallTime(getOperationContext()));
 }
 
 }  // namespace repl

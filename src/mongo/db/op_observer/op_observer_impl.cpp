@@ -42,6 +42,7 @@
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_reserved.h"
 #include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
@@ -2342,12 +2343,14 @@ void OpObserverImpl::onTruncateRange(OperationContext* opCtx,
                 rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
                 VersionContext::getDecoration(opCtx)));
 
-    TruncateRangeOplogEntry objectEntry(
-        std::string(coll->ns().coll()), minRecordId, maxRecordId, bytesDeleted, docsDeleted);
+    NamespaceString nss = coll->ns();
+    TruncateRangeOplogEntry objectEntry(nss, minRecordId, maxRecordId, bytesDeleted, docsDeleted);
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-    oplogEntry.setNss(coll->ns().getCommandNS());
+    // For oplog truncation, use admin.$cmd as the namespace to get around the isOplogDisabledFor()
+    // checks that usually prevent generating oplog entries for operations on the oplog.
+    oplogEntry.setNss(nss.isOplog() ? NamespaceString::kAdminCommandNamespace : nss.getCommandNS());
     oplogEntry.setUuid(coll->uuid());
     oplogEntry.setObject(objectEntry.toBSON());
     opTime = logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());

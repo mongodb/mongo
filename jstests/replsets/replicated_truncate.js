@@ -57,7 +57,7 @@ function doTest(startIndex, endIndex, originalDocs, docsBeforeTruncate) {
                 op: "c",
                 ns: `${dbName}.$cmd`,
                 o: {
-                    "truncateRange": collName,
+                    "truncateRange": coll.getFullName(),
                     "minRecordId": originalDocs[startIndex].$recordId,
                     "maxRecordId": originalDocs[endIndex].$recordId,
                     "bytesDeleted": recordsDeleted, // just a placeholder

@@ -1237,7 +1237,11 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           -> Status {
           const auto& entry = *op;
           const auto& cmd = entry.getObject();
-          const auto& ns = OplogApplication::extractNsFromCmd(entry.getNss().dbName(), cmd);
+          // for truncateRange, the full namespace including database name is in the
+          // first command element, rather than just the usual ns value without database name.
+          const auto& ns = NamespaceStringUtil::deserialize(boost::none,
+                                                            cmd.firstElement().valueStringData(),
+                                                            SerializationContext::stateDefault());
 
           const auto truncateRangeEntry = TruncateRangeOplogEntry::parse(cmd);
           writeConflictRetryWithLimit(opCtx, "applyOps_truncateRange", ns, [&] {

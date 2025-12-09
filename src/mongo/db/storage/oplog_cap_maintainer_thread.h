@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/util/background.h"
 #include "mongo/util/modules.h"
 
 namespace MONGO_MOD_PUBLIC mongo {
@@ -38,4 +40,58 @@ void startOplogCapMaintainerThread(ServiceContext* serviceContext,
                                    bool shouldSkipOplogSampling);
 
 void stopOplogCapMaintainerThread(ServiceContext* serviceContext, const Status& reason);
+
+/**
+ * Responsible for deleting oplog truncate markers once their max capacity has been reached.
+ */
+class MONGO_MOD_OPEN OplogCapMaintainerThread : public BackgroundJob {
+public:
+    OplogCapMaintainerThread() : BackgroundJob(false /* deleteSelf */) {}
+
+    static OplogCapMaintainerThread* get(ServiceContext* serviceCtx);
+    static OplogCapMaintainerThread* get(OperationContext* opCtx);
+    static void set(ServiceContext* serviceCtx,
+                    std::unique_ptr<OplogCapMaintainerThread> oplogCapMaintainerThread);
+
+    std::string name() const override {
+        return _name;
+    }
+
+    void run() override;
+
+    /**
+     * Waits until the maintainer thread finishes. Must not be called concurrently with start().
+     */
+    void shutdown(const Status& reason);
+
+private:
+    /**
+     * Options for lock acquisition with an intent appropriate to the oplog being truncated.
+     */
+    virtual Lock::GlobalLockOptions _getOplogTruncationLockOptions();
+
+    /**
+     * Returns true iff there was an oplog to delete from.
+     */
+    bool _deleteExcessDocuments(OperationContext* opCtx);
+
+    /**
+     * Pass-through method for reclaiming oplog appropriately to the oplog being truncated.
+     */
+    virtual void _reclaimOplog(OperationContext* opCtx, RecordStore& rs, RecordId mayTruncateUpTo);
+
+    // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
+    mutable stdx::mutex _opCtxMutex;
+
+    // Saves a reference to the cap maintainer thread's operation context.
+    boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
+
+    mutable stdx::mutex _stateMutex;
+    bool _shuttingDown = false;
+    Status _shutdownReason = Status::OK();
+
+    std::string _name = std::string("OplogCapMaintainerThread-") +
+        toStringForLogging(NamespaceString::kRsOplogNamespace);
+};
+
 }  // namespace MONGO_MOD_PUBLIC mongo

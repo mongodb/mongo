@@ -87,6 +87,45 @@ CollectionTruncateMarkers::peekOldestMarkerIfNeeded(OperationContext* opCtx) con
     return _markers.front();
 }
 
+boost::optional<CollectionTruncateMarkers::Marker> CollectionTruncateMarkers::newestExpiredRecord(
+    OperationContext* opCtx,
+    RecordStore& recordStore,
+    const RecordId& mayTruncateUpTo,
+    Date_t expiryTime) {
+    // reverse cursor so that non-exact matches will give the next older entry, not the next newer
+    auto recoveryUnit = shard_role_details::getRecoveryUnit(opCtx);
+    auto cursor = recordStore.getCursor(opCtx, *recoveryUnit, /* forward */ false);
+    auto newest = cursor->next();
+    RecordId newestUnpinnedId;
+    if (!mayTruncateUpTo.isNull()) {
+        auto newestUnpinned =
+            cursor->seek(mayTruncateUpTo, SeekableRecordCursor::BoundInclusion::kInclude);
+        if (newestUnpinned) {
+            newestUnpinnedId = newestUnpinned->id;
+        }
+    }
+    // it's OK to round off expiry time to the nearest second.
+    RecordId seekTo(durationCount<Seconds>(expiryTime.toDurationSinceEpoch()), /* low */ 0);
+    if (!mayTruncateUpTo.isNull() && seekTo > mayTruncateUpTo) {
+        seekTo = mayTruncateUpTo;
+    }
+    auto record = cursor->seek(seekTo, SeekableRecordCursor::BoundInclusion::kInclude);
+    if (!record) {
+        return {};
+    }
+    // for behavioral compatibility with ASC, don't entirely empty the oplog
+    // or remove the last unpinned entry (defined there to *include* the mayTruncateUpTo point)
+    if (record->id == newest->id || record->id == newestUnpinnedId) {
+        // reverse cursor, so one older
+        record = cursor->next();
+        if (!record) {
+            return {};
+        }
+    }
+    // byte and record increments are only advisory even when there's a size storer to look at them.
+    return Marker(/*.records =*/0, /*.bytes =*/0, record->id, expiryTime);
+}
+
 void CollectionTruncateMarkers::popOldestMarker() {
     stdx::lock_guard<stdx::mutex> lk(_markersMutex);
     _markers.pop_front();

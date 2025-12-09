@@ -1651,8 +1651,8 @@ TEST_F(OpObserverTest, TruncateRangeIsReplicated) {
     ASSERT_EQ(oplogEntry.getUuid(), autoColl->uuid());
 
     const auto& o = oplogEntry.getObject();
-    TruncateRangeOplogEntry objectEntry(
-        std::string(autoColl->ns().coll()), RecordId("a"), RecordId("b"), 1, 1);
+    // truncate range oplog entries include the db name in the namespace string
+    TruncateRangeOplogEntry objectEntry(autoColl->ns(), RecordId("a"), RecordId("b"), 1, 1);
     ASSERT_BSONOBJ_EQ(o, objectEntry.toBSON());
 }
 

@@ -739,6 +739,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db:server_base",
         "//src/mongo/idl:idl_parser",
     ],
 )

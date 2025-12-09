@@ -46,7 +46,6 @@
 namespace mongo {
 
 namespace {
-const double kNumMSInHour = 1000 * 60 * 60;
 MONGO_FAIL_POINT_DEFINE(hangDuringOplogSampling);
 }  // namespace
 
@@ -174,6 +173,20 @@ void OplogTruncateMarkers::kill() {
     _reclaimCv.notify_one();
 }
 
+Date_t OplogTruncateMarkers::newestExpiredWallTime(OperationContext* opCtx) {
+    // retention times can be fractional, so use floating point arithmetic for this calculation.
+    static const double kNumMSInHour = durationCount<Milliseconds>(Hours(1));
+    long minRetentionMS = storageGlobalParams.oplogMinRetentionHours.load() * kNumMSInHour;
+    // If retention by time is disabled, consumers with space-based retention will consider all
+    // records expired and consumers without will consider no records expired.
+    // The former case is handled separately in _hasExcessMarkers() in this file.
+    // The latter case is not handled elsewhere, so handle it here.
+    if (minRetentionMS == 0) {
+        return Date_t();
+    }
+    return opCtx->fastClockSource().now() - Milliseconds(minRetentionMS);
+}
+
 void OplogTruncateMarkers::clearMarkersOnCommit(OperationContext* opCtx) {
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this](OperationContext*, boost::optional<Timestamp>) {
@@ -253,6 +266,32 @@ bool OplogTruncateMarkers::awaitHasExcessMarkersOrDead(OperationContext* opCtx) 
     return !(_isDead || !isWaitConditionSatisfied);
 }
 
+bool OplogTruncateMarkers::awaitHasExpiredOplogOrDead(OperationContext* opCtx, RecordStore& rs) {
+    // The same mechanism (and the same private data) is used for canceling this wait as for
+    // awaitHasExcessMarkersOrDead, but since this is waiting for time-based truncation, factor
+    // the retention time into the wait period and not just the configured thread wake interval.
+    // Note that oplogMinRetentionHours can be fractional, so don't use Interval to calculate this.
+    double minRetentionSeconds = storageGlobalParams.oplogMinRetentionHours.load() * 60 * 60;
+    int checkPeriodSeconds = (minRetentionSeconds != 0.0)
+        ? std::min<int>(gOplogTruncationCheckPeriodSeconds, minRetentionSeconds)
+        : gOplogTruncationCheckPeriodSeconds;
+    // Wait until kill() is called or oplog can be truncated.
+    stdx::unique_lock<stdx::mutex> lock(_reclaimMutex);
+    MONGO_IDLE_THREAD_BLOCK;
+    auto isWaitConditionSatisfied =
+        opCtx->waitForConditionOrInterruptFor(_reclaimCv, lock, Seconds(checkPeriodSeconds), [&] {
+            if (_isDead) {
+                return true;
+            }
+            RecordId pin(opCtx->getServiceContext()->getStorageEngine()->getPinnedOplog().asULL());
+            return newestExpiredRecord(opCtx, rs, pin, newestExpiredWallTime(opCtx)).has_value();
+        });
+
+    // Return true only when we have detected excess oplog, not because the record store
+    // is being destroyed (_isDead) or we timed out waiting on the condition variable.
+    return !(_isDead || !isWaitConditionSatisfied);
+}
+
 bool OplogTruncateMarkers::_hasExcessMarkers(OperationContext* opCtx) const {
     int64_t totalBytes = 0;
     for (const auto& marker : getMarkers()) {
@@ -272,20 +311,12 @@ bool OplogTruncateMarkers::_hasExcessMarkers(OperationContext* opCtx) const {
         return false;
     }
 
-    double minRetentionHours = storageGlobalParams.oplogMinRetentionHours.load();
-
     // If we are not checking for time, then yes, there is a truncate marker to be reaped
     // because oplog is at capacity.
-    if (minRetentionHours == 0.0) {
+    if (storageGlobalParams.oplogMinRetentionHours.load() == 0.0) {
         return true;
     }
-
-    auto nowWall = Date_t::now();
-    auto lastTruncateMarkerWallTime = truncateMarker.wallTime;
-
-    auto currRetentionMS = durationCount<Milliseconds>(nowWall - lastTruncateMarkerWallTime);
-    double currRetentionHours = currRetentionMS / kNumMSInHour;
-    return currRetentionHours >= minRetentionHours;
+    return truncateMarker.wallTime <= newestExpiredWallTime(opCtx);
 }
 
 void OplogTruncateMarkers::adjust(int64_t maxSize) {

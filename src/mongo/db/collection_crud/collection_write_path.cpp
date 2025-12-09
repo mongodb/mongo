@@ -954,7 +954,7 @@ repl::OpTime truncateRange(OperationContext* opCtx,
     uassert(ErrorCodes::IllegalOperation,
             "Cannot perform ranged truncate in collections other than clustered collections as "
             "RecordIds must be equal across nodes",
-            collection->isClustered());
+            collection->isClustered() || nss.isOplog());
     uassert(ErrorCodes::IllegalOperation,
             "Cannot perform ranged truncate in collections with preimages enabled",
             !collection->isChangeStreamPreAndPostImagesEnabled());

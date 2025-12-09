@@ -96,11 +96,13 @@ void LocalOplogInfo::setRecordStore(OperationContext* opCtx, RecordStore* rs) {
 
     stdx::lock_guard<stdx::mutex> lk(_rsMutex);
     _rs = rs;
-    // If the server was started in read-only mode, if we are restoring the node, or if async
-    // sampling is enabled, skip calculating the oplog truncate markers here.
+    // If the server was started in read-only mode, or we are restoring the node, don't truncate.
+    // If async sampling is enabled, skip calculating the oplog truncate markers here.
+    // Don't sample markers if sampling isn't supported (markers will need to be created elsewhere).
+    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
     bool needsTruncateMarkers = opCtx->getServiceContext()->userWritesAllowed() &&
         !storageGlobalParams.repair && !repl::ReplSettings::shouldSkipOplogSampling() &&
-        !gOplogSamplingAsyncEnabled;
+        !gOplogSamplingAsyncEnabled && provider.supportsOplogSampling();
     if (needsTruncateMarkers) {
         _truncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
     }
