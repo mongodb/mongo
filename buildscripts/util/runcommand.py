@@ -1,7 +1,6 @@
 """Utility to support running a command in a subprocess."""
 
 import os
-import pipes
 import shlex
 import subprocess
 
@@ -31,8 +30,8 @@ class RunCommand(object):
 
     def add_file(self, path):
         """Add a file path to the command."""
-        # For Windows compatability, use pipes.quote around file paths.
-        self._command = "{}{}{}".format(self._command, self._space(), pipes.quote(path))
+        # For Windows compatability, use shlex.quote around file paths.
+        self._command = "{}{}{}".format(self._command, self._space(), shlex.quote(path))
 
     def _space(self):
         """Return a space if the command has been started to be built."""

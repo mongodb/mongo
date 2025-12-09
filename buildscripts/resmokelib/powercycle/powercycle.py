@@ -8,7 +8,6 @@ import importlib
 import json
 import logging
 import os
-import pipes
 import random
 import re
 import shlex
@@ -1180,7 +1179,7 @@ def get_mongo_client_args(
 def mongo_shell(mongo_path, work_dir, host_port, mongo_cmds, retries=5, retry_sleep=5):
     """Start mongo_path from work_dir, connecting to host_port and executes mongo_cmds."""
     cmds = "cd {}; echo {} | {} {}".format(
-        pipes.quote(work_dir), pipes.quote(mongo_cmds), pipes.quote(mongo_path), host_port
+        shlex.quote(work_dir), shlex.quote(mongo_cmds), shlex.quote(mongo_path), host_port
     )
     attempt_num = 0
     while True:
@@ -1341,15 +1340,15 @@ def resmoke_client(
     """Start resmoke client from work_dir, connecting to host_port and executes js_test."""
     log_output = f">> {log_file} 2>&1" if log_file else ""
     cmds = (
-        f"cd {pipes.quote(work_dir)};"
+        f"cd {shlex.quote(work_dir)};"
         f" python {powercycle_constants.RESMOKE_PATH}"
         f" run"
-        f" --mongo {pipes.quote(mongo_path)}"
-        f" --suites {pipes.quote(resmoke_suite)}"
+        f" --mongo {shlex.quote(mongo_path)}"
+        f" --suites {shlex.quote(resmoke_suite)}"
         f" --shellConnString mongodb://{host_port}"
         f" --continueOnFailure"
         f" --repeat {repeat_num}"
-        f" {pipes.quote(js_test)}"
+        f" {shlex.quote(js_test)}"
         f" {log_output}"
     )
     ret, output = None, None
