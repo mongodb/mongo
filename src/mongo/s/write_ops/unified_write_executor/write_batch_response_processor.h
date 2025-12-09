@@ -60,21 +60,8 @@ struct ProcessorResult {
 };
 
 /**
- * Handles responses from shards and interactions with the catalog necessary to retry certain
- * errors.
- * Intended workflow:
- *
- * WriteBatchResponseProcessor processor;
- * {
- *     RoutingContext rtx(...);
- *     WriteBatchResponse response = ...;
- *     auto [toRetry, collectionsToCreate] = processor.onWriteBatchResponse(response);
- *     // queue operations to be retried;
- * }
- * // It is important that the lifetime of RoutingContext has ended, since creating collections will
- * start a new routing operation
- * // Process more rounds of batches...
- * // Generate a response based on the original command we received.
+ * Handles responses from shards and aggregates shard results. For retryable error responses, return
+ * necessary information for the scheduler to retry write operations.
  */
 class WriteBatchResponseProcessor {
 public:
