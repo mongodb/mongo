@@ -3,12 +3,12 @@
  *
  * @tags: [
  *   requires_sharding,
- *   # TODO SERVER-111756 re-enable this test in viewless timeseries suites
- *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const dbName = "list_collections_own_collections";
 
@@ -161,6 +161,15 @@ function runSystemsBucketsTestOnConnection(conn, isMongod) {
 
     assert(admin.auth("root", "root"));
 
+    let viewlessEnabled = false;
+    if (isMongod) {
+        viewlessEnabled = areViewlessTimeseriesEnabled(db);
+    } else {
+        const cfgConn = new Mongo(FixtureHelpers.getConfigServerConnString(db));
+        assert(cfgConn.getDB("admin").auth("root", "root"));
+        viewlessEnabled = areViewlessTimeseriesEnabled(cfgConn.getDB("admin"));
+    }
+
     createTestRoleAndUser(db, "roleWithExactNamespacePrivilegesBuckets", [
         {resource: {db: dbName, collection: "foo"}, actions: ["find"]},
     ]);
@@ -201,13 +210,20 @@ function runSystemsBucketsTestOnConnection(conn, isMongod) {
 
     admin.logout();
 
+    // When viewless is enabled, system.buckets.* collections don't exist
     runTestOnRole(db, "roleWithExactNamespacePrivilegesBuckets", [resFooTS]);
-    runTestOnRole(db, "roleWithExactNamespaceAndSystemPrivilegesBuckets", [resFooTS, resBarTS, resSBFoo]);
 
-    runTestOnRole(db, "roleWithSystemBucketsInAnyDB", [resFooTS, resBarTS, resSBFoo]);
-
-    runTestOnRole(db, "roleWithAnySystemBucketsInDB", [resFooTS, resBarTS, resSBFoo, resSBBar]);
-    runTestOnRole(db, "roleWithAnySystemBuckets", [resFooTS, resBarTS, resSBFoo, resSBBar]);
+    if (viewlessEnabled) {
+        runTestOnRole(db, "roleWithExactNamespaceAndSystemPrivilegesBuckets", [resFooTS, resBarTS]);
+        runTestOnRole(db, "roleWithSystemBucketsInAnyDB", [resFooTS, resBarTS]);
+        runTestOnRole(db, "roleWithAnySystemBucketsInDB", [resFooTS, resBarTS]);
+        runTestOnRole(db, "roleWithAnySystemBuckets", [resFooTS, resBarTS]);
+    } else {
+        runTestOnRole(db, "roleWithExactNamespaceAndSystemPrivilegesBuckets", [resFooTS, resBarTS, resSBFoo]);
+        runTestOnRole(db, "roleWithSystemBucketsInAnyDB", [resFooTS, resBarTS, resSBFoo]);
+        runTestOnRole(db, "roleWithAnySystemBucketsInDB", [resFooTS, resBarTS, resSBFoo, resSBBar]);
+        runTestOnRole(db, "roleWithAnySystemBuckets", [resFooTS, resBarTS, resSBFoo, resSBBar]);
+    }
 }
 
 function runNoAuthTestOnConnection(conn) {
