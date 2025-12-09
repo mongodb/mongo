@@ -66,6 +66,9 @@ class MONGO_MOD_NEEDS_REPLACEMENT DummyInterruptible final : public Interruptibl
         // Must be implemented because it's called by Interruptible::waitForConditionOrInterrupt.
         return Status::OK();
     }
+    Status checkForDeadlineExpiredNoAssert(Date_t now) noexcept override {
+        return Status::OK();
+    }
     DeadlineState pushArtificialDeadline(Date_t deadline, ErrorCodes::Error error) override {
         MONGO_UNREACHABLE;
     }
