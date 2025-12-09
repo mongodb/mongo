@@ -126,6 +126,7 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(removeRecipientDocFailpoint);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeCloning);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientDuringCloning);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeOplogApplication);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientDuringOplogApplication);
 MONGO_FAIL_POINT_DEFINE(reshardingOpCtxKilledWhileRestoringMetrics);
 MONGO_FAIL_POINT_DEFINE(reshardingRecipientFailsAfterTransitionToCloning);
@@ -1015,6 +1016,7 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
     }
 
     if (_recipientCtx.getState() >= RecipientStateEnum::kApplying) {
+        reshardingPauseRecipientBeforeOplogApplication.pauseWhileSet(opCtx);
         _dataReplication->startOplogApplication();
     }
 }

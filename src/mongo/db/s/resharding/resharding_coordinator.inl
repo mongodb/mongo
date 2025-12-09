@@ -82,6 +82,7 @@ inline const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 extern FailPoint reshardingPauseCoordinatorAfterPreparingToDonate;
 extern FailPoint reshardingPauseCoordinatorBeforeInitializing;
 extern FailPoint reshardingPauseCoordinatorBeforeCloning;
+extern FailPoint reshardingPauseCoordinatorBeforeApplying;
 extern FailPoint reshardingPauseCoordinatorBeforeBlockingWrites;
 extern FailPoint reshardingPauseCoordinatorBeforeDecisionPersisted;
 extern FailPoint reshardingPauseBeforeTellingParticipantsToCommit;
@@ -101,6 +102,7 @@ extern FailPoint reshardingPauseBeforeTellingRecipientsToClone;
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorAfterPreparingToDonate);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeInitializing);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCloning);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeApplying);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeBlockingWrites);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseBeforeTellingParticipantsToCommit);
@@ -1380,6 +1382,12 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
             }
         })
         .then([this] {
+            {
+                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                reshardingPauseCoordinatorBeforeApplying.pauseWhileSetAndNotCanceled(
+                    opCtx.get(), _ctHolder->getAbortToken());
+            }
+
             this->_updateCoordinatorDocStateAndCatalogEntries(
                 [=, this](OperationContext* opCtx, TxnNumber txnNumber) {
                     auto now = resharding::getCurrentTime();
