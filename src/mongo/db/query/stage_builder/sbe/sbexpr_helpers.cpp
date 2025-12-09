@@ -467,7 +467,7 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(
     std::vector<std::string> scanFieldNames,
     const SbScanBounds& scanBounds,
     const SbIndexInfoSlots& indexInfoSlots,
-    sbe::ScanCallbacks scanCallbacks,
+    sbe::ScanOpenCallback scanOpenCallback,
     boost::optional<SbSlot> oplogTsSlot) {
     auto resultSlot = SbSlot{_state.slotId()};
     auto recordIdSlot = SbSlot{_state.slotId()};
@@ -494,7 +494,7 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(
                                                 forward,
                                                 _state.yieldPolicy,
                                                 _nodeId,
-                                                std::move(scanCallbacks),
+                                                std::move(scanOpenCallback),
                                                 true /* participateInTrialRunTracking */,
                                                 scanBounds.includeScanStartRecordId,
                                                 scanBounds.includeScanEndRecordId);
@@ -1169,7 +1169,7 @@ SbBuilder::FetchBuildResult SbBuilder::makeFetch(SbStage child,
                                                  SbSlot seekSlot,
                                                  std::vector<std::string> scanFieldNames,
                                                  const SbIndexInfoSlots& indexInfoSlots,
-                                                 sbe::ScanCallbacks scanCallbacks) {
+                                                 sbe::FetchCallbacks scanCallbacks) {
     auto resultSlot = SbSlot{_state.slotId()};
     auto recordIdSlot = SbSlot{_state.slotId()};
 

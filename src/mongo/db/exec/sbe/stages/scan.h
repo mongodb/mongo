@@ -69,19 +69,6 @@ namespace sbe {
 
 using ScanOpenCallback = void (*)(OperationContext*, const CollectionPtr&);
 
-struct ScanCallbacks {
-    ScanCallbacks(IndexKeyCorruptionCheckCallback indexKeyCorruptionCheck = nullptr,
-                  IndexKeyConsistencyCheckCallback indexKeyConsistencyCheck = nullptr,
-                  ScanOpenCallback scanOpen = nullptr)
-        : indexKeyCorruptionCheckCallback(std::move(indexKeyCorruptionCheck)),
-          indexKeyConsistencyCheckCallback(std::move(indexKeyConsistencyCheck)),
-          scanOpenCallback(std::move(scanOpen)) {}
-
-    IndexKeyCorruptionCheckCallback indexKeyCorruptionCheckCallback = nullptr;
-    IndexKeyConsistencyCheckCallback indexKeyConsistencyCheckCallback = nullptr;
-    ScanOpenCallback scanOpenCallback = nullptr;
-};
-
 template <typename Derived>
 class ScanStageBaseImpl;
 
@@ -100,7 +87,7 @@ public:
                        boost::optional<value::SlotId> inIndexKeyPatternSlot,
                        std::vector<std::string> inScanFieldNames,
                        value::SlotVector inScanFieldSlots,
-                       ScanCallbacks inScanCallbacks,
+                       ScanOpenCallback inScanOpenCallback,
                        bool forward)
         : collUuid(inCollUuid),
           dbName(dbName),
@@ -112,7 +99,7 @@ public:
           indexKeyPatternSlot(inIndexKeyPatternSlot),
           scanFieldNames(inScanFieldNames),
           scanFieldSlots(inScanFieldSlots),
-          scanCallbacks(inScanCallbacks),
+          scanOpenCallback(inScanOpenCallback),
           forward(forward) {
         tassert(11094712,
                 "Expecting number of scan fields to match the number of scan slots",
@@ -138,7 +125,7 @@ public:
     const StringListSet scanFieldNames;
     const value::SlotVector scanFieldSlots;
 
-    const ScanCallbacks scanCallbacks;
+    const ScanOpenCallback scanOpenCallback;
 
     // Tells if this is a forward (as opposed to reverse) scan.
     const bool forward;
@@ -187,7 +174,7 @@ protected:
                   value::SlotVector scanFieldSlots,
                   PlanYieldPolicy* yieldPolicy,
                   PlanNodeId nodeId,
-                  ScanCallbacks scanCallbacks,
+                  ScanOpenCallback scanOpenCallback,
                   bool forward,
                   // Optional arguments:
                   bool participateInTrialRunTracking = true);
@@ -304,7 +291,7 @@ public:
                       value::SlotVector scanFieldSlots,
                       PlanYieldPolicy* yieldPolicy,
                       PlanNodeId nodeId,
-                      ScanCallbacks scanCallbacks,
+                      ScanOpenCallback scanOpenCallback,
                       bool forward,
                       // Optional arguments:
                       bool participateInTrialRunTracking = true);
@@ -355,7 +342,7 @@ public:
               bool forward,
               PlanYieldPolicy* yieldPolicy,
               PlanNodeId nodeId,
-              ScanCallbacks scanCallbacks,
+              ScanOpenCallback scanOpenCallback,
               // Optional arguments:
               bool participateInTrialRunTracking = true,
               bool includeScanStartRecordId = true,

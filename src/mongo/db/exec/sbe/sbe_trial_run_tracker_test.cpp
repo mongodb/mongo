@@ -83,7 +83,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToStreamingStage) {
                                            true /* forward */,
                                            nullptr /* yieldPolicy */,
                                            kEmptyPlanNodeId /* nodeId */,
-                                           ScanCallbacks());
+                                           nullptr /* scanOpenCallback */);
 
     auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none);
     ON_BLOCK_EXIT([&]() { scanStage->detachFromTrialRunTracker(); });
@@ -103,7 +103,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToFetchStage) {
                                                         generateSlotId(),
                                                         StringListSet({}),
                                                         value::SlotVector(),
-                                                        ScanCallbacks());
+                                                        FetchCallbacks());
     auto fetchStage = makeS<sbe::FetchStage>(makeS<CoScanStage>(kEmptyPlanNodeId),
                                              collUuid,
                                              DatabaseName(),
@@ -158,7 +158,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBothBlockingAndStreamingStages) {
                                            true /* forward */,
                                            nullptr /* yieldPolicy */,
                                            kEmptyPlanNodeId /* nodeId */,
-                                           ScanCallbacks());
+                                           nullptr /* scanOpenCallback */);
 
     auto rootSortStage = makeS<SortStage>(std::move(scanStage),
                                           makeSV(),
@@ -196,7 +196,7 @@ TEST_F(TrialRunTrackerTest, TrialRunTrackingCanBeDisabled) {
                               true /* forward */,
                               nullptr /* yieldPolicy */,
                               kEmptyPlanNodeId /* nodeId */,
-                              ScanCallbacks());
+                              nullptr /*scanOpenCallback*/);
 
     scanStage->disableTrialRunTracking();
     auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none);
@@ -221,7 +221,7 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForChildDoesNotInhibitTrackingForPa
                               true /* forward */,
                               nullptr /* yieldPolicy */,
                               kEmptyPlanNodeId /* nodeId */,
-                              ScanCallbacks());
+                              nullptr /*scanOpenCallback*/);
 
     // Disable tracking for 'scanStage'. We should still attach the tracker for 'rootSortStage'.
     scanStage->disableTrialRunTracking();

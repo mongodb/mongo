@@ -83,7 +83,6 @@ public:
                     value::SlotVector scanFieldSlots,
                     PlanYieldPolicy* yieldPolicy,
                     PlanNodeId nodeId,
-                    ScanCallbacks scanCallbacks,
                     // Optional arguments:
                     bool participateInTrialRunTracking = true);
     /**

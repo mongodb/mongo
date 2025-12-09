@@ -125,7 +125,7 @@ TEST_F(ScanStageTest, scanStage) {
                                                     true /* forward */,
                                                     nullptr /* yieldPolicy */,
                                                     kEmptyPlanNodeId,
-                                                    ScanCallbacks{},
+                                                    nullptr /* scanOpenCallback */,
                                                     false /* participateInTrialRunTracking */,
                                                     false /* includeScanStartRecordId */,
                                                     false /* includeScanEndRecordId */);

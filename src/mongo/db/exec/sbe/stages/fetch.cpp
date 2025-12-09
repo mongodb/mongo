@@ -217,8 +217,8 @@ void FetchStage::open(bool reOpen) {
     _recordIdAccessor.reset(
         false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_seekRid));
 
-    if (_state->scanCallbacks.scanOpenCallback) {
-        _state->scanCallbacks.scanOpenCallback(_opCtx, _coll.getPtr());
+    if (_state->fetchCallbacks.scanOpenCallback) {
+        _state->fetchCallbacks.scanOpenCallback(_opCtx, _coll.getPtr());
     }
 }
 
@@ -239,7 +239,7 @@ PlanState FetchStage::getNext() {
     // TODO SERVER-113879 investigate whether callbacks can use a named function instead, to
     // guarantee inlining.
     auto checkRecordConsistency = [&]() -> bool {
-        const auto callback = _state->scanCallbacks.indexKeyConsistencyCheckCallback;
+        const auto callback = _state->fetchCallbacks.indexKeyConsistencyCheckCallback;
         if (!callback) {
             return true;
         }
@@ -271,14 +271,14 @@ PlanState FetchStage::getNext() {
         tassert(11430201, "Cursor must not be null", _cursor);
         record = _cursor->seekExact(_seekRid);
         if (!record) {
-            if (_state->scanCallbacks.indexKeyCorruptionCheckCallback) {
+            if (_state->fetchCallbacks.indexKeyCorruptionCheckCallback) {
                 tassert(10794901, "Collection name should be initialized", _coll.getCollName());
-                _state->scanCallbacks.indexKeyCorruptionCheckCallback(_opCtx,
-                                                                      _snapshotIdAccessor,
-                                                                      _indexKeyAccessor,
-                                                                      _indexKeyPatternAccessor,
-                                                                      _seekRid,
-                                                                      *_coll.getCollName());
+                _state->fetchCallbacks.indexKeyCorruptionCheckCallback(_opCtx,
+                                                                       _snapshotIdAccessor,
+                                                                       _indexKeyAccessor,
+                                                                       _indexKeyPatternAccessor,
+                                                                       _seekRid,
+                                                                       *_coll.getCollName());
             }
         }
     } while (!record || !checkRecordConsistency());

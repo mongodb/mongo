@@ -273,7 +273,7 @@ TEST_F(PlanSizeTest, Scan) {
                                        true /* forward */,
                                        nullptr /* yieldPolicy */,
                                        kEmptyPlanNodeId /* nodeId */,
-                                       ScanCallbacks());
+                                       nullptr /* scanOpenCallback */);
     assertPlanSize(*stage);
 }
 
@@ -344,7 +344,7 @@ TEST_F(PlanSizeTest, Fetch) {
                                                         generateSlotId(),
                                                         StringListSet({}),
                                                         value::SlotVector(),
-                                                        ScanCallbacks());
+                                                        FetchCallbacks());
     auto stage = makeS<FetchStage>(
         mockS(), collUuid, DatabaseName(), fetchState, nullptr, kEmptyPlanNodeId, true);
     assertPlanSize(*stage);

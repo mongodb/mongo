@@ -288,8 +288,8 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
     return true;
 }
 
-sbe::ScanCallbacks makeScanCallbacks() {
-    return sbe::ScanCallbacks(indexKeyCorruptionCheckCallback, indexKeyConsistencyCheckCallback);
+sbe::FetchCallbacks makeFetchCallbacks() {
+    return sbe::FetchCallbacks(indexKeyCorruptionCheckCallback, indexKeyConsistencyCheckCallback);
 }
 
 std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
@@ -312,7 +312,8 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
     // in the QSN tree to indicate which collection we are fetching over.
     tassert(6355301, "Cannot fetch from a collection that doesn't exist", collToFetch);
 
-    sbe::ScanCallbacks callbacks(indexKeyCorruptionCheckCallback, indexKeyConsistencyCheckCallback);
+    sbe::FetchCallbacks callbacks(indexKeyCorruptionCheckCallback,
+                                  indexKeyConsistencyCheckCallback);
 
     SbIndexInfoSlots indexInfoSlots;
     indexInfoSlots.indexIdentSlot = indexIdentSlot;

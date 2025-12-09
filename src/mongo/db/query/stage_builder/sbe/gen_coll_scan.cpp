@@ -225,7 +225,7 @@ std::pair<SbStage, PlanStageSlots> generateGenericCollScan(StageBuilderState& st
         }
     }
 
-    sbe::ScanCallbacks callbacks({}, {}, makeOpenCallbackIfNeeded(collection, csn));
+    sbe::ScanOpenCallback callback = makeOpenCallbackIfNeeded(collection, csn);
 
     SbStage resumeRecordIdTree;
     boost::optional<SbSlot> oplogTsSlot;
@@ -236,7 +236,7 @@ std::pair<SbStage, PlanStageSlots> generateGenericCollScan(StageBuilderState& st
                                                                     fields,
                                                                     SbScanBounds{},
                                                                     SbIndexInfoSlots{},
-                                                                    std::move(callbacks),
+                                                                    std::move(callback),
                                                                     oplogTsSlot);
 
     PlanStageSlots outputs;
