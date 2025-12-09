@@ -196,12 +196,12 @@ public:
                 opts.tempDir);
 
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-            *(opts.tempDir), internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+            *opts.tempDir, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 
         auto spillsFile =
-            std::make_shared<SorterFile>(nextFileName(*(opts.tempDir)), opts.sorterFileStats);
+            std::make_shared<SorterFile>(nextFileName(*opts.tempDir), opts.sorterFileStats);
         // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
-        FileBasedSorterStorage<Key, Value> sorterStorage(spillsFile);
+        FileBasedSorterStorage<Key, Value> sorterStorage(spillsFile, *opts.tempDir);
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer =
             sorterStorage.makeWriter(opts, settings);
 
@@ -701,7 +701,7 @@ protected:
             iterators.swap(this->_iters);
 
             std::shared_ptr<File> newSpillsFile = std::make_shared<File>(
-                nextFileName(*(this->_opts.tempDir)), this->_opts.sorterFileStats);
+                nextFileName(*this->_opts.tempDir), this->_opts.sorterFileStats);
 
             LOGV2_DEBUG(6033103,
                         1,
@@ -733,7 +733,8 @@ protected:
 
                 auto mergeIterator = Iterator::merge(spillsToMerge, this->_opts, _comp);
                 // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
-                FileBasedSorterStorage<Key, Value> sorterStorage(newSpillsFile);
+                FileBasedSorterStorage<Key, Value> sorterStorage(newSpillsFile,
+                                                                 *this->_opts.tempDir);
                 std::unique_ptr<SortedStorageWriter<Key, Value>> writer =
                     sorterStorage.makeWriter(this->_opts, _settings);
                 uint64_t pairCount = 0;
@@ -954,7 +955,7 @@ private:
         sort();
 
         // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
-        FileBasedSorterStorage<Key, Value> sorterStorage(this->_file);
+        FileBasedSorterStorage<Key, Value> sorterStorage(this->_file, *this->_opts.tempDir);
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer =
             sorterStorage.makeWriter(this->_opts, this->_settings);
         for (auto& data : _data) {
@@ -1398,8 +1399,15 @@ typename Sorter<Key, Value>::PersistedState Sorter<Key, Value>::persistDataForSh
 //
 
 template <typename Key, typename Value>
-FileBasedSorterStorage<Key, Value>::FileBasedSorterStorage(std::shared_ptr<SorterFile> file)
-    : _file(std::move(file)){};
+FileBasedSorterStorage<Key, Value>::FileBasedSorterStorage(
+    std::shared_ptr<SorterFile> file,
+    boost::optional<boost::filesystem::path> pathToSpillDir,
+    boost::optional<DatabaseName> dbName,
+    SorterChecksumVersion checksumVersion)
+    : _file(std::move(file)),
+      _pathToSpillDir(pathToSpillDir),
+      _dbName(dbName),
+      _checksumVersion(checksumVersion) {}
 
 template <typename Key, typename Value>
 std::unique_ptr<SortedStorageWriter<Key, Value>> FileBasedSorterStorage<Key, Value>::makeWriter(
@@ -1423,6 +1431,21 @@ FileBasedSorterStorage<Key, Value>::makeIteratorUnique(
 template <typename Key, typename Value>
 size_t FileBasedSorterStorage<Key, Value>::getIteratorSize() {
     return sizeof(sorter::FileIterator<Key, Value>);
+}
+
+template <typename Key, typename Value>
+boost::optional<boost::filesystem::path> FileBasedSorterStorage<Key, Value>::getSpillDirPath() {
+    return _pathToSpillDir;
+}
+
+template <typename Key, typename Value>
+boost::optional<DatabaseName> FileBasedSorterStorage<Key, Value>::getDbName() {
+    return _dbName;
+}
+
+template <typename Key, typename Value>
+SorterChecksumVersion FileBasedSorterStorage<Key, Value>::getChecksumVersion() {
+    return _checksumVersion;
 }
 
 //
@@ -1878,7 +1901,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill(size_t maxMemoryU
 
     // Write out all the values from the heap in sorted order.
     // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
-    FileBasedSorterStorage<Key, Value> sorterStorage(_file);
+    FileBasedSorterStorage<Key, Value> sorterStorage(_file, _opts.tempDir);
     std::unique_ptr<SortedStorageWriter<Key, Value>> writer = sorterStorage.makeWriter(_opts, {});
     while (!_heap.empty()) {
         writer->addAlreadySorted(_heap.top().first, _heap.top().second);

@@ -106,7 +106,7 @@ void SpoolStage::spill() {
     auto opts = SortOptions().TempDir(expCtx()->getTempDir());
     opts.FileStats(_spillStats.get());
 
-    FileBasedSorterStorage<RecordId, NullValue> sorterStorage(_file);
+    FileBasedSorterStorage<RecordId, NullValue> sorterStorage(_file, expCtx()->getTempDir());
     std::unique_ptr<SortedStorageWriter<RecordId, NullValue>> writer =
         sorterStorage.makeWriter(opts);
     // Do not spill the records that have been already consumed.

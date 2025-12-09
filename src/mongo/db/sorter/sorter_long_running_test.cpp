@@ -77,7 +77,7 @@ private:
         int currentBufSize = 0;
         // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
         // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
-        FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(makeFile());
+        FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(makeFile(), *opts->tempDir);
         std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> sorter =
             sorterStorage.makeWriter(*opts);
         for (int i = 0; i < range; ++i) {

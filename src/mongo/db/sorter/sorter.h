@@ -461,7 +461,11 @@ public:
                       typename Value::SorterDeserializeSettings>
         Settings;
 
-    explicit FileBasedSorterStorage(std::shared_ptr<SorterFile> file);
+    explicit FileBasedSorterStorage(
+        std::shared_ptr<SorterFile> file,
+        boost::optional<boost::filesystem::path> pathToSpillDir,
+        boost::optional<DatabaseName> dbName = boost::none,
+        SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2);
 
     std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(
         const SortOptions& opts, const Settings& settings = Settings()) override;
@@ -474,8 +478,17 @@ public:
 
     size_t getIteratorSize() override;
 
+    boost::optional<boost::filesystem::path> getSpillDirPath();
+
+    boost::optional<DatabaseName> getDbName();
+
+    SorterChecksumVersion getChecksumVersion();
+
 private:
     std::shared_ptr<SorterFile> _file;
+    boost::optional<boost::filesystem::path> _pathToSpillDir;
+    boost::optional<DatabaseName> _dbName;
+    SorterChecksumVersion _checksumVersion;
 };
 
 /**

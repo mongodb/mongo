@@ -83,7 +83,7 @@ void AccuratePercentile::spill() {
 
     _numTotalValuesSpilled += _accumulatedValues.size();
 
-    FileBasedSorterStorage<Value, Value> sorterStorage(_spillFile);
+    FileBasedSorterStorage<Value, Value> sorterStorage(_spillFile, _expCtx->getTempDir());
     std::unique_ptr<SortedStorageWriter<Value, Value>> writer =
         sorterStorage.makeWriter(SortOptions().TempDir(_expCtx->getTempDir()));
 
