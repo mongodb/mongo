@@ -310,7 +310,7 @@ def linux_extraction(ctx, cc_toolchain, inputs):
                     input_bin.path,
                     debug_info.path,
                 ],
-                mnemonic = "ExtractDebuginfo",
+                mnemonic = "ExtractDebugInfo",
             )
 
             ctx.actions.run(
@@ -325,7 +325,7 @@ def linux_extraction(ctx, cc_toolchain, inputs):
                     input_bin.path,
                     output_bin.path,
                 ],
-                mnemonic = "StripDebuginfo",
+                mnemonic = "StripDebugInfo",
             )
             outputs += [output_bin, debug_info]
         else:
@@ -397,7 +397,7 @@ def macos_extraction(ctx, cc_toolchain, inputs):
                     "-o",
                     debug_info.path,
                 ],
-                mnemonic = "ExtractDebuginfo",
+                mnemonic = "ExtractDebugInfo",
             )
 
             ctx.actions.run(
@@ -410,7 +410,7 @@ def macos_extraction(ctx, cc_toolchain, inputs):
                     output_bin.path,
                     input_bin.path,
                 ],
-                mnemonic = "StripDebuginfo",
+                mnemonic = "StripDebugInfo",
             )
             outputs += [output_bin, debug_info]
         else:
