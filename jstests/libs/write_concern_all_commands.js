@@ -11,6 +11,7 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {AllCommandsTest} from "jstests/libs/all_commands_test.js";
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {getCommandName} from "jstests/libs/cmd_object_utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -234,48 +235,50 @@ const wcCommandsTests = {
                 lsid: getLSID(),
             }),
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.insert({_id: 0}));
+                withRetryOnTransientTxnError(() => {
+                    assert.commandWorked(coll.insert({_id: 0}));
 
-                if (clusterType == "sharded" && bsonWoCompare(getShardKey(coll, fullNs), {}) == 0) {
-                    // Set the primary shard to shard0 so we can assume that it's okay to run
-                    // prepareTransaction on it
+                    if (clusterType == "sharded" && bsonWoCompare(getShardKey(coll, fullNs), {}) == 0) {
+                        // Set the primary shard to shard0 so we can assume that it's okay to run
+                        // prepareTransaction on it
+                        assert.commandWorked(
+                            coll.getDB().adminCommand({moveCollection: fullNs, toShard: cluster.shard0.shardName}),
+                        );
+                    }
+
                     assert.commandWorked(
-                        coll.getDB().adminCommand({moveCollection: fullNs, toShard: cluster.shard0.shardName}),
+                        coll.getDB().runCommand({
+                            insert: collName,
+                            documents: [{_id: 1}],
+                            lsid: getLSID(),
+                            stmtIds: [NumberInt(0)],
+                            txnNumber: getTxnNumber(),
+                            startTransaction: true,
+                            autocommit: false,
+                        }),
                     );
-                }
 
-                assert.commandWorked(
-                    coll.getDB().runCommand({
-                        insert: collName,
-                        documents: [{_id: 1}],
-                        lsid: getLSID(),
-                        stmtIds: [NumberInt(0)],
-                        txnNumber: getTxnNumber(),
-                        startTransaction: true,
-                        autocommit: false,
-                    }),
-                );
+                    assert.commandWorked(
+                        coll.getDB().runCommand({
+                            update: collName,
+                            updates: [{q: {}, u: {$set: {a: 1}}}],
+                            lsid: getLSID(),
+                            stmtIds: [NumberInt(1)],
+                            txnNumber: getTxnNumber(),
+                            autocommit: false,
+                        }),
+                    );
 
-                assert.commandWorked(
-                    coll.getDB().runCommand({
-                        update: collName,
-                        updates: [{q: {}, u: {$set: {a: 1}}}],
-                        lsid: getLSID(),
-                        stmtIds: [NumberInt(1)],
-                        txnNumber: getTxnNumber(),
-                        autocommit: false,
-                    }),
-                );
-
-                let primary = clusterType == "sharded" ? cluster.rs0.getPrimary() : cluster.getPrimary();
-                assert.commandWorked(
-                    primary.getDB(dbName).adminCommand({
-                        prepareTransaction: 1,
-                        lsid: getLSID(),
-                        txnNumber: getTxnNumber(),
-                        autocommit: false,
-                    }),
-                );
+                    let primary = clusterType == "sharded" ? cluster.rs0.getPrimary() : cluster.getPrimary();
+                    assert.commandWorked(
+                        primary.getDB(dbName).adminCommand({
+                            prepareTransaction: 1,
+                            lsid: getLSID(),
+                            txnNumber: getTxnNumber(),
+                            autocommit: false,
+                        }),
+                    );
+                });
             },
             confirmFunc: (res, coll) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
@@ -292,25 +295,27 @@ const wcCommandsTests = {
                 lsid: getLSID(),
             }),
             setupFunc: (coll) => {
-                assert.commandWorked(
-                    coll.getDB().runCommand({
-                        insert: collName,
-                        documents: [{_id: 1}],
-                        lsid: getLSID(),
-                        stmtIds: [NumberInt(0)],
-                        txnNumber: getTxnNumber(),
-                        startTransaction: true,
-                        autocommit: false,
-                    }),
-                );
-                assert.commandWorked(
-                    coll.getDB().adminCommand({
-                        commitTransaction: 1,
-                        lsid: getLSID(),
-                        txnNumber: getTxnNumber(),
-                        autocommit: false,
-                    }),
-                );
+                withRetryOnTransientTxnError(() => {
+                    assert.commandWorked(
+                        coll.getDB().runCommand({
+                            insert: collName,
+                            documents: [{_id: 1}],
+                            lsid: getLSID(),
+                            stmtIds: [NumberInt(0)],
+                            txnNumber: getTxnNumber(),
+                            startTransaction: true,
+                            autocommit: false,
+                        }),
+                    );
+                    assert.commandWorked(
+                        coll.getDB().adminCommand({
+                            commitTransaction: 1,
+                            lsid: getLSID(),
+                            txnNumber: getTxnNumber(),
+                            autocommit: false,
+                        }),
+                    );
+                });
             },
             confirmFunc: (res, coll) => {
                 assert.commandFailedWithCode(res, ErrorCodes.TransactionCommitted);
@@ -674,25 +679,27 @@ const wcCommandsTests = {
                 lsid: getLSID(),
             }),
             setupFunc: (coll) => {
-                assert.commandWorked(
-                    coll.getDB().runCommand({
-                        insert: collName,
-                        documents: [{_id: 1}],
-                        lsid: getLSID(),
-                        stmtIds: [NumberInt(0)],
-                        txnNumber: getTxnNumber(),
-                        startTransaction: true,
-                        autocommit: false,
-                    }),
-                );
-                assert.commandWorked(
-                    coll.getDB().adminCommand({
-                        commitTransaction: 1,
-                        txnNumber: getTxnNumber(),
-                        autocommit: false,
-                        lsid: getLSID(),
-                    }),
-                );
+                withRetryOnTransientTxnError(() => {
+                    assert.commandWorked(
+                        coll.getDB().runCommand({
+                            insert: collName,
+                            documents: [{_id: 1}],
+                            lsid: getLSID(),
+                            stmtIds: [NumberInt(0)],
+                            txnNumber: getTxnNumber(),
+                            startTransaction: true,
+                            autocommit: false,
+                        }),
+                    );
+                    assert.commandWorked(
+                        coll.getDB().adminCommand({
+                            commitTransaction: 1,
+                            txnNumber: getTxnNumber(),
+                            autocommit: false,
+                            lsid: getLSID(),
+                        }),
+                    );
+                });
             },
             confirmFunc: (res, coll) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
@@ -709,17 +716,19 @@ const wcCommandsTests = {
                 lsid: getLSID(),
             }),
             setupFunc: (coll) => {
-                assert.commandWorked(
-                    coll.getDB().runCommand({
-                        insert: collName,
-                        documents: [{_id: 1}],
-                        lsid: getLSID(),
-                        stmtIds: [NumberInt(0)],
-                        txnNumber: getTxnNumber(),
-                        startTransaction: true,
-                        autocommit: false,
-                    }),
-                );
+                withRetryOnTransientTxnError(() => {
+                    assert.commandWorked(
+                        coll.getDB().runCommand({
+                            insert: collName,
+                            documents: [{_id: 1}],
+                            lsid: getLSID(),
+                            stmtIds: [NumberInt(0)],
+                            txnNumber: getTxnNumber(),
+                            startTransaction: true,
+                            autocommit: false,
+                        }),
+                    );
+                });
             },
             confirmFunc: (res, coll) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
