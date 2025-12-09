@@ -2,12 +2,12 @@
 
 import logging
 import os
+import shutil
 import signal
 import subprocess
 import sys
 import time
 from datetime import datetime
-from distutils import spawn
 
 import psutil
 
@@ -61,7 +61,7 @@ def find_program(prog, paths):
         if os.path.exists(full_prog):
             return full_prog
 
-    return spawn.find_executable(prog)
+    return shutil.which(prog)
 
 
 def callo(args, logger):

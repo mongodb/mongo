@@ -14,7 +14,6 @@ import time
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
-from distutils import spawn
 from io import StringIO
 from typing import List, Tuple
 
@@ -265,7 +264,7 @@ class WindowsDumper(Dumper):
         """Find the installed debugger."""
         # We are looking for c:\Program Files (x86)\Windows Kits\8.1\Debuggers\x64
         debugger = "cdb.exe"
-        cdb = spawn.find_executable(debugger)
+        cdb = shutil.which(debugger)
         if cdb is not None:
             return cdb
         from win32com.shell import shell, shellcon
