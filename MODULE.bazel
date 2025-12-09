@@ -11,12 +11,12 @@ http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_
 
 http_archive(
     name = "bazel_clang_tidy",
-    integrity = "sha256-4jSWCC9GXwk4VeqLNZl6heYZUsUqvC8EP1OO+JEVDSA=",
-    strip_prefix = "bazel_clang_tidy-908bf1af4e5b645a7a897b43552c5e482195ee25",
+    integrity = "sha256-PLwbo3dS1ZgeuSiaUctGRIU/O3ScB64+U2mEsN7fgtA=",
+    strip_prefix = "bazel_clang_tidy-1.7",
     urls = [
         # Implements retry by relisting each url multiple times to be used as a failover.
         # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/908bf1af4e5b645a7a897b43552c5e482195ee25.tar.gz",
+        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/refs/tags/v1.7.tar.gz",
     ] * 5,
 )
 
@@ -139,7 +139,7 @@ single_version_override(
     version = "1.3.1",
 )
 
-bazel_dep(name = "abseil-cpp", version = "", repo_name = "com_google_absl")
+bazel_dep(name = "abseil-cpp", version = "20250512.1", repo_name = "com_google_absl")
 local_path_override(
     module_name = "abseil-cpp",
     path = "src/third_party/abseil-cpp/dist",

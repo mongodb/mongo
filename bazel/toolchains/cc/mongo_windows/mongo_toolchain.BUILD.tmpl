@@ -1,4 +1,5 @@
 load("@//bazel/toolchains/cc/mongo_windows:mongo_windows_cc_toolchain_config.bzl", "mongo_windows_cc_toolchain_config")
+load("@//bazel/toolchains/cc:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")
 
 SMALLER_BINARY = select({
     "@//bazel/config:msvc_opt": True,
@@ -109,6 +110,7 @@ mongo_windows_cc_toolchain_config(
     opt_size = OPT_SIZE,
     dbg = DBG,
     debug_symbols = DEBUG_SYMBOLS,
+    global_defines = MONGO_GLOBAL_DEFINES,
 )
 
 exports_files(["rc_wrapper.cmd"])

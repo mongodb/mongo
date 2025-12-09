@@ -51,8 +51,8 @@ mongo_cc_library(
     tags = ["api"],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
-        "//src/third_party/abseil-cpp:absl_base",
-        "//src/third_party/abseil-cpp:absl_strings",
+        "@com_google_absl//absl/base:base",
+        "@com_google_absl//absl/strings:strings",
     ],
 )
 

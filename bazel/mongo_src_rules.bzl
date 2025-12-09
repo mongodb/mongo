@@ -2,7 +2,6 @@
 BUILD files in the "src/" subtree.
 """
 
-load("//bazel/toolchains/cc:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")
 load(
     "//bazel/toolchains/cc:mongo_errors.bzl",
     "REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE",
@@ -214,7 +213,6 @@ DISABLE_3RD_PARTY_FEATURES = select({
 })
 
 MONGO_GLOBAL_SRC_DEPS = [
-    "//src/third_party/abseil-cpp:absl_base",
     "//src/third_party/boost:headers",
     "//src/third_party/croaring:croaring",
     "//src/third_party/fmt:fmt",
@@ -225,7 +223,6 @@ MONGO_GLOBAL_SRC_DEPS = [
     "//src/third_party/SafeInt:headers",
     "//src/third_party/sasl:windows_sasl",
     "//src/third_party/valgrind:headers",
-    "//src/third_party/abseil-cpp:absl_local_repo_deps",
 ]
 
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES
@@ -460,7 +457,7 @@ def mongo_cc_library(
             "@platforms//os:windows": True,
             "//conditions:default": linkstatic,
         }),
-        local_defines = MONGO_GLOBAL_DEFINES + local_defines,
+        local_defines = local_defines,
         defines = defines,
         includes = includes,
         features = features,
@@ -676,7 +673,7 @@ def _mongo_cc_binary_and_test(
             "//conditions:default": [],
         }),
         "linkstatic": LINKSTATIC_ENABLED,
-        "local_defines": MONGO_GLOBAL_DEFINES + local_defines,
+        "local_defines": local_defines,
         "defines": defines,
         "includes": includes,
         "features": ["-pic", "pie"] + features + select({

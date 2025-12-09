@@ -1063,6 +1063,7 @@ def _impl(ctx):
 
         external_include_paths_feature = feature(
             name = "external_include_paths",
+            enabled = True,
             flag_sets = [
                 flag_set(
                     actions = [
@@ -1078,7 +1079,10 @@ def _impl(ctx):
                     ],
                     flag_groups = [
                         flag_group(
-                            flags = ["/external:I%{external_include_paths}"],
+                            flags = [
+                                "/external:I%{external_include_paths}",
+                                "/external:W0",
+                            ],
                             iterate_over = "external_include_paths",
                             expand_if_available = "external_include_paths",
                         ),
@@ -1591,6 +1595,20 @@ def _impl(ctx):
             ],
         )
 
+        mongo_defines_feature = feature(
+            name = "mongo_defines",
+            enabled = True,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(
+                        flags =
+                            ["/D" + define for define in ctx.attr.global_defines],
+                    )],
+                ),
+            ],
+        )
+
         features = [
             no_legacy_features_feature,
             nologo_feature,
@@ -1657,6 +1675,7 @@ def _impl(ctx):
             pdb_page_size_feature,
             incremental_feature,
             sasl_include_feature,
+            mongo_defines_feature,
         ]
     else:
         targets_windows_feature = feature(
@@ -1993,6 +2012,7 @@ mongo_windows_cc_toolchain_config = rule(
         "opt_size": attr.bool(default = False),
         "dbg": attr.bool(default = False),
         "debug_symbols": attr.bool(default = False),
+        "global_defines": attr.string_list(mandatory = False),
     },
     provides = [CcToolchainConfigInfo],
 )

@@ -906,6 +906,7 @@ def _impl(ctx):
 
     external_include_paths_feature = feature(
         name = "external_include_paths",
+        enabled = True,
         flag_sets = [
             flag_set(
                 actions = [
@@ -1726,6 +1727,7 @@ mongo_apple_llvm_cc_toolchain_config = rule(
         "compress_debug_enabled": attr.bool(default = False, mandatory = False),
         "warnings_as_errors_enabled": attr.bool(default = True, mandatory = False),
         "linkstatic": attr.bool(mandatory = True),
+        "global_defines": attr.string_list(mandatory = False),
     },
     fragments = ["apple", "cpp"],
     provides = [CcToolchainConfigInfo],

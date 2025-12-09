@@ -36,7 +36,7 @@ index 0ef1a177878..db1acb27d56 100644
 +    ],
 +    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
 +    deps = [
-+        "//src/third_party/abseil-cpp:absl_strings",
++        "@com_google_absl//absl/strings:strings",
 +        "//src/third_party/grpc:grpc++",
 +        "//src/third_party/nlohmann-json:json",
 +        "//src/third_party/opentelemetry-cpp/api",

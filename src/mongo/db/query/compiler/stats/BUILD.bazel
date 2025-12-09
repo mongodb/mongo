@@ -113,6 +113,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:sbe_values",
         "//src/mongo/stdx",
+        "@com_google_absl//absl/random:distributions",
     ],
 )
 

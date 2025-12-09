@@ -19,6 +19,7 @@ load(
     "SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE",
     "THREAD_SANITIZER_ERROR_MESSAGE",
 )
+load("@//bazel/toolchains/cc:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -294,6 +295,7 @@ mongo_linux_cc_toolchain_config(
     coverage_enabled = COVERAGE_ENABLED,
     compress_debug_enabled = COMPRESS_DEBUG_ENABLED,
     warnings_as_errors_enabled = WARNINGS_AS_ERRORS_ENABLED,
+    global_defines = MONGO_GLOBAL_DEFINES,
 )
 
 mongo_linux_cc_toolchain_config(
@@ -360,6 +362,7 @@ mongo_linux_cc_toolchain_config(
     coverage_enabled = COVERAGE_ENABLED,
     compress_debug_enabled = COMPRESS_DEBUG_ENABLED,
     warnings_as_errors_enabled = WARNINGS_AS_ERRORS_ENABLED,
+    global_defines = MONGO_GLOBAL_DEFINES,
 )
 
 cc_toolchain(

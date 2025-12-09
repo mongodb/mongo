@@ -2,20 +2,11 @@
 """
 
 load(
-    "//bazel/toolchains/cc:mongo_errors.bzl",
+    "@//bazel/toolchains/cc:mongo_errors.bzl",
     "GLIBCXX_DEBUG_ERROR_MESSAGE",
     "SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE",
     "THREAD_SANITIZER_ERROR_MESSAGE",
 )
-
-# Defines are only visible to within //bazel directory where
-# toolchains and rules are defined.
-# TODO: define mongo_generate_config_header rule to hide
-# all the compiler options.
-visibility([
-    "//src/mongo/util",
-    "//bazel",
-])
 
 ABSEIL_DEFINES = [
     "ABSL_FORCE_ALIGNED_ACCESS",
@@ -34,29 +25,29 @@ BOOST_DEFINES = [
     "BOOST_THREAD_USES_DATETIME",
     "BOOST_THREAD_VERSION=5",
 ] + select({
-    "//bazel/config:linkdynamic_not_shared_archive": ["BOOST_LOG_DYN_LINK"],
-    "//conditions:default": [],
+    "@//bazel/config:linkdynamic_not_shared_archive": ["BOOST_LOG_DYN_LINK"],
+    "@//conditions:default": [],
 })
 
 ENTERPRISE_DEFINES = select({
-    "//bazel/config:build_enterprise_enabled": ["MONGO_ENTERPRISE_VERSION=1"],
-    "//conditions:default": [],
+    "@//bazel/config:build_enterprise_enabled": ["MONGO_ENTERPRISE_VERSION=1"],
+    "@//conditions:default": [],
 }) + select({
-    "//bazel/config:enterprise_feature_audit_enabled": ["MONGO_ENTERPRISE_AUDIT=1"],
-    "//conditions:default": [],
+    "@//bazel/config:enterprise_feature_audit_enabled": ["MONGO_ENTERPRISE_AUDIT=1"],
+    "@//conditions:default": [],
 }) + select({
-    "//bazel/config:enterprise_feature_encryptdb_enabled": ["MONGO_ENTERPRISE_ENCRYPTDB=1"],
-    "//conditions:default": [],
+    "@//bazel/config:enterprise_feature_encryptdb_enabled": ["MONGO_ENTERPRISE_ENCRYPTDB=1"],
+    "@//conditions:default": [],
 })
 
 FORTIFY_DEFINE = select({
-    "//bazel/config:opt_on_linux": ["_FORTIFY_SOURCE=3"],
-    "//conditions:default": [],
+    "@//bazel/config:opt_on_linux": ["_FORTIFY_SOURCE=3"],
+    "@//conditions:default": [],
 })
 
 DEBUG_DEFINES = select({
-    "//bazel/config:dbg_enabled": [],
-    "//conditions:default": ["NDEBUG"],
+    "@//bazel/config:dbg_enabled": [],
+    "@//conditions:default": ["NDEBUG"],
 })
 
 PCRE2_DEFINES = ["PCRE2_STATIC"]
@@ -68,28 +59,28 @@ SAFEINT_DEFINES = ["SAFEINT_USE_INTRINSICS=0"]
 # the running compiler. We do this unconditionally because abseil is basically
 # pervasive via the 'base' library.
 ADDRESS_SANITIZER_DEFINES = select({
-    "//bazel/config:sanitize_address_required_settings": ["ADDRESS_SANITIZER"],
-    "//bazel/config:asan_disabled": [],
+    "@//bazel/config:sanitize_address_required_settings": ["ADDRESS_SANITIZER"],
+    "@//bazel/config:asan_disabled": [],
 }, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE)
 
 THREAD_SANITIZER_DEFINES = select({
-    "//bazel/config:sanitize_thread_required_settings": ["THREAD_SANITIZER"],
-    "//bazel/config:tsan_disabled": [],
+    "@//bazel/config:sanitize_thread_required_settings": ["THREAD_SANITIZER"],
+    "@//bazel/config:tsan_disabled": [],
 }, no_match_error = THREAD_SANITIZER_ERROR_MESSAGE)
 
 UNDEFINED_SANITIZER_DEFINES = select({
-    "//bazel/config:ubsan_enabled": ["UNDEFINED_BEHAVIOR_SANITIZER"],
-    "//bazel/config:ubsan_disabled": [],
+    "@//bazel/config:ubsan_enabled": ["UNDEFINED_BEHAVIOR_SANITIZER"],
+    "@//bazel/config:ubsan_disabled": [],
 })
 
 GLIBCXX_DEBUG_DEFINES = select({
-    ("//bazel/config:use_glibcxx_debug_required_settings"): ["_GLIBCXX_DEBUG"],
-    ("//bazel/config:use_glibcxx_debug_disabled"): [],
+    ("@//bazel/config:use_glibcxx_debug_required_settings"): ["_GLIBCXX_DEBUG"],
+    ("@//bazel/config:use_glibcxx_debug_disabled"): [],
 }, no_match_error = GLIBCXX_DEBUG_ERROR_MESSAGE)
 
 TCMALLOC_DEFINES = select({
-    "//bazel/config:tcmalloc_google_enabled": ["ABSL_ALLOCATOR_NOTHROW"],
-    "//conditions:default": [],
+    "@//bazel/config:tcmalloc_google_enabled": ["ABSL_ALLOCATOR_NOTHROW"],
+    "@//conditions:default": [],
 })
 
 MONGO_GLOBAL_DEFINES = (

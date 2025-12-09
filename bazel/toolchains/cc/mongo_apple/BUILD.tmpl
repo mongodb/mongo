@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load("@//bazel/config:configs.bzl", "sdkroot")
 load("@//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl", "get_supported_apple_archs")
 load("@//bazel/toolchains/cc/mongo_apple:mongo_apple_llvm_cc_toolchain_config.bzl", "mongo_apple_llvm_cc_toolchain_config")
+load("@//bazel/toolchains/cc:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")
 load(
     "@//bazel/toolchains/cc:mongo_custom_features.bzl",
     "FEATURES_ATTR_NAMES",
@@ -97,12 +98,13 @@ feature_attrs = get_common_features_attrs()
         builtin_sysroot = "@//bazel/config:sdkroot",
         optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
         debug_level = DEBUG_LEVEL,
-        supports_start_end_lib = True,
+        supports_start_end_lib = False,
         internal_thin_lto_enabled = INTERNAL_THIN_LTO_ENABLED,
         coverage_enabled = COVERAGE_ENABLED,
         compress_debug_enabled = COMPRESS_DEBUG_ENABLED,
         warnings_as_errors_enabled = WARNINGS_AS_ERRORS_ENABLED,
         linkstatic = LINKSTATIC_ENABLED,
+        global_defines = MONGO_GLOBAL_DEFINES,
     )
     for arch, cpu in get_supported_apple_archs().items()
 ]

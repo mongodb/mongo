@@ -76,7 +76,7 @@ mongo_cc_library(
     ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
-        "//src/third_party/abseil-cpp:absl_strings",
+        "@com_google_absl//absl/strings:strings",
         "//src/third_party/nlohmann-json:json",
         "//src/third_party/opentelemetry-cpp/api",
         "//src/third_party/opentelemetry-cpp/ext/src/http/client/curl:http_client_curl",
@@ -149,7 +149,7 @@ mongo_cc_library(
     ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
-        "//src/third_party/abseil-cpp:absl_strings",
+        "@com_google_absl//absl/strings:strings",
         "//src/third_party/nlohmann-json:json",
         "//src/third_party/opentelemetry-cpp/api",
         "//src/third_party/opentelemetry-cpp/sdk:headers",
@@ -221,7 +221,7 @@ mongo_cc_library(
     ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
-        "//src/third_party/abseil-cpp:absl_strings",
+        "@com_google_absl//absl/strings:strings",
         "//src/third_party/grpc:grpc++",
         "//src/third_party/nlohmann-json:json",
         "//src/third_party/opentelemetry-cpp/api",

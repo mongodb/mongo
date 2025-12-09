@@ -66,6 +66,7 @@ buildvariants:
       bazel_compile_flags: >-
         --linkstatic=False
         --define=MONGO_DISTMOD=rhel81
+        --compiler_type=gcc
       compile_variant: enterprise-rhel-81-ppc64le-shared
     tasks:
       - name: compile_test_serial_TG

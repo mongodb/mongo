@@ -435,4 +435,17 @@ def get_common_features(ctx):
                 ),
             ],
         ),
+        feature(
+            name = "mongo_defines",
+            enabled = True,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(
+                        flags =
+                            ["-D" + define for define in ctx.attr.global_defines],
+                    )],
+                ),
+            ],
+        ),
     ]

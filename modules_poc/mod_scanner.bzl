@@ -35,6 +35,7 @@ def _run_mod_scan(
     args.add_all(compilation_context.includes, before_each = "-I")
     args.add_all(compilation_context.quote_includes, before_each = "-iquote")
     args.add_all(compilation_context.system_includes, before_each = "-isystem")
+    args.add_all(compilation_context.external_includes, before_each = "-isystem")
 
     # add args specified by the toolchain, on the command line and rule copts
     args.add_all(flags)

@@ -174,11 +174,11 @@ mongo_cc_library(
         "tcmalloc_malloc_extension",
         "tcmalloc_malloc_tracing_extension",
         "tcmalloc_new_extension",
-        "//src/third_party/abseil-cpp:absl_base",
-        "//src/third_party/abseil-cpp:absl_stacktrace",
-        "//src/third_party/abseil-cpp:absl_status",
-        "//src/third_party/abseil-cpp:absl_statusor",
-        "//src/third_party/abseil-cpp:absl_strings",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/debugging:stacktrace",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -198,8 +198,8 @@ mongo_cc_library(
         "tcmalloc_internal_logging",
         "tcmalloc_internal_sysinfo",
         "tcmalloc_internal_util",
-        "//src/third_party/abseil-cpp:absl_base",
-        "//src/third_party/abseil-cpp:absl_strings",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -215,7 +215,7 @@ mongo_cc_library(
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
     target_compatible_with = PLATFORM_SUPPORTED,
-    deps = ["//src/third_party/abseil-cpp:absl_base"],
+    deps = ["@com_google_absl//absl/base"],
 )
 
 mongo_cc_library(
@@ -233,11 +233,11 @@ mongo_cc_library(
     deps = [
         "tcmalloc_internal_environment",
         "tcmalloc_malloc_extension",
-        "//src/third_party/abseil-cpp:absl_base",
-        "//src/third_party/abseil-cpp:absl_stacktrace",
-        "//src/third_party/abseil-cpp:absl_str_format_internal",
-        "//src/third_party/abseil-cpp:absl_strings",
-        "//src/third_party/abseil-cpp:absl_time",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/debugging:stacktrace",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/time",
     ],
 )
 
@@ -257,7 +257,7 @@ mongo_cc_library(
         "tcmalloc_internal_logging",
         "tcmalloc_internal_page_size",
         "tcmalloc_internal_util",
-        "//src/third_party/abseil-cpp:absl_strings",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -275,7 +275,7 @@ mongo_cc_library(
     target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_internal_page_size",
-        "//src/third_party/abseil-cpp:absl_base",
+        "@com_google_absl//absl/base",
     ],
 )
 
@@ -296,8 +296,8 @@ mongo_cc_library(
         "tcmalloc_internal_logging",
         "tcmalloc_internal_percpu",
         "tcmalloc_internal_util",
-        "//src/third_party/abseil-cpp:absl_base",
-        "//src/third_party/abseil-cpp:absl_strings",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -314,7 +314,7 @@ mongo_cc_library(
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
     target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
-        "//src/third_party/abseil-cpp:absl_base",
+        "@com_google_absl//absl/base",
     ],
 )
 
@@ -340,7 +340,7 @@ mongo_cc_library(
         "tcmalloc_internal_logging",
         "tcmalloc_internal_sysinfo",
         "tcmalloc_internal_util",
-        "//src/third_party/abseil-cpp:absl_base",
+        "@com_google_absl//absl/base",
     ],
 )
 
@@ -358,8 +358,8 @@ mongo_cc_library(
     target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_internal_logging",
-        "//src/third_party/abseil-cpp:absl_base",
-        "//src/third_party/abseil-cpp:absl_time",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/time",
     ],
 )
 
@@ -379,7 +379,7 @@ mongo_cc_library(
         "tcmalloc_internal_mincore",
         "tcmalloc_internal_percpu",
         "tcmalloc_internal_sysinfo",
-        "//src/third_party/abseil-cpp:absl_base",
+        "@com_google_absl//absl/base",
     ],
 )
 
@@ -397,8 +397,8 @@ mongo_cc_library(
     target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_internal_util",
-        "//src/third_party/abseil-cpp:absl_base",
-        "//src/third_party/abseil-cpp:absl_strings",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -415,8 +415,8 @@ mongo_cc_library(
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
     target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
-        "//src/third_party/abseil-cpp:absl_base",
-        "//src/third_party/abseil-cpp:absl_strings",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -479,14 +479,16 @@ mongo_cc_library(
         "tcmalloc_malloc_extension",
         "tcmalloc_malloc_tracing_extension",
         "tcmalloc_new_extension",
-        "//src/third_party/abseil-cpp:absl_base",
-        "//src/third_party/abseil-cpp:absl_hash",
-        "//src/third_party/abseil-cpp:absl_malloc_internal",
-        "//src/third_party/abseil-cpp:absl_raw_hash_set",
-        "//src/third_party/abseil-cpp:absl_stacktrace",
-        "//src/third_party/abseil-cpp:absl_strings",
-        "//src/third_party/abseil-cpp:absl_synchronization",
-        "//src/third_party/abseil-cpp:absl_time",
+        "@com_google_absl//absl/algorithm:container",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/base:malloc_internal",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:raw_hash_set",
+        "@com_google_absl//absl/debugging:stacktrace",
+        "@com_google_absl//absl/hash",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
     ],
 )
 
@@ -505,7 +507,7 @@ mongo_cc_library(
     deps = [
         "tcmalloc_internal_environment",
         "tcmalloc_internal_logging",
-        "//src/third_party/abseil-cpp:absl_strings",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -522,9 +524,11 @@ mongo_cc_library(
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
     target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
-        "//src/third_party/abseil-cpp:absl_malloc_internal",
-        "//src/third_party/abseil-cpp:absl_strings",
-        "//src/third_party/abseil-cpp:absl_time",
+        "@com_google_absl//absl/base:malloc_internal",
+        "@com_google_absl//absl/functional:function_ref",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -541,8 +545,8 @@ mongo_cc_library(
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
     target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
-        "//src/third_party/abseil-cpp:absl_status",
-        "//src/third_party/abseil-cpp:absl_statusor",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -577,5 +581,6 @@ mongo_cc_library(
     target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_malloc_extension",
+        "@com_google_absl//absl/strings:str_format",
     ],
 )

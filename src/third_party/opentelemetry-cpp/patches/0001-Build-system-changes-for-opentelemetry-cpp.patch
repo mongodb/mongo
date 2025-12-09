@@ -64,8 +64,8 @@ index dfc7d3c6450..dbc3b1d452e 100644
 -        "@com_google_absl//absl/base",
 -        "@com_google_absl//absl/strings",
 -        "@com_google_absl//absl/types:variant",
-+        "//src/third_party/abseil-cpp:absl_base",
-+        "//src/third_party/abseil-cpp:absl_strings",
++        "@com_google_absl//absl/base:base",
++        "@com_google_absl//absl/strings:strings",
      ],
  )
  
@@ -221,7 +221,7 @@ index a2dd8f8c650..b3ddd1924b8 100644
 -        "@com_github_opentelemetry_proto//:common_proto_cc",
 -        "@com_google_absl//absl/strings",
 -        "@github_nlohmann_json//:json",
-+        "//src/third_party/abseil-cpp:absl_strings",
++        "@com_google_absl//absl/strings:strings",
 +        "//src/third_party/nlohmann-json:json",
 +        "//src/third_party/opentelemetry-cpp/api",
 +        "//src/third_party/opentelemetry-cpp/ext/src/http/client/curl:http_client_curl",
@@ -283,7 +283,7 @@ index a2dd8f8c650..b3ddd1924b8 100644
 -        "@com_github_opentelemetry_proto//:common_proto_cc",
 -        "@com_google_absl//absl/strings",
 -        "@github_nlohmann_json//:json",
-+        "//src/third_party/abseil-cpp:absl_strings",
++        "@com_google_absl//absl/strings:strings",
 +        "//src/third_party/nlohmann-json:json",
 +        "//src/third_party/opentelemetry-cpp/api",
 +        "//src/third_party/opentelemetry-cpp/sdk:headers",

@@ -240,9 +240,9 @@ mongo_cc_unit_test(
         "core_test_cc_grpc",
         "core_test_strip_prefix_cc_grpc",
         "//src/mongo:base",
-        "//src/third_party/abseil-cpp:absl_status",
         "//src/third_party/grpc:grpc++_reflection",
         "//src/third_party/protobuf",
+        "@com_google_absl//absl/status",
     ],
 )
 
