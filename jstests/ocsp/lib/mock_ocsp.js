@@ -149,6 +149,18 @@ export class MockOCSPServer {
         } else {
             const kSIGINT = 2;
             stopMongoProgramByPid(this.pid, kSIGINT);
+
+            for (let i = 0; i < 50; i++) {
+                if (!checkProgram(this.pid).alive) {
+                    print("Mock OCSP Server stop complete");
+                    return;
+                }
+                sleep(100);
+            }
+
+            // Mock could be caught in a hang, force terminate it
+            const kSIGKILL = 9;
+            stopMongoProgramByPid(this.pid, kSIGKILL);
         }
 
         print("Mock OCSP Server stop complete");
