@@ -392,6 +392,12 @@ ExpressionContextBuilder& ExpressionContextBuilder::tailableMode(TailableModeEnu
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::mainCollPathArrayness(
+    std::shared_ptr<const PathArrayness> mainCollPathArrayness) {
+    params.mainCollPathArrayness = mainCollPathArrayness;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     OperationContext* operationContext,
     const FindCommandRequest& request,

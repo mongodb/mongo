@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -1019,6 +1020,17 @@ public:
         return _featureFlagMqlJsEngineGap.get(VersionContext::getDecoration(getOperationContext()));
     }
 
+    const PathArrayness& getMainCollPathArrayness() const {
+        // mainCollPathArrayness will be unset in cases where we do not do a collection acquisition,
+        // e.g. if running on a 'mongos'. In this case, we return an empty instance of
+        // 'PathArrayness' that denotes all paths as arrays.
+        if (!_params.mainCollPathArrayness) {
+            static const auto kEmptyPathArrayness = PathArrayness();
+            return kEmptyPathArrayness;
+        }
+        return *_params.mainCollPathArrayness;
+    }
+
 protected:
     struct ExpressionContextParams {
         OperationContext* opCtx = nullptr;
@@ -1160,6 +1172,10 @@ protected:
 
         // Indicates that the query is replanned after being rate-limited.
         bool wasRateLimited = false;
+
+        // The PathArrayness information for the main collection. This may remain unset if a
+        // collection acquisition is not possible, e.g. when running on mongos.
+        std::shared_ptr<const PathArrayness> mainCollPathArrayness = nullptr;
     };
 
     ExpressionContextParams _params;

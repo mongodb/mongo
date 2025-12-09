@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 
+#include "mongo/logv2/log.h"
+
 #include <stack>
 
 using namespace mongo::multikey_paths;
@@ -126,10 +128,4 @@ void PathArrayness::TrieNode::insertPath(const FieldPath& path,
     // Recursively invoke the remaining path.
     _children.at(fieldNameToInsert).insertPath(path, multikeyPath, ++depth);
 }
-
-PathArrayness build(std::vector<IndexEntry> entries) {
-    PathArrayness root;
-    return root;
-}
-
 }  // namespace mongo

@@ -105,6 +105,8 @@ public:
         boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>>);
     ExpressionContextBuilder& originalNs(NamespaceString);
     ExpressionContextBuilder& isHybridSearch(bool);
+    ExpressionContextBuilder& mainCollPathArrayness(
+        std::shared_ptr<const PathArrayness> mainCollPathArrayness);
 
     /**
      * Add kSessionTransactionsTableNamespace, and kRsOplogNamespace

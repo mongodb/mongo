@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -140,10 +140,4 @@ private:
      */
     TrieNode _root;
 };
-
-/**
- * Build an arrayness trie from a given vector of index entries.
- */
-PathArrayness build(std::vector<IndexEntry> entries);
-
 }  // namespace mongo
