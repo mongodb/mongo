@@ -38,6 +38,12 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+#if defined(_MSC_VER)
+#define USE_THREADED_INTERPRETER 0
+#else
+#define USE_THREADED_INTERPRETER 1
+#endif
+
 namespace mongo {
 namespace sbe {
 namespace vm {
@@ -250,1175 +256,1229 @@ void ByteCode::runLambdaInternal(const CodeFragment* code, int64_t position) {
 }
 
 void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
+#if USE_THREADED_INTERPRETER
+    // Very important this in sync with Instruction::Tags.
+    static constexpr void* dispatchTable[std::numeric_limits<decltype(Instruction::tag)>::max() +
+                                         1] = {&&do_pushConstVal,
+                                               &&do_pushAccessVal,
+                                               &&do_pushOwnedAccessorVal,
+                                               &&do_pushEnvAccessorVal,
+                                               &&do_pushMoveVal,
+                                               &&do_pushLocalVal,
+                                               &&do_pushMoveLocalVal,
+                                               &&do_pushOneArgLambda,
+                                               &&do_pushTwoArgLambda,
+                                               &&do_pop,
+                                               &&do_swap,
+                                               &&do_makeOwn,
+
+                                               &&do_add,
+                                               &&do_sub,
+                                               &&do_mul,
+                                               &&do_div,
+                                               &&do_idiv,
+                                               &&do_mod,
+                                               &&do_negate,
+                                               &&do_numConvert,
+
+                                               &&do_logicNot,
+
+                                               &&do_less,
+                                               &&do_lessEq,
+                                               &&do_greater,
+                                               &&do_greaterEq,
+                                               &&do_eq,
+                                               &&do_neq,
+
+                                               &&do_cmp3w,
+
+                                               &&do_collLess,
+                                               &&do_collLessEq,
+                                               &&do_collGreater,
+                                               &&do_collGreaterEq,
+                                               &&do_collEq,
+                                               &&do_collNeq,
+                                               &&do_collCmp3w,
+
+                                               &&do_fillEmpty,
+                                               &&do_fillEmptyImm,
+                                               &&do_getField,
+                                               &&do_getFieldImm,
+                                               &&do_getElement,
+                                               &&do_collComparisonKey,
+                                               &&do_getFieldOrElement,
+                                               &&do_traverseP,
+                                               &&do_traversePImm,
+                                               &&do_traverseF,
+                                               &&do_traverseFImm,
+                                               &&do_magicTraverseF,
+                                               &&do_setField,
+                                               &&do_getArraySize,
+
+                                               &&do_aggSum,
+                                               &&do_aggCount,
+                                               &&do_aggMin,
+                                               &&do_aggMax,
+                                               &&do_aggFirst,
+                                               &&do_aggLast,
+
+                                               &&do_aggCollMin,
+                                               &&do_aggCollMax,
+
+                                               &&do_exists,
+                                               &&do_isNull,
+                                               &&do_isObject,
+                                               &&do_isArray,
+                                               &&do_isInList,
+                                               &&do_isString,
+                                               &&do_isNumber,
+                                               &&do_isBinData,
+                                               &&do_isDate,
+                                               &&do_isNaN,
+                                               &&do_isInfinity,
+                                               &&do_isRecordId,
+                                               &&do_isMinKey,
+                                               &&do_isMaxKey,
+                                               &&do_isTimestamp,
+                                               &&do_isKeyString,
+                                               &&do_typeMatchImm,
+
+                                               &&do_function,
+                                               &&do_functionSmall,
+
+                                               &&do_jmp,
+                                               &&do_jmpTrue,
+                                               &&do_jmpFalse,
+                                               &&do_jmpNothing,
+                                               &&do_jmpNotNothing,
+                                               &&do_ret,
+                                               &&do_allocStack,
+
+                                               &&do_fail,
+
+                                               &&do_dateTruncImm,
+
+                                               &&do_valueBlockApplyLambda};
+#endif
+
     auto pcPointer = code->instrs().data() + position;
     auto pcEnd = pcPointer + code->instrs().size();
 
+    /*
+     * When support is available for the computed goto extension, use it to execute SBE bytecode
+     * with the "threaded code" pattern. Otherwise, fall back to dispatching instructions
+     * with a switch statement.
+     *
+     * Compared to using a switch statement in a loop, the threaded approach requires fewer
+     * branches per instruction and executes slightly faster.
+     */
+#if USE_THREADED_INTERPRETER
+    Instruction i;
+#define INSTRUCTION(name) do_##name:
+#define DISPATCH()                              \
+    if (pcPointer == pcEnd) {                   \
+        return;                                 \
+    }                                           \
+    i = readFromMemory<Instruction>(pcPointer); \
+    pcPointer += sizeof(i);                     \
+    goto* dispatchTable[i.tag]
+    DISPATCH();
+#else
+#define INSTRUCTION(name) case Instruction::name:
+#define DISPATCH() break
     while (pcPointer != pcEnd) {
         Instruction i = readFromMemory<Instruction>(pcPointer);
         pcPointer += sizeof(i);
         switch (i.tag) {
-            case Instruction::pushConstVal: {
-                auto tag = readFromMemory<value::TypeTags>(pcPointer);
-                pcPointer += sizeof(tag);
-                auto val = readFromMemory<value::Value>(pcPointer);
-                pcPointer += sizeof(val);
-
-                pushStack(false, tag, val);
-
-                break;
-            }
-            case Instruction::pushAccessVal: {
-                auto accessor = readFromMemory<value::SlotAccessor*>(pcPointer);
-                pcPointer += sizeof(accessor);
-
-                auto [tag, val] = accessor->getViewOfValue();
-                pushStack(false, tag, val);
-
-                break;
-            }
-            case Instruction::pushOwnedAccessorVal: {
-                auto accessor = readFromMemory<value::OwnedValueAccessor*>(pcPointer);
-                pcPointer += sizeof(accessor);
-
-                auto [tag, val] = accessor->getViewOfValue();
-                pushStack(false, tag, val);
-
-                break;
-            }
-            case Instruction::pushEnvAccessorVal: {
-                auto accessor = readFromMemory<RuntimeEnvironment::Accessor*>(pcPointer);
-                pcPointer += sizeof(accessor);
-
-                auto [tag, val] = accessor->getViewOfValue();
-                pushStack(false, tag, val);
-
-                break;
-            }
-            case Instruction::pushMoveVal: {
-                auto accessor = readFromMemory<value::SlotAccessor*>(pcPointer);
-                pcPointer += sizeof(accessor);
-
-                auto [tag, val] = accessor->copyOrMoveValue().releaseToRaw();
-                pushStack(true, tag, val);
-
-                break;
-            }
-            case Instruction::pushLocalVal: {
-                auto stackOffset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(stackOffset);
-
-                auto [owned, tag, val] = getFromStack(stackOffset);
-
-                pushStack(false, tag, val);
-
-                break;
-            }
-            case Instruction::pushMoveLocalVal: {
-                auto stackOffset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(stackOffset);
-
-                auto [owned, tag, val] = getFromStack(stackOffset);
-                setTagToNothing(stackOffset);
-
-                pushStack(owned, tag, val);
-                break;
-            }
-            case Instruction::pushOneArgLambda: {
-                auto offset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(offset);
-                auto newPosition = pcPointer - code->instrs().data() + offset;
-                pushStack(false,
-                          value::TypeTags::LocalOneArgLambda,
-                          value::bitcastFrom<int64_t>(newPosition));
-                break;
-            }
-            case Instruction::pushTwoArgLambda: {
-                auto offset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(offset);
-                auto newPosition = pcPointer - code->instrs().data() + offset;
-                pushStack(false,
-                          value::TypeTags::LocalTwoArgLambda,
-                          value::bitcastFrom<int64_t>(newPosition));
-                break;
-            }
-            case Instruction::pop: {
-                popAndReleaseStack();
-                break;
-            }
-            case Instruction::swap: {
-                swapStack();
-                break;
-            }
-            case Instruction::makeOwn: {
-                auto [popParam, moveFromParam, offsetParam] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [owned, tag, val] = moveFromStack(offsetParam);
-                if (!owned) {
-                    // Value is not owned, make a copy.
-                    std::tie(tag, val) = value::copyValue(tag, val);
-                }
-                // Pop the stack entry if required, otherwise invalidate it to avoid the error
-                // "swapping stack entries containing the same value".
-                if (popParam) {
-                    popStack();
-                } else {
-                    setTagToNothing(offsetParam);
-                }
-                pushStack(true, tag, val);
-
-                break;
-            }
-            case Instruction::add: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [owned, tag, val] = genericAdd(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                pushStack(owned, tag, val);
-
-                break;
-            }
-            case Instruction::sub: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [owned, tag, val] = genericSub(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                pushStack(owned, tag, val);
-                break;
-            }
-            case Instruction::mul: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [owned, tag, val] = genericMul(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                pushStack(owned, tag, val);
-                break;
-            }
-            case Instruction::div: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [owned, tag, val] = genericDiv(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                pushStack(owned, tag, val);
-                break;
-            }
-            case Instruction::idiv: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [owned, tag, val] = genericIDiv(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                pushStack(owned, tag, val);
-                break;
-            }
-            case Instruction::mod: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [owned, tag, val] = genericMod(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                pushStack(owned, tag, val);
-                break;
-            }
-            case Instruction::negate: {
-                auto [popParam, moveFromParam, offsetParam] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [owned, tag, val] = getFromStack(offsetParam, popParam);
-                value::ValueGuard paramGuard(owned && popParam, tag, val);
-
-                auto [resultOwned, resultTag, resultVal] = genericSub(
-                    value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0), tag, val);
-
-                pushStack(resultOwned, resultTag, resultVal);
-                break;
-            }
-            case Instruction::numConvert: {
-                auto tag = readFromMemory<value::TypeTags>(pcPointer);
-                pcPointer += sizeof(tag);
-
-                auto [owned, lhsTag, lhsVal] = getFromStack(0);
-
-                auto [rhsOwned, rhsTag, rhsVal] = genericNumConvert(lhsTag, lhsVal, tag);
-
-                topStack(rhsOwned, rhsTag, rhsVal);
-
-                if (owned) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
-
-                break;
-            }
-            case Instruction::logicNot: {
-                auto [popParam, moveFromParam, offsetParam] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [owned, tag, val] = getFromStack(offsetParam, popParam);
-                value::ValueGuard paramGuard(owned && popParam, tag, val);
-
-                auto [resultTag, resultVal] = genericNot(tag, val);
-
-                pushStack(false, resultTag, resultVal);
-                break;
-            }
-            case Instruction::less: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [tag, val] = value::genericLt(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                pushStack(false, tag, val);
-                break;
-            }
-            case Instruction::collLess: {
-                auto [popColl, moveFromColl, offsetColl] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-                auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
-                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
-
-                if (collTag == value::TypeTags::collator) {
-                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
-                    auto [tag, val] = value::genericLt(lhsTag, lhsVal, rhsTag, rhsVal, comp);
-                    pushStack(false, tag, val);
-                } else {
-                    pushStack(false, value::TypeTags::Nothing, 0);
-                }
-                break;
-            }
-            case Instruction::lessEq: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [tag, val] = value::genericLte(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                pushStack(false, tag, val);
-                break;
-            }
-            case Instruction::collLessEq: {
-                auto [popColl, moveFromColl, offsetColl] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-                auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
-                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
-
-                if (collTag == value::TypeTags::collator) {
-                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
-                    auto [tag, val] = value::genericLte(lhsTag, lhsVal, rhsTag, rhsVal, comp);
-                    pushStack(false, tag, val);
-                } else {
-                    pushStack(false, value::TypeTags::Nothing, 0);
-                }
-                break;
-            }
-            case Instruction::greater: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [tag, val] = value::genericGt(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                pushStack(false, tag, val);
-
-                break;
-            }
-            case Instruction::collGreater: {
-                auto [popColl, moveFromColl, offsetColl] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-                auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
-                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
-
-                if (collTag == value::TypeTags::collator) {
-                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
-                    auto [tag, val] = value::genericGt(lhsTag, lhsVal, rhsTag, rhsVal, comp);
-                    pushStack(false, tag, val);
-                } else {
-                    pushStack(false, value::TypeTags::Nothing, 0);
-                }
-                break;
-            }
-            case Instruction::greaterEq: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [tag, val] = value::genericGte(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                pushStack(false, tag, val);
-                break;
-            }
-            case Instruction::collGreaterEq: {
-                auto [popColl, moveFromColl, offsetColl] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-                auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
-                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
-
-                if (collTag == value::TypeTags::collator) {
-                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
-                    auto [tag, val] = value::genericGte(lhsTag, lhsVal, rhsTag, rhsVal, comp);
-                    pushStack(false, tag, val);
-                } else {
-                    pushStack(false, value::TypeTags::Nothing, 0);
-                }
-                break;
-            }
-            case Instruction::eq: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [tag, val] = value::genericEq(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                pushStack(false, tag, val);
-                break;
-            }
-            case Instruction::collEq: {
-                auto [popColl, moveFromColl, offsetColl] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-                auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
-                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
-
-                if (collTag == value::TypeTags::collator) {
-                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
-                    auto [tag, val] = value::genericEq(lhsTag, lhsVal, rhsTag, rhsVal, comp);
-                    pushStack(false, tag, val);
-                } else {
-                    pushStack(false, value::TypeTags::Nothing, 0);
-                }
-                break;
-            }
-            case Instruction::neq: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [tag, val] = value::genericNeq(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                pushStack(false, tag, val);
-                break;
-            }
-            case Instruction::collNeq: {
-                auto [popColl, moveFromColl, offsetColl] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-                auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
-                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
-
-                if (collTag == value::TypeTags::collator) {
-                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
-                    auto [tag, val] = value::genericNeq(lhsTag, lhsVal, rhsTag, rhsVal, comp);
-                    pushStack(false, tag, val);
-                } else {
-                    pushStack(false, value::TypeTags::Nothing, 0);
-                }
-                break;
-            }
-            case Instruction::cmp3w: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [tag, val] = value::compare3way(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                pushStack(false, tag, val);
-
-                break;
-            }
-            case Instruction::collCmp3w: {
-                auto [popColl, moveFromColl, offsetColl] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-                auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
-                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
-
-                if (collTag == value::TypeTags::collator) {
-                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
-                    auto [tag, val] = value::compare3way(lhsTag, lhsVal, rhsTag, rhsVal, comp);
-                    pushStack(false, tag, val);
-                } else {
-                    pushStack(false, value::TypeTags::Nothing, 0);
-                }
-                break;
-            }
-            case Instruction::fillEmpty: {
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
-                popStack();
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
-
-                if (lhsTag == value::TypeTags::Nothing) {
-                    topStack(rhsOwned, rhsTag, rhsVal);
-
-                    if (lhsOwned) {
-                        value::releaseValue(lhsTag, lhsVal);
-                    }
-                } else {
-                    if (rhsOwned) {
-                        value::releaseValue(rhsTag, rhsVal);
-                    }
-                }
-                break;
-            }
-            case Instruction::fillEmptyImm: {
-                auto k = readFromMemory<Instruction::Constants>(pcPointer);
-                pcPointer += sizeof(k);
-
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
-                if (lhsTag == value::TypeTags::Nothing) {
-                    switch (k) {
-                        case Instruction::Nothing:
-                            break;
-                        case Instruction::Null:
-                            topStack(false, value::TypeTags::Null, 0);
-                            break;
-                        case Instruction::True:
-                            topStack(
-                                false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
-                            break;
-                        case Instruction::False:
-                            topStack(
-                                false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
-                            break;
-                        case Instruction::Int32One:
-                            topStack(false,
-                                     value::TypeTags::NumberInt32,
-                                     value::bitcastFrom<int32_t>(1));
-                            break;
-                        default:
-                            MONGO_UNREACHABLE_TASSERT(11122949);
-                    }
-                }
-                break;
-            }
-            case Instruction::getField: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [owned, tag, val] = getField(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                // Copy value only if needed
-                if (lhsOwned && !owned) {
-                    owned = true;
-                    std::tie(tag, val) = value::copyValue(tag, val);
-                }
-
-                pushStack(owned, tag, val);
-                break;
-            }
-            case Instruction::getFieldImm: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto size = readFromMemory<uint8_t>(pcPointer);
-                pcPointer += sizeof(size);
-                StringData fieldName(reinterpret_cast<const char*>(pcPointer), size);
-                pcPointer += size;
-
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [owned, tag, val] = getField(lhsTag, lhsVal, fieldName);
-
-                // Copy value only if needed
-                if (lhsOwned && !owned) {
-                    owned = true;
-                    std::tie(tag, val) = value::copyValue(tag, val);
-                }
-
-                pushStack(owned, tag, val);
-                break;
-            }
-            case Instruction::getElement: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [owned, tag, val] = getElement(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                // Copy value only if needed
-                if (lhsOwned && !owned) {
-                    owned = true;
-                    std::tie(tag, val) = value::copyValue(tag, val);
-                }
-
-                pushStack(owned, tag, val);
-                break;
-            }
-            case Instruction::getArraySize: {
-                auto [popParam, moveFromParam, offsetParam] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [owned, tag, val] = getFromStack(offsetParam, popParam);
-                value::ValueGuard paramGuard(owned && popParam, tag, val);
-
-                auto [resultOwned, resultTag, resultVal] = getArraySize(tag, val);
-                pushStack(resultOwned, resultTag, resultVal);
-                break;
-            }
-            case Instruction::collComparisonKey: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                if (lhsTag != value::TypeTags::Nothing && rhsTag == value::TypeTags::collator) {
-                    // If lhs is a collatable type, call collComparisonKey() to obtain the
-                    // comparison key. If lhs is not a collatable type, we can just leave it
-                    // on the stack as-is.
-                    if (value::isCollatableType(lhsTag)) {
-                        auto collator = value::getCollatorView(rhsVal);
-                        auto [tag, val] = collComparisonKey(lhsTag, lhsVal, collator);
-                        pushStack(true, tag, val);
-                    } else {
-                        if (popLhs) {
-                            pushStack(lhsOwned, lhsTag, lhsVal);
-                            lhsGuard.reset();
-                        } else if (moveFromLhs) {
-                            setTagToNothing(offsetLhs);
-                            pushStack(lhsOwned, lhsTag, lhsVal);
-                        } else {
-                            pushStack(false, lhsTag, lhsVal);
-                        }
-                    }
-                } else {
-                    // If lhs was Nothing or rhs wasn't Collator, return Nothing.
-                    pushStack(false, value::TypeTags::Nothing, 0);
-                }
-                break;
-            }
-            case Instruction::getFieldOrElement: {
-                auto [popLhs, moveFromLhs, offsetLhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [popRhs, moveFromRhs, offsetRhs] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-
-                auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
-                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
-                auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
-
-                auto [owned, tag, val] = getFieldOrElement(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                // Copy value only if needed
-                if (lhsOwned && !owned) {
-                    owned = true;
-                    std::tie(tag, val) = value::copyValue(tag, val);
-                }
-
-                pushStack(owned, tag, val);
-                break;
-            }
-            case Instruction::traverseP: {
-                traverseP(code);
-                break;
-            }
-            case Instruction::traversePImm: {
-                auto providePosition = readFromMemory<Instruction::Constants>(pcPointer);
-                pcPointer += sizeof(providePosition);
-                auto k = readFromMemory<Instruction::Constants>(pcPointer);
-                pcPointer += sizeof(k);
-
-                auto offset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(offset);
-                auto codePosition = pcPointer - code->instrs().data() + offset;
-
-                traverseP(code,
-                          codePosition,
-                          providePosition == Instruction::True ? true : false,
-                          k == Instruction::Nothing ? std::numeric_limits<int64_t>::max() : 1);
-
-                break;
-            }
-            case Instruction::traverseF: {
-                traverseF(code);
-                break;
-            }
-            case Instruction::traverseFImm: {
-                auto providePosition = readFromMemory<Instruction::Constants>(pcPointer);
-                pcPointer += sizeof(providePosition);
-                auto k = readFromMemory<Instruction::Constants>(pcPointer);
-                pcPointer += sizeof(k);
-
-                auto offset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(offset);
-                auto codePosition = pcPointer - code->instrs().data() + offset;
-
-                traverseF(code,
-                          codePosition,
-                          providePosition == Instruction::True ? true : false,
-                          k == Instruction::True ? true : false);
-
-                break;
-            }
-            case Instruction::magicTraverseF: {
-                magicTraverseF(code);
-                break;
-            }
-            case Instruction::setField: {
-                auto [owned, tag, val] = setField();
-                popAndReleaseStack();
-                popAndReleaseStack();
-                popAndReleaseStack();
-
-                pushStack(owned, tag, val);
-                break;
-            }
-            case Instruction::aggSum: {
-                auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
-                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
-                popStack();
-
-                auto [accTag, accVal] = moveOwnedFromStack(0);
-
-                auto [owned, tag, val] = aggSum(accTag, accVal, fieldTag, fieldVal);
-
-                topStack(owned, tag, val);
-                break;
-            }
-            case Instruction::aggCount: {
-                auto [accTag, accVal] = moveOwnedFromStack(0);
-
-                auto [owned, tag, val] = aggCount(accTag, accVal);
-
-                topStack(owned, tag, val);
-                break;
-            }
-            case Instruction::aggMin: {
-                auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
-                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
-                popStack();
-
-                auto [accOwned, accTag, accVal] = getFromStack(0);
-
-                auto [owned, tag, val] = aggMin(accTag, accVal, fieldTag, fieldVal);
-
-                topStack(owned, tag, val);
-                if (accOwned) {
-                    value::releaseValue(accTag, accVal);
-                }
-                break;
-            }
-            case Instruction::aggCollMin: {
-                auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
-                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
-                popStack();
-
-                auto [collOwned, collTag, collVal] = getFromStack(0);
-                value::ValueGuard collGuard(collOwned, collTag, collVal);
-                popStack();
-
-                auto [accOwned, accTag, accVal] = getFromStack(0);
-
-                // Skip aggregation step if the collation is Nothing or an unexpected type.
-                if (collTag != value::TypeTags::collator) {
-                    auto [tag, val] = value::copyValue(accTag, accVal);
-                    topStack(true, tag, val);
-                    break;
-                }
-                auto collator = value::getCollatorView(collVal);
-
-                auto [owned, tag, val] = aggMin(accTag, accVal, fieldTag, fieldVal, collator);
-
-                topStack(owned, tag, val);
-                if (accOwned) {
-                    value::releaseValue(accTag, accVal);
-                }
-                break;
-            }
-            case Instruction::aggMax: {
-                auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
-                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
-                popStack();
-
-                auto [accOwned, accTag, accVal] = getFromStack(0);
-
-                auto [owned, tag, val] = aggMax(accTag, accVal, fieldTag, fieldVal);
-
-                topStack(owned, tag, val);
-                if (accOwned) {
-                    value::releaseValue(accTag, accVal);
-                }
-                break;
-            }
-            case Instruction::aggCollMax: {
-                auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
-                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
-                popStack();
-
-                auto [collOwned, collTag, collVal] = getFromStack(0);
-                value::ValueGuard collGuard(collOwned, collTag, collVal);
-                popStack();
-
-                auto [accOwned, accTag, accVal] = getFromStack(0);
-
-                // Skip aggregation step if the collation is Nothing or an unexpected type.
-                if (collTag != value::TypeTags::collator) {
-                    auto [tag, val] = value::copyValue(accTag, accVal);
-                    topStack(true, tag, val);
-                    break;
-                }
-                auto collator = value::getCollatorView(collVal);
-
-                auto [owned, tag, val] = aggMax(accTag, accVal, fieldTag, fieldVal, collator);
-
-                topStack(owned, tag, val);
-                if (accOwned) {
-                    value::releaseValue(accTag, accVal);
-                }
-                break;
-            }
-            case Instruction::aggFirst: {
-                auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
-                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
-                popStack();
-
-                auto [accOwned, accTag, accVal] = getFromStack(0);
-
-                auto [owned, tag, val] = aggFirst(accTag, accVal, fieldTag, fieldVal);
-
-                topStack(owned, tag, val);
-                if (accOwned) {
-                    value::releaseValue(accTag, accVal);
-                }
-                break;
-            }
-            case Instruction::aggLast: {
-                auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
-                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
-                popStack();
-
-                auto [accOwned, accTag, accVal] = getFromStack(0);
-
-                auto [owned, tag, val] = aggLast(accTag, accVal, fieldTag, fieldVal);
-
-                topStack(owned, tag, val);
-                if (accOwned) {
-                    value::releaseValue(accTag, accVal);
-                }
-                break;
-            }
-            case Instruction::exists: {
-                auto [popParam, moveFromParam, offsetParam] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [owned, tag, val] = getFromStack(offsetParam, popParam);
-
-                pushStack(false,
-                          value::TypeTags::Boolean,
-                          value::bitcastFrom<bool>(tag != value::TypeTags::Nothing));
-
-                if (owned && popParam) {
-                    value::releaseValue(tag, val);
-                }
-                break;
-            }
-            case Instruction::isNull: {
-                runTagCheck(pcPointer, value::TypeTags::Null);
-                break;
-            }
-            case Instruction::isObject: {
-                runTagCheck(pcPointer, value::isObject);
-                break;
-            }
-            case Instruction::isArray: {
-                runTagCheck(pcPointer, value::isArray);
-                break;
-            }
-            case Instruction::isInList: {
-                runTagCheck(pcPointer, value::isInList);
-                break;
-            }
-            case Instruction::isString: {
-                runTagCheck(pcPointer, value::isString);
-                break;
-            }
-            case Instruction::isNumber: {
-                runTagCheck(pcPointer, value::isNumber);
-                break;
-            }
-            case Instruction::isBinData: {
-                runTagCheck(pcPointer, value::isBinData);
-                break;
-            }
-            case Instruction::isDate: {
-                runTagCheck(pcPointer, value::TypeTags::Date);
-                break;
-            }
-            case Instruction::isNaN: {
-                auto [popParam, moveFromParam, offsetParam] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [owned, tag, val] = getFromStack(offsetParam, popParam);
-
-                if (tag != value::TypeTags::Nothing) {
-                    pushStack(false,
-                              value::TypeTags::Boolean,
-                              value::bitcastFrom<bool>(value::isNaN(tag, val)));
-                } else {
-                    pushStack(false, value::TypeTags::Nothing, 0);
-                }
-
-                if (owned && popParam) {
-                    value::releaseValue(tag, val);
-                }
-                break;
-            }
-            case Instruction::isInfinity: {
-                auto [popParam, moveFromParam, offsetParam] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto [owned, tag, val] = getFromStack(offsetParam, popParam);
-
-                if (tag != value::TypeTags::Nothing) {
-                    pushStack(false,
-                              value::TypeTags::Boolean,
-                              value::bitcastFrom<bool>(value::isInfinity(tag, val)));
-                } else {
-                    pushStack(false, value::TypeTags::Nothing, 0);
-                }
-                if (owned && popParam) {
-                    value::releaseValue(tag, val);
-                }
-                break;
-            }
-            case Instruction::isRecordId: {
-                runTagCheck(pcPointer, value::isRecordId);
-                break;
-            }
-            case Instruction::isMinKey: {
-                runTagCheck(pcPointer, value::TypeTags::MinKey);
-                break;
-            }
-            case Instruction::isMaxKey: {
-                runTagCheck(pcPointer, value::TypeTags::MaxKey);
-                break;
-            }
-            case Instruction::isTimestamp: {
-                runTagCheck(pcPointer, value::TypeTags::Timestamp);
-                break;
-            }
-            case Instruction::isKeyString: {
-                runTagCheck(pcPointer, value::TypeTags::keyString);
-                break;
-            }
-            case Instruction::typeMatchImm: {
-                auto [popParam, moveFromParam, offsetParam] =
-                    Instruction::Parameter::decodeParam(pcPointer);
-                auto mask = readFromMemory<uint32_t>(pcPointer);
-                pcPointer += sizeof(mask);
-
-                auto [owned, tag, val] = getFromStack(offsetParam, popParam);
-
-                if (tag != value::TypeTags::Nothing) {
-                    pushStack(false,
-                              value::TypeTags::Boolean,
-                              value::bitcastFrom<bool>(getBSONTypeMask(tag) & mask));
-                } else {
-                    pushStack(false, value::TypeTags::Nothing, 0);
-                }
-                if (owned && popParam) {
-                    value::releaseValue(tag, val);
-                }
-                break;
-            }
-            case Instruction::functionSmall: {
-                auto f = readFromMemory<SmallBuiltinType>(pcPointer);
-                pcPointer += sizeof(f);
-                SmallArityType arity{0};
-                arity = readFromMemory<SmallArityType>(pcPointer);
-                pcPointer += sizeof(SmallArityType);
-
-                auto [owned, tag, val] = dispatchBuiltin(static_cast<Builtin>(f), arity, code);
-
-                for (ArityType cnt = 0; cnt < arity; ++cnt) {
-                    popAndReleaseStack();
-                }
-
-                pushStack(owned, tag, val);
-
-                break;
-            }
-            case Instruction::function: {
-                auto f = readFromMemory<Builtin>(pcPointer);
-                pcPointer += sizeof(f);
-                ArityType arity{0};
-                arity = readFromMemory<ArityType>(pcPointer);
-                pcPointer += sizeof(ArityType);
-
-                auto [owned, tag, val] = dispatchBuiltin(f, arity, code);
-
-                for (ArityType cnt = 0; cnt < arity; ++cnt) {
-                    popAndReleaseStack();
-                }
-
-                pushStack(owned, tag, val);
-
-                break;
-            }
-            case Instruction::jmp: {
-                auto jumpOffset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(jumpOffset);
-
-                pcPointer += jumpOffset;
-                break;
-            }
-            case Instruction::jmpTrue: {
-                auto jumpOffset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(jumpOffset);
-
-                auto [owned, tag, val] = getFromStack(0);
-                popStack();
-
-                if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
-                    pcPointer += jumpOffset;
-                }
-
-                if (owned) {
-                    value::releaseValue(tag, val);
-                }
-                break;
-            }
-            case Instruction::jmpFalse: {
-                auto jumpOffset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(jumpOffset);
-
-                auto [owned, tag, val] = getFromStack(0);
-                popStack();
-
-                if (tag == value::TypeTags::Boolean && !value::bitcastTo<bool>(val)) {
-                    pcPointer += jumpOffset;
-                }
-
-                if (owned) {
-                    value::releaseValue(tag, val);
-                }
-                break;
-            }
-            case Instruction::jmpNothing: {
-                auto jumpOffset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(jumpOffset);
-
-                auto [owned, tag, val] = getFromStack(0);
-                if (tag == value::TypeTags::Nothing) {
-                    pcPointer += jumpOffset;
-                }
-                break;
-            }
-            case Instruction::jmpNotNothing: {
-                auto jumpOffset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(jumpOffset);
-
-                auto [owned, tag, val] = getFromStack(0);
-                if (tag != value::TypeTags::Nothing) {
-                    pcPointer += jumpOffset;
-                }
-                break;
-            }
-            case Instruction::ret: {
-                pcPointer = pcEnd;
-                break;
-            }
-            case Instruction::allocStack: {
-                auto size = readFromMemory<uint32_t>(pcPointer);
-                pcPointer += sizeof(size);
-
-                allocStack(size);
-                break;
-            }
-            case Instruction::fail: {
-                runFailInstruction();
-                break;
-            }
-            case Instruction::dateTruncImm: {
-                auto unit = readFromMemory<TimeUnit>(pcPointer);
-                pcPointer += sizeof(unit);
-                auto binSize = readFromMemory<int64_t>(pcPointer);
-                pcPointer += sizeof(binSize);
-                auto timezone = readFromMemory<TimeZone>(pcPointer);
-                pcPointer += sizeof(timezone);
-                auto startOfWeek = readFromMemory<DayOfWeek>(pcPointer);
-                pcPointer += sizeof(startOfWeek);
-
-                auto [dateOwned, dateTag, dateVal] = getFromStack(0);
-
-                auto [owned, tag, val] =
-                    dateTrunc(dateTag, dateVal, unit, binSize, timezone, startOfWeek);
-
-                topStack(owned, tag, val);
-
-                if (dateOwned) {
-                    value::releaseValue(dateTag, dateVal);
-                }
-                break;
-            }
-            case Instruction::valueBlockApplyLambda: {
-                valueBlockApplyLambda(code);
-                break;
-            }
-
-            default:
-                MONGO_UNREACHABLE_TASSERT(11122950);
+#endif
+
+    // If we had a 'ret' instruction at the end of every code fragment, we could avoid the
+    // 'pcPointer == pcEnd' conditional for each bytecode.
+    INSTRUCTION(pushConstVal) {
+        auto tag = readFromMemory<value::TypeTags>(pcPointer);
+        pcPointer += sizeof(tag);
+        auto val = readFromMemory<value::Value>(pcPointer);
+        pcPointer += sizeof(val);
+
+        pushStack(false, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(pushAccessVal) {
+        auto accessor = readFromMemory<value::SlotAccessor*>(pcPointer);
+        pcPointer += sizeof(accessor);
+
+        auto [tag, val] = accessor->getViewOfValue();
+        pushStack(false, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(pushOwnedAccessorVal) {
+        auto accessor = readFromMemory<value::OwnedValueAccessor*>(pcPointer);
+        pcPointer += sizeof(accessor);
+
+        auto [tag, val] = accessor->getViewOfValue();
+        pushStack(false, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(pushEnvAccessorVal) {
+        auto accessor = readFromMemory<RuntimeEnvironment::Accessor*>(pcPointer);
+        pcPointer += sizeof(accessor);
+
+        auto [tag, val] = accessor->getViewOfValue();
+        pushStack(false, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(pushMoveVal) {
+        auto accessor = readFromMemory<value::SlotAccessor*>(pcPointer);
+        pcPointer += sizeof(accessor);
+
+        auto [tag, val] = accessor->copyOrMoveValue().releaseToRaw();
+        pushStack(true, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(pushLocalVal) {
+        auto stackOffset = readFromMemory<int>(pcPointer);
+        pcPointer += sizeof(stackOffset);
+
+        auto [owned, tag, val] = getFromStack(stackOffset);
+
+        pushStack(false, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(pushMoveLocalVal) {
+        auto stackOffset = readFromMemory<int>(pcPointer);
+        pcPointer += sizeof(stackOffset);
+
+        auto [owned, tag, val] = getFromStack(stackOffset);
+        setTagToNothing(stackOffset);
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(pushOneArgLambda) {
+        auto offset = readFromMemory<int>(pcPointer);
+        pcPointer += sizeof(offset);
+        auto newPosition = pcPointer - code->instrs().data() + offset;
+        pushStack(
+            false, value::TypeTags::LocalOneArgLambda, value::bitcastFrom<int64_t>(newPosition));
+    }
+    DISPATCH();
+    INSTRUCTION(pushTwoArgLambda) {
+        auto offset = readFromMemory<int>(pcPointer);
+        pcPointer += sizeof(offset);
+        auto newPosition = pcPointer - code->instrs().data() + offset;
+        pushStack(
+            false, value::TypeTags::LocalTwoArgLambda, value::bitcastFrom<int64_t>(newPosition));
+    }
+    DISPATCH();
+    INSTRUCTION(pop) {
+        popAndReleaseStack();
+    }
+    DISPATCH();
+    INSTRUCTION(swap) {
+        swapStack();
+    }
+    DISPATCH();
+    INSTRUCTION(makeOwn) {
+        auto [popParam, moveFromParam, offsetParam] =
+            Instruction::Parameter::decodeParam(pcPointer);
+        auto [owned, tag, val] = moveFromStack(offsetParam);
+        if (!owned) {
+            // Value is not owned, make a copy.
+            std::tie(tag, val) = value::copyValue(tag, val);
+        }
+        // Pop the stack entry if required, otherwise invalidate it to avoid the error
+        // "swapping stack entries containing the same value".
+        if (popParam) {
+            popStack();
+        } else {
+            setTagToNothing(offsetParam);
+        }
+        pushStack(true, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(add) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [owned, tag, val] = genericAdd(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(sub) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [owned, tag, val] = genericSub(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(mul) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [owned, tag, val] = genericMul(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(div) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [owned, tag, val] = genericDiv(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(idiv) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [owned, tag, val] = genericIDiv(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(mod) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [owned, tag, val] = genericMod(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(negate) {
+        auto [popParam, moveFromParam, offsetParam] =
+            Instruction::Parameter::decodeParam(pcPointer);
+        auto [owned, tag, val] = getFromStack(offsetParam, popParam);
+        value::ValueGuard paramGuard(owned && popParam, tag, val);
+
+        auto [resultOwned, resultTag, resultVal] =
+            genericSub(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0), tag, val);
+
+        pushStack(resultOwned, resultTag, resultVal);
+    }
+    DISPATCH();
+    INSTRUCTION(numConvert) {
+        auto tag = readFromMemory<value::TypeTags>(pcPointer);
+        pcPointer += sizeof(tag);
+
+        auto [owned, lhsTag, lhsVal] = getFromStack(0);
+
+        auto [rhsOwned, rhsTag, rhsVal] = genericNumConvert(lhsTag, lhsVal, tag);
+
+        topStack(rhsOwned, rhsTag, rhsVal);
+
+        if (owned) {
+            value::releaseValue(lhsTag, lhsVal);
         }
     }
+    DISPATCH();
+    INSTRUCTION(logicNot) {
+        auto [popParam, moveFromParam, offsetParam] =
+            Instruction::Parameter::decodeParam(pcPointer);
+        auto [owned, tag, val] = getFromStack(offsetParam, popParam);
+        value::ValueGuard paramGuard(owned && popParam, tag, val);
+
+        auto [resultTag, resultVal] = genericNot(tag, val);
+
+        pushStack(false, resultTag, resultVal);
+    }
+    DISPATCH();
+    INSTRUCTION(less) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [tag, val] = value::genericLt(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        pushStack(false, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(collLess) {
+        auto [popColl, moveFromColl, offsetColl] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+        auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+        value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
+
+        if (collTag == value::TypeTags::collator) {
+            auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+            auto [tag, val] = value::genericLt(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+            pushStack(false, tag, val);
+        } else {
+            pushStack(false, value::TypeTags::Nothing, 0);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(lessEq) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [tag, val] = value::genericLte(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        pushStack(false, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(collLessEq) {
+        auto [popColl, moveFromColl, offsetColl] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+        auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+        value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
+
+        if (collTag == value::TypeTags::collator) {
+            auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+            auto [tag, val] = value::genericLte(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+            pushStack(false, tag, val);
+        } else {
+            pushStack(false, value::TypeTags::Nothing, 0);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(greater) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [tag, val] = value::genericGt(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        pushStack(false, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(collGreater) {
+        auto [popColl, moveFromColl, offsetColl] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+        auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+        value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
+
+        if (collTag == value::TypeTags::collator) {
+            auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+            auto [tag, val] = value::genericGt(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+            pushStack(false, tag, val);
+        } else {
+            pushStack(false, value::TypeTags::Nothing, 0);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(greaterEq) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [tag, val] = value::genericGte(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        pushStack(false, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(collGreaterEq) {
+        auto [popColl, moveFromColl, offsetColl] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+        auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+        value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
+
+        if (collTag == value::TypeTags::collator) {
+            auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+            auto [tag, val] = value::genericGte(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+            pushStack(false, tag, val);
+        } else {
+            pushStack(false, value::TypeTags::Nothing, 0);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(eq) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [tag, val] = value::genericEq(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        pushStack(false, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(collEq) {
+        auto [popColl, moveFromColl, offsetColl] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+        auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+        value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
+
+        if (collTag == value::TypeTags::collator) {
+            auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+            auto [tag, val] = value::genericEq(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+            pushStack(false, tag, val);
+        } else {
+            pushStack(false, value::TypeTags::Nothing, 0);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(neq) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [tag, val] = value::genericNeq(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        pushStack(false, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(collNeq) {
+        auto [popColl, moveFromColl, offsetColl] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+        auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+        value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
+
+        if (collTag == value::TypeTags::collator) {
+            auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+            auto [tag, val] = value::genericNeq(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+            pushStack(false, tag, val);
+        } else {
+            pushStack(false, value::TypeTags::Nothing, 0);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(cmp3w) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [tag, val] = value::compare3way(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        pushStack(false, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(collCmp3w) {
+        auto [popColl, moveFromColl, offsetColl] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+        auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+        value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
+
+        if (collTag == value::TypeTags::collator) {
+            auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+            auto [tag, val] = value::compare3way(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+            pushStack(false, tag, val);
+        } else {
+            pushStack(false, value::TypeTags::Nothing, 0);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(fillEmpty) {
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+        popStack();
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+
+        if (lhsTag == value::TypeTags::Nothing) {
+            topStack(rhsOwned, rhsTag, rhsVal);
+
+            if (lhsOwned) {
+                value::releaseValue(lhsTag, lhsVal);
+            }
+        } else {
+            if (rhsOwned) {
+                value::releaseValue(rhsTag, rhsVal);
+            }
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(fillEmptyImm) {
+        auto k = readFromMemory<Instruction::Constants>(pcPointer);
+        pcPointer += sizeof(k);
+
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+        if (lhsTag == value::TypeTags::Nothing) {
+            switch (k) {
+                case Instruction::Nothing:
+                    break;
+                case Instruction::Null:
+                    topStack(false, value::TypeTags::Null, 0);
+                    break;
+                case Instruction::True:
+                    topStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+                    break;
+                case Instruction::False:
+                    topStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
+                    break;
+                case Instruction::Int32One:
+                    topStack(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+                    break;
+                default:
+                    MONGO_UNREACHABLE_TASSERT(11122949);
+            }
+        }
+        DISPATCH();
+    }
+    INSTRUCTION(getField) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [owned, tag, val] = getField(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        // Copy value only if needed
+        if (lhsOwned && !owned) {
+            owned = true;
+            std::tie(tag, val) = value::copyValue(tag, val);
+        }
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(getFieldImm) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto size = readFromMemory<uint8_t>(pcPointer);
+        pcPointer += sizeof(size);
+        StringData fieldName(reinterpret_cast<const char*>(pcPointer), size);
+        pcPointer += size;
+
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [owned, tag, val] = getField(lhsTag, lhsVal, fieldName);
+
+        // Copy value only if needed
+        if (lhsOwned && !owned) {
+            owned = true;
+            std::tie(tag, val) = value::copyValue(tag, val);
+        }
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(getElement) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [owned, tag, val] = getElement(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        // Copy value only if needed
+        if (lhsOwned && !owned) {
+            owned = true;
+            std::tie(tag, val) = value::copyValue(tag, val);
+        }
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(getArraySize) {
+        auto [popParam, moveFromParam, offsetParam] =
+            Instruction::Parameter::decodeParam(pcPointer);
+        auto [owned, tag, val] = getFromStack(offsetParam, popParam);
+        value::ValueGuard paramGuard(owned && popParam, tag, val);
+
+        auto [resultOwned, resultTag, resultVal] = getArraySize(tag, val);
+        pushStack(resultOwned, resultTag, resultVal);
+    }
+    DISPATCH();
+    INSTRUCTION(collComparisonKey) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        if (lhsTag != value::TypeTags::Nothing && rhsTag == value::TypeTags::collator) {
+            // If lhs is a collatable type, call collComparisonKey() to obtain the
+            // comparison key. If lhs is not a collatable type, we can just leave it
+            // on the stack as-is.
+            if (value::isCollatableType(lhsTag)) {
+                auto collator = value::getCollatorView(rhsVal);
+                auto [tag, val] = collComparisonKey(lhsTag, lhsVal, collator);
+                pushStack(true, tag, val);
+            } else {
+                if (popLhs) {
+                    pushStack(lhsOwned, lhsTag, lhsVal);
+                    lhsGuard.reset();
+                } else if (moveFromLhs) {
+                    setTagToNothing(offsetLhs);
+                    pushStack(lhsOwned, lhsTag, lhsVal);
+                } else {
+                    pushStack(false, lhsTag, lhsVal);
+                }
+            }
+        } else {
+            // If lhs was Nothing or rhs wasn't Collator, return Nothing.
+            pushStack(false, value::TypeTags::Nothing, 0);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(getFieldOrElement) {
+        auto [popLhs, moveFromLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
+        auto [popRhs, moveFromRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+
+        auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+        value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+        auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+        value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
+        auto [owned, tag, val] = getFieldOrElement(lhsTag, lhsVal, rhsTag, rhsVal);
+
+        // Copy value only if needed
+        if (lhsOwned && !owned) {
+            owned = true;
+            std::tie(tag, val) = value::copyValue(tag, val);
+        }
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(traverseP) {
+        traverseP(code);
+    }
+    DISPATCH();
+    INSTRUCTION(traversePImm) {
+        auto providePosition = readFromMemory<Instruction::Constants>(pcPointer);
+        pcPointer += sizeof(providePosition);
+        auto k = readFromMemory<Instruction::Constants>(pcPointer);
+        pcPointer += sizeof(k);
+
+        auto offset = readFromMemory<int>(pcPointer);
+        pcPointer += sizeof(offset);
+        auto codePosition = pcPointer - code->instrs().data() + offset;
+
+        traverseP(code,
+                  codePosition,
+                  providePosition == Instruction::True ? true : false,
+                  k == Instruction::Nothing ? std::numeric_limits<int64_t>::max() : 1);
+    }
+    DISPATCH();
+    INSTRUCTION(traverseF) {
+        traverseF(code);
+    }
+    DISPATCH();
+    INSTRUCTION(traverseFImm) {
+        auto providePosition = readFromMemory<Instruction::Constants>(pcPointer);
+        pcPointer += sizeof(providePosition);
+        auto k = readFromMemory<Instruction::Constants>(pcPointer);
+        pcPointer += sizeof(k);
+
+        auto offset = readFromMemory<int>(pcPointer);
+        pcPointer += sizeof(offset);
+        auto codePosition = pcPointer - code->instrs().data() + offset;
+
+        traverseF(code,
+                  codePosition,
+                  providePosition == Instruction::True ? true : false,
+                  k == Instruction::True ? true : false);
+    }
+    DISPATCH();
+    INSTRUCTION(magicTraverseF) {
+        magicTraverseF(code);
+    }
+    DISPATCH();
+    INSTRUCTION(setField) {
+        auto [owned, tag, val] = setField();
+        popAndReleaseStack();
+        popAndReleaseStack();
+        popAndReleaseStack();
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(aggSum) {
+        auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+        value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
+        popStack();
+
+        auto [accTag, accVal] = moveOwnedFromStack(0);
+
+        auto [owned, tag, val] = aggSum(accTag, accVal, fieldTag, fieldVal);
+
+        topStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(aggCount) {
+        auto [accTag, accVal] = moveOwnedFromStack(0);
+
+        auto [owned, tag, val] = aggCount(accTag, accVal);
+
+        topStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(aggMin) {
+        auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+        value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
+        popStack();
+
+        auto [accOwned, accTag, accVal] = getFromStack(0);
+
+        auto [owned, tag, val] = aggMin(accTag, accVal, fieldTag, fieldVal);
+
+        topStack(owned, tag, val);
+        if (accOwned) {
+            value::releaseValue(accTag, accVal);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(aggCollMin) {
+        auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+        value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
+        popStack();
+
+        auto [collOwned, collTag, collVal] = getFromStack(0);
+        value::ValueGuard collGuard(collOwned, collTag, collVal);
+        popStack();
+
+        auto [accOwned, accTag, accVal] = getFromStack(0);
+
+        // Skip aggregation step if the collation is Nothing or an unexpected type.
+        if (collTag != value::TypeTags::collator) {
+            auto [tag, val] = value::copyValue(accTag, accVal);
+            topStack(true, tag, val);
+            return;
+        }
+        auto collator = value::getCollatorView(collVal);
+
+        auto [owned, tag, val] = aggMin(accTag, accVal, fieldTag, fieldVal, collator);
+
+        topStack(owned, tag, val);
+        if (accOwned) {
+            value::releaseValue(accTag, accVal);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(aggMax) {
+        auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+        value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
+        popStack();
+
+        auto [accOwned, accTag, accVal] = getFromStack(0);
+
+        auto [owned, tag, val] = aggMax(accTag, accVal, fieldTag, fieldVal);
+
+        topStack(owned, tag, val);
+        if (accOwned) {
+            value::releaseValue(accTag, accVal);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(aggCollMax) {
+        auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+        value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
+        popStack();
+
+        auto [collOwned, collTag, collVal] = getFromStack(0);
+        value::ValueGuard collGuard(collOwned, collTag, collVal);
+        popStack();
+
+        auto [accOwned, accTag, accVal] = getFromStack(0);
+
+        // Skip aggregation step if the collation is Nothing or an unexpected type.
+        if (collTag != value::TypeTags::collator) {
+            auto [tag, val] = value::copyValue(accTag, accVal);
+            topStack(true, tag, val);
+            return;
+        }
+        auto collator = value::getCollatorView(collVal);
+
+        auto [owned, tag, val] = aggMax(accTag, accVal, fieldTag, fieldVal, collator);
+
+        topStack(owned, tag, val);
+        if (accOwned) {
+            value::releaseValue(accTag, accVal);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(aggFirst) {
+        auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+        value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
+        popStack();
+
+        auto [accOwned, accTag, accVal] = getFromStack(0);
+
+        auto [owned, tag, val] = aggFirst(accTag, accVal, fieldTag, fieldVal);
+
+        topStack(owned, tag, val);
+        if (accOwned) {
+            value::releaseValue(accTag, accVal);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(aggLast) {
+        auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+        value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
+        popStack();
+
+        auto [accOwned, accTag, accVal] = getFromStack(0);
+
+        auto [owned, tag, val] = aggLast(accTag, accVal, fieldTag, fieldVal);
+
+        topStack(owned, tag, val);
+        if (accOwned) {
+            value::releaseValue(accTag, accVal);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(exists) {
+        auto [popParam, moveFromParam, offsetParam] =
+            Instruction::Parameter::decodeParam(pcPointer);
+        auto [owned, tag, val] = getFromStack(offsetParam, popParam);
+
+        pushStack(false,
+                  value::TypeTags::Boolean,
+                  value::bitcastFrom<bool>(tag != value::TypeTags::Nothing));
+
+        if (owned && popParam) {
+            value::releaseValue(tag, val);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(isNull) {
+        runTagCheck(pcPointer, value::TypeTags::Null);
+    }
+    DISPATCH();
+    INSTRUCTION(isObject) {
+        runTagCheck(pcPointer, value::isObject);
+    }
+    DISPATCH();
+    INSTRUCTION(isArray) {
+        runTagCheck(pcPointer, value::isArray);
+    }
+    DISPATCH();
+    INSTRUCTION(isInList) {
+        runTagCheck(pcPointer, value::isInList);
+    }
+    DISPATCH();
+    INSTRUCTION(isString) {
+        runTagCheck(pcPointer, value::isString);
+    }
+    DISPATCH();
+    INSTRUCTION(isNumber) {
+        runTagCheck(pcPointer, value::isNumber);
+    }
+    DISPATCH();
+    INSTRUCTION(isBinData) {
+        runTagCheck(pcPointer, value::isBinData);
+    }
+    DISPATCH();
+    INSTRUCTION(isDate) {
+        runTagCheck(pcPointer, value::TypeTags::Date);
+    }
+    DISPATCH();
+    INSTRUCTION(isNaN) {
+        auto [popParam, moveFromParam, offsetParam] =
+            Instruction::Parameter::decodeParam(pcPointer);
+        auto [owned, tag, val] = getFromStack(offsetParam, popParam);
+
+        if (tag != value::TypeTags::Nothing) {
+            pushStack(
+                false, value::TypeTags::Boolean, value::bitcastFrom<bool>(value::isNaN(tag, val)));
+        } else {
+            pushStack(false, value::TypeTags::Nothing, 0);
+        }
+
+        if (owned && popParam) {
+            value::releaseValue(tag, val);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(isInfinity) {
+        auto [popParam, moveFromParam, offsetParam] =
+            Instruction::Parameter::decodeParam(pcPointer);
+        auto [owned, tag, val] = getFromStack(offsetParam, popParam);
+
+        if (tag != value::TypeTags::Nothing) {
+            pushStack(false,
+                      value::TypeTags::Boolean,
+                      value::bitcastFrom<bool>(value::isInfinity(tag, val)));
+        } else {
+            pushStack(false, value::TypeTags::Nothing, 0);
+        }
+        if (owned && popParam) {
+            value::releaseValue(tag, val);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(isRecordId) {
+        runTagCheck(pcPointer, value::isRecordId);
+    }
+    DISPATCH();
+    INSTRUCTION(isMinKey) {
+        runTagCheck(pcPointer, value::TypeTags::MinKey);
+    }
+    DISPATCH();
+    INSTRUCTION(isMaxKey) {
+        runTagCheck(pcPointer, value::TypeTags::MaxKey);
+    }
+    DISPATCH();
+    INSTRUCTION(isTimestamp) {
+        runTagCheck(pcPointer, value::TypeTags::Timestamp);
+    }
+    DISPATCH();
+    INSTRUCTION(isKeyString) {
+        runTagCheck(pcPointer, value::TypeTags::keyString);
+    }
+    DISPATCH();
+    INSTRUCTION(typeMatchImm) {
+        auto [popParam, moveFromParam, offsetParam] =
+            Instruction::Parameter::decodeParam(pcPointer);
+        auto mask = readFromMemory<uint32_t>(pcPointer);
+        pcPointer += sizeof(mask);
+
+        auto [owned, tag, val] = getFromStack(offsetParam, popParam);
+
+        if (tag != value::TypeTags::Nothing) {
+            pushStack(false,
+                      value::TypeTags::Boolean,
+                      value::bitcastFrom<bool>(getBSONTypeMask(tag) & mask));
+        } else {
+            pushStack(false, value::TypeTags::Nothing, 0);
+        }
+        if (owned && popParam) {
+            value::releaseValue(tag, val);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(functionSmall) {
+        auto f = readFromMemory<SmallBuiltinType>(pcPointer);
+        pcPointer += sizeof(f);
+        SmallArityType arity{0};
+        arity = readFromMemory<SmallArityType>(pcPointer);
+        pcPointer += sizeof(SmallArityType);
+
+        auto [owned, tag, val] = dispatchBuiltin(static_cast<Builtin>(f), arity, code);
+
+        for (ArityType cnt = 0; cnt < arity; ++cnt) {
+            popAndReleaseStack();
+        }
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(function) {
+        auto f = readFromMemory<Builtin>(pcPointer);
+        pcPointer += sizeof(f);
+        ArityType arity{0};
+        arity = readFromMemory<ArityType>(pcPointer);
+        pcPointer += sizeof(ArityType);
+
+        auto [owned, tag, val] = dispatchBuiltin(f, arity, code);
+
+        for (ArityType cnt = 0; cnt < arity; ++cnt) {
+            popAndReleaseStack();
+        }
+
+        pushStack(owned, tag, val);
+    }
+    DISPATCH();
+    INSTRUCTION(jmp) {
+        auto jumpOffset = readFromMemory<int>(pcPointer);
+        pcPointer += sizeof(jumpOffset);
+
+        pcPointer += jumpOffset;
+    }
+    DISPATCH();
+    INSTRUCTION(jmpTrue) {
+        auto jumpOffset = readFromMemory<int>(pcPointer);
+        pcPointer += sizeof(jumpOffset);
+
+        auto [owned, tag, val] = getFromStack(0);
+        popStack();
+
+        if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
+            pcPointer += jumpOffset;
+        }
+
+        if (owned) {
+            value::releaseValue(tag, val);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(jmpFalse) {
+        auto jumpOffset = readFromMemory<int>(pcPointer);
+        pcPointer += sizeof(jumpOffset);
+
+        auto [owned, tag, val] = getFromStack(0);
+        popStack();
+
+        if (tag == value::TypeTags::Boolean && !value::bitcastTo<bool>(val)) {
+            pcPointer += jumpOffset;
+        }
+
+        if (owned) {
+            value::releaseValue(tag, val);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(jmpNothing) {
+        auto jumpOffset = readFromMemory<int>(pcPointer);
+        pcPointer += sizeof(jumpOffset);
+
+        auto [owned, tag, val] = getFromStack(0);
+        if (tag == value::TypeTags::Nothing) {
+            pcPointer += jumpOffset;
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(jmpNotNothing) {
+        auto jumpOffset = readFromMemory<int>(pcPointer);
+        pcPointer += sizeof(jumpOffset);
+
+        auto [owned, tag, val] = getFromStack(0);
+        if (tag != value::TypeTags::Nothing) {
+            pcPointer += jumpOffset;
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(ret) {
+        pcPointer = pcEnd;
+        return;
+    }
+    INSTRUCTION(allocStack) {
+        auto size = readFromMemory<uint32_t>(pcPointer);
+        pcPointer += sizeof(size);
+
+        allocStack(size);
+    }
+    DISPATCH();
+    INSTRUCTION(fail) {
+        runFailInstruction();
+    }
+    DISPATCH();
+    INSTRUCTION(dateTruncImm) {
+        auto unit = readFromMemory<TimeUnit>(pcPointer);
+        pcPointer += sizeof(unit);
+        auto binSize = readFromMemory<int64_t>(pcPointer);
+        pcPointer += sizeof(binSize);
+        auto timezone = readFromMemory<TimeZone>(pcPointer);
+        pcPointer += sizeof(timezone);
+        auto startOfWeek = readFromMemory<DayOfWeek>(pcPointer);
+        pcPointer += sizeof(startOfWeek);
+
+        auto [dateOwned, dateTag, dateVal] = getFromStack(0);
+
+        auto [owned, tag, val] = dateTrunc(dateTag, dateVal, unit, binSize, timezone, startOfWeek);
+
+        topStack(owned, tag, val);
+
+        if (dateOwned) {
+            value::releaseValue(dateTag, dateVal);
+        }
+    }
+    DISPATCH();
+    INSTRUCTION(valueBlockApplyLambda) {
+        valueBlockApplyLambda(code);
+    }
+    DISPATCH();
+#if USE_THREADED_INTERPRETER
+#else
+        }
+    }
+#endif
+#undef DISPATCH
+#undef INSTRUCTION
 }  // ByteCode::runInternal
 
 value::TagValueMaybeOwned ByteCode::run(const CodeFragment* code) {
