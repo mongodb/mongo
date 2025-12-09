@@ -198,6 +198,7 @@
 							"$eq" : "1notShardKey_chunk1_s0_1"
 						}
 					},
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "COLLSCAN"
 				}
 			]
@@ -215,6 +216,7 @@
 							"$eq" : "1notShardKey_chunk1_s0_1"
 						}
 					},
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "COLLSCAN"
 				}
 			]
@@ -408,6 +410,7 @@
 							"$gte" : "1notShardKey_chunk1_s0_1"
 						}
 					},
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "COLLSCAN"
 				}
 			]
@@ -425,6 +428,7 @@
 							"$gte" : "1notShardKey_chunk1_s0_1"
 						}
 					},
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "COLLSCAN"
 				}
 			]
@@ -522,6 +526,7 @@
 			"rejectedPlans" : [
 				[
 					{
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "FETCH"
 					},
 					{
@@ -542,6 +547,7 @@
 						"multiKeyPaths" : {
 							"shardKey" : [ ]
 						},
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "IXSCAN"
 					}
 				]
@@ -675,6 +681,7 @@
 			"rejectedPlans" : [
 				[
 					{
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "FETCH"
 					},
 					{
@@ -698,6 +705,7 @@
 						"multiKeyPaths" : {
 							"shardKey" : [ ]
 						},
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "IXSCAN"
 					}
 				]
@@ -743,6 +751,7 @@
 			"rejectedPlans" : [
 				[
 					{
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "FETCH"
 					},
 					{
@@ -766,6 +775,7 @@
 						"multiKeyPaths" : {
 							"shardKey" : [ ]
 						},
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "IXSCAN"
 					}
 				]
@@ -1952,6 +1962,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -2031,6 +2042,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -2414,6 +2426,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -2493,6 +2506,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -2694,6 +2708,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -2775,6 +2790,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -3341,6 +3357,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -3384,6 +3401,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -3553,6 +3571,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -3597,6 +3616,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -3766,6 +3786,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -3809,6 +3830,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -3978,6 +4000,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -4022,6 +4045,7 @@
 					"notShardKey" : [ ],
 					"shardKey" : [ ]
 				},
+				"nss" : "test.distinct_scan_multi_chunk",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -6005,6 +6029,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -6046,6 +6071,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -6162,6 +6188,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -6203,6 +6230,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -6320,6 +6348,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -6361,6 +6390,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -6477,6 +6507,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -6518,6 +6549,7 @@
 					},
 					{
 						"direction" : "forward",
+						"nss" : "test.distinct_scan_multi_chunk",
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -8754,6 +8786,7 @@
 							}
 						},
 						{
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "FETCH"
 						},
 						{
@@ -8777,6 +8810,7 @@
 							"multiKeyPaths" : {
 								"shardKey" : [ ]
 							},
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "IXSCAN"
 						}
 					]
@@ -8859,6 +8893,7 @@
 							}
 						},
 						{
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "FETCH"
 						},
 						{
@@ -8882,6 +8917,7 @@
 							"multiKeyPaths" : {
 								"shardKey" : [ ]
 							},
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "IXSCAN"
 						}
 					]
@@ -9063,6 +9099,7 @@
 							}
 						},
 						{
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "FETCH"
 						},
 						{
@@ -9086,6 +9123,7 @@
 							"multiKeyPaths" : {
 								"shardKey" : [ ]
 							},
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "IXSCAN"
 						}
 					]
@@ -9168,6 +9206,7 @@
 							}
 						},
 						{
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "FETCH"
 						},
 						{
@@ -9191,6 +9230,7 @@
 							"multiKeyPaths" : {
 								"shardKey" : [ ]
 							},
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "IXSCAN"
 						}
 					]
@@ -9701,6 +9741,7 @@
 							"type" : "simple"
 						},
 						{
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "FETCH"
 						},
 						{
@@ -9724,6 +9765,7 @@
 							"multiKeyPaths" : {
 								"shardKey" : [ ]
 							},
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "IXSCAN"
 						}
 					]
@@ -9787,6 +9829,7 @@
 							"type" : "simple"
 						},
 						{
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "FETCH"
 						},
 						{
@@ -9810,6 +9853,7 @@
 							"multiKeyPaths" : {
 								"shardKey" : [ ]
 							},
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "IXSCAN"
 						}
 					]
@@ -9966,6 +10010,7 @@
 							"type" : "simple"
 						},
 						{
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "FETCH"
 						},
 						{
@@ -9989,6 +10034,7 @@
 							"multiKeyPaths" : {
 								"shardKey" : [ ]
 							},
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "IXSCAN"
 						}
 					]
@@ -10052,6 +10098,7 @@
 							"type" : "simple"
 						},
 						{
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "FETCH"
 						},
 						{
@@ -10075,6 +10122,7 @@
 							"multiKeyPaths" : {
 								"shardKey" : [ ]
 							},
+							"nss" : "test.distinct_scan_multi_chunk",
 							"stage" : "IXSCAN"
 						}
 					]
@@ -10300,6 +10348,7 @@
 							"$eq" : null
 						}
 					},
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "FETCH"
 				},
 				{
@@ -10320,6 +10369,7 @@
 					"multiKeyPaths" : {
 						"shardKey" : [ ]
 					},
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "IXSCAN"
 				}
 			]
@@ -10384,6 +10434,7 @@
 					"stage" : "SHARDING_FILTER"
 				},
 				{
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "FETCH"
 				},
 				{
@@ -10406,6 +10457,7 @@
 							"notShardKey"
 						]
 					},
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "IXSCAN"
 				}
 			]
