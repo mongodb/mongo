@@ -87,6 +87,8 @@ last-continuous:
       ticket: SERVER-113468
     - test_file: jstests/sharding/disable_resumable_range_deleter.js
       ticket: SERVER-112357
+    - test_file: jstests/noPassthrough/query/agg/sort_group_to_distinct_scan.js
+      ticket: SERVER-113145
     - test_file: jstests/aggregation/accumulators/accumulator_js_size_limits.js
       ticket: SERVER-112267
     - test_file: jstests/sharding/resharding_error_during_critical_section.js
@@ -690,6 +692,8 @@ last-lts:
       ticket: SERVER-113468
     - test_file: jstests/sharding/disable_resumable_range_deleter.js
       ticket: SERVER-112357
+    - test_file: jstests/noPassthrough/query/agg/sort_group_to_distinct_scan.js
+      ticket: SERVER-113145
     - test_file: jstests/aggregation/accumulators/accumulator_js_size_limits.js
       ticket: SERVER-112267
     - test_file: jstests/concurrency/fsm_workloads/timeseries/timeseries_create_indexes.js

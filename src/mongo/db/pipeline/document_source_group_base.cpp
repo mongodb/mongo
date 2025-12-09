@@ -520,8 +520,8 @@ std::pair<size_t, SortPatternDirectionComparison> findMatchedSortingInfix(
 }
 
 /**
- *  Compare the the directions of the sorts specified by the preceding $sort stage and the
- * accumulators of the current $group stage. Returns whether they have the same or opptite
+ * Compare the the directions of the sorts specified by the preceding $sort stage and the
+ * accumulators of the current $group stage. Returns whether they have the same or opposite
  * directions, or the sort patterns are incompatible.
  * For example, sortStagePattern {a: 1, b: 1, c: 1}. groupPatterns
  * {b: 1, c: 1} or {b: 1} return sameDirection, groupPatterns {b: -1, c: -1} or {b: -1} return

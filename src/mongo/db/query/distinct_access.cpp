@@ -597,18 +597,20 @@ bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
             "Expected a strict distinct scan when the query has a sortRequirement",
             !hasSortRequirement || strictDistinctOnly);
 
-    // If there are other factors that affect the scan direction, don't attempt to reverse it. Note
-    // that 'flipDistinctScanDirection' is intentionally ignored here, since its purpose is to
-    // implement $last/$bottom with a distinct scan by reversing the sort direction of the query.
-    const bool reverseScanIfNeededToSatisfySortRequirement =
-        !canonicalQuery.getSortPattern() && !plannerParams.traversalPreference;
-
-    if (hasSortRequirement &&
+    // Only validate the sort requirement when there is no sort pattern on 'canonicalQuery'. Because
+    // when there is a sort pattern, 'analyzeSort()' has already validated that the required sort
+    // pattern is provided. Additionally, for the $sort + $group case, the sort patterns have
+    // already been checked for compatibility when attempting the $group rewrite.
+    if (!canonicalQuery.getSortPattern() && hasSortRequirement &&
         !QueryPlannerAnalysis::analyzeNonBlockingSort(
             plannerParams,
             canonicalQuery.getDistinct()->getSerializedSortRequirement(),
             canonicalQuery.getFindCommandRequest().getHint(),
-            reverseScanIfNeededToSatisfySortRequirement,
+            // If there are other factors that affect the scan direction, don't attempt to reverse
+            // it. Note that 'flipDistinctScanDirection' is intentionally ignored here, since its
+            // purpose is to implement $last/$bottom with a distinct scan by reversing the sort
+            // direction of the query.
+            !plannerParams.traversalPreference /*reverseScanIfNeeded*/,
             indexScanNode ? static_cast<QuerySolutionNode*>(indexScanNode)
                           : static_cast<QuerySolutionNode*>(distinctScanNode))) {
         return false;

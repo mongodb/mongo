@@ -71,8 +71,7 @@ const indexes = [
     {season: 1, year: 1},
 ];
 
-// TODO SERVER-113145: DISTINCT_SCAN optimization cases enabled when featureFlagShardFilteringDistinctScan is enabled.
-const alwaysEnabledDistictScanTestCases = [
+const distinctScanTestCases = [
     {
         pipeline: [
             {$sort: {season: 1, year: 1}},
@@ -87,10 +86,6 @@ const alwaysEnabledDistictScanTestCases = [
         ],
         index: {season: 1, year: 1},
     },
-];
-
-// TODO SERVER-113145: DISTINCT_SCAN optimization cases disabled when featureFlagShardFilteringDistinctScan is enabled.
-const distictScanTestCases = [
     {
         pipeline: [
             {$sort: {season: 1, year: 1}},
@@ -263,6 +258,20 @@ const indexScanTestCases = [
     {
         pipeline: [
             {$sort: {season: 1, year: 1}},
+            {$group: {_id: "$season", year: {$bottom: {output: "$year", sortBy: {season: -1, year: -1}}}}},
+        ],
+        index: {season: 1, year: 1},
+    },
+    {
+        pipeline: [
+            {$sort: {season: -1, year: -1}},
+            {$group: {_id: "$season", year: {$bottom: {output: "$year", sortBy: {season: 1, year: 1}}}}},
+        ],
+        index: {season: 1, year: 1},
+    },
+    {
+        pipeline: [
+            {$sort: {season: 1, year: 1}},
             {$group: {_id: "$season", year: {$bottom: {output: "$year", sortBy: {season: 1, year: -1}}}}},
         ],
         index: {season: 1, year: 1},
@@ -358,7 +367,7 @@ const indexScanTestCases = [
     },
 ];
 
-function runTests(db, isDistinctScanOptimizationEnabled) {
+function runTests(db) {
     const coll = db[jsTest.name()];
     coll.drop();
     assert.commandWorked(coll.insertMany(docs));
@@ -388,17 +397,8 @@ function runTests(db, isDistinctScanOptimizationEnabled) {
         assertPipeline(pipeline, validateExplain);
     }
 
-    for (const testCase of alwaysEnabledDistictScanTestCases) {
+    for (const testCase of distinctScanTestCases) {
         assertDistinctScan(testCase.pipeline, testCase.index);
-    }
-
-    for (const testCase of distictScanTestCases) {
-        // TODO SERVER-113145: Some distinct scan optimizations are suppressed when shard filtering feature is enabled.
-        if (isDistinctScanOptimizationEnabled) {
-            assertDistinctScan(testCase.pipeline, testCase.index);
-        } else {
-            assertIndexScan(testCase.pipeline, testCase.index);
-        }
     }
 
     for (const testCase of indexScanTestCases) {
@@ -413,8 +413,7 @@ function runMongodAndTest(featureFlagShardFilteringDistinctScan) {
     const conn = MongoRunner.runMongod(mongodOptions);
     try {
         const db = conn.getDB(`${jsTest.name()}_db`);
-        const isDistinctScanOptimizationEnabled = !featureFlagShardFilteringDistinctScan;
-        runTests(db, isDistinctScanOptimizationEnabled);
+        runTests(db);
     } finally {
         MongoRunner.stopMongod(conn);
     }
