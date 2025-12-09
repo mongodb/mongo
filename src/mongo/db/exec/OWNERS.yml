@@ -41,3 +41,6 @@ filters:
   - "scoped_timer*":
     approvers:
       - 10gen/server-programmability
+  - "serialize_ejson*":
+    approvers:
+      - 10gen/query-optimization

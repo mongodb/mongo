@@ -132,6 +132,7 @@ mongo_cc_unit_test(
         "projection_executor_test.cpp",
         "projection_executor_utils_test.cpp",
         "projection_executor_wildcard_access_test.cpp",
+        "serialize_ejson_utils_test.cpp",
         "//src/mongo/db/exec/agg:exec_pipeline_test.cpp",
         "//src/mongo/db/exec/agg:pipeline_builder_test.cpp",
         "//src/mongo/db/exec/classic:distinct_scan_test.cpp",
@@ -183,6 +184,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":projection_executor",
+        ":serialize_ejson_utils",
         ":working_set",
         "//src/mongo:base",
         "//src/mongo/bson/column",
@@ -273,5 +275,16 @@ mongo_cc_fuzzer_test(
     deps = [
         ":convert_utils",
         "//src/mongo/transport:transport_layer_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "serialize_ejson_utils",
+    srcs = [
+        "serialize_ejson_utils.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/exec/document_value",
     ],
 )
