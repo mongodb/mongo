@@ -136,7 +136,7 @@ struct BatchedDeletesSSS : ServerStatusSection {
 auto& batchedDeletesSSS = *ServerStatusSectionBuilder<BatchedDeletesSSS>("batchedDeletes");
 
 // Wrapper for write_stage_common::ensureStillMatches() which also updates the 'refetchesDueToYield'
-// serverStatus metric. As with ensureStillMatches, if false is returned, the WoringSetMember
+// serverStatus metric. As with ensureStillMatches, if false is returned, the WorkingSetMember
 // referenced by 'id' is no longer valid, and must not be used except for freeing the WSM.
 bool ensureStillMatchesAndUpdateStats(const CollectionPtr& collection,
                                       OperationContext* opCtx,
@@ -223,7 +223,7 @@ PlanStage::StageState BatchedDeleteStage::doWork(WorkingSetID* out) {
 
     if (!_params->isExplain && _commitStagedDeletes) {
         // Overwriting 'planStageState' potentially means throwing away the result produced from
-        // staging. We expect to commit deletes after a new documet is staged and the batch targets
+        // staging. We expect to commit deletes after a new document is staged and the batch targets
         // are met (planStageState = PlanStage::NEED_TIME), after there are no more documents to
         // stage (planStageState = PlanStage::IS_EOF), or when resuming to commit deletes in the
         // buffer before more can be staged (planStageState = PlanStage::NEED_TIME by default).
@@ -292,7 +292,7 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
     std::set<WorkingSetID> recordsToSkip;
     unsigned int docsDeleted = 0;
     unsigned int bytesDeleted = 0;
-    unsigned int bufferOffset = 0;
+    unsigned int rBufferOffset = 0;
     long long timeInBatch = 0;
 
     try {
@@ -301,7 +301,7 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
             "BatchedDeleteStage::_deleteBatch",
             [&] {
                 timeInBatch =
-                    _commitBatch(out, &recordsToSkip, &docsDeleted, &bytesDeleted, &bufferOffset);
+                    _commitBatch(out, &recordsToSkip, &docsDeleted, &bytesDeleted, &rBufferOffset);
                 return PlanStage::NEED_TIME;
             },
             [&] {
@@ -333,11 +333,13 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
     _specificStats.docsDeleted += docsDeleted;
     _specificStats.bytesDeleted += bytesDeleted;
 
-    if (bufferOffset < _stagedDeletesBuffer.size()) {
+    // Note: 'rBufferOffset' stores the 0-based index of the last successfully processed buffer
+    // entry, which is why the total number of documents processed is 1 more.
+    if (auto docsProcessed = rBufferOffset + 1; docsProcessed < _stagedDeletesBuffer.size()) {
         // targetBatchTimeMS was met. Remove staged deletes that have been evaluated
         // (executed or skipped because they no longer match the query) from the buffer. If any
         // staged deletes remain in the buffer, they will be retried in a subsequent batch.
-        _stagedDeletesBuffer.eraseUpToOffsetInclusive(bufferOffset);
+        _stagedDeletesBuffer.removeLastN(docsProcessed);
     } else {
         // The individual deletes staged in the buffer are preserved until the batch is committed so
         // they can be retried in case of a write conflict.
@@ -353,7 +355,7 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
                                            std::set<WorkingSetID>* recordsToSkip,
                                            unsigned int* docsDeleted,
                                            unsigned int* bytesDeleted,
-                                           unsigned int* bufferOffset) {
+                                           unsigned int* rBufferOffset) {
     // Estimate the size of the oplog entry that would result from committing the batch,
     // to ensure we emit an oplog entry that's within the 16MB BSON limit.
     size_t applyOpsBytes = kApplyOpsNonArrayEntryPaddingBytes;
@@ -365,14 +367,27 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
     WriteUnitOfWork wuow(opCtx(),
                          _stagedDeletesBuffer.size() > 1U ? WriteUnitOfWork::kGroupForTransaction
                                                           : WriteUnitOfWork::kDontGroup);
-    for (; *bufferOffset < _stagedDeletesBuffer.size(); ++*bufferOffset) {
+    // We iterate pending deletes in reverse order of staging to work around duplicate deletions
+    // that can result when the same document gets staged twice. When the batch of documents to
+    // delete comes from an index scan, it can contain duplicates in the rare case that a yield
+    // during the index scan coincides with an update to a document that advances its position
+    // in the index. This loop accounts for that possibility by refetching the document to
+    // verify that it still exists and should be deleted, but only when the staged deletion is
+    // from a prior snapshot, which leaves open the possibility that the second of two deletions
+    // does not get verified because it is from the current snapshot. Iterating in reverse
+    // ensures that, in these rare cases, the second time we encounter a document, it will always
+    // be from a prior snapshot and checked. Avoiding duplicate deletions is important because
+    // 'collection_level::deleteDocument()' expects its target to exist, and validation errors
+    // can result when it does not.
+    for (; *rBufferOffset < _stagedDeletesBuffer.size(); ++*rBufferOffset) {
         if (MONGO_unlikely(throwWriteConflictExceptionInBatchedDeleteStage.shouldFail())) {
             throwWriteConflictException(
                 str::stream() << "Hit failpoint '"
                               << throwWriteConflictExceptionInBatchedDeleteStage.getName() << "'.");
         }
 
-        auto workingSetMemberID = _stagedDeletesBuffer.at(*bufferOffset);
+        auto workingSetMemberID =
+            _stagedDeletesBuffer.at(_stagedDeletesBuffer.size() - 1 - *rBufferOffset);
         WorkingSetMember* member = _ws->get(workingSetMemberID);
 
         using write_stage_common::PreWriteFilter;
@@ -410,18 +425,18 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
         tassert(
             6515700, "Expected document to have an _id field present", bsonObjDoc.hasField("_id"));
         applyOpsBytes += bsonObjDoc.getField("_id").size();
-        if (applyOpsBytes > BSONObjMaxUserSize && ((*bufferOffset) > 0)) {
+        if (applyOpsBytes > BSONObjMaxUserSize && ((*rBufferOffset) > 0)) {
             // There's no room to fit this deletion in the current batch, as doing so
             // would exceed 16MB of oplog entry: put this deletion back into the staging
             // buffer and commit the batch. Very large _id fields may exceed this threshold. In that
             // case, put them in their own batch.
-            (*bufferOffset)--;
+            (*rBufferOffset)--;
             wuow.commit();
             return batchTimer.millis();
         }
         tassert(10118000,
                 "batch size may only exceed BSON cap for single, large documents",
-                applyOpsBytes <= BSONObjMaxUserSize || ((*bufferOffset) == 0));
+                applyOpsBytes <= BSONObjMaxUserSize || ((*rBufferOffset) == 0));
 
         collection_internal::deleteDocument(
             opCtx(),

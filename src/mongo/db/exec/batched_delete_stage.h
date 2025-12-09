@@ -143,16 +143,21 @@ private:
     // successfully deleted. Returns NEED_YIELD otherwise.
     PlanStage::StageState _deleteBatch(WorkingSetID* out);
 
-    // Attempts to delete the documents staged for deletion in a WriteUnitOfWork. Updates
-    // recordsToSkip, docsDeleted, and buffferOffset to reflect which document deletes are skipped,
-    // executed, or remaining when the WriteUnitOfWork is committed.
+    // Processes as many deletes in a WriteUnitOfWork as can fit in one applyOps oplog entry, always
+    // at least one document. Returns the number of docs deleted and their size in bytes in the
+    // 'docsDeleted' and 'bytesDeleted' output parameters, respectively.
+    //
+    // Documents are deleted from the _end_ of the buffer, and 'rBufferOffset' is an in/out
+    // parameter whose input is the index of the first document to process and whose output is the
+    // index of the last document processed. In both cases, the index counts _backwards_, with 0 as
+    // the last element.
     //
     // Returns the time spent (milliseconds) committing the batch.
     long long _commitBatch(WorkingSetID* out,
                            std::set<WorkingSetID>* recordsToSkip,
                            unsigned int* docsDeleted,
                            unsigned int* bytesDeleted,
-                           unsigned int* bufferOffset);
+                           unsigned int* rBufferOffset);
 
     // Attempts to stage a new delete in the _stagedDeletesBuffer. Returns the PlanStage::StageState
     // fetched directly from the child except when there is a document to stage. Converts

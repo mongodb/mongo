@@ -34,6 +34,8 @@ selector:
   - jstests/concurrency/fsm_workloads/collection_uuid.js
   - jstests/concurrency/fsm_workloads/random_moveChunk_update_shard_key.js
 
+  - jstests/concurrency/fsm_workloads/update_and_batched_delete.js
+
   exclude_with_any_tags:
   # The ability to shut down a node while its in the middle of applying ops is required for
   # backup_restore. The workloads which perform certain operations which can cause the test to fail

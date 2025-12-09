@@ -47,17 +47,17 @@ void BatchedDeleteStageBuffer::append(WorkingSetID id) {
     _buffer.emplace_back(id);
 }
 
-void BatchedDeleteStageBuffer::eraseUpToOffsetInclusive(size_t bufferOffset) {
+void BatchedDeleteStageBuffer::removeLastN(size_t n) {
     tassert(6515701,
-            "Cannot erase offset '{}' - beyond the size of the BatchedDeleteStageBuffer {}"_format(
-                bufferOffset, _buffer.size()),
-            bufferOffset < _buffer.size());
-    for (unsigned int i = 0; i <= bufferOffset; i++) {
-        auto id = _buffer.at(i);
-        _ws->free(id);
+            fmt::format(
+                "Cannot remove '{}' elements - beyond the size of the BatchedDeleteStageBuffer {}",
+                n,
+                _buffer.size()),
+            n <= _buffer.size());
+    for (unsigned int i = 0; i < n; i++) {
+        _ws->free(_buffer.back());
+        _buffer.pop_back();
     }
-
-    _buffer.erase(_buffer.begin(), _buffer.begin() + bufferOffset + 1);
 }
 
 void BatchedDeleteStageBuffer::erase(const std::set<WorkingSetID>& idsToRemove) {

@@ -64,10 +64,10 @@ public:
     }
 
     /**
-     * Erases up to 'bufferOffset' where 'bufferOffset' is inclusive. Frees up resources of
-     * WorkingSetMembers associated with the removed entries.
+     * Removes the last n elements in the buffer. Frees up resources of WorkingSetMembers associated
+     * with the removed entries.
      */
-    void eraseUpToOffsetInclusive(size_t bufferOffset);
+    void removeLastN(size_t n);
 
     /**
      * Erases the subset of 'idsToRemove' that exist in the buffer. Frees up resources of the
