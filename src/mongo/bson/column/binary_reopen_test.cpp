@@ -29,6 +29,7 @@
 
 #include "mongo/bson/column/binary_reopen.h"
 
+#include "mongo/base/data_view.h"
 #include "mongo/bson/column/simple8b.h"
 #include "mongo/bson/column/simple8b_builder.h"
 #include "mongo/unittest/unittest.h"
@@ -151,7 +152,10 @@ const char* BinaryReopenTest::control(std::vector<uint64_t> blocks, uint8_t scal
     // Write control byte with out scale factor and number of simple8b blocks.
     *c.get() = kControlByteForScaleIndex[scaleIndex] | (blocks.size() - 1);
     // Copy simple8b data
-    memcpy(c.get() + 1, blocks.data(), blocks.size() * sizeof(uint64_t));
+    auto dv = DataView(c.get() + 1);
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        dv.write<LittleEndian<uint64_t>>(blocks[i], i * sizeof(uint64_t));
+    }
     auto ptr = c.get();
     // Store internally to simplify memory management in the tests
     _ownedControls.push_front(std::move(c));
