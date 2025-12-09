@@ -3,8 +3,7 @@
  * queries in the test are range queries which means that a cached plan can be frequently
  * invalidated.
  * @tags: [
- *  requires_fcv_82,
- *  featureFlagMultiPlanLimiter,
+ *  requires_fcv_83,
  *  requires_getmore,
  *  incompatible_with_concurrency_simultaneous,
  *  assumes_stable_shard_list,

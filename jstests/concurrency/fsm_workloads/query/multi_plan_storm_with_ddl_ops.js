@@ -3,8 +3,7 @@
  * changes are potentially risky because MultiPlanBucket is a decoration on a Collection instance.
  *
  * @tags: [
- *  requires_fcv_82,
- *  featureFlagMultiPlanLimiter,
+ *  requires_fcv_83,
  *  requires_getmore,
  *  incompatible_with_concurrency_simultaneous,
  *  assumes_stable_shard_list,

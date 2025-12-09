@@ -2,8 +2,7 @@
  * Tests that clearing the plan cache doesn't crash multiplan rate limiter.
  *
  * @tags: [
- *  requires_fcv_82,
- *  featureFlagMultiPlanLimiter,
+ *  requires_fcv_83,
  *  requires_getmore,
  *  incompatible_with_concurrency_simultaneous,
  *  assumes_stable_shard_list,
