@@ -74,7 +74,7 @@ class ShardingCommandGenerator {
      * Step 2: Randomly pick unvisited actions; navigate via precomputed paths when needed.
      * @param {CollectionTestModel} testModel - The state machine model.
      * @param {ShardingCommandGeneratorParams} params - The generator parameters.
-     * @returns {Array} Array of {command, transition} objects.
+     * @returns {Array<Command>} Array of commands.
      */
     generateCommands(testModel, params) {
         // Re-seed to ensure reproducibility since Random is a global singleton
@@ -91,16 +91,15 @@ class ShardingCommandGenerator {
 
         // Step 3: Select starting state.
         let currentState = startState;
-        const results = [];
+        const commands = [];
 
         // Step 4: While there are unvisited actions.
         while (unvisitedActions.size > 0) {
             // 4a: For each unvisited self-loop action (state → state), visit and mark as visited.
             let selfLoopAction = this._getRandomUnvisitedSelfLoop(testModel, currentState, unvisitedActions);
             while (selfLoopAction !== null) {
-                const transition = this._createTransition(currentState, selfLoopAction, currentState);
-                const command = this.createCommand(transition.action, params);
-                results.push({command, transition});
+                const command = this.createCommand(selfLoopAction, params);
+                commands.push(command);
                 this._markActionAsVisited(unvisitedActions, currentState, selfLoopAction);
                 selfLoopAction = this._getRandomUnvisitedSelfLoop(testModel, currentState, unvisitedActions);
             }
@@ -108,9 +107,8 @@ class ShardingCommandGenerator {
             // 4b: If exists unvisited non-self-loop action, visit it and move to target state.
             const action = this._getRandomUnvisitedNonSelfLoop(testModel, currentState, unvisitedActions);
             if (action !== null) {
-                const transition = this._createTransition(currentState, action.action, action.to);
-                const command = this.createCommand(transition.action, params);
-                results.push({command, transition});
+                const command = this.createCommand(action.action, params);
+                commands.push(command);
                 this._markActionAsVisited(unvisitedActions, currentState, action.action);
                 currentState = action.to;
             } else if (unvisitedActions.size > 0) {
@@ -124,19 +122,14 @@ class ShardingCommandGenerator {
 
                 const path = shortestPaths.get(currentState).get(targetState).path;
                 for (const step of path) {
-                    const transition = this._createTransition(step.from, step.action, step.to);
-                    const command = this.createCommand(transition.action, params);
-                    results.push({command, transition});
+                    const command = this.createCommand(step.action, params);
+                    commands.push(command);
                     this._markActionAsVisited(unvisitedActions, step.from, step.action);
                 }
                 currentState = targetState;
             }
         }
-        return results;
-    }
-
-    _createTransition(from, action, to) {
-        return {from, action, to};
+        return commands;
     }
 
     /**
