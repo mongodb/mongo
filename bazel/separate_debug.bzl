@@ -303,7 +303,7 @@ def linux_extraction(ctx, cc_toolchain, inputs):
             ctx.actions.run(
                 executable = cc_toolchain.objcopy_executable,
                 outputs = [debug_info],
-                inputs = [input_bin],
+                inputs = depset([input_bin], transitive = [cc_toolchain.all_files]),
                 resource_set = linux_extract_resource_set if ctx.attr.type == "program" else None,
                 arguments = [
                     "--only-keep-debug",
@@ -316,7 +316,7 @@ def linux_extraction(ctx, cc_toolchain, inputs):
             ctx.actions.run(
                 executable = cc_toolchain.objcopy_executable,
                 outputs = [output_bin],
-                inputs = depset([debug_info]),
+                inputs = depset([input_bin, debug_info], transitive = [cc_toolchain.all_files]),
                 resource_set = linux_strip_resource_set if ctx.attr.type == "program" else None,
                 arguments = [
                     "--strip-debug",
