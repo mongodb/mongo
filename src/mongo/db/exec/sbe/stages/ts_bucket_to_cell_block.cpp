@@ -176,8 +176,9 @@ const SpecificStats* TsBucketToCellBlockStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-std::vector<DebugPrinter::Block> TsBucketToCellBlockStage::debugPrint() const {
-    auto ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> TsBucketToCellBlockStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
 
     DebugPrinter::addIdentifier(ret, _bucketSlotId);
 
@@ -202,7 +203,7 @@ std::vector<DebugPrinter::Block> TsBucketToCellBlockStage::debugPrint() const {
     DebugPrinter::addIdentifier(ret, _bitmapOutSlotId);
 
     DebugPrinter::addNewLine(ret);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
 
     return ret;
 }

@@ -124,8 +124,8 @@ std::string DebugPrinter::print(const std::vector<Block>& blocks) {
     return ret;
 }
 
-std::string DebugPrinter::print(const PlanStage& s) {
-    return print(s.debugPrint());
+std::string DebugPrinter::print(const PlanStage& s, const DebugPrintInfo& debugPrintInfo) {
+    return print(s.debugPrint(debugPrintInfo));
 }
 }  // namespace sbe
 }  // namespace mongo

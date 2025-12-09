@@ -85,6 +85,7 @@ namespace {
  * - 'out' is a builder for the explain output.
  */
 void generatePlannerInfo(PlanExecutor* exec,
+                         ExplainOptions::Verbosity verbosity,
                          const BSONObj& cmd,
                          const Explain::PlannerContext& plannerContext,
                          BSONObj extraInfo,
@@ -148,8 +149,8 @@ void generatePlannerInfo(PlanExecutor* exec,
     plannerBob.append("maxScansToExplodeReached", enumeratorInfo.hitScanLimit);
     plannerBob.append("prunedSimilarIndexes", enumeratorInfo.prunedAnyIndexes);
 
-    auto&& [winningStats, _] =
-        explainer.getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
+    auto&& [winningStats, _] = explainer.getWinningPlanStatsQueryPlanner(
+        verbosity == ExplainOptions::Verbosity::kInternal /*printBytecode*/);
     plannerBob.append("winningPlan", winningStats);
 
     BSONArrayBuilder bab{plannerBob.subarrayStart("rejectedPlans")};
@@ -375,7 +376,8 @@ void Explain::explainStages(PlanExecutor* exec,
     out->appendElements(explainVersionToBson(explainer.getVersion()));
 
     if (verbosity >= ExplainOptions::Verbosity::kQueryPlanner) {
-        generatePlannerInfo(exec, command, plannerContext, extraInfo, serializationContext, out);
+        generatePlannerInfo(
+            exec, verbosity, command, plannerContext, extraInfo, serializationContext, out);
     }
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -544,9 +546,11 @@ void Explain::planCacheEntryToBSON(const sbe::PlanCacheEntry& entry, BSONObjBuil
 
     appendBasicPlanCacheEntryInfoToBSON(entry, out);
 
-    out->append("cachedPlan",
-                BSON("slots" << entry.cachedPlan->planStageData.debugString() << "stages"
-                             << sbe::DebugPrinter().print(*entry.cachedPlan->root)));
+    sbe::DebugPrintInfo debugPrintInfo{};
+    out->append(
+        "cachedPlan",
+        BSON("slots" << entry.cachedPlan->planStageData.debugString() << "stages"
+                     << sbe::DebugPrinter().print(*entry.cachedPlan->root, debugPrintInfo)));
 
     out->append("indexFilterSet", entry.cachedPlan->indexFilterApplied);
     out->append("isPinned", entry.isPinned());

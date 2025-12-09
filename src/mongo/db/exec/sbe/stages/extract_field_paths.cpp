@@ -185,8 +185,9 @@ const SpecificStats* ExtractFieldPathsStage::getSpecificStats() const {
     return nullptr;
 }
 
-std::vector<DebugPrinter::Block> ExtractFieldPathsStage::debugPrint() const {
-    auto ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> ExtractFieldPathsStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
 
     auto addPathSlotsInAscOrderBySlotId = [&](const std::vector<PathSlot>& pathSlots,
                                               const std::string& prefix) {
@@ -219,7 +220,7 @@ std::vector<DebugPrinter::Block> ExtractFieldPathsStage::debugPrint() const {
     addPathSlotsInAscOrderBySlotId(_outputs, "outputs[`");
 
     DebugPrinter::addNewLine(ret);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
     return ret;
 }
 

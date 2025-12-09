@@ -355,7 +355,8 @@ private:
         };
         auto printCachedPlanFn = [](const sbe::CachedSbePlan& plan) {
             sbe::DebugPrinter p;
-            return p.print(*plan.root.get());
+            sbe::DebugPrintInfo debugPrintInfo{};
+            return p.print(*plan.root.get(), debugPrintInfo);
         };
         PlanCacheCallbacksImpl<sbe::PlanCacheKey,
                                sbe::CachedSbePlan,

@@ -155,11 +155,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<RemoteExplainVector> remoteExplains,
     std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage) {
     auto&& [rootStage, data] = root;
+    sbe::DebugPrintInfo debugPrintInfo{};
     LOGV2_DEBUG(4822860,
                 5,
                 "SBE plan",
                 "slots"_attr = redact(data.debugString()),
-                "stages"_attr = redact(sbe::DebugPrinter{}.print(*rootStage)));
+                "stages"_attr = redact(sbe::DebugPrinter{}.print(*rootStage, debugPrintInfo)));
 
     return {{new PlanExecutorSBE(opCtx,
                                  std::move(cq),
@@ -194,11 +195,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<RemoteCursorMap> remoteCursors,
     std::unique_ptr<RemoteExplainVector> remoteExplains,
     boost::optional<size_t> cachedPlanHash) {
+    sbe::DebugPrintInfo debugPrintInfo{};
     LOGV2_DEBUG(4822861,
                 5,
                 "SBE plan",
                 "slots"_attr = redact(candidate.data.stageData.debugString()),
-                "stages"_attr = redact(sbe::DebugPrinter{}.print(*candidate.root)));
+                "stages"_attr = redact(sbe::DebugPrinter{}.print(*candidate.root, debugPrintInfo)));
 
     return {{new PlanExecutorSBE(opCtx,
                                  std::move(cq),

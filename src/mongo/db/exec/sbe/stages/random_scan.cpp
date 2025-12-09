@@ -144,8 +144,9 @@ std::unique_ptr<PlanStageStats> RandomScanStage::getStats(bool includeDebugInfo)
     return ret;
 }
 
-std::vector<DebugPrinter::Block> RandomScanStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> RandomScanStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    std::vector<DebugPrinter::Block> ret = PlanStage::debugPrint(debugPrintInfo);
     DebugPrinter::addKeyword(ret, "random");
     debugPrintShared(ret);
 

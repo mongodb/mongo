@@ -135,6 +135,8 @@ public:
      */
     virtual std::vector<DebugPrinter::Block> debugPrintMerge() const = 0;
 
+    virtual void debugPrintCode(std::vector<DebugPrinter::Block>& blocks) const = 0;
+
 protected:
     /**
      * The slot that stores the accumulator's state and usually also stores its final value.
@@ -196,6 +198,12 @@ public:
     boost::optional<std::vector<DebugPrinter::Block>> debugPrintInitialize() const final;
     std::vector<DebugPrinter::Block> debugPrintAccumulate() const final;
     std::vector<DebugPrinter::Block> debugPrintMerge() const final;
+
+    void debugPrintCode(std::vector<DebugPrinter::Block>& blocks) const final {
+        PlanStage::debugPrintBytecode(blocks, _accumulatorCode, "ACCUMULATE" /*title*/);
+        PlanStage::debugPrintBytecode(blocks, _mergingCode, "MERGE" /*title*/);
+        PlanStage::debugPrintBytecode(blocks, _optionalInitializerCode, "INIT" /**/);
+    }
 
 private:
     /**
@@ -267,6 +275,10 @@ public:
     boost::optional<std::vector<DebugPrinter::Block>> debugPrintInitialize() const final;
     std::vector<DebugPrinter::Block> debugPrintAccumulate() const final;
     std::vector<DebugPrinter::Block> debugPrintMerge() const final;
+
+    void debugPrintCode(std::vector<DebugPrinter::Block>& blocks) const final {
+        /*no bytecode to print*/
+    }
 
 protected:
     /**

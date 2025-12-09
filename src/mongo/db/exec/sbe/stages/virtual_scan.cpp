@@ -136,7 +136,8 @@ const SpecificStats* VirtualScanStage::getSpecificStats() const {
     return nullptr;
 }
 
-std::vector<DebugPrinter::Block> VirtualScanStage::debugPrint() const {
+std::vector<DebugPrinter::Block> VirtualScanStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
     auto debugPrintValue = [](value::TypeTags tag, value::Value val) {
         std::stringstream ss;
         value::ValuePrinters::make(
@@ -148,7 +149,7 @@ std::vector<DebugPrinter::Block> VirtualScanStage::debugPrint() const {
         return blocks;
     };
 
-    std::vector<DebugPrinter::Block> ret = PlanStage::debugPrint();
+    std::vector<DebugPrinter::Block> ret = PlanStage::debugPrint(debugPrintInfo);
 
     DebugPrinter::addIdentifier(ret, _outField);
 

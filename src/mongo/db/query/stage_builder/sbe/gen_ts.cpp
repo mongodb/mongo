@@ -110,7 +110,8 @@ void printPlan(const sbe::PlanStage& stage) {
     }
 
     static sbe::DebugPrinter debugPrinter(true);
-    std::cout << std::endl << debugPrinter.print(stage) << std::endl << std::endl;
+    sbe::DebugPrintInfo debugPrintInfo{};
+    std::cout << std::endl << debugPrinter.print(stage, debugPrintInfo) << std::endl << std::endl;
 }
 }  // namespace
 

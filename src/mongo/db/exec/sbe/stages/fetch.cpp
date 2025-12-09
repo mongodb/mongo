@@ -320,8 +320,9 @@ const SpecificStats* FetchStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-std::vector<DebugPrinter::Block> FetchStage::debugPrint() const {
-    auto ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> FetchStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
     DebugPrinter::addIdentifier(ret, _state->seekSlot);
     ret.emplace_back("=");
     DebugPrinter::addKeyword(ret, "seek");
@@ -383,7 +384,7 @@ std::vector<DebugPrinter::Block> FetchStage::debugPrint() const {
 
 
     DebugPrinter::addNewLine(ret);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
     return ret;
 }
 

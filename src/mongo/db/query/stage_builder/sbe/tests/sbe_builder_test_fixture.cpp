@@ -181,7 +181,8 @@ void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode
 
     // Print the stage explain output and verify.
     _gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
-    auto explain = sbe::DebugPrinter().print(*stage.get());
+    sbe::DebugPrintInfo debugPrintInfo{};
+    auto explain = sbe::DebugPrinter().print(*stage.get(), debugPrintInfo);
     _gctx->outStream() << (localColl ? replaceUuid(explain, localColl->getCollection().uuid())
                                      : explain);
     _gctx->outStream() << std::endl;

@@ -1026,8 +1026,9 @@ void BlockHashAggStage::close() {
     _memoryTracker.value().set(0);
 }
 
-std::vector<DebugPrinter::Block> BlockHashAggStage::debugPrint() const {
-    auto ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> BlockHashAggStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
 
     ret.emplace_back(DebugPrinter::Block("bitset ="));
     DebugPrinter::addIdentifier(ret, _blockBitsetInSlotId);
@@ -1118,7 +1119,7 @@ std::vector<DebugPrinter::Block> BlockHashAggStage::debugPrint() const {
     }
 
     DebugPrinter::addNewLine(ret);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
 
     return ret;
 }

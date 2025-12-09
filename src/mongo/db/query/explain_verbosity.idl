@@ -39,14 +39,17 @@ enums:
         values:
             # At all verbosities greater than or equal to kQueryPlanner, we display information
             # about the plan selected and alternate rejected plans. Does not include any
-            # execution-related info. String alias is "queryPlanner".
+            # execution-related info.
             kQueryPlanner: "queryPlanner"
 
             # At all verbosities greater than or equal to kExecStats, we display a section of output
             # containing both overall execution stats, and stats per stage in the execution tree.
-            # String alias is "executionStats".
             kExecStats: "executionStats"
 
             # At this verbosity level, we generate the execution stats for each rejected plan as
-            # well as the winning plan. String alias is "allPlansExecution".
+            # well as the winning plan.
             kExecAllPlans: "allPlansExecution"
+
+            # This verbosity is set aside for miscellaneous information. It includes virtual machine
+            # bytecode for the slot-based execution engine.
+            kInternal: "internal"

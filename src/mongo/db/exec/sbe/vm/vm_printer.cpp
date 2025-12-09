@@ -48,12 +48,12 @@
 
 namespace mongo::sbe::vm {
 
-template <CodeFragmentPrinter::PrintFormat format>
+template <CodeFragment::PrintFormat format>
 struct CodeFragmentFormatter;
 
 
 template <>
-struct CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Debug> {
+struct CodeFragmentFormatter<CodeFragment::PrintFormat::Debug> {
     auto pcPointer(const uint8_t* pcPointer) {
         return PcPointerFmt{pcPointer};
     }
@@ -74,19 +74,19 @@ struct CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Debug> {
 template <typename charT, typename traits>
 std::basic_ostream<charT, traits>& operator<<(
     std::basic_ostream<charT, traits>& os,
-    const CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Debug>::PcPointerFmt& a) {
+    const CodeFragmentFormatter<CodeFragment::PrintFormat::Debug>::PcPointerFmt& a) {
     return os << static_cast<const void*>(a.pcPointer);
 }
 
 template <typename charT, typename traits>
 std::basic_ostream<charT, traits>& operator<<(
     std::basic_ostream<charT, traits>& os,
-    const CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Debug>::SlotAccessorFmt& a) {
+    const CodeFragmentFormatter<CodeFragment::PrintFormat::Debug>::SlotAccessorFmt& a) {
     return os << static_cast<const void*>(a.accessor);
 }
 
 template <>
-struct CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Stable> {
+struct CodeFragmentFormatter<CodeFragment::PrintFormat::Stable> {
     CodeFragmentFormatter(const CodeFragment& code) : code(code) {}
 
     auto pcPointer(const uint8_t* pcPointer) {
@@ -112,7 +112,7 @@ struct CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Stable> {
 template <typename charT, typename traits>
 std::basic_ostream<charT, traits>& operator<<(
     std::basic_ostream<charT, traits>& os,
-    const CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Stable>::PcPointerFmt& a) {
+    const CodeFragmentFormatter<CodeFragment::PrintFormat::Stable>::PcPointerFmt& a) {
 
     auto flags = os.flags();
     os << "0x" << std::hex << std::setw(4) << std::setfill('0') << (a.pcPointer - a.pcBegin);
@@ -123,7 +123,7 @@ std::basic_ostream<charT, traits>& operator<<(
 template <typename charT, typename traits>
 std::basic_ostream<charT, traits>& operator<<(
     std::basic_ostream<charT, traits>& os,
-    const CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Stable>::SlotAccessorFmt& a) {
+    const CodeFragmentFormatter<CodeFragment::PrintFormat::Stable>::SlotAccessorFmt& a) {
     return os << "<accessor>";
 }
 
@@ -427,11 +427,12 @@ private:
 
 void CodeFragmentPrinter::print(std::ostream& os, const CodeFragment& code) const {
     switch (_format) {
-        case PrintFormat::Debug:
-            CodeFragmentPrinterImpl(CodeFragmentFormatter<PrintFormat::Debug>()).print(os, code);
+        case CodeFragment::PrintFormat::Debug:
+            CodeFragmentPrinterImpl(CodeFragmentFormatter<CodeFragment::PrintFormat::Debug>())
+                .print(os, code);
             break;
-        case PrintFormat::Stable:
-            CodeFragmentPrinterImpl(CodeFragmentFormatter<PrintFormat::Stable>(code))
+        case CodeFragment::PrintFormat::Stable:
+            CodeFragmentPrinterImpl(CodeFragmentFormatter<CodeFragment::PrintFormat::Stable>(code))
                 .print(os, code);
             break;
     }

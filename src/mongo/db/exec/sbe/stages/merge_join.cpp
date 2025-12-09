@@ -357,8 +357,9 @@ const SpecificStats* MergeJoinStage::getSpecificStats() const {
     return nullptr;
 }
 
-std::vector<DebugPrinter::Block> MergeJoinStage::debugPrint() const {
-    auto ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> MergeJoinStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
 
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
 
@@ -395,7 +396,7 @@ std::vector<DebugPrinter::Block> MergeJoinStage::debugPrint() const {
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     DebugPrinter::addKeyword(ret, "right");
@@ -420,7 +421,7 @@ std::vector<DebugPrinter::Block> MergeJoinStage::debugPrint() const {
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
-    DebugPrinter::addBlocks(ret, _children[1]->debugPrint());
+    DebugPrinter::addBlocks(ret, _children[1]->debugPrint(debugPrintInfo));
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);

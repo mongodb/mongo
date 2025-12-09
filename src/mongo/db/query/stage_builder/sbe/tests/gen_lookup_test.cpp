@@ -236,7 +236,9 @@ public:
             buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
 
         if (enableDebugOutput) {
-            std::cout << std::endl << DebugPrinter{true}.print(stage->debugPrint()) << std::endl;
+            DebugPrintInfo debugPrintInfo{};
+            std::cout << std::endl
+                      << DebugPrinter{true}.print(stage->debugPrint(debugPrintInfo)) << std::endl;
         }
 
         // Prepare the SBE tree for execution.
@@ -348,6 +350,26 @@ private:
                                                          strategy,
                                                          boost::none /* idxEntry */,
                                                          true /* shouldProduceBson */);
+        auto solution = makeQuerySolution(std::move(lookupNode));
+
+        // Convert logical solution into the physical SBE plan.
+        auto [resultSlots, stage, data, _] =
+            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
+
+        if (enableDebugOutput) {
+            DebugPrintInfo debugPrintInfo{};
+            std::cout << std::endl
+                      << DebugPrinter{true}.print(stage->debugPrint(debugPrintInfo)) << std::endl;
+        }
+
+        // Prepare the SBE tree for execution.
+        auto ctx = makeCompileCtx();
+        prepareTree(ctx.get(), stage.get());
+
+        auto resultSlot = *data.staticData->resultSlot;
+        SlotAccessor* resultSlotAccessor = stage->getAccessor(*ctx, resultSlot);
+
+        return CompiledTree{std::move(stage), std::move(data), std::move(ctx), resultSlotAccessor};
         return compileAndRun(colls, std::move(lookupNode));
     }
 };

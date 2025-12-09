@@ -115,6 +115,10 @@ public:
     MONGO_MOD_NEEDS_REPLACEMENT virtual PlanStatsDetails getWinningPlanStats(
         ExplainOptions::Verbosity verbosity) const = 0;
 
+    virtual PlanStatsDetails getWinningPlanStatsQueryPlanner(bool /*printBytecode*/) const {
+        return getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
+    }
+
     /**
      * Returns statistics for the trial period of the winning plan selected by the multi-planner.
      */

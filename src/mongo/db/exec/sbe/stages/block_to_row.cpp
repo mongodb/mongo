@@ -261,8 +261,9 @@ const SpecificStats* BlockToRowStage::getSpecificStats() const {
     return nullptr;
 }
 
-std::vector<DebugPrinter::Block> BlockToRowStage::debugPrint() const {
-    auto ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> BlockToRowStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
 
     ret.emplace_back(DebugPrinter::Block("blocks[`"));
     for (size_t i = 0; i < _blockSlotIds.size(); ++i) {
@@ -285,7 +286,7 @@ std::vector<DebugPrinter::Block> BlockToRowStage::debugPrint() const {
     DebugPrinter::addIdentifier(ret, _bitmapSlotId);
 
     DebugPrinter::addNewLine(ret);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
 
     return ret;
 }

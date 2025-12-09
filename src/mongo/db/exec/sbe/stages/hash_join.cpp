@@ -226,8 +226,9 @@ const SpecificStats* HashJoinStage::getSpecificStats() const {
     return nullptr;
 }
 
-std::vector<DebugPrinter::Block> HashJoinStage::debugPrint() const {
-    auto ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> HashJoinStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
 
     if (_collatorSlot) {
         DebugPrinter::addIdentifier(ret, *_collatorSlot);
@@ -258,7 +259,7 @@ std::vector<DebugPrinter::Block> HashJoinStage::debugPrint() const {
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     DebugPrinter::addKeyword(ret, "right");
@@ -283,7 +284,7 @@ std::vector<DebugPrinter::Block> HashJoinStage::debugPrint() const {
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
-    DebugPrinter::addBlocks(ret, _children[1]->debugPrint());
+    DebugPrinter::addBlocks(ret, _children[1]->debugPrint(debugPrintInfo));
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);

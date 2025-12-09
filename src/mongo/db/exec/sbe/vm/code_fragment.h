@@ -45,6 +45,12 @@ namespace vm {
  */
 class CodeFragment {
 public:
+    enum PrintFormat {
+        /** Debug format, that prints all memory pointers. */
+        Debug,
+        /** Stable format, that prints relative offsets and masks other memory pointers. */
+        Stable
+    };
     const auto& frames() const {
         return _frames;
     }
@@ -173,7 +179,8 @@ public:
     void appendNumericConvert(value::TypeTags targetTag);
 
     // For printing from an interactive debugger.
-    std::string toString() const;
+    std::string toString(
+        vm::CodeFragment::PrintFormat format = vm::CodeFragment::PrintFormat::Debug) const;
 
     // Declares and defines a local variable frame at the current depth.
     // Local frame declaration is used to resolve the stack offsets of local variable access.

@@ -158,7 +158,7 @@ protected:
 
     void printCompiledExpression(std::ostream& os, const vm::CodeFragment& code) {
         os << "-- COMPILED EXPRESSION:" << std::endl;
-        vm::CodeFragmentPrinter(vm::CodeFragmentPrinter::PrintFormat::Stable).print(os, code);
+        vm::CodeFragmentPrinter(vm::CodeFragment::PrintFormat::Stable).print(os, code);
         os << std::endl << std::endl;
     }
 

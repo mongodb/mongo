@@ -176,8 +176,8 @@ public:
         return &_specificStats;
     }
 
-    std::vector<DebugPrinter::Block> debugPrint() const final {
-        auto ret = PlanStage::debugPrint();
+    std::vector<DebugPrinter::Block> debugPrint(const DebugPrintInfo& debugPrintInfo) const final {
+        auto ret = PlanStage::debugPrint(debugPrintInfo);
 
         ret.emplace_back("{`");
         DebugPrinter::addBlocks(ret, _filter->debugPrint());
@@ -185,7 +185,11 @@ public:
 
         DebugPrinter::addNewLine(ret);
 
-        DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+        if (debugPrintInfo.printBytecode) {
+            PlanStage::debugPrintBytecode(ret, _filterCode, "FILTER" /*title*/);
+        }
+
+        DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
 
         return ret;
     }

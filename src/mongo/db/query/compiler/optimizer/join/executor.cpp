@@ -202,10 +202,12 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                                   sbeYieldPolicy.get(),
                                                   false /*preparingFromCache*/,
                                                   nullptr /*remoteCursors*/);
+    sbe::DebugPrintInfo debugPrintInfo{};
     LOGV2_DEBUG(11083905,
                 5,
                 "SBE plan for join-reordered query",
-                "sbePlan"_attr = sbe::DebugPrinter{}.print(planStagesAndData.first->debugPrint()),
+                "sbePlan"_attr =
+                    sbe::DebugPrinter{}.print(planStagesAndData.first->debugPrint(debugPrintInfo)),
                 "sbePlanStageData"_attr = planStagesAndData.second.debugString());
 
     // If there is a pipeline suffix, then that suffix will execute inside a PlanExecutorPipeline,

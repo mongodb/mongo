@@ -740,8 +740,9 @@ void WindowStage::close() {
     _specificStats.peakTrackedMemBytes = _memoryTracker.value().peakTrackedMemoryBytes();
 }
 
-std::vector<DebugPrinter::Block> WindowStage::debugPrint() const {
-    auto ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> WindowStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
 
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _currSlots.size(); ++idx) {
@@ -815,7 +816,58 @@ std::vector<DebugPrinter::Block> WindowStage::debugPrint() const {
     }
 
     DebugPrinter::addNewLine(ret);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+
+    if (debugPrintInfo.printBytecode) {
+        int i = 0;
+        for (const std::unique_ptr<vm::CodeFragment>& code : _windowLowBoundCodes) {
+            std::stringstream title;
+            title << "WINDOW_" << i << "_LOW_BOUND";
+            PlanStage::debugPrintBytecode(ret, code, title.str().c_str());
+            i++;
+        }
+        i = 0;
+        for (const std::unique_ptr<vm::CodeFragment>& code : _windowHighBoundCodes) {
+            std::stringstream title;
+            title << "WINDOW_" << i << "_HIGH_BOUND";
+            PlanStage::debugPrintBytecode(ret, code, title.str().c_str());
+            i++;
+        }
+        i = 0;
+        for (const auto& codes : _windowInitCodes) {
+            int j = 0;
+            for (const std::unique_ptr<vm::CodeFragment>& code : codes) {
+                std::stringstream title;
+                title << "WINDOW_" << i << "_INIT_" << j;
+                PlanStage::debugPrintBytecode(ret, code, title.str().c_str());
+                j++;
+            }
+            i++;
+        }
+        i = 0;
+        for (const auto& codes : _windowAddCodes) {
+            int j = 0;
+            for (const std::unique_ptr<vm::CodeFragment>& code : codes) {
+                std::stringstream title;
+                title << "WINDOW_" << i << "_ADD_" << j;
+                PlanStage::debugPrintBytecode(ret, code, title.str().c_str());
+                j++;
+            }
+            i++;
+        }
+        i = 0;
+        for (const auto& codes : _windowRemoveCodes) {
+            int j = 0;
+            for (const std::unique_ptr<vm::CodeFragment>& code : codes) {
+                std::stringstream title;
+                title << "WINDOW_" << i << "_REMOVE_" << j;
+                PlanStage::debugPrintBytecode(ret, code, title.str().c_str());
+                j++;
+            }
+            i++;
+        }
+    }
+
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
 
     return ret;
 }

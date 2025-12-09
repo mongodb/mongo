@@ -61,7 +61,7 @@ protected:
     }
 
     vm::CodeFragmentPrinter makeCodeFragmentPrinter() {
-        return vm::CodeFragmentPrinter(vm::CodeFragmentPrinter::PrintFormat::Stable);
+        return vm::CodeFragmentPrinter(vm::CodeFragment::PrintFormat::Stable);
     }
 };
 

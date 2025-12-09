@@ -37,9 +37,10 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
-std::string CodeFragment::toString() const {
+std::string CodeFragment::toString(
+    vm::CodeFragment::PrintFormat format /* = vm::CodeFragment::PrintFormat::Debug*/) const {
     std::ostringstream ss;
-    vm::CodeFragmentPrinter printer(vm::CodeFragmentPrinter::PrintFormat::Debug);
+    vm::CodeFragmentPrinter printer(format);
     printer.print(ss, *this);
     return ss.str();
 }

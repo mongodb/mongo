@@ -274,8 +274,9 @@ const SpecificStats* HashLookupStage::getSpecificStats() const {
     return _hashTable.getHashLookupStats();
 }
 
-std::vector<DebugPrinter::Block> HashLookupStage::debugPrint() const {
-    auto ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> HashLookupStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
 
     ret.emplace_back(DebugPrinter::Block("[`"));
     auto& [slot, expr] = _innerAgg;
@@ -293,7 +294,7 @@ std::vector<DebugPrinter::Block> HashLookupStage::debugPrint() const {
     DebugPrinter::addKeyword(ret, "outer");
     DebugPrinter::addIdentifier(ret, _outerKeySlot);
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
-    DebugPrinter::addBlocks(ret, outerChild()->debugPrint());
+    DebugPrinter::addBlocks(ret, outerChild()->debugPrint(debugPrintInfo));
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     DebugPrinter::addKeyword(ret, "inner");
@@ -301,10 +302,14 @@ std::vector<DebugPrinter::Block> HashLookupStage::debugPrint() const {
     DebugPrinter::addIdentifier(ret, _innerProjectSlot);
 
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
-    DebugPrinter::addBlocks(ret, innerChild()->debugPrint());
+    DebugPrinter::addBlocks(ret, innerChild()->debugPrint(debugPrintInfo));
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
+
+    if (debugPrintInfo.printBytecode) {
+        PlanStage::debugPrintBytecode(ret, _aggCode, "AGGREGATE" /*title*/);
+    }
 
     return ret;
 }  // HashLookupStage::debugPrint

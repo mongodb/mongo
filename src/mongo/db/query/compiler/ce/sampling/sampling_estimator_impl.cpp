@@ -420,10 +420,12 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
     std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>& plan,
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy) {
+    sbe::DebugPrintInfo debugPrintInfo{};
     LOGV2_DEBUG(10670302,
                 5,
                 "SamplingCE Sampling SBE plan",
-                "SBE Plan"_attr = sbe::DebugPrinter{}.print(plan.first.get()->debugPrint()));
+                "SBE Plan"_attr =
+                    sbe::DebugPrinter{}.print(plan.first.get()->debugPrint(debugPrintInfo)));
     // Prepare the SBE plan for execution.
     prepareSlotBasedExecutableTree(_opCtx,
                                    plan.first.get(),

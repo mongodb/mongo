@@ -131,8 +131,9 @@ const SpecificStats* ProjectStage::getSpecificStats() const {
     return nullptr;
 }
 
-std::vector<DebugPrinter::Block> ProjectStage::debugPrint() const {
-    auto ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> ProjectStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
 
     ret.emplace_back("[`");
     bool first = true;
@@ -149,7 +150,18 @@ std::vector<DebugPrinter::Block> ProjectStage::debugPrint() const {
     ret.emplace_back("`]");
 
     DebugPrinter::addNewLine(ret);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+
+    if (debugPrintInfo.printBytecode) {
+        int i = 0;
+        for (auto& p : _fields) {
+            std::stringstream title;
+            title << "FIELD_" << i;
+            PlanStage::debugPrintBytecode(ret, p.second.first, title.str().c_str());
+            i++;
+        }
+    }
+
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
     return ret;
 }
 

@@ -500,8 +500,9 @@ const SpecificStats* SearchCursorStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-std::vector<DebugPrinter::Block> SearchCursorStage::debugPrint() const {
-    auto ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> SearchCursorStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
 
     addDebugOptionalSlotIdentifier(ret, _idSlot, "id");
     addDebugOptionalSlotIdentifier(ret, _resultSlot, "result");

@@ -681,8 +681,8 @@ std::unique_ptr<PlanStageStats> ScanStage::getStats(bool includeDebugInfo) const
     return ret;
 }
 
-std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> ScanStage::debugPrint(const DebugPrintInfo& debugPrintInfo) const {
+    std::vector<DebugPrinter::Block> ret = PlanStage::debugPrint(debugPrintInfo);
     bool first = true;
     if (_minRecordIdSlot) {
         DebugPrinter::addIdentifier(ret, _minRecordIdSlot.value());

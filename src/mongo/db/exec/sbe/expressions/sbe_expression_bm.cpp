@@ -70,8 +70,14 @@
 namespace mongo {
 namespace {
 template <typename T>
-std::string debugPrint(const T* sbeElement) {
-    return sbeElement ? sbe::DebugPrinter{}.print(sbeElement->debugPrint()) : std::string();
+std::string debugPrintStage(const T* stage) {
+    sbe::DebugPrintInfo debugPrintInfo{};
+    return stage ? sbe::DebugPrinter{}.print(stage->debugPrint(debugPrintInfo)) : std::string();
+}
+
+template <typename T>
+std::string debugPrintExpr(const T* expr) {
+    return expr ? sbe::DebugPrinter{}.print(expr->debugPrint()) : std::string();
 }
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.bm");
@@ -154,13 +160,13 @@ public:
         LOGV2_DEBUG(6979801,
                     1,
                     "sbe expression benchmark PlanStage",
-                    "stage"_attr = debugPrint(stage.get()));
+                    "stage"_attr = debugPrintStage(stage.get()));
 
         auto expr = evalExpr.lower(state);
         LOGV2_DEBUG(6979802,
                     1,
                     "sbe expression benchmark EExpression",
-                    "expression"_attr = debugPrint(expr.get()));
+                    "expression"_attr = debugPrintExpr(expr.get()));
 
         stage->attachToOperationContext(opCtx.get());
         stage->prepare(_env.ctx);

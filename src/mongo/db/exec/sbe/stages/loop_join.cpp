@@ -249,8 +249,9 @@ const SpecificStats* LoopJoinStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-std::vector<DebugPrinter::Block> LoopJoinStage::debugPrint() const {
-    auto ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> LoopJoinStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
 
     switch (_joinType) {
         case JoinType::Inner:
@@ -294,16 +295,20 @@ std::vector<DebugPrinter::Block> LoopJoinStage::debugPrint() const {
 
     DebugPrinter::addKeyword(ret, "left");
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
 
     DebugPrinter::addKeyword(ret, "right");
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
-    DebugPrinter::addBlocks(ret, _children[1]->debugPrint());
+    DebugPrinter::addBlocks(ret, _children[1]->debugPrint(debugPrintInfo));
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
+
+    if (debugPrintInfo.printBytecode) {
+        PlanStage::debugPrintBytecode(ret, _predicateCode, "PREDICATE_CODE" /*title*/);
+    }
 
     return ret;
 }

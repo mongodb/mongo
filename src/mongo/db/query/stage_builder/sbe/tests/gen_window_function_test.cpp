@@ -98,7 +98,8 @@ public:
 
         // Print the stage explain output and verify.
         _gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
-        _gctx->outStream() << sbe::DebugPrinter().print(*stage.get());
+        sbe::DebugPrintInfo debugPrintInfo{};
+        _gctx->outStream() << sbe::DebugPrinter().print(*stage.get(), debugPrintInfo);
         _gctx->outStream() << std::endl;
         _gctx->verifyOutput();
 

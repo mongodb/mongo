@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
@@ -782,10 +783,29 @@ public:
      */
     virtual void close() = 0;
 
-    virtual std::vector<DebugPrinter::Block> debugPrint() const {
+    virtual std::vector<DebugPrinter::Block> debugPrint(
+        const DebugPrintInfo& debugPrintInfo) const {
         auto stats = getCommonStats();
         std::string str = str::stream() << '[' << stats->nodeId << "] " << stats->stageType;
         return {DebugPrinter::Block(str)};
+    }
+
+    static void debugPrintBytecode(std::vector<DebugPrinter::Block>& blocks,
+                                   const std::unique_ptr<vm::CodeFragment>& code,
+                                   const char* title) {
+        if (!code) {
+            return;
+        }
+
+        tassert(10629900, "Expected non-null title", title != nullptr);
+        blocks.emplace_back(DebugPrinter::Block(title));
+        DebugPrinter::addNewLine(blocks);
+        std::istringstream codeStr(code->toString(vm::CodeFragment::PrintFormat::Stable));
+        std::string line;
+        while (std::getline(codeStr, line)) {
+            blocks.emplace_back(DebugPrinter::Block(line));
+            DebugPrinter::addNewLine(blocks);
+        }
     }
 
     /**

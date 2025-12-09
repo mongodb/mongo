@@ -148,8 +148,9 @@ const SpecificStats* AggProjectStage::getSpecificStats() const {
     return nullptr;
 }
 
-std::vector<DebugPrinter::Block> AggProjectStage::debugPrint() const {
-    auto ret = PlanStage::debugPrint();
+std::vector<DebugPrinter::Block> AggProjectStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
 
     ret.emplace_back("[`");
     bool first = true;
@@ -171,7 +172,25 @@ std::vector<DebugPrinter::Block> AggProjectStage::debugPrint() const {
     ret.emplace_back("`]");
 
     DebugPrinter::addNewLine(ret);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+
+    if (debugPrintInfo.printBytecode) {
+        int i = 0;
+        for (const std::unique_ptr<vm::CodeFragment>& code : _initCodes) {
+            std::stringstream title;
+            title << "INIT_" << i;
+            PlanStage::debugPrintBytecode(ret, code, title.str().c_str());
+            i++;
+        }
+        i = 0;
+        for (const std::unique_ptr<vm::CodeFragment>& code : _aggCodes) {
+            std::stringstream title;
+            title << "AGG_" << i;
+            PlanStage::debugPrintBytecode(ret, code, title.str().c_str());
+            i++;
+        }
+    }
+
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
     return ret;
 }
 

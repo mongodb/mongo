@@ -207,6 +207,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const boost::optional<BSONArray>& remotePlanInfo,
     ExplainOptions::Verbosity verbosity,
     bool isCached,
+    bool printBytecode,
     bool usedJoinOpt = false) {
     BSONObjBuilder bob;
 
@@ -255,8 +256,10 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
         plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
     } else {
         BSONObj execPlanDebugInfo = PlanExplainerSBEBase::buildExecPlanDebugInfo(
-            sbePlanStageRoot, sbePlanStageData, explainThresholdBytes - plan.len() /*lengthCap*/
-        );
+            sbePlanStageRoot,
+            sbePlanStageData,
+            explainThresholdBytes - plan.len() /*lengthCap*/,
+            printBytecode);
         if (plan.len() + execPlanDebugInfo.objsize() > explainThresholdBytes) {
             plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
         } else {
@@ -689,6 +692,25 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStats(
                                  buildRemotePlanInfo(),
                                  verbosity,
                                  matchesCachedPlan(),
+                                 false /*printBytecode*/);
+}
+
+PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStatsQueryPlanner(
+    bool printBytecode) const {
+    tassert(10629901, "encountered unexpected nullptr for root PlanStage", _root);
+    auto stats = _root->getStats(true /* includeDebugInfo  */);
+    tassert(10629902, "encountered unexpected nullptr for PlanStageStats", stats);
+
+    return buildPlanStatsDetails(_solution,
+                                 *stats,
+                                 _root,
+                                 _rootData,
+                                 boost::none /* planSummary */,
+                                 boost::none /* queryParams */,
+                                 buildRemotePlanInfo(),
+                                 ExplainOptions::Verbosity::kQueryPlanner,
+                                 matchesCachedPlan(),
+                                 printBytecode,
                                  _usedJoinOpt);
 }
 

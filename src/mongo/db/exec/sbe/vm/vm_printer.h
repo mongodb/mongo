@@ -38,18 +38,11 @@ namespace mongo::sbe::vm {
 
 class CodeFragmentPrinter {
 public:
-    enum PrintFormat {
-        /** Debug format, that prints all memory pointers. */
-        Debug,
-        /** Stable format, that prints relative offsets and masks other memory pointers. */
-        Stable
-    };
-
-    CodeFragmentPrinter(PrintFormat format) : _format(format) {}
+    CodeFragmentPrinter(CodeFragment::PrintFormat format) : _format(format) {}
 
     void print(std::ostream& os, const CodeFragment& code) const;
 
 private:
-    PrintFormat _format;
+    CodeFragment::PrintFormat _format;
 };
 }  // namespace mongo::sbe::vm

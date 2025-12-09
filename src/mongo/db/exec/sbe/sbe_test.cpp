@@ -511,7 +511,7 @@ TEST(SBEVM, CodeFragmentPrintStable) {
     code.appendDateTrunc(
         TimeUnit::day, 1, timezoneDB.getTimeZone("America/New_York"_sd), DayOfWeek::monday);
 
-    vm::CodeFragmentPrinter printer(vm::CodeFragmentPrinter::PrintFormat::Stable);
+    vm::CodeFragmentPrinter printer(vm::CodeFragment::PrintFormat::Stable);
     printer.print(os, code);
     os << std::endl;
 }
