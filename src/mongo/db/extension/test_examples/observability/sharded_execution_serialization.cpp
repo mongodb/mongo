@@ -47,10 +47,6 @@ public:
     BSONObj serialize() const override {
         return BSON(_name << BSON(kShardedAssertFlagFieldName << true));
     }
-
-    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
-        return nullptr;
-    }
 };
 
 DEFAULT_AST_NODE(ShardedExecutionSerialization);

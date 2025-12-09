@@ -76,10 +76,8 @@ private:
  */
 class ExtensionDPLArrayContainerAdapter final : public ::MongoExtensionDPLArrayContainer {
 public:
-    ExtensionDPLArrayContainerAdapter(std::unique_ptr<DPLArrayContainer> container)
-        : ::MongoExtensionDPLArrayContainer{&VTABLE}, _container(std::move(container)) {
-        sdk_tassert(11368304, "Provided DPLArrayContainer is null", _container != nullptr);
-    }
+    ExtensionDPLArrayContainerAdapter(DPLArrayContainer&& container)
+        : ::MongoExtensionDPLArrayContainer{&VTABLE}, _container(std::move(container)) {}
 
     ExtensionDPLArrayContainerAdapter(const ExtensionDPLArrayContainerAdapter&) = delete;
     ExtensionDPLArrayContainerAdapter& operator=(const ExtensionDPLArrayContainerAdapter&) = delete;
@@ -88,11 +86,11 @@ public:
 
 private:
     const DPLArrayContainer& getImpl() const noexcept {
-        return *_container;
+        return _container;
     }
 
     DPLArrayContainer& getImpl() noexcept {
-        return *_container;
+        return _container;
     }
 
     static void _extDestroy(::MongoExtensionDPLArrayContainer* container) noexcept {
@@ -114,7 +112,7 @@ private:
 
     static constexpr ::MongoExtensionDPLArrayContainerVTable VTABLE{
         .destroy = &_extDestroy, .size = &_extSize, .transfer = &_extTransfer};
-    std::unique_ptr<DPLArrayContainer> _container;
+    DPLArrayContainer _container;
 };
 
 }  // namespace mongo::extension::sdk

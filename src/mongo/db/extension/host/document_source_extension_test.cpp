@@ -843,7 +843,8 @@ public:
 static constexpr std::string_view kSourceName = "$invalidMetadataSource";
 class InvalidMetadataExecAggStage : public sdk::ExecAggStageSource {
 public:
-    InvalidMetadataExecAggStage() : sdk::ExecAggStageSource(kSourceName) {}
+    InvalidMetadataExecAggStage(std::string_view name, BSONObj arguments)
+        : sdk::ExecAggStageSource(name) {}
     ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
                                    ::MongoExtensionExecAggStage* execStage) override {
         if (_currentIndex >= _documentsWithMetadata.size()) {
@@ -870,7 +871,7 @@ public:
     void close() override {}
 
     static inline std::unique_ptr<sdk::ExecAggStageSource> make() {
-        return std::make_unique<InvalidMetadataExecAggStage>();
+        return std::make_unique<InvalidMetadataExecAggStage>(kSourceName, BSONObj());
     }
 
 private:
@@ -880,25 +881,10 @@ private:
         {BSON("_id" << 3 << "field2" << "val3"), BSON("$" << 2.0)}};
     size_t _currentIndex = 0;
 };
-class InvalidMetadataLogicalAggStage : public sdk::LogicalAggStage {
+class InvalidMetadataLogicalAggStage : public sdk::TestLogicalStage<InvalidMetadataExecAggStage> {
 public:
-    InvalidMetadataLogicalAggStage() : sdk::LogicalAggStage(kSourceName) {}
-
-    BSONObj serialize() const override {
-        return BSON(std::string(kSourceName) << "serializedForExecution");
-    }
-
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSONObj();
-    }
-
-    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
-        return InvalidMetadataExecAggStage::make();
-    }
-
-    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
-        return nullptr;
-    }
+    InvalidMetadataLogicalAggStage()
+        : sdk::TestLogicalStage<InvalidMetadataExecAggStage>(kSourceName, BSONObj()) {}
 };
 class InvalidMetadataAstNode : public sdk::AggStageAstNode {
 public:

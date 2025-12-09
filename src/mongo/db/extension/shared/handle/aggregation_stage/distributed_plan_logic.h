@@ -48,20 +48,20 @@ public:
         _assertValidVTable();
     }
 
-    std::vector<VariantDPLHandle> getShardsPipeline() const;
+    std::vector<VariantDPLHandle> extractShardsPipeline();
 
-    std::vector<VariantDPLHandle> getMergingPipeline() const;
+    std::vector<VariantDPLHandle> extractMergingPipeline();
 
     BSONObj getSortPattern() const;
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(11027300,
-                "DistributedPlanLogic 'get_shards_pipeline' is null",
-                vtable.get_shards_pipeline != nullptr);
+                "DistributedPlanLogic 'extract_shards_pipeline' is null",
+                vtable.extract_shards_pipeline != nullptr);
         tassert(11027301,
-                "DistributedPlanLogic 'get_merging_pipeline' is null",
-                vtable.get_merging_pipeline != nullptr);
+                "DistributedPlanLogic 'extract_merging_pipeline' is null",
+                vtable.extract_merging_pipeline != nullptr);
         tassert(11027302,
                 "DistributedPlanLogic 'get_sort_pattern' is null",
                 vtable.get_sort_pattern != nullptr);

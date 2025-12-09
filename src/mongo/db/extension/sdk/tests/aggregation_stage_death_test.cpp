@@ -500,7 +500,7 @@ public:
 
 DEATH_TEST_F(AggStageDeathTest, InvalidDPLArrayContainerVTableFailsSize, "11368301") {
     auto handle = TestDPLArrayContainerHandle{new sdk::ExtensionDPLArrayContainerAdapter(
-        std::make_unique<sdk::DPLArrayContainer>(std::vector<VariantDPLHandle>{}))};
+        sdk::DPLArrayContainer(std::vector<VariantDPLHandle>{}))};
 
     auto vtable = handle.vtable();
     vtable.size = nullptr;
@@ -509,7 +509,7 @@ DEATH_TEST_F(AggStageDeathTest, InvalidDPLArrayContainerVTableFailsSize, "113683
 
 DEATH_TEST_F(AggStageDeathTest, InvalidDPLArrayContainerVTableFailsTransfer, "11368302") {
     auto handle = TestDPLArrayContainerHandle{new sdk::ExtensionDPLArrayContainerAdapter(
-        std::make_unique<sdk::DPLArrayContainer>(std::vector<VariantDPLHandle>{}))};
+        sdk::DPLArrayContainer(std::vector<VariantDPLHandle>{}))};
 
     auto vtable = handle.vtable();
     vtable.transfer = nullptr;
@@ -528,7 +528,7 @@ DEATH_TEST_F(AggStageDeathTest, DPLArrayContainerExtensionToHostWrongSizeFails, 
     const auto size = sdkElements.size();
 
     auto sdkAdapter = std::make_unique<sdk::ExtensionDPLArrayContainerAdapter>(
-        std::make_unique<sdk::DPLArrayContainer>(std::move(sdkElements)));
+        sdk::DPLArrayContainer(std::move(sdkElements)));
 
     TestDPLArrayContainerHandle arrayContainerHandle(sdkAdapter.release());
 
@@ -539,12 +539,6 @@ DEATH_TEST_F(AggStageDeathTest, DPLArrayContainerExtensionToHostWrongSizeFails, 
     // Transfer should fail due to incorrectly sized array.
     arrayContainerHandle.transferInternal(targetArray);
 }
-
-DEATH_TEST_F(AggStageDeathTest, DPLArrayContainerAdapterNullContainerFails, "11368304") {
-    [[maybe_unused]] auto handle =
-        TestDPLArrayContainerHandle{new sdk::ExtensionDPLArrayContainerAdapter(
-            std::unique_ptr<sdk::DPLArrayContainer>(nullptr))};
-};
 
 class DistributedPlanLogicVTableDeathTest : public unittest::Test {
 public:
@@ -561,28 +555,28 @@ public:
 };
 
 DEATH_TEST_F(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetShards, "11027300") {
-    auto distributedPlanLogic = new sdk::ExtensionDistributedPlanLogicAdapter(
-        shared_test_stages::EmptyDistributedPlanLogic::make());
+    auto distributedPlanLogic =
+        new sdk::ExtensionDistributedPlanLogicAdapter(sdk::DistributedPlanLogic{});
     auto handle = TestDistributedPlanLogicVTableHandle{distributedPlanLogic};
 
     auto vtable = handle.vtable();
-    vtable.get_shards_pipeline = nullptr;
+    vtable.extract_shards_pipeline = nullptr;
     handle.assertVTableConstraints(vtable);
 };
 
 DEATH_TEST_F(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetMerging, "11027301") {
-    auto distributedPlanLogic = new sdk::ExtensionDistributedPlanLogicAdapter(
-        shared_test_stages::EmptyDistributedPlanLogic::make());
+    auto distributedPlanLogic =
+        new sdk::ExtensionDistributedPlanLogicAdapter(sdk::DistributedPlanLogic{});
     auto handle = TestDistributedPlanLogicVTableHandle{distributedPlanLogic};
 
     auto vtable = handle.vtable();
-    vtable.get_merging_pipeline = nullptr;
+    vtable.extract_merging_pipeline = nullptr;
     handle.assertVTableConstraints(vtable);
 };
 
 DEATH_TEST_F(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetSortPattern, "11027302") {
-    auto distributedPlanLogic = new sdk::ExtensionDistributedPlanLogicAdapter(
-        shared_test_stages::EmptyDistributedPlanLogic::make());
+    auto distributedPlanLogic =
+        new sdk::ExtensionDistributedPlanLogicAdapter(sdk::DistributedPlanLogic{});
     auto handle = TestDistributedPlanLogicVTableHandle{distributedPlanLogic};
 
     auto vtable = handle.vtable();
@@ -668,7 +662,7 @@ DEATH_TEST_F(AggStageDeathTest, SetSourceOnSourceStageFails, "10957210") {
 }
 
 DEATH_TEST_F(AggStageDeathTest, GetSourceOnSourceStageFails, "10957208") {
-    shared_test_stages::FruitsAsDocumentsExecAggStage sourceStage{};
+    shared_test_stages::FruitsAsDocumentsExecAggStage sourceStage{"", BSONObj()};
 
     // Calling getSource on a source stage should fail.
     [[maybe_unused]] auto source = sourceStage._getSource();

@@ -65,7 +65,8 @@ namespace mongo::extension::sdk::shared_test_stages {
 static constexpr std::string_view kFruitsAsDocumentsName = "$fruitAsDocuments";
 class FruitsAsDocumentsExecAggStage : public sdk::ExecAggStageSource {
 public:
-    FruitsAsDocumentsExecAggStage() : sdk::ExecAggStageSource(kFruitsAsDocumentsName) {}
+    FruitsAsDocumentsExecAggStage(std::string_view name, BSONObj arguments)
+        : sdk::ExecAggStageSource(name) {}
 
     ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
                                    ::MongoExtensionExecAggStage* execStage) override {
@@ -98,7 +99,7 @@ public:
     }
 
     static inline std::unique_ptr<FruitsAsDocumentsExecAggStage> make() {
-        return std::make_unique<FruitsAsDocumentsExecAggStage>();
+        return std::make_unique<FruitsAsDocumentsExecAggStage>(kFruitsAsDocumentsName, BSONObj());
     }
 
 private:
@@ -115,25 +116,11 @@ private:
     size_t _currentIndex = 0;
 };
 
-class FruitsAsDocumentsLogicalAggStage : public sdk::LogicalAggStage {
+class FruitsAsDocumentsLogicalAggStage
+    : public sdk::TestLogicalStage<FruitsAsDocumentsExecAggStage> {
 public:
-    FruitsAsDocumentsLogicalAggStage() : sdk::LogicalAggStage(kFruitsAsDocumentsName) {}
-
-    BSONObj serialize() const override {
-        return BSON(std::string(kFruitsAsDocumentsName) << "serializedForExecution");
-    }
-
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSONObj();
-    }
-
-    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
-        return FruitsAsDocumentsExecAggStage::make();
-    }
-
-    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
-        return nullptr;
-    }
+    FruitsAsDocumentsLogicalAggStage()
+        : sdk::TestLogicalStage<FruitsAsDocumentsExecAggStage>(kFruitsAsDocumentsName, BSONObj()) {}
 };
 
 class FruitsAsDocumentsAstNode : public sdk::AggStageAstNode {
@@ -199,7 +186,8 @@ public:
 
 class AddFruitsToDocumentsExecAggStage : public sdk::ExecAggStageTransform {
 public:
-    AddFruitsToDocumentsExecAggStage() : sdk::ExecAggStageTransform(kTransformName) {}
+    AddFruitsToDocumentsExecAggStage(std::string_view name, BSONObj arguments)
+        : sdk::ExecAggStageTransform(name) {}
 
     // Loosely modeled on the behavior of the existing tranform stage:
     // exec::agg::SingleDocumentTransformationStage::doGetNext(), more specifically, the $addFields
@@ -242,7 +230,7 @@ public:
     }
 
     static inline std::unique_ptr<sdk::ExecAggStageTransform> make() {
-        return std::make_unique<AddFruitsToDocumentsExecAggStage>();
+        return std::make_unique<AddFruitsToDocumentsExecAggStage>(kTransformName, BSONObj());
     }
 
 private:
@@ -257,33 +245,14 @@ private:
     size_t _currentIndex = 0;
 };
 
-class AddFruitsToDocumentsLogicalAggStage : public sdk::LogicalAggStage {
-public:
-    AddFruitsToDocumentsLogicalAggStage() : sdk::LogicalAggStage(kTransformName) {}
-
-    BSONObj serialize() const override {
-        return BSON(std::string(kTransformName) << "serializedForExecution");
-    }
-
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSONObj();
-    }
-
-    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
-        return AddFruitsToDocumentsExecAggStage::make();
-    }
-
-    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
-        return nullptr;
-    }
-};
+using AddFruitsToDocumentsLogicalAggStage = sdk::TestLogicalStage<AddFruitsToDocumentsExecAggStage>;
 
 class AddFruitsToDocumentsAggStageAstNode : public sdk::AggStageAstNode {
 public:
     AddFruitsToDocumentsAggStageAstNode() : sdk::AggStageAstNode(kTransformName) {}
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<AddFruitsToDocumentsLogicalAggStage>();
+        return std::make_unique<AddFruitsToDocumentsLogicalAggStage>(_name, BSONObj());
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -340,9 +309,8 @@ public:
 
 class ValidExtensionExecAggStage : public extension::sdk::ExecAggStageSource {
 public:
-    static constexpr std::string kStageName = "$validExtension";
-
-    ValidExtensionExecAggStage() : sdk::ExecAggStageSource(kStageName) {}
+    ValidExtensionExecAggStage(std::string_view name, BSONObj arguments)
+        : sdk::ExecAggStageSource(name) {}
 
     extension::ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
                                               ::MongoExtensionExecAggStage* execStage) override {
@@ -378,7 +346,7 @@ public:
     }
 
     static inline std::unique_ptr<sdk::ExecAggStageSource> make() {
-        return std::make_unique<ValidExtensionExecAggStage>();
+        return std::make_unique<ValidExtensionExecAggStage>(kTransformName, BSONObj());
     }
 
 private:
@@ -388,28 +356,13 @@ private:
         {BSON("meow" << "cedric"), BSON("$textScore" << 2.0)}};
 };
 
-class TestLogicalStageCompile : public LogicalAggStage {
+class TestLogicalStageCompile : public sdk::TestLogicalStage<ValidExtensionExecAggStage> {
 public:
     static constexpr StringData kStageName = "$testCompile";
     static constexpr StringData kStageSpec = "mongodb";
 
-    TestLogicalStageCompile() : LogicalAggStage(toStdStringViewForInterop(kStageName)) {}
-
-    BSONObj serialize() const override {
-        return BSON(kStageName << kStageSpec);
-    }
-
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSON(kStageName << verbosity);
-    }
-
-    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
-        return std::make_unique<ValidExtensionExecAggStage>();
-    }
-
-    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
-        return nullptr;
-    }
+    TestLogicalStageCompile()
+        : TestLogicalStage(toStdStringViewForInterop(kStageName), BSON(kStageSpec << "")) {}
 
     static inline std::unique_ptr<extension::sdk::LogicalAggStage> make() {
         return std::make_unique<TestLogicalStageCompile>();
@@ -1036,32 +989,16 @@ public:
     }
 };
 
-class CountingLogicalStage final : public sdk::LogicalAggStage {
+class CountingLogicalStage final : public TransformLogicalAggStage {
 public:
     static int alive;
 
-    CountingLogicalStage() : sdk::LogicalAggStage(kCountingName) {
+    CountingLogicalStage() : TransformLogicalAggStage() {
         ++alive;
     }
 
     ~CountingLogicalStage() override {
         --alive;
-    }
-
-    BSONObj serialize() const override {
-        return BSON(std::string(kCountingName) << "serializedForExecution");
-    }
-
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSONObj();
-    }
-
-    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
-        return std::make_unique<TransformExecAggStage>();
-    }
-
-    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
-        return nullptr;
     }
 
     static inline std::unique_ptr<sdk::LogicalAggStage> make() {
@@ -1229,25 +1166,6 @@ public:
  * Sharding-related testing
  * =========================================================
  */
-class EmptyDistributedPlanLogic : public sdk::DistributedPlanLogicBase {
-public:
-    std::unique_ptr<sdk::DPLArrayContainer> getShardsPipeline() const override {
-        return {};
-    }
-
-    std::unique_ptr<sdk::DPLArrayContainer> getMergingPipeline() const override {
-        return {};
-    }
-
-    BSONObj getSortPattern() const override {
-        return BSONObj();
-    }
-
-    static inline std::unique_ptr<sdk::DistributedPlanLogicBase> make() {
-        return std::make_unique<EmptyDistributedPlanLogic>();
-    }
-};
-
 class MockQueryExecutionContext : public host_connector::QueryExecutionContextBase {
 public:
     Status checkForInterrupt() const override {
@@ -1263,67 +1181,30 @@ public:
 static constexpr std::string_view kMergeOnlyDPLStageName = "$mergeOnlyDPL";
 
 /**
- * MergeOnlyDPLDistributedPlanLogic is a DPL implementation that returns merge-only stages
- * containing all three types of VariantDPLHandle: host-defined parse node, extension-defined
- * parse node, and logical stage.
- */
-class MergeOnlyDPLDistributedPlanLogic : public sdk::DistributedPlanLogicBase {
-public:
-    std::unique_ptr<sdk::DPLArrayContainer> getShardsPipeline() const override {
-        // Return nullptr to indicate this stage must run exclusively on the merging node.
-        return nullptr;
-    }
-
-    std::unique_ptr<sdk::DPLArrayContainer> getMergingPipeline() const override {
-        std::vector<VariantDPLHandle> elements;
-        // Host-defined parse node.
-        elements.emplace_back(new host::HostAggStageParseNode(
-            TransformHostParseNode::make(BSON("$match" << BSON("a" << 1)))));
-        // Extension-defined parse node.
-        elements.emplace_back(
-            new sdk::ExtensionAggStageParseNode(std::make_unique<TransformAggStageParseNode>()));
-        // Logical stage handle.
-        elements.emplace_back(extension::LogicalAggStageHandle{
-            new sdk::ExtensionLogicalAggStage(TransformLogicalAggStage::make())});
-
-        return std::make_unique<sdk::DPLArrayContainer>(std::move(elements));
-    }
-
-    BSONObj getSortPattern() const override {
-        return BSONObj();
-    }
-
-    static inline std::unique_ptr<sdk::DistributedPlanLogicBase> make() {
-        return std::make_unique<MergeOnlyDPLDistributedPlanLogic>();
-    }
-};
-
-/**
  * MergeOnlyDPLLogicalStage is a logical stage that returns DPL with merge-only stages
  * containing all three types of VariantDPLHandle.
  */
-class MergeOnlyDPLLogicalStage : public sdk::LogicalAggStage {
+class MergeOnlyDPLLogicalStage : public TransformLogicalAggStage {
 public:
-    MergeOnlyDPLLogicalStage() : sdk::LogicalAggStage(kMergeOnlyDPLStageName) {}
+    boost::optional<sdk::DistributedPlanLogic> getDistributedPlanLogic() const override {
+        sdk::DistributedPlanLogic dpl;
 
-    BSONObj serialize() const override {
-        return BSON(std::string(kMergeOnlyDPLStageName) << "serializedForExecution");
-    }
+        {
+            // Create a merging pipeline with all three types of VariantDPLHandle.
+            std::vector<VariantDPLHandle> elements;
+            // Host-defined parse node.
+            elements.emplace_back(new host::HostAggStageParseNode(
+                TransformHostParseNode::make(BSON("$match" << BSON("a" << 1)))));
+            // Extension-defined parse node.
+            elements.emplace_back(new sdk::ExtensionAggStageParseNode(
+                std::make_unique<TransformAggStageParseNode>()));
+            // Logical stage handle.
+            elements.emplace_back(extension::LogicalAggStageHandle{
+                new sdk::ExtensionLogicalAggStage(std::make_unique<MergeOnlyDPLLogicalStage>())});
+            dpl.mergingPipeline = sdk::DPLArrayContainer(std::move(elements));
+        }
 
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSONObj();
-    }
-
-    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
-        return TransformExecAggStage::make();
-    }
-
-    std::unique_ptr<sdk::DistributedPlanLogicBase> getDistributedPlanLogic() const override {
-        return MergeOnlyDPLDistributedPlanLogic::make();
-    }
-
-    static inline std::unique_ptr<sdk::LogicalAggStage> make() {
-        return std::make_unique<MergeOnlyDPLLogicalStage>();
+        return dpl;
     }
 };
 
@@ -1335,7 +1216,7 @@ public:
     MergeOnlyDPLAstNode() : sdk::AggStageAstNode(kMergeOnlyDPLStageName) {}
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return MergeOnlyDPLLogicalStage::make();
+        return std::make_unique<MergeOnlyDPLLogicalStage>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {

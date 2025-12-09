@@ -37,30 +37,33 @@
 namespace mongo::extension::sdk {
 
 /**
- * DistributedPlanLogicBase is the base class for implementing the
- * ::MongoExtensionDistributedPlanLogic interface by an extension.
+ * DistributedPlanLogic implements the ::MongoExtensionDistributedPlanLogic interface for an
+ * extension.
  */
-class DistributedPlanLogicBase {
+class DistributedPlanLogic final {
 public:
-    virtual ~DistributedPlanLogicBase() = default;
+    DistributedPlanLogic() : shardsPipeline({}), mergingPipeline({}), sortPattern() {}
+
+    DistributedPlanLogic(DPLArrayContainer&& shardsPipeline,
+                         DPLArrayContainer&& mergingPipeline,
+                         BSONObj sortPattern)
+        : shardsPipeline(std::move(shardsPipeline)),
+          mergingPipeline(std::move(mergingPipeline)),
+          sortPattern(sortPattern.getOwned()) {}
 
     /**
-     * Returns the pipeline to execute on each shard in parallel.
-     * Ownership of the returned DPLArrayContainer is transferred to the caller.
+     * Pipeline to execute on each shard in parallel.
      */
-    virtual std::unique_ptr<DPLArrayContainer> getShardsPipeline() const = 0;
-
+    DPLArrayContainer shardsPipeline;
     /**
-     * Returns the pipeline to execute on the merging node.
-     * Ownership of the returned DPLArrayContainer is transferred to the caller.
+     * Pipeline to execute on the merging node.
      */
-    virtual std::unique_ptr<DPLArrayContainer> getMergingPipeline() const = 0;
-
+    DPLArrayContainer mergingPipeline;
     /**
-     * Returns which fields are ascending and which fields are descending when merging streams
-     * together.
+     * Sort pattern indicating which fields are ascending and which fields are descending when
+     * merging streams together.
      */
-    virtual BSONObj getSortPattern() const = 0;
+    BSONObj sortPattern;
 };
 
 /**
@@ -72,10 +75,8 @@ public:
  */
 class ExtensionDistributedPlanLogicAdapter final : public ::MongoExtensionDistributedPlanLogic {
 public:
-    ExtensionDistributedPlanLogicAdapter(std::unique_ptr<DistributedPlanLogicBase> dpl)
-        : ::MongoExtensionDistributedPlanLogic{&VTABLE}, _dpl(std::move(dpl)) {
-        tassert(11027303, "Provided DistributedPlanLogicBase is null", _dpl != nullptr);
-    }
+    ExtensionDistributedPlanLogicAdapter(DistributedPlanLogic&& dpl)
+        : ::MongoExtensionDistributedPlanLogic{&VTABLE}, _dpl(std::move(dpl)) {}
 
     ~ExtensionDistributedPlanLogicAdapter() = default;
 
@@ -87,19 +88,19 @@ public:
         delete;
 
 private:
-    const DistributedPlanLogicBase& getImpl() const noexcept {
-        return *_dpl;
+    const DistributedPlanLogic& getImpl() const noexcept {
+        return _dpl;
     }
 
-    DistributedPlanLogicBase& getImpl() noexcept {
-        return *_dpl;
+    DistributedPlanLogic& getImpl() noexcept {
+        return _dpl;
     }
 
     static void _extDestroy(::MongoExtensionDistributedPlanLogic* distributedPlanLogic) noexcept {
         delete static_cast<ExtensionDistributedPlanLogicAdapter*>(distributedPlanLogic);
     }
 
-    static ::MongoExtensionStatus* _extGetShardsPipeline(
+    static ::MongoExtensionStatus* _extExtractShardsPipeline(
         ::MongoExtensionDistributedPlanLogic* distributedPlanLogic,
         ::MongoExtensionDPLArrayContainer** output) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
@@ -107,15 +108,14 @@ private:
             auto& impl =
                 static_cast<ExtensionDistributedPlanLogicAdapter*>(distributedPlanLogic)->getImpl();
 
-            auto shardsPipeline = impl.getShardsPipeline();
-            if (shardsPipeline) {
+            if (impl.shardsPipeline.size() > 0) {
                 // Transfer ownership of the container to the caller.
-                *output = new ExtensionDPLArrayContainerAdapter(std::move(shardsPipeline));
+                *output = new ExtensionDPLArrayContainerAdapter(std::move(impl.shardsPipeline));
             }
         });
     }
 
-    static ::MongoExtensionStatus* _extGetMergingPipeline(
+    static ::MongoExtensionStatus* _extExtractMergingPipeline(
         ::MongoExtensionDistributedPlanLogic* distributedPlanLogic,
         ::MongoExtensionDPLArrayContainer** output) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
@@ -123,10 +123,9 @@ private:
             auto& impl =
                 static_cast<ExtensionDistributedPlanLogicAdapter*>(distributedPlanLogic)->getImpl();
 
-            auto mergingPipeline = impl.getMergingPipeline();
-            if (mergingPipeline) {
+            if (impl.mergingPipeline.size() > 0) {
                 // Transfer ownership of the container to the caller.
-                *output = new ExtensionDPLArrayContainerAdapter(std::move(mergingPipeline));
+                *output = new ExtensionDPLArrayContainerAdapter(std::move(impl.mergingPipeline));
             }
         });
     }
@@ -140,20 +139,19 @@ private:
                 static_cast<const ExtensionDistributedPlanLogicAdapter*>(distributedPlanLogic)
                     ->getImpl();
 
-            auto sortPattern = impl.getSortPattern();
-            if (!sortPattern.isEmpty()) {
-                *output = new VecByteBuf(sortPattern);
+            if (!impl.sortPattern.isEmpty()) {
+                *output = new VecByteBuf(impl.sortPattern);
             }
         });
     }
 
     static constexpr ::MongoExtensionDistributedPlanLogicVTable VTABLE{
         .destroy = &_extDestroy,
-        .get_shards_pipeline = &_extGetShardsPipeline,
-        .get_merging_pipeline = &_extGetMergingPipeline,
+        .extract_shards_pipeline = &_extExtractShardsPipeline,
+        .extract_merging_pipeline = &_extExtractMergingPipeline,
         .get_sort_pattern = &_extGetSortPattern};
 
-    std::unique_ptr<DistributedPlanLogicBase> _dpl;
+    DistributedPlanLogic _dpl;
 };
 
 }  // namespace mongo::extension::sdk

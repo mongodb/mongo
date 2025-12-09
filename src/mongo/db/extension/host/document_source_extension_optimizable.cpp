@@ -140,7 +140,7 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic() {
     DistributedPlanLogic logic;
 
     // Convert shardsPipeline.
-    auto shardsPipeline = dplHandle.getShardsPipeline();
+    auto shardsPipeline = dplHandle.extractShardsPipeline();
     if (!shardsPipeline.empty()) {
         tassert(11420601,
                 "Shards pipeline must have exactly one element per API specification",
@@ -153,7 +153,7 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic() {
     }
 
     // Convert mergingPipeline.
-    auto mergingPipeline = dplHandle.getMergingPipeline();
+    auto mergingPipeline = dplHandle.extractMergingPipeline();
     for (auto& handle : mergingPipeline) {
         auto stages = convertDPLHandleToDocumentSources(handle);
         logic.mergingStages.splice(logic.mergingStages.end(), stages);

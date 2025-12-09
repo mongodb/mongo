@@ -61,7 +61,7 @@ extern template void raiiVectorToAbiArray<VariantDPLHandle>(
  * expose it to the host as a ExtensionLogicalAggStage.
  */
 class ExecAggStageBase;
-class DistributedPlanLogicBase;
+class DistributedPlanLogic;
 class LogicalAggStage {
 public:
     virtual ~LogicalAggStage() = default;
@@ -73,7 +73,7 @@ public:
     virtual BSONObj serialize() const = 0;
     virtual BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const = 0;
     virtual std::unique_ptr<ExecAggStageBase> compile() const = 0;
-    virtual std::unique_ptr<DistributedPlanLogicBase> getDistributedPlanLogic() const = 0;
+    virtual boost::optional<DistributedPlanLogic> getDistributedPlanLogic() const = 0;
 
 protected:
     LogicalAggStage() = delete;  // No default constructor.
@@ -165,7 +165,7 @@ private:
                 static_cast<const ExtensionLogicalAggStage*>(extLogicalStage)->getImpl();
 
             if (auto dpl = impl.getDistributedPlanLogic()) {
-                *output = new ExtensionDistributedPlanLogicAdapter(std::move(dpl));
+                *output = new ExtensionDistributedPlanLogicAdapter(std::move(*dpl));
             }
         });
     }

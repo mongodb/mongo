@@ -540,13 +540,15 @@ typedef struct MongoExtensionDistributedPlanLogicVTable {
      * the caller. If a stage must run exclusively on the merging node, the output pointer is
      * returned as a nullptr.
      *
+     * This method may only be called once.
+     *
      * Note: This is currently restricted to only a single shardsStage for parity with the
      * DistributedPlanLogic shardsStage. This single shardsStage must be fully expanded (i.e. not a
      * desugar stage) so that it can be converted to a single DocumentSource. If in the future an
      * extension stage may return more than one shardsStage, we will remove that restriction and
      * modify DistributedPlanLogic.
      */
-    MongoExtensionStatus* (*get_shards_pipeline)(
+    MongoExtensionStatus* (*extract_shards_pipeline)(
         MongoExtensionDistributedPlanLogic* distributedPlanLogic,
         MongoExtensionDPLArrayContainer** output);
 
@@ -557,8 +559,10 @@ typedef struct MongoExtensionDistributedPlanLogicVTable {
      * extension populates the provided output pointer, transferring ownership of the container to
      * the caller. If nothing can run on the merging node, the output pointer is returned as a
      * nullptr.
+     *
+     * This method may only be called once.
      */
-    MongoExtensionStatus* (*get_merging_pipeline)(
+    MongoExtensionStatus* (*extract_merging_pipeline)(
         MongoExtensionDistributedPlanLogic* distributedPlanLogic,
         MongoExtensionDPLArrayContainer** output);
 
@@ -566,6 +570,11 @@ typedef struct MongoExtensionDistributedPlanLogicVTable {
      * Returns which fields are ascending and which fields are descending when merging streams
      * together. Ownership of the ByteBuf is transferred to the caller. The MongoExtensionByteBuf
      * will not be allocated if no sort pattern is required to merge the streams.
+     *
+     * Note: Specifying a sort pattern via DistributedPlanLogic will not be enough to execute
+     * the distributed sort. get_next() on the MongoExtensionExecAggStage must also set the
+     * $sortKey metadata field on each output document. Returning a non-empty sort pattern here but
+     * not setting the sort key metadata on output documents will result in a runtime error.
      */
     MongoExtensionStatus* (*get_sort_pattern)(
         MongoExtensionDistributedPlanLogic* distributedPlanLogic, MongoExtensionByteBuf** output);
