@@ -1806,8 +1806,10 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
-        boost::optional<PauseDuringStateTransitions> doneTransitionGuard;
-        doneTransitionGuard.emplace(controller(), RecipientStateEnum::kDone);
+        auto recipientStates = std::vector<RecipientStateEnum>{RecipientStateEnum::kCloning,
+                                                               RecipientStateEnum::kDone};
+        boost::optional<PauseDuringStateTransitions> stateTransitionsGuard;
+        stateTransitionsGuard.emplace(controller(), recipientStates);
 
         auto doc = makeRecipientDocument(testOptions);
         auto instanceId =
@@ -1825,9 +1827,13 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
         auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
         notifyToStartCloning(opCtx.get(), *recipient, doc);
+        // TODO (SERVER-115139): Don't wait for the recipient to be "cloning" state after making
+        // the recipient able to reliably handle the case where abort request comes in before the
+        // cancellation source is initialized.
+        stateTransitionsGuard->wait(RecipientStateEnum::kCloning);
         recipient->abort(false);
 
-        doneTransitionGuard->wait(RecipientStateEnum::kDone);
+        stateTransitionsGuard->wait(RecipientStateEnum::kDone);
         stepDown();
 
         ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
@@ -1842,7 +1848,7 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
         ASSERT_FALSE(isPausedOrShutdown);
         recipient = *maybeRecipient;
 
-        doneTransitionGuard.reset();
+        stateTransitionsGuard.reset();
         recipient->abort(false);
 
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
