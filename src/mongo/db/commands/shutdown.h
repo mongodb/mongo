@@ -44,15 +44,14 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/ntservice.h"
 
-#include <string>
-#include <vector>
 
 namespace mongo {
-Status stepDownForShutdown(OperationContext* opCtx,
-                           const Milliseconds& waitTime,
-                           bool forceShutdown) noexcept;
+MONGO_MOD_PUBLIC Status stepDownForShutdown(OperationContext* opCtx,
+                                            const Milliseconds& waitTime,
+                                            bool forceShutdown) noexcept;
 
 namespace shutdown_detail {
 /**

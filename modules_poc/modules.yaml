@@ -115,6 +115,8 @@ core.servers:
     - src/mongo/s/mongos_options*
 
 core.commands:
+  meta:
+    fully_marked: true
   files:
     - src/mongo/db/commands/async_command_execution_test.cpp
     - src/mongo/db/commands/buildinfo_common.*

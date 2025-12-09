@@ -39,6 +39,7 @@
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_request_executor.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -56,7 +57,7 @@ namespace mongo {
  * The default implementation available here provide every field except 'storageEngines'
  * which is only provided by the CmdBuildInfoShard specialization.
  */
-class CmdBuildInfoCommon : public TypedCommand<CmdBuildInfoCommon> {
+class MONGO_MOD_OPEN CmdBuildInfoCommon : public TypedCommand<CmdBuildInfoCommon> {
 public:
     using Request = BuildInfoCommand;
     using Reply = typename BuildInfoCommand::Reply;

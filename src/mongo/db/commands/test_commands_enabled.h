@@ -29,6 +29,7 @@
 
 #pragma once
 #include "mongo/base/status.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -52,9 +53,9 @@ namespace mongo {
  *         ...
  *     }
  */
-bool getTestCommandsEnabled();
+MONGO_MOD_PUBLIC bool getTestCommandsEnabled();
 
-void setTestCommandsEnabled(bool b);
+MONGO_MOD_PUBLIC void setTestCommandsEnabled(bool b);
 
 /** Callback for the enableTestCommands server parameter. */
 Status onUpdateTestCommandsEnabled(bool b);
