@@ -29,10 +29,16 @@
 
 #include "mongo/db/s/range_deletion.h"
 
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/service_context.h"
+
 namespace mongo {
 
 RangeDeletion::RangeDeletion(const RangeDeletionTask& task)
-    : _taskId(task.getId()), _range(task.getRange()) {}
+    : _taskId(task.getId()),
+      _range(task.getRange()),
+      _registrationTime(task.getTimestamp().value_or(
+          Timestamp(getGlobalServiceContext()->getFastClockSource()->now()))) {}
 
 RangeDeletion::~RangeDeletion() {
     if (!_completionPromise.getFuture().isReady()) {
@@ -46,6 +52,10 @@ const UUID& RangeDeletion::getTaskId() const {
 
 const ChunkRange& RangeDeletion::getRange() const {
     return _range;
+}
+
+const Timestamp& RangeDeletion::getRegistrationTime() const {
+    return _registrationTime;
 }
 
 SharedSemiFuture<void> RangeDeletion::getPendingFuture() {

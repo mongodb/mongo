@@ -38,7 +38,6 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deleter_service.h"
-#include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -155,20 +154,19 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
                 "Persisting range deletion task on donor",
                 "migrationId"_attr = _migrationInfo.getId(),
                 logAttrs(_migrationInfo.getNss()));
-    RangeDeletionTask donorDeletionTask(_migrationInfo.getId(),
-                                        _migrationInfo.getNss(),
-                                        _migrationInfo.getCollectionUuid(),
-                                        _migrationInfo.getDonorShardId(),
-                                        _migrationInfo.getRange(),
-                                        _waitForDelete ? CleanWhenEnum::kNow
-                                                       : CleanWhenEnum::kDelayed);
-    donorDeletionTask.setPending(true);
-    donorDeletionTask.setKeyPattern(*_shardKeyPattern);
-    const auto currentTime = VectorClock::get(opCtx)->getTime();
-    donorDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
-    donorDeletionTask.setPreMigrationShardVersion(_shardVersionPriorToTheMigration);
-    rangedeletionutil::persistRangeDeletionTaskLocally(
-        opCtx, donorDeletionTask, defaultMajorityWriteConcernDoNotUse());
+
+    _donorRangeDeletionTask.emplace(rangedeletionutil::createAndPersistRangeDeletionTask(
+        opCtx,
+        _migrationInfo.getId(),
+        _migrationInfo.getNss(),
+        _migrationInfo.getCollectionUuid(),
+        _migrationInfo.getDonorShardId(),
+        _migrationInfo.getRange(),
+        _waitForDelete ? CleanWhenEnum::kNow : CleanWhenEnum::kDelayed,
+        true,
+        *_shardKeyPattern,
+        _shardVersionPriorToTheMigration,
+        defaultMajorityWriteConcernDoNotUse()));
 }
 
 void MigrationCoordinator::setMigrationDecision(DecisionEnum decision) {
@@ -282,25 +280,24 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
                                                           _migrationInfo.getCollectionUuid(),
                                                           _migrationInfo.getRange(),
                                                           _migrationInfo.getId());
-
-    RangeDeletionTask deletionTask(_migrationInfo.getId(),
-                                   _migrationInfo.getNss(),
-                                   _migrationInfo.getCollectionUuid(),
-                                   _migrationInfo.getDonorShardId(),
-                                   _migrationInfo.getRange(),
-                                   _waitForDelete ? CleanWhenEnum::kNow : CleanWhenEnum::kDelayed);
-    const auto currentTime = VectorClock::get(opCtx)->getTime();
-    deletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
-    // In multiversion migration recovery scenarios, we may not have the key pattern.
-    if (_shardKeyPattern) {
-        deletionTask.setKeyPattern(*_shardKeyPattern);
+    // We only expect _donorRangeDeletionTask to be empty in a recovery scenario in which case we
+    // can read the task previously persisted to disk.
+    _donorRangeDeletionTask = _donorRangeDeletionTask
+        ? _donorRangeDeletionTask
+        : rangedeletionutil::getRangeDeletionTask(
+              opCtx, _migrationInfo.getCollectionUuid(), _migrationInfo.getRange());
+    if (!_donorRangeDeletionTask) {
+        LOGV2_DEBUG(11335400,
+                    2,
+                    "No range deletion task found on donor",
+                    "migrationId"_attr = _migrationInfo.getId());
+        return Future<void>::makeReady();
     }
 
-
     auto waitForActiveQueriesToComplete = [&]() {
-        return CollectionShardingRuntime::acquireShared(opCtx, deletionTask.getNss())
-            ->getOngoingQueriesCompletionFuture(deletionTask.getCollectionUuid(),
-                                                deletionTask.getRange())
+        return CollectionShardingRuntime::acquireShared(opCtx, _donorRangeDeletionTask->getNss())
+            ->getOngoingQueriesCompletionFuture(_donorRangeDeletionTask->getCollectionUuid(),
+                                                _donorRangeDeletionTask->getRange())
             .semi();
     }();
 
@@ -309,19 +306,19 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
     const auto rangeDeleterService = RangeDeleterService::get(opCtx);
     rangeDeleterService->getTermInitializationFuture().get(opCtx);
     auto rangeDeletionCompletionFuture =
-        rangeDeleterService->registerTask(deletionTask,
+        rangeDeleterService->registerTask(*_donorRangeDeletionTask,
                                           std::move(waitForActiveQueriesToComplete),
                                           RangeDeleterService::TaskPending::kPending);
 
     LOGV2_DEBUG(6555800,
                 2,
                 "Marking range deletion task on donor as ready for processing",
-                "rangeDeletion"_attr = deletionTask);
+                "rangeDeletion"_attr = *_donorRangeDeletionTask);
 
     // Mark the range deletion task document as non-pending in order to unblock the previously
     // registered range deletion
     rangedeletionutil::markAsReadyRangeDeletionTaskLocally(
-        opCtx, deletionTask.getCollectionUuid(), deletionTask.getRange());
+        opCtx, _donorRangeDeletionTask->getCollectionUuid(), _donorRangeDeletionTask->getRange());
 
     return rangeDeletionCompletionFuture;
 }

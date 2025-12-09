@@ -358,10 +358,42 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
     const RangeDeletionTask& rdt,
     SemiFuture<void>&& waitForActiveQueriesToComplete,
     TaskPending pending) {
+
+    auto overlappingRangeDeletions =
+        _rangeDeletionTasks.getOverlappingTasks(rdt.getCollectionUuid(), rdt.getRange());
+
     auto scheduleRangeDeletionChain = [&](SharedSemiFuture<void> pendingFuture) {
         (void)pendingFuture.thenRunOn(_executor)
+            .then([this]() {
+                // Wait for all recovery tasks to be registered first.
+                return getServiceUpFuture();
+            })
             .then([this,
-                   waitForOngoingQueries = std::move(waitForActiveQueriesToComplete).share()]() {
+                   overlappingTasks = std::move(overlappingRangeDeletions),
+                   registrationTime = rdt.getTimestamp().value_or(
+                       Timestamp(getGlobalServiceContext()->getFastClockSource()->now())),
+                   taskId = rdt.getId()]() {
+                std::vector<ExecutorFuture<void>> futures;
+                for (const auto& [_, task] : overlappingTasks) {
+                    if ((task->getRegistrationTime() < registrationTime) ||
+                        (task->getRegistrationTime() == registrationTime &&
+                         taskId < task->getTaskId())) {
+                        futures.emplace_back(task->getCompletionFuture().thenRunOn(_executor));
+                    }
+                }
+                // We want to wait for all overlapping range deletion tasks to finish before
+                // proceeding with this task. This is because the range deleter service assumes that
+                // there are no overlapping range deletion tasks and attempting to union tasks or
+                // splice incoming tasks could lead to unexpected behavior with the current
+                // implementation.
+                if (futures.empty()) {
+                    return SemiFuture<std::vector<Status>>::makeReady(std::vector<Status>{});
+                }
+                return whenAll(std::move(futures));
+            })
+            .then([this, waitForOngoingQueries = std::move(waitForActiveQueriesToComplete).share()](
+                      std::vector<Status> /*statuses*/) {
+                // We do not care about the statuses of the overlapping tasks we waited on.
                 // Step 1: wait for ongoing queries retaining the range to drain
                 return waitForOngoingQueries;
             })

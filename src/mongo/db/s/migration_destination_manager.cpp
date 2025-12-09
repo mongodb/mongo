@@ -1594,29 +1594,25 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
         {
             // 3. Insert a pending range deletion task for the incoming range.
-            RangeDeletionTask recipientDeletionTask(*_migrationId,
-                                                    _nss,
-                                                    donorCollectionOptionsAndIndexes.uuid,
-                                                    _fromShard,
-                                                    range,
-                                                    CleanWhenEnum::kNow);
-            recipientDeletionTask.setPending(true);
-            const auto currentTime = VectorClock::get(outerOpCtx)->getTime();
-            recipientDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
-            recipientDeletionTask.setKeyPattern(KeyPattern(_shardKeyPattern));
 
             // Installing an IGNORED collection version since, if this range deletion task prevails,
             // it will mean that the migration has been aborted.
-            recipientDeletionTask.setPreMigrationShardVersion(ChunkVersion::IGNORED());
+            rangedeletionutil::createAndPersistRangeDeletionTask(
+                outerOpCtx,
+                *_migrationId,
+                _nss,
+                donorCollectionOptionsAndIndexes.uuid,
+                _fromShard,
+                range,
+                CleanWhenEnum::kNow,
+                true,
+                KeyPattern(_shardKeyPattern),
+                ChunkVersion::IGNORED(),
+                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
             // It is illegal to wait for write concern with a session checked out, so persist the
             // range deletion task with an immediately satsifiable write concern and then wait for
             // majority after yielding the session.
-            rangedeletionutil::persistRangeDeletionTaskLocally(
-                outerOpCtx,
-                recipientDeletionTask,
-                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
-
             runWithoutSession(outerOpCtx, [&] {
                 WriteConcernResult ignoreResult;
                 auto latestOpTime =

@@ -197,5 +197,22 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
  * TODO SERVER-103046: Remove once 9.0 becomes last lts.
  */
 MONGO_MOD_PUBLIC void setPreMigrationShardVersionOnRangeDeletionTasks(OperationContext* opCtx);
+
+RangeDeletionTask createAndPersistRangeDeletionTask(
+    OperationContext* opCtx,
+    const UUID& migrationId,
+    const NamespaceString& nss,
+    const UUID& collectionUuid,
+    const ShardId& donorShardId,
+    const ChunkRange& range,
+    CleanWhenEnum whenToClean,
+    bool pending,
+    const boost::optional<KeyPattern>& shardKeyPattern,
+    const boost::optional<ChunkVersion>& preMigrationShardVersion,
+    const WriteConcernOptions& writeConcern);
+
+boost::optional<RangeDeletionTask> getRangeDeletionTask(OperationContext* opCtx,
+                                                        const UUID& collectionUuid,
+                                                        const ChunkRange& range);
 }  // namespace rangedeletionutil
 }  // namespace mongo

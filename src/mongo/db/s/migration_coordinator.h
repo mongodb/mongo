@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/migration_session_id.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
@@ -158,6 +159,7 @@ private:
     ChunkVersion _shardVersionPriorToTheMigration;
     bool _waitForDelete = false;
     boost::optional<ExecutorFuture<void>> _releaseRecipientCriticalSectionFuture;
+    boost::optional<RangeDeletionTask> _donorRangeDeletionTask;
 };
 
 }  // namespace migrationutil

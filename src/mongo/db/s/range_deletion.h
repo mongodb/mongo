@@ -50,6 +50,8 @@ public:
 
     const ChunkRange& getRange() const;
 
+    const Timestamp& getRegistrationTime() const;
+
     SharedSemiFuture<void> getPendingFuture();
 
     void clearPending();
@@ -61,6 +63,7 @@ public:
 private:
     UUID _taskId;
     ChunkRange _range;
+    Timestamp _registrationTime;
 
     // Marked ready once the range deletion has been fully processed
     SharedPromise<void> _completionPromise;

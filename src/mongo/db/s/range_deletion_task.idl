@@ -51,7 +51,7 @@ enums:
 
 structs:
     rangeDeletionTask:
-        # TODO SERVER-113354: Put all interactions with this on-disk state behind public functions in this module.
+        # TODO SERVER-114753: Put all interactions with this on-disk state behind public functions in this module.
         mod_visibility: needs_replacement
         description: "Represents a chunk range to be deleted by the range deleter."
         strict: false

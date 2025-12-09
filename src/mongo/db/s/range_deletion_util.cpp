@@ -61,6 +61,7 @@
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/storage/exceptions.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -793,6 +794,44 @@ void setPreMigrationShardVersionOnRangeDeletionTasks(OperationContext* opCtx) {
     }()});
     update.getWriteCommandRequestBase().setOrdered(false);
     write_ops::checkWriteErrors(client.update(update));
+}
+
+RangeDeletionTask createAndPersistRangeDeletionTask(
+    OperationContext* opCtx,
+    const UUID& migrationId,
+    const NamespaceString& nss,
+    const UUID& collectionUuid,
+    const ShardId& donorShardId,
+    const ChunkRange& range,
+    CleanWhenEnum whenToClean,
+    const bool pending,
+    const boost::optional<KeyPattern>& shardKeyPattern,
+    const boost::optional<ChunkVersion>& preMigrationShardVersion,
+    const WriteConcernOptions& writeConcern) {
+    RangeDeletionTask task(migrationId, nss, collectionUuid, donorShardId, range, whenToClean);
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    task.setTimestamp(currentTime.clusterTime().asTimestamp());
+    task.setPending(pending);
+    task.setKeyPattern(shardKeyPattern);
+    task.setPreMigrationShardVersion(preMigrationShardVersion);
+    persistRangeDeletionTaskLocally(opCtx, task, writeConcern);
+
+    return task;
+}
+
+boost::optional<RangeDeletionTask> getRangeDeletionTask(OperationContext* opCtx,
+                                                        const UUID& collectionUuid,
+                                                        const ChunkRange& range) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    boost::optional<RangeDeletionTask> deletionTask;
+
+    auto filter = getQueryFilterForRangeDeletionTask(collectionUuid, range);
+
+    store.forEach(opCtx, filter, [&](const RangeDeletionTask& task) {
+        deletionTask.emplace(task);
+        return false;
+    });
+    return deletionTask;
 }
 }  // namespace rangedeletionutil
 }  // namespace mongo

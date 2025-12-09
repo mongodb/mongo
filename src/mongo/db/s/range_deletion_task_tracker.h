@@ -77,8 +77,7 @@ public:
      * represent the task parameter provided to this function, and result will be
      * kRegisteredNewTask. If a task with the same ChunkRange already exists, the task pointer in
      * the returned RegisteredTask will point to the previously registered task, and result will be
-     * kJoinedExistingTask. An exception will be thrown if a new task is attempted to be registered
-     * that overlaps, but does not exactly match, an existing task.
+     * kJoinedExistingTask.
      */
     RangeDeletionTaskTracker::RegisteredTask registerTask(const RangeDeletionTask& task);
 

@@ -29,11 +29,14 @@
 
 #include "mongo/db/s/range_deletion_task_tracker.h"
 
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 #define ASSERT_UASSERTS(STATEMENT) ASSERT_THROWS(STATEMENT, AssertionException)
 
 namespace mongo {
+
+class RangeDeletionTaskTrackerTest : public ServiceContextTest {};
 
 RangeDeletionTask createTask(UUID collectionId, ChunkRange range) {
     RangeDeletionTask task;
@@ -71,14 +74,14 @@ std::vector<ChunkRange> getOverlappingRangeCases() {
     return ranges;
 }
 
-TEST(RangeDeletionTaskTracker, RegisterNewTask) {
+TEST_F(RangeDeletionTaskTrackerTest, RegisterNewTask) {
     RangeDeletionTaskTracker tasks;
     auto task = createTask(UUID::gen(), kTestRange);
     auto registration = tasks.registerTask(task);
     ASSERT_EQ(registration.result, RangeDeletionTaskTracker::kRegisteredNewTask);
 }
 
-TEST(RangeDeletionTaskTracker, JoinExistingTask) {
+TEST_F(RangeDeletionTaskTrackerTest, JoinExistingTask) {
     RangeDeletionTaskTracker tasks;
     auto task = createTask(UUID::gen(), kTestRange);
     auto firstRegistration = tasks.registerTask(task);
@@ -88,7 +91,7 @@ TEST(RangeDeletionTaskTracker, JoinExistingTask) {
     ASSERT_EQ(firstRegistration.task, secondRegistration.task);
 }
 
-TEST(RangeDeletionTaskTracker, SameRangeDifferentCollection) {
+TEST_F(RangeDeletionTaskTrackerTest, SameRangeDifferentCollection) {
     RangeDeletionTaskTracker tasks;
     auto task = createTask(UUID::gen(), kTestRange);
     auto firstRegistration = tasks.registerTask(task);
@@ -99,22 +102,7 @@ TEST(RangeDeletionTaskTracker, SameRangeDifferentCollection) {
     ASSERT_NE(firstRegistration.task, secondRegistration.task);
 }
 
-TEST(RangeDeletionTaskTracker, RegisterOverlappingTaskUasserts) {
-    auto collId = UUID::gen();
-    auto originalTask = createTask(collId, {BSON("x" << 10), BSON("x" << 20)});
-    RangeDeletionTaskTracker tasks;
-    tasks.registerTask(originalTask);
-
-    for (const auto& range : getOverlappingRangeCases()) {
-        if (range == originalTask.getRange()) {
-            // Exact overlap joins the existing task.
-            continue;
-        }
-        ASSERT_UASSERTS(tasks.registerTask(createTask(collId, range))) << range.toBSON();
-    }
-}
-
-TEST(RangeDeletionTaskTracker, GetOverlappingTasks) {
+TEST_F(RangeDeletionTaskTrackerTest, GetOverlappingTasks) {
     auto collId = UUID::gen();
     for (const auto& range : getOverlappingRangeCases()) {
         RangeDeletionTaskTracker tasks;
@@ -124,7 +112,7 @@ TEST(RangeDeletionTaskTracker, GetOverlappingTasks) {
     }
 }
 
-TEST(RangeDeletionTaskTracker, MultipleOverlappingTasks) {
+TEST_F(RangeDeletionTaskTrackerTest, MultipleOverlappingTasks) {
     auto collId = UUID::gen();
     RangeDeletionTaskTracker tasks;
     tasks.registerTask(createTask(collId, {BSON("x" << 10), BSON("x" << 15)}));
@@ -133,7 +121,7 @@ TEST(RangeDeletionTaskTracker, MultipleOverlappingTasks) {
     ASSERT_EQ(overlap.size(), 2);
 }
 
-TEST(RangeDeletionTaskTracker, TaskCounts) {
+TEST_F(RangeDeletionTaskTrackerTest, TaskCounts) {
     RangeDeletionTaskTracker tasks;
     ASSERT_EQ(tasks.getTaskCount(), 0);
     ASSERT_EQ(tasks.getTaskCountForCollection(UUID::gen()), 0);
@@ -158,7 +146,7 @@ TEST(RangeDeletionTaskTracker, TaskCounts) {
     ASSERT_EQ(tasks.getTaskCountForCollection(task.getCollectionUuid()), 0);
 }
 
-TEST(RangeDeletionTaskTracker, CompleteTask) {
+TEST_F(RangeDeletionTaskTrackerTest, CompleteTask) {
     RangeDeletionTaskTracker tasks;
     auto task = createTask(UUID::gen(), kTestRange);
     auto [registeredTask, _] = tasks.registerTask(task);

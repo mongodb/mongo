@@ -34,29 +34,6 @@ namespace mongo {
 namespace {
 using Tasks = range_deletions::detail::Tasks;
 const Tasks kEmptyTasks;
-
-std::shared_ptr<RangeDeletion> getFirstOverlappingTask(const Tasks& tasks,
-                                                       const ChunkRange& range) {
-    for (const auto& [_, task] : tasks) {
-        if (task->getRange().overlaps(range)) {
-            return task;
-        }
-    }
-    return nullptr;
-}
-
-void assertNoOverlappingRanges(const Tasks& tasks, const ChunkRange& range) {
-    auto overlap = getFirstOverlappingTask(tasks, range);
-    if (overlap == nullptr) {
-        return;
-    }
-    uasserted(
-        ErrorCodes::RangeOverlapConflict,
-        fmt::format("Unable to register task for range {} because existing range {} is overlapping",
-                    range.toBSON().toString(),
-                    overlap->getRange().toBSON().toString()));
-}
-
 }  // namespace
 
 using RegisteredTask = RangeDeletionTaskTracker::RegisteredTask;
@@ -69,7 +46,6 @@ RegisteredTask RangeDeletionTaskTracker::registerTask(const RangeDeletionTask& t
             return {it->second, RegistrationResult::kJoinedExistingTask};
         }
     }
-    assertNoOverlappingRanges(tasks, task.getRange());
     auto [it, isNewTask] = tasks.emplace(task.getRange(), std::make_shared<RangeDeletion>(task));
     invariant(isNewTask);
     return {it->second, RegistrationResult::kRegisteredNewTask};
