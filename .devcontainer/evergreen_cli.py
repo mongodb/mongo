@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from s3_artifact_utils import calculate_sha256, download_file
 
 # Default Evergreen CLI version
-DEFAULT_EVERGREEN_VERSION = "4abdb95261a646cdd4b979e8717f261d830e6a0b"
+DEFAULT_EVERGREEN_VERSION = "9e70579a0122864374d4449c6d195c0b00c9c458"
 
 # S3 bucket and prefix
 BUCKET = "evg-bucket-evergreen"
