@@ -2,8 +2,19 @@
 import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
+
+// Get original log verbosities so we can reset them later.
+const nodes = [st.s0, st.rs0.getPrimary(), st.rs1.getPrimary()];
+let originalVerbosities = [];
+for (const node of nodes) {
+    let originalVerbosity = assert.commandWorked(
+        node.adminCommand({getParameter: 1, logComponentVerbosity: 1}),
+    ).logComponentVerbosity;
+    originalVerbosities.push({"node": node, "verbosity": originalVerbosity});
+}
 
 const mongosDB = st.s0.getDB("source_db");
 const sourceColl = mongosDB["source_coll"];
@@ -127,39 +138,48 @@ function testMerge(sourceColl, targetColl, shardedSource, shardedTarget) {
     }
 }
 
-//
-// Tests for $merge where the output collection is in the same database as the source
-// collection.
-//
+try {
+    // Bump up the log component verbosity for sharding on each node to diagnose in case of failure (BF-40553).
+    setLogVerbosity(nodes, {"sharding": {"verbosity": 5}});
 
-// Test with unsharded source and sharded target collection.
-testMerge(sourceColl, outputCollSameDb, false, true);
+    //
+    // Tests for $merge where the output collection is in the same database as the source
+    // collection.
+    //
+    // Test with unsharded source and sharded target collection.
+    testMerge(sourceColl, outputCollSameDb, false, true);
 
-// Test with sharded source and sharded target collection.
-testMerge(sourceColl, outputCollSameDb, true, true);
+    // Test with sharded source and sharded target collection.
+    testMerge(sourceColl, outputCollSameDb, true, true);
 
-// Test with sharded source and unsharded target collection.
-testMerge(sourceColl, outputCollSameDb, true, false);
+    // Test with sharded source and unsharded target collection.
+    testMerge(sourceColl, outputCollSameDb, true, false);
 
-// Test with unsharded source and unsharded target collection.
-testMerge(sourceColl, outputCollSameDb, false, false);
+    // Test with unsharded source and unsharded target collection.
+    testMerge(sourceColl, outputCollSameDb, false, false);
 
-//
-// Tests for $merge to a database that differs from the source collection's database.
-//
-const foreignDb = st.s0.getDB("foreign_db");
-const outputCollDiffDb = foreignDb["output_coll"];
+    //
+    // Tests for $merge to a database that differs from the source collection's database.
+    //
+    const foreignDb = st.s0.getDB("foreign_db");
+    const outputCollDiffDb = foreignDb["output_coll"];
 
-// Test with sharded source and sharded target collection.
-testMerge(sourceColl, outputCollDiffDb, true, true);
+    // Test with sharded source and sharded target collection.
+    testMerge(sourceColl, outputCollDiffDb, true, true);
 
-// Test with unsharded source and unsharded target collection.
-testMerge(sourceColl, outputCollDiffDb, false, false);
+    // Test with unsharded source and unsharded target collection.
+    testMerge(sourceColl, outputCollDiffDb, false, false);
 
-// Test with unsharded source and sharded target collection.
-testMerge(sourceColl, outputCollDiffDb, false, true);
+    // Test with unsharded source and sharded target collection.
+    testMerge(sourceColl, outputCollDiffDb, false, true);
 
-// Test with sharded source and unsharded target collection.
-testMerge(sourceColl, outputCollDiffDb, true, false);
+    // Test with sharded source and unsharded target collection.
+    testMerge(sourceColl, outputCollDiffDb, true, false);
+} finally {
+    // Reset the log verbosities to the original values on all nodes.
+    for (const nodeVerbosityInfo of originalVerbosities) {
+        setLogVerbosity([nodeVerbosityInfo["node"]], nodeVerbosityInfo["verbosity"]);
+    }
 
-st.stop();
+    st.stop();
+}
