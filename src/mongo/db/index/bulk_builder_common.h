@@ -128,6 +128,10 @@ public:
                 static_cast<T*>(this)->debugEnsureSorted(data);
             }
 
+            if (static_cast<T*>(this)->duplicateMetadataKeyCheck(data)) {
+                continue;
+            }
+
             // Before attempting to insert, perform a duplicate key check.
             bool isDup;
             try {

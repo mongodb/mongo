@@ -1155,6 +1155,14 @@ RecordId decodeRecordIdLongAtEnd(const void* buf, size_t size);
 RecordId decodeRecordIdStrAtEnd(const void* buf, size_t size);
 
 /**
+ * Decodes a RecordId in the given format from the end of a buffer.
+ */
+inline RecordId decodeRecordIdAtEnd(const void* buf, size_t size, KeyFormat keyFormat) {
+    return keyFormat == KeyFormat::String ? decodeRecordIdStrAtEnd(buf, size)
+                                          : decodeRecordIdLongAtEnd(buf, size);
+}
+
+/**
  * Given a KeyString with a RecordId in the long format, returns the length of the section without
  * the RecordId.
  * If a RecordId pointer is provided, also decode the RecordId into the pointer.

@@ -134,6 +134,9 @@ public:
                         bool dupsAllowed,
                         const RecordIdHandlerFn& onDuplicateRecord);
 
+    bool duplicateMetadataKeyCheck(
+        const std::pair<ColumnStoreSorter::Key, ColumnStoreSorter::Value>& data);
+
     void insertKey(std::unique_ptr<ColumnStore::BulkBuilder>& inserter,
                    const std::pair<ColumnStoreSorter::Key, ColumnStoreSorter::Value>& data);
 
@@ -266,6 +269,11 @@ bool ColumnStoreAccessMethod::BulkBuilder::duplicateCheck(
     bool dupsAllowed,
     const RecordIdHandlerFn& onDuplicateRecord) {
     // no duplicates in a columnstore index
+    return false;
+}
+
+bool ColumnStoreAccessMethod::BulkBuilder::duplicateMetadataKeyCheck(
+    const std::pair<ColumnStoreSorter::Key, ColumnStoreSorter::Value>& data) {
     return false;
 }
 
