@@ -46,7 +46,13 @@ server_parameters:
         cpp_varname: gOpenTelemetryMetricsHttpEndpoint
         cpp_vartype: std::string
         redact: false
-
+    openTelemetryMetricsCompression:
+        description: Compression type for exporting OTel metrics. Valid options are ["none", "gzip"]. Default is "none".
+        set_at: startup
+        cpp_varname: gOpenTelemetryMetricsCompression
+        cpp_vartype: std::string
+        redact: false
+        default: none
     openTelemetryExportIntervalMillis:
         description: The time interval between two consecutive exports.
         set_at: startup
@@ -54,7 +60,6 @@ server_parameters:
         cpp_vartype: int
         redact: false
         default: 1000
-
     openTelemetryExportTimeoutMillis:
         description: The timeout of an export.
         set_at: startup

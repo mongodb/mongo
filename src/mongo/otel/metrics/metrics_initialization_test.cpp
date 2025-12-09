@@ -135,6 +135,55 @@ TEST_F(OtelMetricsInitializationTest, FeatureFlagDisabledHttpSet) {
     ASSERT_TRUE(isNoop(provider.get()));
 }
 
+TEST_F(OtelMetricsInitializationTest, InvalidCompressionParam) {
+    {
+        RAIIServerParameterControllerForTest httpParam{"openTelemetryMetricsHttpEndpoint",
+                                                       "http://localhost:4318/v1/traces"};
+        RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
+                                                              "foo"};
+        ASSERT_EQ(metrics::initialize("mongod").code(), ErrorCodes::InvalidOptions);
+        auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+        ASSERT_TRUE(isNoop(provider.get()));
+    }
+
+    RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory", "/tmp/"};
+    for (const auto& value : {"gzip", "foo"}) {
+        RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
+                                                              value};
+        ASSERT_EQ(metrics::initialize("mongod").code(), ErrorCodes::InvalidOptions);
+        auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+        ASSERT_TRUE(isNoop(provider.get()));
+    }
+}
+
+TEST_F(OtelMetricsInitializationTest, ValidCompressionParam) {
+    {
+        RAIIServerParameterControllerForTest httpParam{"openTelemetryMetricsHttpEndpoint",
+                                                       "http://localhost:4318/v1/traces"};
+        for (const auto& value : {"gzip", "none"}) {
+            RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
+                                                                  value};
+            ASSERT_OK(metrics::initialize("mongod"));
+
+            auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+            ASSERT_FALSE(isNoop(provider.get()));
+            ASSERT_NOT_EQUALS(provider.get(), nullptr);
+
+            metrics::shutdown();
+        }
+    }
+
+    RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory", "/tmp/"};
+    RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
+                                                          "none"};
+    ASSERT_OK(metrics::initialize("mongod"));
+
+    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+    ASSERT_FALSE(isNoop(provider.get()));
+    ASSERT_NOT_EQUALS(provider.get(), nullptr);
+
+    metrics::shutdown();
+}
 }  // namespace
 }  // namespace otel
 }  // namespace mongo
