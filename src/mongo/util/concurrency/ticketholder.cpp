@@ -186,11 +186,6 @@ boost::optional<Ticket> TicketHolder::_performWaitForTicketUntil(OperationContex
                                                                  AdmissionContext* admCtx,
                                                                  Date_t until,
                                                                  bool interruptible) {
-    // Cap 'until' to not exceed the operation's deadline.
-    if (interruptible && opCtx->hasDeadline()) {
-        until = std::min(until, opCtx->getDeadline());
-    }
-
     auto nextDeadline = [&]() {
         // Timed waits can be problematic if we have a large number of waiters, since each time we
         // check for interrupt we risk waking up all waiting threads at the same time. We introduce
@@ -239,21 +234,7 @@ boost::optional<Ticket> TicketHolder::_performWaitForTicketUntil(OperationContex
         }
 
         if (deadline == until) {
-            if (!interruptible) {
-                // Uninterruptible wait - just return timeout
-                return boost::none;
-            }
-
-            // It's possible that system_clock (used by BasicWaitableAtomic::waitUntil)
-            // is slightly ahead of FastClock (used by OperationContext::checkForInterrupt).
-            // Handle this clock skew by explicitly checking the deadline against until,
-            // similar to OperationContext::waitForConditionOrInterruptNoAssertUntil.
-            opCtx->checkForDeadlineExpired(until);
-
-            // We only reach here when 'until' < opCtx->getDeadline(), meaning the caller
-            // provided an explicit deadline that is earlier than the operation's maxTimeMS.
-            // In this case, we return boost::none to indicate the caller's deadline expired
-            // (non-throwing), while the operation itself remains alive.
+            // We hit the end of our deadline, so return nothing.
             return boost::none;
         }
     }

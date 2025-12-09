@@ -888,11 +888,6 @@ public:
     }
 
 private:
-    /**
-     * Helper that marks the operation as killed (if not an artificial deadline) and returns an
-     * error Status indicating the deadline has expired.
-     */
-    Status _markKilledAndReturnDeadlineError() noexcept;
     StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
         stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override;
 
@@ -918,28 +913,6 @@ private:
             markKilled(_timeoutError);
         }
     }
-
-    /**
-     * Returns true if this operation has a deadline and it has passed according to the now argument
-     */
-    bool _hasDeadlineExpired(Date_t now) const;
-
-    /**
-     * Returns a timeout error Status if 'now' indicates the operation's deadline has been
-     * reached. Returns Status::OK() otherwise.
-     *
-     * Use this function when the current time is retrieved from a clock source different
-     * from the one used by this Interruptible in checkForInterruptNoAssert
-     * (e.g., system_clock vs FastClockSource).
-     *
-     * Only returns an error if 'now' >= getDeadline(), indicating the operation's own
-     * deadline (e.g., maxTimeMS) has expired. If 'now' < getDeadline(), the caller provided
-     * an earlier deadline unrelated to this operation, and Status::OK() is returned.
-     *
-     * For non-artificial deadlines, also marks the operation as killed before returning.
-     * See waitForConditionOrInterruptNoAssertUntil() for the similar pattern.
-     */
-    Status checkForDeadlineExpiredNoAssert(Date_t now) noexcept override;
 
     /**
      * Returns true if this operation has a deadline and it has passed according to the fast clock

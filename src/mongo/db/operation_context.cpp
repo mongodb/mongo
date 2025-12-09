@@ -142,7 +142,7 @@ void OperationContext::setDeadlineAfterNowBy(Microseconds maxTime, ErrorCodes::E
     setDeadlineAndMaxTime(when, maxTime, timeoutError);
 }
 
-bool OperationContext::_hasDeadlineExpired(Date_t now) const {
+bool OperationContext::hasDeadlineExpired() const {
     if (!hasDeadline()) {
         return false;
     }
@@ -153,16 +153,8 @@ bool OperationContext::_hasDeadlineExpired(Date_t now) const {
         return true;
     }
 
-    return now >= getDeadline();
-}
-
-bool OperationContext::hasDeadlineExpired() const {
-    if (!hasDeadline()) {
-        return false;
-    }
-
     const auto now = fastClockSource().now();
-    return _hasDeadlineExpired(now);
+    return now >= getDeadline();
 }
 
 ErrorCodes::Error OperationContext::getTimeoutError() const {
@@ -241,7 +233,10 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
     }
 
     if (hasDeadlineExpired()) {
-        return _markKilledAndReturnDeadlineError();
+        if (!_hasArtificialDeadline) {
+            markKilled(_timeoutError);
+        }
+        return Status(_timeoutError, "operation exceeded time limit");
     }
 
     if (_ignoreInterrupts) {
@@ -401,21 +396,6 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
         // contract.
         return ex.toStatus();
     }
-}
-
-Status OperationContext::_markKilledAndReturnDeadlineError() noexcept {
-    // TODO SERVER-115028: Unify with _markKilledIfDeadlineRequires
-    if (!_hasArtificialDeadline) {
-        markKilled(_timeoutError);
-    }
-    return Status(_timeoutError, "operation exceeded time limit");
-}
-
-Status OperationContext::checkForDeadlineExpiredNoAssert(Date_t now) noexcept {
-    if (_hasDeadlineExpired(now)) {
-        return _markKilledAndReturnDeadlineError();
-    }
-    return Status::OK();
 }
 
 void OperationContext::markKilled(ErrorCodes::Error killCode) {
