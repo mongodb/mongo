@@ -46,3 +46,19 @@ server_parameters:
         cpp_varname: gOpenTelemetryMetricsHttpEndpoint
         cpp_vartype: std::string
         redact: false
+
+    openTelemetryExportIntervalMillis:
+        description: The time interval between two consecutive exports.
+        set_at: startup
+        cpp_varname: gOpenTelemetryExportIntervalMillis
+        cpp_vartype: int
+        redact: false
+        default: 1000
+
+    openTelemetryExportTimeoutMillis:
+        description: The timeout of an export.
+        set_at: startup
+        cpp_varname: gOpenTelemetryExportTimeoutMillis
+        cpp_vartype: int
+        redact: false
+        default: 500

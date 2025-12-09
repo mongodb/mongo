@@ -70,9 +70,8 @@ Status initializeHttp(const std::string& name, const std::string& endpoint) {
 
     // Initialize and set the global MeterProvider
     metrics_sdk::PeriodicExportingMetricReaderOptions pemOpts;
-    // TODO SERVER-105803 add a configurable knob for these
-    pemOpts.export_interval_millis = stdx::chrono::milliseconds(1000);
-    pemOpts.export_timeout_millis = stdx::chrono::milliseconds(500);
+    pemOpts.export_interval_millis = stdx::chrono::milliseconds(gOpenTelemetryExportIntervalMillis);
+    pemOpts.export_timeout_millis = stdx::chrono::milliseconds(gOpenTelemetryExportTimeoutMillis);
 
     auto reader =
         metrics_sdk::PeriodicExportingMetricReaderFactory::Create(std::move(exporter), pemOpts);
@@ -103,9 +102,8 @@ Status initializeFile(const std::string& name, const std::string& directory) {
 
     // Initialize and set the global MeterProvider
     metrics_sdk::PeriodicExportingMetricReaderOptions pemOpts;
-    // TODO SERVER-105803 add a configurable knob for these
-    pemOpts.export_interval_millis = stdx::chrono::milliseconds(1000);
-    pemOpts.export_timeout_millis = stdx::chrono::milliseconds(500);
+    pemOpts.export_interval_millis = stdx::chrono::milliseconds(gOpenTelemetryExportIntervalMillis);
+    pemOpts.export_timeout_millis = stdx::chrono::milliseconds(gOpenTelemetryExportTimeoutMillis);
 
     auto reader =
         metrics_sdk::PeriodicExportingMetricReaderFactory::Create(std::move(exporter), pemOpts);
