@@ -1235,15 +1235,10 @@ class RunPlugin(PluginInterface):
             "generate-multiversion-exclude-tags",
             "generate-matrix-suites",
         ):
+            configure_resmoke.validate_and_update_config(parser, parsed_args, should_configure_otel)
             if config.EVERGREEN_TASK_ID is not None:
-                configure_resmoke.validate_and_update_config(
-                    parser, parsed_args, should_configure_otel
-                )
                 return TestRunnerEvg(subcommand, **kwargs)
             else:
-                configure_resmoke.validate_and_update_config(
-                    parser, parsed_args, should_configure_otel
-                )
                 return TestRunner(subcommand, **kwargs)
         return None
 
