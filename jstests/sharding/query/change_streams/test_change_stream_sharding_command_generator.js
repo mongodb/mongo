@@ -11,6 +11,11 @@ import {ShardingCommandGeneratorParams} from "jstests/libs/util/change_stream/ch
 import {State} from "jstests/libs/util/change_stream/change_stream_state.js";
 import {Writer} from "jstests/libs/util/change_stream/change_stream_writer.js";
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
+import {ChangeEventMatcher} from "jstests/libs/util/change_stream/change_stream_event.js";
+import {
+    SingleChangeStreamMatcher,
+    MultipleChangeStreamMatcher,
+} from "jstests/libs/util/change_stream/change_stream_matcher.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
@@ -154,5 +159,92 @@ describe("ShardingCommandGenerator", function () {
         );
 
         jsTest.log.info("✓ Sequential multi-Writer test passed");
+    });
+});
+
+describe("ChangeEventMatcher helpers", function () {
+    it("matches only the fields provided in the expected event and ignores extras", () => {
+        const expected = {
+            operationType: "insert",
+            ns: {db: "testDb", coll: "testColl"},
+            fullDocument: {_id: 1},
+        };
+
+        const actual = {
+            operationType: "insert",
+            ns: {db: "testDb", coll: "testColl"},
+            fullDocument: {_id: 1},
+            clusterTime: new Timestamp(1, 1), // ignored because not in expected
+            _id: {_data: "opaqueResumeToken"}, // ignored because not in expected
+        };
+
+        const matcher = new ChangeEventMatcher(expected);
+        assert(matcher.matches(actual));
+    });
+
+    it("returns false when a required expected field does not match", () => {
+        const expected = {
+            operationType: "insert",
+            fullDocument: {_id: 1},
+        };
+        const actual = {
+            operationType: "insert",
+            fullDocument: {_id: 2},
+        };
+
+        const matcher = new ChangeEventMatcher(expected);
+        assert(!matcher.matches(actual));
+    });
+
+    it("advances through ordered events with SingleChangeStreamMatcher", () => {
+        const m1 = new ChangeEventMatcher({operationType: "insert", fullDocument: {_id: 1}});
+        const m2 = new ChangeEventMatcher({operationType: "insert", fullDocument: {_id: 2}});
+
+        const streamMatcher = new SingleChangeStreamMatcher([m1, m2]);
+
+        assert(streamMatcher.matches({operationType: "insert", fullDocument: {_id: 1}}));
+        assert(!streamMatcher.isDone());
+        assert(streamMatcher.matches({operationType: "insert", fullDocument: {_id: 2}}));
+        assert(streamMatcher.isDone());
+    });
+
+    it("matches interleaved events across multiple streams with MultipleChangeStreamMatcher", () => {
+        // Stream 1 expects: insert _id:1, then insert _id:3
+        const stream1 = new SingleChangeStreamMatcher([
+            new ChangeEventMatcher({operationType: "insert", fullDocument: {_id: 1}}),
+            new ChangeEventMatcher({operationType: "insert", fullDocument: {_id: 3}}),
+        ]);
+
+        // Stream 2 expects: insert _id:2, then insert _id:4
+        const stream2 = new SingleChangeStreamMatcher([
+            new ChangeEventMatcher({operationType: "insert", fullDocument: {_id: 2}}),
+            new ChangeEventMatcher({operationType: "insert", fullDocument: {_id: 4}}),
+        ]);
+
+        const multiMatcher = new MultipleChangeStreamMatcher([stream1, stream2]);
+
+        // Events arrive interleaved: 1, 2, 3, 4
+        assert(multiMatcher.matches({operationType: "insert", fullDocument: {_id: 1}}));
+        assert(!multiMatcher.isDone());
+
+        assert(multiMatcher.matches({operationType: "insert", fullDocument: {_id: 2}}));
+        assert(!multiMatcher.isDone());
+
+        assert(multiMatcher.matches({operationType: "insert", fullDocument: {_id: 3}}));
+        assert(!multiMatcher.isDone());
+
+        assert(multiMatcher.matches({operationType: "insert", fullDocument: {_id: 4}}));
+        assert(multiMatcher.isDone());
+    });
+
+    it("returns false when event matches no stream in MultipleChangeStreamMatcher", () => {
+        const stream1 = new SingleChangeStreamMatcher([
+            new ChangeEventMatcher({operationType: "insert", fullDocument: {_id: 1}}),
+        ]);
+
+        const multiMatcher = new MultipleChangeStreamMatcher([stream1]);
+
+        // Event _id:99 doesn't match any stream
+        assert(!multiMatcher.matches({operationType: "insert", fullDocument: {_id: 99}}));
     });
 });
