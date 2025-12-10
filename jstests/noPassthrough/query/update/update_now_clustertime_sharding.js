@@ -197,7 +197,7 @@ assert.commandFailedWithCode(
         update: {$set: {operationFailsBeforeApplyingUpdates: true}},
         runtimeConstants: {localNow: new Date(), clusterTime: new Timestamp(0, 0)},
     }),
-    51196,
+    [51196, 11423300],
 );
 
 // Test that $$NOW and $$CLUSTER_TIME can be used in a findAndModify query and update.

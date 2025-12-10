@@ -127,9 +127,12 @@ BulkWriteCommandReply bulkWrite(OperationContext* opCtx,
         executeWriteCommand(opCtx, WriteCommandRef{request}, originalCommand));
 }
 
-FindAndModifyCommandResponse findAndModify(OperationContext* opCtx,
-                                           const write_ops::FindAndModifyCommandRequest& request,
-                                           BSONObj originalCommand) {
+FindAndModifyCommandResponse findAndModify(
+    OperationContext* opCtx,
+    const write_ops::FindAndModifyCommandRequest& originalRequest,
+    BSONObj originalCommand) {
+    // Make a copy in the event that we need to set runtime constants.
+    auto request = originalRequest;
     if (request.getEncryptionInformation()) {
         StatusWith<write_ops::FindAndModifyCommandReply> swReply(
             write_ops::FindAndModifyCommandReply{});
@@ -142,6 +145,12 @@ FindAndModifyCommandResponse findAndModify(OperationContext* opCtx,
         // case.
     }
 
+    // Append mongoS' runtime constants to the command object so that we have the same values
+    // for these constants across all shards.
+    uassert(11423300,
+            "Cannot specify runtime constants option to a mongos",
+            request.getLegacyRuntimeConstants() == boost::none);
+    request.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
     return std::get<FindAndModifyCommandResponse>(
         executeWriteCommand(opCtx, WriteCommandRef{request}, originalCommand));
 }
