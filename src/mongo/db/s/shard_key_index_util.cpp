@@ -34,7 +34,10 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/s/sharding_api_d_params_gen.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/assert_util.h"
 
 #include <memory>
@@ -168,9 +171,8 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
         reasons |= kErrorCollation;
     }
 
-    if (errMsg && reasons != 0) {
-        std::string errors = "Index " + indexEntry->descriptor()->indexName() +
-            " cannot be used for sharding because:";
+    if (reasons != 0) {
+        std::string errors = "Index " + desc->indexName() + " cannot be used for sharding because:";
         if (reasons & kErrorPartial) {
             errors += " Index key is partial.";
         }
@@ -189,10 +191,31 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
         if (reasons & kErrorWildcard) {
             errors += " Index key is a wildcard index.";
         }
-        if (!errMsg->empty()) {
-            *errMsg += "\n";
+
+        if (errMsg) {
+            if (!errMsg->empty()) {
+                *errMsg += "\n";
+            }
+            *errMsg += errors;
         }
-        *errMsg += errors;
+
+        // TODO (SERVER-112793) Remove metrics reporting for compound wildcard indexes prefixed by
+        // the shard key once v9.0 branches out.
+        if (reasons & kErrorWildcard && !(reasons & kErrorNotPrefix)) {
+            ShardingStatistics::get(opCtx)
+                .countHitsOfCompoundWildcardIndexesWithShardKeyPrefix.addAndFetch(1);
+            if (enableCompoundWildcardIndexLog.load()) {
+                static logv2::SeveritySuppressor logSeverity{
+                    Hours{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(5)};
+                LOGV2_DEBUG(11279201,
+                            logSeverity().toInt(),
+                            "Found a compound wildcard index prefixed by the shard key",
+                            "index"_attr = desc->keyPattern(),
+                            "indexName"_attr = desc->indexName(),
+                            "shardKey"_attr = shardKey,
+                            "nss"_attr = collection.get()->ns());
+            }
+        }
     }
     return false;
 }
