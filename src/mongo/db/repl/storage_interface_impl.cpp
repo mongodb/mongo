@@ -691,6 +691,17 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
     auto isFind = mode == FindDeleteMode::kFind;
     auto opStr = isFind ? "StorageInterfaceImpl::find" : "StorageInterfaceImpl::delete";
 
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+    // TODO SERVER-114535: If a lock-free read is active and we enter this function the operation
+    // could force us to abandon the snapshot opened. This could cause the acquisition held above
+    // this call to become invalid by accident. We disable the checks temporarily until a more
+    // permanent fix is in place.
+    boost::optional<DisableCollectionConsistencyChecks> disableChecks;
+    if (isFind) {
+        disableChecks.emplace(opCtx);
+    }
+#endif
+
     return writeConflictRetry(opCtx, opStr, nsOrUUID, [&]() -> StatusWith<std::vector<BSONObj>> {
         // We need to explicitly use this in a few places to help the type inference.  Use a
         // shorthand.

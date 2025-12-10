@@ -383,6 +383,10 @@ static std::pair<BSONObj, BSONObj> buildMetadataKeyRange(const BSONObj& keyPatte
 std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
                                               const IndexCatalogEntry* index,
                                               MultikeyMetadataAccessStats* stats) {
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+    // TODO SERVER-94613: Remove this once there is no more writeConflictRetry loop here.
+    DisableCollectionConsistencyChecks disableChecks{opCtx};
+#endif
     return writeConflictRetry(
         opCtx, "wildcard multikey path retrieval", NamespaceString::kEmpty, [&]() {
             tassert(7354611, "stats must be non-null", stats);

@@ -161,6 +161,15 @@ public:
 
     /** Returns whatever `f` returns. */
     decltype(auto) operator()(auto&& f) {
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+        // There cannot be a collection in use when entering a Write Conflict Retry since we could
+        // end up with a stale pointer to the collection if we abandon the snapshot. This call will
+        // invariant if there is a collection in use.
+        ConsistentCollection::checkNoCollectionsInUse(
+            _opCtx,
+            _recoveryUnit(),
+            "No collection can be use when entering a write conflict retry loop");
+#endif
         // Always run without retries in a WuoW because the entire WuoW needs to be retried.
         if (shard_role_details::getLocker(_opCtx)->inAWriteUnitOfWork())
             return _runWithoutRetries(f);

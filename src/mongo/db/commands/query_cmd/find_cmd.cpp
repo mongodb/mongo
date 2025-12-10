@@ -444,6 +444,12 @@ public:
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* replyBuilder) override {
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+            // TODO SERVER-115113: This writeConflictRetry loop shouldn't exist as the operation is
+            // exclusively performing a read. Temporarily disable the consistent collection checker
+            // until this gets resolved.
+            DisableCollectionConsistencyChecks disableChecks{opCtx};
+#endif
             writeConflictRetry(
                 opCtx, "find explain cmd WriteConflictException loop", _ns, [&]() -> void {
                     this->explainFind(opCtx, verbosity, replyBuilder);
@@ -637,6 +643,12 @@ public:
          * information in 'getExecutorFind' invocation.
          */
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* replyBuilder) override {
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+            // TODO SERVER-115113: This writeConflictRetry loop shouldn't exist as the operation is
+            // exclusively performing a read. Temporarily disable the consistent collection checker
+            // until this gets resolved.
+            DisableCollectionConsistencyChecks disableChecks{opCtx};
+#endif
             writeConflictRetry(opCtx, "find cmd WriteConflictException loop", _ns, [&]() -> void {
                 this->runFind(opCtx, replyBuilder);
             });

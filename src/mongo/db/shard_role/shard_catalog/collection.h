@@ -761,6 +761,18 @@ public:
     }
 };
 
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+class MONGO_MOD_PUBLIC DisableCollectionConsistencyChecks {
+public:
+    DisableCollectionConsistencyChecks(OperationContext* opCtx, int numTimes = 1);
+    ~DisableCollectionConsistencyChecks();
+
+private:
+    OperationContext* _opCtx;
+    int _previousValue;
+};
+#endif
+
 /**
  * A collection pointer that is consistent with the underlying WT snapshot. This class will
  * invariant in debug builds that there are no pointers to the collection leftover once we abandon
@@ -816,6 +828,12 @@ public:
     const Collection* get() const {
         return _collection;
     }
+
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+    static void checkNoCollectionsInUse(OperationContext* opCtx,
+                                        RecoveryUnit& ru,
+                                        StringData message);
+#endif
 
 private:
     friend class CollectionCatalog;  // The catalog is the main source for consistent collections as

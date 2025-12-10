@@ -74,6 +74,14 @@ public:
         return _collections[coll];
     }
 
+    bool isEmpty() const {
+        for (const auto& [_, count] : _collections) {
+            if (count != 0)
+                return false;
+        }
+        return true;
+    }
+
 private:
     stdx::unordered_map<const Collection*, int> _collections;
 };
@@ -82,11 +90,24 @@ private:
 #ifdef MONGO_CONFIG_DEBUG_BUILD
 const RecoveryUnit::Snapshot::Decoration<CollectionsInUse> collectionsInUse =
     RecoveryUnit::Snapshot::declareDecoration<CollectionsInUse>();
+const OperationContext::Decoration<int> disableConsistentCollectionChecks =
+    OperationContext::declareDecoration<int>();
 #endif
 
 }  // namespace
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
+DisableCollectionConsistencyChecks::DisableCollectionConsistencyChecks(OperationContext* opCtx,
+                                                                       int numTimes)
+    : _opCtx(opCtx) {
+    _previousValue = disableConsistentCollectionChecks(opCtx);
+    disableConsistentCollectionChecks(opCtx) += numTimes;
+}
+
+DisableCollectionConsistencyChecks::~DisableCollectionConsistencyChecks() {
+    disableConsistentCollectionChecks(_opCtx) = _previousValue;
+}
+
 ConsistentCollection::~ConsistentCollection() {
     _releaseCollectionIfInSnapshot();
 }
@@ -142,6 +163,19 @@ ConsistentCollection& ConsistentCollection::operator=(ConsistentCollection&& oth
     _collection = std::exchange(other._collection, nullptr);
     _snapshot = std::exchange(other._snapshot, nullptr);
     return *this;
+}
+
+void ConsistentCollection::checkNoCollectionsInUse(OperationContext* opCtx,
+                                                   RecoveryUnit& ru,
+                                                   StringData message) {
+    if (disableConsistentCollectionChecks(opCtx) > 0) {
+        disableConsistentCollectionChecks(opCtx)--;
+        return;
+    }
+    auto snapshot = &ru.getSnapshot();
+    if (!collectionsInUse(snapshot).isEmpty()) {
+        LOGV2_FATAL(11205800, "Check for no collection in use failed", "error"_attr = message);
+    }
 }
 
 int ConsistentCollection::_getRefCount() const {

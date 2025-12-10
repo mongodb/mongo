@@ -531,6 +531,14 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
     FLETagQueryInterface::TagQueryType type) {
 
     auto opStr = "getTagsFromStorage"_sd;
+
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+    // TODO SERVER-114536: If a lock-free read is active and we enter this function the operation
+    // could force us to abandon the snapshot opened. This could cause the acquisition held above
+    // this call to become invalid by accident. We disable the checks temporarily until a more
+    // permanent fix is in place.
+    DisableCollectionConsistencyChecks disableChecks{opCtx};
+#endif
     return writeConflictRetry(
         opCtx, opStr, nsOrUUID, [&]() -> std::vector<std::vector<FLEEdgeCountInfo>> {
             const auto collectionAcquisition = acquireCollectionMaybeLockFree(
