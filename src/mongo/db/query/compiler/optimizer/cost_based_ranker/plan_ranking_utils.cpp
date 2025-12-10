@@ -138,6 +138,7 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
     std::unique_ptr<ce::SamplingEstimator> samplingEstimator =
         std::make_unique<ce::SamplingEstimatorImpl>(&opCtx,
                                                     collectionsAccessor,
+                                                    nss,
                                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                     static_cast<size_t>(sampleSize),
                                                     samplingStyle,

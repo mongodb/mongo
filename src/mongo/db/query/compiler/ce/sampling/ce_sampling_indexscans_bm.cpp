@@ -309,6 +309,7 @@ void BM_RunCardinalityEstimationOnSampleWithIndexBounds(benchmark::State& state)
     SamplingEstimatorImpl samplingEstimator(
         samplingEstimatorTest.getOperationContext(),
         collection,
+        collection.getMainCollection()->ns(),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         samplingStyle.first,
@@ -377,6 +378,7 @@ void BM_RunCardinalityEstimationOnSampleWithMatchExpressions(benchmark::State& s
     SamplingEstimatorImpl samplingEstimator(
         samplingEstimatorTest.getOperationContext(),
         collection,
+        collection.getMainCollection()->ns(),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         samplingStyle.first,

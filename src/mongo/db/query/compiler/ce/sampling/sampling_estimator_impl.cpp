@@ -342,7 +342,7 @@ SamplingEstimatorImpl::generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolic
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     sbe::value::SlotIdGenerator ids;
     staticData->resultSlot = ids.generate();
-    const CollectionPtr& collection = _collections.getMainCollection();
+    const CollectionPtr& collection = _collections.lookupCollection(_nss);
     auto stage = makeScanStage(
         collection, staticData->resultSlot, boost::none, boost::none, true, sbeYieldPolicy);
 
@@ -375,7 +375,7 @@ SamplingEstimatorImpl::generateChunkSamplingPlan(PlanYieldPolicy* sbeYieldPolicy
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     sbe::value::SlotIdGenerator ids;
     staticData->resultSlot = ids.generate();
-    const CollectionPtr& collection = _collections.getMainCollection();
+    const CollectionPtr& collection = _collections.lookupCollection(_nss);
     auto chunkSize = static_cast<int64_t>(_sampleSize / *_numChunks);
 
     boost::optional<sbe::value::SlotId> outerRid = ids.generate();
@@ -458,7 +458,7 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
                                                              std::move(plan),
                                                              _collections,
                                                              QueryPlannerParams::DEFAULT,
-                                                             _collections.getMainCollection()->ns(),
+                                                             _nss,
                                                              std::move(sbeYieldPolicy),
                                                              false /* isFromPlanCache */,
                                                              false /* cachedPlanHash */)
@@ -477,14 +477,13 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
 
 void SamplingEstimatorImpl::generateFullCollScanSample() {
     // Create a CanonicalQuery for the CollScan plan.
-    const auto& ns = _collections.getMainCollection()->ns();
-    auto cq = makeEmptyCanonicalQuery(ns, _opCtx);
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, ns);
+    auto cq = makeEmptyCanonicalQuery(_nss, _opCtx);
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
 
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     sbe::value::SlotIdGenerator ids;
     staticData->resultSlot = ids.generate();
-    const CollectionPtr& collection = _collections.getMainCollection();
+    const CollectionPtr& collection = _collections.lookupCollection(_nss);
 
     auto stage = makeScanStage(
         collection, staticData->resultSlot, boost::none, boost::none, false, sbeYieldPolicy.get());
@@ -513,10 +512,9 @@ void SamplingEstimatorImpl::generateFullCollScanSample() {
 
 void SamplingEstimatorImpl::generateRandomSample(size_t sampleSize) {
     // Create a CanonicalQuery for the sampling plan.
-    const auto& ns = _collections.getMainCollection()->ns();
-    auto cq = makeEmptyCanonicalQuery(ns, _opCtx);
+    auto cq = makeEmptyCanonicalQuery(_nss, _opCtx);
     _sampleSize = sampleSize;
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, ns);
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
 
     auto plan = generateRandomSamplingPlan(sbeYieldPolicy.get());
     executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
@@ -531,10 +529,9 @@ void SamplingEstimatorImpl::generateRandomSample() {
 
 void SamplingEstimatorImpl::generateChunkSample(size_t sampleSize) {
     // Create a CanonicalQuery for the sampling plan.
-    const auto& ns = _collections.getMainCollection()->ns();
-    auto cq = makeEmptyCanonicalQuery(ns, _opCtx);
+    auto cq = makeEmptyCanonicalQuery(_nss, _opCtx);
     _sampleSize = sampleSize;
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, ns);
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
 
     auto plan = generateChunkSamplingPlan(sbeYieldPolicy.get());
     executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
@@ -574,14 +571,13 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
 
 void SamplingEstimatorImpl::generateSampleBySeqScanningForTesting() {
     // Create a CanonicalQuery for the sampling plan.
-    const auto& ns = _collections.getMainCollection()->ns();
-    auto cq = makeEmptyCanonicalQuery(ns, _opCtx);
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, ns);
+    auto cq = makeEmptyCanonicalQuery(_nss, _opCtx);
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
 
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     sbe::value::SlotIdGenerator ids;
     staticData->resultSlot = ids.generate();
-    const CollectionPtr& collection = _collections.getMainCollection();
+    const CollectionPtr& collection = _collections.lookupCollection(_nss);
     // Scan the first '_sampleSize' documents sequentially from the start of the target collection
     // in order to generate a repeatable sample.
     auto stage = makeScanStage(
@@ -770,6 +766,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bound
 
 SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              const MultipleCollectionAccessor& collections,
+                                             const NamespaceString& nss,
                                              PlanYieldPolicy::YieldPolicy yieldPolicy,
                                              size_t sampleSize,
                                              SamplingStyle samplingStyle,
@@ -777,6 +774,7 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              CardinalityEstimate collectionCard)
     : _opCtx(opCtx),
       _collections(collections),
+      _nss(nss),
       _yieldPolicy(yieldPolicy),
       _samplingStyle(samplingStyle),
       _sampleSize(sampleSize),
@@ -785,6 +783,7 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
 
 SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              const MultipleCollectionAccessor& collections,
+                                             const NamespaceString& nss,
                                              PlanYieldPolicy::YieldPolicy yieldPolicy,
                                              SamplingStyle samplingStyle,
                                              CardinalityEstimate collectionCard,
@@ -793,6 +792,7 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              boost::optional<int> numChunks)
     : SamplingEstimatorImpl(opCtx,
                             collections,
+                            nss,
                             yieldPolicy,
                             calculateSampleSize(ci, marginOfError),
                             samplingStyle,
@@ -857,6 +857,7 @@ std::unique_ptr<SamplingEstimator> SamplingEstimatorImpl::makeDefaultSamplingEst
     return std::unique_ptr<ce::SamplingEstimatorImpl>(
         new ce::SamplingEstimatorImpl(cq.getOpCtx(),
                                       collections,
+                                      cq.nss(),
                                       yieldPolicy,
                                       getSamplingStyle(qkc.getInternalQuerySamplingCEMethod()),
                                       collCard,

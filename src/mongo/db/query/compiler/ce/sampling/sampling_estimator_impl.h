@@ -69,6 +69,7 @@ public:
      */
     SamplingEstimatorImpl(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
+                          const NamespaceString& nss,
                           PlanYieldPolicy::YieldPolicy yieldPolicy,
                           SamplingStyle samplingStyle,
                           CardinalityEstimate collectionCard,
@@ -84,6 +85,7 @@ public:
      */
     SamplingEstimatorImpl(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
+                          const NamespaceString& nss,
                           PlanYieldPolicy::YieldPolicy yieldPolicy,
                           size_t sampleSize,
                           SamplingStyle samplingStyle,
@@ -348,6 +350,7 @@ private:
     // The collection the sampling plan runs against and is the one accessed by the query being
     // optimized.
     const MultipleCollectionAccessor& _collections;
+    NamespaceString _nss;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     SamplingStyle _samplingStyle;
     size_t _sampleSize;

@@ -105,6 +105,7 @@ std::unique_ptr<ce::SamplingEstimator> JoinOrderingTestFixture::samplingEstimato
     auto samplingEstimator = std::make_unique<ce::SamplingEstimatorImpl>(
         operationContext(),
         mca,
+        nss,
         PlanYieldPolicy::YieldPolicy::YIELD_MANUAL,
         sampleSize,
         ce::SamplingEstimatorImpl::SamplingStyle::kRandom,

@@ -898,6 +898,7 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
     ce::SamplingEstimatorAssertingKeysScanned samplingEstimator(
         planRankingTest.getOperationContext(),
         colls,
+        collection.nss(),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         ce::SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -1055,6 +1056,7 @@ TEST(CardinalityEstimator, SamplingCECompareIndexWithSample) {
     ce::SamplingEstimatorForTesting samplingEstimator(
         planRankingTest.getOperationContext(),
         colls,
+        collection.nss(),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         ce::SamplingEstimatorForTesting::SamplingStyle::kRandom,

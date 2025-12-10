@@ -1208,6 +1208,7 @@ void BM_RunAllConfigs(benchmark::State& state) {
                     SamplingEstimatorImpl samplingEstimator(
                         samplingEstimatorTest.getOperationContext(),
                         collection,
+                        collection.getMainCollection()->ns(),
                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                         sampleSize,
                         samplingStyle.first,
@@ -1299,6 +1300,7 @@ void BM_CreateSample(benchmark::State& state) {
         SamplingEstimatorImpl samplingEstimator(
             samplingEstimatorTest.getOperationContext(),
             collection,
+            collection.getMainCollection()->ns(),
             PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
             sampleSize,
             sampling.first,
@@ -1345,6 +1347,7 @@ void BM_RunCardinalityEstimationOnSample(benchmark::State& state) {
     SamplingEstimatorImpl samplingEstimator(
         samplingEstimatorTest.getOperationContext(),
         collection,
+        collection.getMainCollection()->ns(),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         sampling.first,
@@ -1410,6 +1413,7 @@ void BM_RunCardinalityEstimationOnSampleWithProjection(benchmark::State& state) 
     SamplingEstimatorImpl samplingEstimator(
         samplingEstimatorTest.getOperationContext(),
         collection,
+        collection.getMainCollection()->ns(),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         sampling.first,

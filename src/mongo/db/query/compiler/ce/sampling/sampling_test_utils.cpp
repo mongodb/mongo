@@ -481,6 +481,7 @@ void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
             SamplingEstimatorImpl samplingEstimator(
                 operationContext(),
                 collection,
+                collection.getMainCollection()->ns(),
                 PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                 actualSampleSize,
                 samplingAlgoAndChunk.first,
@@ -522,6 +523,7 @@ void SamplingAccuracyTest::runNDVSamplingEstimatorTestConfiguration(
                     SamplingEstimatorImpl samplingEstimator(
                         operationContext(),
                         collection,
+                        collection.getMainCollection()->ns(),
                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                         actualSampleSize,
                         samplingAlgoAndChunk.first,
@@ -560,6 +562,7 @@ SamplingEstimatorForTesting SamplingEstimatorTest::createSamplingEstimatorForTes
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        collection.nss(),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,

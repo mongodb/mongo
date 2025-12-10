@@ -73,6 +73,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -93,6 +94,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcessWithProjection) {
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -123,6 +125,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcess) {
         const size_t kChunkSize = sampleSize / chunkNum;
         SamplingEstimatorForTesting samplingEstimator(optCtx,
                                                       colls,
+                                                      kTestNss,
                                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                       sampleSize,
                                                       SamplingEstimatorImpl::SamplingStyle::kChunk,
@@ -176,6 +179,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcessWithProjection) {
         const size_t kChunkSize = sampleSize / chunkNum;
         SamplingEstimatorForTesting samplingEstimator(optCtx,
                                                       colls,
+                                                      kTestNss,
                                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                       sampleSize,
                                                       SamplingEstimatorImpl::SamplingStyle::kChunk,
@@ -235,6 +239,7 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcess) {
     const int collectionSize = 50;
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   sampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -260,6 +265,7 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcessWithProjection) {
     const int collectionSize = 50;
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   sampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -290,6 +296,7 @@ TEST_F(SamplingEstimatorTest, ProjectAllFieldsRandomSampling) {
     const auto topLevelSampleFieldNames = StringSet{"_id", "a", "b", "nil", "arr", "obj"};
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -320,6 +327,7 @@ TEST_F(SamplingEstimatorTest, ProjectOneFieldRandomSampling) {
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -346,6 +354,7 @@ TEST_F(SamplingEstimatorTest, NoProjectionRandomSampling) {
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -375,6 +384,7 @@ TEST_F(SamplingEstimatorTest, ProjectNonExistentFieldRandomSampling) {
     // Project field "c" which does not exist on any documents in the collection.
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -402,6 +412,7 @@ TEST_F(SamplingEstimatorTest, DrawANewSample) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         kSampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -447,6 +458,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -501,6 +513,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -511,6 +524,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
     SamplingEstimatorForTesting samplingEstimatorWithProjection(
         operationContext(),
         colls,
+        kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -580,6 +594,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -660,6 +675,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityMultipleExpressions) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -711,6 +727,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -720,6 +737,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
     SamplingEstimatorForTesting samplingEstimatorWithProjection(
         operationContext(),
         colls,
+        kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -749,6 +767,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -837,6 +856,7 @@ TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -962,6 +982,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -1088,6 +1109,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -1120,6 +1142,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -1137,6 +1160,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   MultipleCollectionAccessor{coll},
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -1156,6 +1180,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -1179,6 +1204,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -1202,6 +1228,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -1231,6 +1258,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -1267,6 +1295,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -1303,6 +1332,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -1330,6 +1360,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -1357,6 +1388,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
@@ -1453,6 +1485,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeOnePercent) {
 
     SamplingEstimatorForTesting estimator(operationContext(),
                                           colls,
+                                          kTestNss,
                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                           sampleSize,
                                           SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -1472,6 +1505,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTwoPercent) {
 
     SamplingEstimatorForTesting estimator(operationContext(),
                                           colls,
+                                          kTestNss,
                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                           sampleSize,
                                           SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -1491,6 +1525,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTenPercent) {
 
     SamplingEstimatorForTesting estimator(operationContext(),
                                           colls,
+                                          kTestNss,
                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                           sampleSize,
                                           SamplingEstimatorForTesting::SamplingStyle::kRandom,
@@ -1513,6 +1548,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
