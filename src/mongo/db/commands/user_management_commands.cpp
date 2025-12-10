@@ -529,17 +529,24 @@ class AuthzLockGuard {
     AuthzLockGuard& operator=(AuthzLockGuard&) = delete;
 
 public:
-    enum InvalidationMode { kInvalidate, kReadOnly };
+    enum UMCMode { kWrite, kReadOnly };
 
-    AuthzLockGuard(OperationContext* opCtx, InvalidationMode mode)
+    AuthzLockGuard(OperationContext* opCtx, UMCMode mode)
         : _opCtx(opCtx),
           _authzManager(AuthorizationManager::get(opCtx->getService())),
-          _lock(_UMCMutexDecoration(opCtx->getServiceContext())),
           _mode(mode),
-          _cacheGeneration(_authzManager->getCacheGeneration()) {}
+          _cacheGeneration(_authzManager->getCacheGeneration()),
+          _readLock(_UMCMutexDecoration(_opCtx->getServiceContext()), std::defer_lock),
+          _writeLock(_UMCMutexDecoration(_opCtx->getServiceContext()), std::defer_lock) {
+        if (_mode == kReadOnly) {
+            _readLock.lock();
+        } else if (_mode == kWrite) {
+            _writeLock.lock();
+        }
+    }
 
     ~AuthzLockGuard() {
-        if (!_lock.owns_lock() || _mode == kReadOnly) {
+        if (_mode == kReadOnly || !_writeLock.owns_lock()) {
             return;
         }
 
@@ -549,39 +556,24 @@ public:
         }
     }
 
-    AuthzLockGuard(AuthzLockGuard&&) = default;
-    AuthzLockGuard& operator=(AuthzLockGuard&&) = default;
+    AuthzLockGuard(AuthzLockGuard&&) = delete;
+    AuthzLockGuard& operator=(AuthzLockGuard&&) = delete;
 
 private:
-    static Decorable<ServiceContext>::Decoration<stdx::mutex> _UMCMutexDecoration;
+    static Decorable<ServiceContext>::Decoration<std::shared_mutex> _UMCMutexDecoration;
 
     OperationContext* _opCtx;
     AuthorizationManager* _authzManager;
-    stdx::unique_lock<stdx::mutex> _lock;
-    InvalidationMode _mode;
+
+    UMCMode _mode;
     OID _cacheGeneration;
+
+    std::shared_lock<std::shared_mutex> _readLock;
+    std::unique_lock<std::shared_mutex> _writeLock;
 };
 
-Decorable<ServiceContext>::Decoration<stdx::mutex> AuthzLockGuard::_UMCMutexDecoration =
-    ServiceContext::declareDecoration<stdx::mutex>();
-
-/**
- * When executing a UMC that requires writes, this function must be called so that a lock is taken
- * that invalidates the user cache when it is released.
- */
-StatusWith<AuthzLockGuard> getWritableAuthzLock(OperationContext* opCtx) {
-    AuthzLockGuard lk(opCtx, AuthzLockGuard::kInvalidate);
-    return std::move(lk);
-}
-
-/**
- * When executing a read-only UMC, this function must be called so that it can be synchronized
- * without necessarily invalidating the user cache afterwards.
- */
-StatusWith<AuthzLockGuard> getReadOnlyAuthzLock(OperationContext* opCtx) {
-    AuthzLockGuard lk(opCtx, AuthzLockGuard::kReadOnly);
-    return std::move(lk);
-}
+Decorable<ServiceContext>::Decoration<std::shared_mutex> AuthzLockGuard::_UMCMutexDecoration =
+    ServiceContext::declareDecoration<std::shared_mutex>();
 
 template <typename T>
 void buildCredentials(BSONObjBuilder* builder, const UserName& userName, const T& cmd) {
@@ -1228,7 +1220,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
     UUID::gen().appendToBuilder(&userObjBuilder, AuthorizationManager::USERID_FIELD_NAME);
     userName.appendToBSON(&userObjBuilder);
 
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
     buildCredentials(&credentialsBuilder, userName, cmd);
@@ -1346,7 +1338,7 @@ void CmdUMCTyped<UpdateUserCommand>::Invocation::typedRun(OperationContext* opCt
         updateDocumentBuilder.append("$unset", updateUnset);
     }
 
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     // Role existence has to be checked after acquiring the update lock
     if (auto roles = cmd.getRoles()) {
@@ -1382,7 +1374,7 @@ void CmdUMCTyped<DropUserCommand>::Invocation::typedRun(OperationContext* opCtx)
     auto dbname = cmd.getDbName();
     UserName userName(cmd.getCommandParameter(), dbname);
 
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     audit::logDropUser(Client::getCurrent(), userName);
 
@@ -1409,7 +1401,7 @@ DropAllUsersFromDatabaseReply CmdUMCTyped<DropAllUsersFromDatabaseCommand>::Invo
     auto dbname = cmd.getDbName();
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     audit::logDropAllUsersFromDatabase(client, dbname);
 
@@ -1439,7 +1431,7 @@ void CmdUMCTyped<GrantRolesToUserCommand>::Invocation::typedRun(OperationContext
             !cmd.getRoles().empty());
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     stdx::unordered_set<RoleName> userRoles;
     uassertStatusOK(getCurrentUserRoles(opCtx, userName, &userRoles));
@@ -1472,7 +1464,7 @@ void CmdUMCTyped<RevokeRolesFromUserCommand>::Invocation::typedRun(OperationCont
             !cmd.getRoles().empty());
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     stdx::unordered_set<RoleName> userRoles;
     uassertStatusOK(getCurrentUserRoles(opCtx, userName, &userRoles));
@@ -1499,7 +1491,7 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
     OperationContext* opCtx) {
     const auto& cmd = request();
 
-    auto lk = uassertStatusOK(getReadOnlyAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kReadOnly);
     return CmdUMCPassthrough::lookupUsers(opCtx, cmd);
 }
 
@@ -1548,7 +1540,7 @@ void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCt
     }
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     // Role existence has to be checked after acquiring the update lock
     uassertStatusOK(checkOkayToGrantRolesToRole(opCtx, roleName, resolvedRoleNames));
@@ -1604,7 +1596,7 @@ void CmdUMCTyped<UpdateRoleCommand>::Invocation::typedRun(OperationContext* opCt
     }
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     // Role existence has to be checked after acquiring the update lock
     uassertStatusOK(CmdUMCPassthrough::rolesExist(opCtx, {roleName}));
@@ -1654,7 +1646,7 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
             str::stream() << roleName << " is a built-in role and cannot be modified",
             !auth::isBuiltinRole(roleName));
 
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     std::vector<std::string> unrecognizedActions;
     PrivilegeVector newPrivileges = Privilege::privilegeVectorFromParsedPrivilegeVector(
@@ -1706,7 +1698,7 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
             str::stream() << roleName << " is a built-in role and cannot be modified",
             !auth::isBuiltinRole(roleName));
 
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     std::vector<std::string> unrecognizedActions;
     PrivilegeVector rmPrivs = Privilege::privilegeVectorFromParsedPrivilegeVector(
@@ -1768,7 +1760,7 @@ void CmdUMCTyped<GrantRolesToRoleCommand>::Invocation::typedRun(OperationContext
     auto rolesToAdd = auth::resolveRoleNames(cmd.getRoles(), dbname);
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     // Check for cycles
     uassertStatusOK(checkOkayToGrantRolesToRole(opCtx, roleName, rolesToAdd));
@@ -1807,7 +1799,7 @@ void CmdUMCTyped<RevokeRolesFromRoleCommand>::Invocation::typedRun(OperationCont
             !auth::isBuiltinRole(roleName));
 
     auto rolesToRemove = auth::resolveRoleNames(cmd.getRoles(), dbname);
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     // Remove roles from existing set.
     auto data = uassertStatusOK(CmdUMCPassthrough::resolveRoles(
@@ -1880,7 +1872,7 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
             !auth::isBuiltinRole(roleName));
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     uassertStatusOK(CmdUMCPassthrough::rolesExist(opCtx, {roleName}));
 
@@ -1953,7 +1945,7 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
     auto* client = opCtx->getClient();
     auto* service = client->getService();
     auto* authzManager = AuthorizationManager::get(service);
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     // From here on, we always want to invalidate the user cache before returning.
     ScopeGuard invalidateGuard([opCtx, authzManager, &dbname] {
@@ -2050,7 +2042,7 @@ template <>
 RolesInfoReply CmdUMCTyped<RolesInfoCommand, UMCInfoParams>::Invocation::typedRun(
     OperationContext* opCtx) {
     const auto& cmd = request();
-    auto lk = uassertStatusOK(getReadOnlyAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kReadOnly);
     return CmdUMCPassthrough::lookupRoles(opCtx, cmd);
 }
 
@@ -2059,7 +2051,7 @@ MONGO_REGISTER_COMMAND(CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUser
 template <>
 void CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUserCacheParams>::Invocation::typedRun(
     OperationContext* opCtx) {
-    auto lk = getReadOnlyAuthzLock(opCtx);
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kReadOnly);
     AuthorizationManager::get(opCtx->getService())
         ->invalidateUsersByTenant(request().getDbName().tenantId());
 }
@@ -2457,7 +2449,7 @@ void CmdMergeAuthzCollections::Invocation::typedRun(OperationContext* opCtx) {
 
     auto* service = opCtx->getClient()->getService();
     auto* authzManager = AuthorizationManager::get(service);
-    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
 
     // From here on, we always want to invalidate the user cache before returning.
     ScopeGuard invalidateGuard([&] { authzManager->invalidateUserCache(); });
