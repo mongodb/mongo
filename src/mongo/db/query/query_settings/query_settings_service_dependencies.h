@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_cmds_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::query_settings {
 using SetClusterParameterFn = std::function<void(OperationContext*,
@@ -44,11 +45,12 @@ using SetClusterParameterFn = std::function<void(OperationContext*,
  * nodes that are specified to execute before "QuerySettingsService".
  * This abstraction mechanism breaks cyclic dependecies.
  */
-struct ServiceDependencies {
+struct MONGO_MOD_NEEDS_REPLACEMENT ServiceDependencies {
     SetClusterParameterFn setClusterParameterReplSet;
     SetClusterParameterFn setClusterParameterConfigsvr;
 };
 
+MONGO_MOD_NEEDS_REPLACEMENT
 ServiceDependencies& getServiceDependencies(ServiceContext* serviceContext);
 
 }  // namespace mongo::query_settings

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/query_settings.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

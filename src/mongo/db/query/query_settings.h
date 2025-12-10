@@ -37,6 +37,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>

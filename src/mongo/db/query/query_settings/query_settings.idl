@@ -32,6 +32,7 @@ global:
         - "mongo/db/query/query_settings/query_framework_serialization.h"
         - "mongo/db/query/query_settings/index_hints_serialization.h"
         - "mongo/db/query/query_settings/query_settings_comment.h"
+    mod_visibility: private
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -102,6 +103,7 @@ structs:
                 type: Comment
                 optional: true
                 stability: internal
+        mod_visibility: public
 
     QueryShapeConfiguration:
         description: >-

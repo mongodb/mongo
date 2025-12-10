@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo::query_settings"
     cpp_includes:
         - "mongo/db/query/query_feature_flags_gen.h"
+    mod_visibility: private
 
 imports:
     - "mongo/db/basic_types.idl"

@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 
 namespace mongo::query_settings {

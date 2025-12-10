@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::query_settings {
 

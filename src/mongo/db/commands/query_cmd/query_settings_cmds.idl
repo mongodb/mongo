@@ -28,6 +28,7 @@
 
 global:
     cpp_namespace: "mongo"
+    mod_visibility: private
 
 imports:
     - "mongo/db/auth/access_checks.idl"

@@ -36,6 +36,7 @@
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/stdx/trusted_hasher.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /**
@@ -92,7 +93,7 @@ RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
                                                  const QueryInstance& queryInstance,
                                                  const boost::optional<TenantId>& tenantId);
 
-class QuerySettingsService {
+class MONGO_MOD_PUBLIC QuerySettingsService {
 public:
     /**
      * Gets the instance of the class using the service context.

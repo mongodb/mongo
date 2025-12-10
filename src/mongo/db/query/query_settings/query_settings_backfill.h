@@ -31,10 +31,10 @@
 
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
-#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

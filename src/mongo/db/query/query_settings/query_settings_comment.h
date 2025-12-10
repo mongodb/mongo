@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/basic_types.h"
+#include "mongo/util/modules.h"
 
 #include <compare>
 

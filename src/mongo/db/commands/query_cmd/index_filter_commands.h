@@ -40,6 +40,7 @@
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
