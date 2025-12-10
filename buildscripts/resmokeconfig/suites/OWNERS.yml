@@ -27,6 +27,9 @@ filters:
   - "aggregation_secondary_reads.yml":
     approvers:
       - 10gen/query-execution-classic
+  - "backup_restore.yml":
+    approvers:
+      - 10gen/server-backup-restore
   - "benchmarks_abt_lowering.yml":
     approvers:
       - 10gen/query-execution-sbe

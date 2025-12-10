@@ -460,7 +460,7 @@ buildvariants:
       - name: jsCore
         distros:
           - rhel8.8-large
-      - name: noPassthroughHotBackups_gen
+      - name: hotBackups_gen
       - name: generate_buildid_to_debug_symbols_mapping
 
   - name: &enterprise-rhel8-sdam-replica-set-monitor-64-bit enterprise-rhel8-sdam-replica-set-monitor-64-bit

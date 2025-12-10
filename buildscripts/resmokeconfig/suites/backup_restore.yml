@@ -1,0 +1,18 @@
+test_kind: js_test
+description: |
+  Suite that runs backup and restore testing. These tests are a lot more memory and resource heavy.
+  Hence, they require their own suite.
+
+selector:
+  roots:
+    - src/mongo/db/modules/*/jstests/hot_backups/**/*.js
+
+# backupRestore tests start their own mongod's.
+executor:
+  archive:
+    tests:
+      - jstests/noPassthrough/backup*/*.js
+      - src/mongo/db/modules/enterprise/jstests/hot_backups/**/*.js
+  config:
+    shell_options:
+      nodb: ""

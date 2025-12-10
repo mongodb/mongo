@@ -971,14 +971,14 @@ tasks:
 
   # Only run hot_backups tests for hot_backups variant.
   - <<: *gen_task_template
-    name: noPassthroughHotBackups_gen
-    tags: ["assigned_to_jira_team_server_repl", "experimental"]
+    name: hotBackups_gen
+    tags: ["assigned_to_jira_team_server_repl", "release_critical"]
     commands:
       - func: "generate resmoke tasks"
         vars:
-          suite: no_passthrough
+          suite: backup_restore
           resmoke_args: src/mongo/db/modules/*/jstests/hot_backups/**/*.js
-          use_xlarge_distro: "true"
+          use_2xlarge_distro: "true"
 
   - <<: *gen_task_template
     name: queryableWT_gen
