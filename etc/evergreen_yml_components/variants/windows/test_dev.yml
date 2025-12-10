@@ -77,15 +77,15 @@ buildvariants:
       - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch .requires_execution_on_windows_patch_build
       - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch .requires_execution_on_windows_patch_build
         distros:
-          - windows-2022-xxlarge
+          - windows-2022-expandedports-xxlarge
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch .requires_execution_on_windows_patch_build
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch .requires_execution_on_windows_patch_build
         distros:
-          - windows-2022-xxlarge
+          - windows-2022-expandedports-xxlarge
       - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows .requires_execution_on_windows_patch_build
       - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows .requires_execution_on_windows_patch_build
         distros:
-          - windows-2022-xxlarge
+          - windows-2022-expandedports-xxlarge
 
   - name: windows-compile-suggested
     display_name: "* Windows Server 2022 Enterprise Compile Non-essential"
@@ -98,15 +98,15 @@ buildvariants:
       - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch !.requires_execution_on_windows_patch_build
       - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch !.requires_execution_on_windows_patch_build
         distros:
-          - windows-2022-xxlarge
+          - windows-2022-expandedports-xxlarge
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch !.requires_execution_on_windows_patch_build
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch !.requires_execution_on_windows_patch_build
         distros:
-          - windows-2022-xxlarge
+          - windows-2022-expandedports-xxlarge
       - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.requires_execution_on_windows_patch_build
       - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.requires_execution_on_windows_patch_build
         distros:
-          - windows-2022-xxlarge
+          - windows-2022-expandedports-xxlarge
       # server_selection_json_test & server_discovery_and_monitoring_json_test depend on this
       - name: compile_unittest_libaries_TG
       - name: run_bazel_TG
@@ -144,11 +144,11 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
         distros:
-          - windows-2022-xlarge
+          - windows-2022-expandedports-xlarge
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
         distros:
-          - windows-2022-xlarge
+          - windows-2022-expandedports-xlarge
 
   # This Windows build variant exists to run all tasks that have been excluded from running on the required Windows build variant.
   # See SERVER-79037 for how the essential set of tasks was computed.
@@ -166,8 +166,8 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
         distros:
-          - windows-2022-xlarge
+          - windows-2022-expandedports-xlarge
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
         distros:
-          - windows-2022-xlarge
+          - windows-2022-expandedports-xlarge
