@@ -18,6 +18,14 @@ idl_generator(
     src = "metrics_settings.idl",
 )
 
+mongo_cc_unit_test(
+    name = "metrics_counter_test",
+    srcs = [
+        "metrics_counter_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+)
+
 mongo_cc_library(
     name = "otel_metrics",
     srcs = [
