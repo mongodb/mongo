@@ -360,7 +360,8 @@ public:
                                         shardMetrics.Obj(), IDLParserContext("CursorMetrics"));
                                     CurOp::get(opCtx)
                                         ->debug()
-                                        .additiveMetrics.aggregateCursorMetrics(metrics);
+                                        .getAdditiveMetrics()
+                                        .aggregateCursorMetrics(metrics);
                                 }
                                 continue;
                             }
@@ -385,7 +386,7 @@ public:
 
                     if (allShardMetricsReturned) {
                         collectQueryStatsMongos(opCtx,
-                                                std::move(curOp->debug().queryStatsInfo.key));
+                                                std::move(curOp->debug().getQueryStatsInfo().key));
                     }
 
                     return true;
@@ -401,7 +402,7 @@ public:
             auto* curOp = CurOp::get(opCtx);
             curOp->setEndOfOpMetrics(1);
 
-            collectQueryStatsMongos(opCtx, std::move(curOp->debug().queryStatsInfo.key));
+            collectQueryStatsMongos(opCtx, std::move(curOp->debug().getQueryStatsInfo().key));
             return true;
         }
     }
@@ -415,7 +416,7 @@ public:
         const BSONObj& originalCmdObj = request.body;
 
         auto curOp = CurOp::get(opCtx);
-        curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
+        curOp->debug().getQueryStatsInfo().disableForSubqueryExecution = true;
 
         const auto originalNss = parseNs(request.parseDbName(), originalCmdObj);
         uassert(ErrorCodes::InvalidNamespace,

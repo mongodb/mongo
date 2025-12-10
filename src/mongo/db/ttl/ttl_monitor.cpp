@@ -619,7 +619,7 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
 
     try {
         const auto numDeletedDocs = exec->executeDelete();
-        const auto numDeletedKeys = opDebug.additiveMetrics.keysDeleted.value_or(0ll);
+        const auto numDeletedKeys = opDebug.getAdditiveMetrics().keysDeleted.value_or(0ll);
         ttlDeletedDocuments.increment(numDeletedDocs);
         ttlDeletedKeys.increment(numDeletedKeys);
 
@@ -772,7 +772,7 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
 
     try {
         const auto numDeletedDocs = exec->executeDelete();
-        const auto numDeletedKeys = opDebug.additiveMetrics.keysDeleted.value_or(0ll);
+        const auto numDeletedKeys = opDebug.getAdditiveMetrics().keysDeleted.value_or(0ll);
         ttlDeletedDocuments.increment(numDeletedDocs);
         ttlDeletedKeys.increment(numDeletedKeys);
 

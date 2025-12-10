@@ -127,10 +127,10 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _planCacheKey(CurOp::get(operationUsingCursor)->debug().planCacheKey),
       _planCacheShapeHash(CurOp::get(operationUsingCursor)->debug().planCacheShapeHash),
       _queryShapeHash(CurOp::get(operationUsingCursor)->debug().getQueryShapeHash()),
-      _queryStatsKeyHash(CurOp::get(operationUsingCursor)->debug().queryStatsInfo.keyHash),
-      _queryStatsKey(std::move(CurOp::get(operationUsingCursor)->debug().queryStatsInfo.key)),
+      _queryStatsKeyHash(CurOp::get(operationUsingCursor)->debug().getQueryStatsInfo().keyHash),
+      _queryStatsKey(std::move(CurOp::get(operationUsingCursor)->debug().getQueryStatsInfo().key)),
       _queryStatsWillNeverExhaust(
-          CurOp::get(operationUsingCursor)->debug().queryStatsInfo.willNeverExhaust),
+          CurOp::get(operationUsingCursor)->debug().getQueryStatsInfo().willNeverExhaust),
       _isChangeStreamQuery(CurOp::get(operationUsingCursor)->debug().isChangeStreamQuery),
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation()),

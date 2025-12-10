@@ -296,7 +296,7 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
         }
     })());
     auto& opDebug = CurOp::get(*opCtx)->debug();
-    ASSERT_EQ(opDebug.queryStatsInfo.keyHash, boost::none);
+    ASSERT_EQ(opDebug.getQueryStatsInfo().keyHash, boost::none);
 }
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {

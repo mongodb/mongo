@@ -460,7 +460,15 @@ public:
         bool metricsRequested = false;
     };
 
-    MONGO_MOD_PRIVATE QueryStatsInfo queryStatsInfo;
+    // Return the QueryStatsInfo for the current operation.
+    MONGO_MOD_PRIVATE QueryStatsInfo& getQueryStatsInfo() {
+        return _queryStatsInfo;
+    }
+
+    // Return the QueryStatsInfo for the current operation (const friendly).
+    MONGO_MOD_PRIVATE const QueryStatsInfo& getQueryStatsInfo() const {
+        return _queryStatsInfo;
+    }
 
     // The query framework that this operation used. Will be unknown for non query operations.
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};
@@ -541,10 +549,17 @@ public:
     // Used to track the amount of time spent waiting for a response from remote operations.
     boost::optional<Microseconds> remoteOpWaitTime;
 
-    // Stores the current operation's count of these metrics. If they are needed to be accumulated
+    // Returns the current operation's count of these metrics. If they are needed to be accumulated
     // elsewhere, they should be extracted by another aggregator (like the ClientCursor) to ensure
     // these only ever reflect just this CurOp's consumption.
-    AdditiveMetrics additiveMetrics;
+    AdditiveMetrics& getAdditiveMetrics() {
+        return _additiveMetrics;
+    }
+
+    // Const version of the above method.
+    const AdditiveMetrics& getAdditiveMetrics() const {
+        return _additiveMetrics;
+    }
 
     // Stores storage statistics.
     std::unique_ptr<StorageStats> storageStats;
@@ -579,6 +594,14 @@ public:
     extension::host::OperationMetricsRegistry extensionMetrics;
 
 private:
+    // QueryStatsInfo for the current operation, accessible via accessor methods defined above.
+    QueryStatsInfo _queryStatsInfo;
+
+    // Stores the current operation's count of these metrics. If they are needed to be accumulated
+    // elsewhere, they should be extracted by another aggregator (like the ClientCursor) to ensure
+    // these only ever reflect just this CurOp's consumption.
+    AdditiveMetrics _additiveMetrics;
+
     // The hash of query_shape::QueryShapeHash.
     boost::optional<query_shape::QueryShapeHash> _queryShapeHash;
 

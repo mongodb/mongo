@@ -525,8 +525,10 @@ public:
                             if (shardMetrics.isABSONObj()) {
                                 auto metrics = CursorMetrics::parse(
                                     shardMetrics.Obj(), IDLParserContext("CursorMetrics"));
-                                CurOp::get(opCtx)->debug().additiveMetrics.aggregateCursorMetrics(
-                                    metrics);
+                                CurOp::get(opCtx)
+                                    ->debug()
+                                    .getAdditiveMetrics()
+                                    .aggregateCursorMetrics(metrics);
                             }
                         }
                     }
@@ -551,7 +553,7 @@ public:
 
                     CurOp::get(opCtx)->setEndOfOpMetrics(n);
                     collectQueryStatsMongos(
-                        opCtx, std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
+                        opCtx, std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key));
 
                     return true;
                 });
@@ -570,7 +572,7 @@ public:
             result.appendArray("values", BSONObj());
             CurOp::get(opCtx)->setEndOfOpMetrics(0);
             collectQueryStatsMongos(opCtx,
-                                    std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
+                                    std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key));
             return true;
         }
     }
@@ -598,8 +600,8 @@ public:
 
         // We must store the key in distinct to prevent collecting query stats when the aggregation
         // runs.
-        auto ownedQueryStatsKey = std::move(curOp->debug().queryStatsInfo.key);
-        curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
+        auto ownedQueryStatsKey = std::move(curOp->debug().getQueryStatsInfo().key);
+        curOp->debug().getQueryStatsInfo().disableForSubqueryExecution = true;
 
         // Skip privilege checking if we are in an explain.
         if (verbosity) {

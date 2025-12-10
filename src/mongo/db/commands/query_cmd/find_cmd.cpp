@@ -236,7 +236,7 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
         });
 
         if (parsedRequest->findCommandRequest->getIncludeQueryStatsMetrics()) {
-            CurOp::get(opCtx)->debug().queryStatsInfo.metricsRequested = true;
+            CurOp::get(opCtx)->debug().getQueryStatsInfo().metricsRequested = true;
         }
     }
 
@@ -577,7 +577,7 @@ public:
                 timeseries::requiresViewlessTimeseriesTranslation(opCtx, *collectionOrView)) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 collectionOrView.reset();
-                CurOp::get(opCtx)->debug().queryStatsInfo.disableForSubqueryExecution = true;
+                CurOp::get(opCtx)->debug().getQueryStatsInfo().disableForSubqueryExecution = true;
                 return runFindAsAgg(opCtx, *cq, verbosity, replyBuilder);
             }
 

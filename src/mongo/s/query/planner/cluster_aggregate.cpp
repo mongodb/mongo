@@ -238,7 +238,7 @@ void appendEmptyResultSetWithStatus(OperationContext* opCtx,
     if (status == ErrorCodes::ShardNotFound) {
         status = {ErrorCodes::NamespaceNotFound, status.reason()};
     }
-    collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
+    collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key));
     appendEmptyResultSet(opCtx, *result, status, nss);
 }
 
@@ -984,7 +984,7 @@ Status runAggregateImpl(OperationContext* opCtx,
                     &result);
             }
             collectQueryStatsMongos(opCtx,
-                                    std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
+                                    std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key));
         }
 
         // Populate `result` and `req` once we know this function is not going to be implicitly

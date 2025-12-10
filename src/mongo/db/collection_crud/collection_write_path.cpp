@@ -367,12 +367,12 @@ Status insertDocumentsImpl(OperationContext* opCtx,
     }
 
     if (opDebug) {
-        opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
+        opDebug->getAdditiveMetrics().incrementKeysInserted(keysInserted);
         // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
         if (!opCtx->inMultiDocumentTransaction()) {
             shard_role_details::getRecoveryUnit(opCtx)->onRollback(
                 [opDebug, keysInserted](OperationContext*) {
-                    opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
+                    opDebug->getAdditiveMetrics().incrementKeysInserted(-keysInserted);
                 });
         }
     }
@@ -730,14 +730,14 @@ void updateDocument(OperationContext* opCtx,
         }
 
         if (opDebug) {
-            opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
-            opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
+            opDebug->getAdditiveMetrics().incrementKeysInserted(keysInserted);
+            opDebug->getAdditiveMetrics().incrementKeysDeleted(keysDeleted);
             // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
             if (!opCtx->inMultiDocumentTransaction()) {
                 shard_role_details::getRecoveryUnit(opCtx)->onRollback(
                     [opDebug, keysInserted, keysDeleted](OperationContext*) {
-                        opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
-                        opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
+                        opDebug->getAdditiveMetrics().incrementKeysInserted(-keysInserted);
+                        opDebug->getAdditiveMetrics().incrementKeysDeleted(-keysDeleted);
                     });
             }
         }
@@ -825,14 +825,14 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
         }
 
         if (opDebug) {
-            opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
-            opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
+            opDebug->getAdditiveMetrics().incrementKeysInserted(keysInserted);
+            opDebug->getAdditiveMetrics().incrementKeysDeleted(keysDeleted);
             // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
             if (!opCtx->inMultiDocumentTransaction()) {
                 shard_role_details::getRecoveryUnit(opCtx)->onRollback(
                     [opDebug, keysInserted, keysDeleted](OperationContext*) {
-                        opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
-                        opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
+                        opDebug->getAdditiveMetrics().incrementKeysInserted(-keysInserted);
+                        opDebug->getAdditiveMetrics().incrementKeysDeleted(-keysDeleted);
                     });
             }
         }
@@ -928,12 +928,12 @@ void deleteDocument(OperationContext* opCtx,
         opCtx, collection, stmtId, doc.value(), documentKey, deleteArgs);
 
     if (opDebug) {
-        opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
+        opDebug->getAdditiveMetrics().incrementKeysDeleted(keysDeleted);
         // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
         if (!opCtx->inMultiDocumentTransaction()) {
             shard_role_details::getRecoveryUnit(opCtx)->onRollback(
                 [opDebug, keysDeleted](OperationContext*) {
-                    opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
+                    opDebug->getAdditiveMetrics().incrementKeysDeleted(-keysDeleted);
                 });
         }
     }

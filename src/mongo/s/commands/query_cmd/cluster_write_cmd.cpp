@@ -720,7 +720,7 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
             for (size_t i = 0; i < numAttempts; ++i) {
                 serviceOpCounters(opCtx).gotInsert();
             }
-            debug.additiveMetrics.ninserted = response.getN();
+            debug.getAdditiveMetrics().ninserted = response.getN();
             break;
         case BatchedCommandRequest::BatchType_Update:
             for (size_t i = 0; i < numAttempts; ++i) {
@@ -729,12 +729,13 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
 
             // The response.getN() count is the sum of documents matched and upserted.
             if (response.isUpsertDetailsSet()) {
-                debug.additiveMetrics.nMatched = response.getN() - response.sizeUpsertDetails();
-                debug.additiveMetrics.nUpserted = response.sizeUpsertDetails();
+                debug.getAdditiveMetrics().nMatched =
+                    response.getN() - response.sizeUpsertDetails();
+                debug.getAdditiveMetrics().nUpserted = response.sizeUpsertDetails();
             } else {
-                debug.additiveMetrics.nMatched = response.getN();
+                debug.getAdditiveMetrics().nMatched = response.getN();
             }
-            debug.additiveMetrics.nModified = response.getNModified();
+            debug.getAdditiveMetrics().nModified = response.getNModified();
 
             for (auto&& update : _batchedRequest.getUpdateRequest().getUpdates()) {
                 incrementUpdateMetrics(update.getU(),
@@ -747,7 +748,7 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
             for (size_t i = 0; i < numAttempts; ++i) {
                 serviceOpCounters(opCtx).gotDelete();
             }
-            debug.additiveMetrics.ndeleted = response.getN();
+            debug.getAdditiveMetrics().ndeleted = response.getN();
             break;
     }
 

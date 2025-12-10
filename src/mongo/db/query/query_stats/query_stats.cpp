@@ -374,7 +374,7 @@ void registerRequest(OperationContext* opCtx,
 
     auto& opDebug = CurOp::get(opCtx)->debug();
 
-    if (opDebug.queryStatsInfo.disableForSubqueryExecution) {
+    if (opDebug.getQueryStatsInfo().disableForSubqueryExecution) {
         LOGV2_DEBUG(
             9219800,
             4,
@@ -383,11 +383,11 @@ void registerRequest(OperationContext* opCtx,
     }
 
     if (!shouldCollect(opCtx->getServiceContext())) {
-        opDebug.queryStatsInfo.disableForSubqueryExecution = true;
+        opDebug.getQueryStatsInfo().disableForSubqueryExecution = true;
         return;
     }
 
-    if (opDebug.queryStatsInfo.key) {
+    if (opDebug.getQueryStatsInfo().key) {
         // A find() or distinct() request may have already registered the shapifier. Ie, it's
         // a find or distinct command over a non-physical collection, eg view, which is
         // implemented by generating an agg pipeline.
@@ -398,15 +398,15 @@ void registerRequest(OperationContext* opCtx,
         return;
     }
 
-    opDebug.queryStatsInfo.willNeverExhaust = willNeverExhaust;
+    opDebug.getQueryStatsInfo().willNeverExhaust = willNeverExhaust;
     // There are a few cases where a query shape can be larger than the original query. For example,
     // {$exists: false} in the input query serializes to {$not: {$exists: true}. In rare cases where
     // an input query has thousands of clauses, the cumulative bloat that shapification adds results
     // in a BSON object that exceeds the 16 MB memory limit. In these cases, we want to exclude the
     // original query from queryStats metrics collection and let it execute normally.
     try {
-        opDebug.queryStatsInfo.key = makeKey();
-        opDebug.queryStatsInfo.keyHash = absl::HashOf(*opDebug.queryStatsInfo.key);
+        opDebug.getQueryStatsInfo().key = makeKey();
+        opDebug.getQueryStatsInfo().keyHash = absl::HashOf(*opDebug.getQueryStatsInfo().key);
         if (MONGO_unlikely(queryStatsFailToSerializeKey.shouldFail())) {
             uasserted(ErrorCodes::FailPointEnabled,
                       "queryStatsFailToSerializeKey fail point is enabled");
@@ -463,8 +463,9 @@ bool shouldRequestRemoteMetrics(const OpDebug& opDebug) {
     // execution. If the keyHash is non-null, then we expect we should forward remote query stats
     // metrics to a higher level of execution, such as running an aggregation for a view, or there
     // are multiple cursors open in a single operation context, such as in $search.
-    return opDebug.queryStatsInfo.metricsRequested || opDebug.queryStatsInfo.key != nullptr ||
-        opDebug.queryStatsInfo.keyHash != boost::none;
+    return opDebug.getQueryStatsInfo().metricsRequested ||
+        opDebug.getQueryStatsInfo().key != nullptr ||
+        opDebug.getQueryStatsInfo().keyHash != boost::none;
 }
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {

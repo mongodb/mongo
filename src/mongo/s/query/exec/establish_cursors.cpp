@@ -287,7 +287,8 @@ void CursorEstablisher::_waitForResponse() {
             hasCursorToClean |= cursorValue.getCursorId() != 0;
 
             if (const auto& cursorMetrics = cursorValue.getCursorMetrics()) {
-                CurOp::get(_opCtx)->debug().additiveMetrics.aggregateCursorMetrics(*cursorMetrics);
+                CurOp::get(_opCtx)->debug().getAdditiveMetrics().aggregateCursorMetrics(
+                    *cursorMetrics);
             }
 
             // If we have already received an error back and are going to abort the operation
@@ -659,7 +660,7 @@ std::vector<RemoteCursor> establishCursorsOnAllHosts(
 
                 auto& cursorValue = cursor.getValue();
                 if (const auto& cursorMetrics = cursorValue.getCursorMetrics()) {
-                    CurOp::get(opCtx)->debug().additiveMetrics.aggregateCursorMetrics(
+                    CurOp::get(opCtx)->debug().getAdditiveMetrics().aggregateCursorMetrics(
                         *cursorMetrics);
                 }
 

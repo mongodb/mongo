@@ -66,7 +66,7 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
 
     RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
     auto& opDebug = CurOp::get(*opCtx)->debug();
-    ASSERT_EQ(opDebug.queryStatsInfo.disableForSubqueryExecution, false);
+    ASSERT_EQ(opDebug.getQueryStatsInfo().disableForSubqueryExecution, false);
 
     // First call to registerRequest() should be rate limited.
     auto& limiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
@@ -80,8 +80,8 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     }));
 
     // Since the query was rate limited, no key should have been created.
-    ASSERT(opDebug.queryStatsInfo.key == nullptr);
-    ASSERT_EQ(opDebug.queryStatsInfo.disableForSubqueryExecution, true);
+    ASSERT(opDebug.getQueryStatsInfo().key == nullptr);
+    ASSERT_EQ(opDebug.getQueryStatsInfo().disableForSubqueryExecution, true);
 
     // Second call should not be rate limited.
     QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext())
@@ -96,9 +96,9 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     }));
 
     // queryStatsKey should not be created for previously rate limited query.
-    ASSERT(opDebug.queryStatsInfo.key == nullptr);
-    ASSERT_EQ(opDebug.queryStatsInfo.disableForSubqueryExecution, true);
-    ASSERT_FALSE(opDebug.queryStatsInfo.keyHash.has_value());
+    ASSERT(opDebug.getQueryStatsInfo().key == nullptr);
+    ASSERT_EQ(opDebug.getQueryStatsInfo().disableForSubqueryExecution, true);
+    ASSERT_FALSE(opDebug.getQueryStatsInfo().keyHash.has_value());
 }
 
 TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {
@@ -114,8 +114,8 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {
     auto opCtx = makeOperationContext();
 
     auto& opDebug = CurOp::get(*opCtx)->debug();
-    ASSERT(opDebug.queryStatsInfo.key == nullptr);
-    ASSERT_FALSE(opDebug.queryStatsInfo.keyHash.has_value());
+    ASSERT(opDebug.getQueryStatsInfo().key == nullptr);
+    ASSERT_FALSE(opDebug.getQueryStatsInfo().keyHash.has_value());
     QueryStatsStoreManager::get(serviceCtx) =
         std::make_unique<QueryStatsStoreManager>(16 * 1024 * 1024, 1);
 
@@ -134,13 +134,14 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {
                                                           query_shape::CollectionType::kCollection);
         }));
 
-        ASSERT(opDebug.queryStatsInfo.key != nullptr);
-        ASSERT(opDebug.queryStatsInfo.keyHash.has_value());
+        ASSERT(opDebug.getQueryStatsInfo().key != nullptr);
+        ASSERT(opDebug.getQueryStatsInfo().keyHash.has_value());
 
-        ASSERT_DOES_NOT_THROW(query_stats::writeQueryStats(opCtx.get(),
-                                                           opDebug.queryStatsInfo.keyHash,
-                                                           std::move(opDebug.queryStatsInfo.key),
-                                                           QueryStatsSnapshot{}));
+        ASSERT_DOES_NOT_THROW(
+            query_stats::writeQueryStats(opCtx.get(),
+                                         opDebug.getQueryStatsInfo().keyHash,
+                                         std::move(opDebug.getQueryStatsInfo().key),
+                                         QueryStatsSnapshot{}));
     }
 
     // Second call should see that query stats are now disabled.
@@ -164,23 +165,24 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {
         }));
 
         // queryStatsKey should not be created since we have a size budget of 0.
-        ASSERT(opDebug.queryStatsInfo.key == nullptr);
+        ASSERT(opDebug.getQueryStatsInfo().key == nullptr);
         // Query stats are disabled by a lack of space, not by being a on a subquery path.
-        ASSERT_EQ(opDebug.queryStatsInfo.disableForSubqueryExecution, false);
+        ASSERT_EQ(opDebug.getQueryStatsInfo().disableForSubqueryExecution, false);
 
         // Interestingly, we purposefully leave the hash value around on the OperationContext after
         // the previous operation finishes. This is because we think it may have value in being
         // logged in the future, even after query stats have been written. Excepting obscure
         // internal use-cases, most OperationContexts will die shortly after the query stats are
         // written, so this isn't expected to be a large issue.
-        ASSERT(opDebug.queryStatsInfo.keyHash.has_value());
+        ASSERT(opDebug.getQueryStatsInfo().keyHash.has_value());
 
         QueryStatsStoreManager::get(serviceCtx)->resetSize(16 * 1024 * 1024);
         // SERVER-84730 this assertion used to throw since there is no key, but there is a hash.
-        ASSERT_DOES_NOT_THROW(query_stats::writeQueryStats(opCtx.get(),
-                                                           opDebug.queryStatsInfo.keyHash,
-                                                           std::move(opDebug.queryStatsInfo.key),
-                                                           QueryStatsSnapshot{}));
+        ASSERT_DOES_NOT_THROW(
+            query_stats::writeQueryStats(opCtx.get(),
+                                         opDebug.getQueryStatsInfo().keyHash,
+                                         std::move(opDebug.getQueryStatsInfo().key),
+                                         QueryStatsSnapshot{}));
     }
 }
 
@@ -203,7 +205,7 @@ TEST_F(QueryStatsTest, RegisterRequestAbsorbsErrors) {
 
     // Skip this check for debug builds because errors are always fatal in that environment.
     if (!kDebugBuild) {
-        opDebug.queryStatsInfo = OpDebug::QueryStatsInfo{};
+        opDebug.getQueryStatsInfo() = OpDebug::QueryStatsInfo{};
         ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
             uasserted(ErrorCodes::BadValue, "fake error");
             return nullptr;
@@ -214,14 +216,14 @@ TEST_F(QueryStatsTest, RegisterRequestAbsorbsErrors) {
     internalQueryStatsErrorsAreCommandFatal.store(true);
 
     // We shouldn't propagate 'BSONObjectTooLarge' errors under any circumstances.
-    opDebug.queryStatsInfo = OpDebug::QueryStatsInfo{};
+    opDebug.getQueryStatsInfo() = OpDebug::QueryStatsInfo{};
     ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
         uasserted(ErrorCodes::BSONObjectTooLarge, "size error");
         return nullptr;
     }));
 
     // This should hit our tripwire assertion.
-    opDebug.queryStatsInfo = OpDebug::QueryStatsInfo{};
+    opDebug.getQueryStatsInfo() = OpDebug::QueryStatsInfo{};
     ASSERT_THROWS_CODE(query_stats::registerRequest(opCtx.get(),
                                                     nss,
                                                     [&]() {

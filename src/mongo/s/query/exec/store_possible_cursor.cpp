@@ -107,7 +107,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 
     auto& response = incomingCursorResponse.getValue();
     if (const auto& cursorMetrics = response.getCursorMetrics()) {
-        CurOp::get(opCtx)->debug().additiveMetrics.aggregateCursorMetrics(*cursorMetrics);
+        CurOp::get(opCtx)->debug().getAdditiveMetrics().aggregateCursorMetrics(*cursorMetrics);
     }
 
     return storePossibleCursor(opCtx,
@@ -133,7 +133,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         TailableModeEnum tailableMode,
                                         boost::optional<BSONObj> routerSort) {
     auto&& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.additiveMetrics.nBatches = 1;
+    opDebug.getAdditiveMetrics().nBatches = 1;
     // If nShards has already been set, then we are storing the forwarding $mergeCursors cursor from
     // a split aggregation pipeline, and the shards half of that pipeline may have targeted multiple
     // shards. In that case, leave the current value as-is.
@@ -142,7 +142,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 
     if (incomingCursorResponse.getCursorId() == CursorId(0)) {
         opDebug.cursorExhausted = true;
-        collectQueryStatsMongos(opCtx, std::move(opDebug.queryStatsInfo.key));
+        collectQueryStatsMongos(opCtx, std::move(opDebug.getQueryStatsInfo().key));
         return incomingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
     }
 

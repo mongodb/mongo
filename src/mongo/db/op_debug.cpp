@@ -307,6 +307,7 @@ void OpDebug::report(OperationContext* opCtx,
 
     OPDEBUG_TOATTR_HELP_BOOL(exhaust);
 
+    const AdditiveMetrics& additiveMetrics = getAdditiveMetrics();
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
     OPDEBUG_TOATTR_HELP_OPTIONAL("docsExamined", additiveMetrics.docsExamined);
 
@@ -590,6 +591,7 @@ void OpDebug::append(OperationContext* opCtx,
 
     OPDEBUG_APPEND_BOOL(b, exhaust);
 
+    const AdditiveMetrics& additiveMetrics = getAdditiveMetrics();
     OPDEBUG_APPEND_OPTIONAL(b, "keysExamined", additiveMetrics.keysExamined);
     OPDEBUG_APPEND_OPTIONAL(b, "docsExamined", additiveMetrics.docsExamined);
 
@@ -919,22 +921,22 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationConte
     });
 
     addIfNeeded("keysExamined", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.keysExamined);
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.getAdditiveMetrics().keysExamined);
     });
     addIfNeeded("docsExamined", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.docsExamined);
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.getAdditiveMetrics().docsExamined);
     });
     addIfNeeded("hasSortStage", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_BOOL2(b, field, args.op.additiveMetrics.hasSortStage);
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.getAdditiveMetrics().hasSortStage);
     });
     addIfNeeded("usedDisk", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_BOOL2(b, field, args.op.additiveMetrics.usedDisk);
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.getAdditiveMetrics().usedDisk);
     });
     addIfNeeded("fromMultiPlanner", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_BOOL2(b, field, args.op.additiveMetrics.fromMultiPlanner);
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.getAdditiveMetrics().fromMultiPlanner);
     });
     addIfNeeded("fromPlanCache", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_BOOL2(b, field, args.op.additiveMetrics.fromPlanCache.value_or(false));
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.getAdditiveMetrics().fromPlanCache.value_or(false));
     });
     addIfNeeded("replanned", [](auto field, auto args, auto& b) {
         if (args.op.replanReason) {
@@ -947,32 +949,32 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationConte
         }
     });
     addIfNeeded("nMatched", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nMatched);
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.getAdditiveMetrics().nMatched);
     });
     addIfNeeded("nBatches", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nBatches);
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.getAdditiveMetrics().nBatches);
     });
     addIfNeeded("nModified", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nModified);
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.getAdditiveMetrics().nModified);
     });
     addIfNeeded("ninserted", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.ninserted);
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.getAdditiveMetrics().ninserted);
     });
     addIfNeeded("ndeleted", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.ndeleted);
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.getAdditiveMetrics().ndeleted);
     });
     addIfNeeded("nUpserted", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nUpserted);
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.getAdditiveMetrics().nUpserted);
     });
     addIfNeeded("cursorExhausted", [](auto field, auto args, auto& b) {
         OPDEBUG_APPEND_BOOL2(b, field, args.op.cursorExhausted);
     });
 
     addIfNeeded("keysInserted", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.keysInserted);
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.getAdditiveMetrics().keysInserted);
     });
     addIfNeeded("keysDeleted", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.keysDeleted);
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.getAdditiveMetrics().keysDeleted);
     });
 
     addIfNeeded("prepareReadConflicts", [](auto field, auto args, auto& b) {
@@ -1008,7 +1010,7 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationConte
         b.appendNumber(field, args.curop.numYields());
     });
     addIfNeeded("nreturned", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nreturned);
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.getAdditiveMetrics().nreturned);
     });
 
     addIfNeeded("planCacheShapeHash", [](auto field, auto args, auto& b) {
@@ -1150,9 +1152,10 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationConte
     });
 
     addIfNeeded("workingMillis", [](auto field, auto args, auto& b) {
-        b.appendNumber(field,
-                       durationCount<Milliseconds>(
-                           args.op.additiveMetrics.clusterWorkingTime.value_or(Milliseconds{0})));
+        b.appendNumber(
+            field,
+            durationCount<Milliseconds>(
+                args.op.getAdditiveMetrics().clusterWorkingTime.value_or(Milliseconds{0})));
     });
 
     addIfNeeded("planSummary", [](auto field, auto args, auto& b) {
@@ -1211,6 +1214,7 @@ void OpDebug::setPlanSummaryMetrics(PlanSummaryStats&& planSummaryStats) {
     // Data-bearing node metrics need to be aggregated here rather than just assigned.
     // Certain operations like $mergeCursors may have already accumulated metrics from remote
     // data-bearing nodes, and we need to add in the work done locally.
+    AdditiveMetrics& additiveMetrics = getAdditiveMetrics();
     additiveMetrics.keysExamined =
         additiveMetrics.keysExamined.value_or(0) + planSummaryStats.totalKeysExamined;
     additiveMetrics.docsExamined =
@@ -1315,6 +1319,7 @@ static void appendResolvedViewsInfoImpl(
 CursorMetrics OpDebug::getCursorMetrics() const {
     CursorMetrics metrics;
 
+    const AdditiveMetrics& additiveMetrics = getAdditiveMetrics();
     metrics.setKeysExamined(additiveMetrics.keysExamined.value_or(0));
     metrics.setDocsExamined(additiveMetrics.docsExamined.value_or(0));
     metrics.setBytesRead(additiveMetrics.bytesRead.value_or(0));

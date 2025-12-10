@@ -436,10 +436,11 @@ public:
             // Store profiling data if profiling is enabled.
             collectProfilingDataIfNeeded(curOp, *exec);
 
-            collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().queryStatsInfo.key));
+            collectQueryStatsMongod(
+                opCtx, expCtx, std::move(curOp->debug().getQueryStatsInfo().key));
 
             CountCommandReply reply = buildCountReply(countResult);
-            if (curOp->debug().queryStatsInfo.metricsRequested) {
+            if (curOp->debug().getQueryStatsInfo().metricsRequested) {
                 reply.setMetrics(curOp->debug().getCursorMetrics().toBSON());
             }
             return reply;
@@ -523,7 +524,7 @@ public:
                 });
 
                 if (req.getIncludeQueryStatsMetrics()) {
-                    curOp->debug().queryStatsInfo.metricsRequested = true;
+                    curOp->debug().getQueryStatsInfo().metricsRequested = true;
                 }
             }
         }
@@ -591,7 +592,7 @@ public:
                              ExplainOptions::Verbosity verbosity,
                              rpc::ReplyBuilderInterface* replyBuilder) {
             auto curOp = CurOp::get(opCtx);
-            curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
+            curOp->debug().getQueryStatsInfo().disableForSubqueryExecution = true;
             const auto vts = auth::ValidatedTenancyScope::get(opCtx);
             auto viewAggRequest =
                 query_request_conversion::asAggregateCommandRequest(req, true /* hasExplain */);

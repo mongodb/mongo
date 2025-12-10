@@ -196,8 +196,8 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
             opCtx, *shard_role_details::getRecoveryUnit(opCtx), toDelete);
 
         if (opDebug) {
-            opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
-            opDebug->additiveMetrics.incrementNdeleted(1);
+            opDebug->getAdditiveMetrics().incrementKeysDeleted(keysDeleted);
+            opDebug->getAdditiveMetrics().incrementNdeleted(1);
         }
         serviceOpCounters(opCtx).gotDelete();
     }

@@ -112,7 +112,7 @@ struct InShard : InBoth {
         InBoth::record(opCtx);
         auto* curOp = CurOp::get(opCtx);
         auto& debug = curOp->debug();
-        auto& am = debug.additiveMetrics;
+        auto& am = debug.getAdditiveMetrics();
         incrCounter(deleted, am.ndeleted);
         incrCounter(inserted, am.ninserted);
         incrCounter(returned, am.nreturned);

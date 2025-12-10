@@ -852,8 +852,8 @@ CursorInitialReply createInitialCursorReplyMongod(OperationContext* opCtx,
     }
 
     auto&& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.additiveMetrics.nBatches = 1;
-    opDebug.additiveMetrics.nreturned = firstBatch.size();
+    opDebug.getAdditiveMetrics().nBatches = 1;
+    opDebug.getAdditiveMetrics().nreturned = firstBatch.size();
 
     if (exec->isEOF()) {
         opDebug.cursorExhausted = true;

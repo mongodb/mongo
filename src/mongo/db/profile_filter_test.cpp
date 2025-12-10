@@ -179,12 +179,12 @@ TEST_F(ProfileFilterTest, FilterDependsOnEnabledFeatureFlag) {
     ASSERT_TRUE(profileFilter.dependsOn("nreturned"));
 
     // '$_testFeatureFlagLatest' will always return 1. If 'nreturned' is 2, the filter should match.
-    opDebug->additiveMetrics.nreturned = 2;
+    opDebug->getAdditiveMetrics().nreturned = 2;
     ASSERT_TRUE(profileFilter.matches(opCtx, *opDebug, *curop));
 
     // '$_testFeatureFlagLatest' will always return 1. If 'nreturned' is 0.1, the filter should not
     // match.
-    opDebug->additiveMetrics.nreturned = 0.1;
+    opDebug->getAdditiveMetrics().nreturned = 0.1;
     ASSERT_FALSE(profileFilter.matches(opCtx, *opDebug, *curop));
 }
 

@@ -1634,7 +1634,7 @@ void TransactionParticipant::Participant::_stashActiveTransaction(OperationConte
 
         auto curop = CurOp::get(opCtx);
         o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
-                                                                curop->debug().additiveMetrics,
+                                                                curop->debug().getAdditiveMetrics(),
                                                                 curop->getPrepareReadConflicts(),
                                                                 curop->getOperationStorageMetrics(),
                                                                 o().txnState.isPrepared());
@@ -2532,7 +2532,7 @@ void TransactionParticipant::Participant::_finishCommitTransaction(
 
         auto curop = CurOp::get(opCtx);
         o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
-                                                                curop->debug().additiveMetrics,
+                                                                curop->debug().getAdditiveMetrics(),
                                                                 curop->getPrepareReadConflicts(),
                                                                 curop->getOperationStorageMetrics(),
                                                                 o().txnState.isPrepared());
@@ -2651,7 +2651,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         auto curop = CurOp::get(opCtx);
         o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
-                                                                curop->debug().additiveMetrics,
+                                                                curop->debug().getAdditiveMetrics(),
                                                                 curop->getPrepareReadConflicts(),
                                                                 curop->getOperationStorageMetrics(),
                                                                 o().txnState.isPrepared());
@@ -3141,7 +3141,7 @@ void TransactionParticipant::Participant::_transactionInfoForLog(
 
     attrs.addDeepCopy("readTimestamp", singleTransactionStats.getReadTimestamp().toString());
 
-    singleTransactionStats.getOpDebug()->additiveMetrics.report(&attrs);
+    singleTransactionStats.getOpDebug()->getAdditiveMetrics().report(&attrs);
 
     const auto& storageMetrics = singleTransactionStats.getTransactionStorageMetrics();
     attrs.add("writeConflicts", storageMetrics.writeConflicts.loadRelaxed());

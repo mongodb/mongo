@@ -70,7 +70,7 @@ mongo::write_ops::InsertCommandReply performTimeseriesWrites(
         curOp.setLogicalOp(lk, LogicalOp::opInsert);
         curOp.ensureStarted();
         // Initialize 'ninserted' for the operation if is not yet.
-        curOp.debug().additiveMetrics.incrementNinserted(0);
+        curOp.debug().getAdditiveMetrics().incrementNinserted(0);
     }
 
     return performTimeseriesWrites(opCtx, request, preConditions, &curOp);
@@ -128,7 +128,7 @@ mongo::write_ops::InsertCommandReply performTimeseriesWrites(
         RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
     }
 
-    curOp->debug().additiveMetrics.ninserted = baseReply.getN();
+    curOp->debug().getAdditiveMetrics().ninserted = baseReply.getN();
     serviceOpCounters(opCtx).gotInserts(baseReply.getN());
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInserts(opCtx->getWriteConcern(),
                                                                         baseReply.getN());

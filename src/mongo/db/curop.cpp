@@ -462,7 +462,7 @@ void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline, bool isFinal) {
 }
 
 void CurOp::setEndOfOpMetrics(long long nreturned) {
-    _debug.additiveMetrics.nreturned = nreturned;
+    _debug.getAdditiveMetrics().nreturned = nreturned;
     // A non-none queryStatsInfo.keyHash indicates the current query is being tracked locally for
     // queryStats, and a metricsRequested being true indicates the query is being tracked remotely
     // via the metrics included in cursor responses. In either case, we need to track the current
@@ -472,9 +472,9 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
     // for query stats collection we want it set before incrementing cursor metrics using OpDebug's
     // AdditiveMetrics. The value of executionTime set here will be overwritten later in
     // completeAndLogOperation.
-    const auto& info = _debug.queryStatsInfo;
+    const auto& info = _debug.getQueryStatsInfo();
     if (info.keyHash || info.metricsRequested) {
-        auto& metrics = _debug.additiveMetrics;
+        auto& metrics = _debug.getAdditiveMetrics();
         auto elapsed = elapsedTimeExcludingPauses();
         // We don't strictly need to record executionTime unless keyHash is non-none, but there's
         // no harm in recording it since we've already computed the value.
@@ -719,9 +719,9 @@ bool CurOp::shouldCurOpStackOmitDiagnosticInformation(CurOp* curop) {
 }
 
 void CurOp::_updateExecutionTimers() {
-    _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
+    _debug.getAdditiveMetrics().executionTime = elapsedTimeExcludingPauses();
 
-    auto workingMillis = duration_cast<Milliseconds>(*_debug.additiveMetrics.executionTime) -
+    auto workingMillis = duration_cast<Milliseconds>(*_debug.getAdditiveMetrics().executionTime) -
         (_sumBlockedTimeTotal() - _blockedTimeAtStart);
     // Round up to zero if necessary to allow precision errors from FastClockSource used by flow
     // control ticketholder.
@@ -834,7 +834,7 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
 
     if (_debug.isReplOplogGetMore) {
         oplogGetMoreStats.recordMillis(
-            durationCount<Milliseconds>(*_debug.additiveMetrics.executionTime));
+            durationCount<Milliseconds>(*_debug.getAdditiveMetrics().executionTime));
     }
     const auto [shouldProfileAtLevel1, shouldLogSlowOp] = _shouldProfileAtLevel1AndLogSlowQuery(
         logOptions,

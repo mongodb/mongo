@@ -687,7 +687,7 @@ public:
 
             // Collect and increment metrics now that we have enough information. It's important
             // we do so before generating the response so that the response can include metrics.
-            curOp->debug().additiveMetrics.nBatches = 1;
+            curOp->debug().getAdditiveMetrics().nBatches = 1;
             curOp->setEndOfOpMetrics(numResults);
             collectQueryStatsMongod(opCtx, cursorPin);
 
@@ -802,7 +802,7 @@ public:
             }
 
             if (_cmd.getIncludeQueryStatsMetrics()) {
-                curOp->debug().queryStatsInfo.metricsRequested = true;
+                curOp->debug().getQueryStatsInfo().metricsRequested = true;
             }
 
             ClientCursorPin cursorPin = pinCursorWithRetry(opCtx, cursorId, nss);

@@ -35,7 +35,7 @@
 namespace mongo {
 
 void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCursor) {
-    pinnedCursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
+    pinnedCursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().getAdditiveMetrics());
 
     // For a change stream query, we want to collect and update query stats on the initial query and
     // for every getMore.
@@ -44,11 +44,11 @@ void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCur
 
         auto snapshot = query_stats::captureMetrics(
             opCtx,
-            query_stats::microsecondsToUint64(opDebug.additiveMetrics.executionTime),
-            opDebug.additiveMetrics);
+            query_stats::microsecondsToUint64(opDebug.getAdditiveMetrics().executionTime),
+            opDebug.getAdditiveMetrics());
 
         query_stats::writeQueryStats(opCtx,
-                                     opDebug.queryStatsInfo.keyHash,
+                                     opDebug.getQueryStatsInfo().keyHash,
                                      pinnedCursor->takeKey(),
                                      snapshot,
                                      {} /* supplementalMetrics */,
@@ -65,11 +65,11 @@ void collectQueryStatsMongod(OperationContext* opCtx,
 
     auto snapshot = query_stats::captureMetrics(
         opCtx,
-        query_stats::microsecondsToUint64(opDebug.additiveMetrics.executionTime),
-        opDebug.additiveMetrics);
+        query_stats::microsecondsToUint64(opDebug.getAdditiveMetrics().executionTime),
+        opDebug.getAdditiveMetrics());
 
     query_stats::writeQueryStats(opCtx,
-                                 opDebug.queryStatsInfo.keyHash,
+                                 opDebug.getQueryStatsInfo().keyHash,
                                  std::move(key),
                                  snapshot,
                                  query_stats::computeSupplementalQueryStatsMetrics(opDebug));

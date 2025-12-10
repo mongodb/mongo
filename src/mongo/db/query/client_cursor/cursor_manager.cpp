@@ -238,8 +238,8 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     CurOp::get(opCtx)->debug().setQueryShapeHash(opCtx, cursor->_queryShapeHash);
 
     // Pass along queryStats context so it is retrievable after query execution for storing metrics.
-    CurOp::get(opCtx)->debug().queryStatsInfo.keyHash = cursor->_queryStatsKeyHash;
-    CurOp::get(opCtx)->debug().queryStatsInfo.willNeverExhaust =
+    CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash = cursor->_queryStatsKeyHash;
+    CurOp::get(opCtx)->debug().getQueryStatsInfo().willNeverExhaust =
         cursor->_queryStatsWillNeverExhaust;
     // Pass along 'isChangeStreamQuery' for serverStatus metrics.
     CurOp::get(opCtx)->debug().isChangeStreamQuery = cursor->_isChangeStreamQuery;

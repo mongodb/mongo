@@ -521,7 +521,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     auto&& opDebug = CurOp::get(opCtx)->debug();
     // Fill out query exec properties.
     opDebug.nShards = ccc->getNumRemotes();
-    opDebug.additiveMetrics.nBatches = 1;
+    opDebug.getAdditiveMetrics().nBatches = 1;
 
     // If the caller wants to know whether the cursor returned partial results, set it here.
     if (partialResultsReturned) {
@@ -539,7 +539,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
             updateNumHostsTargetedMetrics(opCtx, cri, shardIds.size());
         }
         if (const auto remoteMetrics = ccc->takeRemoteMetrics()) {
-            opDebug.additiveMetrics.aggregateDataBearingNodeMetrics(*remoteMetrics);
+            opDebug.getAdditiveMetrics().aggregateDataBearingNodeMetrics(*remoteMetrics);
         }
         collectQueryStatsMongos(opCtx, ccc->takeKey());
         return CursorId(0);
@@ -644,7 +644,7 @@ void earlyExitWithNoResults(OperationContext* opCtx,
         boost::none,
         allowedFeatures,
         !didDoFLERewrite /* mustRegisterRequestToQueryStats */);
-    collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
+    collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key));
 
     auto cursorId = CursorId(0);
 
@@ -1247,7 +1247,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     auto&& opDebug = CurOp::get(opCtx)->debug();
     // Set nReturned and whether the cursor has been exhausted.
     opDebug.cursorExhausted = (idToReturn == 0);
-    opDebug.additiveMetrics.nBatches = 1;
+    opDebug.getAdditiveMetrics().nBatches = 1;
     CurOp::get(opCtx)->setEndOfOpMetrics(batch.size());
 
     const bool partialResultsReturned = pinnedCursor.getValue()->partialResultsReturned();

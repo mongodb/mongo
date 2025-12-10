@@ -448,7 +448,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp, LogicalOp logicalOp) {
     try {
         curOp->done();
         auto executionTimeMicros = curOp->elapsedTimeExcludingPauses();
-        curOp->debug().additiveMetrics.executionTime = executionTimeMicros;
+        curOp->debug().getAdditiveMetrics().executionTime = executionTimeMicros;
 
         recordCurOpMetrics(opCtx);
         Top::getDecoration(opCtx).record(opCtx,
@@ -505,7 +505,7 @@ void setCurOpInfoAndEnsureStarted(OperationContext* opCtx,
     curOp->ensureStarted();
 
     if (logicalOp == LogicalOp::opInsert) {
-        curOp->debug().additiveMetrics.ninserted = 0;
+        curOp->debug().getAdditiveMetrics().ninserted = 0;
     }
 }
 

@@ -187,7 +187,7 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
         });
 
         if (parsedDistinct->distinctCommandRequest->getIncludeQueryStatsMetrics()) {
-            CurOp::get(opCtx)->debug().queryStatsInfo.metricsRequested = true;
+            CurOp::get(opCtx)->debug().getQueryStatsInfo().metricsRequested = true;
         }
     }
 
@@ -722,10 +722,10 @@ public:
 
         auto* cq = executor->getCanonicalQuery();
         collectQueryStatsMongod(
-            opCtx, cq->getExpCtx(), std::move(curOp->debug().queryStatsInfo.key));
+            opCtx, cq->getExpCtx(), std::move(curOp->debug().getQueryStatsInfo().key));
 
         // Include queryStats metrics in the result to be sent to mongos.
-        const bool includeMetrics = CurOp::get(opCtx)->debug().queryStatsInfo.metricsRequested;
+        const bool includeMetrics = CurOp::get(opCtx)->debug().getQueryStatsInfo().metricsRequested;
 
         if (includeMetrics) {
             // It is safe to unconditionally add the metrics because we are assured that the user
@@ -772,8 +772,8 @@ public:
 
         // We must store the key in distinct to prevent collecting query stats when the aggregation
         // runs.
-        auto ownedQueryStatsKey = std::move(curOp->debug().queryStatsInfo.key);
-        curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
+        auto ownedQueryStatsKey = std::move(curOp->debug().getQueryStatsInfo().key);
+        curOp->debug().getQueryStatsInfo().disableForSubqueryExecution = true;
 
         // If running explain distinct as agg, then aggregate is executed without privilege checks
         // and without response formatting.
@@ -815,7 +815,7 @@ public:
         // that can be read completely locally, such as non-existent database collections or
         // unsplittable collections, will run through this distinct path on mongod and return
         // metrics back to mongos.
-        const bool includeMetrics = curOp->debug().queryStatsInfo.metricsRequested;
+        const bool includeMetrics = curOp->debug().getQueryStatsInfo().metricsRequested;
         boost::optional<BSONObj> metrics = includeMetrics
             ? boost::make_optional(curOp->debug().getCursorMetrics().toBSON())
             : boost::none;

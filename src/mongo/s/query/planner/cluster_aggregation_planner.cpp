@@ -597,11 +597,11 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     // the cursor from its opCtx.
     opDebug.nShards = std::max(opDebug.nShards, nShards);
     opDebug.cursorExhausted = exhausted;
-    opDebug.additiveMetrics.nBatches = 1;
+    opDebug.getAdditiveMetrics().nBatches = 1;
     CurOp::get(opCtx)->setEndOfOpMetrics(responseBuilder.numDocs());
 
     if (exhausted) {
-        opDebug.additiveMetrics.aggregateDataBearingNodeMetrics(ccc->takeRemoteMetrics());
+        opDebug.getAdditiveMetrics().aggregateDataBearingNodeMetrics(ccc->takeRemoteMetrics());
         collectQueryStatsMongos(opCtx, ccc->takeKey());
     } else {
         collectQueryStatsMongos(opCtx, ccc);
@@ -1090,7 +1090,8 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
     if (explain) {
         // If this was an explain, then we get back an explain result object rather than a cursor.
         result = response.swResponse.getValue().data;
-        collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
+        collectQueryStatsMongos(opCtx,
+                                std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key));
     } else {
         result = uassertStatusOK(storePossibleCursor(
             opCtx,

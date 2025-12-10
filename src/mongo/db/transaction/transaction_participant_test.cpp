@@ -3581,25 +3581,36 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponS
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Initialize field values for both AdditiveMetrics objects.
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.keysExamined =
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->getAdditiveMetrics()
+        .keysExamined = 1;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().keysExamined = 5;
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->getAdditiveMetrics()
+        .docsExamined = 2;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().docsExamined = 0;
+    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->getAdditiveMetrics().nMatched =
+        3;
+    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->getAdditiveMetrics().nModified =
         1;
-    CurOp::get(opCtx())->debug().additiveMetrics.keysExamined = 5;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.docsExamined =
-        2;
-    CurOp::get(opCtx())->debug().additiveMetrics.docsExamined = 0;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.nMatched = 3;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.nModified = 1;
-    CurOp::get(opCtx())->debug().additiveMetrics.nModified = 1;
-    CurOp::get(opCtx())->debug().additiveMetrics.ninserted = 4;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.keysInserted =
-        1;
-    CurOp::get(opCtx())->debug().additiveMetrics.keysInserted = 1;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.keysDeleted = 0;
-    CurOp::get(opCtx())->debug().additiveMetrics.keysDeleted = 0;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().nModified = 1;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().ninserted = 4;
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->getAdditiveMetrics()
+        .keysInserted = 1;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().keysInserted = 1;
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->getAdditiveMetrics()
+        .keysDeleted = 0;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().keysDeleted = 0;
 
     auto additiveMetricsToCompare =
-        txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics;
-    additiveMetricsToCompare.add(CurOp::get(opCtx())->debug().additiveMetrics);
+        txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->getAdditiveMetrics();
+    additiveMetricsToCompare.add(CurOp::get(opCtx())->debug().getAdditiveMetrics());
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
@@ -3608,8 +3619,9 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponS
     }
     txnParticipant.stashTransactionResources(opCtx());
 
-    ASSERT(txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.equals(
-        additiveMetricsToCompare));
+    ASSERT(
+        txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->getAdditiveMetrics().equals(
+            additiveMetricsToCompare));
 }
 
 TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponCommit) {
@@ -3617,25 +3629,34 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponC
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Initialize field values for both AdditiveMetrics objects.
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.keysExamined =
-        3;
-    CurOp::get(opCtx())->debug().additiveMetrics.keysExamined = 2;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.docsExamined =
-        0;
-    CurOp::get(opCtx())->debug().additiveMetrics.docsExamined = 2;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.nMatched = 4;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.nModified = 5;
-    CurOp::get(opCtx())->debug().additiveMetrics.nModified = 1;
-    CurOp::get(opCtx())->debug().additiveMetrics.ninserted = 1;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.ndeleted = 4;
-    CurOp::get(opCtx())->debug().additiveMetrics.ndeleted = 0;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.keysInserted =
-        1;
-    CurOp::get(opCtx())->debug().additiveMetrics.keysInserted = 1;
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->getAdditiveMetrics()
+        .keysExamined = 3;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().keysExamined = 2;
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->getAdditiveMetrics()
+        .docsExamined = 0;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().docsExamined = 2;
+    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->getAdditiveMetrics().nMatched =
+        4;
+    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->getAdditiveMetrics().nModified =
+        5;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().nModified = 1;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().ninserted = 1;
+    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->getAdditiveMetrics().ndeleted =
+        4;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().ndeleted = 0;
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->getAdditiveMetrics()
+        .keysInserted = 1;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().keysInserted = 1;
 
     auto additiveMetricsToCompare =
-        txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics;
-    additiveMetricsToCompare.add(CurOp::get(opCtx())->debug().additiveMetrics);
+        txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->getAdditiveMetrics();
+    additiveMetricsToCompare.add(CurOp::get(opCtx())->debug().getAdditiveMetrics());
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
@@ -3644,8 +3665,9 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponC
     }
     txnParticipant.commitUnpreparedTransaction(opCtx());
 
-    ASSERT(txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.equals(
-        additiveMetricsToCompare));
+    ASSERT(
+        txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->getAdditiveMetrics().equals(
+            additiveMetricsToCompare));
 }
 
 TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponAbort) {
@@ -3653,25 +3675,36 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponA
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Initialize field values for both AdditiveMetrics objects.
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.keysExamined =
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->getAdditiveMetrics()
+        .keysExamined = 2;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().keysExamined = 4;
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->getAdditiveMetrics()
+        .docsExamined = 1;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().docsExamined = 3;
+    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->getAdditiveMetrics().nMatched =
         2;
-    CurOp::get(opCtx())->debug().additiveMetrics.keysExamined = 4;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.docsExamined =
-        1;
-    CurOp::get(opCtx())->debug().additiveMetrics.docsExamined = 3;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.nMatched = 2;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.nModified = 0;
-    CurOp::get(opCtx())->debug().additiveMetrics.nModified = 3;
-    CurOp::get(opCtx())->debug().additiveMetrics.ndeleted = 5;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.keysInserted =
-        1;
-    CurOp::get(opCtx())->debug().additiveMetrics.keysInserted = 1;
-    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.keysDeleted = 6;
-    CurOp::get(opCtx())->debug().additiveMetrics.keysDeleted = 0;
+    txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->getAdditiveMetrics().nModified =
+        0;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().nModified = 3;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().ndeleted = 5;
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->getAdditiveMetrics()
+        .keysInserted = 1;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().keysInserted = 1;
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->getAdditiveMetrics()
+        .keysDeleted = 6;
+    CurOp::get(opCtx())->debug().getAdditiveMetrics().keysDeleted = 0;
 
     auto additiveMetricsToCompare =
-        txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics;
-    additiveMetricsToCompare.add(CurOp::get(opCtx())->debug().additiveMetrics);
+        txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->getAdditiveMetrics();
+    additiveMetricsToCompare.add(CurOp::get(opCtx())->debug().getAdditiveMetrics());
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
@@ -3680,8 +3713,9 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponA
     }
     txnParticipant.abortTransaction(opCtx());
 
-    ASSERT(txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.equals(
-        additiveMetricsToCompare));
+    ASSERT(
+        txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->getAdditiveMetrics().equals(
+            additiveMetricsToCompare));
 }
 
 TEST_F(TransactionsMetricsTest, StorageMetricsObjectsShouldBeAddedTogetherUponStash) {
@@ -4220,14 +4254,14 @@ TEST_F(TransactionsMetricsTest, LastClientInfoShouldUpdateUponAbort) {
  * Sets up the additive metrics for Transactions Metrics test.
  */
 void setupAdditiveMetrics(const int metricValue, OperationContext* opCtx) {
-    CurOp::get(opCtx)->debug().additiveMetrics.keysExamined = metricValue;
-    CurOp::get(opCtx)->debug().additiveMetrics.docsExamined = metricValue;
-    CurOp::get(opCtx)->debug().additiveMetrics.nMatched = metricValue;
-    CurOp::get(opCtx)->debug().additiveMetrics.nModified = metricValue;
-    CurOp::get(opCtx)->debug().additiveMetrics.ninserted = metricValue;
-    CurOp::get(opCtx)->debug().additiveMetrics.ndeleted = metricValue;
-    CurOp::get(opCtx)->debug().additiveMetrics.keysInserted = metricValue;
-    CurOp::get(opCtx)->debug().additiveMetrics.keysDeleted = metricValue;
+    CurOp::get(opCtx)->debug().getAdditiveMetrics().keysExamined = metricValue;
+    CurOp::get(opCtx)->debug().getAdditiveMetrics().docsExamined = metricValue;
+    CurOp::get(opCtx)->debug().getAdditiveMetrics().nMatched = metricValue;
+    CurOp::get(opCtx)->debug().getAdditiveMetrics().nModified = metricValue;
+    CurOp::get(opCtx)->debug().getAdditiveMetrics().ninserted = metricValue;
+    CurOp::get(opCtx)->debug().getAdditiveMetrics().ndeleted = metricValue;
+    CurOp::get(opCtx)->debug().getAdditiveMetrics().keysInserted = metricValue;
+    CurOp::get(opCtx)->debug().getAdditiveMetrics().keysDeleted = metricValue;
 }
 
 void setupPrepareConflictMetrics(const int metricValue, OperationContext* opCtx) {

@@ -823,8 +823,8 @@ TEST_F(CatalogTestFixture, CappedDeleteRecord) {
     auto globalDeletesAfterInsert = serviceOpCounters(ClusterRole::ShardServer).getDelete()->load();
     ASSERT_EQUALS(globalDeletesAfterInsert, globalDeletesInitial + 1);
 
-    ASSERT_EQUALS(1, opDebug.additiveMetrics.keysDeleted.get_value_or(-1));
-    ASSERT_EQUALS(1, opDebug.additiveMetrics.ndeleted.get_value_or(-1));
+    ASSERT_EQUALS(1, opDebug.getAdditiveMetrics().keysDeleted.get_value_or(-1));
+    ASSERT_EQUALS(1, opDebug.getAdditiveMetrics().ndeleted.get_value_or(-1));
 
     ASSERT_EQUALS(1, coll->numRecords(operationContext()));
 

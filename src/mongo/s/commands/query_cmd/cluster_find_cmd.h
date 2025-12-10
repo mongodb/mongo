@@ -207,7 +207,7 @@ public:
             Impl::checkCanExplainHere(opCtx);
 
             auto curOp = CurOp::get(opCtx);
-            curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
+            curOp->debug().getQueryStatsInfo().disableForSubqueryExecution = true;
 
             setReadConcern(opCtx);
             doFLERewriteIfNeeded(opCtx);

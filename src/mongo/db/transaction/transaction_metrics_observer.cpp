@@ -192,7 +192,7 @@ void TransactionMetricsObserver::onTransactionOperation(
     bool isPrepared) {
     // Add the latest operation stats to the aggregate OpDebug::AdditiveMetrics and StorageMetrics
     // objects stored in the SingleTransactionStats instance on the TransactionMetricsObserver.
-    _singleTransactionStats.getOpDebug()->additiveMetrics.add(additiveMetrics);
+    _singleTransactionStats.getOpDebug()->getAdditiveMetrics().add(additiveMetrics);
     _singleTransactionStats.incrementPrepareReadConflicts(prepareReadConflicts);
     _singleTransactionStats.getTransactionStorageMetrics() += storageMetrics;
 

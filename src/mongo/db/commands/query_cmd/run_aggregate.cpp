@@ -279,7 +279,7 @@ void collectQueryStats(const AggExState& aggExState,
     if (maybePinnedCursor) {
         collectQueryStatsMongod(opCtx, *maybePinnedCursor);
     } else {
-        collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().queryStatsInfo.key));
+        collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().getQueryStatsInfo().key));
     }
 }
 
@@ -813,7 +813,7 @@ void executeExplain(const AggExState& aggExState,
     collectQueryStatsMongod(
         aggExState.getOpCtx(),
         expCtx,
-        std::move(CurOp::get(aggExState.getOpCtx())->debug().queryStatsInfo.key));
+        std::move(CurOp::get(aggExState.getOpCtx())->debug().getQueryStatsInfo().key));
 }
 
 /**
@@ -935,7 +935,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
             aggExState.hasChangeStream());
 
         if (aggExState.getRequest().getIncludeQueryStatsMetrics()) {
-            CurOp::get(aggExState.getOpCtx())->debug().queryStatsInfo.metricsRequested = true;
+            CurOp::get(aggExState.getOpCtx())->debug().getQueryStatsInfo().metricsRequested = true;
         }
     }
 

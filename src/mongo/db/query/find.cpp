@@ -93,7 +93,7 @@ void endQueryOp(OperationContext* opCtx,
     // are collected within collectQueryStatsMongod.
     curOp->debug().cursorid = (cursor.has_value() ? cursor->getCursor()->cursorid() : -1);
     curOp->debug().cursorExhausted = !cursor.has_value();
-    curOp->debug().additiveMetrics.nBatches = 1;
+    curOp->debug().getAdditiveMetrics().nBatches = 1;
 
     // Fill out CurOp based on explain summary statistics.
     PlanSummaryStats summaryStats;
@@ -116,7 +116,7 @@ void endQueryOp(OperationContext* opCtx,
     } else {
         auto* cq = exec.getCanonicalQuery();
         const auto& expCtx = cq ? cq->getExpCtx() : makeBlankExpressionContext(opCtx, exec.nss());
-        collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().queryStatsInfo.key));
+        collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().getQueryStatsInfo().key));
     }
 
     if (curOp->shouldDBProfile()) {

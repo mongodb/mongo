@@ -94,9 +94,9 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _planCacheShapeHash(CurOp::get(opCtx)->debug().planCacheShapeHash),
       _queryShapeHash(CurOp::get(opCtx)->debug().getQueryShapeHash()),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
-      _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
-      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)),
-      _queryStatsWillNeverExhaust(CurOp::get(opCtx)->debug().queryStatsInfo.willNeverExhaust),
+      _queryStatsKeyHash(CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash),
+      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key)),
+      _queryStatsWillNeverExhaust(CurOp::get(opCtx)->debug().getQueryStatsInfo().willNeverExhaust),
       _isChangeStreamQuery(CurOp::get(opCtx)->debug().isChangeStreamQuery) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
@@ -117,9 +117,9 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _planCacheShapeHash(CurOp::get(opCtx)->debug().planCacheShapeHash),
       _queryShapeHash(CurOp::get(opCtx)->debug().getQueryShapeHash()),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
-      _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
-      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)),
-      _queryStatsWillNeverExhaust(CurOp::get(opCtx)->debug().queryStatsInfo.willNeverExhaust),
+      _queryStatsKeyHash(CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash),
+      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key)),
+      _queryStatsWillNeverExhaust(CurOp::get(opCtx)->debug().getQueryStatsInfo().willNeverExhaust),
       _isChangeStreamQuery(CurOp::get(opCtx)->debug().isChangeStreamQuery) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(

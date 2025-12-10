@@ -322,8 +322,8 @@ public:
 
             auto&& opDebug = CurOp::get(opCtx)->debug();
             opDebug.nShards = ccc->getNumRemotes();
-            opDebug.additiveMetrics.nBatches = 1;
-            opDebug.additiveMetrics.nreturned = firstBatch.size();
+            opDebug.getAdditiveMetrics().nBatches = 1;
+            opDebug.getAdditiveMetrics().nreturned = firstBatch.size();
 
             if (cursorState == ClusterCursorManager::CursorState::Exhausted) {
                 opDebug.cursorExhausted = true;
