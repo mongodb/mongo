@@ -76,6 +76,7 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/query/util/retry.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -1141,36 +1142,30 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
                                           const NamespaceString& requestedNss,
                                           const PrivilegeVector& privileges,
                                           boost::optional<ExplainOptions::Verbosity> verbosity,
-                                          BSONObjBuilder* result,
-                                          unsigned numberRetries) {
-    if (numberRetries >= kMaxViewRetries) {
-        return Status(ErrorCodes::InternalError,
-                      "Failed to resolve view after max number of retries.");
-    }
+                                          BSONObjBuilder* result) {
+    auto body = [&](ResolvedView& currentResolvedView) {
+        auto resolvedAggRequest =
+            PipelineResolver::buildRequestWithResolvedPipeline(currentResolvedView, request);
 
-    auto resolvedAggRequest =
-        PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, request);
+        result->resetToEmpty();
 
-    result->resetToEmpty();
+        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+            txnRouter.onViewResolutionError(opCtx, requestedNss);
+        }
 
-    if (auto txnRouter = TransactionRouter::get(opCtx)) {
-        txnRouter.onViewResolutionError(opCtx, requestedNss);
-    }
+        // We pass both the underlying collection namespace and the view namespace here. The
+        // underlying collection namespace is used to execute the aggregation on mongoD. Any cursor
+        // returned will be registered under the view namespace so that subsequent getMore and
+        // killCursors calls against the view have access.
+        Namespaces nsStruct;
+        nsStruct.requestedNss = requestedNss;
+        nsStruct.executionNss = currentResolvedView.getNamespace();
 
-    // We pass both the underlying collection namespace and the view namespace here. The
-    // underlying collection namespace is used to execute the aggregation on mongoD. Any cursor
-    // returned will be registered under the view namespace so that subsequent getMore and
-    // killCursors calls against the view have access.
-    Namespaces nsStruct;
-    nsStruct.requestedNss = requestedNss;
-    nsStruct.executionNss = resolvedView.getNamespace();
+        uassert(ErrorCodes::OptionNotSupportedOnView,
+                "$rankFusion and $scoreFusion are unsupported on timeseries collections",
+                !(currentResolvedView.timeseries() && request.getIsHybridSearch()));
 
-    uassert(ErrorCodes::OptionNotSupportedOnView,
-            "$rankFusion and $scoreFusion are unsupported on timeseries collections",
-            !(resolvedView.timeseries() && request.getIsHybridSearch()));
-
-    sharding::router::CollectionRouter router(opCtx, nsStruct.executionNss);
-    try {
+        sharding::router::CollectionRouter router(opCtx, nsStruct.executionNss);
         router.routeWithRoutingContext(
             "ClusterAggregate::retryOnViewError",
             [&](OperationContext* opCtx, RoutingContext& routingCtx) {
@@ -1218,27 +1213,24 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
                                                resolvedAggRequest,
                                                LiteParsedPipeline(resolvedAggRequest, true),
                                                privileges,
-                                               boost::make_optional(resolvedView),
+                                               boost::make_optional(currentResolvedView),
                                                boost::make_optional(request),
                                                verbosity,
                                                result));
             });
-    } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-        // If the underlying namespace was changed to a view during retry, then re-run the
-        // aggregation on the new resolved namespace.
-        return ClusterAggregate::retryOnViewError(opCtx,
-                                                  resolvedAggRequest,
-                                                  *ex.extraInfo<ResolvedView>(),
-                                                  requestedNss,
-                                                  privileges,
-                                                  verbosity,
-                                                  result,
-                                                  numberRetries + 1);
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
 
-    return Status::OK();
+        return Status::OK();
+    };
+
+    // If the underlying namespace was changed to a view during retry, then re-run the aggregation
+    // on the new resolved namespace.
+    auto onError = [&](ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex,
+                       ResolvedView& currentResolvedView) {
+        currentResolvedView = *ex.extraInfo<ResolvedView>();
+    };
+
+    return retryOnWithState<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>(
+        "ClusterAggregate::retryOnViewError", resolvedView, kMaxViewRetries, body, onError);
 }
 
 }  // namespace mongo

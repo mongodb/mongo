@@ -47,7 +47,7 @@ TEST(RetryOnTest, RetriesUntilSuccessUpToMax) {
         return 42;
     };
 
-    auto result = retryOn<ErrorCodes::BadValue>(fn, kMaxRetries);
+    auto result = retryOn<ErrorCodes::BadValue>("RetryOnTest", fn, kMaxRetries);
 
     ASSERT_EQ(result, 42);
     // 2 throws + 1 success = 3 total attempts.
@@ -64,8 +64,9 @@ TEST(RetryOnTest, ThrowsAfterExhaustingMaxRetries) {
         uasserted(ErrorCodes::BadValue, "mocking bad value error response for test");
     };
 
-    ASSERT_THROWS_CODE(
-        retryOn<ErrorCodes::BadValue>(fn, kMaxRetries), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(retryOn<ErrorCodes::BadValue>("RetryOnTest", fn, kMaxRetries),
+                       DBException,
+                       ErrorCodes::BadValue);
 
     // We should attempt exactly (maxRetries + 1) times before propagating.
     ASSERT_EQ(numCalls, kMaxRetries + 1);
@@ -80,8 +81,9 @@ TEST(RetryOnTest, DoesNotRetryOnDifferentErrorCode) {
         uasserted(ErrorCodes::BadValue, "mocking bad value error response for test");
     };
 
-    ASSERT_THROWS_CODE(
-        retryOn<ErrorCodes::NamespaceNotFound>(fn, kMaxRetries), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(retryOn<ErrorCodes::NamespaceNotFound>("RetryOnTest", fn, kMaxRetries),
+                       DBException,
+                       ErrorCodes::BadValue);
 
     // Because the error code doesn't match E, we should not retry at all.
     ASSERT_EQ(numCalls, 1);
@@ -97,10 +99,46 @@ TEST(RetryOnTest, ZeroMaxRetriesMeansSingleAttempt) {
         return 0;
     };
 
-    ASSERT_THROWS_CODE(
-        retryOn<ErrorCodes::BadValue>(fn, kMaxRetries), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(retryOn<ErrorCodes::BadValue>("RetryOnTest", fn, kMaxRetries),
+                       DBException,
+                       ErrorCodes::BadValue);
     // One attempt, zero retries.
     ASSERT_EQ(numCalls, 1);
+}
+
+TEST(RetryOnTest, OnErrorInvokedForEachRetryWithState) {
+    constexpr auto kMaxRetries = 5;
+    auto numCalls = 0;
+    auto numOnErrorCalls = 0;
+    // Initial state: number of throws remaining before success.
+    auto initialThrowsRemaining = 2;
+
+    auto lastObservedThrowsRemaining = -1;
+
+    auto fn = [&](int& throwsRemaining) {
+        ++numCalls;
+        if (throwsRemaining > 0) {
+            --throwsRemaining;
+            uasserted(ErrorCodes::BadValue,
+                      "mocking bad value error response for onErrorWithState test");
+        }
+        return 42;
+    };
+
+    auto onError = [&](ExceptionFor<ErrorCodes::BadValue>& ex, int& throwsRemaining) {
+        ++numOnErrorCalls;
+        lastObservedThrowsRemaining = throwsRemaining;
+    };
+
+    auto result = retryOnWithState<ErrorCodes::BadValue>(
+        "RetryOnWithStateTest"_sd, initialThrowsRemaining, kMaxRetries, fn, onError);
+
+    ASSERT_EQ(result, 42);
+    // 2 throws + 1 success = 3 total attempts.
+    ASSERT_EQ(numCalls, 3);
+    ASSERT_EQ(numOnErrorCalls, 2);
+    // onError should have seen the state after the last throw.
+    ASSERT_EQ(lastObservedThrowsRemaining, 0);
 }
 }  // namespace
 }  // namespace mongo

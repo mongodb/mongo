@@ -149,8 +149,7 @@ public:
                                    const NamespaceString& requestedNss,
                                    const PrivilegeVector& privileges,
                                    boost::optional<ExplainOptions::Verbosity> verbosity,
-                                   BSONObjBuilder* result,
-                                   unsigned numberRetries = 0);
+                                   BSONObjBuilder* result);
 };
 
 }  // namespace mongo

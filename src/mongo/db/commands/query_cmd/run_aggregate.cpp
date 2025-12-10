@@ -1335,6 +1335,6 @@ Status runAggregate(
 
     // Retry if the namespace concurrently transitioned from collection to view during aggregation
     // planning.
-    return retryOn<ErrorCodes::CollectionBecameView>(body);
+    return retryOn<ErrorCodes::CollectionBecameView>("runAggregate", body);
 }
 }  // namespace mongo
