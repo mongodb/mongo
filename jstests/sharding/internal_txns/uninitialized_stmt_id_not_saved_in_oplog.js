@@ -12,6 +12,10 @@ import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getOplogEntriesForTxn} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
+// Turn off the TestingProctor, since the placementConflictTime check will invariant in testing but
+// not in production.
+TestData.testingDiagnosticsEnabled = false;
+
 const st = new ShardingTest({shards: 1});
 const shard0Primary = st.rs0.getPrimary();
 

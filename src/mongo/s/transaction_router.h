@@ -139,7 +139,7 @@ public:
                                         BSONObj cmd,
                                         bool isFirstStatementInThisParticipant,
                                         bool addingParticipantViaSubRouter,
-                                        bool hasTxnCreatedAnyDatabase) const;
+                                        const std::set<DatabaseName>& createdDatabases) const;
 
         // True if the participant has been chosen as the coordinator for its transaction
         bool isCoordinator{false};
@@ -811,21 +811,23 @@ public:
      * append the ones passed to the function.
      */
     static BSONObj appendFieldsForStartTransaction(
+        OperationContext* opCtx,
         BSONObj cmdObj,
         const repl::ReadConcernArgs& readConcernArgs,
         const boost::optional<LogicalTime>& atClusterTimeForSnapshotReadConcern,
         const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern,
         bool doAppendStartTransaction,
         bool startOrContinueTransaction,
-        bool hasTxnCreatedAnyDatabase);
+        const std::set<DatabaseName>& createdDatabases);
 
     /**
      * Appends the needed fields when continuing a transaction on a participant.
      */
     static BSONObj appendFieldsForContinueTransaction(
+        OperationContext* opCtx,
         BSONObj cmdObj,
         const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern,
-        bool hasTxnCreatedAnyDatabase);
+        const std::set<DatabaseName>& createdDatabases);
 
     /**
      * Returns a new read concern settings object by combining the input settings.

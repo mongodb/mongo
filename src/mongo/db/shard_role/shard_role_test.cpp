@@ -790,138 +790,6 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithoutSpecifyingPlacementVersion) {
     ASSERT_FALSE(acquisition.getShardingDescription().isSharded());
 }
 
-
-TEST_F(ShardRoleTest, AcquireInMultiDocumentTransactionMustCheckForPlacementConflictTime_NoThrow) {
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
-    OperationContext* opCtx = operationContext();
-    // Simulate a routed request, this necessary for the check to throw.
-    ScopedSetShardRole setShardRole(
-        opCtx, nssUnshardedCollection1, ShardVersion::UNTRACKED(), dbVersionTestDb);
-
-    // Never throw if we are not a multi-document transaction.
-    ASSERT_DOES_NOT_THROW(
-        acquireCollection(opCtx,
-                          CollectionAcquisitionRequest(nssUnshardedCollection1,
-                                                       placementConcern,
-                                                       repl::ReadConcernArgs(),
-                                                       AcquisitionPrerequisites::kRead),
-                          MODE_IS));
-
-    // Setting the operation context in multi-document transaction requires the version to include
-    // the PlacementConflictTime
-    opCtx->setInMultiDocumentTransaction();
-    // Attaching the PlacementConflictTime must now work regularly.
-    auto dbVersionDbWithPlacementConflictTime = dbVersionTestDb;
-    dbVersionDbWithPlacementConflictTime.setPlacementConflictTime(LogicalTime(Timestamp{0, 0}));
-    placementConcern =
-        PlacementConcern{dbVersionDbWithPlacementConflictTime, ShardVersion::UNTRACKED()};
-
-    ASSERT_DOES_NOT_THROW(
-        acquireCollection(opCtx,
-                          CollectionAcquisitionRequest(nssUnshardedCollection1,
-                                                       placementConcern,
-                                                       repl::ReadConcernArgs(),
-                                                       AcquisitionPrerequisites::kRead),
-                          MODE_IS));
-
-    // The PlacementConflictTime can also be set on the shardVersion
-    auto shardVersionWithPlacementConflictTime = ShardVersion::UNTRACKED();
-    shardVersionWithPlacementConflictTime.setPlacementConflictTime(LogicalTime(Timestamp{0, 0}));
-    placementConcern = PlacementConcern{dbVersionTestDb, shardVersionWithPlacementConflictTime};
-    ASSERT_DOES_NOT_THROW(
-        acquireCollection(opCtx,
-                          CollectionAcquisitionRequest(nssUnshardedCollection1,
-                                                       placementConcern,
-                                                       repl::ReadConcernArgs(),
-                                                       AcquisitionPrerequisites::kRead),
-                          MODE_IS));
-}
-
-TEST_F(ShardRoleTest,
-       AcquireInMultiDocumentTransactionMissingPlacementConflictTime_excluded_versions) {
-    OperationContext* opCtx = operationContext();
-    opCtx->setInMultiDocumentTransaction();
-
-    // Do not throw for unrouted operations
-    {
-        PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
-        ScopedSetShardRole setShardRole(opCtx, nssUnshardedCollection1, boost::none, boost::none);
-        ASSERT_DOES_NOT_THROW(
-            acquireCollection(opCtx,
-                              CollectionAcquisitionRequest(nssUnshardedCollection1,
-                                                           placementConcern,
-                                                           repl::ReadConcernArgs(),
-                                                           AcquisitionPrerequisites::kRead),
-                              MODE_IS));
-    }
-
-    // Do not throw for (boost::none, unsharded)
-    {
-        PlacementConcern placementConcern{boost::none, ShardVersion::UNTRACKED()};
-        ScopedSetShardRole setShardRole(
-            opCtx, nssUnshardedCollection1, ShardVersion::UNTRACKED(), dbVersionTestDb);
-        ASSERT_DOES_NOT_THROW(
-            acquireCollection(opCtx,
-                              CollectionAcquisitionRequest(nssUnshardedCollection1,
-                                                           placementConcern,
-                                                           repl::ReadConcernArgs(),
-                                                           AcquisitionPrerequisites::kRead),
-                              MODE_IS));
-    }
-
-    // Do not throw for (boost::none, ignore)
-    {
-        PlacementConcern placementConcern{boost::none, shardVersionIgnore};
-        ScopedSetShardRole setShardRole(
-            opCtx, nssUnshardedCollection1, ShardVersion::UNTRACKED(), dbVersionTestDb);
-        ASSERT_DOES_NOT_THROW(
-            acquireCollection(opCtx,
-                              CollectionAcquisitionRequest(nssUnshardedCollection1,
-                                                           placementConcern,
-                                                           repl::ReadConcernArgs(),
-                                                           AcquisitionPrerequisites::kRead),
-                              MODE_IS));
-    }
-}
-
-DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
-                   AcquireInMultiDocumentTransactionMissingPlacementConflictTime_version_unsharded,
-                   "Tripwire assertion.*10206300") {
-    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
-    OperationContext* opCtx = operationContext();
-    // Simulate a routed request, this necessary for the check to throw.
-    ScopedSetShardRole setShardRole(
-        opCtx, nssUnshardedCollection1, ShardVersion::UNTRACKED(), dbVersionTestDb);
-    // Setting the operation context in multi-document transaction requires the version to include
-    // the PlacementConflictTime
-    opCtx->setInMultiDocumentTransaction();
-    acquireCollection(opCtx,
-                      CollectionAcquisitionRequest(nssUnshardedCollection1,
-                                                   placementConcern,
-                                                   repl::ReadConcernArgs(),
-                                                   AcquisitionPrerequisites::kRead),
-                      MODE_IS);
-}
-
-DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
-                   AcquireInMultiDocumentTransactionMissingPlacementConflictTime_version_sharded,
-                   "Tripwire assertion.*10206300") {
-    PlacementConcern placementConcern{dbVersionTestDb, shardVersionShardedCollection1};
-    OperationContext* opCtx = operationContext();
-    ScopedSetShardRole setShardRole(
-        opCtx, nssShardedCollection1, shardVersionShardedCollection1, dbVersionTestDb);
-    // Setting the operation context in multi-document transaction requires the version to include
-    // the PlacementConflictTime
-    opCtx->setInMultiDocumentTransaction();
-    ASSERT_THROWS(acquireCollection(opCtx,
-                                    CollectionAcquisitionRequest(nssShardedCollection1,
-                                                                 placementConcern,
-                                                                 repl::ReadConcernArgs(),
-                                                                 AcquisitionPrerequisites::kRead),
-                                    MODE_IS),
-                  unittest::TestAssertionFailureException);
-}
-
 // ---------------------------------------------------------------------------
 // Acquire inexistent collections
 
@@ -1120,14 +988,12 @@ TEST_F(ShardRoleTest, NoExceptionIsThrownWhenShardVersionUnshardedButStashedIsEq
 // MaybeLockFree
 TEST_F(ShardRoleTest, AcquireCollectionMaybeLockFreeTakesLocksWhenInMultiDocTransaction) {
     operationContext()->setInMultiDocumentTransaction();
-    auto dbVersionDbWithPlacementConflictTime = dbVersionTestDb;
-    dbVersionDbWithPlacementConflictTime.setPlacementConflictTime(LogicalTime(Timestamp{0, 0}));
-    const auto acquisition = acquireCollectionMaybeLockFree(
-        operationContext(),
-        {nssUnshardedCollection1,
-         {dbVersionDbWithPlacementConflictTime, ShardVersion::UNTRACKED()},
-         repl::ReadConcernArgs(),
-         AcquisitionPrerequisites::kRead});
+    const auto acquisition =
+        acquireCollectionMaybeLockFree(operationContext(),
+                                       {nssUnshardedCollection1,
+                                        {dbVersionTestDb, ShardVersion::UNTRACKED()},
+                                        repl::ReadConcernArgs(),
+                                        AcquisitionPrerequisites::kRead});
     ASSERT_TRUE(shard_role_details::getLocker(operationContext())
                     ->isCollectionLockedForMode(nssUnshardedCollection1, MODE_IS));
 }

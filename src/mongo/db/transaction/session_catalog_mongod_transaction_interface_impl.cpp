@@ -79,8 +79,8 @@ void MongoDSessionCatalogTransactionInterfaceImpl::
 void MongoDSessionCatalogTransactionInterfaceImpl::beginOrContinueTransactionUnconditionally(
     OperationContext* opCtx, TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    txnParticipant.beginOrContinueTransactionUnconditionally(opCtx,
-                                                             std::move(txnNumberAndRetryCounter));
+    txnParticipant.beginOrContinueTransactionUnconditionally(
+        opCtx, std::move(txnNumberAndRetryCounter), boost::none);
 }
 
 void MongoDSessionCatalogTransactionInterfaceImpl::abortTransaction(

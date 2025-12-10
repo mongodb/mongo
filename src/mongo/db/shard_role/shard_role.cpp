@@ -291,67 +291,6 @@ void verifyDbAndCollection(OperationContext* opCtx,
     }
 }
 
-void logMissingPlacementConflictTime(const NamespaceString& nss) {
-    if (TestingProctor::instance().isEnabled()) {
-        tasserted(
-            10206300,
-            str::stream() << "Routed operations in multi-document transactions with readConcern != "
-                             "snapshot must carry a PlacementConflictTime for nss "
-                          << nss.toStringForErrorMsg());
-    } else {
-        static logv2::SeveritySuppressor logSeverity{
-            Minutes{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(5)};
-        LOGV2_DEBUG(10206301,
-                    logSeverity().toInt(),
-                    "Detected a missing PlacementConflictTime for an operation in a multi-document "
-                    "transaction with readConcern != snapshot originating from a router.",
-                    "nss"_attr = redact(nss.toStringForErrorMsg()));
-    }
-}
-
-// Check the operation correctly carries the PlacementConflictTime in case of a multi-document
-// transaction. The version is mandatory when all the following are true:
-// 1. The operation is coming from a router
-// 2. The operation carry a valid placement version that cannot be ignored.
-// 3. The operation requests a read concern != snapshot
-// 4. The operation runs as a part of a multi-document transaction
-// 5. The operation runs on a trackable namespace
-// The PlacementConflictTime is either present in the dbVersion or in the shardVersion otherwise.
-void assertPlacementConflictTimePresentWhenRequired(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const boost::optional<DatabaseVersion>& receivedDbVersion,
-    const boost::optional<ShardVersion>& receivedShardVersion) {
-    bool isShardVersionIgnored =
-        receivedShardVersion && ShardVersion::isPlacementVersionIgnored(*receivedShardVersion);
-    bool isShardVersionUntracked =
-        receivedShardVersion && *receivedShardVersion == ShardVersion::UNTRACKED();
-    bool isRoutedVersion = (receivedDbVersion && isShardVersionUntracked) ||
-        (receivedShardVersion && !isShardVersionIgnored && !isShardVersionUntracked);
-
-    if (isRoutedVersion && opCtx->inMultiDocumentTransaction() &&
-        OperationShardingState::isComingFromRouter(opCtx) &&
-        repl::ReadConcernArgs::get(opCtx).getLevel() !=
-            repl::ReadConcernLevel::kSnapshotReadConcern &&
-        !nss.isNamespaceAlwaysUntracked()) {
-        // Get the PlacementConflictTime from the either the dbVersion or shardVersion: This is
-        // inline with the protocol which will use the first available value in either of the two
-        // versions.
-        auto placementConflictTime = [&]() -> boost::optional<LogicalTime> {
-            if (receivedDbVersion && receivedDbVersion->getPlacementConflictTime()) {
-                return receivedDbVersion->getPlacementConflictTime();
-            } else if (receivedShardVersion) {
-                return receivedShardVersion->placementConflictTime();
-            }
-            return boost::none;
-        }();
-        if (!placementConflictTime) {
-            logMissingPlacementConflictTime(nss);
-        }
-    }
-}
-
-
 void checkPlacementVersion(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const PlacementConcern& placementConcern) {
@@ -366,9 +305,6 @@ void checkPlacementVersion(OperationContext* opCtx,
         const auto scopedCSS = CollectionShardingState::acquire(opCtx, nss);
         scopedCSS->checkShardVersionOrThrow(opCtx, *receivedShardVersion);
     }
-
-    assertPlacementConflictTimePresentWhenRequired(
-        opCtx, nss, receivedDbVersion, receivedShardVersion);
 }
 
 /**

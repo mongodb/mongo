@@ -122,6 +122,27 @@ public:
     }
 
     std::string toString() const;
+
+    // TODO (SERVER-115178): Remove once v9.0 branches out
+    const boost::optional<mongo::LogicalTime>& getPlacementConflictTime_DEPRECATED() const {
+        return DatabaseVersionBase::getPlacementConflictTime();
+    }
+
+    // TODO (SERVER-115178): Remove once v9.0 branches out
+    void setPlacementConflictTime_DEPRECATED(boost::optional<mongo::LogicalTime> value) {
+        DatabaseVersionBase::setPlacementConflictTime(value);
+    }
+
+private:
+    // TODO (SERVER-115178): Remove once v9.0 branches out
+    const boost::optional<mongo::LogicalTime>& getPlacementConflictTime() const {
+        MONGO_UNREACHABLE_TASSERT(10909302);
+    }
+
+    // TODO (SERVER-115178): Remove once v9.0 branches out
+    void setPlacementConflictTime(boost::optional<mongo::LogicalTime> value) {
+        MONGO_UNREACHABLE_TASSERT(10909303);
+    }
 };
 
 inline std::ostream& operator<<(std::ostream& s, const DatabaseVersion& v) {

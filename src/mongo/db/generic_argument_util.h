@@ -128,6 +128,7 @@ inline OperationSessionInfoFromClient getOperationSessionInfoFromClient(
     osi.setStartTransaction(args.getStartTransaction());
     osi.setStartOrContinueTransaction(args.getStartOrContinueTransaction());
     osi.setCoordinator(args.getCoordinator());
+    osi.setTransactionRuntimeContext(args.getTransactionRuntimeContext());
     return osi;
 }
 

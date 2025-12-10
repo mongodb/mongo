@@ -243,3 +243,12 @@ feature_flags:
         default: true
         version: 8.3
         fcv_gated: true
+    # TODO (SERVER-115179): remove feature once 9.0 becomes LTS.
+    featureFlagAddTransactionRuntimeContextAsAGenericArgument:
+        description:
+            "Feature flag to notify that the placementConflictTime is being kept in TransactionParticipant
+            instead of being a ShardVersion/DatabaseVersion field."
+        cpp_varname: feature_flags::gAddTransactionRuntimeContextAsAGenericArgument
+        default: true
+        version: 8.3
+        fcv_gated: true

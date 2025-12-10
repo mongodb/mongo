@@ -48,6 +48,14 @@ ShardVersion ShardVersion::parse(const BSONElement& element) {
 }
 
 void ShardVersion::serialize(StringData field, BSONObjBuilder* builder) const {
+    builder->append(field, toBSON());
+}
+
+std::string ShardVersion::toString() const {
+    return placementVersion().toString();
+}
+
+BSONObj ShardVersion::toBSON() const {
     ShardVersionBase version;
     version.setGeneration({placementVersion().epoch(), placementVersion().getTimestamp()});
     version.setPlacement(
@@ -56,12 +64,7 @@ void ShardVersion::serialize(StringData field, BSONObjBuilder* builder) const {
     if (MONGO_unlikely(_ignoreShardingCatalogUuidMismatch)) {
         version.setIgnoreCollectionUuidMismatch(_ignoreShardingCatalogUuidMismatch);
     }
-
-    builder->append(field, version.toBSON());
-}
-
-std::string ShardVersion::toString() const {
-    return placementVersion().toString();
+    return version.toBSON();
 }
 
 }  // namespace mongo

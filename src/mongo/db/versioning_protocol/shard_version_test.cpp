@@ -49,7 +49,7 @@ TEST(ShardVersionTest, ToAndFromBSON) {
     const CollectionGeneration gen(OID::gen(), Timestamp(1, 2));
     const ChunkVersion chunkVersion(gen, {3, 4});
     ShardVersion shardVersion = ShardVersionFactory::make(chunkVersion);
-    shardVersion.setPlacementConflictTime(LogicalTime(Timestamp(7, 8)));
+    shardVersion.setPlacementConflictTime_DEPRECATED(LogicalTime(Timestamp(7, 8)));
 
     BSONObjBuilder builder;
     shardVersion.serialize(ShardVersion::kShardVersionField, &builder);

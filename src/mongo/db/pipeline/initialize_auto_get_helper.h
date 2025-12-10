@@ -68,7 +68,7 @@ inline std::vector<ScopedSetShardRole> createScopedShardRoles(
             auto sv =
                 isTracked ? nssCri->second.getShardVersion(myShardId) : ShardVersion::UNTRACKED();
             if (placementConflictTime) {
-                sv.setPlacementConflictTime(*placementConflictTime);
+                sv.setPlacementConflictTime_DEPRECATED(*placementConflictTime);
             }
             return sv;
         }();
@@ -89,7 +89,7 @@ inline std::vector<ScopedSetShardRole> createScopedShardRoles(
             : boost::none;
 
         if (placementConflictTime && dbVersion) {
-            dbVersion->setPlacementConflictTime(*placementConflictTime);
+            dbVersion->setPlacementConflictTime_DEPRECATED(*placementConflictTime);
         }
 
         try {

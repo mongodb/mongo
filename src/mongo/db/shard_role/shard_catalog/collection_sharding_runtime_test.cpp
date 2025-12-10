@@ -60,6 +60,7 @@
 #include "mongo/db/s/range_deleter_service_test.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -70,11 +71,13 @@
 #include "mongo/db/sharding_environment/sharding_mongod_test_fixture.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -140,6 +143,40 @@ public:
         return csr._metadataManager.get();
     }
 };
+
+/**
+ * Runs the given callback function within a transaction with the given placementConflictTime.
+ */
+template <typename Callable>
+void runWithinTxn(OperationContext* opCtx,
+                  boost::optional<LogicalTime> placementConflictTime,
+                  Callable&& func) {
+    TxnNumber txnNumber{0};
+
+    opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx->setTxnNumber(txnNumber);
+    opCtx->setInMultiDocumentTransaction();
+
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+
+    TransactionRuntimeContext transactionRuntimeContext;
+    transactionRuntimeContext.setPlacementConflictTime(placementConflictTime);
+
+    txnParticipant.beginOrContinue(opCtx,
+                                   {txnNumber},
+                                   false /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kStart,
+                                   transactionRuntimeContext);
+
+    txnParticipant.unstashTransactionResources(opCtx, "DummyCommandName");
+    func();
+    txnParticipant.commitUnpreparedTransaction(opCtx);
+    txnParticipant.stashTransactionResources(opCtx);
+
+    opCtx->resetMultiDocumentTransactionState();
+}
 
 TEST_F(CollectionShardingRuntimeTest,
        GetCollectionDescriptionThrowsStaleConfigBeforeSetFilteringMetadataIsCalledAndNoOSSSet) {
@@ -410,7 +447,7 @@ TEST_F(CollectionShardingRuntimeTest, ShardVersionCheckDetectsClusterTimeConflic
 
     const auto collectionTimestamp = metadata.getShardPlacementVersion().getTimestamp();
 
-    auto receivedShardVersion = ShardVersionFactory::make(metadata);
+    const auto receivedShardVersion = ShardVersionFactory::make(metadata);
 
     // Test that conflict is thrown when transaction 'atClusterTime' is not valid the current shard
     // version.
@@ -440,23 +477,80 @@ TEST_F(CollectionShardingRuntimeTest, ShardVersionCheckDetectsClusterTimeConflic
     }
 
     // Test that conflict is thrown when transaction 'placementConflictTime' is not valid the
-    // current shard version.
+    // current shard version, when the ff AddTransactionRuntimeContextAsAGenericArgument is
+    // enabled, meaning that the placementConflictTime is retrieved from the TransactionParticipant.
     {
-        // Valid placementConflictTime (equal or later than collection timestamp).
-        {
-            receivedShardVersion.setPlacementConflictTime(LogicalTime(collectionTimestamp + 1));
+        RAIIServerParameterControllerForTest featureFlagController(
+            "featureFlagAddTransactionRuntimeContextAsAGenericArgument", true);
+
+        runWithinTxn(operationContext(), LogicalTime(collectionTimestamp + 1), [&]() {
             ScopedSetShardRole scopedSetShardRole{
                 opCtx, kTestNss, receivedShardVersion, boost::none /* databaseVersion */};
+            ASSERT_DOES_NOT_THROW(csr.checkShardVersionOrThrow(opCtx));
+        });
+
+        runWithinTxn(operationContext(), LogicalTime(collectionTimestamp - 1), [&]() {
+            ScopedSetShardRole scopedSetShardRole{
+                opCtx, kTestNss, receivedShardVersion, boost::none /* databaseVersion */};
+            ASSERT_THROWS_CODE(
+                csr.checkShardVersionOrThrow(opCtx), DBException, ErrorCodes::SnapshotUnavailable);
+        });
+
+        // The placementConflictTime attached to the DatabaseVersion should be ignored if the
+        // featureFlagAddTransactionRuntimeContextAsAGenericArgument is enabled.
+        {
+            auto receivedShardVersionWithPCT = receivedShardVersion;
+            receivedShardVersionWithPCT.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(collectionTimestamp - 1));
+            ScopedSetShardRole scopedSetShardRole{
+                opCtx, kTestNss, receivedShardVersionWithPCT, boost::none /* databaseVersion */};
+            ASSERT_DOES_NOT_THROW(csr.checkShardVersionOrThrow(opCtx));
+        }
+    }
+
+    // Test that conflict is thrown when transaction 'placementConflictTime' is not valid the
+    // current shard version, when the ff AddTransactionRuntimeContextAsAGenericArgument is
+    // disabled, meaning that the placementConflictTime is retrieved from the ShardVersion object.
+    {
+        RAIIServerParameterControllerForTest featureFlagController(
+            "featureFlagAddTransactionRuntimeContextAsAGenericArgument", false);
+
+        // Valid placementConflictTime (equal or later than collection timestamp).
+        {
+            auto receivedShardVersionWithPCT = receivedShardVersion;
+            receivedShardVersionWithPCT.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(collectionTimestamp + 1));
+            ScopedSetShardRole scopedSetShardRole{
+                opCtx, kTestNss, receivedShardVersionWithPCT, boost::none /* databaseVersion */};
             ASSERT_DOES_NOT_THROW(csr.checkShardVersionOrThrow(opCtx));
         }
 
         // Conflicting placementConflictTime (earlier than collection timestamp).
-        receivedShardVersion.setPlacementConflictTime(LogicalTime(collectionTimestamp - 1));
-        ScopedSetShardRole scopedSetShardRole{
-            opCtx, kTestNss, receivedShardVersion, boost::none /* databaseVersion */};
-        ASSERT_THROWS_CODE(
-            csr.checkShardVersionOrThrow(opCtx), DBException, ErrorCodes::SnapshotUnavailable);
+        {
+            auto receivedShardVersionWithPCT = receivedShardVersion;
+            receivedShardVersionWithPCT.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(collectionTimestamp - 1));
+            ScopedSetShardRole scopedSetShardRole{
+                opCtx, kTestNss, receivedShardVersionWithPCT, boost::none /* databaseVersion */};
+            ASSERT_THROWS_CODE(
+                csr.checkShardVersionOrThrow(opCtx), DBException, ErrorCodes::SnapshotUnavailable);
+        }
     }
+}
+
+DEATH_TEST_REGEX_F(CollectionShardingRuntimeTest,
+                   TestsShouldTassertIfPlacementConflictTimeIsNotPresentInTxns,
+                   "Tripwire assertion.*10206300") {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    const auto metadata = makeShardedMetadata(operationContext());
+    csr.setFilteringMetadata(operationContext(), metadata);
+    const auto receivedShardVersion = ShardVersionFactory::make(metadata);
+
+    runWithinTxn(operationContext(), boost::none, [&]() {
+        ScopedSetShardRole scopedSetShardRole{
+            operationContext(), kTestNss, receivedShardVersion, boost::none /* databaseVersion */};
+        csr.checkShardVersionOrThrow(operationContext());
+    });
 }
 
 TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanShardVersion) {

@@ -554,23 +554,31 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
     const auto& targetingCri = routingCtx.getCollectionRoutingInfo(nss);
 
     try {
-        auto shardVersion = [&] {
+        boost::optional<LogicalTime> optOriginalPlacementConflictTime;
+        if (auto txnRouter = TransactionRouter::get(opCtx);
+            txnRouter && opCtx->inMultiDocumentTransaction()) {
+            optOriginalPlacementConflictTime = txnRouter.getPlacementConflictTime();
+        }
+
+        ShardVersion shardVersion = std::invoke([&] {
             auto sv = targetingCri.hasRoutingTable() ? targetingCri.getShardVersion(localShardId)
                                                      : ShardVersion::UNTRACKED();
-            if (auto txnRouter = TransactionRouter::get(opCtx);
-                txnRouter && opCtx->inMultiDocumentTransaction()) {
-                if (auto optOriginalPlacementConflictTime = txnRouter.getPlacementConflictTime()) {
-                    sv.setPlacementConflictTime(*optOriginalPlacementConflictTime);
-                }
-            }
+            if (optOriginalPlacementConflictTime.has_value())
+                sv.setPlacementConflictTime_DEPRECATED(*optOriginalPlacementConflictTime);
             return sv;
-        }();
-        ScopedSetShardRole shardRole{
-            opCtx,
-            nss,
-            shardVersion,
-            boost::optional<DatabaseVersion>{!targetingCri.hasRoutingTable(),
-                                             targetingCri.getDbVersion()}};
+        });
+        boost::optional<DatabaseVersion> dbVersion =
+            std::invoke([&]() -> boost::optional<DatabaseVersion> {
+                if (targetingCri.hasRoutingTable()) {
+                    return boost::none;
+                }
+                auto dbv = targetingCri.getDbVersion();
+                if (optOriginalPlacementConflictTime.has_value()) {
+                    dbv.setPlacementConflictTime_DEPRECATED(*optOriginalPlacementConflictTime);
+                }
+                return dbv;
+            });
+        ScopedSetShardRole shardRole{opCtx, nss, shardVersion, dbVersion};
 
         // Mark routing table as validated as we have "sent" the versioned command to a shard by
         // entering the shard role for a local read.

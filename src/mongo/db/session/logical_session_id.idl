@@ -37,6 +37,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/transaction/transaction_runtime_context.idl"
     - "mongo/crypto/sha256_block.idl"
 
 types:
@@ -216,6 +217,10 @@ structs:
             coordinator:
                 description: "Indicates that this shard is the coordinator shard for the transaction two-phase commit."
                 type: bool
+                optional: true
+            transactionRuntimeContext:
+                description: "Contains context fields of the current transaction"
+                type: TransactionRuntimeContext
                 optional: true
 
     SessionsCollectionFetchResultIndividualResult:

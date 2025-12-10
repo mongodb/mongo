@@ -59,6 +59,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/transaction_metrics_observer.h"
 #include "mongo/db/transaction/transaction_operations.h"
+#include "mongo/db/transaction/transaction_runtime_context_gen.h"
 #include "mongo/idl/mutable_observer_registry.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/util/assert_util.h"
@@ -438,6 +439,22 @@ public:
         boost::optional<TxnNumber> getClientTxnNumber(
             const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) const;
 
+        /**
+         * Returns the placementConflictTimeForNonSnapshotReadConcern of this transaction.
+         * This optional value represents a conservative upper bound for placement changes (i.e.,
+         * chunk migrations) for any collection which might be accessed for the lifetime of the
+         * transaction. The transactions will fail with a retryable MigrationConflict error
+         * if any placement changes have committed since this time."
+         */
+        boost::optional<LogicalTime> getPlacementConflictTimeForNonSnapshotReadConcern() const;
+
+        /**
+         * Returns the list of databases that were created by the transaction running on the top
+         * router (where the client is connected. This is used to ignore the placementConflictTime
+         * check on those databases.
+         */
+        std::span<const DatabaseName> getDatabasesCreatedAtTopRouter() const;
+
     protected:
         explicit Observer(TransactionParticipant* tp) : _tp(tp) {}
 
@@ -582,7 +599,9 @@ public:
         void beginOrContinue(OperationContext* opCtx,
                              TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                              boost::optional<bool> autocommit,
-                             TransactionActions action);
+                             TransactionActions action,
+                             const boost::optional<TransactionRuntimeContext>&
+                                 transactionRuntimeContext = boost::none);
 
         /**
          * Used only by the secondary oplog application logic. Similar to 'beginOrContinue' without
@@ -590,7 +609,10 @@ public:
          * the past.
          */
         void beginOrContinueTransactionUnconditionally(
-            OperationContext* opCtx, TxnNumberAndRetryCounter txnNumberAndRetryCounter);
+            OperationContext* opCtx,
+            TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+            const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext =
+                boost::none);
 
         /**
          * If the participant is in prepare, returns a future whose promise is fulfilled when
@@ -1075,14 +1097,19 @@ public:
         // Attempt to begin a new multi document transaction at the given transaction number and
         // transaction retry counter.
         void _beginMultiDocumentTransaction(
-            OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
+            OperationContext* opCtx,
+            const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+            const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext =
+                boost::none);
 
         // Attempt to continue an in-progress multi document transaction at the given transaction
         // number and transaction retry counter.
         void _continueMultiDocumentTransaction(
             OperationContext* opCtx,
             const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
-            TransactionActions action);
+            TransactionActions action,
+            const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext =
+                boost::none);
 
         // Implementation of public refreshFromStorageIfNeeded methods.
         void _refreshFromStorageIfNeeded(OperationContext* opCtx, bool fetchOplogEntries);
@@ -1283,6 +1310,8 @@ private:
         // Set to true if incomplete history is detected. For example, when the oplog to a write was
         // truncated because it was too old.
         bool hasIncompleteHistory{false};
+
+        boost::optional<TransactionRuntimeContext> transactionRuntimeContext;
     } _o;
 
     /**

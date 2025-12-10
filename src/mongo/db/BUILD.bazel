@@ -1325,6 +1325,7 @@ mongo_cc_library(
         "//src/mongo/db/sharding_environment:shard_id.cpp",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
         "//src/mongo/db/topology/vector_clock:vector_clock_gen",
+        "//src/mongo/db/transaction:transaction_runtime_context_gen",
         "//src/mongo/db/versioning_protocol:chunk_version.cpp",
         "//src/mongo/db/versioning_protocol:chunk_version_gen",
         "//src/mongo/db/versioning_protocol:database_version.cpp",

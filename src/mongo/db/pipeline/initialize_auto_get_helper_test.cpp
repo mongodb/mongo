@@ -320,12 +320,13 @@ TEST_F(InitializeAutoGetHelperTest, InTransactionRcLocal) {
         ASSERT_EQ(criNssA.getShardVersion(kMyShardName), oss.getShardVersion(nssA));
 
         ASSERT_EQ(criNssB.getShardVersion(kMyShardName), oss.getShardVersion(nssB));
-        ASSERT_EQ(afterClusterTime, oss.getShardVersion(nssB)->placementConflictTime());
+        ASSERT_EQ(afterClusterTime, oss.getShardVersion(nssB)->placementConflictTime_DEPRECATED());
 
         ASSERT_EQ(db1Version, oss.getDbVersion(dbName1));
-        ASSERT_EQ(afterClusterTime, oss.getDbVersion(dbName1)->getPlacementConflictTime());
+        ASSERT_EQ(afterClusterTime,
+                  oss.getDbVersion(dbName1)->getPlacementConflictTime_DEPRECATED());
         ASSERT_EQ(ShardVersion::UNTRACKED(), oss.getShardVersion(nssC));
-        ASSERT_EQ(afterClusterTime, oss.getShardVersion(nssC)->placementConflictTime());
+        ASSERT_EQ(afterClusterTime, oss.getShardVersion(nssC)->placementConflictTime_DEPRECATED());
     });
     ASSERT_EQ(true, anySecondaryCollectionIsNotLocal);
 }

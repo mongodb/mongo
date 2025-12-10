@@ -25,6 +25,7 @@ idl_generator(
         "//src/mongo/db/session:logical_session_id_gen",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
         "//src/mongo/db/topology/vector_clock:vector_clock_gen",
+        "//src/mongo/db/transaction:transaction_runtime_context_gen",
         "//src/mongo/rpc/metadata:audit_metadata_gen",
     ],
 )

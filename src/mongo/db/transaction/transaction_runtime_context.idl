@@ -1,4 +1,4 @@
-# Copyright (C) 2022-present MongoDB, Inc.
+# Copyright (C) 2025-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -26,38 +26,37 @@
 # it in the license file.
 #
 
+# This IDL file describes the BSON format for a LogicalSessionId, and
+# handles the serialization to and deserialization from its BSON representation
+# for that class.
+
 global:
-    mod_visibility: private
     cpp_namespace: "mongo"
-    cpp_includes:
-        - "mongo/db/versioning_protocol/shard_version.h"
+    mod_visibility: public
 
 imports:
-    - "mongo/db/versioning_protocol/chunk_version.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-    ShardVersionBase:
-        description:
-            Shard version for the shard version protocol. Includes collection generation and
-            placement version.
+    TransactionRuntimeContext:
+        description: "Contains context fields of a transaction"
         strict: false
-        chained_structs:
-            CollectionGenerationBase: Generation
-            CollectionPlacementBase: Placement
         fields:
-            # TODO (SERVER-115178): Remove this field once v9.0 branches out
             placementConflictTime:
                 description:
-                    "(DEPRECATED) This optional value represents a conservative upper bound for placement
+                    "This optional value represents a conservative upper bound for placement
                     changes (i.e., chunk migrations) for any collection which might be accessed
                     for the lifetime of the transaction. If specified, transactions will fail with
                     a retryable MigrationConflict error if any placement changes have committed
                     since this time."
                 type: logicalTime
                 optional: true
-            ignoreCollectionUuidMismatch:
+            createdDatabases:
                 description:
-                    "Instructs shards to disregard collection UUID mismatches between the sharding
-                    catalog and their local catalog. Only meant to be used for
-                    inconsistency-recovery situations."
-                type: optionalBool
+                    "Used to propagate knowledge about what databases were created by the transaction
+                    running on the top router (where the client is connected). This is used later to
+                    ignore the placementConflictTime check for those databases. This parameter must
+                    be empty for commands that doesn't run within a transaction, and it's only used
+                    on internal commands only."
+                type: array<database_name>
+                optional: false

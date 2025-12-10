@@ -468,7 +468,8 @@ void runWithTransactionFromOpCtx(OperationContext* opCtx,
     txnParticipant.beginOrContinue(opCtx,
                                    {txnNumber},
                                    false /* autocommit */,
-                                   TransactionParticipant::TransactionActions::kStart);
+                                   TransactionParticipant::TransactionActions::kStart,
+                                   boost::none);
     txnParticipant.unstashTransactionResources(opCtx, "reshardingOplogApplication");
 
     func(opCtx);

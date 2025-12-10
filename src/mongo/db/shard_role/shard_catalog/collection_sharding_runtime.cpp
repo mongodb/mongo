@@ -50,6 +50,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
@@ -62,6 +63,7 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -145,6 +147,46 @@ void checkShardingMetadataWasValidAtTxnClusterTime(
                                    "transaction which requires "
                                 << placementConflictTime->asTimestamp()
                                 << ". Transaction will be aborted.");
+    }
+}
+
+// Check the placementConflictTime exists if we are running within a multi-document transaction.
+void assertPlacementConflictTimePresentWhenRequired(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardVersion& receivedShardVersion,
+    const boost::optional<LogicalTime>& placementConflictTime) {
+    bool isShardVersionIgnored = ShardVersion::isPlacementVersionIgnored(receivedShardVersion);
+    bool isShardVersionUntracked = receivedShardVersion == ShardVersion::UNTRACKED();
+
+    bool isRoutedVersion = !isShardVersionIgnored && !isShardVersionUntracked;
+
+    if (isRoutedVersion && opCtx->inMultiDocumentTransaction() &&
+        OperationShardingState::isComingFromRouter(opCtx) &&
+        repl::ReadConcernArgs::get(opCtx).getLevel() !=
+            repl::ReadConcernLevel::kSnapshotReadConcern &&
+        !nss.isNamespaceAlwaysUntracked()) {
+
+        if (placementConflictTime.has_value()) {
+            return;
+        }
+
+        if (TestingProctor::instance().isEnabled()) {
+            tasserted(10206300,
+                      str::stream()
+                          << "Routed operations in multi-document transactions with readConcern != "
+                             "snapshot must carry a placementConflictTime for nss "
+                          << nss.toStringForErrorMsg());
+        } else {
+            static logv2::SeveritySuppressor logSeverity{
+                Minutes{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(5)};
+            LOGV2_DEBUG(
+                10206301,
+                logSeverity().toInt(),
+                "Detected a missing placementConflictTime for an operation in a multi-document "
+                "transaction with readConcern != snapshot originating from a router.",
+                "nss"_attr = redact(nss.toStringForErrorMsg()));
+        }
     }
 }
 
@@ -563,10 +605,23 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     const bool isPlacementVersionIgnored =
         ShardVersion::isPlacementVersionIgnored(receivedShardVersion);
 
+    const boost::optional<LogicalTime>& placementConflictTime = std::invoke([&]() {
+        if (!feature_flags::gAddTransactionRuntimeContextAsAGenericArgument.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            return receivedShardVersion.placementConflictTime_DEPRECATED();
+        }
+        auto tp = TransactionParticipant::get(opCtx);
+        return tp ? tp.getPlacementConflictTimeForNonSnapshotReadConcern() : boost::none;
+    });
+
+    assertPlacementConflictTimePresentWhenRequired(
+        opCtx, _nss, receivedShardVersion, placementConflictTime);
+
     if (wantedPlacementVersion.isWriteCompatibleWith(receivedPlacementVersion) ||
         isPlacementVersionIgnored) {
         const auto timeOfLastIncomingChunkMigration = currentMetadata.getShardMaxValidAfter();
-        const auto& placementConflictTime = receivedShardVersion.placementConflictTime();
+
         if (placementConflictTime &&
             placementConflictTime->asTimestamp() < timeOfLastIncomingChunkMigration) {
             uasserted(ErrorCodes::MigrationConflict,
@@ -581,6 +636,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
         checkShardingMetadataWasValidAtTxnClusterTime(
             opCtx, _nss, placementConflictTime, currentMetadata);
+
         return optCurrentMetadata;
     }
 

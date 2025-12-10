@@ -77,16 +77,18 @@ public:
         return _chunkVersion;
     }
 
-    boost::optional<LogicalTime> placementConflictTime() const {
+    // TODO (SERVER-115178): Remove once v9.0 branches out
+    boost::optional<LogicalTime> placementConflictTime_DEPRECATED() const {
         return _placementConflictTime;
+    }
+
+    // TODO (SERVER-115178): Remove once v9.0 branches out
+    void setPlacementConflictTime_DEPRECATED(LogicalTime conflictTime) {
+        _placementConflictTime.emplace(std::move(conflictTime));
     }
 
     void setPlacementVersionIgnored() {
         _chunkVersion = ChunkVersion::IGNORED();
-    }
-
-    void setPlacementConflictTime(LogicalTime conflictTime) {
-        _placementConflictTime.emplace(std::move(conflictTime));
     }
 
     bool getIgnoreShardingCatalogUuidMismatch() const {
@@ -109,6 +111,7 @@ public:
     void serialize(StringData field, BSONObjBuilder* builder) const;
 
     std::string toString() const;
+    BSONObj toBSON() const;
 
 private:
     ShardVersion(ChunkVersion chunkVersion,

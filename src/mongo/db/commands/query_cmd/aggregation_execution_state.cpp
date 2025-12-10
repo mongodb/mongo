@@ -687,7 +687,8 @@ ScopedSetShardRole ResolvedViewAggExState::setShardRole(const CollectionRoutingI
                 OperationShardingState::get(_opCtx).getShardVersion(underlyingNss);
         }
 
-        return originalShardVersion ? originalShardVersion->placementConflictTime() : boost::none;
+        return originalShardVersion ? originalShardVersion->placementConflictTime_DEPRECATED()
+                                    : boost::none;
     }();
 
     if (cri.hasRoutingTable()) {
@@ -695,17 +696,19 @@ ScopedSetShardRole ResolvedViewAggExState::setShardRole(const CollectionRoutingI
 
         auto sv = cri.getShardVersion(myShardId);
         if (optPlacementConflictTimestamp) {
-            sv.setPlacementConflictTime(*optPlacementConflictTimestamp);
+            sv.setPlacementConflictTime_DEPRECATED(*optPlacementConflictTimestamp);
         }
         return ScopedSetShardRole(
             _opCtx, underlyingNss, sv /*shardVersion*/, boost::none /*databaseVersion*/);
     } else {
         auto sv = ShardVersion::UNTRACKED();
+        auto dbv = cri.getDbVersion();
         if (optPlacementConflictTimestamp) {
-            sv.setPlacementConflictTime(*optPlacementConflictTimestamp);
+            sv.setPlacementConflictTime_DEPRECATED(*optPlacementConflictTimestamp);
+            dbv.setPlacementConflictTime_DEPRECATED(*optPlacementConflictTimestamp);
         }
         return ScopedSetShardRole(
-            _opCtx, underlyingNss, sv /*shardVersion*/, cri.getDbVersion() /*databaseVersion*/);
+            _opCtx, underlyingNss, sv /*shardVersion*/, dbv /*databaseVersion*/);
     }
 }
 

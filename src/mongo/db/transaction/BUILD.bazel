@@ -34,6 +34,14 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "transaction_runtime_context_gen",
+    src = "transaction_runtime_context.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "transaction_api",
     srcs = [

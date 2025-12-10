@@ -30,6 +30,7 @@ idl_generator(
     deps = [
         "//src/mongo/crypto:sha256_block_gen",
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/transaction:transaction_runtime_context_gen",
     ],
 )
 

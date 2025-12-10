@@ -38,12 +38,15 @@
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
@@ -57,17 +60,73 @@
 namespace mongo {
 namespace {
 
-void checkPlacementConflictTimestamp(const boost::optional<LogicalTime> atClusterTime,
+// Check the placementConflictTime exists if we are running within a multi-document transaction.
+void assertPlacementConflictTimePresentWhenRequired(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const boost::optional<LogicalTime> placementConflictTime) {
+    if (opCtx->inMultiDocumentTransaction() && OperationShardingState::isComingFromRouter(opCtx) &&
+        repl::ReadConcernArgs::get(opCtx).getLevel() !=
+            repl::ReadConcernLevel::kSnapshotReadConcern) {
+        if (placementConflictTime.has_value()) {
+            return;
+        }
+
+        if (TestingProctor::instance().isEnabled()) {
+            tasserted(9758701,
+                      str::stream()
+                          << "Routed operations in multi-document transactions with readConcern != "
+                             "snapshot must carry a `placementConflictTime` for db "
+                          << dbName.toStringForErrorMsg());
+        } else {
+            static logv2::SeveritySuppressor logSeverity{
+                Minutes{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(5)};
+            LOGV2_DEBUG(
+                9758702,
+                logSeverity().toInt(),
+                "Detected a missing `placementConflictTime` for an operation in a multi-document "
+                "transaction with readConcern != snapshot originating from a router.",
+                "db"_attr = redact(dbName.toStringForErrorMsg()));
+        }
+    }
+}
+
+void checkPlacementConflictTimestamp(OperationContext* opCtx,
+                                     const boost::optional<LogicalTime> atClusterTime,
                                      const DatabaseVersion& receivedDatabaseVersion,
                                      const DatabaseName& dbName,
                                      const DatabaseVersion& installedDatabaseVersion) {
-    // placementConflictTimestamp equal to Timestamp(0, 0) means ignore, even for atClusterTime
-    // transactions.
-    const auto shouldIgnorePlacementConflict = receivedDatabaseVersion.getPlacementConflictTime()
-        ? receivedDatabaseVersion.getPlacementConflictTime()->asTimestamp() == Timestamp(0, 0)
-        : false;
+    boost::optional<LogicalTime> placementConflictTime;
+    bool skipAtClusterTimeAndPlacementConflictTimeChecks = false;
 
-    if (atClusterTime && !shouldIgnorePlacementConflict) {
+    if (feature_flags::gAddTransactionRuntimeContextAsAGenericArgument.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // Fetch the placementConflictTime through the TransactionParticipant if we are within a
+        // transaction.
+        auto tp = TransactionParticipant::get(opCtx);
+        if (tp) {
+            placementConflictTime = tp.getPlacementConflictTimeForNonSnapshotReadConcern();
+
+            const auto& createdDatabases = tp.getDatabasesCreatedAtTopRouter();
+            skipAtClusterTimeAndPlacementConflictTimeChecks =
+                (std::ranges::find(createdDatabases, dbName) != createdDatabases.end());
+        }
+    } else {
+        // The placementConflictTimestamp equal to Timestamp(0, 0) means ignore, even for
+        // atClusterTime transactions.
+        placementConflictTime = receivedDatabaseVersion.getPlacementConflictTime_DEPRECATED();
+        skipAtClusterTimeAndPlacementConflictTimeChecks = placementConflictTime.has_value() &&
+            placementConflictTime->asTimestamp() == Timestamp(0, 0);
+    }
+
+    assertPlacementConflictTimePresentWhenRequired(opCtx, dbName, placementConflictTime);
+
+    if (skipAtClusterTimeAndPlacementConflictTimeChecks) {
+        return;
+    }
+
+    if (atClusterTime.has_value()) {
         uassert(ErrorCodes::MigrationConflict,
                 str::stream() << "Database " << dbName.toStringForErrorMsg()
                               << " has undergone a catalog change operation at time "
@@ -76,18 +135,16 @@ void checkPlacementConflictTimestamp(const boost::optional<LogicalTime> atCluste
                                  "transaction which requires "
                               << atClusterTime->asTimestamp() << ". Transaction will be aborted.",
                 atClusterTime->asTimestamp() >= installedDatabaseVersion.getTimestamp());
-    } else if (receivedDatabaseVersion.getPlacementConflictTime() &&
-               !shouldIgnorePlacementConflict) {
+    } else if (placementConflictTime.has_value()) {
         uassert(ErrorCodes::MigrationConflict,
                 str::stream() << "Database " << dbName.toStringForErrorMsg()
                               << " has undergone a catalog change operation at time "
                               << installedDatabaseVersion.getTimestamp()
                               << " and no longer satisfies the requirements for the current "
                                  "transaction which requires "
-                              << receivedDatabaseVersion.getPlacementConflictTime()->asTimestamp()
+                              << placementConflictTime->asTimestamp()
                               << ". Transaction will be aborted.",
-                receivedDatabaseVersion.getPlacementConflictTime()->asTimestamp() >=
-                    installedDatabaseVersion.getTimestamp());
+                placementConflictTime->asTimestamp() >= installedDatabaseVersion.getTimestamp());
     }
 }
 
@@ -184,7 +241,7 @@ void DatabaseShardingRuntime::checkDbVersionOrThrow(OperationContext* opCtx,
 
     // Check placement conflicts for multi-document transactions.
     const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-    checkPlacementConflictTimestamp(atClusterTime, receivedVersion, _dbName, wantedVersion);
+    checkPlacementConflictTimestamp(opCtx, atClusterTime, receivedVersion, _dbName, wantedVersion);
 }
 
 void DatabaseShardingRuntime::assertIsPrimaryShardForDb(OperationContext* opCtx) const {

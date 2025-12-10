@@ -960,7 +960,8 @@ void TransactionParticipant::Participant::_beginOrContinueRetryableWrite(
 void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
     OperationContext* opCtx,
     const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
-    TransactionActions action) {
+    TransactionActions action,
+    const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext) {
     uassert(ErrorCodes::NoSuchTransaction,
             str::stream()
                 << "Given transaction number " << txnNumberAndRetryCounter.getTxnNumber()
@@ -1033,10 +1034,38 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
                     o().txnResourceStash->getReadConcernArgs().getArgsAtClusterTime() ==
                         repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime());
     }
+
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        if (o(lk).transactionRuntimeContext.has_value() &&
+            o(lk).transactionRuntimeContext->getPlacementConflictTime().has_value() &&
+            transactionRuntimeContext.has_value()) {
+            tassert(
+                9758703,
+                str::stream()
+                    << "placementConflictTime must not change during the lifetime of "
+                       "the transaction. "
+                    << "Expected "
+                    << o(lk).transactionRuntimeContext->getPlacementConflictTime()->asTimestamp()
+                    << ", got "
+                    << (transactionRuntimeContext->getPlacementConflictTime()
+                            ? transactionRuntimeContext->getPlacementConflictTime()
+                                  ->asTimestamp()
+                                  .toString()
+                            : "null"),
+                o(lk).transactionRuntimeContext->getPlacementConflictTime() ==
+                    transactionRuntimeContext->getPlacementConflictTime());
+        }
+        if (transactionRuntimeContext.has_value()) {
+            o(lk).transactionRuntimeContext = transactionRuntimeContext;
+        }
+    }
 }
 
 void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
-    OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
+    OperationContext* opCtx,
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+    const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext) {
     // Aborts any in-progress txns.
     _setNewTxnNumberAndRetryCounter(opCtx, txnNumberAndRetryCounter);
     p().autoCommit = false;
@@ -1076,6 +1105,29 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
             *o().transactionExpireDate);
         o(lk).readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 
+        if (o(lk).transactionRuntimeContext.has_value() &&
+            o(lk).transactionRuntimeContext->getPlacementConflictTime().has_value() &&
+            transactionRuntimeContext.has_value()) {
+            tassert(
+                9758704,
+                str::stream()
+                    << "placementConflictTime must not change during the lifetime of "
+                       "the transaction. "
+                    << "Expected "
+                    << o(lk).transactionRuntimeContext->getPlacementConflictTime()->asTimestamp()
+                    << ", got "
+                    << (transactionRuntimeContext->getPlacementConflictTime()
+                            ? transactionRuntimeContext->getPlacementConflictTime()
+                                  ->asTimestamp()
+                                  .toString()
+                            : "null"),
+                o(lk).transactionRuntimeContext->getPlacementConflictTime() ==
+                    transactionRuntimeContext->getPlacementConflictTime());
+        }
+        if (transactionRuntimeContext.has_value()) {
+            o(lk).transactionRuntimeContext = transactionRuntimeContext;
+        }
+
         invariant(p().transactionOperations.isEmpty());
     }
 }
@@ -1084,7 +1136,8 @@ void TransactionParticipant::Participant::beginOrContinue(
     OperationContext* opCtx,
     TxnNumberAndRetryCounter txnNumberAndRetryCounter,
     boost::optional<bool> autocommit,
-    TransactionActions action) {
+    TransactionActions action,
+    const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext) {
     opCtx->setActiveTransactionParticipant();
 
     if (_isInternalSessionForRetryableWrite()) {
@@ -1093,7 +1146,8 @@ void TransactionParticipant::Participant::beginOrContinue(
         parentTxnParticipant.beginOrContinue(opCtx,
                                              {*_sessionId().getTxnNumber(), boost::none},
                                              boost::none,
-                                             TransactionActions::kNone);
+                                             TransactionActions::kNone,
+                                             transactionRuntimeContext);
     }
 
     // Make sure we are still a primary. We need to hold on to the RSTL through the end of this
@@ -1200,7 +1254,8 @@ void TransactionParticipant::Participant::beginOrContinue(
     if (!startTransaction) {
         invariant(action == TransactionActions::kContinue ||
                   action == TransactionActions::kStartOrContinue);
-        _continueMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter, action);
+        _continueMultiDocumentTransaction(
+            opCtx, txnNumberAndRetryCounter, action, transactionRuntimeContext);
         return;
     }
 
@@ -1211,7 +1266,7 @@ void TransactionParticipant::Participant::beginOrContinue(
         return;
     }
 
-    _beginMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter);
+    _beginMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter, transactionRuntimeContext);
 
     // Remember whether or not this operation is starting a transaction, in case something later
     // in the execution needs to adjust its behavior based on this.
@@ -1219,7 +1274,9 @@ void TransactionParticipant::Participant::beginOrContinue(
 }
 
 void TransactionParticipant::Participant::beginOrContinueTransactionUnconditionally(
-    OperationContext* opCtx, TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
+    OperationContext* opCtx,
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+    const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext) {
     invariant(opCtx->inMultiDocumentTransaction());
     opCtx->setActiveTransactionParticipant();
 
@@ -1235,7 +1292,7 @@ void TransactionParticipant::Participant::beginOrContinueTransactionUnconditiona
         if (!txnNumberAndRetryCounter.getTxnRetryCounter()) {
             txnNumberAndRetryCounter.setTxnRetryCounter(0);
         }
-        _beginMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter);
+        _beginMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter, transactionRuntimeContext);
     } else {
         invariant(o().txnState.isInSet(TransactionState::kInProgress | TransactionState::kPrepared),
                   str::stream() << "Current state: " << o().txnState);
@@ -2421,8 +2478,7 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
         TransactionParticipant::Participant newTxnParticipant =
             TransactionParticipant::get(splitOpCtx.get());
         newTxnParticipant.beginOrContinueTransactionUnconditionally(
-            splitOpCtx.get(), {*(splitOpCtx->getTxnNumber())});
-
+            splitOpCtx.get(), {*(splitOpCtx->getTxnNumber())}, boost::none);
         // We cannot throw exceptions in the middle of committing multiple split transactions,
         // and therefore our lock acquisitions cannot be interruptible. We also must set the
         // UninterruptibleLockGuard before unstashTransactionResources because this function
@@ -2691,7 +2747,7 @@ void TransactionParticipant::Participant::_abortSplitPreparedTxnOnPrimary(
         TransactionParticipant::Participant newTxnParticipant =
             TransactionParticipant::get(splitOpCtx.get());
         newTxnParticipant.beginOrContinueTransactionUnconditionally(
-            splitOpCtx.get(), {*(splitOpCtx->getTxnNumber())});
+            splitOpCtx.get(), {*(splitOpCtx->getTxnNumber())}, boost::none);
 
         // We cannot throw exceptions in the middle of aborting multiple split transactions,
         // and therefore our lock acquisitions cannot be interruptible. We also must set the
@@ -2901,6 +2957,23 @@ void TransactionParticipant::Observer::reportUnstashedState(OperationContext* op
         _reportTransactionStats(opCtx, &transactionBuilder, o().readConcernArgs);
         builder->append("transaction", transactionBuilder.obj());
     }
+}
+
+boost::optional<LogicalTime>
+TransactionParticipant::Observer::getPlacementConflictTimeForNonSnapshotReadConcern() const {
+    if (!o().transactionRuntimeContext.has_value()) {
+        return boost::none;
+    }
+    return o().transactionRuntimeContext->getPlacementConflictTime();
+}
+
+std::span<const DatabaseName> TransactionParticipant::Observer::getDatabasesCreatedAtTopRouter()
+    const {
+    if (!o().transactionRuntimeContext.has_value()) {
+        return {};
+    }
+    const auto& v = o().transactionRuntimeContext->getCreatedDatabases();
+    return std::span<const DatabaseName>(v);
 }
 
 std::string TransactionParticipant::TransactionState::toString(StateFlag state) {
@@ -3553,6 +3626,7 @@ void TransactionParticipant::Participant::_invalidate(WithLock wl) {
     o(wl).isValid = false;
     o(wl).activeTxnNumberAndRetryCounter = {kUninitializedTxnNumber, kUninitializedTxnRetryCounter};
     o(wl).lastWriteOpTime = repl::OpTime();
+    o(wl).transactionRuntimeContext = boost::none;
 
     // Reset the transactions metrics.
     o(wl).transactionMetricsObserver.resetSingleTransactionStats(
@@ -3583,6 +3657,7 @@ void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
     o(*lk).affectedNamespaces.clear();
     o(*lk).prepareOpTime = repl::OpTime();
     o(*lk).recoveryPrepareOpTime = repl::OpTime();
+    o(*lk).transactionRuntimeContext = boost::none;
     p().autoCommit = boost::none;
     p().needToWriteAbortEntry = false;
 

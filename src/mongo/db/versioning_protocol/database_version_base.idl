@@ -57,11 +57,12 @@ structs:
             lastMod:
                 type: int
                 description: "an integer which is bumped whenever the database's primary shard changes"
+            # TODO (SERVER-115178): Remove this field once v9.0 branches out
             placementConflictTime:
                 type: logicalTime
                 optional: true
                 description:
-                    "This optional value represents a conservative upper bound for placement
+                    "(DEPRECATED) This optional value represents a conservative upper bound for placement
                     changes (i.e., movePrimary or drop+recreate) for any collection which might
                     be accessed for the lifetime of the transaction. If specified, transactions
                     will fail with a retryable MigrationConflict error if any placement changes

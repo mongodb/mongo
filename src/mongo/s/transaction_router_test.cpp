@@ -52,6 +52,7 @@
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/db/versioning_protocol/shard_version_gen.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/db/write_concern_options.h"
@@ -59,6 +60,7 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_word.h"
@@ -283,16 +285,25 @@ protected:
         });
     }
 
-    ShardVersionBase exampleShardVersion() const {
-        ShardVersionBase version;
-        version.setGeneration({OID::gen(), Timestamp(4, 1)});
-        version.setPlacement(Timestamp(6, 2));
-
-        return version;
+    ShardVersion exampleShardVersion() const {
+        CollectionGeneration generation{OID::gen(), Timestamp(4, 1)};
+        CollectionPlacement placement{6, 2};
+        return ShardVersionFactory::make(ChunkVersion{generation, placement});
     }
 
     DatabaseVersion exampleDatabaseVersion() const {
         return DatabaseVersion(UUID::gen(), Timestamp(3, 1));
+    }
+
+    BSONObj createdDatabasesToBSON(const std::set<DatabaseName>& createdDatabases) {
+        BSONObjBuilder bob;
+        BSONArrayBuilder createdDbsArr(bob.subarrayStart("createdDatabases"));
+        for (const auto& db : createdDatabases) {
+            createdDbsArr.append(
+                DatabaseNameUtil::serialize(db, SerializationContext::stateCommandRequest()));
+        }
+        createdDbsArr.done();
+        return bob.obj();
     }
 
 private:
@@ -342,6 +353,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                       << "readConcern"
                       << BSON("level" << "snapshot"
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                      << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startTransaction" << true << "coordinator" << true << "autocommit"
                       << false << "txnNumber" << txnNum);
 
@@ -354,9 +366,9 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     {
         auto newCmd =
             txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, BSON("update" << "test"));
-        ASSERT_BSONOBJ_EQ(BSON("update" << "test"
-                                        << "coordinator" << true << "autocommit" << false
-                                        << "txnNumber" << txnNum),
+        ASSERT_BSONOBJ_EQ(BSON("update" << "test" << "transactionRuntimeContext"
+                                        << BSON("createdDatabases" << BSONArray()) << "coordinator"
+                                        << true << "autocommit" << false << "txnNumber" << txnNum),
                           newCmd);
     }
 }
@@ -375,6 +387,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, BasicStartTxnWithAtClusterTime) 
                       << "readConcern"
                       << BSON("level" << "snapshot"
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                      << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startTransaction" << true << "coordinator" << true << "autocommit"
                       << false << "txnNumber" << txnNum);
 
@@ -388,8 +401,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, BasicStartTxnWithAtClusterTime) 
         auto newCmd =
             txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, BSON("update" << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update" << "test"
-                                        << "coordinator" << true << "autocommit" << false
-                                        << "txnNumber" << txnNum),
+                                        << "transactionRuntimeContext"
+                                        << BSON("createdDatabases" << BSONArray()) << "coordinator"
+                                        << true << "autocommit" << false << "txnNumber" << txnNum),
                           newCmd);
     }
 }
@@ -418,6 +432,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterAttachesTxnMetadata) {
                           << "readConcern"
                           << BSON("level" << "snapshot"
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                          << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                           << "shardVersion" << expectedShardVersion.toBSON() << "databaseVersion"
                           << expectedDatabaseVersion.toBSON() << "startOrContinueTransaction"
                           << true << "autocommit" << false << "txnNumber" << txnNum);
@@ -496,6 +511,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterCannotCommit) {
                       << "readConcern"
                       << BSON("level" << "snapshot"
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                      << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startOrContinueTransaction" << true << "autocommit" << false
                       << "txnNumber" << txnNum);
 
@@ -532,6 +548,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterCannotAbort) {
                       << "readConcern"
                       << BSON("level" << "snapshot"
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                      << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startOrContinueTransaction" << true << "autocommit" << false
                       << "txnNumber" << txnNum);
 
@@ -565,6 +582,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterCannotImplicitlyAbort) 
                       << "readConcern"
                       << BSON("level" << "snapshot"
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                      << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startOrContinueTransaction" << true << "autocommit" << false
                       << "txnNumber" << txnNum);
 
@@ -598,16 +616,19 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartOrContinueWithMatchingReadC
 
     const auto shardVersion = exampleShardVersion();
     auto expectedShardVersion = shardVersion;
-    expectedShardVersion.setPlacementConflictTime(kInMemoryLogicalTime);
+    expectedShardVersion.setPlacementConflictTime_DEPRECATED(kInMemoryLogicalTime);
     const auto databaseVersion = exampleDatabaseVersion();
     auto expectedDatabaseVersion = databaseVersion;
-    expectedDatabaseVersion.setPlacementConflictTime(kInMemoryLogicalTime);
+    expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(kInMemoryLogicalTime);
     {
         BSONObj expectedNewObj = BSON(
             "insert" << "test"
                      << "readConcern"
                      << BSON("level" << "majority"
                                      << "afterClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                     << "transactionRuntimeContext"
+                     << BSON("placementConflictTime" << kInMemoryLogicalTime.asTimestamp()
+                                                     << "createdDatabases" << BSONArray())
                      << "shardVersion" << expectedShardVersion.toBSON() << "databaseVersion"
                      << expectedDatabaseVersion.toBSON() << "startOrContinueTransaction" << true
                      << "autocommit" << false << "txnNumber" << txnNum);
@@ -718,6 +739,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartOrContinueWithSnapshotRCSet
                       << "readConcern"
                       << BSON("level" << "snapshot"
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                      << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startOrContinueTransaction" << true << "autocommit" << false
                       << "txnNumber" << txnNum);
 
@@ -1129,6 +1151,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
                       << "readConcern"
                       << BSON("level" << "snapshot"
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                      << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startTransaction" << true << "coordinator" << true << "autocommit"
                       << false << "txnNumber" << txnNum);
 
@@ -1142,8 +1165,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
         auto newCmd =
             txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, BSON("update" << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update" << "test"
-                                        << "coordinator" << true << "autocommit" << false
-                                        << "txnNumber" << txnNum),
+                                        << "transactionRuntimeContext"
+                                        << BSON("createdDatabases" << BSONArray()) << "coordinator"
+                                        << true << "autocommit" << false << "txnNumber" << txnNum),
                           newCmd);
     }
 
@@ -1152,6 +1176,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
                  << "readConcern"
                  << BSON("level" << "snapshot"
                                  << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                 << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                  << "startTransaction" << true << "autocommit" << false << "txnNumber" << txnNum);
 
     {
@@ -1164,7 +1189,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
         auto newCmd =
             txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, BSON("update" << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update" << "test"
-                                        << "autocommit" << false << "txnNumber" << txnNum),
+                                        << "transactionRuntimeContext"
+                                        << BSON("createdDatabases" << BSONArray()) << "autocommit"
+                                        << false << "txnNumber" << txnNum),
                           newCmd);
     }
 }
@@ -1186,6 +1213,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartingNewTxnShouldClearState) 
                           << "readConcern"
                           << BSON("level" << "snapshot"
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                          << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                           << "startTransaction" << true << "coordinator" << true << "autocommit"
                           << false << "txnNumber" << txnNum),
             newCmd);
@@ -1202,6 +1230,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartingNewTxnShouldClearState) 
                       << "readConcern"
                       << BSON("level" << "snapshot"
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                      << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startTransaction" << true << "coordinator" << true << "autocommit"
                       << false << "txnNumber" << txnNum2);
 
@@ -1736,6 +1765,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, DoesNotAttachTxnNumIfAlreadyTher
                  << "txnNumber" << txnNum << "readConcern"
                  << BSON("level" << "snapshot"
                                  << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                 << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                  << "startTransaction" << true << "coordinator" << true << "autocommit" << false);
 
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -1826,6 +1856,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, AttachTxnValidatesReadConcernIfA
                           << "readConcern"
                           << BSON("level" << "snapshot"
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                          << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                           << "startTransaction" << true << "coordinator" << true << "autocommit"
                           << false << "txnNumber" << txnNum),
             newCmd);
@@ -1958,6 +1989,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, PassesThroughEmptyReadConcernToP
     BSONObj expectedNewObj =
         BSON("insert" << "test"
                       << "readConcern" << BSON("afterClusterTime" << afterClusterTime)
+                      << "transactionRuntimeContext"
+                      << BSON("placementConflictTime" << afterClusterTime << "createdDatabases"
+                                                      << BSONArray())
                       << "startTransaction" << true << "coordinator" << true << "autocommit"
                       << false << "txnNumber" << txnNum);
 
@@ -1983,6 +2017,9 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     BSONObj expectedNewObj = BSON(
         "insert" << "test"
                  << "readConcern" << BSON("afterClusterTime" << kAfterClusterTime.asTimestamp())
+                 << "transactionRuntimeContext"
+                 << BSON("placementConflictTime" << kAfterClusterTime.asTimestamp()
+                                                 << "createdDatabases" << BSONArray())
                  << "startTransaction" << true << "coordinator" << true << "autocommit" << false
                  << "txnNumber" << txnNum);
 
@@ -2565,9 +2602,16 @@ TEST_F(
 TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRC) {
     const auto test = [this](bool hasTxnCreatedAnyDatabase) {
         repl::ReadConcernArgs defaultRCArgs;
+        const auto createdDatabases = hasTxnCreatedAnyDatabase
+            ? std::set<DatabaseName>{DatabaseName::createDatabaseName_forTest(boost::none,
+                                                                              "dummyDb1"),
+                                     DatabaseName::createDatabaseName_forTest(boost::none,
+                                                                              "dummyDb2")}
+            : std::set<DatabaseName>{};
         const auto shardVersion = exampleShardVersion();
         const auto databaseVersion = exampleDatabaseVersion();
         auto result = TransactionRouter::appendFieldsForStartTransaction(
+            operationContext(),
             BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
                          << databaseVersion.toBSON()),
             defaultRCArgs,
@@ -2575,7 +2619,7 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRC) {
             LogicalTime{Timestamp(10, 1)},
             true /* doAppendStartTransaction */,
             false /* doAppendStartOrContinueTransaction */,
-            hasTxnCreatedAnyDatabase);
+            createdDatabases);
 
         ASSERT_EQ(result["MyCmd"].numberLong(), 1);
         repl::ReadConcernArgs resultArgs;
@@ -2584,14 +2628,16 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRC) {
         ASSERT_EQ(result["startTransaction"].boolean(), true);
 
         auto expectedShardVersion = shardVersion;
-        expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+        expectedShardVersion.setPlacementConflictTime_DEPRECATED(LogicalTime(Timestamp(10, 1)));
         ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
 
         auto expectedDatabaseVersion = databaseVersion;
         if (hasTxnCreatedAnyDatabase) {
-            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(Timestamp(0, 0)));
         } else {
-            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(Timestamp(10, 1)));
         }
         ASSERT_BSONOBJ_EQ(expectedDatabaseVersion.toBSON(), result["databaseVersion"].Obj());
     };
@@ -2605,35 +2651,58 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCMajority) 
         repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kMajorityReadConcern);
         const auto shardVersion = exampleShardVersion();
         const auto databaseVersion = exampleDatabaseVersion();
+        const auto placementConflictTime = LogicalTime{Timestamp(10, 1)};
+        const auto createdDatabases = hasTxnCreatedAnyDatabase
+            ? std::set<DatabaseName>{DatabaseName::createDatabaseName_forTest(boost::none,
+                                                                              "dummyDb1"),
+                                     DatabaseName::createDatabaseName_forTest(boost::none,
+                                                                              "dummyDb2")}
+            : std::set<DatabaseName>{};
+
         auto result = TransactionRouter::appendFieldsForStartTransaction(
+            operationContext(),
             BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
                          << databaseVersion.toBSON()),
             defaultRCArgs,
             boost::none,
-            LogicalTime{Timestamp(10, 1)},
+            placementConflictTime,
             true /* doAppendStartTransaction */,
             false /* doAppendStartOrContinueTransaction */,
-            hasTxnCreatedAnyDatabase);
+            createdDatabases);
 
         ASSERT_EQ(result["MyCmd"].numberLong(), 1);
         repl::ReadConcernArgs resultArgs;
         ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
         ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT(!resultArgs.getArgsAtClusterTime());
-        ASSERT_EQ(resultArgs.getArgsAfterClusterTime()->asTimestamp(), Timestamp(10, 1));
+        ASSERT_EQ(resultArgs.getArgsAfterClusterTime()->asTimestamp(),
+                  placementConflictTime.asTimestamp());
         ASSERT_EQ(result["startTransaction"].boolean(), true);
 
         auto expectedShardVersion = shardVersion;
-        expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+        expectedShardVersion.setPlacementConflictTime_DEPRECATED(placementConflictTime);
         ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
 
         auto expectedDatabaseVersion = databaseVersion;
         if (hasTxnCreatedAnyDatabase) {
-            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(Timestamp(0, 0)));
         } else {
-            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(placementConflictTime);
         }
         ASSERT_BSONOBJ_EQ(expectedDatabaseVersion.toBSON(), result["databaseVersion"].Obj());
+
+        ASSERT(result.hasField("transactionRuntimeContext"));
+
+        const auto trcResult =
+            TransactionRuntimeContext::parse(result["transactionRuntimeContext"].Obj());
+
+        ASSERT(trcResult.getPlacementConflictTime().has_value());
+        ASSERT_EQ(placementConflictTime.asTimestamp(),
+                  trcResult.getPlacementConflictTime()->asTimestamp());
+
+        ASSERT_EQ(std::vector<DatabaseName>(createdDatabases.begin(), createdDatabases.end()),
+                  trcResult.getCreatedDatabases());
     };
 
     test(false /* hasTxnCreatedAnyDatabase */);
@@ -2645,35 +2714,57 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpe
         repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kLocalReadConcern);
         const auto shardVersion = exampleShardVersion();
         const auto databaseVersion = exampleDatabaseVersion();
+        const auto placementConflictTime = LogicalTime{Timestamp(10, 1)};
+        const auto createdDatabases = hasTxnCreatedAnyDatabase
+            ? std::set<DatabaseName>{DatabaseName::createDatabaseName_forTest(boost::none,
+                                                                              "dummyDb1"),
+                                     DatabaseName::createDatabaseName_forTest(boost::none,
+                                                                              "dummyDb2")}
+            : std::set<DatabaseName>{};
+
         auto result = TransactionRouter::appendFieldsForStartTransaction(
+            operationContext(),
             BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
                          << databaseVersion.toBSON() << "readConcern" << BSON("level" << "local")),
             defaultRCArgs,
             boost::none,
-            LogicalTime{Timestamp(10, 1)},
+            placementConflictTime,
             true /* doAppendStartTransaction */,
             false /* doAppendStartOrContinueTransaction */,
-            hasTxnCreatedAnyDatabase);
+            createdDatabases);
 
         ASSERT_EQ(result["MyCmd"].numberLong(), 1);
         repl::ReadConcernArgs resultArgs;
         ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
         ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kLocalReadConcern);
         ASSERT(!resultArgs.getArgsAtClusterTime());
-        ASSERT_EQ(resultArgs.getArgsAfterClusterTime()->asTimestamp(), Timestamp(10, 1));
+        ASSERT_EQ(resultArgs.getArgsAfterClusterTime(), placementConflictTime);
         ASSERT_EQ(result["startTransaction"].boolean(), true);
 
         auto expectedShardVersion = shardVersion;
-        expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+        expectedShardVersion.setPlacementConflictTime_DEPRECATED(placementConflictTime);
         ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
 
         auto expectedDatabaseVersion = databaseVersion;
         if (hasTxnCreatedAnyDatabase) {
-            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(Timestamp(0, 0)));
         } else {
-            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(placementConflictTime);
         }
         ASSERT_BSONOBJ_EQ(expectedDatabaseVersion.toBSON(), result["databaseVersion"].Obj());
+
+        ASSERT(result.hasField("transactionRuntimeContext"));
+
+        const auto trcResult =
+            TransactionRuntimeContext::parse(result["transactionRuntimeContext"].Obj());
+
+        ASSERT(trcResult.getPlacementConflictTime().has_value());
+        ASSERT_EQ(placementConflictTime.asTimestamp(),
+                  trcResult.getPlacementConflictTime()->asTimestamp());
+
+        ASSERT_EQ(std::vector<DatabaseName>(createdDatabases.begin(), createdDatabases.end()),
+                  trcResult.getCreatedDatabases());
     };
 
     test(false /* hasTxnCreatedAnyDatabase */);
@@ -2685,32 +2776,51 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpe
         repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         const auto shardVersion = exampleShardVersion();
         const auto databaseVersion = exampleDatabaseVersion();
+        const auto atClusterTime = LogicalTime(Timestamp(1, 2));
+        const auto createdDatabases = hasTxnCreatedAnyDatabase
+            ? std::set<DatabaseName>{DatabaseName::createDatabaseName_forTest(boost::none,
+                                                                              "dummyDb1"),
+                                     DatabaseName::createDatabaseName_forTest(boost::none,
+                                                                              "dummyDb2")}
+            : std::set<DatabaseName>{};
+
         auto result = TransactionRouter::appendFieldsForStartTransaction(
+            operationContext(),
             BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
                          << databaseVersion.toBSON() << "readConcern"
                          << BSON("level" << "snapshot")),
             defaultRCArgs,
-            LogicalTime(Timestamp(1, 2)),
+            atClusterTime,
             boost::none,
             false /* doAppendStartTransaction */,
             false /* doAppendStartOrContinueTransaction */,
-            hasTxnCreatedAnyDatabase);
+            createdDatabases);
 
         ASSERT_EQ(result["MyCmd"].numberLong(), 1);
         repl::ReadConcernArgs resultArgs;
         ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
         ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kSnapshotReadConcern);
-        ASSERT_EQ(resultArgs.getArgsAtClusterTime()->asTimestamp(), Timestamp(1, 2));
+        ASSERT_EQ(resultArgs.getArgsAtClusterTime(), atClusterTime);
         ASSERT_BSONOBJ_EQ(result["shardVersion"].Obj(), shardVersion.toBSON());
         if (hasTxnCreatedAnyDatabase) {
             auto expectedDatabaseVersion = databaseVersion;
-            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(Timestamp(0, 0)));
             ASSERT_BSONOBJ_EQ(result["databaseVersion"].Obj(), expectedDatabaseVersion.toBSON());
 
         } else {
             ASSERT_BSONOBJ_EQ(result["databaseVersion"].Obj(), databaseVersion.toBSON());
         }
         ASSERT(!result["startTransaction"]);
+
+        ASSERT(result.hasField("transactionRuntimeContext"));
+
+        const auto trcResult =
+            TransactionRuntimeContext::parse(result["transactionRuntimeContext"].Obj());
+
+        ASSERT(!trcResult.getPlacementConflictTime().has_value());
+        ASSERT_EQ(std::vector<DatabaseName>(createdDatabases.begin(), createdDatabases.end()),
+                  trcResult.getCreatedDatabases());
     };
 
     test(false /* hasTxnCreatedAnyDatabase */);
@@ -2723,34 +2833,51 @@ TEST_F(TransactionRouterTest,
         repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
         const auto shardVersion = exampleShardVersion();
         const auto databaseVersion = exampleDatabaseVersion();
+        const auto atClusterTime = LogicalTime(Timestamp(1, 2));
+        const auto createdDatabases = hasTxnCreatedAnyDatabase
+            ? std::set<DatabaseName>{DatabaseName::createDatabaseName_forTest(boost::none,
+                                                                              "dummyDb1"),
+                                     DatabaseName::createDatabaseName_forTest(boost::none,
+                                                                              "dummyDb2")}
+            : std::set<DatabaseName>{};
 
         auto result = TransactionRouter::appendFieldsForStartTransaction(
+            operationContext(),
             BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
                          << databaseVersion.toBSON() << "readConcern"
                          << BSON("level" << "snapshot"
-                                         << "atClusterTime" << Timestamp(1, 2))),
+                                         << "atClusterTime" << atClusterTime.asTimestamp())),
             defaultRCArgs,
-            LogicalTime(Timestamp(1, 2)),
+            atClusterTime,
             boost::none,
             false /* doAppendStartTransaction */,
             false /* doAppendStartOrContinueTransaction */,
-            hasTxnCreatedAnyDatabase);
+            createdDatabases);
 
         ASSERT_EQ(result["MyCmd"].numberLong(), 1);
         repl::ReadConcernArgs resultArgs;
         ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
         ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kSnapshotReadConcern);
-        ASSERT_EQ(resultArgs.getArgsAtClusterTime()->asTimestamp(), Timestamp(1, 2));
+        ASSERT_EQ(resultArgs.getArgsAtClusterTime(), atClusterTime);
         ASSERT_BSONOBJ_EQ(result["shardVersion"].Obj(), shardVersion.toBSON());
         if (hasTxnCreatedAnyDatabase) {
             auto expectedDatabaseVersion = databaseVersion;
-            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(Timestamp(0, 0)));
             ASSERT_BSONOBJ_EQ(result["databaseVersion"].Obj(), expectedDatabaseVersion.toBSON());
 
         } else {
             ASSERT_BSONOBJ_EQ(result["databaseVersion"].Obj(), databaseVersion.toBSON());
         }
         ASSERT(!result["startTransaction"]);
+
+        ASSERT(result.hasField("transactionRuntimeContext"));
+
+        const auto trcResult =
+            TransactionRuntimeContext::parse(result["transactionRuntimeContext"].Obj());
+        ASSERT(!trcResult.getPlacementConflictTime().has_value());
+        ASSERT_EQ(std::vector<DatabaseName>(createdDatabases.begin(), createdDatabases.end()),
+                  trcResult.getCreatedDatabases());
     };
 
     test(false /* hasTxnCreatedAnyDatabase */);
@@ -2758,69 +2885,121 @@ TEST_F(TransactionRouterTest,
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionNoShardVersion) {
+    const auto placementConflictTime = LogicalTime{Timestamp(10, 1)};
     auto result = TransactionRouter::appendFieldsForContinueTransaction(
-        BSON("MyCmd" << 1), LogicalTime{Timestamp(10, 1)}, false /* hasTxnCreatedAnyDatabase */);
+        operationContext(), BSON("MyCmd" << 1), placementConflictTime, {} /* createdDatabases */);
 
-    ASSERT_BSONOBJ_EQ(BSON("MyCmd" << 1), result);
+    ASSERT_BSONOBJ_EQ(BSON("MyCmd"
+                           << 1 << "transactionRuntimeContext"
+                           << BSON("placementConflictTime" << placementConflictTime.asTimestamp()
+                                                           << "createdDatabases" << BSONArray())),
+                      result);
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionWithShardVersion) {
     const auto test = [this](bool hasTxnCreatedAnyDatabase) {
         const auto shardVersion = exampleShardVersion();
         const auto databaseVersion = exampleDatabaseVersion();
+
+        const auto createdDatabases = hasTxnCreatedAnyDatabase
+            ? std::set<DatabaseName>{DatabaseName::createDatabaseName_forTest(boost::none, "db")}
+            : std::set<DatabaseName>{};
+
         auto result = TransactionRouter::appendFieldsForContinueTransaction(
+            operationContext(),
             BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
                          << databaseVersion.toBSON()),
             LogicalTime{Timestamp(10, 1)},
-            hasTxnCreatedAnyDatabase);
+            createdDatabases);
 
         ASSERT_EQ(result["MyCmd"].numberLong(), 1);
 
         auto expectedShardVersion = shardVersion;
-        expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+        expectedShardVersion.setPlacementConflictTime_DEPRECATED(LogicalTime(Timestamp(10, 1)));
         ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
 
         auto expectedDatabaseVersion = databaseVersion;
         if (hasTxnCreatedAnyDatabase) {
-            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(Timestamp(0, 0)));
         } else {
-            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(Timestamp(10, 1)));
         }
         ASSERT_BSONOBJ_EQ(expectedDatabaseVersion.toBSON(), result["databaseVersion"].Obj());
     };
 
-    test(false /* hasTxnCreatedAnyDatabase */);
-    test(true /* hasTxnCreatedAnyDatabase */);
+    // The behavior should not depend on the feature flag
+    // 'gAddTransactionRuntimeContextAsAGenericArgument'.
+    {
+        RAIIServerParameterControllerForTest ff(
+            "featureFlagAddTransactionRuntimeContextAsAGenericArgument", false);
+        test(false /* hasTxnCreatedAnyDatabase */);
+        test(true /* hasTxnCreatedAnyDatabase */);
+    }
+    {
+        RAIIServerParameterControllerForTest ff(
+            "featureFlagAddTransactionRuntimeContextAsAGenericArgument", true);
+        test(false /* hasTxnCreatedAnyDatabase */);
+        test(true /* hasTxnCreatedAnyDatabase */);
+    }
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionWithShardVersionNoConflictTime) {
     const auto test = [this](bool hasTxnCreatedAnyDatabase) {
         const auto shardVersion = exampleShardVersion();
         const auto databaseVersion = exampleDatabaseVersion();
+
+        const auto createdDatabases = hasTxnCreatedAnyDatabase
+            ? std::set<DatabaseName>{DatabaseName::createDatabaseName_forTest(boost::none, "db")}
+            : std::set<DatabaseName>{};
+
         auto result = TransactionRouter::appendFieldsForContinueTransaction(
+            operationContext(),
             BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
                          << databaseVersion.toBSON()),
             boost::none,
-            hasTxnCreatedAnyDatabase);
+            createdDatabases);
 
         ASSERT_EQ(result["MyCmd"].numberLong(), 1);
         ASSERT_BSONOBJ_EQ(shardVersion.toBSON(), result["shardVersion"].Obj());
         auto expectedDatabaseVersion = databaseVersion;
         if (hasTxnCreatedAnyDatabase) {
-            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(Timestamp(0, 0)));
         }
         ASSERT_BSONOBJ_EQ(expectedDatabaseVersion.toBSON(), result["databaseVersion"].Obj());
     };
 
-    test(false /* hasTxnCreatedAnyDatabase */);
-    test(true /* hasTxnCreatedAnyDatabase */);
+    // The behavior should not depend on the feature flag
+    // 'gAddTransactionRuntimeContextAsAGenericArgument'.
+    {
+        RAIIServerParameterControllerForTest ff(
+            "featureFlagAddTransactionRuntimeContextAsAGenericArgument", false);
+        test(false /* hasTxnCreatedAnyDatabase */);
+        test(true /* hasTxnCreatedAnyDatabase */);
+    }
+    {
+        RAIIServerParameterControllerForTest ff(
+            "featureFlagAddTransactionRuntimeContextAsAGenericArgument", true);
+        test(false /* hasTxnCreatedAnyDatabase */);
+        test(true /* hasTxnCreatedAnyDatabase */);
+    }
 }
 
 TEST_F(TransactionRouterTest,
        AppendFieldsForContinueTransactionWithShardVersionWithConflictTimeForBulkWrite) {
-    const auto test = [this](bool hasTxnCreatedAnyDatabase) {
+    const auto test = [this](bool hasTxnCreatedAnyDatabase,
+                             bool ffTransactionRuntimeContextEnabled) {
         const auto shardVersion = ShardVersion::UNTRACKED();
         const auto databaseVersion = exampleDatabaseVersion();
+
+        const auto createdDatabases = hasTxnCreatedAnyDatabase
+            ? std::set<DatabaseName>{DatabaseName::createDatabaseName_forTest(boost::none,
+                                                                              "dummyDb1"),
+                                     DatabaseName::createDatabaseName_forTest(boost::none,
+                                                                              "dummyDb2")}
+            : std::set<DatabaseName>{};
 
         // Create a bulkWrite request object
         auto cmdObj = [&]() {
@@ -2837,7 +3016,7 @@ TEST_F(TransactionRouterTest,
         // Run appendFieldsForContinueTransaction
         auto placementConflictTime = LogicalTime{Timestamp(10, 1)};
         auto resultObj = TransactionRouter::appendFieldsForContinueTransaction(
-            cmdObj, placementConflictTime, hasTxnCreatedAnyDatabase);
+            operationContext(), cmdObj, placementConflictTime, createdDatabases);
 
         // Deserialize the resulted bulkWrite object
         auto opMsgRequest = OpMsgRequestBuilder::create(
@@ -2846,25 +3025,54 @@ TEST_F(TransactionRouterTest,
             BulkWriteCommandRequest::parse(opMsgRequest, IDLParserContext{"bulkWrite"});
 
         // Asserts the placementConflictTime is attached
-        ASSERT_EQ(resultRequest.getNsInfo()[0].getShardVersion()->placementConflictTime(),
-                  placementConflictTime);
+        ASSERT_EQ(
+            resultRequest.getNsInfo()[0].getShardVersion()->placementConflictTime_DEPRECATED(),
+            placementConflictTime);
+
+        // Asserts the databaseVersion is the expected one
         auto expectedDatabaseVersion = databaseVersion;
         if (hasTxnCreatedAnyDatabase) {
-            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(Timestamp(0, 0)));
         } else {
-            expectedDatabaseVersion.setPlacementConflictTime(placementConflictTime);
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(placementConflictTime);
         }
         ASSERT_BSONOBJ_EQ(expectedDatabaseVersion.toBSON(),
                           resultRequest.getNsInfo()[0].getDatabaseVersion()->toBSON());
+
+        if (ffTransactionRuntimeContextEnabled) {
+            ASSERT(resultRequest.getTransactionRuntimeContext().has_value());
+            const auto trcResult = resultRequest.getTransactionRuntimeContext().get();
+
+            ASSERT(trcResult.getPlacementConflictTime().has_value());
+            ASSERT_EQ(placementConflictTime.asTimestamp(),
+                      trcResult.getPlacementConflictTime()->asTimestamp());
+
+            ASSERT_EQ(std::vector<DatabaseName>(createdDatabases.begin(), createdDatabases.end()),
+                      trcResult.getCreatedDatabases());
+        }
     };
 
-    test(false /* hasTxnCreatedAnyDatabase */);
-    test(true /* hasTxnCreatedAnyDatabase */);
+    {
+        const bool ffEnabled = false;
+        RAIIServerParameterControllerForTest ff(
+            "featureFlagAddTransactionRuntimeContextAsAGenericArgument", ffEnabled);
+        test(false /* hasTxnCreatedAnyDatabase */, ffEnabled);
+        test(true /* hasTxnCreatedAnyDatabase */, ffEnabled);
+    }
+    {
+        const bool ffEnabled = true;
+        RAIIServerParameterControllerForTest ff(
+            "featureFlagAddTransactionRuntimeContextAsAGenericArgument", ffEnabled);
+        test(false /* hasTxnCreatedAnyDatabase */, ffEnabled);
+        test(true /* hasTxnCreatedAnyDatabase */, ffEnabled);
+    }
 }
 
 TEST_F(TransactionRouterTest,
        AppendFieldsForStartTransactionWithShardVersionWithConflictTimeForBulkWrite) {
-    const auto test = [this](bool hasTxnCreatedAnyDatabase) {
+    const auto test = [this](bool hasTxnCreatedAnyDatabase,
+                             bool ffTransactionRuntimeContextEnabled) {
         const auto shardVersion = ShardVersion::UNTRACKED();
         const auto databaseVersion = exampleDatabaseVersion();
 
@@ -2881,16 +3089,20 @@ TEST_F(TransactionRouterTest,
         }();
 
         // Run appendFieldsForStartTransaction
+        const auto createdDatabases = hasTxnCreatedAnyDatabase
+            ? std::set<DatabaseName>{DatabaseName::createDatabaseName_forTest(boost::none, "db")}
+            : std::set<DatabaseName>{};
         auto placementConflictTime = LogicalTime{Timestamp(10, 1)};
         repl::ReadConcernArgs defaultRCArgs;
         auto resultObj = TransactionRouter::appendFieldsForStartTransaction(
+            operationContext(),
             cmdObj,
             defaultRCArgs,
             boost::none,
             placementConflictTime,
             true /* doAppendStartTransaction */,
             false /* doAppendStartOrContinueTransaction */,
-            hasTxnCreatedAnyDatabase);
+            createdDatabases);
 
         // Deserialize the resulted bulkWrite object
         auto opMsgRequest = OpMsgRequestBuilder::create(
@@ -2899,20 +3111,49 @@ TEST_F(TransactionRouterTest,
             BulkWriteCommandRequest::parse(opMsgRequest, IDLParserContext{"bulkWrite"});
 
         // Asserts the placementConflictTime is attached
-        ASSERT_EQ(resultRequest.getNsInfo()[0].getShardVersion()->placementConflictTime(),
-                  placementConflictTime);
+        ASSERT_EQ(
+            resultRequest.getNsInfo()[0].getShardVersion()->placementConflictTime_DEPRECATED(),
+            placementConflictTime);
         auto expectedDatabaseVersion = databaseVersion;
         if (hasTxnCreatedAnyDatabase) {
-            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(Timestamp(0, 0)));
         } else {
-            expectedDatabaseVersion.setPlacementConflictTime(placementConflictTime);
+            expectedDatabaseVersion.setPlacementConflictTime_DEPRECATED(placementConflictTime);
         }
+
+        // Asserts the databaseVersion is the expected one
         ASSERT_BSONOBJ_EQ(expectedDatabaseVersion.toBSON(),
                           resultRequest.getNsInfo()[0].getDatabaseVersion()->toBSON());
+
+        // Asserts the createdDatabases field is attached when the feature flag is enabled
+        if (ffTransactionRuntimeContextEnabled) {
+            ASSERT(resultRequest.getTransactionRuntimeContext().has_value());
+            const auto trcResult = resultRequest.getTransactionRuntimeContext().get();
+
+            ASSERT(trcResult.getPlacementConflictTime().has_value());
+            ASSERT_EQ(placementConflictTime.asTimestamp(),
+                      trcResult.getPlacementConflictTime()->asTimestamp());
+
+            ASSERT_EQ(std::vector<DatabaseName>(createdDatabases.begin(), createdDatabases.end()),
+                      trcResult.getCreatedDatabases());
+        }
     };
 
-    test(false /* hasTxnCreatedAnyDatabase */);
-    test(true /* hasTxnCreatedAnyDatabase */);
+    {
+        const bool ffEnabled = false;
+        RAIIServerParameterControllerForTest ff(
+            "featureFlagAddTransactionRuntimeContextAsAGenericArgument", ffEnabled);
+        test(false /* hasTxnCreatedAnyDatabase */, ffEnabled);
+        test(true /* hasTxnCreatedAnyDatabase */, ffEnabled);
+    }
+    {
+        const bool ffEnabled = true;
+        RAIIServerParameterControllerForTest ff(
+            "featureFlagAddTransactionRuntimeContextAsAGenericArgument", ffEnabled);
+        test(false /* hasTxnCreatedAnyDatabase */, ffEnabled);
+        test(true /* hasTxnCreatedAnyDatabase */, ffEnabled);
+    }
 }
 
 TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
@@ -7560,6 +7801,7 @@ TEST_F(TransactionRouterTest, ParticipantCanBeAddedOnNonRetryableStmtInRetryable
                           << "stmtId" << -1 << "readConcern"
                           << BSON("level" << "snapshot"
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                          << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                           << "startTransaction" << true << "coordinator" << true << "autocommit"
                           << false << "txnNumber" << txnNum);
 
@@ -7571,9 +7813,11 @@ TEST_F(TransactionRouterTest, ParticipantCanBeAddedOnNonRetryableStmtInRetryable
         BSONArray stmtIds(BSON_ARRAY(-1 << -1 << -1));
         BSONObj cmdObj = BSON("insert" << "test"
                                        << "stmtIds" << stmtIds);
-        BSONObj expectedNewObj = BSON("insert" << "test"
-                                               << "stmtIds" << stmtIds << "coordinator" << true
-                                               << "autocommit" << false << "txnNumber" << txnNum);
+        BSONObj expectedNewObj =
+            BSON("insert" << "test"
+                          << "stmtIds" << stmtIds << "transactionRuntimeContext"
+                          << BSON("createdDatabases" << BSONArray()) << "coordinator" << true
+                          << "autocommit" << false << "txnNumber" << txnNum);
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, cmdObj);
         ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
     }
@@ -7677,9 +7921,10 @@ protected:
             txnRouter.setDefaultAtClusterTime(operationContext());
             auto actualCmdObj =
                 txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, cmdObj);
-            BSONObj expectedCmdObj =
-                BSON("insert" << "test"
-                              << "readConcern" << txnReadConcernObj << startActionString << true);
+            BSONObj expectedCmdObj = BSON(
+                "insert" << "test"
+                         << "readConcern" << txnReadConcernObj << "transactionRuntimeContext"
+                         << BSON("createdDatabases" << BSONArray()) << startActionString << true);
             if (startAction != TransactionRouter::TransactionActions::kStartOrContinue) {
                 // When the action is startOrContinue, the "coordinator" field does not get
                 // attached.
@@ -7702,8 +7947,9 @@ protected:
                 txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, cmdObj);
             BSONObj expectedCmdObj =
                 BSON("update" << "test"
-                              << "readConcern" << txnReadConcernObj << startActionString << true
-                              << "autocommit" << false << "txnNumber" << txnNum);
+                              << "readConcern" << txnReadConcernObj << "transactionRuntimeContext"
+                              << BSON("createdDatabases" << BSONArray()) << startActionString
+                              << true << "autocommit" << false << "txnNumber" << txnNum);
             ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
         }
 
@@ -7747,8 +7993,9 @@ protected:
                 txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, cmdObj);
             BSONObj expectedCmdObj =
                 BSON("delete" << "test"
-                              << "readConcern" << txnReadConcernObj << startActionString << true
-                              << "autocommit" << false << "txnNumber" << txnNum);
+                              << "readConcern" << txnReadConcernObj << "transactionRuntimeContext"
+                              << BSON("createdDatabases" << BSONArray()) << startActionString
+                              << true << "autocommit" << false << "txnNumber" << txnNum);
             ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
         }
 
@@ -7763,9 +8010,10 @@ protected:
             txnRouter.setDefaultAtClusterTime(operationContext());
             auto actualCmdObj =
                 txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, cmdObj);
-            BSONObj expectedCmdObj =
-                BSON("delete" << "test"
-                              << "autocommit" << false << "txnNumber" << txnNum);
+            BSONObj expectedCmdObj = BSON(
+                "delete" << "test"
+                         << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
+                         << "autocommit" << false << "txnNumber" << txnNum);
             ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
         }
     }

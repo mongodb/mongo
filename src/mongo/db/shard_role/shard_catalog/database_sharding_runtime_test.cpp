@@ -42,11 +42,15 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_factory_shard.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
@@ -72,6 +76,10 @@ public:
 
     void setUp() override {
         ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
+
+        shard_role_details::setRecoveryUnit(operationContext(),
+                                            std::make_unique<RecoveryUnitMock>(),
+                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
@@ -135,6 +143,70 @@ public:
 
     DatabaseType createDatabase(const UUID& uuid, const Timestamp& timestamp) {
         return DatabaseType(kDbName, kShardList[0].getName(), DatabaseVersion(uuid, timestamp));
+    }
+
+    class RecoveryUnitMock : public RecoveryUnitNoop {
+        using ReadSource = RecoveryUnit::ReadSource;
+
+    public:
+        void setTimestampReadSource(ReadSource source,
+                                    boost::optional<Timestamp> provided = boost::none) override {
+            _source = source;
+            _timestamp = provided;
+        }
+        ReadSource getTimestampReadSource() const override {
+            return _source;
+        };
+        boost::optional<Timestamp> getPointInTimeReadTimestamp() override {
+            return _timestamp;
+        }
+
+    private:
+        ReadSource _source = ReadSource::kNoTimestamp;
+        boost::optional<Timestamp> _timestamp;
+    };
+
+    /**
+     * Runs the given callback function within a transaction with the given placementConflictTime.
+     */
+    template <typename Callable>
+    void runWithinTxn(OperationContext* opCtx,
+                      boost::optional<LogicalTime> placementConflictTime,
+                      const std::vector<DatabaseName>& createdDatabases,
+                      Callable&& func) {
+        TxnNumber txnNumber{0};
+
+        opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+        opCtx->setTxnNumber(txnNumber);
+        opCtx->setInMultiDocumentTransaction();
+
+        auto argsAtClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+        if (argsAtClusterTime.has_value()) {
+            shard_role_details::getRecoveryUnit(operationContext())
+                ->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                         argsAtClusterTime->asTimestamp());
+        }
+
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+
+        TransactionRuntimeContext transactionRuntimeContext;
+        transactionRuntimeContext.setPlacementConflictTime(placementConflictTime);
+        transactionRuntimeContext.setCreatedDatabases(createdDatabases);
+
+        txnParticipant.beginOrContinue(opCtx,
+                                       {txnNumber},
+                                       false /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kStart,
+                                       transactionRuntimeContext);
+
+        txnParticipant.unstashTransactionResources(opCtx, "DummyCmd");
+        func();
+        txnParticipant.commitUnpreparedTransaction(opCtx);
+        txnParticipant.stashTransactionResources(opCtx);
+
+        opCtx->resetMultiDocumentTransactionState();
     }
 };
 
@@ -230,6 +302,7 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, CheckReceivedDatabaseVersion
         repl::ReadConcernArgs::get(operationContext()) = cmdLevelReadConcern;
         ASSERT_DOES_NOT_THROW(dsr->checkDbVersionOrThrow(operationContext(), installedDbVersion));
 
+
         // Command atClusterTime is older than db timestamp.
         cmdLevelReadConcern.setArgsAtClusterTimeForSnapshot(Timestamp(8, 0));
         repl::ReadConcernArgs::get(operationContext()) = cmdLevelReadConcern;
@@ -244,39 +317,145 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, CheckReceivedDatabaseVersion
                            AssertionException,
                            ErrorCodes::StaleDbVersion);
 
-        // If received version has 'placementConflictTime' == Timestamp(0, 0), then ignore conflict.
-        auto receivedVersionWithPlacementConflictTimeZero = installedDbVersion;
-        receivedVersionWithPlacementConflictTimeZero.setPlacementConflictTime(
-            LogicalTime(Timestamp{0, 0}));
-        ASSERT_DOES_NOT_THROW(dsr->checkDbVersionOrThrow(
-            operationContext(), receivedVersionWithPlacementConflictTimeZero));
+        // If the database has been created within the current transaction, ignore conflict
+        runWithinTxn(operationContext(), LogicalTime(Timestamp(8, 0)), {kDbName}, [&] {
+            ASSERT_DOES_NOT_THROW(
+                dsr->checkDbVersionOrThrow(operationContext(), installedDbVersion));
+        });
+
+        // When the feature flag 'AddTransactionRuntimeContextAsAGenericArgument' is disabled, if
+        // received version has 'placementConflictTime' == Timestamp(0, 0), then ignore conflict.
+        {
+            RAIIServerParameterControllerForTest featureFlagController(
+                "featureFlagAddTransactionRuntimeContextAsAGenericArgument", false);
+
+            auto receivedVersionWithPlacementConflictTimeZero = installedDbVersion;
+            receivedVersionWithPlacementConflictTimeZero.setPlacementConflictTime_DEPRECATED(
+                LogicalTime(Timestamp{0, 0}));
+            ASSERT_DOES_NOT_THROW(dsr->checkDbVersionOrThrow(
+                operationContext(), receivedVersionWithPlacementConflictTimeZero));
+        }
 
         repl::ReadConcernArgs::get(operationContext()) = previousReadConcern;
     }
+}
 
-    // If installed database timestamp is greater than received 'placementConflictTime', then throw
-    // MigrationConflict. (Except if 'placementConflictTime' is Timestamp(0, 0)).
+TEST_F(DatabaseShardingRuntimeTestWithMockedLoader,
+       CheckReceivedDatabaseVersionWithPlacementConflictTime) {
+    OperationContext* opCtx = operationContext();
+
+    const auto installedDbVersion = DatabaseVersion(UUID::gen(), Timestamp(10, 0));
+    const auto placementConflictTimeToThrow = LogicalTime(Timestamp{8, 0});
+    const auto placementConflictTimeToNOTThrow = LogicalTime({11, 0});
+
+    // Install DSR
     {
+        const auto dbInfoToInstall =
+            DatabaseType(kDbName, kShardList[0].getName(), installedDbVersion);
+
+        AutoGetDb autoDb(operationContext(), kDbName, MODE_IX);
+        const auto dsr =
+            DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(operationContext(), kDbName);
+        dsr->setDbInfo_DEPRECATED(operationContext(), dbInfoToInstall);
+    }
+
+    const auto dsr = DatabaseShardingRuntime::acquireShared(operationContext(), kDbName);
+
+    // If received version matches, then success.
+    ASSERT_DOES_NOT_THROW(dsr->checkDbVersionOrThrow(operationContext(), installedDbVersion));
+
+    // When the feature AddTransactionRuntimeContextAsAGenericArgument is disabled, if installed
+    // database timestamp is greater than 'placementConflictTime' attached to the DbVersion, then
+    // throw MigrationConflict. (Except if 'placementConflictTime' is Timestamp(0, 0)).
+    {
+        RAIIServerParameterControllerForTest featureFlagController(
+            "featureFlagAddTransactionRuntimeContextAsAGenericArgument", false);
+
         auto receivedVersionWithGreaterPlacementConflictTime = installedDbVersion;
-        receivedVersionWithGreaterPlacementConflictTime.setPlacementConflictTime(
-            LogicalTime(Timestamp{11, 0}));
+        receivedVersionWithGreaterPlacementConflictTime.setPlacementConflictTime_DEPRECATED(
+            placementConflictTimeToNOTThrow);
         ASSERT_DOES_NOT_THROW(dsr->checkDbVersionOrThrow(
             operationContext(), receivedVersionWithGreaterPlacementConflictTime));
 
         auto receivedVersionWithLowerPlacementConflictTime = installedDbVersion;
-        receivedVersionWithLowerPlacementConflictTime.setPlacementConflictTime(
-            LogicalTime(Timestamp{8, 0}));
+        receivedVersionWithLowerPlacementConflictTime.setPlacementConflictTime_DEPRECATED(
+            placementConflictTimeToThrow);
         ASSERT_THROWS_CODE(dsr->checkDbVersionOrThrow(
                                operationContext(), receivedVersionWithLowerPlacementConflictTime),
                            AssertionException,
                            ErrorCodes::MigrationConflict);
 
         auto receivedVersionWithZeroPlacementConflictTime = installedDbVersion;
-        receivedVersionWithZeroPlacementConflictTime.setPlacementConflictTime(
+        receivedVersionWithZeroPlacementConflictTime.setPlacementConflictTime_DEPRECATED(
             LogicalTime(Timestamp{0, 0}));
         ASSERT_DOES_NOT_THROW(dsr->checkDbVersionOrThrow(
             operationContext(), receivedVersionWithZeroPlacementConflictTime));
     }
+
+    // When the feature AddTransactionRuntimeContextAsAGenericArgument is enabled, if the
+    // installed database timestamp is greater than the 'placementConflictTime' returned by the
+    // TransactionParticipant and the operation runs within a transaction, then throw
+    // MigrationConflict. (Except if 'placementConflictTime' is Timestamp(0, 0)).
+    {
+        RAIIServerParameterControllerForTest featureFlagController(
+            "featureFlagAddTransactionRuntimeContextAsAGenericArgument", true);
+
+        // It should throw if the placementConflictTime is greater than the installed db timestamp
+        runWithinTxn(opCtx, placementConflictTimeToNOTThrow, {}, [&] {
+            ASSERT_DOES_NOT_THROW(
+                dsr->checkDbVersionOrThrow(operationContext(), installedDbVersion));
+        });
+
+        // It should throw if the placementConflictTime is lower than the installed db timestamp
+        runWithinTxn(opCtx, placementConflictTimeToThrow, {}, [&] {
+            ASSERT_THROWS_CODE(dsr->checkDbVersionOrThrow(operationContext(), installedDbVersion),
+                               AssertionException,
+                               ErrorCodes::MigrationConflict);
+        });
+
+        // It should not throw if the database kDbName was created within the transaction.
+        runWithinTxn(opCtx, placementConflictTimeToThrow, {kDbName}, [&] {
+            ASSERT_DOES_NOT_THROW(
+                dsr->checkDbVersionOrThrow(operationContext(), installedDbVersion));
+        });
+
+        // The placementConflictTime attached to the DatabaseVersion is ignored if the
+        // featureFlagAddTransactionRuntimeContextAsAGenericArgument is enabled.
+        {
+            auto receivedVersionWithLowerPlacementConflictTime = installedDbVersion;
+            receivedVersionWithLowerPlacementConflictTime.setPlacementConflictTime_DEPRECATED(
+                placementConflictTimeToThrow);
+            ASSERT_DOES_NOT_THROW(dsr->checkDbVersionOrThrow(
+                operationContext(), receivedVersionWithLowerPlacementConflictTime));
+        }
+    }
+}
+
+DEATH_TEST_REGEX_F(DatabaseShardingRuntimeTestWithMockedLoader,
+                   TestsShouldTassertIfPlacementConflictTimeIsNotPresentInTxns,
+                   "Tripwire assertion.*9758701") {
+    const auto installedDbVersion = DatabaseVersion(UUID::gen(), Timestamp(10, 0));
+
+    // Install DSR
+    {
+        const auto dbInfoToInstall =
+            DatabaseType(kDbName, kShardList[0].getName(), installedDbVersion);
+        AutoGetDb autoDb(operationContext(), kDbName, MODE_IX);
+        const auto dsr =
+            DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(operationContext(), kDbName);
+        dsr->setDbInfo_DEPRECATED(operationContext(), dbInfoToInstall);
+    }
+
+    const auto dsr = DatabaseShardingRuntime::acquireShared(operationContext(), kDbName);
+    ASSERT_DOES_NOT_THROW(dsr->checkDbVersionOrThrow(operationContext(), installedDbVersion));
+
+    runWithinTxn(operationContext(), boost::none, {}, [&]() {
+        ScopedSetShardRole scopedSetShardRole{operationContext(),
+                                              NamespaceString{kDbName},
+                                              boost::none,
+                                              installedDbVersion /* databaseVersion */};
+        dsr->checkDbVersionOrThrow(operationContext(), installedDbVersion);
+    });
 }
 
 TEST_F(DatabaseShardingRuntimeTestWithMockedLoader,

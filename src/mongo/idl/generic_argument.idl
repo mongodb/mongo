@@ -45,6 +45,7 @@ imports:
     - "mongo/rpc/metadata/audit_metadata.idl"
     - "mongo/db/sharding_environment/sharding_types.idl"
     - "mongo/db/router_role/gossiped_routing_cache.idl"
+    - "mongo/db/transaction/transaction_runtime_context.idl"
 
 structs:
     GenericArguments:
@@ -389,6 +390,12 @@ structs:
                 # Even though we do want this field to be forwarded to shards, we set
                 # forward_to_shards to false because it gets manually appended upon egress.
                 forward_to_shards: false
+                stability: "internal"
+            # Contains context fields of the current transaction
+            transactionRuntimeContext:
+                type: TransactionRuntimeContext
+                forward_to_shards: false
+                optional: true
                 stability: "internal"
 
     GenericReplyFields:

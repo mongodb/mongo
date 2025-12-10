@@ -124,18 +124,24 @@ void runInTransaction(OperationContext* opCtx, Callable&& func) {
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
 
+    TransactionRuntimeContext transactionRuntimeContext;
+    transactionRuntimeContext.setPlacementConflictTime(LogicalTime(Timestamp::max()));
+
     auto txnParticipant = TransactionParticipant::get(opCtx);
     ASSERT(txnParticipant);
     txnParticipant.beginOrContinue(opCtx,
                                    {txnNum},
                                    false /* autocommit */,
-                                   TransactionParticipant::TransactionActions::kStart);
+                                   TransactionParticipant::TransactionActions::kStart,
+                                   transactionRuntimeContext);
     txnParticipant.unstashTransactionResources(opCtx, "SetDestinedRecipient");
 
     func();
 
     txnParticipant.commitUnpreparedTransaction(opCtx);
     txnParticipant.stashTransactionResources(opCtx);
+
+    opCtx->resetMultiDocumentTransactionState();
 }
 
 class DestinedRecipientTest : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
@@ -269,9 +275,6 @@ protected:
         coll.setAllowMigrations(false);
 
         // When running in transaction, the db version must carry a PlacementConflictTime.
-        if (runInTransaction) {
-            env.dbVersion.setPlacementConflictTime(LogicalTime(Timestamp{0, 0}));
-        }
         getConfigServerCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
             DatabaseType(kNss.dbName(), kShardList[0].getName(), env.dbVersion));
 
