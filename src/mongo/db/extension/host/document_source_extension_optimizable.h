@@ -47,12 +47,20 @@ public:
             new DocumentSourceExtensionOptimizable(expCtx, std::move(astNode)));
     }
 
-    // Construction from a logical stage handle. Used when creating DocumentSources from DPL
-    // logical stage handles.
+
+    /**
+     * Construct a DocumentSourceExtensionOptimizable from a logical stage handle.
+     *
+     * Note: it is important that the input properties match the logical stage type being passed in.
+     * Therefore this should only be used when "cloning" an existing document source - e.g. for
+     * creating DocumentSources from DPL logical stage handles.
+     */
     static boost::intrusive_ptr<DocumentSourceExtensionOptimizable> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, LogicalAggStageHandle logicalStage) {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        LogicalAggStageHandle logicalStage,
+        const MongoExtensionStaticProperties& properties) {
         return boost::intrusive_ptr<DocumentSourceExtensionOptimizable>(
-            new DocumentSourceExtensionOptimizable(expCtx, std::move(logicalStage)));
+            new DocumentSourceExtensionOptimizable(expCtx, std::move(logicalStage), properties));
     }
 
     Value serialize(const SerializationOptions& opts) const override;
@@ -64,11 +72,7 @@ public:
     Id getId() const override;
 
     const MongoExtensionStaticProperties& getStaticProperties() const {
-        tassert(11420604,
-                "Static properties are not available. This stage was likely created from a "
-                "LogicalAggStageHandle without an AST node",
-                _properties.has_value());
-        return _properties.get();
+        return _properties;
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const override;
@@ -81,7 +85,7 @@ public:
     }
 
 protected:
-    const boost::optional<MongoExtensionStaticProperties> _properties;
+    const MongoExtensionStaticProperties _properties;
     const LogicalAggStageHandle _logicalStage;
 
     DocumentSourceExtensionOptimizable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -91,9 +95,10 @@ protected:
           _logicalStage(astNode.bind()) {}
 
     DocumentSourceExtensionOptimizable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       LogicalAggStageHandle logicalStage)
+                                       LogicalAggStageHandle logicalStage,
+                                       const MongoExtensionStaticProperties& properties)
         : DocumentSourceExtension(logicalStage.getName(), expCtx),
-          _properties(boost::none),
+          _properties(properties),
           _logicalStage(std::move(logicalStage)) {}
 };
 

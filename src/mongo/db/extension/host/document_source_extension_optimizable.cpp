@@ -54,16 +54,14 @@ StageConstraints DocumentSourceExtensionOptimizable::constraints(
     // Default properties if unset
     auto constraints = DocumentSourceExtension::constraints(pipeState);
 
-    const auto& properties = getStaticProperties();
-
     // Apply potential overrides from static properties.
-    if (!properties.getRequiresInputDocSource()) {
+    if (!_properties.getRequiresInputDocSource()) {
         constraints.setConstraintsForNoInputSources();
     }
-    if (auto pos = static_properties_util::toPositionRequirement(properties.getPosition())) {
+    if (auto pos = static_properties_util::toPositionRequirement(_properties.getPosition())) {
         constraints.requiredPosition = *pos;
     }
-    if (auto host = static_properties_util::toHostTypeRequirement(properties.getHostType())) {
+    if (auto host = static_properties_util::toHostTypeRequirement(_properties.getHostType())) {
         constraints.hostRequirement = *host;
     }
 
@@ -75,8 +73,6 @@ DocumentSource::Id DocumentSourceExtensionOptimizable::getId() const {
 }
 
 DepsTracker::State DocumentSourceExtensionOptimizable::getDependencies(DepsTracker* deps) const {
-    const auto& properties = getStaticProperties();
-
     auto processFields = [](const auto& fields, auto&& apply) {
         if (fields.has_value()) {
             for (const auto& fieldName : *fields) {
@@ -87,17 +83,17 @@ DepsTracker::State DocumentSourceExtensionOptimizable::getDependencies(DepsTrack
     };
 
     // Report required metadata fields for this stage.
-    processFields(properties.getRequiredMetadataFields(),
+    processFields(_properties.getRequiredMetadataFields(),
                   [&](auto metaType) { deps->setNeedsMetadata(metaType); });
 
     // Drop upstream metadata fields if this stage does not preserve them.
-    if (!properties.getPreservesUpstreamMetadata()) {
+    if (!_properties.getPreservesUpstreamMetadata()) {
         // TODO: SERVER-100443
         deps->clearMetadataAvailable();
     }
 
     // Report provided metadata fields for this stage.
-    processFields(properties.getProvidedMetadataFields(),
+    processFields(_properties.getProvidedMetadataFields(),
                   [&](auto metaType) { deps->setMetadataAvailable(metaType); });
 
     // Retain entire metadata and do not optimize, as it may be needed by the extension.
@@ -128,11 +124,19 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic() {
                                                                                   dplElement);
                     }
                 },
-                [&](LogicalAggStageHandle& dplElement) {
-                    // Create a DocumentSource directly from the logical stage handle.
+                [&](LogicalAggStageHandle& dplLogicalStage) {
+                    // Create a DocumentSource directly from the logical stage handle. We only allow
+                    // logical stages to be created here if they are the same type as the
+                    // originating stage. Because of this assumption, we can pass in the static
+                    // properties from the originating stage. Otherwise we would not have access to
+                    // the new stage's properties here, since they live on the ASTNode.
+                    uassert(11513800,
+                            "an extension logical stage in a distributed plan pipeline must be the "
+                            "same type as its originating stage",
+                            dplLogicalStage.getName() == _logicalStage.getName());
                     return std::list<boost::intrusive_ptr<DocumentSource>>{
-                        DocumentSourceExtensionOptimizable::create(getExpCtx(),
-                                                                   std::move(dplElement))};
+                        DocumentSourceExtensionOptimizable::create(
+                            getExpCtx(), std::move(dplLogicalStage), _properties)};
                 }},
             handle);
     };

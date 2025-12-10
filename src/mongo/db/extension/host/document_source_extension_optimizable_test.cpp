@@ -251,15 +251,49 @@ TEST_F(DocumentSourceExtensionOptimizableTest, distributedPlanLogicReturnsNoneWh
     ASSERT_FALSE(dpl.has_value());
 }
 
+class InvalidDPLLogicalStage : public sdk::shared_test_stages::TransformLogicalAggStage {
+public:
+    boost::optional<sdk::DistributedPlanLogic> getDistributedPlanLogic() const override {
+        sdk::DistributedPlanLogic dpl;
+
+        {
+            // Create a merging pipeline with a logical stage that is different from this one.
+            std::vector<VariantDPLHandle> elements;
+            elements.emplace_back(
+                extension::LogicalAggStageHandle{new sdk::ExtensionLogicalAggStage(
+                    sdk::shared_test_stages::MergeOnlyDPLLogicalStage::make())});
+            dpl.mergingPipeline = sdk::DPLArrayContainer(std::move(elements));
+        }
+
+        return dpl;
+    }
+};
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       distributedPlanLogicReturnsErrorWhenGivenMismatchedLogicalStage) {
+    auto logicalStage =
+        new sdk::ExtensionLogicalAggStage(std::make_unique<InvalidDPLLogicalStage>());
+    auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
+
+    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
+        getExpCtx(), std::move(logicalStageHandle), MongoExtensionStaticProperties{});
+
+    ASSERT_THROWS_CODE(optimizable->distributedPlanLogic(), AssertionException, 11513800);
+}
+
 TEST_F(DocumentSourceExtensionOptimizableTest, distributedPlanLogicWithMergeOnlyStage) {
     // Create a stage that returns DPL with merge-only stages containing all three types of
     // VariantDPLHandle.
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::MergeOnlyDPLAstNode::make());
-    auto astHandle = AggStageAstNodeHandle(astNode);
+    auto logicalStage = new sdk::ExtensionLogicalAggStage(
+        sdk::shared_test_stages::MergeOnlyDPLLogicalStage::make());
+    auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
 
-    auto optimizable =
-        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+    // Initialize properties with a non-default value.
+    auto properties =
+        MongoExtensionStaticProperties::parse(BSON("requiresInputDocSource" << false));
+
+    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
+        getExpCtx(), std::move(logicalStageHandle), properties);
 
     auto dpl = optimizable->distributedPlanLogic();
     ASSERT_TRUE(dpl.has_value());
@@ -287,7 +321,12 @@ TEST_F(DocumentSourceExtensionOptimizableTest, distributedPlanLogicWithMergeOnly
     auto thirdStageIt = std::next(secondStageIt);
     ASSERT_NE(*thirdStageIt, nullptr);
     ASSERT_EQ(std::string((*thirdStageIt)->getSourceName()),
-              sdk::shared_test_stages::TransformAggStageDescriptor::kStageName);
+              sdk::shared_test_stages::kMergeOnlyDPLStageName);
+    // The new logical stage should inherit the original stage's static properties.
+    ASSERT_EQ(static_cast<host::DocumentSourceExtensionOptimizable*>(thirdStageIt->get())
+                  ->getStaticProperties()
+                  .getRequiresInputDocSource(),
+              properties.getRequiresInputDocSource());
 
     // Verify sort pattern is empty.
     ASSERT_FALSE(logic.mergeSortPattern.has_value());

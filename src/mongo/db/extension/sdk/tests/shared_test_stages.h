@@ -1186,6 +1186,8 @@ static constexpr std::string_view kMergeOnlyDPLStageName = "$mergeOnlyDPL";
  */
 class MergeOnlyDPLLogicalStage : public TransformLogicalAggStage {
 public:
+    MergeOnlyDPLLogicalStage() : TransformLogicalAggStage(kMergeOnlyDPLStageName, BSONObj()) {}
+
     boost::optional<sdk::DistributedPlanLogic> getDistributedPlanLogic() const override {
         sdk::DistributedPlanLogic dpl;
 
@@ -1206,21 +1208,9 @@ public:
 
         return dpl;
     }
-};
 
-/**
- * MergeOnlyDPLAstNode is an AST node that binds to MergeOnlyDPLLogicalStage.
- */
-class MergeOnlyDPLAstNode : public sdk::AggStageAstNode {
-public:
-    MergeOnlyDPLAstNode() : sdk::AggStageAstNode(kMergeOnlyDPLStageName) {}
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+    static inline std::unique_ptr<LogicalAggStage> make() {
         return std::make_unique<MergeOnlyDPLLogicalStage>();
-    }
-
-    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<MergeOnlyDPLAstNode>();
     }
 };
 

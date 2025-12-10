@@ -462,6 +462,9 @@ typedef enum MongoExtensionDPLArrayElementType : uint32_t {
 /**
  * MongoExtensionDPLArrayElement represents a single element in a MongoExtensionDPLArray. Each
  * element can be either a parse node or a logical stage.
+ *
+ * If an element is a logical stage, it must be the same stage type as the logical stage that
+ * generated it.
  */
 typedef struct MongoExtensionDPLArrayElement {
     // Indicates what type the element is.
