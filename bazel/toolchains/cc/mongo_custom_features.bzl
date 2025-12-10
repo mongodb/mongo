@@ -21,7 +21,6 @@ COMPILERS = struct(
 )
 
 LINKERS = struct(
-    GOLD = "gold",
     LLD = "lld",
     MOLD = "mold",
 )

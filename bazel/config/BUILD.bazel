@@ -786,18 +786,11 @@ linker(
 )
 
 # Underscored settings are for flagging configuration errors and for evaluating auto.
-# Use :linker_gold & linker_lld to check the final evaluated linker.
+# Use :linker_mold & linker_lld to check the final evaluated linker.
 config_setting(
     name = "_linker_auto",
     flag_values = {
         "//bazel/config:linker": "auto",
-    },
-)
-
-config_setting(
-    name = "_linker_gold",
-    flag_values = {
-        "//bazel/config:linker": "gold",
     },
 )
 
@@ -816,30 +809,10 @@ config_setting(
 )
 
 selects.config_setting_group(
-    name = "_linker_gold_set_by_auto",
-    match_all = [
-        ":_linker_auto",
-        "@platforms//cpu:s390x",
-        "@platforms//os:linux",
-    ],
-)
-
-selects.config_setting_group(
     name = "_linker_lld_set_by_auto",
     match_all = [
         ":_linker_auto",
-        ":not_s390x",
         "@platforms//os:linux",
-    ],
-)
-
-# Final setting intended for external use.
-#   linker == gold || (linker == auto && cpu == s390x)
-selects.config_setting_group(
-    name = "linker_gold",
-    match_any = [
-        ":_linker_gold_set_by_auto",
-        ":_linker_gold",
     ],
 )
 
@@ -857,7 +830,6 @@ selects.config_setting_group(
     name = "linker_lld_valid_settings",
     match_all = [
         ":linker_lld",
-        ":not_s390x",
         ":not_macos",
     ],
 )
@@ -875,7 +847,6 @@ selects.config_setting_group(
     match_any = [
         ":linker_default",
         ":linker_lld",
-        ":linker_gold",
     ],
 )
 

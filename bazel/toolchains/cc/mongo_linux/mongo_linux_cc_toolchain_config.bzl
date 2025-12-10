@@ -1006,8 +1006,7 @@ def _impl(ctx):
                     # Disallow an executable stack. Also, issue a warning if any files are
                     # found that would cause the stack to become executable if the
                     # noexecstack flag was not in play, so that we can find them and fix
-                    # them. We do this here after we check for ld.gold because the
-                    # --warn-execstack is currently only offered with gold.
+                    # them.
                     "-Wl,-z,noexecstack",
                     "-Wl,--warn-execstack",
 

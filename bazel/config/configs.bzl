@@ -49,7 +49,7 @@ mongo_toolchain_version = rule(
 # linker
 # ==========
 
-linker_values = ["auto", "gold", "lld", "mold"]
+linker_values = ["auto", "lld", "mold"]
 
 linker_provider = provider(
     doc = "Specify the type of linker to use.",
