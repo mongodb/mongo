@@ -7,8 +7,6 @@ After an aggregate command issued by a user is parsed into a `Pipeline`, it unde
 1. [**Inter-stage Optimization**](#inter-stage-optimization): optimizes the entire `Pipeline` object, which is represented internally as a container of `DocumentSource`s. This modifies the container by combining, swapping, dropping, and/or inserting stages.
 1. [**Stage-specific Optimization**](#stage-specific-optimization): optimizes each stage, or `DocumentSource` individually.
 
-<!-- TODO(SERVER-110110): Add links to RBR docs where applicable. -->
-
 For information on how to register new rewrites, see [Registering new rewrites](#registering-new-rewrites).
 
 > ### Aside: Disabling Optimizations
@@ -144,7 +142,7 @@ For implementation details about dependency tracking and validation, refer to th
 
 ## Stage-specific Optimization
 
-Once we have the final order of the stages, we go through each stage and call [`DocumentSource::optimize()`](https://github.com/mongodb/mongo/blob/65b9efd4861b9f0d61f8b29843d29febcba91bcb/src/mongo/db/pipeline/document_source.h#L507) on each one (called from [`Pipeline::optimizeEachStage()`](https://github.com/mongodb/mongo/blob/65b9efd4861b9f0d61f8b29843d29febcba91bcb/src/mongo/db/pipeline/pipeline.cpp#L383)), either returning an optimized `DocumentSource` that's semantically equivalent or removing the stage if it's a no-op. For instance, a no-op stage like `{$match: {}}` would be removed.
+Once we have the final order of the stages, we again invoke the [rule-based rewrite engine](../query/compiler/rewrites/README.md), but this time with a configuration that only run rules that perform stage-specific optimizations. These rules are currently implemented as public `optimize()` methods on `DocumentSource` subclasses and registered as unconditional rules. Each of these rules either returns an optimized `DocumentSource` that's semantically equivalent or removes the current stage if it's a no-op. For instance, a no-op stage like `{$match: {}}` would be removed.
 
 The `MatchExpression` in a `$match` stage contains specific rewrite logic that is covered in greater detail [here](../matcher/README.md).
 
@@ -226,7 +224,7 @@ graph TD
 
 ## Registering new rewrites
 
-All pipeline rewrites are invoked through the [rule-based rewrite engine](https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/pipeline/optimization/rule_based_rewriter.h#L196). While most rewrites are still implemented inside `DocumentSource::optimizeAt()` and `optimize()` and registered as unconditional rules (i.e., rules where the precondition is always true), new rewrites should be implemented and registered as their own, separate rules. A rule is defined by a name, precondition and transform functions, a priority and a set of tags: https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/query/compiler/rewrites/rule_based_rewriter.h#L51-L81
+All pipeline rewrites are invoked through the [rule-based rewrite engine](https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/pipeline/optimization/rule_based_rewriter.h#L196) (see [README](../query/compiler/rewrites/README.md)). While most rewrites are still implemented inside `DocumentSource::optimizeAt()` and `optimize()` and registered as unconditional rules (i.e., rules where the precondition is always true), new rewrites should be implemented and registered as their own, separate rules. A rule is defined by a name, precondition and transform functions, a priority and a set of tags: https://github.com/mongodb/mongo/blob/d8c7211ff2b04e961019b3939500221b94149931/src/mongo/db/query/compiler/rewrites/rule_based_rewriter.h#L51-L81
 
 ### Rule registry and registration macros
 
