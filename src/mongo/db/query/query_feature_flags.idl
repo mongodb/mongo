@@ -315,3 +315,10 @@ feature_flags:
         cpp_varname: gFeatureFlagPathArrayness
         fcv_gated: false
         default: false
+
+    featureFlagUnifiedWriteExecutor:
+        description: "Feature flag to use the unified write executor."
+        cpp_varname: "gFeatureFlagUnifiedWriteExecutor"
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development

@@ -149,7 +149,7 @@ executor:
         enableTestCommands: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
         findShardsOnConfigTimeoutMS: 30000 # giving legroom as this suite is doing initial sync
-        internalQueryUnifiedWriteExecutor: true
+        featureFlagUnifiedWriteExecutor: true
     shard_options:
       all_nodes_electable: True
       mongod_options:
@@ -177,7 +177,7 @@ executor:
         queryAnalysisWriterIntervalSecs: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
         skipDroppingHashedShardKeyIndex: true
-        internalQueryUnifiedWriteExecutor: true
+        featureFlagUnifiedWriteExecutor: true
     num_rs_nodes_per_shard: 3
     num_shards: 2
     num_mongos: 2

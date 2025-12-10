@@ -231,8 +231,8 @@ executor:
         mongos_options:
           set_parameters:
             enableTestCommands: 1
-            internalQueryUnifiedWriteExecutor: true
+            featureFlagUnifiedWriteExecutor: true
         mongod_options:
           set_parameters:
             enableTestCommands: 1
-            internalQueryUnifiedWriteExecutor: true
+            featureFlagUnifiedWriteExecutor: true

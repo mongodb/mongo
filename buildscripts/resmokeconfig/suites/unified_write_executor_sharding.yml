@@ -103,5 +103,5 @@ executor:
       global_vars:
         TestData:
           setParametersMongos:
-            internalQueryUnifiedWriteExecutor: true
+            featureFlagUnifiedWriteExecutor: true
       nodb: ""

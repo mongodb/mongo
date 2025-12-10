@@ -28,3 +28,5 @@
 - featureFlagPrimaryDrivenIndexBuilds
 # TODO SERVER-104494 SERVER-104258: Turn this back on once the issues are fixed.
 - featureFlagReshardingCloneNoRefresh
+# TODO: SERVER-91308 Enable unified write executor.
+- featureFlagUnifiedWriteExecutor

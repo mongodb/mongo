@@ -99,7 +99,7 @@ executor:
           traceExceptions: false
           runningWithBalancer: true
           implicitlyShardOnCreateCollectionOnly: true
-          internalQueryUnifiedWriteExecutor: true
+          featureFlagUnifiedWriteExecutor: true
 
   hooks:
     - class: CheckShardFilteringMetadata
@@ -116,7 +116,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
-        internalQueryUnifiedWriteExecutor: true
+        featureFlagUnifiedWriteExecutor: true
     shard_options:
       mongod_options:
         oplogSize: 1024
@@ -128,7 +128,7 @@ executor:
         queryAnalysisSamplerConfigurationRefreshSecs: 1
         skipDroppingHashedShardKeyIndex: true
         reshardingMinimumOperationDurationMillis: 0
-        internalQueryUnifiedWriteExecutor: true
+        featureFlagUnifiedWriteExecutor: true
     num_rs_nodes_per_shard: 3
     num_shards: 2
     num_mongos: 2

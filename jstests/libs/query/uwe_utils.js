@@ -1,15 +1,10 @@
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 /**
  * Checks whether the unified write executor is used for sharded writes.
  */
 export function isUweEnabled(db) {
-    return !!assert.commandWorkedOrFailedWithCode(
-        db.adminCommand({
-            getParameter: 1,
-            internalQueryUnifiedWriteExecutor: 1,
-        }),
-        // Allow the error when the query knob is not present.
-        ErrorCodes.InvalidOptions,
-    ).internalQueryUnifiedWriteExecutor;
+    return FeatureFlagUtil.isPresentAndEnabled(db, "UnifiedWriteExecutor");
 }
 
 /**

@@ -1668,14 +1668,6 @@ server_parameters:
         default: false
         redact: false
 
-    internalQueryUnifiedWriteExecutor:
-        description: "Boolean flag to use the unified write executor."
-        set_at: [startup, runtime]
-        cpp_varname: "internalQueryUnifiedWriteExecutor"
-        cpp_vartype: AtomicWord<bool>
-        default: false
-        redact: false
-
     internalQueryGetMoreMaxCursorPinRetryAttempts:
         description: >-
             Max number of attempts to pin cursor by getMore command before failing in cases where

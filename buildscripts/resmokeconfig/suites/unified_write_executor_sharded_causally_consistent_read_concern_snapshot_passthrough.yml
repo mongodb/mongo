@@ -91,7 +91,7 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-        internalQueryUnifiedWriteExecutor: true
+        featureFlagUnifiedWriteExecutor: true
         logComponentVerbosity:
           command: 1
           network:
@@ -101,7 +101,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         minSnapshotHistoryWindowInSeconds: 3600
-        internalQueryUnifiedWriteExecutor: true
+        featureFlagUnifiedWriteExecutor: true
         logComponentVerbosity:
           command: 1
           network:
