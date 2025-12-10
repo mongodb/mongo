@@ -1165,16 +1165,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         coll = primary_client["test"]["validate.hook"].with_options(
             write_concern=pymongo.write_concern.WriteConcern(w=len(self.nodes))
         )
-        coll.insert_one({"a": 1})
+        res = primary_client.test.command({"insert": "validate.hook", "documents": [{"a": 1}]})
+        clusterTime = res["opTime"]["ts"]
         coll.drop()
-
-        res = primary_client.admin.command({"replSetGetStatus": 1})
-
-        if "appliedOpTime" not in res["optimes"]:
-            # This can be null when the node is starting up.
-            return False
-
-        clusterTime = res["optimes"]["appliedOpTime"]["ts"]
 
         self.logger.info("Performing Internode Validation")
 
