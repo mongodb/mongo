@@ -28,6 +28,7 @@
  */
 #include "mongo/db/extension/shared/extension_status.h"
 
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -50,6 +51,49 @@ TEST(ExtensionStatusTest, extensionStatusOKTest) {
     ASSERT_EQUALS(ExtensionStatusOK::getInstance().getCode(), 0);
     ASSERT_EQUALS(ExtensionStatusOK::getInstance().getReason().size(), 0);
     ASSERT_EQUALS(ExtensionStatusOK::getInstanceCount(), 1);
+}
+
+TEST(ExtensionStatusTest, extensionStatusOKCloneTest) {
+    // StatusHandle going out of scope should call destroy, but not destroy our singleton.
+    auto* const statusOKSingleton = &ExtensionStatusOK::getInstance();
+    {
+        StatusHandle statusHandle(statusOKSingleton);
+        ASSERT_EQUALS(statusHandle.getCode(), 0);
+        ASSERT_EQUALS(statusHandle.getReason().size(), 0);
+
+        auto clonedHandle = statusHandle.clone();
+        ASSERT_EQUALS(statusHandle.getCode(), 0);
+        ASSERT_EQUALS(statusHandle.getReason().size(), 0);
+        ASSERT_EQUALS(ExtensionStatusOK::getInstanceCount(), 1);
+    }
+
+    ASSERT_TRUE(statusOKSingleton == &ExtensionStatusOK::getInstance());
+
+    ASSERT_EQUALS(ExtensionStatusOK::getInstance().getCode(), 0);
+    ASSERT_EQUALS(ExtensionStatusOK::getInstance().getReason().size(), 0);
+    ASSERT_EQUALS(ExtensionStatusOK::getInstanceCount(), 1);
+}
+
+TEST(ExtensionStatusTest, extensionGenericStatusCloneTest) {
+    StatusHandle statusHandle(new ExtensionGenericStatus(1, std::string("reason")));
+    auto clonedHandle = statusHandle.clone();
+    ASSERT_EQUALS(statusHandle.getCode(), clonedHandle.getCode());
+    ASSERT_EQUALS(statusHandle.getReason(), clonedHandle.getReason());
+}
+
+TEST(ExtensionStatusTest, ExtensionStatusExceptionCloneTest) {
+    StatusHandle status(wrapCXXAndConvertExceptionToStatus(
+        [&]() { uasserted(11186305, "Failed with uassert in $noOpExtension parse."); }));
+
+    auto clonedHandle = status.clone();
+    ASSERT_EQUALS(status.getCode(), clonedHandle.getCode());
+    ASSERT_EQUALS(status.getReason(), clonedHandle.getReason());
+
+    auto exceptionPtr = ExtensionStatusException::extractException(*status.get());
+    ASSERT(exceptionPtr);
+    auto exceptionPtrFromClone = ExtensionStatusException::extractException(*clonedHandle.get());
+    ASSERT(exceptionPtrFromClone);
+    ASSERT_EQ(exceptionPtr, exceptionPtrFromClone);
 }
 
 // Test that a std::exception correctly returns MONGO_EXTENSION_STATUS_RUNTIME_ERROR when called via
@@ -130,6 +174,66 @@ TEST(ExtensionStatusTest, extensionStatusInvokeCAndConvertStatusToException_Exte
         ExtensionDBException,
         10596412,
         kErrorString);
+}
+
+DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsGetCode, "10930105") {
+    StatusHandle status(new ExtensionGenericStatus());
+    auto vtable = status.vtable();
+    vtable.get_code = nullptr;
+    StatusHandle::assertVTableConstraintsHelper(vtable);
+}
+
+DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsGetReason, "10930106") {
+    StatusHandle status(new ExtensionGenericStatus());
+    auto vtable = status.vtable();
+    vtable.get_reason = nullptr;
+    StatusHandle::assertVTableConstraintsHelper(vtable);
+}
+
+DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsSetCode, "11186306") {
+    StatusHandle status(new ExtensionGenericStatus());
+    auto vtable = status.vtable();
+    vtable.set_code = nullptr;
+    StatusHandle::assertVTableConstraintsHelper(vtable);
+}
+
+DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsSetReason, "11186309") {
+    StatusHandle status(new ExtensionGenericStatus());
+    auto vtable = status.vtable();
+    vtable.set_reason = nullptr;
+    StatusHandle::assertVTableConstraintsHelper(vtable);
+}
+
+DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsClone, "11186310") {
+    StatusHandle status(new ExtensionGenericStatus());
+    auto vtable = status.vtable();
+    vtable.clone = nullptr;
+    StatusHandle::assertVTableConstraintsHelper(vtable);
+}
+
+DEATH_TEST(ExtensionStatusTest, ExtensionStatusOKSetReasonFails, "11186303") {
+    StatusHandle status(&ExtensionStatusOK::getInstance());
+    status.setReason(std::string(""));
+}
+
+TEST(ExtensionStatusTest, ExtensionStatusOKSetCodeNoOp) {
+    StatusHandle status(&ExtensionStatusOK::getInstance());
+    status.setCode(100);
+    ASSERT_EQ(status.getCode(), 0);
+}
+
+DEATH_TEST(ExtensionStatusTest, ExtensionStatusExceptionSetReasonFails, "11186304") {
+    StatusHandle status(wrapCXXAndConvertExceptionToStatus(
+        [&]() { uasserted(11186311, "Failed with uassert in $noOpExtension parse."); }));
+    status.setReason(std::string(""));
+}
+
+TEST(ExtensionStatusTest, ExtensionStatusExceptionSetCodeNoOp) {
+    StatusHandle status(wrapCXXAndConvertExceptionToStatus(
+        [&]() { uasserted(11186312, "Failed with uassert in $noOpExtension parse."); }));
+    ASSERT_EQ(status.getCode(), 11186312);
+    status.setCode(0);
+    ASSERT_EQ(status.getCode(), 11186312);
 }
 
 }  // namespace

@@ -37,12 +37,16 @@ MongoExtensionStatus* QueryExecutionContextAdapter::_extCheckForInterrupt(
     return wrapCXXAndConvertExceptionToStatus([&]() {
         const auto& execCtx = static_cast<const QueryExecutionContextAdapter*>(ctx)->getCtxImpl();
         Status interrupted = execCtx.checkForInterrupt();
-
-        MongoExtensionByteView reasonByteView{stringViewAsByteView(interrupted.reason())};
-        // Note that we don't need invokeCAndConvertStatusToException here because
-        // set_code/set_reason do not throw errors.
-        queryStatus->vtable->set_code(queryStatus, interrupted.code());
-        queryStatus->vtable->set_reason(queryStatus, reasonByteView);
+        // Ensure output query status is valid before accessing it.
+        if (!interrupted.isOK()) {
+            StatusHandle::assertValidStatus(queryStatus);
+            MongoExtensionByteView reasonByteView{stringViewAsByteView(interrupted.reason())};
+            // Note that we don't need invokeCAndConvertStatusToException here because
+            // set_code does not throw errors.
+            queryStatus->vtable->set_code(queryStatus, interrupted.code());
+            invokeCAndConvertStatusToException(
+                [&]() { return queryStatus->vtable->set_reason(queryStatus, reasonByteView); });
+        }
     });
 }
 

@@ -147,7 +147,14 @@ typedef struct MongoExtensionStatusVTable {
     /**
      * Set a reason associated with `status`. May be empty.
      */
-    void (*set_reason)(MongoExtensionStatus* status, MongoExtensionByteView newReason);
+    MongoExtensionStatus* (*set_reason)(MongoExtensionStatus* status,
+                                        MongoExtensionByteView newReason);
+
+    /**
+     * Clone this instance of MongoExtensionStatus.
+     */
+    MongoExtensionStatus* (*clone)(const MongoExtensionStatus* status,
+                                   MongoExtensionStatus** output);
 } MongoExtensionStatusVTable;
 
 /**

@@ -33,7 +33,8 @@ namespace mongo::extension::sdk {
 
 ExtensionGenericStatus QueryExecutionContextHandle::checkForInterrupt() const {
     assertValid();
-
+    // ExtensionGenericStatus defaults to OK, check_for_interrupt will only update the status if an
+    // interrupt was detected.
     ExtensionGenericStatus queryStatus;
     invokeCAndConvertStatusToException(
         [&]() { return vtable().check_for_interrupt(get(), &queryStatus); });
