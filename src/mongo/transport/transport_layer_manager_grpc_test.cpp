@@ -93,7 +93,7 @@ public:
         uassertStatusOK(getServiceContext()->getTransportLayerManager()->setup());
         uassertStatusOK(getServiceContext()->getTransportLayerManager()->start());
 
-        _asioListenAddress = HostAndPort("127.0.0.1", _asioTL->listenerMainPort());
+        _asioListenAddress = HostAndPort("127.0.0.1", _asioTL->listenerPort());
         _grpcEgressReactor = std::dynamic_pointer_cast<grpc::GRPCReactor>(
             _grpcTL->getReactor(TransportLayer::WhichReactor::kEgress));
     }
@@ -423,7 +423,7 @@ private:
 
 #define ASSERT_ASIO_ECHO_SUCCEEDS(tl)                                                         \
     {                                                                                         \
-        auto swSession = tl.connect(HostAndPort("localhost", tl.listenerMainPort()),          \
+        auto swSession = tl.connect(HostAndPort("localhost", tl.listenerPort()),              \
                                     ConnectSSLMode::kEnableSSL,                               \
                                     grpc::CommandServiceTestFixtures::kDefaultConnectTimeout, \
                                     boost::none);                                             \

@@ -168,13 +168,6 @@ public:
     void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) final;
 
     /**
-     * The maintenance port is unavailable with grpc enabled.
-     */
-    bool isConnectedToMaintenancePort() const final {
-        return false;
-    }
-
-    /**
      * All gRPC sessions are considered bound to the operation state.
      */
     bool bindsToOperationState() const final {

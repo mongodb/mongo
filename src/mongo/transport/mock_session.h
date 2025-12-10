@@ -89,10 +89,6 @@ public:
         return false;
     };
 
-    bool isConnectedToMaintenancePort() const override {
-        return false;
-    }
-
     void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override {}
 
     bool bindsToOperationState() const override {
