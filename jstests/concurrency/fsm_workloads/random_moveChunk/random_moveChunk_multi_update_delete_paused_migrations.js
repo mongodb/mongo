@@ -17,6 +17,7 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
 import {migrationsAreAllowed} from "jstests/libs/chunk_manipulation_util.js";
 import {randomUpdateDelete} from "jstests/concurrency/fsm_workload_modifiers/random_update_delete.js";
+import {ConcurrentOperation} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/move_chunk_errors.js";
 
 function getPauseMigrationsClusterParameter(db) {
     const response = assert.commandWorked(db.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
@@ -41,8 +42,8 @@ export const $config = extendWorkload($partialConfig, function ($config, $super)
     $config.iterations = 50;
     $config.data.partitionSize = 100;
 
-    $config.data.isMoveChunkErrorAcceptable = (err) => {
-        return err.code === ErrorCodes.Interrupted;
+    $config.data.getConcurrentOperations = () => {
+        return [...$super.data.getConcurrentOperations(), ConcurrentOperation.CoordinatedMultiWrite];
     };
 
     $config.setup = function setup(db, collName, cluster) {

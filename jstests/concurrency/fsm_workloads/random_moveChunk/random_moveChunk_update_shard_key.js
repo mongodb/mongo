@@ -11,6 +11,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {ConcurrentOperation} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/move_chunk_errors.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
@@ -27,25 +28,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // applied.
     $config.data.expectedCounters = {};
 
-    // Because updates don't have a shard filter stage, a migration may fail if a
-    // broadcast update is operating on orphans from a previous migration in the range being
-    // migrated back in. The particular error code is replaced with a more generic one, so this is
-    // identified by the failed migration's error message.
-    $config.data.isMoveChunkErrorAcceptable = (err) => {
-        return (
-            err.message &&
-            (err.message.includes("CommandFailed") ||
-                err.message.includes("Documents in target range may still be in use") ||
-                // This error can occur when the test updates the shard key value of a document whose
-                // chunk has been moved to another shard. Receiving a chunk only waits for documents
-                // with shard key values in that range to have been cleaned up by the range deleter.
-                // So, if the range deleter has not yet cleaned up that document when the chunk is
-                // moved back to the original shard, the moveChunk may fail as a result of a duplicate
-                // key error on the recipient.
-                err.message.includes("Location51008") ||
-                err.message.includes("Location6718402") ||
-                err.message.includes("Location16977"))
-        );
+    $config.data.getConcurrentOperations = () => {
+        return [
+            ...$super.data.getConcurrentOperations(),
+            ConcurrentOperation.BroadcastWrite,
+            ConcurrentOperation.ShardKeyUpdate,
+        ];
     };
 
     $config.data.runningWithStepdowns = TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;

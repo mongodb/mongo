@@ -13,6 +13,7 @@ import "jstests/libs/parallelTester.js";
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
+import {ConcurrentOperation} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/move_chunk_errors.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = 5;
@@ -51,34 +52,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         return collName + "_" + latchNumber.toString();
     };
 
-    // Because updates don't have a shard filter stage, a migration may fail if a
-    // broadcast update is operating on orphans from a previous migration in the range being
-    // migrated back in. The particular error code is replaced with a more generic one, so this
-    // is identified by the failed migration's error message.
-    $config.data.isMoveChunkErrorAcceptable = (err) => {
-        const codes = [
-            ErrorCodes.ShardKeyNotFound,
-            ErrorCodes.LockTimeout,
-            // The refienCollectionCoordinator interrupt all migrations by setting `allowMigration`
-            // to false
-            ErrorCodes.Interrupted,
-            ErrorCodes.OrphanedRangeCleanUpFailed,
+    $config.data.getConcurrentOperations = () => {
+        return [
+            ...$super.data.getConcurrentOperations(),
+            ConcurrentOperation.BroadcastWrite,
+            ConcurrentOperation.RefineShardKey,
         ];
-        return (
-            (err.code && codes.includes(err.code)) ||
-            (err.message &&
-                (err.message.includes("CommandFailed") ||
-                    err.message.includes("Documents in target range may still be in use") ||
-                    // This error will occur as a result of trying to move a chunk with a
-                    // pre-refine collection epoch.
-                    err.message.includes("collection may have been dropped") ||
-                    // This error will occur if a moveChunk command has been sent with chunk
-                    // boundaries that represent the pre-refine chunks, but the collection has
-                    // already been changed to possess the post-refine chunk boundaries.
-                    (err.message.includes("shard key bounds") &&
-                        err.message.includes("are not valid for shard key pattern")) ||
-                    (err.message.includes("bound") && err.message.includes("is not valid for shard key pattern"))))
-        );
     };
 
     $config.states.refineCollectionShardKey = function refineCollectionShardKey(db, collName, connCache) {

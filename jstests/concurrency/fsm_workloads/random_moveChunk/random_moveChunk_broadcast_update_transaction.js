@@ -17,6 +17,7 @@ import {
     verifyDocuments,
 } from "jstests/concurrency/fsm_workload_helpers/update_in_transaction_states.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
+import {ConcurrentOperation} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/move_chunk_errors.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = 5;
@@ -26,16 +27,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // partition per thread.
     $config.data.partitionSize = 100;
 
-    // Because updates don't have a shard filter stage, a migration may fail if a
-    // broadcast update is operating on orphans from a previous migration in the range being
-    // migrated back in. The particular error code is replaced with a more generic one, so this is
-    // identified by the failed migration's error message.
-    $config.data.isMoveChunkErrorAcceptable = (err) => {
-        return (
-            err.message &&
-            (err.message.indexOf("CommandFailed") > -1 ||
-                err.message.indexOf("Documents in target range may still be in use") > -1)
-        );
+    $config.data.getConcurrentOperations = () => {
+        return [...$super.data.getConcurrentOperations(), ConcurrentOperation.BroadcastWrite];
     };
 
     $config.states.exactIdUpdate = function (db, collName, connCache) {

@@ -8,27 +8,11 @@
  */
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {isMoveChunkErrorAcceptableWithConcurrent} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/move_chunk_errors.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 export function randomManualMigration($config, $super) {
-    $config.data.isMoveChunkErrorAcceptable = (err) => {
-        // When the balancer is enabled, the manual chunk migrations done by the moveChunk base
-        // might conflict with the splits being done by the balancer.
-        let acceptDueToBalancerConflict = TestData.runningWithBalancer && (err.code == 656452 || err.code == 11089203);
-        // When shards are being added and removed, the target shard may no longer exist by the time
-        // the migration is issued. We have to check the error messages because chunk migrations can
-        // modify the error message and lose the original error code.
-        let acceptDueToDrainingConflict =
-            TestData.shardsAddedRemoved &&
-            (err.code == ErrorCodes.ShardNotFound ||
-                (err.message &&
-                    (err.message.includes("ShardNotFound") ||
-                        err.message.includes("is currently draining") ||
-                        // This interruption can happen if a shard is being removed, and the
-                        // namespace involved in chunk migration is dropped as part of shard removal
-                        err.message.includes("Location6718402"))));
-        return acceptDueToBalancerConflict || acceptDueToDrainingConflict;
-    };
+    $config.data.getConcurrentOperations = () => [];
 
     $config.states.moveChunk = function moveChunk(db, collName, connCache) {
         // Some tests want to specify a collection to run chunk migrations on whereas others want to
@@ -84,7 +68,7 @@ export function randomManualMigration($config, $super) {
         } catch (e) {
             // Failed moveChunks are thrown by the moveChunk helper with the response included as a
             // JSON string in the error's message.
-            if (this.isMoveChunkErrorAcceptable(e)) {
+            if (isMoveChunkErrorAcceptableWithConcurrent(this.getConcurrentOperations(), e)) {
                 print("Ignoring acceptable moveChunk error: " + tojson(e));
                 return;
             }

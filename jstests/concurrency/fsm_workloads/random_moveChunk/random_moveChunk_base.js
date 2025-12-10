@@ -11,6 +11,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {isMoveChunkErrorAcceptableWithConcurrent} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/move_chunk_errors.js";
 import {findFirstBatch} from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_base_partitioned.js";
 
@@ -31,7 +32,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     // Depending on the operations performed by each workload, it might be expected that a random
     // moveChunk may fail with an error code other than those expected by the helper.
-    $config.data.isMoveChunkErrorAcceptable = (err) => false;
+    $config.data.getConcurrentOperations = () => [];
 
     /**
      * Returns the _id of a random document owned by this thread for a given collection.
@@ -102,7 +103,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         } catch (e) {
             // Failed moveChunks are thrown by the moveChunk helper with the response included as a
             // JSON string in the error's message.
-            if (this.isMoveChunkErrorAcceptable(e)) {
+            if (isMoveChunkErrorAcceptableWithConcurrent(this.getConcurrentOperations(), e)) {
                 print("Ignoring acceptable moveChunk error: " + tojson(e));
                 return;
             }
