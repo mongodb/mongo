@@ -76,14 +76,17 @@ public:
     void produceSerializationMap(
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
-            operatorOrientedUpdates) const final {
+            operatorOrientedUpdates,
+        const SerializationOptions& opts) const final {
         // The RenameNode sits in the update tree at the destination path, because that's the path
         // that may need to be synthesized if it's not already in the document. However, the
         // destination path is the _value_ and goes on the right side of the rename element (i.e.:
         // {$rename: {sourcePath: "destPath"}}), unlike all other modifiers, where the path to
         // synthesize is the field (on the left).
-        (*operatorOrientedUpdates)["$rename"].emplace_back(_val.fieldName(),
-                                                           BSON("" << currentPath->dottedField()));
+
+        (*operatorOrientedUpdates)["$rename"].emplace_back(
+            opts.serializeFieldPathFromString(_val.fieldName()),
+            BSON("" << opts.serializeFieldRef(*currentPath)));
     }
 
     void acceptVisitor(UpdateNodeVisitor* visitor) final {

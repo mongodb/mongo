@@ -90,8 +90,8 @@ private:
         MONGO_UNREACHABLE;
     }
 
-    BSONObj operatorValue() const final {
-        return BSON("" << _val);
+    BSONObj operatorValue(const SerializationOptions& opts) const final {
+        return BSON("" << opts.serializeLiteral(_val));
     }
 
     ArithmeticOp _op;

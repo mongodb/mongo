@@ -82,22 +82,30 @@ private:
         return "$bit";
     }
 
-    BSONObj operatorValue() const final {
+    BSONObj operatorValue(const SerializationOptions& opts) const final {
         BSONObjBuilder bob;
         {
             BSONObjBuilder subBuilder(bob.subobjStart(""));
             for (const auto& [bitOperator, operand] : _opList) {
-                operand.toBSON(
-                    [](SafeNum (SafeNum::*bitOperator)(const SafeNum&) const) {
-                        if (bitOperator == &SafeNum::bitAnd)
-                            return "and";
-                        if (bitOperator == &SafeNum::bitOr)
-                            return "or";
-                        if (bitOperator == &SafeNum::bitXor)
-                            return "xor";
-                        MONGO_UNREACHABLE;
-                    }(bitOperator),
-                    &subBuilder);
+                std::string operandName;
+                if (bitOperator == &SafeNum::bitAnd)
+                    operandName = "and";
+                else if (bitOperator == &SafeNum::bitOr)
+                    operandName = "or";
+                else if (bitOperator == &SafeNum::bitXor)
+                    operandName = "xor";
+                else
+                    MONGO_UNREACHABLE_TASSERT(11034400);
+
+                if (opts.isDefaultSerialization()) {
+                    operand.toBSON(operandName, &subBuilder);
+                } else {
+                    // Serialize dummy numeric value.
+                    // TODO SERVER-114855: Ideally, we should pass in SerializationOptions to the
+                    // SafeNum::toBSON(...) and handle serialization inside there. Unfortunately,
+                    // there is a circular dependency between both of those libraries.
+                    subBuilder << operandName << opts.serializeLiteral(1);
+                }
             }
         }
         return bob.obj();

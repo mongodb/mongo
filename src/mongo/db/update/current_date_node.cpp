@@ -65,6 +65,11 @@ Status CurrentDateNode::init(BSONElement modExpr,
                              const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
+    // TODO (SERVER-114765): Fix inconsistent behaviors with $currentDate type handling. Consider
+    // re-using the logic in matcher_type_set_parser to handle type checking here. Specifically,
+    // this would allow us to share the alias map used to map string types to BSONType values.
+    // Calling operatorValue should also return the numerical type code when serializing. This will
+    // align $currentDate serialization with other parts of the codebase that deal with BSON types.
     if (modExpr.type() == BSONType::boolean) {
         _typeIsDate = true;
     } else if (modExpr.type() == BSONType::object) {
@@ -72,10 +77,11 @@ Status CurrentDateNode::init(BSONElement modExpr,
         for (auto&& elem : modExpr.Obj()) {
             if (elem.fieldNameStringData() == kType) {
                 if (elem.type() == BSONType::string) {
-                    if (elem.valueStringData() == kDate) {
+                    StringData valueString = elem.valueStringData();
+                    if (valueString == kDate) {
                         _typeIsDate = true;
                         foundValidType = true;
-                    } else if (elem.valueStringData() == kTimestamp) {
+                    } else if (valueString == kTimestamp) {
                         _typeIsDate = false;
                         foundValidType = true;
                     }
@@ -116,7 +122,9 @@ void CurrentDateNode::setValueForNewElement(mutablebson::Element* element) const
     setValue(_service, element, _typeIsDate);
 }
 
-BSONObj CurrentDateNode::operatorValue() const {
+BSONObj CurrentDateNode::operatorValue(const SerializationOptions& opts) const {
+    // We do not need to do any special serialization here, because type is simply an enum with only
+    // two possible values.
     BSONObjBuilder bob;
     {
         BSONObjBuilder subBuilder(bob.subobjStart(""));

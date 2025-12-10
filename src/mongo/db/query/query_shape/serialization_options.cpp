@@ -515,6 +515,10 @@ std::string SerializationOptions::serializeFieldPathFromString(StringData path) 
     return std::string{path};
 }
 
+std::string SerializationOptions::serializeFieldRef(const FieldRef& fieldRef) const {
+    return serializeFieldPathFromString(fieldRef.dottedField());
+}
+
 bool SerializationOptions::isDefaultSerialization() const {
     return literalPolicy == LiteralSerializationPolicy::kUnchanged && !transformIdentifiers;
 }

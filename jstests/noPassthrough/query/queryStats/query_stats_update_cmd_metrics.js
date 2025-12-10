@@ -54,6 +54,49 @@ function testReplacementUpdateMetrics(coll) {
 }
 
 /**
+ * Test that a modifier update generates the expected query stats.
+ */
+function testModifierUpdateMetrics(coll) {
+    const testDB = coll.getDB();
+    const modifierUpdateCommandObj = {
+        update: collName,
+        updates: [
+            {
+                q: {}, // Should match all docs in collection.
+                u: {$set: {v: "newValue", documentUpdated: true, count: 42}},
+                multi: true,
+            },
+        ],
+        comment: "running modifier update!!",
+    };
+
+    assert.commandWorked(testDB.runCommand(modifierUpdateCommandObj));
+
+    const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: coll.getName()});
+    assert.eq(entry.key.queryShape.command, "update");
+
+    assertAggregatedMetricsSingleExec(entry, {
+        keysExamined: 0,
+        docsExamined: 8,
+        hasSortStage: false,
+        usedDisk: false,
+        fromMultiPlanner: false,
+        fromPlanCache: false,
+        writes: {nMatched: 8, nUpserted: 0, nModified: 8, nDeleted: 0, nInserted: 0},
+    });
+
+    assertExpectedResults({
+        results: entry,
+        expectedQueryStatsKey: entry.key,
+        expectedExecCount: 1,
+        expectedDocsReturnedSum: 0,
+        expectedDocsReturnedMax: 0,
+        expectedDocsReturnedMin: 0,
+        expectedDocsReturnedSumOfSq: 0,
+    });
+}
+
+/**
  * Test that a pipeline update generates the expected query stats.
  */
 function testPipelineUpdateMetrics(coll) {
@@ -150,6 +193,10 @@ withQueryStatsEnabled(collName, (coll) => {
 
     jsTest.log.info("Testing replacement update metrics");
     testReplacementUpdateMetrics(coll);
+    resetCollection(coll);
+
+    jsTest.log.info("Testing modifier update metrics");
+    testModifierUpdateMetrics(coll);
     resetCollection(coll);
 
     jsTest.log.info("Testing pipeline update metrics");

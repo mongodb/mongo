@@ -34,6 +34,7 @@
 #include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/update/log_builder_interface.h"
 #include "mongo/db/update/runtime_update_path.h"
 #include "mongo/db/update/update_executor.h"
@@ -123,7 +124,8 @@ public:
     virtual void produceSerializationMap(
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
-            operatorOrientedUpdates) const = 0;
+            operatorOrientedUpdates,
+        const SerializationOptions& opts = {}) const = 0;
 
     /**
      * Set the collation. This is a noop if the UpdateExecutor subclass does not require a collator.

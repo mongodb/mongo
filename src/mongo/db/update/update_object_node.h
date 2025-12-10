@@ -119,20 +119,21 @@ public:
      * Gather all update operators in the subtree rooted from this into a BSONObj in the format of
      * the update command's update parameter.
      */
-    BSONObj serialize() const;
+    BSONObj serialize(const SerializationOptions& opts) const;
 
     void produceSerializationMap(
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
-            operatorOrientedUpdates) const final {
+            operatorOrientedUpdates,
+        const SerializationOptions& opts) const final {
         for (const auto& [pathSuffix, child] : _children) {
             FieldRef::FieldRefTempAppend tempAppend(*currentPath, pathSuffix);
-            child->produceSerializationMap(currentPath, operatorOrientedUpdates);
+            child->produceSerializationMap(currentPath, operatorOrientedUpdates, opts);
         }
         // Object nodes have a positional child that must be accounted for.
         if (_positionalChild) {
             FieldRef::FieldRefTempAppend tempAppend(*currentPath, "$");
-            _positionalChild->produceSerializationMap(currentPath, operatorOrientedUpdates);
+            _positionalChild->produceSerializationMap(currentPath, operatorOrientedUpdates, opts);
         }
     }
 

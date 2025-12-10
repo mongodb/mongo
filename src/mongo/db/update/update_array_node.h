@@ -85,11 +85,12 @@ public:
     void produceSerializationMap(
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
-            operatorOrientedUpdates) const final {
+            operatorOrientedUpdates,
+        const SerializationOptions& opts) const final {
         for (const auto& [pathSuffix, child] : _children) {
             FieldRef::FieldRefTempAppend tempAppend(*currentPath,
                                                     toArrayFilterIdentifier(pathSuffix));
-            child->produceSerializationMap(currentPath, operatorOrientedUpdates);
+            child->produceSerializationMap(currentPath, operatorOrientedUpdates, opts);
         }
     }
 

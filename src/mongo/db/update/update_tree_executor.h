@@ -71,7 +71,10 @@ public:
      * format of the update command's update parameter.
      */
     Value serialize() const final {
-        return Value(_updateTree->serialize());
+        return serialize(SerializationOptions());
+    }
+    Value serialize(const SerializationOptions& opts) const {
+        return Value(_updateTree->serialize(opts));
     }
 
     void setCollator(const CollatorInterface* collator) final {

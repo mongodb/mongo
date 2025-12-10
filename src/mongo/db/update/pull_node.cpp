@@ -77,8 +77,8 @@ public:
     }
 
 private:
-    BSONObj value() const final {
-        return BSON("" << _matchExpr.inputBSON());
+    BSONObj value(const SerializationOptions& opts) const final {
+        return BSON("" << _matchExpr->serialize(opts));
     }
 
     CopyableMatchExpression _matchExpr;
@@ -114,8 +114,8 @@ public:
     }
 
 private:
-    BSONObj value() const final {
-        return _matchExpr.inputBSON();
+    BSONObj value(const SerializationOptions& opts) const final {
+        return _matchExpr->serialize(opts);
     }
 
     CopyableMatchExpression _matchExpr;
@@ -143,8 +143,8 @@ public:
     }
 
 private:
-    BSONObj value() const final {
-        return BSON("" << _modExpr);
+    BSONObj value(const SerializationOptions& opts) const final {
+        return BSON("" << opts.serializeLiteral(_modExpr));
     }
 
     BSONElement _modExpr;

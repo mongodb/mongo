@@ -1453,19 +1453,28 @@ void registerRequestForQueryStats(OperationContext* opCtx,
         return;
     }
 
-    // Skip unsupported update types.
-    // TODO(SERVER-110344) Support modifier updates.
-    if (parsedUpdate.getRequest()->getUpdateModification().type() !=
-            write_ops::UpdateModification::Type::kReplacement &&
-        parsedUpdate.getRequest()->getUpdateModification().type() !=
-            write_ops::UpdateModification::Type::kPipeline) {
-        return;
+    // Skip unsupported update types, such as delta and transform.
+    auto modType = parsedUpdate.getRequest()->getUpdateModification().type();
+    switch (modType) {
+        case write_ops::UpdateModification::Type::kReplacement:
+        case write_ops::UpdateModification::Type::kModifier:
+        case write_ops::UpdateModification::Type::kPipeline:
+            break;
+        default:
+            return;
+    }
+
+    // TODO (SERVER-113907): Implement query shape for update with array filters.
+    if (modType == write_ops::UpdateModification::Type::kModifier) {
+        // Skip modifier updates that contains array filters.
+        if (!parsedUpdate.getRequest()->getArrayFilters().empty()) {
+            return;
+        }
     }
 
     // TODO(SERVER-113688): Support recording query stats for pipeline updates containing
     // $_internalApplyOplogUpdate.
-    if (parsedUpdate.getRequest()->getUpdateModification().type() ==
-        write_ops::UpdateModification::Type::kPipeline) {
+    if (modType == write_ops::UpdateModification::Type::kPipeline) {
         if (parsedUpdate.getDriver()
                 ->getUpdateExecutor()
                 ->getCheckExistenceForDiffInsertOperations()) {

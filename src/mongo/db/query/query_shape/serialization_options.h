@@ -35,6 +35,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/explain_verbosity_gen.h"
@@ -127,6 +128,8 @@ struct SerializationOptions {
     }
 
     std::string serializeFieldPathFromString(StringData path) const;
+
+    std::string serializeFieldRef(const FieldRef& fieldRef) const;
 
     std::vector<std::string> serializeFieldPathFromString(
         const std::vector<std::string>& paths) const {

@@ -87,20 +87,17 @@ private:
         return "$addToSet";
     }
 
-    BSONObj operatorValue() const final {
-        if (_elements.size() == 1) {
-            return BSON("" << _elements[0]);
+    BSONObj operatorValue(const SerializationOptions& opts) const final {
+        if (!_useEachElem) {
+            tassert(11034401,
+                    "We should only be serializing one element max if $each is not specified.",
+                    _elements.size() == 1);
+            return BSON("" << opts.serializeLiteral(_elements[0]));
         } else {
-            BSONObjBuilder bob;
-            {
-                BSONObjBuilder subBuilder(bob.subobjStart(""));
-                {
-                    BSONObjBuilder eachBuilder(subBuilder.subarrayStart("$each"));
-                    for (const auto& element : _elements)
-                        eachBuilder << element;
-                }
-            }
-            return bob.obj();
+            BSONArrayBuilder valueArrayBuilder;
+            for (const auto& element : _elements)
+                valueArrayBuilder << element;
+            return BSON("" << BSON("$each" << opts.serializeLiteral(valueArrayBuilder.arr())));
         }
     }
 
@@ -109,6 +106,10 @@ private:
 
     // The collator used to compare array elements for deduplication.
     const CollatorInterface* _collator = nullptr;
+
+    // Specifies whether the $each operator was used. This is important for correct serialization to
+    // representative and debug query shapes.
+    bool _useEachElem = false;
 };
 
 }  // namespace mongo

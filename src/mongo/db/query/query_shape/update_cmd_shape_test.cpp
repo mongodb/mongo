@@ -87,6 +87,20 @@ public:
         return shapes.front();
     }
 
+    void validateShapeSize(const UpdateCmdShape& shape) {
+        auto updateComponents =
+            static_cast<const UpdateCmdShapeComponents&>(shape.specificComponents());
+
+        const auto letSize = updateComponents.let.size();
+        const auto cSize =
+            (updateComponents.representativeC) ? updateComponents.representativeC->objsize() : 0;
+
+        ASSERT_EQ(updateComponents.size(),
+                  sizeof(UpdateCmdShapeComponents) + updateComponents.representativeQ.objsize() +
+                      updateComponents._representativeUObj.objsize() + cSize + letSize -
+                      sizeof(LetShapeComponent));
+    }
+
     std::unique_ptr<QueryTestServiceContext> _queryTestServiceContext;
 
     ServiceContext::UniqueOperationContext _operationContext;
@@ -139,6 +153,108 @@ TEST_F(UpdateCmdShapeTest, BasicReplacementUpdateShape) {
         })",
         shape.toBson(_operationContext.get(),
                      SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, BasicModifierUpdateShape) {
+    // Note that $set and $setOnInsert uses the same SetNode implementation.
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ 
+            { 
+                q: { x: {$eq: 3} }, 
+                u: { 
+                    $set: {
+                        item: "ABC123",
+                        "info.publisher": "2222",
+                        tags: [ "software" ],
+                        "ratings.1": { by: "xyz", rating: 3 },
+                        emptyField: "",
+                        emptyObject: {}
+                    },
+                    $setOnInsert: { newInsert: true },
+                    $set: {},
+                    $setOnInsert: {}
+                }, 
+                multi: false, 
+                upsert: true 
+            } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { 
+                db: "testDB", 
+                coll: "testColl" 
+            }, 
+            command: "update", 
+            q: { 
+                x: { $eq: 1 } 
+            }, 
+            u: {
+                $set: { 
+                    emptyField: "?", 
+                    emptyObject: { "?": "?" }, 
+                    "info.publisher": "?", 
+                    item: "?", 
+                    "ratings.1": { "?": "?" }, 
+                    tags: [ "?" ] 
+                },
+                $setOnInsert: { newInsert: true } 
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { 
+                db: "testDB", 
+                coll: "testColl" 
+            }, 
+            command: "update", 
+            q: { x: { $eq: "?number" } }, 
+            u: {
+                $set: { 
+                    emptyField: "?string",
+                    emptyObject: "?object", 
+                    "info.publisher": "?string", 
+                    item: "?string", 
+                    "ratings.1": "?object", 
+                    tags: "?array<?string>" 
+                },
+                $setOnInsert: { newInsert: "?bool" }
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { 
+                db: "HASH<testDB>", 
+                coll: "HASH<testColl>" 
+            }, 
+            command: "update", 
+            q: { "HASH<x>": { $eq: "?number" } }, 
+            u: {
+                $set: { 
+                    "HASH<emptyField>": "?string",
+                    "HASH<emptyObject>": "?object", 
+                    "HASH<info>.HASH<publisher>": "?string", 
+                    "HASH<item>": "?string", 
+                    "HASH<ratings>.HASH<1>": "?object", 
+                    "HASH<tags>": "?array<?string>" 
+                },
+                $setOnInsert: { "HASH<newInsert>": "?bool" }
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -205,6 +321,685 @@ TEST_F(UpdateCmdShapeTest, BasicPipelineUpdateShape) {
         })",
         shape.toBson(_operationContext.get(),
                      SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, CurrentDateModifierUpdateShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ 
+            { 
+                q: { x: {$eq: 3} }, 
+                u: { 
+                    $currentDate: { lastModified: { $type: "timestamp" } },
+                    $currentDate: { firstModified: { $type: "date" } },
+                    $currentDate: { example: true },
+                    $currentDate: { exampleTimestamp: false },
+                    $currentDate: {}
+                }, 
+                multi: false, 
+                upsert: true 
+            } ],
+        "$db": "testDB"
+    })"_sd);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { 
+                db: "testDB", 
+                coll: "testColl" 
+            }, 
+            command: "update", 
+            q: { 
+                x: { $eq: 1 } 
+            }, 
+            u: {
+                $currentDate: { 
+                    example: { $type: "date" }, 
+                    exampleTimestamp: { $type: "date" }, 
+                    firstModified: { $type: "date" }, 
+                    lastModified: { $type: "timestamp" } 
+                }
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { 
+                db: "testDB", 
+                coll: "testColl" 
+            }, 
+            command: "update", 
+            q: { x: { $eq: "?number" } }, 
+            u: {
+                $currentDate: { 
+                    example: { $type: "date" }, 
+                    exampleTimestamp: { $type: "date" }, 
+                    firstModified: { $type: "date" }, 
+                    lastModified: { $type: "timestamp" } 
+                }
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+        cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
+        command: "update", 
+        q: { "HASH<x>": { $eq: "?number" } }, 
+        u: {
+            $currentDate: { 
+                "HASH<example>": { $type: "date" }, 
+                "HASH<exampleTimestamp>": { $type: "date" }, 
+                "HASH<firstModified>": { $type: "date" }, 
+                "HASH<lastModified>": { $type: "timestamp" } 
+            }
+        }, 
+        multi: false, 
+        upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+/**
+ * Test that arithmetic-related modifier update operators are tested properly.
+ * Note that both $inc and $mul both use ArithmeticNode.
+ */
+TEST_F(UpdateCmdShapeTest, ArithmeticModifierUpdateShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ 
+            { 
+                q: { x: {$eq: 3} }, 
+                u: { 
+                    $mul: { amount: 2 },
+                    $inc: { quantity: -2, "metrics.orders": 1 },
+                    $mul: {},
+                    $inc: {}  
+                },
+                multi: false, 
+                upsert: true 
+            } ],
+        "$db": "testDB"
+    })"_sd);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: { x: { $eq: 1 } }, 
+            u: { 
+                $inc: { "metrics.orders": 1, quantity: 1 }, 
+                $mul: { amount: 1 } 
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: { x: { $eq: "?number" } }, 
+            u: { 
+                $inc: { "metrics.orders": "?number", quantity: "?number" },
+                $mul: { amount: "?number" } 
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+        cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
+        command: "update", 
+        q: { "HASH<x>": { $eq: "?number" } }, 
+        u: { 
+            $inc: { "HASH<metrics>.HASH<orders>": "?number", "HASH<quantity>": "?number" },
+            $mul: { "HASH<amount>": "?number" } 
+        }, 
+        multi: false, 
+        upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+/**
+ * Test that compare-related modifier update operators are tested properly.
+ * $max and $mul both are instances of CompareNode.
+ */
+TEST_F(UpdateCmdShapeTest, CompareModifierUpdateShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ 
+            { 
+                q: { x: {$eq: 3} }, 
+                u: {
+                    $min: { minPrice: 5 },
+                    $max: { maxPrice: 500 },
+                    $min: {},
+                    $max: {}
+                },
+                multi: false, 
+                upsert: true 
+            } ],
+        "$db": "testDB"
+    })"_sd);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: { x: { $eq: 1 } }, 
+            u: {
+                $max: { maxPrice: 1 }, 
+                $min: { minPrice: 1 }
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: { x: { $eq: "?number" } }, 
+            u: {
+                $max: { maxPrice: "?number" }, 
+                $min: { minPrice: "?number" }
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+        cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
+        command: "update", 
+        q: { "HASH<x>": { $eq: "?number" } }, 
+        u: {
+            $max: { "HASH<maxPrice>": "?number" }, 
+            $min: { "HASH<minPrice>": "?number" }
+        }, 
+        multi: false, 
+        upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, AddToSetModifierUpdateShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [{ 
+                q: { x: {$eq: 3} }, 
+                u: {
+                    $addToSet: { testEmpty: { $each: [] } }, 
+                    $addToSet: { scores: { $each: [ 50, 60, 70 ] } }, 
+                    $addToSet: { scoresSingleAdd: 50 },
+                    $addToSet: {}
+                }, 
+                multi: false, 
+                upsert: true 
+            } ],
+        "$db": "testDB"
+    })"_sd);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { 
+                db: "testDB", 
+                coll: "testColl" 
+            }, 
+            command: "update", 
+            q: { 
+                x: { $eq: 1 } 
+            }, 
+            u: {
+                $addToSet: { 
+                    scores: { $each: [ 1 ] }, 
+                    scoresSingleAdd: 1, 
+                    testEmpty: { $each: [] }
+                }
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { 
+                db: "testDB", 
+                coll: "testColl" 
+            }, 
+            command: "update", 
+            q: { x: { $eq: "?number" } }, 
+            u: {
+                $addToSet: { 
+                    scores: { $each: "?array<?number>" }, 
+                    scoresSingleAdd: "?number", 
+                    testEmpty: { $each: "[]" } 
+                }
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+        cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
+        command: "update", 
+        q: { "HASH<x>": { $eq: "?number" } }, 
+        u: {
+            $addToSet: { 
+                "HASH<scores>": { $each: "?array<?number>" }, 
+                "HASH<scoresSingleAdd>": "?number", 
+                "HASH<testEmpty>": { $each: "[]" } 
+            }
+        }, 
+        multi: false, 
+        upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, PushModifierUpdateShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ 
+            { 
+                q: { x: {$eq: 3} }, 
+                u: {
+                    $push: { scoresSinglePush: 89 },
+                    $push: { tests: { $each: [ 40, 60 ], $sort: -1 } },
+                    $push: { testsEmpty: { $each: [ ], $sort: 1 } },
+                    $push: {
+                        scoresWithPostion: {
+                            $each: [ 50, 60, 70 ],
+                            $position: 0
+                        }
+                    },
+                    $push: {
+                        scoresToSlice: {
+                            $each: [ 80, 78, 86 ],
+                            $slice: -5
+                        }
+                    },
+                    $push: {
+                        quizzes: {
+                            $each: [ { id: 3, score: 8 }, { id: 4, score: 7 }, { id: 5, score: 6 } ],
+                            $sort: { score: 1, name: -1 }
+                        }
+                    },
+                    $push: {}
+                },
+                multi: false, 
+                upsert: true 
+            } ],
+        "$db": "testDB"
+    })"_sd);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: { x: { $eq: 1 } }, 
+            u: {
+                $push: { 
+                    quizzes: { $each: [ { "?": "?" } ], $sort: { score: 1, name: -1 } }, 
+                    scoresSinglePush: { $each: [ 1 ] }, 
+                    scoresToSlice: { $each: [ 1 ], $slice: 1 }, 
+                    scoresWithPostion: { $each: [ 1 ], $position: 1 }, 
+                    tests: { $each: [ 1 ], $sort: -1 }, 
+                    testsEmpty: { $each: [], $sort: 1 }
+                } 
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: { x: { $eq: "?number" } }, 
+            u: {
+                $push: { 
+                    quizzes: { $each: "?array<?object>", $sort: { score: 1, name: -1 } }, 
+                    scoresSinglePush: { $each: "?array<?number>" }, 
+                    scoresToSlice: { $each: "?array<?number>", $slice: "?number" }, 
+                    scoresWithPostion: { $each: "?array<?number>", $position: "?number" }, 
+                    tests: { $each: "?array<?number>", $sort: -1 } , 
+                    testsEmpty: { $each: "[]", $sort: 1 }
+                } 
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
+            command: "update", 
+            q: { "HASH<x>": { "$eq": "?number" } }, 
+            u: {
+                $push: { 
+                    "HASH<quizzes>": { $each: "?array<?object>", $sort: { "HASH<score>": 1, "HASH<name>": -1 } }, 
+                    "HASH<scoresSinglePush>": { $each: "?array<?number>" }, 
+                    "HASH<scoresToSlice>": { $each: "?array<?number>", $slice: "?number" }, 
+                    "HASH<scoresWithPostion>": { $each: "?array<?number>", $position: "?number" }, 
+                    "HASH<tests>": { $each: "?array<?number>", $sort: -1 } , 
+                    "HASH<testsEmpty>": { $each: "[]", $sort: 1 }
+                } 
+            }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, PullModifierUpdateShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ 
+            { 
+                q: { x: {$eq: 3} }, 
+                u: { 
+                    $pull: { instock: { $elemMatch: { qty: { $gt: 10, $lte: 20 } } } },
+                    $pull: { pulledObjects: { testField: 6 } },
+                    $pull: { arrayToPullFrom: 6 },
+                    $pull: { results: { answers: { $elemMatch: { q: 2, a: { $gte: 8 } } } } },
+                    $pull: { resultsWithoutPredicate: { q: 2, a: 8 } },
+                    $pull: { "where.to.begin" : { "$regex" : "^thestart", "$options" : "" } },
+                    $pull: {}
+                },
+                multi: false, 
+                upsert: true 
+            } ],
+        "$db": "testDB"
+    })"_sd);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+        cmdNs : {db : "testDB", coll : "testColl"},
+        command : "update",
+        q : {x : {$eq : 1}},
+        u : {
+            $pull : {
+                arrayToPullFrom : 1,
+                instock : {$elemMatch : {$and : [ {qty : {$gt : 1}}, {qty : {$lte : 1}} ]}},
+                pulledObjects : {testField : {$eq : 1}},
+                results : {answers : {$elemMatch : {$and : [ {q : {$eq : 1}}, {a : {$gte : 1}} ]}}},
+                resultsWithoutPredicate : {$and : [ {q : {$eq : 1}}, {a : {$eq : 1}} ]},
+                "where.to.begin": {"$regularExpression":{"pattern":"\\?","options":""}}
+            }
+        },
+        multi : false,
+        upsert : true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            cmdNs : {db : "testDB", coll : "testColl"},
+            command : "update",
+            q : {x : {$eq : "?number"}},
+            u : {
+                $pull : {
+                    arrayToPullFrom : "?number",
+                    instock : {
+                        $elemMatch :
+                            {$and : [ {qty : {$gt : "?number"}}, {qty : {$lte : "?number"}} ]}
+                    },
+                    pulledObjects : {testField : {$eq : "?number"}},
+                    results : {
+                        answers : {
+                            $elemMatch :
+                                {$and : [ {q : {$eq : "?number"}}, {a : {$gte : "?number"}} ]}
+                        }
+                    },
+                    resultsWithoutPredicate :
+                        {$and : [ {q : {$eq : "?number"}}, {a : {$eq : "?number"}} ]},
+                    "where.to.begin": {"$regularExpression":{"pattern":"?string","options":""}}
+                }
+            },
+            multi : false,
+            upsert : true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            cmdNs : {db : "HASH<testDB>", coll : "HASH<testColl>"},
+            command : "update",
+            q : {"HASH<x>" : {$eq : "?number"}},
+            u : {
+                $pull : {
+                    "HASH<arrayToPullFrom>" : "?number",
+                    "HASH<instock>" : {
+                        $elemMatch :
+                            {$and : [ {"HASH<qty>" : {$gt : "?number"}}, {"HASH<qty>" : {$lte : "?number"}} ]}
+                    },
+                    "HASH<pulledObjects>" : {"HASH<testField>" : {$eq : "?number"}},
+                    "HASH<results>" : {
+                        "HASH<answers>" : {
+                            $elemMatch :
+                                {$and : [ {"HASH<q>" : {$eq : "?number"}}, {"HASH<a>" : {$gte : "?number"}} ]}
+                        }
+                    },
+                    "HASH<resultsWithoutPredicate>" :
+                        {$and : [ {"HASH<q>" : {$eq : "?number"}}, {"HASH<a>" : {$eq : "?number"}} ]},
+                    "HASH<where>.HASH<to>.HASH<begin>": {"$regularExpression":{"pattern":"?string","options":""}}
+                }
+            },
+            multi : false,
+            upsert : true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, BitModifierUpdateShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [{  q: { x: {$eq: 3} },  u: { $bit: { expdata: { and: 10 } }, $bit: {} }, multi: false, upsert: true }],
+        "$db": "testDB"})"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: { x: { $eq: 1 } }, 
+            u: { $bit: { expdata: { and: 1 } } },
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: {x: {$eq: "?number"}},  
+            u: { $bit: { expdata: { and: "?number" } } },
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
+        command: "update", 
+        q: { "HASH<x>": { $eq: "?number" } },  
+        u: { $bit: { "HASH<expdata>": { and: "?number" } } },
+        multi: false, 
+        upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, UnsetModifierUpdateShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [{ q: { x: {$eq: 3} },  u: {$unset : {tagsToRemove: {"this.should" : "beignored"}}, $unset: {}}, multi: false, upsert: true }],
+        "$db": "testDB"})"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: { x: { $eq: 1 } }, 
+            u: {$unset : {tagsToRemove: 1}}, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: {x: {$eq: "?number"}},  
+            u: {$unset : {tagsToRemove: 1}}, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
+        command: "update", 
+        q: { "HASH<x>": { $eq: "?number" } },  
+        u: {$unset : {"HASH<tagsToRemove>": 1}}, 
+        multi: false, 
+        upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, RenameModifierUpdateShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [{ q: { x: {$eq: 3} },  u: {$rename : {oldName : "newName"}, $rename: {}}, multi: false, upsert: true }],
+        "$db": "testDB"})"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: { x: { $eq: 1 } }, 
+            u: {$rename : {oldName : "newName"}}, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: {x: {$eq: "?number"}},  
+            u: {$rename : {oldName : "newName"}}, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
+            command: "update", 
+            q: {"HASH<x>": {$eq: "?number"}},  
+            u: {$rename : {"HASH<oldName>" : "HASH<newName>"}}, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, PopModifierUpdateShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [{ q: { x: {$eq: 3} },  u: {$pop: {popFirstElement : -1}, $pop : {popLastElement : 1}, $pop: {}}, multi: false, upsert: true }],
+        "$db": "testDB"})"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: { x: { $eq: 1 } }, 
+            u: {$pop: {popFirstElement : -1, popLastElement : 1}}, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: {x: {$eq: "?number"}},  
+            u: {$pop: {popFirstElement : -1, popLastElement : 1}}, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
+        command: "update", 
+        q: { "HASH<x>": { $eq: "?number" } },  
+        u: {$pop: {"HASH<popFirstElement>": -1, "HASH<popLastElement>": 1}}, 
+        multi: false, 
+        upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, PullAllModifierUpdateShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [{ q: { x: {$eq: 3} },  u: {$pullAll: {colorsToRemove: [ "red", "blue" ]}, $pullAll: {colorsToRemoveEmpty: []}, $pullAll: {}}, multi: false, upsert: true }],
+        "$db": "testDB"})"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: { x: { $eq: 1 } }, 
+            u: { $pullAll: { colorsToRemove: [ "?" ], colorsToRemoveEmpty: [] } }, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: {x: {$eq: "?number"}},  
+            u: {$pullAll: {colorsToRemove: "?array<?string>", "colorsToRemoveEmpty": "[]"}}, 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
+        command: "update", 
+        q: { "HASH<x>": { $eq: "?number" } },  
+        u: {$pullAll: { "HASH<colorsToRemove>": "?array<?string>", "HASH<colorsToRemoveEmpty>": "[]" }}, 
+        multi: false, 
+        upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -800,6 +1595,65 @@ TEST_F(UpdateCmdShapeTest, BatchReplacementUpdateShape) {
                          SerializationContext::stateDefault()));
 }
 
+TEST_F(UpdateCmdShapeTest, BatchModifierUpdateShape) {
+    auto shapes = makeShapesFromUpdate(R"({
+        update: "testColl",
+        updates: [
+          { q: { x: {$eq: 3} }, u: { $unset: { foo: 1 }}, multi: false, upsert: false },
+          { q: { x: {$gt: 3}, y: "foo" }, u: {$set: { x: {y: 100}, z: false }}, multi: true, upsert: true }
+        ],
+        "$db": "testDB"
+    })"_sd);
+    ASSERT_EQ(shapes.size(), 2);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "x": {
+                    "$eq": "?number"
+                }
+            },
+            "u": {$unset: { foo: 1 }},
+            "multi": false,
+            "upsert": false
+        })",
+        shapes[0].toBson(_operationContext.get(),
+                         SerializationOptions::kDebugQueryShapeSerializeOptions,
+                         SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "$and": [
+                    {
+                        "x": {
+                            "$gt": "?number"
+                        }
+                    },
+                    {
+                        "y": {
+                            "$eq": "?string"
+                        }
+                    }
+                ]
+            },
+            "u": {$set: { x: "?object", z: "?bool" }},
+            "multi": true,
+            "upsert": true
+        })",
+        shapes[1].toBson(_operationContext.get(),
+                         SerializationOptions::kDebugQueryShapeSerializeOptions,
+                         SerializationContext::stateDefault()));
+}
+
 TEST_F(UpdateCmdShapeTest, BatchPipelineUpdateShape) {
     auto shapes = makeShapesFromUpdate(R"({
         update: "testColl",
@@ -988,10 +1842,15 @@ TEST_F(UpdateCmdShapeTest, StableQueryShapeHashValue) {
     expectedHash = "F373308007DC7A9F0BC2A7D2BD1862E77EEE1D1EDE45C9618C20905A674A2815";
     verifyHash(expectedHash, updateCmd);
 
-    // TODO(SERVER-110344): When shapifying update modifiers is supported and
-    // 'representativeArrayFilters' is set, test hash stability when 'representativeArrayFilters' is
-}
+    // Changing update to a modifier style should change the hash.
+    updateCmd.c = boost::none;
+    updateCmd.u = fromjson(R"({ "$set": { "foo": "bar", "num": "mynum" }})"_sd);
+    expectedHash = "670D08BB8ECAC87CDEF7AB4B600E08F7F1418767858A4FAB23A7478DFDFEF83C";
+    verifyHash(expectedHash, updateCmd);
 
+    // TODO(SERVER-113907): When 'representativeArrayFilters' is supported, test hash stability when
+    // 'representativeArrayFilters' is added.
+}
 
 TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponents) {
     auto shape = makeOneShapeFromUpdate(R"({
@@ -999,18 +1858,19 @@ TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponents) {
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: false } ],
         "$db": "testDB"
     })"_sd);
-    auto updateComponents =
-        static_cast<const UpdateCmdShapeComponents&>(shape.specificComponents());
+    validateShapeSize(shape);
+}
 
-    // The sizes of any members of UpdateCmdShapeComponents are typically accounted for by
-    // sizeof(UpdateCmdShapeComponents). The important part of the test here is to ensure that
-    // any additional memory allocations are also included in the size() operation.
-    const auto letSize = updateComponents.let.size();
+TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponentsForModifierUpdate) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { q: { x: {$eq: 3} }, u: {$set: {foo: "bar" }}, multi: false, upsert: false } ],
+        "$db": "testDB"
+    })"_sd);
 
-    ASSERT_EQ(updateComponents.size(),
-              sizeof(UpdateCmdShapeComponents) + updateComponents.representativeQ.objsize() +
-                  updateComponents._representativeUObj.objsize() + letSize -
-                  sizeof(LetShapeComponent));
+    // TODO SERVER-113907: When 'representativeArrayFilters' is supported, add tests for validating
+    // shape size with arrayFilters.
+    validateShapeSize(shape);
 }
 
 TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponentsWithPipelineAndConstants) {
@@ -1028,15 +1888,8 @@ TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponentsWithPipelineAndConstant
 
     auto updateComponents =
         static_cast<const UpdateCmdShapeComponents&>(shape.specificComponents());
-
-    const auto letSize = updateComponents.let.size();
     ASSERT(updateComponents.representativeC);
-    const auto cSize = updateComponents.representativeC->objsize();
-
-    ASSERT_EQ(updateComponents.size(),
-              sizeof(UpdateCmdShapeComponents) + updateComponents.representativeQ.objsize() +
-                  updateComponents._representativeUObj.objsize() + cSize + letSize -
-                  sizeof(LetShapeComponent));
+    validateShapeSize(shape);
 }
 
 TEST_F(UpdateCmdShapeTest, EquivalentUpdateCmdShapeSizes) {

@@ -89,8 +89,10 @@ private:
         return "$pop";
     }
 
-    BSONObj operatorValue() const final {
-        return _popFromFront ? BSON("" << -1) : BSON("" << 1);
+    BSONObj operatorValue(const SerializationOptions& opts) const final {
+        // Since the only valid values for $pop are 1 and -1, this is more of an enum than an actual
+        // user data value. Thus, we can directly return the value here.
+        return BSON("" << (_popFromFront ? -1 : 1));
     }
 
     bool _popFromFront = true;

@@ -150,8 +150,7 @@ TEST(UpdateSerialization, AddToSetSerializesWithReducedVerbosity) {
     assertRoundTrip(R"({ "$addToSet" : { "stitch.lib" : "cool" } })");
     assertRoundTrip(R"({ "$addToSet" : { "stitch.lib" : { "$each" : [ "cool", "sweet" ] } } })");
     assertRoundTrip(R"({ "$addToSet" : { "stitch.lib" : { "$each" : [] } } })");
-    ASSERT_EQ(R"({ "$addToSet" : { "stitch.lib" : "cool" } })",
-              updateRoundTrip(R"({ "$addToSet" : { "stitch.lib" : { "$each" : [ "cool" ] } } })"));
+    assertRoundTrip(R"({ "$addToSet" : { "stitch.lib" : { "$each" : [ "cool" ] } } })");
 }
 
 TEST(UpdateSerialization, PopSerializesExactly) {
@@ -161,13 +160,17 @@ TEST(UpdateSerialization, PopSerializesExactly) {
 
 TEST(UpdateSerialization, PullUpdateLanguageSerializesExactlyFindLanguageChanges) {
     // This exercises PullNode::ObjectMatcher.
-    assertRoundTrip(
-        R"({ "$pull" : { "up" : { "push" : "down", "lucky numbers" : [ 1, 4, 7, 82 ] } } })");
+    assertRoundTrip(R"({ "$pull" : { "lucky numbers" : [ 1, 4, 7, 82 ] } })");
+    ASSERT_EQ(
+        R"({ "$pull" : { "up" : { "$and" : [ { "push" : { "$eq" : "down" } }, { "lucky numbers" : { "$eq" : [ 1, 4, 7, 82 ] } } ] } } })",
+        updateRoundTrip(
+            R"({ "$pull" : { "up" : { "push" : "down", "lucky numbers" : [ 1, 4, 7, 82 ] } } })"));
+
     // These exercise PullNode::WrappedObjectMatcher.
     assertRoundTrip(R"({ "$pull" : { "up.num" : { "$gt" : 12 } } })");
     assertRoundTrip(R"({ "$pull" : { "up.num" : { "$in" : [ 12, 13, 14 ] } } })");
     assertRoundTrip(R"({ "$pull" : { "foo" : { "bar" : { "$gt" : 3 } } } })");
-    ASSERT_EQ(R"({ "$pull" : { "where.to.begin" : { "$regex" : "^thestart", "$options" : "" } } })",
+    ASSERT_EQ(R"({ "$pull" : { "where.to.begin" : { "$regex" : "^thestart" } } })",
               updateRoundTrip(R"({ "$pull" : { "where.to.begin" : /^thestart/ } })"));
     // These exercise PullNode::EqualityMatcher.
     assertRoundTrip(R"({ "$pull" : { "up.num" : 12 } })");
@@ -226,12 +229,11 @@ TEST(UpdateSerialization, CompoundStatementsSerialize) {
                     R"("$rename" : { "name.first" : "name.fname" }, )"
                     R"("$set" : { "a.ba.ba.45.$" : [ null, false, NaN ] } })");
 
-    assertRoundTrip(
-        R"({ "$addToSet" : { "stitch.lib" : { "$each" : [ "cool", "sweet" ] } }, )"
-        R"("$pop" : { "p.0.p" : 1 }, )"
-        R"("$pull" : { "up" : { "push" : "down", "lucky numbers" : [ 1, 4, 7, 82 ] } }, )"
-        R"("$pullAll" : { "no stuff" : [] }, )"
-        R"("$set" : { "grades.$[].questions.$[]" : 2 } })");
+    assertRoundTrip(R"({ "$addToSet" : { "stitch.lib" : { "$each" : [ "cool", "sweet" ] } }, )"
+                    R"("$pop" : { "p.0.p" : 1 }, )"
+                    R"("$pull" : { "lucky numbers" : [ 1, 4, 7, 82 ] }, )"
+                    R"("$pullAll" : { "no stuff" : [] }, )"
+                    R"("$set" : { "grades.$[].questions.$[]" : 2 } })");
 
     assertRoundTrip(R"({ "$bit" : { "bitwise" : { "and" : 7 } }, )"
                     R"("$currentDate" : { "whattimeisit" : { "$type" : "timestamp" } }, )"

@@ -55,22 +55,17 @@ Value shapifyUpdateOp(const ParsedUpdate& parsedUpdate,
                       const SerializationOptions& opts =
                           SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
     const auto modType = parsedUpdate.getRequest()->getUpdateModification().type();
-
-    tassert(11034201,
-            "Unsupported type of update modification",
-            modType == write_ops::UpdateModification::Type::kReplacement ||
-                modType == write_ops::UpdateModification::Type::kPipeline);
-
-    if (modType == write_ops::UpdateModification::Type::kReplacement) {
-        return opts.serializeLiteral(
-            parsedUpdate.getRequest()->getUpdateModification().getUpdateReplacement());
-    } else if (modType == write_ops::UpdateModification::Type::kPipeline) {
-        // Retrieve pipeline from the update driver to avoid re-parsing. We use the
-        // PipelineExecutor's serialize because it filters out the queue stage that was not
-        // originally part of the user's pipeline.
-        const auto* executor = parsedUpdate.getDriver()->getUpdateExecutor();
-        const auto* pipelineExecutor = static_cast<const PipelineExecutor*>(executor);
-        return Value(pipelineExecutor->serialize(opts));
+    const auto* executor = parsedUpdate.getDriver()->getUpdateExecutor();
+    switch (modType) {
+        case write_ops::UpdateModification::Type::kReplacement:
+            return opts.serializeLiteral(
+                parsedUpdate.getRequest()->getUpdateModification().getUpdateReplacement());
+        case write_ops::UpdateModification::Type::kPipeline:
+            return Value(static_cast<const PipelineExecutor*>(executor)->serialize(opts));
+        case write_ops::UpdateModification::Type::kModifier:
+            return Value(static_cast<const UpdateTreeExecutor*>(executor)->serialize(opts));
+        default:
+            MONGO_UNREACHABLE_TASSERT(11034402);
     }
     return {};
 }
@@ -109,7 +104,7 @@ UpdateCmdShapeComponents::UpdateCmdShapeComponents(const ParsedUpdate& parsedUpd
       multi(parsedUpdate.getRequest()->getMulti()),
       upsert(parsedUpdate.getRequest()->isUpsert()),
       let(let) {
-    // TODO(SERVER-110344): Support representativeArrayFilters when shapifying update modifiers.
+    // TODO(SERVER-113907): Support representativeArrayFilters when shapifying update modifiers.
 }
 
 void UpdateCmdShapeComponents::HashValue(absl::HashState state) const {
@@ -121,7 +116,7 @@ void UpdateCmdShapeComponents::HashValue(absl::HashState state) const {
         state = absl::HashState::combine(std::move(state), simpleHash(*representativeC));
     }
     if (representativeArrayFilters) {
-        // TODO(SERVER-110344): Revisit here when supporting representativeArrayFilters when
+        // TODO(SERVER-113907): Revisit here when supporting representativeArrayFilters when
         // shapifying update modifiers.
         for (const auto& filter : *representativeArrayFilters) {
             state = absl::HashState::combine(std::move(state), simpleHash(filter));
@@ -242,7 +237,7 @@ QueryShapeHash UpdateCmdShape::sha256Hash(OperationContext*, const Serialization
     updateCommandShapeBuffer.appendBuf(nssDataRange.data(), nssDataRange.length());
     updateCommandShapeBuffer.appendBuf(collation.objdata(), collation.objsize());
 
-    // TODO(SERVER-110344): Revisit here when supporting representativeArrayFilters when
+    // TODO(SERVER-113907): Revisit here when supporting representativeArrayFilters when
     // shapifying update modifiers.
     // TODO: Because representativeArrayFilters is variable-sized, updateCommandShapeBuffer could
     // potentially exceed the stack allocation and require heap allocation. Consider using a

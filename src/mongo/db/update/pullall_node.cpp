@@ -70,14 +70,11 @@ public:
     }
 
 private:
-    BSONObj value() const final {
-        BSONObjBuilder bob;
-        {
-            BSONArrayBuilder subarrayBuilder(bob.subarrayStart(""));
-            for (const auto& element : _elementsToMatch)
-                subarrayBuilder << element;
-        }
-        return bob.obj();
+    BSONObj value(const SerializationOptions& opts) const final {
+        BSONArrayBuilder subarrayBuilder;
+        for (const auto& element : _elementsToMatch)
+            subarrayBuilder << element;
+        return BSON("" << opts.serializeLiteral(subarrayBuilder.arr()));
     }
 
     std::vector<BSONElement> _elementsToMatch;

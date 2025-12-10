@@ -73,13 +73,13 @@ Status AddToSetNode::init(BSONElement modExpr,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
-    bool isEach = false;
+    _useEachElem = false;
 
     // If the value of 'modExpr' is an object whose first field is '$each', treat it as an $each.
     if (modExpr.type() == BSONType::object) {
         auto firstElement = modExpr.Obj().firstElement();
         if (firstElement && firstElement.fieldNameStringData() == "$each") {
-            isEach = true;
+            _useEachElem = true;
             if (firstElement.type() != BSONType::array) {
                 return Status(
                     ErrorCodes::TypeMismatch,
@@ -97,7 +97,7 @@ Status AddToSetNode::init(BSONElement modExpr,
     }
 
     // If the value of 'modExpr' was not an $each, we append the entire element.
-    if (!isEach) {
+    if (!_useEachElem) {
         _elements.push_back(modExpr);
     }
 

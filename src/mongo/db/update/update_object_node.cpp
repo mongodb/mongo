@@ -382,14 +382,16 @@ void UpdateObjectNode::setChild(std::string field, std::unique_ptr<UpdateNode> c
     }
 }
 
-BSONObj UpdateObjectNode::serialize() const {
+BSONObj UpdateObjectNode::serialize(
+    const SerializationOptions& opts = SerializationOptions{}) const {
+    // Map from operator name to list of (path, update) pairs.
     std::map<std::string, std::vector<std::pair<std::string, BSONObj>>> operatorOrientedUpdates;
 
     BSONObjBuilder bob;
 
     for (const auto& [pathPrefix, child] : _children) {
         auto path = FieldRef(pathPrefix);
-        child->produceSerializationMap(&path, &operatorOrientedUpdates);
+        child->produceSerializationMap(&path, &operatorOrientedUpdates, opts);
     }
 
     for (const auto& [op, updates] : operatorOrientedUpdates)

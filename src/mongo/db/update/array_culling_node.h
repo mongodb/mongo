@@ -81,16 +81,18 @@ protected:
         /**
          * Retrieve the value the matcher applies as a single-element BSONObj with an empty string
          * as the keyname. For example, for the input syntax: { $pull: { votes: { $gte: 6 } } },
-         * this function would return: { "": { $gte: 6 } } in BSON.
+         * this function would return: { "": { $gte: 6 } } in BSON, also depending on what
+         * serialization options are provided, i.e. { $gte: 1 } for representative or { $gte:
+         * "?number" } for debug query shape serialization.
          */
-        virtual BSONObj value() const = 0;
+        virtual BSONObj value(const SerializationOptions& opts) const = 0;
     };
 
     clonable_ptr<ElementMatcher> _matcher;
 
 private:
-    BSONObj operatorValue() const final {
-        return _matcher->value();
+    BSONObj operatorValue(const SerializationOptions& opts) const final {
+        return _matcher->value(opts);
     }
 };
 

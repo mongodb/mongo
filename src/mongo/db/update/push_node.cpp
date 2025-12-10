@@ -181,27 +181,48 @@ Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
     return Status::OK();
 }
 
-BSONObj PushNode::operatorValue() const {
+BSONObj PushNode::operatorValue(const SerializationOptions& opts) const {
     BSONObjBuilder bob;
     {
         BSONObjBuilder subBuilder(bob.subobjStart(""));
         {
             // This serialization function always produces $each regardless of whether the input
-            // contained it.
-            BSONObjBuilder eachBuilder(subBuilder.subarrayStart("$each"));
+            // contained the operator or not.
+            BSONArrayBuilder valueArrayBuilder;
             for (const auto& value : _valuesToPush)
-                eachBuilder << value;
+                valueArrayBuilder << value;
+            bob << "$each" << opts.serializeLiteral(valueArrayBuilder.arr());
         }
+
         if (_slice)
-            subBuilder << "$slice" << _slice.value();
+            subBuilder << "$slice" << opts.serializeLiteral(_slice.value());
         if (_position)
-            subBuilder << "$position" << _position.value();
+            subBuilder << "$position" << opts.serializeLiteral(_position.value());
         if (_sort) {
             // The sort pattern is stored in a dummy enclosing object that we must unwrap.
+            // Since sort value can only be -1 or 1, treat it as an enum and serialize it directly.
+            auto sortPattern = _sort->sortPattern;
             if (_sort->useWholeValue)
-                subBuilder << "$sort" << _sort->sortPattern.firstElement();
-            else
-                subBuilder << "$sort" << _sort->sortPattern;
+                subBuilder << "$sort" << sortPattern.firstElement();
+            else {
+                if (opts.isDefaultSerialization())
+                    subBuilder << "$sort" << sortPattern;
+                else {
+                    // Each field needs to be serialized for tokenization potentially.
+                    // TODO SERVER-114788: Ideally, this sort element, which is currently a
+                    // PatternElementCmp object, should re-use SortPattern instead, which is used
+                    // with agg stages. This would not only align capabilities (such as expression
+                    // comparison), but also allow for re-use of its serialize(...) method for
+                    // shapification use.
+                    BSONObjBuilder sortBuilder = subBuilder.subobjStart("$sort");
+                    BSONObjIterator i(sortPattern);
+                    while (i.more()) {
+                        BSONElement e = i.next();
+                        const auto name = e.fieldNameStringData();
+                        sortBuilder.append(opts.serializeFieldPath(name), e.number());
+                    }
+                }
+            }
         }
     }
     return bob.obj();
