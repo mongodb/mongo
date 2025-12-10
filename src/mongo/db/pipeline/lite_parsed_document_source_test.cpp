@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/stage_params.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/unittest/assert.h"
@@ -105,7 +106,7 @@ TEST_F(LiteParserRegistrationTest, GetParserWithoutFeatureFlag) {
     registration.setPrimaryParser(std::move(primaryParser));
 
     // When there's no feature flag, should return primary parser.
-    const auto& parserInfo = registration.getParser();
+    const auto& parserInfo = registration.getParserInfo();
     assertParserIsPrimary(parserInfo);
 }
 
@@ -117,7 +118,7 @@ TEST_F(LiteParserRegistrationTest, GetParserWithFeatureFlagEnabled) {
     registration.setPrimaryParser(std::move(primaryParser));
 
     // When feature flag is enabled, should return primary parser.
-    const auto& parserInfo = registration.getParser();
+    const auto& parserInfo = registration.getParserInfo();
     assertParserIsPrimary(parserInfo);
 }
 
@@ -129,7 +130,7 @@ TEST_F(LiteParserRegistrationTest, GetParserWithFeatureFlagDisabled) {
     registration.setPrimaryParser(std::move(primaryParser));
 
     // When feature flag is disabled, should return fallback parser.
-    const auto& parserInfo = registration.getParser();
+    const auto& parserInfo = registration.getParserInfo();
     assertParserIsFallback(parserInfo);
 }
 
@@ -141,15 +142,15 @@ TEST_F(LiteParserRegistrationTest, GetParserWithChangingFeatureFlag) {
     registration.setPrimaryParser(std::move(primaryParser));
 
     // When feature flag is disabled, should return fallback parser.
-    assertParserIsFallback(registration.getParser());
+    assertParserIsFallback(registration.getParserInfo());
 
     // Enable the feature flag and check that the primary parser is chosen.
     mockFlag.setForServerParameter(true);
-    assertParserIsPrimary(registration.getParser());
+    assertParserIsPrimary(registration.getParserInfo());
 
     // Disable it and check that the fallback parser is chosen.
     mockFlag.setForServerParameter(false);
-    assertParserIsFallback(registration.getParser());
+    assertParserIsFallback(registration.getParserInfo());
 }
 
 class LiteParsedDocumentSourceParseTest : public unittest::Test {
@@ -171,6 +172,10 @@ protected:
 
     void tearDown() override {
         LiteParsedDocumentSource::unregisterParser_forTest(_stageName);
+    }
+
+    const LiteParsedDocumentSource::LiteParserInfo& getParserInfo() {
+        return LiteParsedDocumentSource::getParserInfo_forTest(_stageName);
     }
 
     // Note that _stageName should be unique between every test and set at the beginning. This is
@@ -210,7 +215,7 @@ TEST_F(LiteParsedDocumentSourceParseTest, FirstFallbackParserTakesPrecedence) {
                                                      AllowedWithClientType::kAny);
 
     // Ensure that the parser info is the original fallback parser.
-    auto parserInfo = LiteParsedDocumentSource::getInfo(_stageName);
+    auto parserInfo = getParserInfo();
     ASSERT_EQ(parserInfo.allowedWithApiStrict, AllowedWithApiStrict::kNeverInVersion1);
     ASSERT_EQ(parserInfo.allowedWithClientType, AllowedWithClientType::kInternal);
 }
@@ -230,7 +235,7 @@ TEST_F(LiteParsedDocumentSourceParseTest, FirstFallbackParserTakesPrecedenceWith
                                                      AllowedWithClientType::kAny);
 
     // Ensure that the parser info is the original fallback parser.
-    auto parserInfo = LiteParsedDocumentSource::getInfo(_stageName);
+    auto parserInfo = getParserInfo();
     ASSERT_EQ(parserInfo.allowedWithApiStrict, AllowedWithApiStrict::kNeverInVersion1);
     ASSERT_EQ(parserInfo.allowedWithClientType, AllowedWithClientType::kInternal);
 }
