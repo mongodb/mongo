@@ -223,7 +223,7 @@ public:
 private:
     struct Empty {};
     MONGO_COMPILER_NO_UNIQUE_ADDRESS std::conditional_t<kDebugBuild, std::bitset<N>, Empty>
-        _hasField;
+        _hasField{};
 };
 
 void handleMissingRequiredFields(const auto& hasMembers,
