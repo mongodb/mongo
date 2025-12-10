@@ -40,13 +40,14 @@
 namespace mongo {
 
 using Parser = LiteParsedDocumentSource::Parser;
+using ParserMap = LiteParsedDocumentSource::ParserMap;
 
 namespace {
 
 // Empty vector used by LiteParsedDocumentSources which do not have a sub pipeline.
 inline static std::vector<LiteParsedPipeline> kNoSubPipeline = {};
 
-StringMap<LiteParsedDocumentSource::LiteParserRegistration> parserMap;
+ParserMap parserMap;
 
 }  // namespace
 
@@ -254,6 +255,10 @@ PrivilegeVector LiteParsedDocumentSourceNestedPipelines::requiredPrivilegesBasic
             &requiredPrivileges, pipeline.requiredPrivileges(isMongos, bypassDocumentValidation));
     }
     return requiredPrivileges;
+}
+
+const ParserMap& LiteParsedDocumentSource::getParserMap() {
+    return parserMap;
 }
 
 }  // namespace mongo

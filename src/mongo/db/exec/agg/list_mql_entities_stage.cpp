@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_list_mql_entities.h"
 #include "mongo/db/pipeline/document_source_list_mql_entities_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -59,14 +60,16 @@ REGISTER_AGG_STAGE_MAPPING(listMqlEntitiesStage,
 ListMqlEntitiesStage::ListMqlEntitiesStage(StringData stageName,
                                            const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                            MqlEntityTypeEnum type)
-    : ListMqlEntitiesStage(
-          stageName, pExpCtx, type, /* docSourceParserMap */ DocumentSource::getParserMap()) {}
+    : ListMqlEntitiesStage(stageName,
+                           pExpCtx,
+                           type,
+                           /* docSourceParserMap */ LiteParsedDocumentSource::getParserMap()) {}
 
 boost::intrusive_ptr<Stage> ListMqlEntitiesStage::create_forTest(
     StringData stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     MqlEntityTypeEnum type,
-    const StringMap<DocumentSource::ParserRegistration>& parserRegistrationMap) {
+    const LiteParsedDocumentSource::ParserMap& parserRegistrationMap) {
     return new ListMqlEntitiesStage(stageName, pExpCtx, type, parserRegistrationMap);
 }
 
@@ -74,7 +77,7 @@ ListMqlEntitiesStage::ListMqlEntitiesStage(
     StringData stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     MqlEntityTypeEnum type,
-    const StringMap<DocumentSource::ParserRegistration>& docSourceParserMap)
+    const LiteParsedDocumentSource::ParserMap& docSourceParserMap)
     : Stage(stageName, pExpCtx), _type(type) {
     for (auto&& [stageName, _] : docSourceParserMap) {
         _results.push_back(stageName);

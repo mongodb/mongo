@@ -53,17 +53,16 @@ public:
         StringData stageName,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         MqlEntityTypeEnum type,
-        const StringMap<DocumentSource::ParserRegistration>& parserRegistrationMap);
+        const LiteParsedDocumentSource::ParserMap& parserRegistrationMap);
 
 private:
     static constexpr auto kEntityTypeFieldName =
         DocumentSourceListMqlEntities::kEntityTypeFieldName;
 
-    ListMqlEntitiesStage(
-        StringData stageName,
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-        MqlEntityTypeEnum type,
-        const StringMap<DocumentSource::ParserRegistration>& parserRegistrationMap);
+    ListMqlEntitiesStage(StringData stageName,
+                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                         MqlEntityTypeEnum type,
+                         const LiteParsedDocumentSource::ParserMap& parserRegistrationMap);
 
     GetNextResult doGetNext() final;
 

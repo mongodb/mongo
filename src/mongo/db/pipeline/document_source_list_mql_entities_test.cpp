@@ -73,7 +73,7 @@ TEST_F(DocumentSourceListMqlEntitiesTest, ParserRejectsInvalid) {
 
 TEST_F(DocumentSourceListMqlEntitiesTest, AggStages) {
     // Verify that the order of result is sorted.
-    StringMap<DocumentSource::ParserRegistration> availableDocSources = {
+    LiteParsedDocumentSource::ParserMap availableDocSources = {
         {"docSource1", {}}, {"docSource3", {}}, {"docSource2", {}}};
     auto stage =
         exec::agg::ListMqlEntitiesStage::create_forTest(DocumentSourceListMqlEntities::kStageName,

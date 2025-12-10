@@ -72,6 +72,10 @@ struct LiteParserOptions {
     bool allowGenericForeignDbLookup = false;
 };
 
+namespace exec::agg {
+class ListMqlEntitiesStage;
+}  // namespace exec::agg
+
 /**
  * A lightly parsed version of a DocumentSource. It is not executable and not guaranteed to return a
  * parse error when encountering an invalid specification. Instead, the purpose of this class is to
@@ -134,6 +138,8 @@ public:
         // Whether or not the fallback parser has been registered or not.
         bool _fallbackIsSet = false;
     };
+
+    using ParserMap = StringMap<LiteParsedDocumentSource::LiteParserRegistration>;
 
     /**
      * Constructs a LiteParsedDocumentSource from the user-supplied BSON.
@@ -397,7 +403,17 @@ private:
      */
     friend class LiteParserRegistrationTest;
     friend class LiteParsedDocumentSourceParseTest;
+
+    // Give access to 'getParserMap()' for the implementation of $listMqlEntities but hiding
+    // it from all other stages.
+    friend class exec::agg::ListMqlEntitiesStage;
+
     static void unregisterParser_forTest(const std::string& name);
+
+    /**
+     * Returns the map of registered lite parsers.
+     */
+    static const ParserMap& getParserMap();
 
     std::string _parseTimeName;
 };
