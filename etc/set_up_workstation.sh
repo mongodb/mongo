@@ -127,7 +127,7 @@ setup_clang_config() {
     echo "################################################################################"
     echo "Installing clang config..."
 
-    bazel build compiledb
+    MONGO_WRAPPER_OUTPUT_ALL=1 bazel build compiledb
 
     echo "Finished installing clang config..."
 }

@@ -33,3 +33,6 @@ filters:
   - "/evergreen_yml_components/variants/release/release.yml":
     approvers:
       - 10gen/devprod-release-infrastructure
+  - "set_up_workstation.sh":
+    approvers:
+      - 10gen/devprod-build

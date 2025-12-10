@@ -385,6 +385,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /etc/system_perf.yml @10gen/performance @svc-auto-approve-bot
 /etc/evergreen_yml_components/tasks/release_tasks.yml @10gen/devprod-release-infrastructure @svc-auto-approve-bot
 /etc/evergreen_yml_components/variants/release/release.yml @10gen/devprod-release-infrastructure @svc-auto-approve-bot
+/etc/set_up_workstation.sh @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./etc/evergreen_yml_components/tasks/resmoke/non_server_teams/OWNERS.yml
 /etc/evergreen_yml_components/tasks/resmoke/non_server_teams/ @10gen/devprod-correctness @svc-auto-approve-bot
