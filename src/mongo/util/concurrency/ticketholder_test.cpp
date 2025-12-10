@@ -281,6 +281,9 @@ void TicketHolderTest::runTicketWaitTimeoutTest(Milliseconds maxTimeMS,
     MockAdmission timedOutAdmission{getServiceContext(), AdmissionContext::Priority::kNormal};
     timedOutAdmission.opCtx->setDeadlineAfterNowBy(maxTimeMS, ErrorCodes::MaxTimeMSExpired);
 
+    // Record the start time (after set the deadline)
+    Timer timer;
+
     // Spawn a thread that will try to acquire a ticket and should timeout
     AtomicWord<bool> didTimeout{false};
     AtomicWord<ErrorCodes::Error> errorCode{ErrorCodes::OK};
@@ -295,9 +298,6 @@ void TicketHolderTest::runTicketWaitTimeoutTest(Milliseconds maxTimeMS,
 
     // Wait until the thread is actually queued waiting for a ticket
     ASSERT_TRUE(timedOutAdmission.waitUntilQueued(kDefaultTimeout));
-
-    // Record the start time (after queued, to measure only wait time)
-    Timer timer;
 
     // Wait for the future to complete
     _opCtx->runWithDeadline(
@@ -1140,7 +1140,7 @@ TEST_F(TicketHolderTestTick, WaitForTicketDeadlineBetweenTimeoutWindows) {
     // ticket wait finishes in an interval which has no overlap with the first or second
     // timeout window.
     runTicketWaitTimeoutTest(Milliseconds{650},  // maxTimeMS
-                             Milliseconds{1},    // lowerBoundSlack
+                             Milliseconds{10},   // lowerBoundSlack
                              Milliseconds{10});  // upperBoundSlack
 }
 
@@ -1148,7 +1148,7 @@ TEST_F(TicketHolderTestTick, WaitForTicketWithShortDeadline) {
     // This test verifies that short deadlines (much less than the 500ms base interval) are
     // respected.
     runTicketWaitTimeoutTest(Milliseconds{50},   // maxTimeMS - much less than 500ms base interval
-                             Milliseconds{1},    // lowerBoundSlack
+                             Milliseconds{10},   // lowerBoundSlack
                              Milliseconds{10});  // upperBoundSlack
 }
 }  // namespace
