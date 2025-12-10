@@ -86,6 +86,9 @@ public:
 
     int64_t getInternalQuerySpillingMinAvailableDiskSpaceBytes() const;
 
+    bool getMeasureQueryExecutionTimeInNanoseconds() const;
+    bool getUseMultiplannerForSingleSolutions() const;
+
 private:
     QueryFrameworkControlEnum _queryFrameworkControlValue;
     QueryPlanRankerModeEnum _planRankerMode;
@@ -102,6 +105,8 @@ private:
     bool _sbeDisableGroupPushdownValue;
     bool _sbeDisableLookupPushdownValue;
     bool _sbeDisableTimeSeriesValue;
+    bool _measureQueryExecutionTimeInNanoseconds;
+    bool _useMultiplannerForSingleSolutions;
 
     // Join-ordering values.
     bool _isJoinOrderingEnabled;

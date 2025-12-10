@@ -210,8 +210,8 @@ std::unique_ptr<Pipeline> Pipeline::parseCommon(
     // memory.
     uassert(7749501,
             str::stream() << "Pipeline length must be no longer than "
-                          << internalPipelineLengthLimit << " stages.",
-            static_cast<int>(rawPipeline.size()) <= internalPipelineLengthLimit);
+                          << internalPipelineLengthLimit.load() << " stages.",
+            static_cast<int>(rawPipeline.size()) <= internalPipelineLengthLimit.load());
 
     DocumentSourceContainer stages;
     for (auto&& stageElem : rawPipeline) {
@@ -297,8 +297,8 @@ std::unique_ptr<Pipeline> Pipeline::create(DocumentSourceContainer stages,
 void Pipeline::validateCommon(bool alreadyOptimized) const {
     uassert(5054701,
             str::stream() << "Pipeline length must be no longer than "
-                          << internalPipelineLengthLimit << " stages",
-            static_cast<int>(_sources.size()) <= internalPipelineLengthLimit);
+                          << internalPipelineLengthLimit.load() << " stages",
+            static_cast<int>(_sources.size()) <= internalPipelineLengthLimit.load());
 
     // Keep track of stages which can only appear once.
     std::set<StringData> singleUseStages;

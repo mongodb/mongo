@@ -624,13 +624,13 @@ std::vector<RemoteCursor> establishCursorsOnAllHosts(
     newCmd.append("$readPreference", BSON("mode" << "nearest"));
 
     executor::AsyncMulticaster::Options options;
-    options.maxConcurrency = internalQueryAggMulticastMaxConcurrency;
+    options.maxConcurrency = internalQueryAggMulticastMaxConcurrency.loadRelaxed();
     auto results = executor::AsyncMulticaster(executor, options)
                        .multicast(servers,
                                   nss.dbName(),
                                   newCmd.obj(),
                                   opCtx,
-                                  Milliseconds(internalQueryAggMulticastTimeoutMS));
+                                  Milliseconds(internalQueryAggMulticastTimeoutMS.loadRelaxed()));
 
     if (routingCtx.hasNss(nss)) {
         routingCtx.onRequestSentForNss(nss);

@@ -469,7 +469,9 @@ public:
         // Force multiplanning (and therefore caching) if forcePlanCache is set. We could
         // manually update the plan cache instead without multiplanning but this is simpler.
         if (1 == solutions.size() && !_cq->getExpCtxRaw()->getForcePlanCache() &&
-            !internalQueryPlannerUseMultiplannerForSingleSolutions) {
+            !_cq->getExpCtxRaw()
+                 ->getQueryKnobConfiguration()
+                 .getUseMultiplannerForSingleSolutions()) {
             // Only one possible plan. Build the stages from the solution.
             solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
             return buildSingleSolutionPlan(std::move(solutions[0]),
@@ -806,7 +808,9 @@ protected:
 
         if (solutions.size() > 1 ||
             // Search queries are not supported in classic multi-planner.
-            (internalQueryPlannerUseMultiplannerForSingleSolutions &&
+            (this->_cq->getExpCtxRaw()
+                 ->getQueryKnobConfiguration()
+                 .getUseMultiplannerForSingleSolutions() &&
              !this->_cq->isSearchQuery())) {
             auto result = this->releaseResult();
             result->runtimePlanner = std::make_unique<crp_sbe::MultiPlanner>(

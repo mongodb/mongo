@@ -252,7 +252,10 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     auto expCtx = cq.getExpCtxRaw();
     tassert(6142207, "No expression context", expCtx);
     if (expCtx->getExplain() || expCtx->getMayDbProfile()) {
-        root->markShouldCollectTimingInfo();
+        root->markShouldCollectTimingInfo(
+            expCtx->getQueryKnobConfiguration().getMeasureQueryExecutionTimeInNanoseconds()
+                ? QueryExecTimerPrecision::kNanos
+                : QueryExecTimerPrecision::kMillis);
     }
 
     // Register this plan to yield according to the configured policy.

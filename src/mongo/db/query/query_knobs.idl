@@ -379,9 +379,9 @@ server_parameters:
 
     internalPipelineLengthLimit:
         description: "The maximum length allowed for an an aggregation pipeline."
-        set_at: [startup]
+        set_at: [startup, runtime]
         cpp_varname: "internalPipelineLengthLimit"
-        cpp_vartype: int
+        cpp_vartype: AtomicWord<int>
         default:
             expr: "defaultInternalPipelineLengthLimit()"
         validator:
@@ -504,9 +504,9 @@ server_parameters:
         description: >-
             Forces planner to use multiplanning even if there is only one solution present.
             Used for testing to increase multiplanning and replanning test coverage.
-        set_at: startup
+        set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerUseMultiplannerForSingleSolutions"
-        cpp_vartype: bool
+        cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
 
@@ -1151,7 +1151,7 @@ server_parameters:
             If true, the explain results include 'executionTimeMicros' and
             'executionTimeNanos' fields to represent the execution time of each execution stage in
             microseconds and in nanoseconds
-        set_at: [startup]
+        set_at: [startup, runtime]
         cpp_varname: "internalMeasureQueryExecutionTimeInNanoseconds"
         cpp_vartype: AtomicWord<bool>
         default: false
@@ -1204,6 +1204,7 @@ server_parameters:
             If true, then ExclusionProjectionExecutor won't use fast path implementation. This
             is needed for the generational fuzzers that are sensitive to field order and other corner cases
             when switching from Document to BSONObj.
+        # This is a test-only knob and doesn't need to be set at runtime.
         set_at: [startup]
         cpp_varname: "internalQueryDisableExclusionProjectionFastPath"
         cpp_vartype: bool
@@ -1299,7 +1300,7 @@ server_parameters:
 
     internalQueryGlobalProfilingFilter:
         description: "Enables the setProfilingFilterGlobally command."
-        set_at: [startup]
+        set_at: [startup, runtime]
         cpp_varname: internalQueryGlobalProfilingFilter
         cpp_vartype: AtomicWord<bool>
         default: false
@@ -1333,8 +1334,8 @@ server_parameters:
 
     internalQueryAggMulticastTimeoutMS:
         description: "Timeout in MS for requests to shard servers when aggregations are sent to all shard servers"
-        set_at: [startup]
-        cpp_vartype: int
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
         cpp_varname: internalQueryAggMulticastTimeoutMS
         default: 60000
         validator:
@@ -1343,8 +1344,8 @@ server_parameters:
 
     internalQueryAggMulticastMaxConcurrency:
         description: "Max number of concurrent requests when aggregations are sent to all shard servers"
-        set_at: startup
-        cpp_vartype: int
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
         cpp_varname: internalQueryAggMulticastMaxConcurrency
         default: 100
         validator:

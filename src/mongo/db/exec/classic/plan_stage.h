@@ -366,7 +366,7 @@ public:
                 "Calling markShouldCollectTimingInfo after execution has started",
                 durationCount<Microseconds>(_commonStats.executionTime.executionTimeEstimate) == 0);
 
-        if (internalMeasureQueryExecutionTimeInNanoseconds.load()) {
+        if (_expCtx->getQueryKnobConfiguration().getMeasureQueryExecutionTimeInNanoseconds()) {
             _commonStats.executionTime.precision = QueryExecTimerPrecision::kNanos;
         } else {
             _commonStats.executionTime.precision = QueryExecTimerPrecision::kMillis;

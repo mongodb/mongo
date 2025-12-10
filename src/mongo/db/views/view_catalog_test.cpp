@@ -459,8 +459,8 @@ TEST_F(ViewCatalogFixture, CreateViewCycles) {
 }
 
 TEST_F(ViewCatalogFixture, CanSuccessfullyCreateViewWhosePipelineIsExactlyAtMaxSizeInBytes) {
-    internalPipelineLengthLimit = 100000;
-    ON_BLOCK_EXIT([] { internalPipelineLengthLimit = 1000; });
+    internalPipelineLengthLimit.store(100000);
+    ON_BLOCK_EXIT([] { internalPipelineLengthLimit.store(1000); });
 
     ASSERT_EQ(ViewGraph::kMaxViewPipelineSizeBytes % kOneKiBMatchStage.objsize(), 0);
 
@@ -481,8 +481,8 @@ TEST_F(ViewCatalogFixture, CanSuccessfullyCreateViewWhosePipelineIsExactlyAtMaxS
 }
 
 TEST_F(ViewCatalogFixture, CannotCreateViewWhosePipelineExceedsMaxSizeInBytes) {
-    internalPipelineLengthLimit = 100000;
-    ON_BLOCK_EXIT([] { internalPipelineLengthLimit = 1000; });
+    internalPipelineLengthLimit.store(100000);
+    ON_BLOCK_EXIT([] { internalPipelineLengthLimit.store(1000); });
 
     // Fill the builder to exactly the maximum size, then push it just over the limit by adding an
     // additional tiny match stage.
@@ -501,8 +501,8 @@ TEST_F(ViewCatalogFixture, CannotCreateViewWhosePipelineExceedsMaxSizeInBytes) {
 }
 
 TEST_F(ViewCatalogFixture, CannotCreateViewIfItsFullyResolvedPipelineWouldExceedMaxSizeInBytes) {
-    internalPipelineLengthLimit = 100000;
-    ON_BLOCK_EXIT([] { internalPipelineLengthLimit = 1000; });
+    internalPipelineLengthLimit.store(100000);
+    ON_BLOCK_EXIT([] { internalPipelineLengthLimit.store(1000); });
 
     BSONArrayBuilder builder1;
     BSONArrayBuilder builder2;

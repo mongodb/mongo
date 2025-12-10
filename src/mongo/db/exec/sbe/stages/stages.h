@@ -457,20 +457,16 @@ public:
      * Force this stage to collect timing info during its execution. Must not be called after
      * execution has started.
      */
-    void markShouldCollectTimingInfo() {
+    void markShouldCollectTimingInfo(QueryExecTimerPrecision precision) {
         tassert(11093508,
                 "Execution should not have started",
                 durationCount<Microseconds>(_commonStats.executionTime.executionTimeEstimate) == 0);
 
-        if (internalMeasureQueryExecutionTimeInNanoseconds.load()) {
-            _commonStats.executionTime.precision = QueryExecTimerPrecision::kNanos;
-        } else {
-            _commonStats.executionTime.precision = QueryExecTimerPrecision::kMillis;
-        }
+        _commonStats.executionTime.precision = precision;
 
         auto stage = static_cast<T*>(this);
         for (auto&& child : stage->_children) {
-            child->markShouldCollectTimingInfo();
+            child->markShouldCollectTimingInfo(precision);
         }
     }
 

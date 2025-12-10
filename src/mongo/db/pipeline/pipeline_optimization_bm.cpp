@@ -61,11 +61,11 @@ public:
     void SetUp(benchmark::State& state) override {
         QueryFCVEnvironmentForTest::setUp();
         // Keep the same default on debug builds.
-        internalPipelineLengthLimit = 1000;
+        internalPipelineLengthLimit.store(1000);
     };
 
     void TearDown(benchmark::State& state) override {
-        internalPipelineLengthLimit = defaultInternalPipelineLengthLimit();
+        internalPipelineLengthLimit.store(defaultInternalPipelineLengthLimit());
     }
 
     static std::vector<BSONObj> makePipeline(size_t numStages) {
