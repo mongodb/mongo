@@ -32,6 +32,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
 #include <iosfwd>
 #include <string>
@@ -41,7 +42,7 @@
 
 namespace mongo {
 
-enum class ChangeStreamType {
+enum class MONGO_MOD_PUBLIC ChangeStreamType {
     // Collection-level change stream: change stream is opened on a single collection.
     kCollection,
 
@@ -58,7 +59,7 @@ enum class ChangeStreamType {
 /**
  * Represents a change stream instance.
  */
-class ChangeStream {
+class MONGO_MOD_PUBLIC ChangeStream {
 public:
     ChangeStream(ChangeStreamReadMode mode,
                  ChangeStreamType type,

@@ -35,8 +35,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/repl/oplog_entry.h"
-
-#include <string>
+#include "mongo/util/modules.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -58,6 +57,7 @@ ResumeTokenData resolveResumeTokenFromSpec(const boost::intrusive_ptr<Expression
 /**
  * Creates endOfTransaction no-op oplog entry
  */
+MONGO_MOD_NEEDS_REPLACEMENT
 repl::MutableOplogEntry createEndOfTransactionOplogEntry(
     const LogicalSessionId& lsid,
     const TxnNumber& txnNumber,

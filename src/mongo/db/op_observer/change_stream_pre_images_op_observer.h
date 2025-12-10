@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -39,7 +40,7 @@ namespace mongo {
  *
  * Delegates config.system.preimages inserts to ChangeStreamPreImagesCollectionManager.
  */
-class ChangeStreamPreImagesOpObserver final : public OpObserverNoop {
+class MONGO_MOD_PUBLIC ChangeStreamPreImagesOpObserver final : public OpObserverNoop {
     ChangeStreamPreImagesOpObserver(const ChangeStreamPreImagesOpObserver&) = delete;
     ChangeStreamPreImagesOpObserver& operator=(const ChangeStreamPreImagesOpObserver&) = delete;
 

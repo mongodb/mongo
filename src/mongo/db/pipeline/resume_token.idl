@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/pipeline/resume_token.h"
+    mod_visibility: public
 
 imports:
     - "mongo/db/basic_types.idl"

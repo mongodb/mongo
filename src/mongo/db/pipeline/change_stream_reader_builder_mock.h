@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_reader_builder.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>

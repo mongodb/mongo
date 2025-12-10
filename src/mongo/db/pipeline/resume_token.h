@@ -35,6 +35,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
@@ -144,7 +145,7 @@ std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData);
  *
  *   As an optimization, the _typeBits field may be missing and should not affect token comparison.
  */
-class ResumeToken {
+class MONGO_MOD_PUBLIC ResumeToken {
 public:
     constexpr static StringData kDataFieldName = "_data"_sd;
     constexpr static StringData kTypeBitsFieldName = "_typeBits"_sd;

@@ -58,6 +58,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <list>
@@ -77,7 +78,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStream);
  * The $changeStream stage is an alias for a cursor on oplog followed by a $match stage and a
  * transform stage on mongod.
  */
-class DocumentSourceChangeStream final {
+class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceChangeStream final {
 public:
     class LiteParsed : public LiteParsedDocumentSource {
     public:

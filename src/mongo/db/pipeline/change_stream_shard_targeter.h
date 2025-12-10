@@ -34,6 +34,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/change_stream_reader_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 
@@ -44,7 +45,7 @@ namespace mongo {
 /**
  * Indicates if and how the change event fetching can proceed.
  */
-enum class ShardTargeterDecision {
+enum class MONGO_MOD_PUBLIC ShardTargeterDecision {
     // Fetching of change stream events can continue.
     kContinue,
 
@@ -52,7 +53,7 @@ enum class ShardTargeterDecision {
     kSwitchToV1,
 };
 
-inline StringData toString(ShardTargeterDecision decision) {
+MONGO_MOD_NEEDS_REPLACEMENT inline StringData toString(ShardTargeterDecision decision) {
     switch (decision) {
         case ShardTargeterDecision::kContinue:
             return "continue"_sd;
@@ -62,7 +63,7 @@ inline StringData toString(ShardTargeterDecision decision) {
     MONGO_UNREACHABLE_TASSERT(10657560);
 }
 
-class ChangeStreamShardTargeter {
+class MONGO_MOD_OPEN ChangeStreamShardTargeter {
 public:
     virtual ~ChangeStreamShardTargeter() = default;
 

@@ -166,6 +166,7 @@ public:
         return accessedFields;
     }
 
+    // TODO SERVER-112709: Split change stream document source tests into QO and QE parts
     MONGO_MOD_NEEDS_REPLACEMENT
     const ChangeStreamEventTransformation::SupportedEvents& getSupportedEvents_forTest() const {
         return _defaultEventBuilder->getSupportedEvents_forTest();

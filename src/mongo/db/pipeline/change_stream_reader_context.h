@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 
@@ -42,7 +43,7 @@ namespace mongo {
  * Provides resources for opening/closing of cursors on data shards and the config server, and
  * inquiring the current state of the change stream.
  */
-class ChangeStreamReaderContext {
+class MONGO_MOD_PUBLIC ChangeStreamReaderContext {
 public:
     virtual ~ChangeStreamReaderContext() = default;
 

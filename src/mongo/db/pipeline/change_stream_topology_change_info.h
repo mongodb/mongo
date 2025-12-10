@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -42,7 +43,7 @@ class BSONObjBuilder;
 /**
  * Contains a BSONObj the stores the topology change event in a sharded-cluster deployment.
  */
-class ChangeStreamTopologyChangeInfo final : public ErrorExtraInfo {
+class MONGO_MOD_NEEDS_REPLACEMENT ChangeStreamTopologyChangeInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::ChangeStreamTopologyChange;
 

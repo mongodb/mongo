@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -43,7 +44,7 @@ class BSONObjBuilder;
  * Contains information to augment the 'ChangeStreamInvalidated' error code. In particular, this
  * class holds the resume token of the "invalidate" event which gave rise to the exception.
  */
-class ChangeStreamInvalidationInfo final : public ErrorExtraInfo {
+class MONGO_MOD_NEEDS_REPLACEMENT ChangeStreamInvalidationInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::ChangeStreamInvalidated;
 

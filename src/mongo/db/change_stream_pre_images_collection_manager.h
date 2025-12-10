@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -49,7 +50,7 @@ namespace mongo {
  * Manages the lifecycle of the change stream pre-images collection(s). Also is responsible for
  * inserting the pre-images into the pre-images collection.
  */
-class ChangeStreamPreImagesCollectionManager {
+class MONGO_MOD_NEEDS_REPLACEMENT ChangeStreamPreImagesCollectionManager {
 public:
     struct PurgingJobStats {
         /**

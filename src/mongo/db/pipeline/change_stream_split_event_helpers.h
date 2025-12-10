@@ -31,13 +31,14 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <queue>
 #include <utility>
 
 namespace mongo {
-namespace change_stream_split_event {
+namespace MONGO_MOD_NEEDS_REPLACEMENT change_stream_split_event {
 
 constexpr auto kIdField = "_id"_sd;
 constexpr auto kSplitEventField = "splitEvent"_sd;
@@ -67,5 +68,5 @@ std::queue<Document> splitChangeEvent(const Document& event,
                                       size_t maxFragmentBsonSize,
                                       size_t skipFirstFragments = 0);
 
-}  // namespace change_stream_split_event
+}  // namespace MONGO_MOD_NEEDS_REPLACEMENT change_stream_split_event
 }  // namespace mongo

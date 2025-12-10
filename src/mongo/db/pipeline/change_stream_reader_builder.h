@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_shard_targeter.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>
@@ -40,7 +41,7 @@
 
 namespace mongo {
 
-class ChangeStreamReaderBuilder {
+class MONGO_MOD_OPEN ChangeStreamReaderBuilder {
 public:
     virtual ~ChangeStreamReaderBuilder() = default;
 

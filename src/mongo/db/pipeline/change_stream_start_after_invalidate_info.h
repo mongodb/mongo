@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -44,7 +45,8 @@ class BSONObjBuilder;
  * particular, this class captures the 'invalidate' event that contains the client-provided resume
  * token.
  */
-class ChangeStreamStartAfterInvalidateInfo final : public ErrorExtraInfo {
+class MONGO_MOD_NEEDS_REPLACEMENT ChangeStreamStartAfterInvalidateInfo final
+    : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::ChangeStreamStartAfterInvalidate;
 

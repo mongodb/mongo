@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/change_stream_reader_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 class ChangeStreamReaderContextMock : public ChangeStreamReaderContext {
