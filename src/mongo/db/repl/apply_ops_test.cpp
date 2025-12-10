@@ -58,6 +58,7 @@
 #include "mongo/logv2/log_severity.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_reply_builder.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -586,6 +587,82 @@ TEST_F(ApplyOpsTest, ApplyOpsCmdStaleConfigSetsShardingOperationFailedStatus) {
     const auto ossError =
         OperationShardingState::get(opCtx.get()).resetShardingOperationFailedStatus();
     ASSERT_EQ(ErrorCodes::StaleConfig, ossError->code());
+}
+
+TEST_F(ApplyOpsTest, ApplyOpsNoRidOnRridCollection) {
+    auto opCtx = cc().makeOperationContext();
+    auto mode = OplogApplication::Mode::kApplyOpsCmd;
+
+    // Create a collection on the admin database.
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("test.ApplyOpsNoRidOnRridCollection");
+    CollectionOptions options;
+    options.recordIdsReplicated = true;
+    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, options));
+
+    auto insertOp = BSON("op" << "i"
+                              << "ns" << nss.toString_forTest() << "o" << BSON("_id" << 1));
+
+    auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(insertOp));
+    BSONObjBuilder resultBuilder;
+    ASSERT_OK(applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
+}
+
+using ApplyOpsDeathTest = ApplyOpsTest;
+DEATH_TEST_F(ApplyOpsDeathTest, ApplyOpsRidOnNonRridCollection, "11454700") {
+    auto opCtx = cc().makeOperationContext();
+    auto mode = OplogApplication::Mode::kApplyOpsCmd;
+
+    // Create a collection on the admin database.
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("test.ApplyOpsRidOnNonRridCollection");
+    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, {}));
+
+    auto insertOp = BSON("op" << "i"
+                              << "ns" << nss.ns_forTest() << "o" << BSON("_id" << 1) << "rid" << 0);
+
+    auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(insertOp));
+    BSONObjBuilder resultBuilder;
+    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(
+        applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
+}
+
+DEATH_TEST_F(ApplyOpsDeathTest, SteadyStateNoRidOnRridCollection, "11454701") {
+    auto opCtx = cc().makeOperationContext();
+    auto mode = OplogApplication::Mode::kSecondary;
+
+    // Create a collection on the admin database.
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("test.SteadyStateNoRidOnRridCollection");
+    CollectionOptions options;
+    options.recordIdsReplicated = true;
+    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, options));
+
+    auto insertOp = BSON("op" << "i"
+                              << "ns" << nss.ns_forTest() << "o" << BSON("_id" << 1));
+
+    auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(insertOp));
+    BSONObjBuilder resultBuilder;
+    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(
+        applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
+}
+
+DEATH_TEST_F(ApplyOpsDeathTest, SteadyStateRidOnNonRridCollection, "11454701") {
+    auto opCtx = cc().makeOperationContext();
+    auto mode = OplogApplication::Mode::kSecondary;
+
+    // Create a collection on the admin database.
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("test.SteadyStateRidOnNonRridCollection");
+    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, {}));
+
+    auto insertOp = BSON("op" << "i"
+                              << "ns" << nss.ns_forTest() << "o" << BSON("_id" << 1) << "rid" << 0);
+
+    auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(insertOp));
+    BSONObjBuilder resultBuilder;
+    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(
+        applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
 }
 
 }  // namespace

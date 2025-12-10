@@ -1511,6 +1511,33 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
     const CollectionPtr& collection = collectionAcquisition.getCollectionPtr();
 
+    if (collection &&
+        (opType == OpTypeEnum::kInsert || opType == OpTypeEnum::kUpdate ||
+         opType == OpTypeEnum::kDelete)) {
+        auto rridErrMsg = fmt::format(
+            "Unexpected recordId value for collection with ns: '{}', uuid: '{}', "
+            "recordIdsReplicated: '{}' when applying oplog entry: '{}'",
+            collection->ns().toStringForErrorMsg(),
+            collection->uuid().toString(),
+            collection->areRecordIdsReplicated(),
+            redact(opOrGroupedInserts.toBSON()).toString());
+        if (mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
+            // Only disallow applying an operation with 'rid' field on a collection not using
+            // replicated record ids.
+            tassert(11454700,
+                    rridErrMsg,
+                    !op.getDurableReplOperation().getRecordId().has_value() ||
+                        collection->areRecordIdsReplicated());
+        } else {
+            // Check that the operation's 'rid' field is consistent with whether the collection is
+            // using replicated record ids.
+            tassert(11454701,
+                    rridErrMsg,
+                    op.getDurableReplOperation().getRecordId().has_value() ==
+                        collection->areRecordIdsReplicated());
+        }
+    }
+
     BSONObj o = op.getObject();
 
     // The feature compatibility version in the server configuration collection must not change
@@ -1598,9 +1625,29 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 // applyOps, this has the effect of preserving recordIds when applyOps is run,
                 // which is intentional.
                 for (size_t i = 0; i < insertObjs.size(); i++) {
-                    if (insertOps[i]->getDurableReplOperation().getRecordId()) {
-                        insertObjs[i].replicatedRecordId =
-                            *insertOps[i]->getDurableReplOperation().getRecordId();
+                    auto optRid = insertOps[i]->getDurableReplOperation().getRecordId();
+                    auto errMsg = fmt::format(
+                        "Unexpected recordId value for collection with ns: '{}', uuid: '{}', "
+                        "recordIdsReplicated: '{}' when applying oplog entry: '{}'",
+                        collection->ns().toStringForErrorMsg(),
+                        collection->uuid().toString(),
+                        collection->areRecordIdsReplicated(),
+                        redact(insertOps[i]->getDurableReplOperation().toBSON()).toString());
+                    if (mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
+                        // Only disallow applying an operation with 'rid' field on a collection not
+                        // using replicated record ids.
+                        tassert(11454702,
+                                errMsg,
+                                !optRid.has_value() || collection->areRecordIdsReplicated());
+                    } else {
+                        // Check that the operation's 'rid' field is consistent with whether the
+                        // collection is using replicated record ids.
+                        tassert(11454703,
+                                errMsg,
+                                optRid.has_value() == collection->areRecordIdsReplicated());
+                    }
+                    if (optRid) {
+                        insertObjs[i].replicatedRecordId = *optRid;
                     }
                 }
 

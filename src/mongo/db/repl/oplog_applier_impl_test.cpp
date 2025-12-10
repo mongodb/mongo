@@ -1229,6 +1229,80 @@ DEATH_TEST_F(OplogApplierImplTestDeathTest,
     oplogApplier.applyOplogBatch(_opCtx.get(), {}).getStatus().ignore();
 }
 
+DEATH_TEST_F(OplogApplierImplTestDeathTest, ApplyOpsRidOnNonRridCollectionGrouped, "11454702") {
+    auto nss = NamespaceString::createNamespaceString_forTest(
+        "test.ApplyOpsRidOnNonRridCollectionGrouped");
+    createCollection(_opCtx.get(), nss, {});
+
+    auto op1 = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 1), 1LL}, nss, BSON("_id" << 1));
+
+    MutableOplogEntry op2Mutable;
+    op2Mutable.setOpType(OpTypeEnum::kInsert);
+    op2Mutable.setNss(nss);
+    op2Mutable.setObject(BSON("_id" << 2));
+    op2Mutable.setObject2(BSON("_id" << 2));
+    op2Mutable.setOpTime({Timestamp(Seconds(1), 2), 1LL});
+    op2Mutable.setRecordId(RecordId(2));
+    op2Mutable.setWallClockTime(Date_t::now());
+    auto op2 = OplogEntry(op2Mutable.toBSON());
+
+    std::vector<ApplierOperation> ops = {ApplierOperation{&op1}, ApplierOperation{&op2}};
+    OplogEntryOrGroupedInserts groupedInserts(ops.begin(), ops.end());
+
+    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(_applyOplogEntryOrGroupedInsertsWrapper(
+        _opCtx.get(), groupedInserts, OplogApplication::Mode::kApplyOpsCmd));
+}
+
+DEATH_TEST_F(OplogApplierImplTestDeathTest, SteadyStateRidOnNonRridCollectionGrouped, "11454703") {
+    auto nss = NamespaceString::createNamespaceString_forTest(
+        "test.SteadyStateRidOnNonRridCollectionGrouped");
+    createCollection(_opCtx.get(), nss, {});
+
+    auto op1 = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 1), 1LL}, nss, BSON("_id" << 1));
+
+    MutableOplogEntry op2Mutable;
+    op2Mutable.setOpType(OpTypeEnum::kInsert);
+    op2Mutable.setNss(nss);
+    op2Mutable.setObject(BSON("_id" << 2));
+    op2Mutable.setObject2(BSON("_id" << 2));
+    op2Mutable.setOpTime({Timestamp(Seconds(1), 2), 1LL});
+    op2Mutable.setRecordId(RecordId(2));
+    op2Mutable.setWallClockTime(Date_t::now());
+    auto op2 = OplogEntry(op2Mutable.toBSON());
+
+    std::vector<ApplierOperation> ops = {ApplierOperation{&op1}, ApplierOperation{&op2}};
+    OplogEntryOrGroupedInserts groupedInserts(ops.begin(), ops.end());
+
+    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(_applyOplogEntryOrGroupedInsertsWrapper(
+        _opCtx.get(), groupedInserts, OplogApplication::Mode::kSecondary));
+}
+
+DEATH_TEST_F(OplogApplierImplTestDeathTest, SteadyStateNoRidOnRridCollectionGrouped, "11454703") {
+    auto nss = NamespaceString::createNamespaceString_forTest(
+        "test.SteadyStateNoRidOnRridCollectionGrouped");
+    CollectionOptions options;
+    options.recordIdsReplicated = true;
+    createCollection(_opCtx.get(), nss, options);
+
+    MutableOplogEntry op1Mutable;
+    op1Mutable.setOpType(OpTypeEnum::kInsert);
+    op1Mutable.setNss(nss);
+    op1Mutable.setObject(BSON("_id" << 1));
+    op1Mutable.setObject2(BSON("_id" << 1));
+    op1Mutable.setOpTime({Timestamp(Seconds(1), 1), 1LL});
+    op1Mutable.setRecordId(RecordId(1));
+    op1Mutable.setWallClockTime(Date_t::now());
+    auto op1 = OplogEntry(op1Mutable.toBSON());
+
+    auto op2 = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 2), 1LL}, nss, BSON("_id" << 2));
+
+    std::vector<ApplierOperation> ops = {ApplierOperation{&op1}, ApplierOperation{&op2}};
+    OplogEntryOrGroupedInserts groupedInserts(ops.begin(), ops.end());
+
+    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(_applyOplogEntryOrGroupedInsertsWrapper(
+        _opCtx.get(), groupedInserts, OplogApplication::Mode::kSecondary));
+}
+
 bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
                                           ReplicationCoordinator* const replCoord,
                                           ReplicationConsistencyMarkers* const consistencyMarkers,
