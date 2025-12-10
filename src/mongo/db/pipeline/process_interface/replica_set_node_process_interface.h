@@ -96,11 +96,11 @@ public:
 
     ~ReplicaSetNodeProcessInterface() override = default;
 
-    Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                  const NamespaceString& ns,
-                  std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
-                  const WriteConcernOptions& wc,
-                  boost::optional<OID> targetEpoch) final;
+    InsertResult insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        const NamespaceString& ns,
+                        std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+                        const WriteConcernOptions& wc,
+                        boost::optional<OID> targetEpoch) final;
 
     StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const NamespaceString& ns,
@@ -130,16 +130,24 @@ public:
                               const BSONObj& cmdObj,
                               const TimeseriesOptions& userOpts) override;
 
-    Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                            const NamespaceString& ns,
-                            std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
-                            const WriteConcernOptions& wc,
-                            boost::optional<OID> targetEpoch) override;
+    InsertResult insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  const NamespaceString& ns,
+                                  std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+                                  const WriteConcernOptions& wc,
+                                  boost::optional<OID> targetEpoch) override;
 
     UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx,
                                         const NamespaceString& nss) override;
 
 private:
+    /**
+     * Attemps to execute the specified command on the primary. Returns the command response without
+     * parsing the result. May return non-OK status in case of network issues.
+     */
+    StatusWith<BSONObj> _executeCommandOnPrimaryRaw(OperationContext* opCtx,
+                                                    const NamespaceString& ns,
+                                                    const BSONObj& cmdObj,
+                                                    bool attachWriteConcern = true) const;
     /**
      * Attemps to execute the specified command on the primary. Returns the command response upon
      * success or a non-OK status upon a failed command response, a writeConcernError, or any

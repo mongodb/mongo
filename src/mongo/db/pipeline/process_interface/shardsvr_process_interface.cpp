@@ -204,7 +204,7 @@ boost::optional<Document> ShardServerProcessInterface::lookupSingleDocument(
         expCtx, nss, std::move(collectionUUID), documentKey, std::move(opts));
 }
 
-Status ShardServerProcessInterface::insert(
+MongoProcessInterface::InsertResult ShardServerProcessInterface::insert(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
     std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
@@ -226,7 +226,20 @@ Status ShardServerProcessInterface::insert(
                    &response,
                    targetEpoch);
 
-    return response.toStatus();
+    InsertResult result;
+    if (!response.getOk()) {
+        result.push_back(response.getTopLevelStatus());
+    } else if (response.isErrDetailsSet()) {
+        result.reserve(response.getErrDetails().size());
+        for (const auto& error : response.getErrDetails()) {
+            result.push_back(error.getStatus());
+        }
+    } else if (response.isWriteConcernErrorSet()) {
+        result.push_back(response.getWriteConcernError()->toStatus());
+    } else {
+        result.push_back(Status::OK());
+    }
+    return result;
 }
 
 StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::update(
@@ -631,7 +644,7 @@ boost::optional<TimeseriesOptions> ShardServerProcessInterface::_getTimeseriesOp
                                          IDLParserContext("TimeseriesOptions"));
 }
 
-Status ShardServerProcessInterface::insertTimeseries(
+MongoProcessInterface::InsertResult ShardServerProcessInterface::insertTimeseries(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
     std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,

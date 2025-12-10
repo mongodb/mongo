@@ -197,7 +197,7 @@ boost::optional<Document> NonShardServerProcessInterface::lookupSingleDocument(
     return lookedUpDocument;
 }
 
-Status NonShardServerProcessInterface::insert(
+MongoProcessInterface::InsertResult NonShardServerProcessInterface::insert(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
     std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
@@ -206,37 +206,40 @@ Status NonShardServerProcessInterface::insert(
     auto writeResults =
         write_ops_exec::performInserts(expCtx->getOperationContext(), *insertCommand);
 
-    // Need to check each result in the batch since the writes are unordered.
-    for (const auto& result : writeResults.results) {
-        if (result.getStatus() != Status::OK()) {
-            return result.getStatus();
+    InsertResult results;
+    for (const auto& writeResult : writeResults.results) {
+        if (writeResult.getStatus() != Status::OK()) {
+            results.push_back(writeResult.getStatus());
         }
     }
-    return Status::OK();
+    if (results.empty()) {
+        results.push_back(Status::OK());
+    }
+    return results;
 }
 
-Status NonShardServerProcessInterface::insertTimeseries(
+MongoProcessInterface::InsertResult NonShardServerProcessInterface::insertTimeseries(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
     std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
     const WriteConcernOptions& wc,
     boost::optional<OID> targetEpoch) {
-    try {
-        auto [preConditions, _] =
-            timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
-                expCtx->getOperationContext(),
-                ns,
-                *insertCommand,
-                insertCommand->getCollectionUUID());
-        auto insertReply = timeseries::write_ops::performTimeseriesWrites(
-            expCtx->getOperationContext(), *insertCommand, preConditions);
+    InsertResult result;
+    auto [preConditions, _] = timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+        expCtx->getOperationContext(), ns, *insertCommand, insertCommand->getCollectionUUID());
+    auto insertReply = timeseries::write_ops::performTimeseriesWrites(
+        expCtx->getOperationContext(), *insertCommand, preConditions);
 
-        checkWriteErrors(insertReply.getWriteCommandReplyBase());
-    } catch (DBException& ex) {
-        ex.addContext(str::stream() << "time-series insert failed: " << ns.toStringForErrorMsg());
-        throw;
+    if (insertReply.getWriteErrors().has_value()) {
+        for (const auto& writeError : *insertReply.getWriteErrors()) {
+            result.push_back(writeError.getStatus());
+        }
+        uassert(10903400, "Write errors must not be empty", !result.empty());
+    } else {
+        result.push_back(Status::OK());
     }
-    return Status::OK();
+
+    return result;
 }
 
 StatusWith<MongoProcessInterface::UpdateResult> NonShardServerProcessInterface::update(

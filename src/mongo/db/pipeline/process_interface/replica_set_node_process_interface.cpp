@@ -87,7 +87,7 @@ void ReplicaSetNodeProcessInterface::setReplicaSetNodeExecutor(
     replicaSetNodeExecutor(service) = std::move(executor);
 }
 
-Status ReplicaSetNodeProcessInterface::insert(
+MongoProcessInterface::InsertResult ReplicaSetNodeProcessInterface::insert(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
     std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
@@ -101,7 +101,29 @@ Status ReplicaSetNodeProcessInterface::insert(
 
     BatchedCommandRequest batchInsertCommand(std::move(insertCommand));
 
-    return _executeCommandOnPrimary(opCtx, ns, batchInsertCommand.toBSON()).getStatus();
+    auto statusWithReply = _executeCommandOnPrimaryRaw(opCtx, ns, batchInsertCommand.toBSON());
+    if (!statusWithReply.isOK()) {
+        return {statusWithReply.getStatus()};
+    }
+
+    BatchedCommandResponse response;
+    std::string errMsg;
+    InsertResult result;
+    if (!response.parseBSON(statusWithReply.getValue(), &errMsg)) {
+        result.emplace_back(ErrorCodes::FailedToParse, errMsg);
+    } else if (!response.getOk()) {
+        result.push_back(response.getTopLevelStatus());
+    } else if (response.isErrDetailsSet()) {
+        result.reserve(response.getErrDetails().size());
+        for (const auto& error : response.getErrDetails()) {
+            result.push_back(error.getStatus());
+        }
+    } else if (response.isWriteConcernErrorSet()) {
+        result.push_back(response.getWriteConcernError()->toStatus());
+    } else {
+        result.push_back(Status::OK());
+    }
+    return result;
 }
 
 StatusWith<MongoProcessInterface::UpdateResult> ReplicaSetNodeProcessInterface::update(
@@ -158,7 +180,7 @@ void ReplicaSetNodeProcessInterface::createTimeseriesView(OperationContext* opCt
     }
 }
 
-Status ReplicaSetNodeProcessInterface::insertTimeseries(
+MongoProcessInterface::InsertResult ReplicaSetNodeProcessInterface::insertTimeseries(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
     std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
@@ -235,7 +257,7 @@ UUID ReplicaSetNodeProcessInterface::fetchCollectionUUIDFromPrimary(OperationCon
     return uassertStatusOK(UUID::parse(uuid));
 }
 
-StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
+StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimaryRaw(
     OperationContext* opCtx,
     const NamespaceString& ns,
     const BSONObj& cmdObj,
@@ -284,23 +306,36 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
     if (!rcr.response.status.isOK()) {
         return rcr.response.status;
     }
+    return std::move(rcr.response.data);
+}
 
-    auto commandStatus = getStatusFromCommandResult(rcr.response.data);
+StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const BSONObj& cmdObj,
+    bool attachWriteConcern) const {
+    auto statusWithData = _executeCommandOnPrimaryRaw(opCtx, ns, cmdObj, attachWriteConcern);
+    if (!statusWithData.isOK()) {
+        return statusWithData.getStatus();
+    }
+    auto data = statusWithData.getValue();
+
+    auto commandStatus = getStatusFromCommandResult(data);
     if (!commandStatus.isOK()) {
         return commandStatus;
     }
 
-    auto writeConcernStatus = getWriteConcernStatusFromCommandResult(rcr.response.data);
+    auto writeConcernStatus = getWriteConcernStatusFromCommandResult(data);
     if (!writeConcernStatus.isOK()) {
         return writeConcernStatus;
     }
 
-    auto writeStatus = getFirstWriteErrorStatusFromCommandResult(rcr.response.data);
+    auto writeStatus = getFirstWriteErrorStatusFromCommandResult(data);
     if (!writeStatus.isOK()) {
         return writeStatus;
     }
 
-    return rcr.response.data;
+    return data;
 }
 
 void ReplicaSetNodeProcessInterface::_attachGenericCommandArgs(OperationContext* opCtx,

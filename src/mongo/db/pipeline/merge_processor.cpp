@@ -163,8 +163,10 @@ MergeStrategy makeInsertStrategy() {
         });
         auto insertCommand = bcr.extractInsertRequest();
         insertCommand->setDocuments(std::move(objectsToInsert));
-        uassertStatusOK(expCtx->getMongoProcessInterface()->insert(
-            expCtx, ns, std::move(insertCommand), wc, epoch));
+        for (const auto& insertStatus : expCtx->getMongoProcessInterface()->insert(
+                 expCtx, ns, std::move(insertCommand), wc, epoch)) {
+            uassertStatusOK(insertStatus);
+        }
     };
 }
 

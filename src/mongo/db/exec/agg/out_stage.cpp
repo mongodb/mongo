@@ -289,8 +289,10 @@ void OutStage::flush(BatchedCommandRequest bcr, BatchedObjects batch) {
     auto targetEpoch = boost::none;
 
     if (_timeseries) {
-        uassertStatusOK(pExpCtx->getMongoProcessInterface()->insertTimeseries(
-            pExpCtx, _tempNs, std::move(insertCommand), _writeConcern, targetEpoch));
+        for (const auto& insertStatus : pExpCtx->getMongoProcessInterface()->insertTimeseries(
+                 pExpCtx, _tempNs, std::move(insertCommand), _writeConcern, targetEpoch)) {
+            uassertStatusOK(insertStatus);
+        }
     } else {
         // Use the UUID to catch a mismatch if the temp collection was dropped and recreated.
         // Timeseries will detect this as inserts don't implicitly
@@ -301,8 +303,10 @@ void OutStage::flush(BatchedCommandRequest bcr, BatchedObjects batch) {
             insertCommand->getWriteCommandRequestBase().setCollectionUUID(_tempNsUUID);
         }
         try {
-            uassertStatusOK(pExpCtx->getMongoProcessInterface()->insert(
-                pExpCtx, _tempNs, std::move(insertCommand), _writeConcern, targetEpoch));
+            for (const auto& insertStatus : pExpCtx->getMongoProcessInterface()->insert(
+                     pExpCtx, _tempNs, std::move(insertCommand), _writeConcern, targetEpoch)) {
+                uassertStatusOK(insertStatus);
+            }
 
         } catch (ExceptionFor<ErrorCodes::CollectionUUIDMismatch>& ex) {
             ex.addContext(

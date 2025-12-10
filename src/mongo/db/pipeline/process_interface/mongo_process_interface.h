@@ -239,21 +239,26 @@ public:
     virtual void updateClientOperationTime(OperationContext* opCtx) const = 0;
 
     /**
-     * Executes 'insertCommand' against 'ns' and returns an error Status if the insert fails. If
-     * 'targetEpoch' is set, throws ErrorCodes::StaleEpoch if the targeted collection does not have
-     * the same epoch or the epoch changes during the course of the insert.
+     * Executes 'insertCommand' against 'ns'. Returns a vector of statuses. Will contain at least
+     * one error status if insert failed to not swallow any errors. If 'targetEpoch' is set, throws
+     * ErrorCodes::StaleEpoch if the targeted collection does not have the same epoch or the epoch
+     * changes during the course of the insert.
      */
-    virtual Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          const NamespaceString& ns,
-                          std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
-                          const WriteConcernOptions& wc,
-                          boost::optional<OID> targetEpoch) = 0;
+    using InsertResult = absl::InlinedVector<Status, 4>;
 
-    virtual Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                    const NamespaceString& ns,
-                                    std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
-                                    const WriteConcernOptions& wc,
-                                    boost::optional<OID> targetEpoch) = 0;
+    virtual InsertResult insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                const NamespaceString& ns,
+                                std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+                                const WriteConcernOptions& wc,
+                                boost::optional<OID> targetEpoch) = 0;
+
+    virtual InsertResult insertTimeseries(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& ns,
+        std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+        const WriteConcernOptions& wc,
+        boost::optional<OID> targetEpoch) = 0;
+
     /**
      * Executes the updates described by 'updateCommand'. Returns an error Status if any of the
      * updates fail, otherwise returns an 'UpdateResult' objects with the details of the update
