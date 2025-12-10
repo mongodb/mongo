@@ -88,6 +88,18 @@ TEST(ResourceIdTest, Masking) {
     }
 }
 
+TEST(ResourceIdTest, SaltingWorks) {
+    const std::string collAName = "db1.collA";
+
+    const uint64_t salt1 = 0;
+    const uint64_t salt2 = 1;
+
+    const auto id1Salt1 = hashStringDataForResourceId(collAName, salt1);
+    const auto id1Salt2 = hashStringDataForResourceId(collAName, salt2);
+
+    ASSERT_NE(id1Salt1, id1Salt2);
+}
+
 }  // namespace resource_id_test
 
 namespace lock_manager_test {
