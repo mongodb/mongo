@@ -952,6 +952,21 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/resharding:resharding_oplog_crud_application_test.cpp",
         "//src/mongo/db/s/resharding:resharding_oplog_fetcher_test.cpp",
         "//src/mongo/db/s/resharding:resharding_oplog_session_application_test.cpp",
+    ],
+    tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine_SERVER-98847",
+        "mongo_unittest_sixth_group",
+    ],
+    deps = [
+        ":db_s_shard_server_test_deps",
+        ":sharding_test_helpers",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_s_resharding_part3_test",
+    srcs = [
         "//src/mongo/db/s/resharding:resharding_recipient_service_external_state_test.cpp",
         "//src/mongo/db/s/resharding:resharding_recipient_service_test.cpp",
         "//src/mongo/db/s/resharding:resharding_txn_cloner_test.cpp",
@@ -960,7 +975,7 @@ mongo_cc_unit_test(
         # State mismatch in sandbox in resharding_recipient_service_test.cpp
         "code_coverage_quarantine",
         "code_coverage_quarantine_SERVER-98847",
-        "mongo_unittest_sixth_group",
+        "mongo_unittest_fifth_group",
     ],
     deps = [
         ":db_s_shard_server_test_deps",
