@@ -871,6 +871,8 @@ last-continuous:
     ticket: SERVER-92978
   - test_file: jstests/change_streams/ddl_abort_index_build_event.js
     ticket: SERVER-93154
+  - test_file: jstests/aggregation/expressions/reduce_overflow.js
+    ticket: SERVER-102364
   - test_file: jstests/change_streams/events_containing_version_literals.js
     ticket: SERVER-111406
   - test_file: jstests/core/query/update/update_set_unset.js
@@ -1816,6 +1818,8 @@ last-lts:
     ticket: SERVER-92978
   - test_file: jstests/change_streams/ddl_abort_index_build_event.js
     ticket: SERVER-93154
+  - test_file: jstests/aggregation/expressions/reduce_overflow.js
+    ticket: SERVER-102364
   - test_file: jstests/change_streams/events_containing_version_literals.js
     ticket: SERVER-111406
   - test_file: jstests/core/query/update/update_set_unset.js
