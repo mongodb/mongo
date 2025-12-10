@@ -20,6 +20,7 @@ selector:
     - jstests/core/query/partial_index_logical.js
     - jstests/core/index/index_filter_commands.js
     - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
+    - jstests/core/timeseries/pbt/timeseries_cache_usage_pbt.js
 
     # CBR picks a different plan which results in different results due to SERVER-23229
     - jstests/core/query/project/projection_dotted_paths.js

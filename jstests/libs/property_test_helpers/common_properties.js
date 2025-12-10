@@ -2,7 +2,7 @@
  * Common properties our property-based tests may use. Intended to be paired with the `testProperty`
  * interface in property_testing_utils.js.
  */
-import {runDeoptimized} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {getPlanCache, runDeoptimized} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {
     getAllPlans,
     getAllPlanStages,
@@ -10,6 +10,7 @@ import {
     getRejectedPlans,
     getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Returns different query shapes using the first parameters plugged in.
@@ -270,5 +271,168 @@ export function createQueriesWithKnobsSetAreSameAsControlCollScanProperty(contro
             }
             return {passed: true};
         });
+    };
+}
+
+// Motivation: Check that the plan cache key we use to lookup in the cache and to store in the cache
+// are consistent.
+export function createRepeatQueriesUseCacheProperty(experimentColl) {
+    return function repeatQueriesUseCacheProperty(getQuery, testHelpers) {
+        for (let queryIx = 0; queryIx < testHelpers.numQueryShapes; queryIx++) {
+            const query = getQuery(queryIx, 0 /* paramIx */);
+            const explain = experimentColl.explain().aggregate(query.pipeline, query.options);
+
+            // If there are no rejected plans, there is no need to cache.
+            if (getRejectedPlans(explain).length === 0) {
+                continue;
+            }
+
+            // Currently, both classic and SBE queries use the classic plan cache.
+            const serverStatusBefore = db.serverStatus();
+            const classicHitsBefore = serverStatusBefore.metrics.query.planCache.classic.hits;
+            const sbeHitsBefore = serverStatusBefore.metrics.query.planCache.sbe.hits;
+
+            for (let i = 0; i < 5; i++) {
+                experimentColl.aggregate(query.pipeline, query.options).toArray();
+            }
+
+            const serverStatusAfter = db.serverStatus();
+            const classicHitsAfter = serverStatusAfter.metrics.query.planCache.classic.hits;
+            const sbeHitsAfter = serverStatusAfter.metrics.query.planCache.sbe.hits;
+
+            // If neither the SBE plan cache hits nor the classic plan cache hits have incremented, then
+            // our query must not have hit the cache. We check for at least one hit, since ties can
+            // prevent a plan from being cached right away.
+            if (checkSbeFullyEnabled(db) && sbeHitsAfter - sbeHitsBefore > 0) {
+                continue;
+            } else if (classicHitsAfter - classicHitsBefore > 0) {
+                continue;
+            }
+            return {
+                passed: false,
+                message: "Plan cache hits failed to increment after running query several times.",
+                query,
+                explain,
+                classicHitsBefore,
+                classicHitsAfter,
+                sbeHitsBefore,
+                sbeHitsAfter,
+                planCacheState: getPlanCache(experimentColl).list(),
+            };
+        }
+        return {passed: true};
+    };
+}
+
+// Function to verify the field excluded by an exclusion projection does not exist in any result documents.
+export function checkExclusionProjectionFieldResults(query, results) {
+    const projectSpec = query.pipeline.at(-1)["$project"];
+    const excludedField = Object.keys(projectSpec).filter((field) => field !== "_id")[0];
+    const isIdFieldIncluded = projectSpec._id;
+
+    for (const doc of results) {
+        const docFields = Object.keys(doc);
+        // If the excluded field still exists, fail.
+        if (docFields.includes(excludedField)) {
+            return false;
+        }
+        // If _id is excluded and it exists, fail.
+        if (!isIdFieldIncluded && docFields.includes("_id")) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Function to verify only the field included by an inclusion projection exists in the result documents.
+export function checkInclusionProjectionResults(query, results) {
+    const projectSpec = query.pipeline.at(-1)["$project"];
+    const includedField = Object.keys(projectSpec).filter((field) => field !== "_id")[0];
+    const isIdFieldExcluded = !projectSpec._id;
+
+    for (const doc of results) {
+        for (const field of Object.keys(doc)) {
+            // If the _id field is excluded and it exists, fail.
+            if (field === "_id" && isIdFieldExcluded) {
+                return false;
+            }
+            // If we have a field on the doc that is not the included field, fail.
+            if (field !== "_id" && field !== includedField) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+// Function to verify that the number of results is less than or equal to the limit specified.
+export function checkLimitResults(query, results) {
+    const limitStage = query.pipeline.at(-1);
+    const limitVal = limitStage["$limit"];
+
+    return results.length <= limitVal;
+}
+
+// Function to verify that the results are sorted according to the $sort specification.
+export function checkSortResults(query, results) {
+    const sortSpec = query.pipeline.at(-1)["$sort"];
+    const sortField = Object.keys(sortSpec)[0];
+    const sortDirection = sortSpec[sortField];
+
+    function orderCorrect(doc1, doc2) {
+        const doc1SortVal = doc1[sortField];
+        const doc2SortVal = doc2[sortField];
+
+        // bsonWoCompare does not match the $sort semantics for arrays. It is nontrivial to write a
+        // comparison function that matches these semantics, so we will ignore arrays.
+        // TODO SERVER-101149 improve sort checking logic to possibly handle arrays and missing
+        // values.
+        if (Array.isArray(doc1SortVal) || Array.isArray(doc2SortVal)) {
+            return true;
+        }
+        if (typeof doc1SortVal === "undefined" || typeof doc2SortVal === "undefined") {
+            return true;
+        }
+
+        const cmp = bsonWoCompare(doc1SortVal, doc2SortVal);
+        if (sortDirection === 1) {
+            return cmp <= 0;
+        } else {
+            return cmp >= 0;
+        }
+    }
+
+    for (let i = 0; i < results.length - 1; i++) {
+        const doc1 = results[i];
+        const doc2 = results[i + 1];
+        if (!orderCorrect(doc1, doc2)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// 'checkResultsFn' takes the query and the results and outputs a boolean. Use
+// 'makeBehavioralPropertyFn' when the expected behavior of a query is testable from the results
+// alone. For example if we have {$limit: 2}, we can test the limit worked from the results alone,
+// by asserting results.length <= 2
+export function makeBehavioralPropertyFn(experimentColl, checkResultsFn, failMsg) {
+    return function (getQuery, testHelpers) {
+        for (let queryIx = 0; queryIx < testHelpers.numQueryShapes; queryIx++) {
+            const query = getQuery(queryIx, 0 /* paramIx */);
+            const results = experimentColl.aggregate(query.pipeline, query.options).toArray();
+
+            const passed = checkResultsFn(query, results);
+            if (!passed) {
+                return {
+                    passed: false,
+                    msg: failMsg,
+                    query,
+                    results,
+                    explain: experimentColl.explain().aggregate(query.pipeline, query.options),
+                };
+            }
+        }
+        return {passed: true};
     };
 }

@@ -139,10 +139,11 @@ export function getQueryAndOptionsModel({
     deterministicBag = true,
     allowCollation = false,
     allowedStages = [],
+    isTS = false,
 } = {}) {
     const noCollation = fc.constant({});
     return fc.record({
-        "pipeline": getAggPipelineArb({allowOrs, deterministicBag, allowedStages}),
+        "pipeline": getAggPipelineArb({allowOrs, deterministicBag, allowedStages, isTS}),
         "options": allowCollation ? oneof(noCollation, fc.record({"collation": collationArb})) : noCollation,
     });
 }

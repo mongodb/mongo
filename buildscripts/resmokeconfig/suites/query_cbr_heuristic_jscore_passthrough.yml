@@ -20,6 +20,7 @@ selector:
     - jstests/core/query/partial_index_logical.js
     - jstests/core/index/index_filter_commands.js
     - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
+    - jstests/core/timeseries/pbt/timeseries_cache_usage_pbt.js
 
     # Asserting on specific plan, CBR pick different one
     - jstests/core/query/agg_hint.js

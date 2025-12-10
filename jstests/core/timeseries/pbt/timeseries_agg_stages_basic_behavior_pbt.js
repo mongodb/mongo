@@ -5,13 +5,15 @@
  *  - An inclusion projection should keep the specified fields, and drop all others.
  *  - $limit should limit the number of results.
  *  - $sort should output documents in sorted order.
+ *  TODO SERVER-83072 enable $group once the timeseries bug array bug is fixed.
  *  - $group should output documents with unique _ids (the group key).
  *
  * These may seem like simple checks that aren't worth testing. However with complex optimizations,
- * they may break sometimes, such as with SERVER-100299.
+ * they may break sometimes.
  *
  * @tags: [
  * query_intensive_pbt,
+ * requires_timeseries,
  * assumes_no_implicit_collection_creation_on_get_collection,
  * # Runs queries that may return many results, requiring getmores.
  * requires_getmore,
@@ -19,8 +21,8 @@
  * not_allowed_with_signed_security_token,
  * ]
  */
+
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
-import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
 import {
     getAggPipelineArb,
     getSingleFieldProjectArb,
@@ -38,23 +40,21 @@ import {
     checkSortResults,
     makeBehavioralPropertyFn,
 } from "jstests/libs/property_test_helpers/common_properties.js";
+import {getNestedProperties} from "jstests/libs/query/analyze_plan.js";
 
 if (isSlowBuild(db)) {
     jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
 
+const is83orAbove = (() => {
+    const {version} = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}).featureCompatibilityVersion;
+    return MongoRunner.compareBinVersions(version, "8.3") >= 0;
+})();
+
 const numRuns = 20;
 
-/*
- * --- Exclusion projection testing ---
- *
- * Our projection testing does not allow dotted fields in the $project, since this would make the
- * assert logic much more complicated. The fields are all non-dotted top level fields.
- * The documents may contain objects and arrays, but this doesn't interfere with the assertions
- * since we can still check if the field exists in the document or not (we don't need to inspect the
- * value).
- */
+// --- Exclusion projection testing ---
 const exclusionProjectionTest = {
     // The stage we're testing.
     stageArb: getSingleFieldProjectArb(false /*isInclusion*/, {simpleFieldsOnly: true}), // Only allow simple paths, no dotted paths.
@@ -85,45 +85,32 @@ const sortTest = {
     failMsg: "$sort did not output documents in sorted order.",
 };
 
-// --- $group testing ---
-function checkGroupResults(query, results) {
-    /*
-     * JSON.stringify can output the same string for two different inputs, for example
-     * `JSON.stringify(null)` and `JSON.stringify(NaN)` both output 'null'.
-     * Our PBTs are meant to cover a core subset of MQL. Because of this design decision, we don't
-     * have to worry about overlapping output for JSON.stringify. The data in our PBT test documents
-     * have a narrow enough set of types.
-     */
-    const ids = results.map((doc) => JSON.stringify(doc._id));
-    return new Set(ids).size === results.length;
-}
-const groupTest = {
-    stageArb: groupArb,
-    checkResultsFn: checkGroupResults,
-    failMsg: "$group did not output documents with unique _ids",
-};
+// TODO SERVER-114750 add more test cases here, or add a new PBT.
 
-const testCases = [exclusionProjectionTest, inclusionProjectionTest, limitTest, sortTest, groupTest];
-const experimentColl = db.agg_behavior_correctness_experiment;
+const testCases = [exclusionProjectionTest, inclusionProjectionTest, limitTest, sortTest];
+const experimentColl = db[`${jsTestName()}_experiment`];
 
 for (const {stageArb, checkResultsFn, failMsg} of testCases) {
     const propFn = makeBehavioralPropertyFn(experimentColl, checkResultsFn, failMsg);
 
     // Create an agg model that ends with the stage we're testing. The bag does not have to be
     // deterministic because these properties should always hold.
-    const startOfPipelineArb = getAggPipelineArb({deterministicBag: false});
-    const aggModel = fc.record({startOfPipeline: startOfPipelineArb, lastStage: stageArb}).map(function ({
-        startOfPipeline,
-        lastStage,
-    }) {
-        return {"pipeline": [...startOfPipeline, lastStage], "options": {}};
-    });
+    const startOfPipelineArb = getAggPipelineArb({deterministicBag: false, isTS: true});
+    const aggModel = fc
+        .record({startOfPipeline: startOfPipelineArb, lastStage: stageArb})
+        .filter(({startOfPipeline, _}) => {
+            // Older versions suffer from SERVER-112844
+            return is83orAbove || getNestedProperties(startOfPipeline, "$elemMatch").length == 0;
+        })
+        .map(function ({startOfPipeline, lastStage}) {
+            return {"pipeline": [...startOfPipeline, lastStage], "options": {}};
+        });
 
-    // Run the property with a regular collection.
+    // Run the property with a TS collection.
     testProperty(
         propFn,
         {experimentColl},
-        makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun: 20}),
+        makeWorkloadModel({collModel: getCollectionModel({isTS: true}), aggModel, numQueriesPerRun: 20}),
         numRuns,
     );
 }
