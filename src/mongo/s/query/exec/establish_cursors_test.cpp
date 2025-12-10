@@ -32,25 +32,22 @@
 // IWYU pragma: no_include "cxxabi.h"
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/query/exec/establish_cursors.h"
 #include "mongo/s/resource_yielders.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -1247,6 +1244,73 @@ TEST_F(EstablishCursorsTest, MultipleRemotesMultipleDifferentErrors) {
     });
 
     future.default_timed_get();
+}
+
+TEST_F(EstablishCursorsTest, LogsUnableToEstablishRemoteCursorsOnTimeout) {
+    auto& settings = logv2::LogManager::global().getGlobalSettings();
+    auto originalSeverity = settings.getMinimumLogSeverity(logv2::LogComponent::kQuery);
+    startCapturingLogMessages();
+
+    BSONObj cmdObj = fromjson("{find: 'testcoll'}");
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
+
+    int iterations = 3;
+
+    // Set the log level to debug and count the number of log lines
+    settings.setMinimumLoggedSeverity(logv2::LogComponent::kQuery, logv2::LogSeverity::Debug(5));
+
+    // Wait for 1 second for the timer to reset.
+    sleepmillis(1000);
+    for (int i = 0; i < iterations; i++) {
+        auto future = launchAsync([&] {
+            ASSERT_THROWS(establishCursors(operationContext(),
+                                           executor(),
+                                           _nss,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           remotes,
+                                           false),
+                          ExceptionFor<ErrorCodes::FailedToParse>);
+        });
+
+        // Remote responds with non-retriable error.
+        onCommand([this](const RemoteCommandRequest& request) {
+            ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+            return createErrorCursorResponse(Status(ErrorCodes::FailedToParse, "failed to parse"));
+        });
+        future.default_timed_get();
+    }
+
+    ASSERT_EQUALS(countBSONFormatLogLinesIsSubset(BSON("id" << 4625501)), iterations);
+
+    // Set the log level to info and count the additional number of log lines.
+    settings.setMinimumLoggedSeverity(logv2::LogComponent::kQuery, logv2::LogSeverity::Info());
+
+    // Wait for 1 second for the timer to reset.
+    sleepmillis(1000);
+    for (int i = 0; i < iterations; i++) {
+        auto future = launchAsync([&] {
+            ASSERT_THROWS(establishCursors(operationContext(),
+                                           executor(),
+                                           _nss,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           remotes,
+                                           false),
+                          ExceptionFor<ErrorCodes::FailedToParse>);
+        });
+
+        // Remote responds with non-retriable error.
+        onCommand([this](const RemoteCommandRequest& request) {
+            ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+            return createErrorCursorResponse(Status(ErrorCodes::FailedToParse, "failed to parse"));
+        });
+        future.default_timed_get();
+    }
+
+    stopCapturingLogMessages();
+
+    ASSERT_EQUALS(countBSONFormatLogLinesIsSubset(BSON("id" << 4625501)), 1 + iterations);
+
+    settings.setMinimumLoggedSeverity(logv2::LogComponent::kQuery, originalSeverity);
 }
 
 }  // namespace
