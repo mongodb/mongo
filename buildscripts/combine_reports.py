@@ -4,6 +4,7 @@
 import errno
 import json
 import os
+import re
 import sys
 from optparse import OptionParser
 
@@ -46,6 +47,25 @@ def check_error(input_count, output_count):
         raise ValueError("Both input file and output files exist")
 
 
+def add_bazel_target_info(test_report, report_file):
+    outputs_path = os.path.dirname(
+        os.path.dirname(os.path.relpath(report_file, start="bazel-testlogs"))
+    )
+    if re.search(r"shard_\d+_of_\d+", os.path.basename(outputs_path)):
+        target_path = os.path.dirname(outputs_path)
+    else:
+        target_path = outputs_path
+    target = "//" + ":".join(target_path.rsplit("/", 1))
+    target_string = target.replace("/", "_").replace(":", "_")
+    for test in test_report.test_infos:
+        test.test_file = f"{target} - {test.test_file}"
+        test.group_id = f"{target_string}_{test.group_id}"
+        test.log_info["log_name"] = os.path.join(outputs_path, test.log_info["log_name"])
+        test.log_info["logs_to_merge"] = [
+            os.path.join(outputs_path, log) for log in test.log_info["logs_to_merge"]
+        ]
+
+
 def main():
     """Execute Main program."""
     usage = "usage: %prog [options] report1.json report2.json ..."
@@ -69,6 +89,13 @@ def main():
         action="store_false",
         help="Do not exit with a non-zero code if any test in the report fails.",
     )
+    parser.add_option(
+        "--add-bazel-target-info",
+        dest="add_bazel_target_info",
+        default=False,
+        action="store_true",
+        help="Add bazel targets to the test names and log locations.",
+    )
 
     (options, args) = parser.parse_args()
 
@@ -82,7 +109,10 @@ def main():
     for report_file in report_files:
         try:
             report_file_json = read_json_file(report_file)
-            test_reports.append(report.TestReport.from_dict(report_file_json))
+            test_report = report.TestReport.from_dict(report_file_json)
+            if options.add_bazel_target_info:
+                add_bazel_target_info(test_report, report_file)
+            test_reports.append(test_report)
         except IOError as err:
             # errno.ENOENT is the error code for "No such file or directory".
             if err.errno == errno.ENOENT:

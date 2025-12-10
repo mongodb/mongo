@@ -93,14 +93,20 @@ def resmoke_suite_test(
             "--log=evg",
             "--cedarReportFile=cedar_report.json",
             "--skipSymbolization",  # Symbolization is not yet functional, SERVER-103538
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/resmoke:installed_dist_test_enabled": [
             "--installDir=dist-test/bin",
             "--mongoVersionFile=$(location //:.resmoke_mongo_version.yml)",
         ],
         "//conditions:default": [
-            "--installDir=install-dist-test/bin",
             "--mongoVersionFile=$(location //bazel/resmoke:resmoke_mongo_version)",
         ],
     })
+
+    deps_path = ":".join(["$(location %s)" % dep for dep in deps])
+
     native.py_test(
         name = name,
         # To a user of resmoke_suite_test, the `srcs` is the list of tests to select. However, to the py_test rule,
@@ -122,13 +128,16 @@ def resmoke_suite_test(
             "//:generated_resmoke_config",
             "//:empty_jsconfig",
         ] + select({
-            "//bazel/resmoke:in_evergreen_enabled": ["//:installed-dist-test", "//:.resmoke_mongo_version.yml"],
-            "//conditions:default": ["//:install-dist-test", "//bazel/resmoke:resmoke_mongo_version"],
+            "//bazel/resmoke:installed_dist_test_enabled": ["//:installed-dist-test", "//:.resmoke_mongo_version.yml"],
+            "//conditions:default": ["//bazel/resmoke:resmoke_mongo_version"],
         }),
-        deps = deps + [
+        deps = [
             resmoke,
             "//buildscripts:bazel_local_resources",
-        ],
+        ] + select({
+            "//bazel/resmoke:installed_dist_test_enabled": [],
+            "//conditions:default": deps,
+        }),
         main = resmoke_shim,
         args = [
             "run",
@@ -145,6 +154,9 @@ def resmoke_suite_test(
         env = {
             "LOCAL_RESOURCES": "$(LOCAL_RESOURCES)",
             "GIT_PYTHON_REFRESH": "quiet",  # Ignore "Bad git executable" error when importing git python. Git commands will still error if run.
-        },
+        } | select({
+            "//bazel/resmoke:installed_dist_test_enabled": {},
+            "//conditions:default": {"DEPS_PATH": deps_path},
+        }),
         **kwargs
     )

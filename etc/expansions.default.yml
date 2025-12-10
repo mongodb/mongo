@@ -32,6 +32,7 @@ mciuploads_binary_visibility: public
 jstestfuzz_concurrent_num_files: "10"
 curator_release: "latest"
 ext: tgz
+resmoke_tests_tag_filter: resmoke_tests_tag_filter_not_set
 
 # Bazel compile expansions.
 compiling_for_test: "false"

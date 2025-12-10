@@ -1331,9 +1331,9 @@ functions:
         OTEL_PARENT_ID: ${otel_parent_id}
         OTEL_COLLECTOR_DIR: "../build/OTelTraces/"
 
-  "execute resmoke tests via bazel": &execute_resmoke_tests_via_bazel
+  "execute resmoke tests via bazel sh": &execute_resmoke_tests_via_bazel_sh
     command: subprocess.exec
-    display_name: "execute resmoke tests via bazel"
+    display_name: "execute resmoke tests via bazel sh"
     type: test
     params:
       binary: bash
@@ -1351,6 +1351,12 @@ functions:
         requester: ${requester}
       args:
         - "./src/evergreen/resmoke_tests_execute_bazel.sh"
+
+  "execute resmoke tests via bazel":
+    - *get_version_expansions
+    - *apply_version_expansions
+    - *f_expansions_write
+    - *execute_resmoke_tests_via_bazel_sh
 
   "assume ECR role": &assume_ecr_role
     command: ec2.assume_role
@@ -1973,7 +1979,7 @@ functions:
     - *update_task_timeout
     - *f_expansions_write
     - *sign_macos_dev_binaries
-    - *execute_resmoke_tests_via_bazel
+    - *execute_resmoke_tests_via_bazel_sh
 
   "run generated tests via bazel":
     - *f_expansions_write
@@ -1997,7 +2003,7 @@ functions:
     - *get_version_expansions
     - *apply_version_expansions
     - *f_expansions_write
-    - *execute_resmoke_tests_via_bazel
+    - *execute_resmoke_tests_via_bazel_sh
 
   "generate version expansions": &generate_version_expansions
     command: subprocess.exec
@@ -3235,6 +3241,20 @@ functions:
         - data_archives/*.tgz
       remote_file: ${project}/${build_variant}/${revision}/datafiles/${task_id}-
       display_name: "Data files "
+
+  "upload bazel test logs":
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      bucket: mciuploads
+      permissions: private
+      visibility: signed
+      content_type: text/plain
+      local_files_include_filter:
+        - tmp/bazel-testlogs/*.log
+      remote_file: ${project}/${build_variant}/${revision}/${task_id}-
+      display_name: "Bazel test.log:  "
 
   "attach wiki page":
     - *f_expansions_write

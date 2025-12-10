@@ -40,22 +40,15 @@ buildvariants:
     cron: "0 4 * * 0" # Every week starting 0400 UTC Sunday
     stepback: false
     run_on:
-      - amazon2023-arm64-latest-m8g-xlarge
-    depends_on:
-      - name: archive_dist_test
-        variant: amazon-linux2023-arm64-static-compile
-      - name: archive_jstestshell
-        variant: amazon-linux2023-arm64-static-compile
-      - name: version_gen
-        variant: generate-tasks-for-version
+      - amazon2023-arm64-latest-m8g-4xlarge
     expansions:
-      compile_variant: amazon-linux2023-arm64-static-compile
+      compile_variant: bazel-integration-tests
+      evergreen_remote_exec: on
+      multi_suite_resmoke_task: true
       multiversion_platform: amazon2023
       multiversion_edition: enterprise
       multiversion_architecture: aarch64
       multiversion_link_dir: multiversion_binaries
-      bazel_compile_flags: >-
-        --default_test_resources=cpu=1,2,4,8
+      resmoke_tests_tag_filter: ci-development-critical-single-variant
     tasks:
-      - name: bazel_multiversion_sanity_check_gen
-      - name: bazel_jstestfuzz_gen
+      - name: resmoke_tests_TG

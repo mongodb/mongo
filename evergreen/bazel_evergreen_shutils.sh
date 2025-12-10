@@ -85,6 +85,7 @@ bazel_evergreen_shutils::compute_local_arg() {
         local_arg+=" --jobs=auto"
     elif [[ "$mode" == "test" && "${task_name:-}" == "unit_tests" ]]; then
         local_arg+=" --config=remote_test"
+        local_arg+=" --test_timeout=660" # Allow extra 60s for coredump on abort
     fi
 
     if bazel_evergreen_shutils::is_ppc64le; then

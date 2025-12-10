@@ -105,6 +105,15 @@ if __name__ == "__main__":
 
     add_evergreen_build_info(resmoke_args)
 
+    if os.environ.get("DEPS_PATH"):
+        # Modify DEPS_PATH to use os.pathsep, rather than ':'
+        os.environ["PATH"] += os.pathsep + os.pathsep.join(
+            [
+                os.path.dirname(os.path.abspath(path))
+                for path in os.environ.get("DEPS_PATH").split(":")
+            ]
+        )
+
     if os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR"):
         undeclared_output_dir = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
         resmoke_args.append(f"--dbpathPrefix={os.path.join(undeclared_output_dir,'data')}")

@@ -80,6 +80,18 @@ config_setting(
     },
 )
 
+bool_flag(
+    name = "installed_dist_test",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "installed_dist_test_enabled",
+    flag_values = {
+        "//bazel/resmoke:installed_dist_test": "True",
+    },
+)
+
 py_binary(
     name = "resmoke_config_generator",
     srcs = ["resmoke_config_generator.py"],

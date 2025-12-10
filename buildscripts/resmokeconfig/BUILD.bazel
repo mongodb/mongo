@@ -52,8 +52,14 @@ resmoke_suite_test(
     resmoke_args = [
         "--storageEngineCacheSizeGB=1",
     ],
+    shard_count = 24,
     tags = [
-        "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+        "ci-development-critical-single-variant",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
     ],
 )
 
@@ -74,6 +80,10 @@ resmoke_suite_test(
     ],
     tags = [
         "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
     ],
 )
 
@@ -100,6 +110,10 @@ resmoke_suite_test(
     tags = [
         "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
     ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
 )
 
 # This is an experimental test target for running the multiversion_sanity_check
@@ -124,5 +138,9 @@ resmoke_suite_test(
     shard_count = 1,
     tags = [
         "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
     ],
 )

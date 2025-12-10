@@ -486,40 +486,83 @@ tasks:
           suite: //buildscripts/resmokeconfig:core
           compiling_for_test: true
           bazel_args: >-
-            --test_sharding_strategy=forced=16
             --test_arg=--testTimeout=960
             --test_timeout=1500
           # Timeouts are 16 minutes for individual tests, the same as the default idle timeout.
           # The bazel test timeout is 25 minutes, slightly shorter than the 30 minute commit queue
           # timeout, so that it will timeout before the task would.
 
-  # Experimental task running the jstestfuzz suite bazel target. To be removed with SERVER-103537.
-  - <<: *jstestfuzz_template
-    name: bazel_jstestfuzz_gen
+  - name: resmoke_tests
     tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    exec_timeout_secs: 1800 # 30 minutes.
     commands:
-      - func: "generate resmoke tasks"
+      - func: "execute resmoke tests via bazel"
         vars:
-          <<: *jstestfuzz_config_vars
-          num_files: 8
-          num_tasks: 2
-          jstestfuzz_vars: --jsTestsDir ../jstests
-          suite: //buildscripts/resmokeconfig:jstestfuzz
-          npm_command: jstestfuzz
+          targets: //buildscripts/...
+          compiling_for_test: true
+          bazel_args: >-
+            --test_tag_filters=${resmoke_tests_tag_filter},-incompatible_with_bazel_remote_test
+            --test_arg=--testTimeout=960
+            --test_timeout=1500
+          # Timeouts are 16 minutes for individual tests, the same as the default idle timeout.
+          # The bazel test timeout is 25 minutes, slightly shorter than the 30 minute exec
+          # timeout, so that it will timeout before the task would.
+          # The task_compile_flags are taken from what is set for archive_dist_test in bazel_compile.sh
+          task_compile_flags: >-
+            --verbose_failures
+            --simple_build_id=True
+            --features=strip_debug
+            --separate_debug=False
+            --define=MONGO_VERSION=${version}
+            --config=evg
+            --config=opt_profiled
+            --jobs=1600
 
-  # Experimental task running the multiversion sanity check bazel targets. To be removed with SERVER-103537.
-  - <<: *gen_task_template
-    name: bazel_multiversion_sanity_check_gen
-    tags:
-      [
-        "assigned_to_jira_team_devprod_correctness",
-        "experimental",
-        "multiversion",
-        "future_git_tag_incompatible",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-      - func: "initialize multiversion tasks"
+task_groups:
+  - name: resmoke_tests_TG
+    max_hosts: -1
+    setup_task_can_fail_task: true
+    setup_task:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "set task expansion macros"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "configure evergreen api credentials"
+      - func: "set up credentials"
+      - func: "get engflow creds"
+    teardown_task:
+      - func: "debug full disk"
+      - func: "attach bazel invocation"
+      - func: "upload bazel test logs"
+      - func: "attach report"
+      - func: "upload mongodatafiles"
+      - func: "attach multiversion download links"
+      - func: "kill processes"
+      - func: "save mongo coredumps"
+      - func: "generate hang analyzer tasks"
+      - func: "save disk statistics"
+      - func: "save system resource information"
+      - func: "remove files"
         vars:
-          //buildscripts/resmokeconfig:bazel_multiversion_sanity_check_last_continuous_new_new_old: last_continuous
-          //buildscripts/resmokeconfig:bazel_multiversion_sanity_check_last_lts_new_new_old: last_lts
+          files: >-
+            src/resmoke_error_code
+            src/*.gcda.gcov
+            src/gcov-intermediate-files.tgz
+            src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz
+            mongo-coredumps.json
+            src/debugger*.*
+            src/mongo-hanganalyzer.tgz
+            diskstats.tgz
+            system-resource-info.tgz
+            ${report_file|src/report.json}
+            ${archive_file|src/archive.json}
+            src/network_diagnostics.txt
+    tasks:
+      - resmoke_tests
