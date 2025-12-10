@@ -883,7 +883,7 @@ last-continuous:
     ticket: SERVER-107535
   - test_file: jstests/sharding/timeseries_user_system_buckets_sharding.js
     ticket: SERVER-113933
-  - test_file: jstests/concurrency/fsm_workloads/query/remove/update_and_batched_delete.js
+  - test_file: jstests/concurrency/fsm_workloads/update_and_batched_delete.js
     ticket: SERVER-95570
   - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
     ticket: SERVER-110953
@@ -1832,7 +1832,7 @@ last-lts:
     ticket: SERVER-107535
   - test_file: jstests/sharding/timeseries_user_system_buckets_sharding.js
     ticket: SERVER-113933
-  - test_file: jstests/concurrency/fsm_workloads/query/remove/update_and_batched_delete.js
+  - test_file: jstests/concurrency/fsm_workloads/update_and_batched_delete.js
     ticket: SERVER-95570
   - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
     ticket: SERVER-110953
