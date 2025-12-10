@@ -13,6 +13,10 @@ const kRetryableErrors = [
         errmsg: "Another ConfigsvrCoordinator with different arguments is already running",
     },
     {
+        code: ErrorCodes.ConflictingOperationInProgress,
+        errmsg: "Cannot downgrade while cluster server parameters are being set",
+    },
+    {
         code: ErrorCodes.CannotDowngrade,
         errmsg: "Cannot downgrade while cluster server parameters are being set",
     },
