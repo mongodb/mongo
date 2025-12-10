@@ -222,24 +222,17 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
             auto completionStatus = coordinator->getCompletionFuture().getNoThrow(opCtx);
             auto result = coordinator->getResult(opCtx);
 
-            if (!result) {
-                uassertStatusOK(completionStatus);
-
-                // Result must be populated if the coordinator succeeded.
-                tassert(10710101, "DropIndexes result unavailable", result);
+            if (!completionStatus.isOK()) {
+                // Return `completionStatus` if it differs from `result`'s error code; otherwise
+                // return `result` to preserve the `raw` field.
+                if (!result || !result->hasField("code") ||
+                    result->getField("code").Int() != completionStatus.code()) {
+                    uassertStatusOK(completionStatus);
+                }
             }
 
-            // If 'result' is set but not OK, we should avoid propagating the coordinator error;
-            // otherwise, the 'raw' field would not be returned to the user.
-            //
-            // However, if 'result' is set and OK, we should propagate the coordinator error.
-            // For example, in the case of a stepdown, the coordinator’s persistent document
-            // will not be deleted. In this scenario, we must return the stepdown error to the
-            // user even if the dropIndexes succeeded on all shards, since the dropIndexes command
-            // may be retried on the new primary node.
-            if (result->getField("ok").trueValue()) {
-                uassertStatusOK(completionStatus);
-            }
+            // Result must be populated if the coordinator succeeded.
+            tassert(10710101, "DropIndexes result unavailable", result);
 
             return Response(result->getOwned());
         }
