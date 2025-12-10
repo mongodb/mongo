@@ -1144,6 +1144,7 @@ replication.utils:
     - src/mongo/db/repl/*replication_process*
     - src/mongo/db/repl/*collection_utils*
     - src/mongo/db/repl/*replication_types*
+    - src/mongo/db/repl/*temp_collections_cleanup_mongod*
     - src/mongo/db/*mongod_options_replication*
     - src/mongo/db/op_observer/find_and_modify_images_op_observer*
     - src/mongo/db/incremental_rollout_metrics.cpp
