@@ -989,8 +989,12 @@ error_codes:
   - {code: 474, name: ReshardCollectionQuiescing}
   - {code: 475, name: ReshardCollectionInterruptedDueToFCVChange}
   - {code: 476, name: ReshardCollectionMissingAbortReason}
-
   - {code: 477, name: CollectionBecameView}
+  - {
+      code: 478,
+      name: StreamProcessorPrivateNetworkingError,
+      categories: [StreamProcessorRetryableError],
+    }
 
   # Error codes 4000-8999 are reserved.
 
