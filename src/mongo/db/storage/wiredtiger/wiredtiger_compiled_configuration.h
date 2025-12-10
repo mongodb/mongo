@@ -48,6 +48,8 @@ public:
 
     const char* getConfig(WiredTigerSession* session) const;
 
+    const std::string& getRawConfig() const;
+
 private:
     std::string _apiName;
     std::string _config;

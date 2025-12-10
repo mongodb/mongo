@@ -127,9 +127,12 @@ private:
         WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
             getWiredTigerConfigFromStartupOptions(provider);
         wtConfig.cacheSizeMB = 1;
-        wtConfig.extraOpenOptions = "log=(file_max=1m,prealloc=false)";
         if (_preciseCheckpoints) {
-            wtConfig.extraOpenOptions += ",precise_checkpoint=true,preserve_prepared=true,";
+            // Precise checkpoints don't work with journaling in tests.
+            wtConfig.extraOpenOptions = "precise_checkpoint=true,preserve_prepared=true,";
+            wtConfig.logEnabled = false;
+        } else {
+            wtConfig.extraOpenOptions = "log=(file_max=1m,prealloc=false)";
         }
         // Faithfully simulate being in replica set mode for timestamping tests which requires
         // parity for journaling settings.
@@ -1131,13 +1134,23 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
     engine = _helper.getWiredTigerKVEngine();
     auto opCtxPtr2 = _makeOperationContext();
 
-    // Verify that we see the prepared transaction on startup recovery.
+    // Verify that we see the prepared transaction on startup recovery and reclaim it.
     int count = 0;
     auto iterator = engine->getUnclaimedPreparedTransactionsForStartupRecovery(opCtxPtr2.get());
+    auto& ru2 = *checked_cast<WiredTigerRecoveryUnit*>(
+        shard_role_details::getRecoveryUnit(opCtxPtr2.get()));
+
     while (auto recoveredPreparedId = iterator->next()) {
         ASSERT_EQ(*recoveredPreparedId, preparedId);
+        ru2.beginUnitOfWork(false);
+        ru2.setPrepareTimestamp(prepareTimestamp);
+        ru2.setPreparedId(*recoveredPreparedId);
+        ru2.reclaimPreparedTransactionForRecovery();
+
+        ru2.setDurableTimestamp(Timestamp(3, 0));
+        ru2.setCommitTimestamp(prepareTimestamp);
+        ru2.commitUnitOfWork();
         count++;
-        // TODO: SERVER-114477 Add code to reclaim the prepared transaction and commit it.
     }
     ASSERT_EQ(count, 1);
 }
@@ -1198,7 +1211,23 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
     ASSERT_TRUE(secondId == preparedId1 || secondId == preparedId2);
     ASSERT_NE(firstId, secondId);
     ASSERT_TRUE(!iterator->next());
-    // TODO: SERVER-114477 Add code to reclaim the prepared transactions and commit them.
+
+    // Reclaim the prepared transactions and abort/commit them.
+    auto& ru3 =
+        *checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtxPtr.get()));
+    ru3.beginUnitOfWork(false);
+    ru3.setPrepareTimestamp(prepareTimestamp1);
+    ru3.setPreparedId(firstId);
+    ru3.reclaimPreparedTransactionForRecovery();
+    ru3.abortUnitOfWork();
+
+    ru3.beginUnitOfWork(false);
+    ru3.setPrepareTimestamp(prepareTimestamp2);
+    ru3.setPreparedId(secondId);
+    ru3.reclaimPreparedTransactionForRecovery();
+    ru3.setDurableTimestamp(Timestamp(8, 0));
+    ru3.setCommitTimestamp(prepareTimestamp2);
+    ru3.commitUnitOfWork();
 }
 
 TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
@@ -1267,16 +1296,69 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
     _helper.restartEngine();
     engine = _helper.getWiredTigerKVEngine();
     auto opCtxPtr2 = _makeOperationContext();
+    auto& ru2 = *checked_cast<WiredTigerRecoveryUnit*>(
+        shard_role_details::getRecoveryUnit(opCtxPtr2.get()));
 
-    // Verify that we see the prepared transaction on startup recovery.
+    // Verify that we see the prepared transaction on startup recovery and reclaim it.
     int count = 0;
     auto iterator = engine->getUnclaimedPreparedTransactionsForStartupRecovery(opCtxPtr2.get());
     while (auto recoveredPreparedId = iterator->next()) {
         ASSERT_EQ(*recoveredPreparedId, preparedId);
+        ru2.beginUnitOfWork(false);
+        // Not strictly necessary to begin a transaction, but used to verify that starting a
+        // transaction can handle extra configuration options when claim_prepared_id is set.
+        ru2.setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
+        ru2.setPrepareTimestamp(prepareTimestamp);
+        ru2.setPreparedId(*recoveredPreparedId);
+        ru2.reclaimPreparedTransactionForRecovery();
+
+        ru2.abortUnitOfWork();
         count++;
-        // TODO: SERVER-114477 Add code to reclaim the prepared transaction and commit it.
     }
     ASSERT_EQ(count, 1);
+}
+using WiredTigerKVEngineTestWithPreciseCheckpointsDeathTest =
+    WiredTigerKVEngineTestWithPreciseCheckpoints;
+DEATH_TEST_F(WiredTigerKVEngineTestWithPreciseCheckpointsDeathTest,
+             UnresolvedPreparedTransactionsMustBeClaimed,
+             "Found 1 unclaimed prepared transactions") {
+    // Create an unresolved prepared transaction.
+    auto opCtxPtr = _makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+    const auto prepareTimestamp = Timestamp(2, 0);
+    const auto preparedId = prepareTimestamp.asULL();
+    createPreparedTransaction(opCtxPtr.get(), ru, prepareTimestamp, preparedId);
+    ASSERT_EQ(ru.getPrepareTimestamp(), prepareTimestamp);
+    ASSERT_EQ(ru.getPreparedId().value(), preparedId);
+
+    // Create a checkpoint that includes the prepared transaction.
+    auto* engine = _helper.getWiredTigerKVEngine();
+    engine->setInitialDataTimestamp(Timestamp(1, 0));
+    engine->setStableTimestamp(prepareTimestamp, /*force=*/false);
+    engine->checkpoint();
+
+    // This is necessary to satisfy the destructor of the recovery unit which expects to not be
+    // in a unit of work when the storage engine is restarted. This does not affect the results of
+    // the prepared transaction iterator since the transaction rollback is not in the
+    // checkpoint.
+    ru.abortUnitOfWork();
+
+    // Release the opCtx to prevent memory issues when the storage engine is restarted.
+    opCtxPtr.reset();
+
+    // Simulate startup recovery by restarting the storage engine.
+    _helper.restartEngine();
+    engine = _helper.getWiredTigerKVEngine();
+    auto opCtxPtr2 = _makeOperationContext();
+
+    // Verify that we see the prepared transaction on startup recovery.
+    auto iterator = engine->getUnclaimedPreparedTransactionsForStartupRecovery(opCtxPtr2.get());
+    auto recoveredPreparedId = iterator->next();
+    ASSERT_EQ(*recoveredPreparedId, preparedId);
+    ASSERT_TRUE(!iterator->next());
+
+    // Purposely don't reclaim the transaction to verify that destroying the iterator without
+    // claiming the prepared transaction results in a crash.
 }
 
 }  // namespace

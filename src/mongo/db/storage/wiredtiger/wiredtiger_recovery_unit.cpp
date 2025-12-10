@@ -552,6 +552,19 @@ void WiredTigerRecoveryUnit::_txnOpen() {
         _timer.reset(new Timer());
     }
 
+    // A non-empty _preparedId at transaction start means the caller intends to reclaim the
+    // corresponding prepared transaction during startup recovery. In this case, a read source
+    // must not be set, since it is not applicable.
+    if (_preparedId) {
+        tassert(11447700,
+                "Read source should not be specified when recovering a prepared transaction.",
+                _timestampReadSource == ReadSource::kNoTimestamp);
+        tassert(
+            11447701,
+            "Rounding up prepared timestamps is incompatible with claiming a prepared transaction",
+            !_optionsUsedToOpenSnapshot.roundUpPreparedTimestamps);
+    }
+
     switch (_timestampReadSource) {
         case ReadSource::kNoTimestamp: {
             if (_oplogManager) {
@@ -561,7 +574,8 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                                     _prepareConflictBehavior,
                                     _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kNoRoundError,
-                                    _untimestampedWriteAssertionLevel)
+                                    _untimestampedWriteAssertionLevel,
+                                    _preparedId)
                 .done();
             break;
         }
@@ -948,6 +962,14 @@ void WiredTigerRecoveryUnit::setPrepareConflictBehavior(PrepareConflictBehavior 
 
 PrepareConflictBehavior WiredTigerRecoveryUnit::getPrepareConflictBehavior() const {
     return _prepareConflictBehavior;
+}
+
+void WiredTigerRecoveryUnit::reclaimPreparedTransactionForRecovery() {
+    invariant(_preparedId.has_value());
+
+    // Start a WiredTiger transaction that takes over and continues the prepared transaction
+    // identified by _preparedId.
+    preallocateSnapshot();
 }
 
 void WiredTigerRecoveryUnit::setTimestampReadSource(ReadSource readSource,

@@ -45,6 +45,10 @@ const char* CompiledConfiguration::getConfig(WiredTigerSession* session) const {
     return (compiled->get(_compileToken));
 }
 
+const std::string& CompiledConfiguration::getRawConfig() const {
+    return _config;
+}
+
 // -----------------------
 
 

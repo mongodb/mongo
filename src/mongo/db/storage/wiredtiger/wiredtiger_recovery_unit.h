@@ -129,6 +129,8 @@ public:
 
     PrepareConflictBehavior getPrepareConflictBehavior() const override;
 
+    void reclaimPreparedTransactionForRecovery() override;
+
     /**
      * Set pre-fetching capabilities for this session. This allows pre-loading of a set of pages
      * into the cache and is an optional optimization.

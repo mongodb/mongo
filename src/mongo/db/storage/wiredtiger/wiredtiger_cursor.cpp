@@ -124,22 +124,11 @@ WiredTigerBulkLoadCursor::WiredTigerBulkLoadCursor(OperationContext* opCtx,
     invariantWTOK(_session->open_cursor(indexUri.c_str(), nullptr, nullptr, &_cursor), *_session);
 }
 
-WiredTigerPrepareCursor::WiredTigerPrepareCursor(WiredTigerSession& session) {
-    int ret = session.open_cursor("prepared_discover:", nullptr, nullptr, &_cursor);
-
-    if (ret == 0) {
-        return;  // Success
-    }
-
-    auto status = wtRCToStatus(ret, session);
-    uassertStatusOK(status);
+WiredTigerPrepareCursor::WiredTigerPrepareCursor(WiredTigerSession& session) : _session(session) {
+    _cursor = session.getNewCursor("prepared_discover:", nullptr);
 }
 
 WiredTigerPrepareCursor::~WiredTigerPrepareCursor() {
-    // TODO: SERVER-114477 uassertStatusOK on the result of _cursor->close() once the code to
-    // reclaim unclaimed prepared transactions is added. Without the ability to reclaim an unclaimed
-    // prepared transaction, _cursor->close() fails with an error about unclaimed prepared
-    // transactions, which prevents tests using this cursor from running successfully.
-    _cursor->close(_cursor);
+    _session.closeCursor(_cursor);
 }
 }  // namespace mongo

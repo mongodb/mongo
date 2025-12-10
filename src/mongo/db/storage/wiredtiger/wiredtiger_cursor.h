@@ -144,5 +144,6 @@ public:
 
 private:
     WT_CURSOR* _cursor = nullptr;  // Owned
+    WiredTigerSession& _session;
 };
 }  // namespace mongo

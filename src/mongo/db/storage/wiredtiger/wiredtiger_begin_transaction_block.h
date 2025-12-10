@@ -66,7 +66,8 @@ public:
                             PrepareConflictBehavior prepareConflictBehavior,
                             bool roundUpPreparedTimestamps,
                             RoundUpReadTimestamp roundUpReadTimestamp,
-                            RecoveryUnit::UntimestampedWriteAssertionLevel allowUntimestampedWrite);
+                            RecoveryUnit::UntimestampedWriteAssertionLevel allowUntimestampedWrite,
+                            boost::optional<uint64_t> claimPreparedId = boost::none);
     WiredTigerBeginTxnBlock(WiredTigerSession* session, const char* config);
     ~WiredTigerBeginTxnBlock();
 

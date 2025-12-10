@@ -254,6 +254,16 @@ public:
     }
 
     /**
+     * Starts a storage engine transaction that takes over and continues a prepared transaction
+     * identified by setPreparedId(). Must be called after setPrepareTimestamp() and
+     * setPreparedId().
+     */
+    virtual void reclaimPreparedTransactionForRecovery() {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "This storage engine does not support reclaiming prepared transactions");
+    }
+
+    /**
      * If there is an open transaction, it is closed. If the current AbandonSnapshotMode is
      * 'kAbort', the transaction is aborted. If the mode is 'kCommit' the transaction is committed,
      * and all data currently pointed to by cursors remains pinned until the cursors are
