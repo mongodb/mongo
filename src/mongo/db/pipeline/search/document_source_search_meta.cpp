@@ -61,8 +61,10 @@ auto cloneEachOne(std::list<boost::intrusive_ptr<DocumentSource>> stages, const 
 }
 }  // namespace
 
+ALLOCATE_STAGE_PARAMS_ID(searchMeta, SearchMetaStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(searchMeta,
-                         LiteParsedSearchStage::parse,
+                         SearchMetaLiteParsed::parse,
                          DocumentSourceSearchMeta::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
 

@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
@@ -40,6 +41,8 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
+
+DEFINE_LITE_PARSED_SEARCH_STAGE_DERIVED(Search);
 
 /**
  * The $search stage expands to multiple internal stages when parsed, namely

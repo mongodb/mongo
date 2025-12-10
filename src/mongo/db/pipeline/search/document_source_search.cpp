@@ -65,10 +65,10 @@ StringData removePrefixWorkaround(StringData key, StringData pre) {
 }
 }  // namespace
 
-ALLOCATE_STAGE_PARAMS_ID(searchStage, SearchStageStageParams::id);
+ALLOCATE_STAGE_PARAMS_ID(search, SearchStageParams::id);
 
 REGISTER_DOCUMENT_SOURCE(search,
-                         LiteParsedSearchStage::parse,
+                         SearchLiteParsed::parse,
                          DocumentSourceSearch::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
 
@@ -77,7 +77,7 @@ ALLOCATE_DOCUMENT_SOURCE_ID(search, DocumentSourceSearch::id)
 // $searchBeta is supported as an alias for $search for compatibility with applications that used
 // search during its beta period.
 REGISTER_DOCUMENT_SOURCE(searchBeta,
-                         LiteParsedSearchStage::parse,
+                         SearchLiteParsed::parse,
                          DocumentSourceSearch::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
 

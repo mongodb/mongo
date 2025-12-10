@@ -31,9 +31,12 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
+
+DEFINE_LITE_PARSED_SEARCH_STAGE_DERIVED(SearchMeta);
 
 /**
  * The $searchMeta stage is similar to the $_internalMongotRemote stage except that it consumes

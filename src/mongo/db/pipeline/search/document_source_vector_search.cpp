@@ -49,8 +49,10 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
+ALLOCATE_STAGE_PARAMS_ID(vectorSearch, VectorSearchStageParams::id);
+
 REGISTER_DOCUMENT_SOURCE(vectorSearch,
-                         LiteParsedSearchStage::parse,
+                         VectorSearchLiteParsed::parse,
                          DocumentSourceVectorSearch::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
 ALLOCATE_DOCUMENT_SOURCE_ID(vectorSearch, DocumentSourceVectorSearch::id)

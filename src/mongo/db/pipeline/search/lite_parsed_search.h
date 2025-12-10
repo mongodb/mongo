@@ -34,20 +34,12 @@
 
 namespace mongo {
 
-DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(SearchStage);
-
 /**
- * A 'LiteParsed' representation of either a $search or $searchMeta stage.
- * This is the parent class for the $listSearchIndexes stage.
+ * A 'LiteParsed' representation of a search stage. This is the parent class for the
+ * $listSearchIndexes stage.
  */
-class LiteParsedSearchStage : public LiteParsedDocumentSource {
+class LiteParsedSearchStageBase : public LiteParsedDocumentSource {
 public:
-    static std::unique_ptr<LiteParsedSearchStage> parse(const NamespaceString& nss,
-                                                        const BSONElement& spec,
-                                                        const LiteParserOptions& options) {
-        return std::make_unique<LiteParsedSearchStage>(spec, std::move(nss));
-    }
-
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
         // There are no foreign namespaces.
         return stdx::unordered_set<NamespaceString>{};
@@ -75,14 +67,28 @@ public:
         transactionNotSupported(getParseTimeName());
     }
 
-    std::unique_ptr<StageParams> getStageParams() const final {
-        return std::make_unique<SearchStageStageParams>(_originalBson);
-    }
-
-    explicit LiteParsedSearchStage(const BSONElement& spec, NamespaceString nss)
+    explicit LiteParsedSearchStageBase(const BSONElement& spec, NamespaceString nss)
         : LiteParsedDocumentSource(spec), _nss(std::move(nss)) {}
 
 private:
     const NamespaceString _nss;
 };
+
+#define DEFINE_LITE_PARSED_SEARCH_STAGE_DERIVED(stageName)                                        \
+    DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(stageName);                                              \
+    class stageName##LiteParsed : public mongo::LiteParsedSearchStageBase {                       \
+    public:                                                                                       \
+        stageName##LiteParsed(const mongo::BSONElement& originalBson, mongo::NamespaceString nss) \
+            : mongo::LiteParsedSearchStageBase(originalBson, nss) {}                              \
+        static std::unique_ptr<stageName##LiteParsed> parse(                                      \
+            const mongo::NamespaceString& nss,                                                    \
+            const mongo::BSONElement& spec,                                                       \
+            const mongo::LiteParserOptions& options) {                                            \
+            return std::make_unique<stageName##LiteParsed>(spec, nss);                            \
+        }                                                                                         \
+        std::unique_ptr<mongo::StageParams> getStageParams() const final {                        \
+            return std::make_unique<stageName##StageParams>(_originalBson);                       \
+        }                                                                                         \
+    };
+
 }  // namespace mongo

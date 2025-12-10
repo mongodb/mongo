@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/util/modules.h"
@@ -41,6 +42,8 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+DEFINE_LITE_PARSED_SEARCH_STAGE_DERIVED(VectorSearch);
 
 /**
  * Interface used to retrieve the execution stats of explain().
