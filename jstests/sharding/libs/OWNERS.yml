@@ -24,3 +24,6 @@ filters:
   - "last_lts_mongos_commands.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "*proxy_protocol*":
+    approvers:
+      - 10gen/server-networking-and-observability

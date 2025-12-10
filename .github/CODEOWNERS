@@ -1669,6 +1669,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/libs/**/create_sharded_collection_util.js @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
 /jstests/sharding/libs/**/remove_shard_util.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /jstests/sharding/libs/**/last_lts_mongos_commands.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/libs/**/*proxy_protocol* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/load_balancer_support/OWNERS.yml
 /jstests/sharding/load_balancer_support/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
