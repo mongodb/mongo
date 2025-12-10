@@ -77,12 +77,8 @@ uint64_t combinations(int n, int k) {
 
 JoinPredicateEstimator::JoinPredicateEstimator(const JoinGraph& graph,
                                                const std::vector<ResolvedPath>& resolvedPaths,
-                                               const SamplingEstimatorMap& samplingEstimators,
-                                               const BaseTableCardinalityMap& tableCards)
-    : _graph(graph),
-      _resolvedPaths(resolvedPaths),
-      _samplingEstimators(samplingEstimators),
-      _tableCards(tableCards) {}
+                                               const SamplingEstimatorMap& samplingEstimators)
+    : _graph(graph), _resolvedPaths(resolvedPaths), _samplingEstimators(samplingEstimators) {}
 
 // This function makes a number of assumptions:
 // * Join predicate are independent from single table predicates. This allows us to estimate them
@@ -133,8 +129,8 @@ cost_based_ranker::SelectivityEstimate JoinPredicateEstimator::joinPredicateSel(
 
     // Extract the cardinality estimates for left and right nodes before single table predicates are
     // applied.
-    auto leftCard = _tableCards.at(leftNode.collectionName);
-    auto rightCard = _tableCards.at(rightNode.collectionName);
+    auto leftCard = _samplingEstimators.at(leftNode.collectionName)->getCollCard();
+    auto rightCard = _samplingEstimators.at(rightNode.collectionName)->getCollCard();
 
     // For the purposes of estimation, we assume that this edge represents a "primary key" to
     // "foreign key" join, despite these concepts not existing in MongoDB. We also assume that the

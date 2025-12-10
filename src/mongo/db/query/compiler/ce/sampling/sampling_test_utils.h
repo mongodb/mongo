@@ -58,10 +58,6 @@ public:
         return SamplingEstimatorImpl::calculateSampleSize(ci, marginOfError);
     }
 
-    double getCollCard() {
-        return SamplingEstimatorImpl::getCollCard();
-    }
-
     static bool matches(const OrderedIntervalList& oil, BSONElement val) {
         return SamplingEstimatorImpl::matches(oil, val);
     }

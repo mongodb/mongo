@@ -240,6 +240,10 @@ public:
         }
     }
 
+    double getCollCard() const override {
+        return _collectionCard.toDouble();
+    }
+
 protected:
     /*
      * This helper creates a CanonicalQuery for the sampling plan. This CanonicalQuery is “empty”
@@ -249,10 +253,6 @@ protected:
      */
     static std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(const NamespaceString& nss,
                                                                    OperationContext* opCtx);
-
-    double getCollCard() const {
-        return _collectionCard.cardinality().v();
-    }
 
     /*
      * The sample size is calculated based on the confidence level and margin of error(MoE)

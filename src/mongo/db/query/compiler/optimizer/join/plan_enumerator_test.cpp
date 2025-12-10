@@ -333,17 +333,15 @@ TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollection) {
     graph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
 
     SamplingEstimatorMap samplingEstimators;
-    auto aSamplingEstimator = std::make_unique<FakeNdvEstimator>();
+    auto aSamplingEstimator = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
     aSamplingEstimator->addFakeNDVEstimate(
         {FieldPath("foo")}, CardinalityEstimate{CardinalityType{5}, EstimationSource::Sampling});
     samplingEstimators[aNss] = std::move(aSamplingEstimator);
-    samplingEstimators[bNss] = std::make_unique<FakeNdvEstimator>();
+    samplingEstimators[bNss] = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
 
-    BaseTableCardinalityMap tableCards;
-    tableCards.emplace(aNss, CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
-    tableCards.emplace(bNss, CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
-
-    JoinPredicateEstimator predEstimator{graph, paths, samplingEstimators, tableCards};
+    JoinPredicateEstimator predEstimator{graph, paths, samplingEstimators};
 
     auto selEst = predEstimator.joinPredicateSel(graph.getEdge(0));
     // The selectivity estimate comes from 1 / NDV(A.foo) = 1 / 5 = 0.2
@@ -371,19 +369,16 @@ TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollectionEmbedPath) {
     graph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
 
     SamplingEstimatorMap samplingEstimators;
-    samplingEstimators[aNss] = std::make_unique<FakeNdvEstimator>();
-    // Only add fake estimates for "b" estimator
-    auto bSamplingEstimator = std::make_unique<FakeNdvEstimator>();
+    samplingEstimators[aNss] = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
+    // Ensure "b" collection has smaller CE. Only add fake estimates for "b" estimator.
+    auto bSamplingEstimator = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
     bSamplingEstimator->addFakeNDVEstimate(
         {FieldPath("foo")}, CardinalityEstimate{CardinalityType{5}, EstimationSource::Sampling});
     samplingEstimators[bNss] = std::move(bSamplingEstimator);
 
-    BaseTableCardinalityMap tableCards;
-    tableCards.emplace(aNss, CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
-    // Ensure "b" collection has smaller CE
-    tableCards.emplace(bNss, CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
-
-    JoinPredicateEstimator predEstimator{graph, paths, samplingEstimators, tableCards};
+    JoinPredicateEstimator predEstimator{graph, paths, samplingEstimators};
 
     auto selEst = predEstimator.joinPredicateSel(graph.getEdge(0));
     // The selectivity estimate comes from 1 / NDV(B.foo) = 1 / 5 = 0.2
@@ -414,8 +409,9 @@ TEST_F(JoinPredicateEstimatorFixture, NDVCompoundJoinKey) {
     graph.addSimpleEqualityEdge(aNodeId, bNodeId, 2, 3);
 
     SamplingEstimatorMap samplingEstimators;
-    auto aSamplingEstimator = std::make_unique<FakeNdvEstimator>();
-    // We shoudl end up using the NDV from (foo, bar) and not from foo or bar.
+    auto aSamplingEstimator = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
+    // We should end up using the NDV from (foo, bar) and not from foo or bar.
     aSamplingEstimator->addFakeNDVEstimate(
         {FieldPath("foo"), FieldPath("bar")},
         CardinalityEstimate{CardinalityType{5}, EstimationSource::Sampling});
@@ -424,13 +420,10 @@ TEST_F(JoinPredicateEstimatorFixture, NDVCompoundJoinKey) {
     aSamplingEstimator->addFakeNDVEstimate(
         {FieldPath("bar")}, CardinalityEstimate{CardinalityType{3}, EstimationSource::Sampling});
     samplingEstimators[aNss] = std::move(aSamplingEstimator);
-    samplingEstimators[bNss] = std::make_unique<FakeNdvEstimator>();
+    samplingEstimators[bNss] = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
 
-    BaseTableCardinalityMap tableCards;
-    tableCards.emplace(aNss, CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
-    tableCards.emplace(bNss, CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
-
-    JoinPredicateEstimator predEstimator{graph, paths, samplingEstimators, tableCards};
+    JoinPredicateEstimator predEstimator{graph, paths, samplingEstimators};
 
     auto selEst = predEstimator.joinPredicateSel(graph.getEdge(0));
     // The selectivity estimate comes from 1 / NDV(A.foo, A.bar) = 1 / 5 = 0.2

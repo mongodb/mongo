@@ -73,6 +73,8 @@ using namespace cost_based_ranker;
  */
 class FakeNdvEstimator : public ce::SamplingEstimator {
 public:
+    FakeNdvEstimator(CardinalityEstimate collCard) : _collCard(collCard) {};
+
     CardinalityEstimate estimateCardinality(const MatchExpression* expr) const override {
         MONGO_UNREACHABLE;
     }
@@ -115,7 +117,12 @@ public:
         return _fakeEstimates.at(fieldNames);
     }
 
+    double getCollCard() const override {
+        return _collCard.toDouble();
+    }
+
 private:
+    CardinalityEstimate _collCard;
     stdx::unordered_map<std::vector<FieldPath>, CardinalityEstimate> _fakeEstimates;
 };
 

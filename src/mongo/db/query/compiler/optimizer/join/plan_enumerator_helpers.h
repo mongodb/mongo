@@ -69,9 +69,6 @@ private:
  */
 uint64_t combinations(int n, int k);
 
-using BaseTableCardinalityMap =
-    stdx::unordered_map<NamespaceString, cost_based_ranker::CardinalityEstimate>;
-
 /**
  * Container for all objects necessary to estimate the selectivity of join predicates.
  */
@@ -79,8 +76,7 @@ class JoinPredicateEstimator {
 public:
     JoinPredicateEstimator(const JoinGraph& graph,
                            const std::vector<ResolvedPath>& resolvedPaths,
-                           const SamplingEstimatorMap& samplingEstimators,
-                           const BaseTableCardinalityMap& tableCards);
+                           const SamplingEstimatorMap& samplingEstimators);
 
     /**
      * Returns an estimate of the selectivity of the given 'JoinEdge' using sampling.
@@ -91,7 +87,6 @@ private:
     const JoinGraph& _graph;
     const std::vector<ResolvedPath>& _resolvedPaths;
     const SamplingEstimatorMap& _samplingEstimators;
-    const BaseTableCardinalityMap& _tableCards;
 };
 
 }  // namespace mongo::join_ordering

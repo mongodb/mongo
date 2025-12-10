@@ -99,6 +99,8 @@ public:
      * Does not support estimating NDV over array-valued fields.
      */
     virtual CardinalityEstimate estimateNDV(const std::vector<FieldPath>& fieldNames) const = 0;
+
+    virtual double getCollCard() const = 0;
 };
 
 }  // namespace mongo::ce
