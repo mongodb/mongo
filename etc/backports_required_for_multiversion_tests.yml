@@ -496,6 +496,8 @@ last-continuous:
       ticket: SERVER-113887
     - test_file: jstests/sharding/disable_resumable_range_deleter.js
       ticket: SERVER-112357
+    - test_file: jstests/core/query/regex/regex_max_pattern_length.js
+      ticket: SERVER-86326
   suites: null
 last-lts:
   all:
@@ -1049,4 +1051,6 @@ last-lts:
       ticket: SERVER-113887
     - test_file: jstests/sharding/disable_resumable_range_deleter.js
       ticket: SERVER-112357
+    - test_file: jstests/core/query/regex/regex_max_pattern_length.js
+      ticket: SERVER-86326
   suites: null

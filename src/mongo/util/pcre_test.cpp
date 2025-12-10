@@ -443,5 +443,32 @@ TEST(PcreTest, HeapLimit) {
     }
 }
 
+TEST(PcreTest, MaxPatternLength) {
+    const std::string s(1024, 'y');
+
+    // Test patterns of various lengths
+    for (uint32_t patternLength : {2, 5, 10, 100, 1000, 10000, 16384, 20000, 30000, 32764}) {
+        std::string pattern = fmt::format("^{}", std::string(patternLength - 1, 'x'));
+
+        // We use an anchored pattern here in order to reduce internal memory usage during regex
+        // execution.
+        Regex customLimitRegex(pattern, CompileOptions{});
+        ASSERT_FALSE(customLimitRegex.error());
+        auto match = customLimitRegex.match(s);
+        ASSERT_TRUE(match.error());
+        ASSERT_EQ(match.error().message(), "no match");
+    }
+
+    // Test a pattern that is above the maximum allowed pattern length.
+    {
+        const std::string kTooLongErrorMessage =
+            "pattern string is longer than the limit set by the application";
+        const std::string pattern = fmt::format("^{}", std::string(32764, 'x'));
+        Regex defaultLimitRegex(pattern, CompileOptions{});
+        ASSERT_TRUE(defaultLimitRegex.error());
+        ASSERT_EQ(defaultLimitRegex.error().message(), kTooLongErrorMessage);
+    }
+}
+
 }  // namespace
 }  // namespace mongo::pcre

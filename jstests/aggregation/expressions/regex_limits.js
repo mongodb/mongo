@@ -41,16 +41,19 @@ function testRegexAggException(inputObj, exceptionCode, expression) {
 }
 
 (function testLongRegex() {
-    // Our limit on regex pattern length is 2^14.
+    // The maximum allowed pattern length is 16384 before SERVER-86326, and 32764 with it.
+    // Using a limit of 16384 should work across all versions in multiversion tests.
     const kMaxRegexPatternLen = 16384;
-    const patternMaxLen = "c".repeat(kMaxRegexPatternLen);
+    const patternMaxLen = "c".repeat(kMaxRegexPatternLen - 1);
+    const anchoredPatternMaxLen = "^" + patternMaxLen;
 
     // Test that a regex with maximum allowable pattern length can find a document.
-    testRegexAgg({input: "$z", regex: patternMaxLen},
+    testRegexAgg({input: "$z", regex: anchoredPatternMaxLen},
                  [{match: patternMaxLen, "idx": 0, "captures": []}]);
 
-    // Test that a regex pattern exceeding the limit fails.
-    const patternTooLong = patternMaxLen + "c";
+    // Test that a regex pattern exceeding the limit fails. A pattern length of 32765 is
+    // disallowed in all versions in multiversion tests.
+    const patternTooLong = "c".repeat(32765);
     testRegexAggException({input: "$z", regex: patternTooLong}, 51111);
 })();
 
