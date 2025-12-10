@@ -102,7 +102,7 @@ public:
     virtual std::shared_ptr<executor::TaskExecutor> getSharedTaskExecutor() const = 0;
 
     /**
-     * Returns shared db worker thread pool for collection cloning.
+     * Returns shared db worker thread pool for collection cloning and oplog applier.
      */
     virtual ThreadPool* getDbWorkThreadPool() const = 0;
 

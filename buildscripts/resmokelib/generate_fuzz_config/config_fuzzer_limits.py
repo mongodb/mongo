@@ -167,7 +167,12 @@ config_fuzzer_params = {
             "period": 5,
             "fuzz_at": ["startup", "runtime"],
         },
-        "replWriterThreadCount": {"min": 1, "max": 256, "fuzz_at": ["startup"]},
+        "replWriterThreadCount": {
+            "min": 1,
+            "max": 256,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         # Default value 1000; many tests don't insert enough measurements to rollover due to count, so we enable a larger range for this parameter.
         "timeseriesBucketMaxCount": {
             "min": 20,

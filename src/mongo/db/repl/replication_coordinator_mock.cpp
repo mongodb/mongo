@@ -458,6 +458,10 @@ StatusWith<BSONObj> ReplicationCoordinatorMock::prepareReplSetUpdatePositionComm
     return cmdBuilder.obj();
 }
 
+ThreadPool* ReplicationCoordinatorMock::getDbWorkThreadPool() const noexcept {
+    return nullptr;
+}
+
 ReplSetConfig ReplicationCoordinatorMock::getConfig() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 

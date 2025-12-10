@@ -228,6 +228,8 @@ public:
 
     void appendSecondaryInfoData(BSONObjBuilder*) final;
 
+    ThreadPool* getDbWorkThreadPool() const noexcept final;
+
     ReplSetConfig getConfig() const final;
 
     ConnectionString getConfigConnectionString() const final;

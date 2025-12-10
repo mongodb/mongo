@@ -32,20 +32,17 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/repl_worker_pool_thread_count.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
-#include "mongo/util/processinfo.h"
 
 #include <algorithm>
-#include <functional>
 #include <mutex>
 #include <string>
-#include <type_traits>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -158,34 +155,17 @@ void OplogApplier::setMinValid(const OpTime& minValid) {
     _minValid = minValid;
 }
 
-std::unique_ptr<ThreadPool> makeReplWorkerPool() {
-    // Reduce content pinned in cache by single oplog batch on small machines by reducing the number
-    // of threads of ReplWriter to reduce the number of concurrent open WT transactions.
-    if (replWriterThreadCount < replWriterMinThreadCount) {
-        LOGV2_FATAL_NOTRACE(
-            5605400,
-            "replWriterMinThreadCount must be less than or equal to replWriterThreadCount",
-            "replWriterMinThreadCount"_attr = replWriterMinThreadCount,
-            "replWriterThreadCount"_attr = replWriterThreadCount);
-    }
-    auto numberOfThreads =
-        std::min(replWriterThreadCount, 2 * static_cast<int>(ProcessInfo::getNumAvailableCores()));
-    return makeReplWorkerPool(numberOfThreads);
-}
 
-std::unique_ptr<ThreadPool> makeReplWorkerPool(int threadCount) {
-    return makeReplWorkerPool(threadCount, "ReplWriterWorker"_sd);
-}
+namespace {
 
-std::unique_ptr<ThreadPool> makeReplWorkerPool(int threadCount,
+std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount,
                                                StringData name,
                                                bool isKillableByStepdown) {
     ThreadPool::Options options;
     options.threadNamePrefix = name + "-";
     options.poolName = name + "ThreadPool";
-    options.minThreads =
-        replWriterMinThreadCount < threadCount ? replWriterMinThreadCount : threadCount;
-    options.maxThreads = static_cast<size_t>(threadCount);
+    options.minThreads = std::min(getMinThreadCountForReplWorkerPool(), threadCount);
+    options.maxThreads = threadCount;
     options.onCreateThread = [isKillableByStepdown](const std::string&) {
         Client::initThread(getThreadName(),
                            getGlobalServiceContext()->getService(ClusterRole::ShardServer),
@@ -197,6 +177,16 @@ std::unique_ptr<ThreadPool> makeReplWorkerPool(int threadCount,
     auto pool = std::make_unique<ThreadPool>(options);
     pool->startup();
     return pool;
+}
+
+}  // namespace
+
+std::unique_ptr<ThreadPool> makeReplWorkerPool() {
+    return makeReplWorkerPool(getThreadCountForReplWorkerPool());
+}
+
+std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount) {
+    return makeReplWorkerPool(threadCount, "ReplWriterWorker"_sd, false);
 }
 
 }  // namespace repl

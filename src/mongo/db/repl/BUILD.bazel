@@ -318,6 +318,27 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "repl_writer_thread_pool_server_parameters_gen",
+    src = "repl_writer_thread_pool_server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "repl_writer_thread_pool_server_parameters",
+    srcs = [
+        "repl_worker_pool_thread_count.cpp",
+        ":repl_writer_thread_pool_server_parameters_gen",
+    ],
+    deps = [
+        ":repl_coordinator_interface",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
 mongo_cc_library(
     name = "oplog_write_interface",
     srcs = [
@@ -906,7 +927,7 @@ mongo_cc_library(
         ":oplog",
         ":oplog_entry",
         ":repl_coordinator_interface",
-        ":repl_server_parameters",
+        ":repl_writer_thread_pool_server_parameters",
         ":truncate_range_oplog_entry_idl",
         "//src/mongo/db:change_stream_pre_image_util",
         "//src/mongo/db:server_base",
@@ -1856,6 +1877,7 @@ mongo_cc_unit_test(
         ":repl_coordinator_impl",
         ":repl_coordinator_test_fixture",
         ":repl_server_parameters",
+        ":repl_writer_thread_pool_server_parameters",
         ":task_executor_mock",
         "//src/mongo/db:change_stream_pre_images_collection_manager",
         "//src/mongo/db:server_base",
@@ -2106,6 +2128,7 @@ mongo_cc_benchmark(
         ":repl_coordinator_impl",
         ":repl_coordinator_interface",
         ":repl_server_parameters",
+        ":repl_writer_thread_pool_server_parameters",
         ":replication_consistency_markers_impl",
         ":replication_recovery",
         ":replmocks",

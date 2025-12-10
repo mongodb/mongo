@@ -224,7 +224,7 @@ TEST_F(ThreadPoolTest, MaxPoolSize20MinPoolSize15) {
 
 DEATH_TEST_REGEX_F(ThreadPoolDeathTest,
                    MaxThreadsTooFewDies,
-                   "Cannot create pool.*with maximum number of threads.*less than 1") {
+                   "Cannot configure pool.*with maximum number of threads.*less than 1") {
     ThreadPool::Options options;
     options.maxThreads = 0;
     makePool(options);
@@ -233,7 +233,7 @@ DEATH_TEST_REGEX_F(ThreadPoolDeathTest,
 DEATH_TEST_REGEX_F(
     ThreadPoolDeathTest,
     MinThreadsTooManyDies,
-    R"re(.*Cannot create pool.*with minimum number of threads.*larger than the configured maximum.*minThreads":6,"maxThreads":5)re") {
+    R"re(.*Cannot configure pool.*with minimum number of threads.*larger than the maximum.*minThreads":6,"maxThreads":5)re") {
     ThreadPool::Options options;
     options.maxThreads = 5;
     options.minThreads = 6;
@@ -314,6 +314,337 @@ TEST_F(ThreadPoolTest, ThreadPoolRunsOnCreateThreadFunctionBeforeConsumingTasks)
     });
     barrier.countDownAndWait();
     ASSERT_EQ(journal, "[onCreate(mythread0)][Call(OK)]");
+}
+
+TEST_F(ThreadPoolTest, JoinAllRetiredThreads) {
+    Atomic<int> retiredThreads(0);
+    ThreadPool::Options options;
+    options.minThreads = 4;
+    options.maxThreads = 8;
+    options.maxIdleThreadAge = Milliseconds(100);
+    options.onJoinRetiredThread = [&](const stdx::thread& t) {
+        retiredThreads.addAndFetch(1);
+    };
+    unittest::Barrier barrier(options.maxThreads + 1);
+
+    auto& pool = makePool(options);
+    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+        pool.schedule([&](auto status) {
+            ASSERT_OK(status);
+            barrier.countDownAndWait();
+        });
+    }
+    ASSERT_EQ(pool.getStats().numThreads, 0);
+    pool.startup();
+    barrier.countDownAndWait();
+
+    while (pool.getStats().numThreads > options.minThreads) {
+        sleepFor(Microseconds{1});
+    }
+
+    pool.shutdown();
+    pool.join();
+
+    ASSERT_EQ(retiredThreads.load(), options.maxThreads - options.minThreads);
+    ASSERT_EQ(pool.getStats().numIdleThreads, 0);
+}
+
+DEATH_TEST_REGEX_F(
+    ThreadPoolDeathTest,
+    ModifyMinThreadsGreaterThanMax,
+    R"re(.*Cannot configure pool.*with minimum number of threads.*larger than the maximum.*minThreads":7,"maxThreads":5)re") {
+    ThreadPool::Options options;
+    options.maxThreads = 5;
+    options.minThreads = 3;
+    auto& pool = makePool(options);
+
+    const size_t newMinThreads = 7;
+    pool.setMinThreads(newMinThreads);
+}
+
+DEATH_TEST_REGEX_F(
+    ThreadPoolDeathTest,
+    ModifyMaxLessThanMin,
+    R"re(.*Cannot configure pool.*with minimum number of threads.*larger than the maximum.*minThreads":3,"maxThreads":2)re") {
+    ThreadPool::Options options;
+    options.maxThreads = 5;
+    options.minThreads = 3;
+    auto& pool = makePool(options);
+
+    const size_t newMaxThreads = 2;
+    pool.setMaxThreads(newMaxThreads);
+}
+
+DEATH_TEST_REGEX_F(ThreadPoolDeathTest,
+                   ModifyMaxToZero,
+                   "Cannot configure pool.*with maximum number of threads.*less than 1") {
+    ThreadPool::Options options;
+    options.maxThreads = 5;
+    options.minThreads = 0;
+    auto& pool = makePool(options);
+
+    const size_t newMaxThreads = 0;
+    pool.setMaxThreads(newMaxThreads);
+}
+
+TEST_F(ThreadPoolTest, ModifyMinThreads) {
+    Atomic<int> retiredThreads(0);
+    ThreadPool::Options options;
+    options.minThreads = 4;
+    options.maxThreads = 8;
+    options.maxIdleThreadAge = Milliseconds(100);
+    options.onJoinRetiredThread = [&](const stdx::thread& t) {
+        retiredThreads.addAndFetch(1);
+    };
+    unittest::Barrier barrier(options.maxThreads + 1);
+
+    auto& pool = makePool(options);
+    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+        pool.schedule([&](auto status) {
+            ASSERT_OK(status);
+            barrier.countDownAndWait();
+        });
+    }
+    ASSERT_EQ(pool.getStats().numThreads, 0);
+    pool.startup();
+    barrier.countDownAndWait();
+
+    while (pool.getStats().numThreads > options.minThreads) {
+        sleepFor(Microseconds{1});
+    }
+
+    ASSERT_EQ(pool.getStats().numIdleThreads, options.minThreads);
+    sleepFor(Milliseconds{100});
+    ASSERT_EQ(retiredThreads.load(), options.maxThreads - options.minThreads);
+
+    // Modify to lower value
+    // reset # of retired threads
+    retiredThreads.store(0);
+    // barrier was reset when counter reached 0
+    const size_t newMinThreads = 2;
+    pool.setMinThreads(newMinThreads);
+    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+        pool.schedule([&](auto status) {
+            ASSERT_OK(status);
+            barrier.countDownAndWait();
+        });
+    }
+    barrier.countDownAndWait();
+
+    while (pool.getStats().numThreads > newMinThreads) {
+        sleepFor(Microseconds{1});
+    }
+
+    ASSERT_EQ(pool.getStats().numIdleThreads, newMinThreads);
+    sleepFor(Milliseconds{100});
+    ASSERT_EQ(retiredThreads.load(), options.maxThreads - newMinThreads);
+
+    // modify to higher value
+    // reset # of retired threads
+    retiredThreads.store(0);
+    // barrier was reset when counter reached 0
+    const size_t higherMinThreads = 6;
+    pool.setMinThreads(higherMinThreads);
+    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+        pool.schedule([&](auto status) {
+            ASSERT_OK(status);
+            barrier.countDownAndWait();
+        });
+    }
+    barrier.countDownAndWait();
+
+    while (pool.getStats().numThreads > higherMinThreads) {
+        sleepFor(Microseconds{1});
+    }
+
+    ASSERT_EQ(pool.getStats().numIdleThreads, higherMinThreads);
+    sleepFor(Milliseconds{100});
+    ASSERT_EQ(retiredThreads.load(), options.maxThreads - higherMinThreads);
+    pool.shutdown();
+    pool.join();
+}
+
+TEST_F(ThreadPoolTest, DecreaseMaxThreadsAndDoLessWork) {
+    Atomic<int> retiredThreads(0);
+    ThreadPool::Options options;
+    const size_t originalMaxThreads = 8;
+    options.minThreads = 4;
+    options.maxThreads = originalMaxThreads;
+    options.maxIdleThreadAge = Milliseconds(1000);
+    options.onJoinRetiredThread = [&](const stdx::thread& t) {
+        retiredThreads.addAndFetch(1);
+    };
+
+    auto& pool = makePool(options);
+    ASSERT_EQ(pool.getStats().numThreads, 0);
+    pool.startup();
+
+    unittest::Barrier barrier(options.maxThreads + 1);
+    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+        pool.schedule([&](auto status) {
+            ASSERT_OK(status);
+            barrier.countDownAndWait();
+        });
+    }
+    barrier.countDownAndWait();
+
+    // No threads should have retired yet.
+    ASSERT_EQ(retiredThreads.load(), 0);
+
+    // Modify maxThreads to a lower value;
+    const size_t lowerMaxThreads = 4;
+    pool.setMaxThreads(lowerMaxThreads);
+    unittest::Barrier barrier2(2);
+    // Schedule only one task
+    pool.schedule([&](auto status) {
+        ASSERT_OK(status);
+        barrier2.countDownAndWait();
+    });
+
+    barrier2.countDownAndWait();
+    // Cleaning up the retired threads happens after task execution, so wait briefly for this to
+    // complete.
+    sleepFor(Milliseconds{100});
+    // Four threads should have retired due to lowering max from 8 to 4.
+    ASSERT_EQ(retiredThreads.load(), originalMaxThreads - lowerMaxThreads);
+    pool.shutdown();
+    pool.join();
+}
+
+TEST_F(ThreadPoolTest, ModifyMaxThreads) {
+    Atomic<int> retiredThreads(0);
+    ThreadPool::Options options;
+    options.minThreads = 4;
+    options.maxThreads = 8;
+    options.maxIdleThreadAge = Milliseconds(100);
+    options.onJoinRetiredThread = [&](const stdx::thread& t) {
+        retiredThreads.addAndFetch(1);
+    };
+    unittest::Barrier barrier(options.maxThreads + 1);
+
+    auto& pool = makePool(options);
+    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+        pool.schedule([&](auto status) {
+            ASSERT_OK(status);
+            barrier.countDownAndWait();
+        });
+    }
+    ASSERT_EQ(pool.getStats().numThreads, 0);
+    pool.startup();
+    barrier.countDownAndWait();
+
+    while (pool.getStats().numThreads > options.minThreads) {
+        sleepFor(Microseconds{1});
+    }
+
+    ASSERT_EQ(pool.getStats().numIdleThreads, options.minThreads);
+    sleepFor(Milliseconds{100});
+    ASSERT_EQ(retiredThreads.load(), options.maxThreads - options.minThreads);
+
+    // Modify to higher value
+    // reset # of retired threads
+    retiredThreads.store(0);
+    const size_t newMaxThreads = 12;
+    pool.setMaxThreads(newMaxThreads);
+    // create new barrier to reflect new number of threads
+    unittest::Barrier barrier2(newMaxThreads + 1);
+    for (auto i = size_t{0}; i < newMaxThreads; ++i) {
+        pool.schedule([&](auto status) {
+            ASSERT_OK(status);
+            barrier2.countDownAndWait();
+        });
+    }
+    barrier2.countDownAndWait();
+
+    while (pool.getStats().numThreads > options.minThreads) {
+        sleepFor(Microseconds{1});
+    }
+
+    ASSERT_EQ(pool.getStats().numIdleThreads, options.minThreads);
+    sleepFor(Milliseconds{100});
+    ASSERT_EQ(retiredThreads.load(), newMaxThreads - options.minThreads);
+
+    // modify to lower value
+    // reset # of retired threads
+    retiredThreads.store(0);
+    const size_t lowerMaxThreads = 6;
+    pool.setMaxThreads(lowerMaxThreads);
+    // create new barrier to reflect new number of threads
+    unittest::Barrier barrier3(lowerMaxThreads + 1);
+    for (auto i = size_t{0}; i < lowerMaxThreads; ++i) {
+        pool.schedule([&](auto status) {
+            ASSERT_OK(status);
+            barrier3.countDownAndWait();
+        });
+    }
+    barrier3.countDownAndWait();
+
+    while (pool.getStats().numThreads > options.minThreads) {
+        sleepFor(Microseconds{1});
+    }
+
+    ASSERT_EQ(pool.getStats().numIdleThreads, options.minThreads);
+    sleepFor(Milliseconds{100});
+    ASSERT_EQ(retiredThreads.load(), lowerMaxThreads - options.minThreads);
+    pool.shutdown();
+    pool.join();
+}
+
+TEST_F(ThreadPoolTest, ModifyMaxAndMinThreads) {
+    Atomic<int> retiredThreads(0);
+    ThreadPool::Options options;
+    options.minThreads = 4;
+    options.maxThreads = 8;
+    options.maxIdleThreadAge = Milliseconds(100);
+    options.onJoinRetiredThread = [&](const stdx::thread& t) {
+        retiredThreads.addAndFetch(1);
+    };
+    unittest::Barrier barrier(options.maxThreads + 1);
+
+    auto& pool = makePool(options);
+    for (auto i = size_t{0}; i < options.maxThreads; ++i) {
+        pool.schedule([&](auto status) {
+            ASSERT_OK(status);
+            barrier.countDownAndWait();
+        });
+    }
+    ASSERT_EQ(pool.getStats().numThreads, 0);
+    pool.startup();
+    barrier.countDownAndWait();
+
+    while (pool.getStats().numThreads > options.minThreads) {
+        sleepFor(Microseconds{1});
+    }
+
+    ASSERT_EQ(pool.getStats().numIdleThreads, options.minThreads);
+    sleepFor(Milliseconds{100});
+    ASSERT_EQ(retiredThreads.load(), options.maxThreads - options.minThreads);
+
+    // reset # of retired threads
+    retiredThreads.store(0);
+    const size_t newMaxThreads = 12;
+    const size_t newMinThreads = 2;
+    pool.setMaxThreads(newMaxThreads);
+    pool.setMinThreads(newMinThreads);
+    // create new barrier to reflect new number of threads
+    unittest::Barrier barrier2(newMaxThreads + 1);
+    for (auto i = size_t{0}; i < newMaxThreads; ++i) {
+        pool.schedule([&](auto status) {
+            ASSERT_OK(status);
+            barrier2.countDownAndWait();
+        });
+    }
+    barrier2.countDownAndWait();
+
+    while (pool.getStats().numThreads > newMinThreads) {
+        sleepFor(Microseconds{1});
+    }
+
+    ASSERT_EQ(pool.getStats().numIdleThreads, newMinThreads);
+    sleepFor(Milliseconds{100});
+    ASSERT_EQ(retiredThreads.load(), newMaxThreads - newMinThreads);
+    pool.shutdown();
+    pool.join();
 }
 
 TEST_F(ThreadPoolTest, SafeToCallWaitForIdleBeforeShutdown) {

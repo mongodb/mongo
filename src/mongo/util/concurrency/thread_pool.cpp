@@ -74,6 +74,26 @@ std::string threadIdToString(stdx::thread::id id) {
 }
 
 /**
+ * Check the options limits, and fassert if they don't make sense.
+ */
+void checkOptionsLimits(const ThreadPool::Options& options) {
+    if (options.maxThreads < 1) {
+        LOGV2_FATAL(28702,
+                    "Cannot configure pool with maximum number of threads less than 1",
+                    "poolName"_attr = options.poolName,
+                    "maxThreads"_attr = options.maxThreads);
+    }
+    if (options.minThreads > options.maxThreads) {
+        LOGV2_FATAL(28686,
+                    "Cannot configure pool with minimum number of threads larger than the "
+                    "maximum",
+                    "poolName"_attr = options.poolName,
+                    "minThreads"_attr = options.minThreads,
+                    "maxThreads"_attr = options.maxThreads);
+    }
+}
+
+/**
  * Sets defaults and checks bounds limits on "options", and returns it.
  *
  * This method is just a helper for the ThreadPool constructor.
@@ -85,20 +105,7 @@ ThreadPool::Options cleanUpOptions(ThreadPool::Options&& options) {
     if (options.threadNamePrefix.empty()) {
         options.threadNamePrefix = fmt::format("{}-", options.poolName);
     }
-    if (options.maxThreads < 1) {
-        LOGV2_FATAL(28702,
-                    "Cannot create pool with maximum number of threads less than 1",
-                    "poolName"_attr = options.poolName,
-                    "maxThreads"_attr = options.maxThreads);
-    }
-    if (options.minThreads > options.maxThreads) {
-        LOGV2_FATAL(28686,
-                    "Cannot create pool with minimum number of threads larger than the "
-                    "configured maximum",
-                    "poolName"_attr = options.poolName,
-                    "minThreads"_attr = options.minThreads,
-                    "maxThreads"_attr = options.maxThreads);
-    }
+    checkOptionsLimits(options);
     return {std::move(options)};
 }
 
@@ -116,6 +123,8 @@ public:
     void schedule(Task task);
     void waitForIdle();
     Stats getStats() const;
+    void setMaxThreads(size_t maxThreads);
+    void setMinThreads(size_t minThreads);
 
 private:
     /**
@@ -195,8 +204,8 @@ private:
      */
     void _joinRetired_inlock();
 
-    // These are the options with which the pool was configured at construction time.
-    const Options _options;
+    // These are the options with which the pool is configured.
+    Options _options;
 
     // Mutex guarding all non-const member variables.
     mutable stdx::mutex _mutex;
@@ -249,7 +258,9 @@ ThreadPool::Impl::~Impl() {
     }
 
     if (_state != shutdownComplete) {
-        LOGV2_FATAL(28704, "Failed to shutdown pool during destruction");
+        LOGV2_FATAL(28704,
+                    "Failed to shutdown pool during destruction",
+                    "poolName"_attr = _options.poolName);
     }
     invariant(_threads.empty());
     invariant(_pendingTasks.empty());
@@ -262,6 +273,12 @@ void ThreadPool::Impl::startup() {
                     "Attempted to start pool that has already started",
                     "poolName"_attr = _options.poolName);
     }
+    LOGV2(11280000,
+          "Starting thread pool",
+          "poolName"_attr = _options.poolName,
+          "numThreads"_attr = _threads.size(),
+          "minThreads"_attr = _options.minThreads,
+          "maxThreads"_attr = _options.maxThreads);
     _setState_inlock(running);
     invariant(_threads.empty());
     size_t numToStart = std::clamp(_pendingTasks.size(), _options.minThreads, _options.maxThreads);
@@ -299,6 +316,8 @@ void ThreadPool::Impl::_joinRetired_inlock() {
     while (!_retiredThreads.empty()) {
         auto& t = _retiredThreads.front();
         t.join();
+        if (_options.onJoinRetiredThread)
+            _options.onJoinRetiredThread(t);
         _retiredThreads.pop_front();
     }
 }
@@ -377,7 +396,7 @@ void ThreadPool::Impl::schedule(Task task) {
     if (_state == preStart) {
         return;
     }
-    if (_numIdleThreads < _pendingTasks.size()) {
+    if (_numIdleThreads < _pendingTasks.size() && _threads.size() < _options.maxThreads) {
         _startWorkerThread_inlock();
     }
     if (_numIdleThreads <= _pendingTasks.size()) {
@@ -431,6 +450,21 @@ void ThreadPool::Impl::_workerThreadBody(const std::string& threadName) noexcept
 void ThreadPool::Impl::_consumeTasks(const std::string& threadName) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     while (_state == running) {
+        if (_threads.size() > _options.maxThreads) {
+            LOGV2_DEBUG(23114,
+                        1,
+                        "Reaping this thread as we are above maxThreads",
+                        "poolName"_attr = _options.poolName,
+                        "threadName"_attr = threadName,
+                        "numThreads"_attr = _threads.size(),
+                        "maxThreads"_attr = _options.maxThreads);
+            // Wake up someone else if there is work to do, as we will be exiting without doing it.
+            if (!_pendingTasks.empty()) {
+                _workAvailable.notify_one();
+            }
+            break;
+        }
+
         if (!_pendingTasks.empty()) {
             _doOneTask(&lk);
             continue;
@@ -455,6 +489,7 @@ void ThreadPool::Impl::_consumeTasks(const std::string& threadName) {
                             1,
                             "Reaping this thread",
                             "threadName"_attr = threadName,
+                            "poolName"_attr = _options.poolName,
                             "nextThreadRetirementDate"_attr =
                                 _lastFullUtilizationDate + _options.maxIdleThreadAge);
                 break;
@@ -463,6 +498,7 @@ void ThreadPool::Impl::_consumeTasks(const std::string& threadName) {
             LOGV2_DEBUG(23107,
                         3,
                         "Not reaping this thread",
+                        "poolName"_attr = _options.poolName,
                         "threadName"_attr = threadName,
                         "nextThreadRetirementDate"_attr = nextRetirement);
             waitDeadline = nextRetirement;
@@ -474,6 +510,7 @@ void ThreadPool::Impl::_consumeTasks(const std::string& threadName) {
             LOGV2_DEBUG(23108,
                         3,
                         "Waiting for work",
+                        "poolName"_attr = _options.poolName,
                         "threadName"_attr = threadName,
                         "numThreads"_attr = _threads.size(),
                         "minThreads"_attr = _options.minThreads);
@@ -511,7 +548,7 @@ void ThreadPool::Impl::_consumeTasks(const std::string& threadName) {
                             "expectedState"_attr = static_cast<int32_t>(running));
     }
 
-    // This thread is ending because it was idle for too long.
+    // This thread is ending because it was idle for too long, or we were over maxThreads.
     // Move self from _threads to _retiredThreads.
     auto selfId = stdx::this_thread::get_id();
     auto pos = std::find_if(
@@ -601,6 +638,47 @@ void ThreadPool::Impl::_setState_inlock(const LifecycleState newState) {
     _stateChange.notify_all();
 }
 
+void ThreadPool::Impl::setMinThreads(size_t minThreads) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    const auto oldMinThreads = _options.minThreads;
+    _options.minThreads = minThreads;
+    checkOptionsLimits(_options);
+    LOGV2(11280001,
+          "setting thread pool minThreads",
+          "poolName"_attr = _options.poolName,
+          "numThreads"_attr = _threads.size(),
+          "minThreads"_attr = _options.minThreads,
+          "maxThreads"_attr = _options.maxThreads,
+          "old minThreads"_attr = oldMinThreads);
+
+    // Check if we need to create new threads
+    while (_threads.size() < _options.minThreads) {
+        LOGV2_DEBUG(1280005,
+                    1,
+                    "Spawning new thread as we are below minThreads",
+                    "poolName"_attr = _options.poolName,
+                    "numThreads"_attr = _threads.size(),
+                    "minThreads"_attr = _options.minThreads,
+                    "maxThreads"_attr = _options.maxThreads);
+        _startWorkerThread_inlock();
+    }
+}
+
+void ThreadPool::Impl::setMaxThreads(size_t maxThreads) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    const auto oldMaxThreads = _options.maxThreads;
+    _options.maxThreads = maxThreads;
+    checkOptionsLimits(_options);
+    LOGV2(11280002,
+          "setting thread pool maxThreads",
+          "poolName"_attr = _options.poolName,
+          "numThreads"_attr = _threads.size(),
+          "minThreads"_attr = _options.minThreads,
+          "maxThreads"_attr = _options.maxThreads,
+          "old maxThreads"_attr = oldMaxThreads);
+    // Reaping extra threads will automatically be done in _consumeTasks().
+}
+
 // ========================================
 // ThreadPool public functions that simply forward to the `_impl`.
 
@@ -630,6 +708,14 @@ void ThreadPool::waitForIdle() {
 
 ThreadPool::Stats ThreadPool::getStats() const {
     return _impl->getStats();
+}
+
+void ThreadPool::setMinThreads(size_t minThreads) {
+    _impl->setMinThreads(minThreads);
+}
+
+void ThreadPool::setMaxThreads(size_t maxThreads) {
+    _impl->setMaxThreads(maxThreads);
 }
 
 }  // namespace mongo

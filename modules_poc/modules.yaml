@@ -1027,7 +1027,7 @@ replication.configs:
     - src/mongo/db/repl/*member_config*
     - src/mongo/db/repl/*member_data*
     - src/mongo/db/repl/*member_id*
-    - src/mongo/db/repl/repl_server_parameters.idl
+    - src/mongo/db/repl/repl_*server_parameters.idl
     - src/mongo/db/repl/*member_state*
     - src/mongo/db/repl/*repl_settings*
     - src/mongo/db/repl/*repl_set_tag*
@@ -1039,28 +1039,29 @@ replication.oplog:
     jira: Replication
     fully_marked: true
   files:
+    - src/mongo/db/commands/apply_ops*
+    - src/mongo/db/commands/oplog*
     - src/mongo/db/op_observer/op_observer*
     - src/mongo/db/op_observer/operation_logger*
-    - src/mongo/db/repl/local_oplog_info*
-    - src/mongo/db/commands/oplog*
-    - src/mongo/db/commands/apply_ops*
-    - src/mongo/db/repl/*oplog*
-    - src/mongo/db/repl/*noop_writer*
+    - src/mongo/db/repl/*apply_ops*
     - src/mongo/db/repl/*bgsync*
+    - src/mongo/db/repl/*consistency_markers*
+    - src/mongo/db/repl/*get_next_optimes_test*
+    - src/mongo/db/repl/*idempotency_test_fixture*
+    - src/mongo/db/repl/*insert_group*
+    - src/mongo/db/repl/*noop_writer*
+    - src/mongo/db/repl/*oplog*
+    - src/mongo/db/repl/*oplog_visibility_manager*
+    - src/mongo/db/repl/*optime*
+    - src/mongo/db/repl/*reporter*
+    - src/mongo/db/repl/*session_update_tracker*
+    - src/mongo/db/repl/*slotted_timestamp_list*
     - src/mongo/db/repl/*sync_source*
+    - src/mongo/db/repl/apply_container_ops_test.cpp
+    - src/mongo/db/repl/local_oplog_info*
+    - src/mongo/db/repl/repl_worker_pool_thread_count*
     - src/mongo/s/commands/cluster_oplog_note_cmd.cpp
     - src/mongo/s/commands/cluster_repl_set_get_status_cmd.cpp
-    - src/mongo/db/repl/*insert_group*
-    - src/mongo/db/repl/*apply_ops*
-    - src/mongo/db/repl/*oplog_visibility_manager*
-    - src/mongo/db/repl/*slotted_timestamp_list*
-    - src/mongo/db/repl/*session_update_tracker*
-    - src/mongo/db/repl/*consistency_markers*
-    - src/mongo/db/repl/*optime*
-    - src/mongo/db/repl/apply_container_ops_test.cpp
-    - src/mongo/db/repl/*reporter*
-    - src/mongo/db/repl/*idempotency_test_fixture*
-    - src/mongo/db/repl/*get_next_optimes_test*
 
 replication.server_rw_concerns:
   meta:

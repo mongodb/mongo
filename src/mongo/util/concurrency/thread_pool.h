@@ -105,6 +105,16 @@ public:
 
         /** If callable, called before each worker thread begins consuming tasks. */
         std::function<void(const std::string&)> onCreateThread;
+
+        /**
+         * If callable, called after joining each retired thread.
+         * These joins happen when a thread completes a task, and there is no more work in the
+         * thread pool. That is, they will be done by a single thread (the function does not need to
+         * be thread safe unless it will also be called in other places).
+         * Since there could be multiple calls to this function in a single critical section, avoid
+         * complex logic in the callback.
+         */
+        std::function<void(const stdx::thread&)> onJoinRetiredThread;
     };
 
     /**
@@ -168,6 +178,20 @@ public:
      * Returns statistics about the thread pool's utilization.
      */
     Stats getStats() const;
+
+    /**
+     * Set the minimum number of threads for this ThreadPool.
+     * Calling this method will spin up new threads if the new minimum is greater than the current
+     * number of threads.
+     */
+    void setMinThreads(size_t minThreads);
+
+    /**
+     * Set the maximum number of threads for this ThreadPool.
+     * Calling this method will cause threads to be reaped once they finish their tasks if more than
+     * the maximum are running.
+     */
+    void setMaxThreads(size_t maxThreads);
 
 private:
     class Impl;

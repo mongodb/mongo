@@ -642,7 +642,12 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
     // Increment the batch size stat.
     oplogApplicationBatchSize.increment(ops.size());
 
-    std::vector<WorkerMultikeyPathInfo> multikeyVector(_workerPool->getStats().options.maxThreads);
+    // The worker pool's maxThreads can be updated at any point in time. So we record its current
+    // value here and use it to construct our different work vectors for the next batch of work to
+    // schedule.
+    const size_t nWorkers = _workerPool->getStats().options.maxThreads;
+    LOGV2_DEBUG(11280004, 2, "Number of workers for oplog application", "nWorkers"_attr = nWorkers);
+    std::vector<WorkerMultikeyPathInfo> multikeyVector(nWorkers);
     {
         // Each node records cumulative batch application stats for itself using this timer.
         TimerHolder timer(&applyBatchStats);
@@ -668,8 +673,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         //   and create a pseudo oplog.
         std::vector<std::vector<OplogEntry>> derivedOps;
 
-        std::vector<std::vector<ApplierOperation>> writerVectors(
-            _workerPool->getStats().options.maxThreads);
+        std::vector<std::vector<ApplierOperation>> writerVectors(nWorkers);
         _fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps);
 
         // Wait for oplog writes to finish.
@@ -712,8 +716,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         const bool isDataConsistent = getMinValid() < ops.front().getOpTime();
 
         {
-            std::vector<Status> statusVector(_workerPool->getStats().options.maxThreads,
-                                             Status::OK());
+            std::vector<Status> statusVector(nWorkers, Status::OK());
             // Doles out all the work to the writer pool threads. writerVectors is not modified,
             // but applyOplogBatchPerWorker will modify the vectors that it contains.
             invariant(writerVectors.size() == statusVector.size());

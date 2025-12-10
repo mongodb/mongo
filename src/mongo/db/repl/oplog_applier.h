@@ -31,7 +31,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_batcher.h"
@@ -40,7 +39,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
@@ -270,17 +268,10 @@ public:
 extern NoopOplogApplierObserver noopOplogApplierObserver;
 
 /**
- * Creates the default thread pool for writer tasks.
+ * Creates the thread pool for writer tasks.
  */
 std::unique_ptr<ThreadPool> makeReplWorkerPool();
-std::unique_ptr<ThreadPool> makeReplWorkerPool(int threadCount);
-
-/**
- * Creates a thread pool suitable for writer tasks, with the specified name
- */
-std::unique_ptr<ThreadPool> makeReplWorkerPool(int threadCount,
-                                               StringData name,
-                                               bool isKillableByStepdown = false);
+std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount);
 
 }  // namespace MONGO_MOD_PUB repl
 }  // namespace mongo

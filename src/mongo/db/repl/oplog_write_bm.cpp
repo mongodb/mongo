@@ -58,6 +58,7 @@
 #include "mongo/db/repl/oplog_writer_impl.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/repl_writer_thread_pool_server_parameters_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"

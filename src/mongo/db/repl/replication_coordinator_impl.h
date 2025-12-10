@@ -342,6 +342,8 @@ public:
 
     void appendSecondaryInfoData(BSONObjBuilder* result) override;
 
+    ThreadPool* getDbWorkThreadPool() const noexcept override;
+
     ReplSetConfig getConfig() const override;
 
     ConnectionString getConfigConnectionString() const override;
