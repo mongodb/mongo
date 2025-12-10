@@ -827,7 +827,6 @@ std::unique_ptr<PlanStageStats> WindowStage::getStats(bool includeDebugInfo) con
     ret->specific = std::make_unique<WindowStats>(_specificStats);
 
     if (includeDebugInfo) {
-        DebugPrinter printer;
         BSONObjBuilder bob;
         // Spilling stats.
         bob.appendBool("usedDisk", _specificStats.usedDisk);

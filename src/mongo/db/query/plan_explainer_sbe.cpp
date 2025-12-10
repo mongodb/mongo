@@ -474,7 +474,8 @@ void statsToBSON(const sbe::PlanStageStats* stats,
 PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const QuerySolution* solution,
     const sbe::PlanStageStats& stats,
-    const boost::optional<BSONObj>& execPlanDebugInfo,
+    const sbe::PlanStage* sbePlanStageRoot,
+    const stage_builder::PlanStageData* sbePlanStageData,
     const boost::optional<BSONObj>& optimizerExplain,
     const boost::optional<std::string>& planSummary,
     const boost::optional<BSONObj>& queryParams,
@@ -502,7 +503,6 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
         statsToBSON(solution->root(), &bob, &bob);
     }
 
-    invariant(execPlanDebugInfo);
     BSONObjBuilder plan;
     if (planSummary) {
         plan.append("planSummary", *planSummary);
@@ -517,7 +517,20 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
         plan.append("queryPlan", bob.obj());
     }
 
-    plan.append("slotBasedPlan", *execPlanDebugInfo);
+    int explainThresholdBytes = internalQueryExplainSizeThresholdBytes.loadRelaxed();
+
+    if (plan.len() > explainThresholdBytes) {
+        plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
+    } else {
+        BSONObj execPlanDebugInfo = PlanExplainerSBEBase::buildExecPlanDebugInfo(
+            sbePlanStageRoot, sbePlanStageData, explainThresholdBytes - plan.len() /*lengthCap*/
+        );
+        if (plan.len() + execPlanDebugInfo.objsize() > explainThresholdBytes) {
+            plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
+        } else {
+            plan.append("slotBasedPlan", execPlanDebugInfo);
+        }
+    }
     if (remotePlanInfo && !remotePlanInfo->isEmpty()) {
         plan.append("remotePlans", *remotePlanInfo);
     }
@@ -631,7 +644,8 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStats(
 
     return buildPlanStatsDetails(_solution,
                                  *stats,
-                                 buildExecPlanDebugInfo(_root, _rootData),
+                                 _root,
+                                 _rootData,
                                  buildCascadesPlan(),
                                  planSummary,
                                  queryParams,
@@ -693,18 +707,16 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() con
     invariant(_rootData);
     if (_rootData->savedStatsOnEarlyExit) {
         invariant(_solution);
-        return buildPlanStatsDetails(
-            _solution,
-            *_rootData->savedStatsOnEarlyExit,
-            // This parameter is not used in `buildPlanStatsDetails` if the last parameter is
-            // `ExplainOptions::Verbosity::kExecAllPlans`, as is the case here.
-            boost::none /* execPlanDebugInfo */,
-            boost::none /* optimizerExplain */,
-            boost::none, /* planSummary */
-            boost::none, /* queryParams */
-            boost::none /* remotePlanInfo */,
-            ExplainOptions::Verbosity::kExecAllPlans,
-            matchesCachedPlan());
+        return buildPlanStatsDetails(_solution,
+                                     *_rootData->savedStatsOnEarlyExit,
+                                     _root /* sbePlanStageRoot */,
+                                     _rootData /* sbePlanStageData*/,
+                                     boost::none, /* optimizerExplain */
+                                     boost::none, /* planSummary */
+                                     boost::none, /* queryParams */
+                                     boost::none /* remotePlanInfo */,
+                                     ExplainOptions::Verbosity::kExecAllPlans,
+                                     matchesCachedPlan());
     }
     return getWinningPlanStats(ExplainOptions::Verbosity::kExecAllPlans);
 }
@@ -723,13 +735,12 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
 
         auto stats = candidate.root->getStats(true /* includeDebugInfo  */);
         invariant(stats);
-        auto execPlanDebugInfo =
-            buildExecPlanDebugInfo(candidate.root.get(), &candidate.data.stageData);
         bool candidateMatchesCachedPlan =
             _cachedPlanHash && (*_cachedPlanHash == candidate.solution->hash());
         res.push_back(buildPlanStatsDetails(candidate.solution.get(),
                                             *stats,
-                                            execPlanDebugInfo,
+                                            candidate.root.get(),
+                                            &candidate.data.stageData,
                                             boost::none /* optimizerExplain */,
                                             boost::none, /* planSummary */
                                             boost::none /* queryParams */,
