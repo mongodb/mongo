@@ -741,6 +741,16 @@ IndexBuildMetrics ReplIndexBuildState::getIndexBuildMetrics() const {
     return _metrics;
 }
 
+void ReplIndexBuildState::setVotedToCommitTime(const Date_t& time) {
+    stdx::lock_guard lk(_mutex);
+    _metrics.voteCommitTime = time;
+}
+
+void ReplIndexBuildState::setReceivedCommitIndexBuildEntryTime(const Date_t& time) {
+    stdx::lock_guard lk(_mutex);
+    _metrics.commitIndexOplogEntryTime = time;
+}
+
 void ReplIndexBuildState::setMultikey(std::vector<boost::optional<MultikeyPaths>> multikey) {
     _indexBuildState.setMultikey(std::move(multikey));
 }

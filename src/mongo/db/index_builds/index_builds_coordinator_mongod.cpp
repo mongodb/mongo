@@ -880,6 +880,7 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
     };
 
     runVoteCommand(opCtx, replState.get(), generateCmd, checkVoteCommitIndexCmdSucceeded);
+    replState->setVotedToCommitTime(Date_t::now());
 
     if (MONGO_unlikely(hangIndexBuildAfterSignalPrimaryForCommitReadiness.shouldFail())) {
         LOGV2(4841707, "Hanging index build after signaling the primary for commit readiness");
