@@ -3,5 +3,3 @@
 leak:InitModule
 # ARM64 python leaks memory from an unclear source. This suppresses that one leak.
 leak:PyObject_Malloc
-# FIXME-WT-16126 : Temporarily suppression until the underlying issue is resolved.
-leak:__wti_block_disagg_addr_string

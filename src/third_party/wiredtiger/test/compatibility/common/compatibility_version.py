@@ -90,6 +90,18 @@ class WTVersion:
         else:
             return True
 
+    def __ge__(self, other: "WTVersion"):
+        if self < other:
+            return False
+        else:
+            return True
+
+    def __le__(self, other: "WTVersion"):
+        if self > other:
+            return False
+        else:
+            return True
+
     # Hash is used to support set collection, make it able to remove redundant
     def __hash__(self):
         return hash(self.name)

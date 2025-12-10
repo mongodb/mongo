@@ -275,7 +275,6 @@ resize_item(WT_ITEM *item, size_t new_size)
 static void
 fill_item(WT_ITEM *item, const void *data, size_t size)
 {
-    memset(item, 0, sizeof(WT_ITEM));
     resize_item(item, size);
     if (size > 0 && data != nullptr)
         memcpy(item->mem, data, size);

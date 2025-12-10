@@ -164,4 +164,7 @@ disagg_switch_roles(void)
 
     if (!g.disagg_leader)
         follower_read_latest_checkpoint();
+
+    /* After every switch, verify the contents of each table */
+    wts_verify_mirrors(g.wts_conn, NULL, NULL);
 }

@@ -61,9 +61,8 @@ public:
         logger::log_msg(
           LOG_INFO, "Populate: " + std::to_string(collection_count) + " creating collections.");
 
-        scoped_session session = connection_manager::instance().create_session();
         for (uint64_t i = 0; i < collection_count; ++i)
-            database.add_collection(session);
+            database.add_collection();
 
         logger::log_msg(LOG_INFO, "Populate: finished.");
     }
@@ -108,9 +107,9 @@ public:
         while (tc->running()) {
 
             auto &cc = ccv[counter];
-            tc->begin();
+            tc->txn.begin();
 
-            while (tc->active() && tc->running()) {
+            while (tc->txn.active() && tc->running()) {
 
                 /* Generate a random key/value pair. */
                 std::string key = random_generator::instance().generate_random_string(tc->key_size);
@@ -119,15 +118,15 @@ public:
 
                 /* Insert a key value pair. */
                 if (tc->insert(cc.cursor, cc.coll.id, key, value)) {
-                    if (tc->can_commit()) {
+                    if (tc->txn.can_commit()) {
                         /* We are not checking the result of commit as it is not necessary. */
-                        if (tc->commit())
+                        if (tc->txn.commit())
                             rollback_retries = 0;
                         else
                             ++rollback_retries;
                     }
                 } else {
-                    tc->rollback();
+                    tc->txn.rollback();
                     ++rollback_retries;
                 }
                 testutil_assert(rollback_retries < MAX_ROLLBACKS);
@@ -137,7 +136,7 @@ public:
             }
 
             /* Rollback any transaction that could not commit before the end of the test. */
-            tc->try_rollback();
+            tc->txn.try_rollback();
 
             /* Reset our cursor to avoid pinning content. */
             testutil_check(cc.cursor->reset(cc.cursor.get()));
@@ -179,10 +178,10 @@ public:
              * The oldest timestamp might move ahead and the reading timestamp might become invalid.
              * To tackle this issue, we round the timestamp to the oldest timestamp value.
              */
-            tc->begin(
+            tc->txn.begin(
               "roundup_timestamps=(read=true),read_timestamp=" + tc->tsm->decimal_to_hex(ts));
 
-            while (tc->active() && tc->running()) {
+            while (tc->txn.active() && tc->running()) {
                 /*
                  * Generate a random prefix. For this, we start by generating a random size and then
                  * its value.
@@ -212,15 +211,15 @@ public:
                 validate_prefix_search_near(
                   ret, exact_prefix, key_prefix_str, cursor_default, generated_prefix);
 
-                tc->add_op();
-                if (tc->get_op_count() >= tc->get_target_op_count())
-                    tc->rollback();
+                tc->txn.add_op();
+                if (tc->txn.get_op_count() >= tc->txn.get_target_op_count())
+                    tc->txn.rollback();
                 tc->sleep();
             }
             testutil_check(cursor_prefix->reset(cursor_prefix.get()));
         }
         /* Roll back the last transaction if still active now the work is finished. */
-        tc->try_rollback();
+        tc->txn.try_rollback();
     }
 
 private:

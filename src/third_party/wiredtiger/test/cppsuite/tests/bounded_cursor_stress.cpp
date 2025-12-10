@@ -383,9 +383,9 @@ public:
 
             collection &coll = tc->db.get_random_collection();
             scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
-            tc->try_begin();
+            tc->txn.try_begin();
 
-            while (tc->active() && tc->running()) {
+            while (tc->txn.active() && tc->running()) {
 
                 /* Generate a random key. */
                 auto key = random_generator::instance().generate_random_string(tc->key_size);
@@ -393,15 +393,15 @@ public:
                   random_generator::instance().generate_pseudo_random_string(tc->value_size);
                 /* Insert a key/value pair. */
                 if (tc->insert(cursor, coll.id, key, value)) {
-                    if (tc->can_commit()) {
+                    if (tc->txn.can_commit()) {
                         /* We are not checking the result of commit as it is not necessary. */
-                        if (tc->commit())
+                        if (tc->txn.commit())
                             rollback_retries = 0;
                         else
                             ++rollback_retries;
                     }
                 } else {
-                    tc->rollback();
+                    tc->txn.rollback();
                     ++rollback_retries;
                 }
                 testutil_assert(rollback_retries < MAX_ROLLBACKS);
@@ -414,7 +414,7 @@ public:
             testutil_check(cursor->reset(cursor.get()));
         }
         /* Rollback any transaction that could not commit before the end of the test. */
-        tc->try_rollback();
+        tc->txn.try_rollback();
     }
 
     void
@@ -431,9 +431,9 @@ public:
             scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
             scoped_cursor rnd_cursor =
               tc->session.open_scoped_cursor(coll.name, "next_random=true");
-            tc->try_begin();
+            tc->txn.try_begin();
 
-            while (tc->active() && tc->running()) {
+            while (tc->txn.active() && tc->running()) {
                 int ret = rnd_cursor->next(rnd_cursor.get());
 
                 /* It is possible not to find anything if the collection is empty. */
@@ -443,7 +443,7 @@ public:
                      * If we cannot find any record, finish the current transaction as we might be
                      * able to see new records after starting a new one.
                      */
-                    testutil_ignore_ret_bool(tc->commit());
+                    testutil_ignore_ret_bool(tc->txn.commit());
                     continue;
                 } else if (ret == WT_ROLLBACK)
                     break;
@@ -455,15 +455,15 @@ public:
                 auto value =
                   random_generator::instance().generate_pseudo_random_string(tc->value_size);
                 if (tc->update(cursor, coll.id, key, value)) {
-                    if (tc->can_commit()) {
+                    if (tc->txn.can_commit()) {
                         /* We are not checking the result of commit as it is not necessary. */
-                        if (tc->commit())
+                        if (tc->txn.commit())
                             rollback_retries = 0;
                         else
                             ++rollback_retries;
                     }
                 } else {
-                    tc->rollback();
+                    tc->txn.rollback();
                     ++rollback_retries;
                 }
                 testutil_assert(rollback_retries < MAX_ROLLBACKS);
@@ -478,7 +478,7 @@ public:
         }
 
         /* Rollback any transaction that could not commit before the end of the test. */
-        tc->try_rollback();
+        tc->txn.try_rollback();
     }
 
     void
@@ -511,9 +511,9 @@ public:
              * The oldest timestamp might move ahead and the reading timestamp might become invalid.
              * To tackle this issue, we round the timestamp to the oldest timestamp value.
              */
-            tc->try_begin(
+            tc->txn.try_begin(
               "roundup_timestamps=(read=true),read_timestamp=" + tc->tsm->decimal_to_hex(ts));
-            while (tc->active() && tc->running()) {
+            while (tc->txn.active() && tc->running()) {
                 /* Generate a random string. */
                 auto key_size = random_generator::instance().generate_integer(
                   static_cast<int64_t>(1), tc->key_size);
@@ -552,16 +552,16 @@ public:
                     validate_bound_search(ret, bounded_cursor, range_key_copy, bound_pair);
                 }
 
-                tc->add_op();
-                if (tc->can_commit())
-                    tc->commit();
+                tc->txn.add_op();
+                if (tc->txn.can_commit())
+                    tc->txn.commit();
                 tc->sleep();
             }
             bounded_cursor->reset(bounded_cursor.get());
             normal_cursor->reset(normal_cursor.get());
         }
         /* Roll back the last transaction if still active now the work is finished. */
-        tc->try_rollback();
+        tc->txn.try_rollback();
     }
 
     /*
@@ -745,9 +745,9 @@ public:
              * The oldest timestamp might move ahead and the reading timestamp might become invalid.
              * To tackle this issue, we round the timestamp to the oldest timestamp value.
              */
-            tc->begin(
+            tc->txn.begin(
               "roundup_timestamps=(read=true),read_timestamp=" + tc->tsm->decimal_to_hex(ts));
-            while (tc->active() && tc->running()) {
+            while (tc->txn.active() && tc->running()) {
                 int ret = cursor_traversal(bounded_cursor, normal_cursor, bound_pair.get_lower(),
                   bound_pair.get_upper(), true);
                 if (ret != 0)
@@ -766,14 +766,14 @@ public:
                       bound_pair.get_upper(), false);
                     testutil_assert(ret == 0 || ret == WT_ROLLBACK);
                 }
-                tc->add_op();
-                if (tc->get_op_count() >= tc->get_target_op_count())
-                    tc->rollback();
+                tc->txn.add_op();
+                if (tc->txn.get_op_count() >= tc->txn.get_target_op_count())
+                    tc->txn.rollback();
                 tc->sleep();
             }
             normal_cursor->reset(normal_cursor.get());
         }
         /* Roll back the last transaction if still active now the work is finished. */
-        tc->try_rollback();
+        tc->txn.try_rollback();
     }
 };

@@ -120,7 +120,7 @@ public:
         collection &coll = tc->db.get_collection(tc->id);
         scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
         for (uint64_t count = 0; count < tc->key_count; ++count) {
-            tc->begin();
+            tc->txn.begin();
             /*
              * Generate the prefix key, and append a random generated key string based on the key
              * size configuration.
@@ -128,9 +128,9 @@ public:
             prefix_key = random_generator::instance().generate_random_string(tc->key_size);
             testutil_assert(cursor.get() != nullptr);
             if (perform_unique_index_insertions(tc, cursor, coll, prefix_key)) {
-                tc->commit();
+                tc->txn.commit();
             } else {
-                tc->rollback();
+                tc->txn.rollback();
                 ++rollback_retries;
                 if (count > 0)
                     --count;
@@ -169,13 +169,12 @@ public:
             ", key size: " + std::to_string(key_size));
 
         /* Create n collections as per the configuration. */
-        scoped_session session = connection_manager::instance().create_session();
         for (uint64_t i = 0; i < collection_count; ++i)
             /*
              * The database model will call into the API and create the collection, with its own
              * session.
              */
-            database.add_collection(session);
+            database.add_collection();
 
         /* Spawn a populate thread for each collection in the database. */
         for (uint64_t i = 0; i < collection_count; ++i) {
@@ -200,6 +199,7 @@ public:
          * traverse through each collection using a cursor to collect the prefix and push it into a
          * 2D vector.
          */
+        scoped_session session = connection_manager::instance().create_session();
         const char *key_tmp;
         int ret = 0;
         for (uint64_t i = 0; i < database.get_collection_count(); i++) {
@@ -243,7 +243,7 @@ public:
 
             /* Do a second lookup now that we know it exists. */
             auto &cursor = cursors[coll.id];
-            tc->begin();
+            tc->txn.begin();
             /*
              * Grab a random existing prefix and perform unique index insertion. We expect it to
              * fail to insert, because it should already exist.
@@ -258,7 +258,7 @@ public:
                 ".");
             testutil_assert(!perform_unique_index_insertions(tc, cursor, coll, prefix_key));
             testutil_check(cursor->reset(cursor.get()));
-            tc->rollback();
+            tc->txn.rollback();
         }
     }
 
@@ -273,7 +273,7 @@ public:
          * Each read thread will count the number of keys in each collection, and will double check
          * if the size of the table hasn't changed.
          */
-        tc->begin();
+        tc->txn.begin();
         while (tc->running()) {
             for (int i = 0; i < tc->db.get_collection_count(); i++) {
                 collection &coll = tc->db.get_collection(i);
@@ -298,6 +298,6 @@ public:
             }
             key_count = 0;
         }
-        tc->rollback();
+        tc->txn.rollback();
     }
 };

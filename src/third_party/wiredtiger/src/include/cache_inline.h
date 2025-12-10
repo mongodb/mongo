@@ -97,7 +97,7 @@ __wt_cache_dirty_inuse(WT_CACHE *cache)
     uint64_t dirty_inuse;
     dirty_inuse = __wt_atomic_load_uint64_relaxed(&cache->bytes_dirty_intl) +
       __wt_atomic_load_uint64_relaxed(&cache->bytes_dirty_leaf);
-    return (__wt_cache_bytes_plus_overhead(cache, __wt_atomic_load_uint64_relaxed(&dirty_inuse)));
+    return (__wt_cache_bytes_plus_overhead(cache, dirty_inuse));
 }
 
 /*
@@ -110,8 +110,7 @@ __wt_cache_dirty_inuse_ingest(WT_CACHE *cache)
     uint64_t dirty_inuse_ingest;
     dirty_inuse_ingest = __wt_atomic_load_uint64_relaxed(&cache->bytes_dirty_intl_ingest) +
       __wt_atomic_load_uint64_relaxed(&cache->bytes_dirty_leaf_ingest);
-    return (
-      __wt_cache_bytes_plus_overhead(cache, __wt_atomic_load_uint64_relaxed(&dirty_inuse_ingest)));
+    return (__wt_cache_bytes_plus_overhead(cache, dirty_inuse_ingest));
 }
 
 /*
@@ -124,8 +123,7 @@ __wt_cache_dirty_inuse_stable(WT_CACHE *cache)
     uint64_t dirty_inuse_stable;
     dirty_inuse_stable = __wt_atomic_load_uint64_relaxed(&cache->bytes_dirty_intl_stable) +
       __wt_atomic_load_uint64_relaxed(&cache->bytes_dirty_leaf_stable);
-    return (
-      __wt_cache_bytes_plus_overhead(cache, __wt_atomic_load_uint64_relaxed(&dirty_inuse_stable)));
+    return (__wt_cache_bytes_plus_overhead(cache, dirty_inuse_stable));
 }
 
 /*

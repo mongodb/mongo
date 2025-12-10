@@ -113,19 +113,19 @@ public:
             const std::string value = std::to_string(new_cache_size);
 
             /* Save the change of cache size in the tracking table. */
-            tc->begin();
+            tc->txn.begin();
             int ret = tc->op_tracker->save_operation(tc->session.get(), tracking_operation::CUSTOM,
               collection_id, key, value, tc->tsm->get_next_ts(), tc->op_track_cursor);
 
             if (ret == 0)
-                testutil_assert(tc->commit());
+                testutil_assert(tc->txn.commit());
             else {
                 /* Due to the cache pressure, it is possible to fail when saving the operation. */
                 testutil_assert(ret == WT_ROLLBACK);
                 logger::log_msg(LOG_WARN,
                   "The cache size reconfiguration could not be saved in the tracking table, ret: " +
                     std::to_string(ret));
-                tc->rollback();
+                tc->txn.rollback();
             }
             increase_cache = !increase_cache;
         }
@@ -149,21 +149,21 @@ public:
               ((WT_CONNECTION_IMPL *)connection_manager::instance().get_connection())->cache_size;
             const std::string value = std::to_string(cache_size);
 
-            tc->try_begin();
+            tc->txn.try_begin();
             if (!tc->insert(cursor, coll.id, key, value)) {
-                tc->rollback();
-            } else if (tc->can_commit()) {
+                tc->txn.rollback();
+            } else if (tc->txn.can_commit()) {
                 /*
                  * The transaction can fit in the current cache size and is ready to be committed.
                  * This means the tracking table will contain a new record to represent this
                  * transaction which will be used during the validation stage.
                  */
-                testutil_assert(tc->commit());
+                testutil_assert(tc->txn.commit());
             }
         }
 
         /* Make sure the last transaction is rolled back now the work is finished. */
-        tc->try_rollback();
+        tc->txn.try_rollback();
     }
 
     void

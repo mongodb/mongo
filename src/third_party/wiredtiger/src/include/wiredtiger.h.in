@@ -53,17 +53,6 @@ typedef int64_t wt_off_t;
 #define WT_ATTRIBUTE_LIBRARY_VISIBLE    __attribute__((visibility("default")))
 #endif
 
-#if defined(_MSC_VER)
-#define WT_DIAGNOSTIC_PUSH      __pragma(warning(push))
-#define WT_DIAGNOSTIC_POP       __pragma(warning(pop))
-/* Disable MSVC warning C4200: nonstandard extension used: zero-sized array in struct/union */
-#define WT_DIAGNOSTIC_DISABLE_ZERO_SIZED_ARRAY  __pragma(warning(disable : 4200))
-#else
-#define WT_DIAGNOSTIC_PUSH
-#define WT_DIAGNOSTIC_POP
-#define WT_DIAGNOSTIC_DISABLE_ZERO_SIZED_ARRAY
-#endif
-
 /*!
  * @defgroup wt WiredTiger API
  * The functions, handles and methods applications use to access and manage
@@ -5726,8 +5715,6 @@ struct __wt_page_log {
 };
 
 #ifndef SWIG
-WT_DIAGNOSTIC_PUSH
-WT_DIAGNOSTIC_DISABLE_ZERO_SIZED_ARRAY
 /*
  * A structure that represents encrypted keys stored by WiredTiger.
  *
@@ -5744,10 +5731,8 @@ struct __wt_crypt_keys {
         uint64_t lsn; /* Returns checkpoint LSN upon success. */
         int error;    /* Returns error code on failure. */
     } r;
-    size_t size;    /* Size of encrypted key data field. */
-    uint8_t data[]; /* Encrypted keys. */
+    WT_ITEM keys;     /* Encrypted keys. */
 };
-WT_DIAGNOSTIC_POP
 
 /*!
  * Interface for custom key provider services used by applications.
@@ -5764,20 +5749,27 @@ struct __wt_key_provider {
      *
      * @param kp the WT_KEY_PROVIDER instance.
      * @param session the current WiredTiger session.
-     * @param keys the WT_CRYPT_KEYS to hold persisted key information.
+     * @param crypt the WT_CRYPT_KEYS to hold persisted key information.
      */
-    int (*load_key)(WT_KEY_PROVIDER *kp, WT_SESSION *session, const WT_CRYPT_KEYS *keys);
+    int (*load_key)(WT_KEY_PROVIDER *kp, WT_SESSION *session, const WT_CRYPT_KEYS *crypt);
 
     /*!
      * Fetch the latest key for checkpoint writes.
      *
-     * The WT_CRYPT_KEYS argument should be set to zero if the key has not changed.
+     * WiredTiger calls this function with an empty WT_CRYPT_KEYS::keys field to
+     * fetch the required size of the keys data.
+     * The WT_CRYPT_KEYS::keys::size member should be set to zero if the key has not changed
+     * or the valid key size otherwise.
+     *
+     * When the key has changed, WiredTiger will allocate the required memory and call this
+     * function again to fetch the new key. The extension should copy the new key into the
+     * WT_CRYPT_KEYS::keys::data field up to WT_CRYPT_KEYS::keys::size.
      *
      * @param kp the WT_KEY_PROVIDER instance.
      * @param session the current WiredTiger session.
-     * @param keysp the WT_CRYPT_KEYS to hold the new key (if changed).
+     * @param[out] crypt the WT_CRYPT_KEYS to hold the new key (if changed).
      */
-    int (*get_key)(WT_KEY_PROVIDER *kp, WT_SESSION *session, WT_CRYPT_KEYS **keysp);
+    int (*get_key)(WT_KEY_PROVIDER *kp, WT_SESSION *session, WT_CRYPT_KEYS *crypt);
 
     /*!
      * Callback function indicating that whether the key has been persisted.
@@ -5787,9 +5779,24 @@ struct __wt_key_provider {
      *
      * @param kp the WT_KEY_PROVIDER instance.
      * @param session the current WiredTiger session.
-     * @param keys the WT_CRYPT_KEYS information to confirm key persistence.
+     * @param crypt the WT_CRYPT_KEYS information to confirm key persistence.
      */
-    int (*on_key_update)(WT_KEY_PROVIDER *kp, WT_SESSION *session, WT_CRYPT_KEYS *keys);
+    int (*on_key_update)(WT_KEY_PROVIDER *kp, WT_SESSION *session, const WT_CRYPT_KEYS *crypt);
+
+    /*!
+     * A callback performed when the key provider is closed and will no
+     * longer be accessed by the WiredTiger database.
+     *
+     * This method is not required and should be set to NULL when not
+     * required by the key provider.
+     *
+     * The WT_KEY_PROVIDER::terminate callback is intended to allow cleanup;
+     * the handle will not be subsequently accessed by WiredTiger.
+     *
+     * @param kp the WT_KEY_PROVIDER instance.
+     * @param session the current WiredTiger session.
+     */
+    int (*terminate)(WT_KEY_PROVIDER *key_provider, WT_SESSION *session);
 };
 #endif
 

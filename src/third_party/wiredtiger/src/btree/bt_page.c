@@ -613,10 +613,8 @@ __page_merge_deltas_common_merge_loop(WT_SESSION_IMPL *session, WT_CELL_UNPACK_A
         hdr = (WT_PAGE_HEADER *)new_image->data;
         memset(hdr, 0, sizeof(WT_PAGE_HEADER));
         hdr->u.entries = entry_count;
-        if (row_internal_page) {
+        if (row_internal_page)
             F_SET(hdr, WT_PAGE_FT_UPDATE);
-            WT_STAT_CONN_DSRC_INCR(session, cache_read_internal_delta);
-        }
 
         /* Compute final on-disk image size using pointer difference. */
         new_image->size = WT_PTRDIFF(p_ptr, new_image->mem);

@@ -1519,12 +1519,12 @@ config_disagg_storage(void)
     else
         g.disagg_leader = strcmp(mode, "leader") == 0;
 
-    /* FIXME WT-15189 For non-leader modes, random cursors are problematic. */
-    if (strcmp(mode, "leader") != 0) {
-        if (config_explicit(NULL, "ops.random_cursor"))
-            WARN("%s", "turning off ops.random_cursor to work with disagg non-leader modes");
-        config_off(NULL, "ops.random_cursor");
-    }
+    /* FIXME WT-15189 For disagg, random cursors are problematic. */
+    if (config_explicit(NULL, "ops.random_cursor"))
+        WARN("%s",
+          "turning off ops.random_cursor with disagg as they are currently problematic and can "
+          "cause stalls");
+    config_off(NULL, "ops.random_cursor");
 
     /* Disaggregated storage requires timestamps. */
     config_off(NULL, "transaction.implicit");

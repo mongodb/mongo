@@ -108,33 +108,6 @@ public:
     /* Get the number of collections assigned to the thread worker */
     uint64_t get_assigned_collection_count() const;
 
-    /* Add an operation to the current work item. */
-    void add_op();
-    /* Get the current number of operations executed. */
-    int64_t get_op_count() const;
-    /* Get the number of operations this work item needs before it can commit */
-    int64_t get_target_op_count() const;
-
-    /*
-     * Returns true if our transaction can be committed as determined by the op count and the state
-     * of the transaction.
-     */
-    bool can_commit();
-    /* Returns whether there is an active transaction. */
-    bool active() const;
-    /* Begins a transaction. */
-    void begin(const std::string &config = "");
-    /* Begin a transaction if we are not currently in one. */
-    void try_begin(const std::string &config = "");
-    /* Commit a transaction and return true if the commit was successful. */
-    bool commit(const std::string &config = "");
-    /* Rollback a transaction, failure will abort the test. */
-    void rollback(const std::string &config = "");
-    /* Attempt to rollback the transaction given the requirements are met. */
-    void try_rollback(const std::string &config = "");
-    /* Set a commit timestamp. */
-    int set_commit_timestamp(wt_timestamp_t ts);
-
 public:
     const int64_t collection_count;
     const int64_t free_space_target_mb;
@@ -149,25 +122,12 @@ public:
     scoped_cursor op_track_cursor;
     scoped_cursor stat_cursor;
     timestamp_manager *tsm;
+    transaction txn;
     operation_tracker *op_tracker;
 
 private:
     std::shared_ptr<barrier> _barrier = nullptr;
     bool _running = true;
     std::chrono::milliseconds _sleep_time_ms;
-    transaction _txn;
-
-    /*
-     * _min_op_count and _max_op_count are the minimum and maximum number of operations within one
-     * transaction.
-     */
-    int64_t _max_op_count = INT64_MAX;
-    int64_t _min_op_count = 0;
-    /*
-     * op_count is the current number of operations that have been executed in the current
-     * transaction.
-     */
-    int64_t _op_count = 0;
-    int64_t _target_op_count = 0;
 };
 } // namespace test_harness

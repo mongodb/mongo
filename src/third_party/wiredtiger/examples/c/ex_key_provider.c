@@ -53,7 +53,7 @@ typedef struct {
 
     /* This example stores a fixed size blob in the key provider struct. It is not required. */
     MY_CRYPT_DATA *encryption_data;
-    uint64_t returned_lsn;
+    uint64_t checkpoint_lsn;
 } MY_KEY_PROVIDER;
 
 /*
@@ -61,7 +61,7 @@ typedef struct {
  *     A simple example of set_key call.
  */
 static int
-my_load_key(WT_KEY_PROVIDER *kp, WT_SESSION *session, const WT_CRYPT_KEYS *keys)
+my_load_key(WT_KEY_PROVIDER *kp, WT_SESSION *session, const WT_CRYPT_KEYS *crypt)
 {
     WT_UNUSED(session);
     MY_KEY_PROVIDER *my_kp = (MY_KEY_PROVIDER *)kp;
@@ -75,8 +75,10 @@ my_load_key(WT_KEY_PROVIDER *kp, WT_SESSION *session, const WT_CRYPT_KEYS *keys)
     free(my_kp->encryption_data);
 
     /* Assign new encryption data. */
-    memcpy((uint8_t *)encryption_data, keys->data, keys->size);
+    memcpy((uint8_t *)encryption_data, crypt->keys.data, crypt->keys.size);
     my_kp->encryption_data = encryption_data;
+    my_kp->checkpoint_lsn = crypt->r.lsn;
+
     return (0);
 }
 
@@ -85,23 +87,25 @@ my_load_key(WT_KEY_PROVIDER *kp, WT_SESSION *session, const WT_CRYPT_KEYS *keys)
  *     An simple example of key rotation done on get_key call.
  */
 static int
-my_get_key(WT_KEY_PROVIDER *kp, WT_SESSION *session, WT_CRYPT_KEYS **keysp)
+my_get_key(WT_KEY_PROVIDER *kp, WT_SESSION *session, WT_CRYPT_KEYS *crypt)
 {
     WT_UNUSED(session);
     MY_KEY_PROVIDER *my_kp = (MY_KEY_PROVIDER *)kp;
 
-    if ((*keysp = calloc(1, sizeof(WT_CRYPT_KEYS) + sizeof(MY_CRYPT_DATA))) == NULL)
-        return (ENOMEM);
+    if (crypt->keys.data == NULL) {
+        /* First call to get_key: return required size. */
+        crypt->keys.size = sizeof(MY_CRYPT_DATA);
 
-    /* Populate the data field in the WT_CRYPT_KEYS structure. */
-    MY_CRYPT_DATA *crypt_data = (MY_CRYPT_DATA *)(*keysp)->data;
+        return (0);
+    }
+
+    /* Second call to get_key: return the new key. */
+    MY_CRYPT_DATA *crypt_data = (MY_CRYPT_DATA *)crypt->keys.data;
 
     /* Set fields in the MY_CRYPT_DATA structure. */
     crypt_data->data = my_kp->encryption_data->data;
     crypt_data->id = my_kp->encryption_data->id;
 
-    /* Set the WT_CRYPT_KEYS size field to match the allocation. */
-    (*keysp)->size = sizeof(MY_CRYPT_DATA);
     return (0);
 }
 
@@ -110,21 +114,31 @@ my_get_key(WT_KEY_PROVIDER *kp, WT_SESSION *session, WT_CRYPT_KEYS **keysp)
  *     A simple example of on_key_update call.
  */
 static int
-my_on_key_update(WT_KEY_PROVIDER *kp, WT_SESSION *session, WT_CRYPT_KEYS *keys)
+my_on_key_update(WT_KEY_PROVIDER *kp, WT_SESSION *session, const WT_CRYPT_KEYS *crypt)
 {
     MY_KEY_PROVIDER *my_kp = (MY_KEY_PROVIDER *)kp;
     WT_EXTENSION_API *wtext = my_kp->wtext;
 
     /* Check size field to determine that the key was successfully persisted. */
-    if (keys->size != 0)
-        my_kp->returned_lsn = keys->r.lsn;
+    if (crypt->keys.size != 0)
+        my_kp->checkpoint_lsn = crypt->r.lsn;
     else
         /* Handle error */
         (void)wtext->err_printf(
-          wtext, session, "on_key_update: %s", wtext->strerror(wtext, session, keys->r.error));
+          wtext, session, "on_key_update: %s", wtext->strerror(wtext, session, crypt->r.error));
 
-    /* Free the allocated key. */
-    free(keys);
+    return (0);
+}
+
+static int
+my_terminate(WT_KEY_PROVIDER *kp, WT_SESSION *session)
+{
+    WT_UNUSED(session);
+    MY_KEY_PROVIDER *my_kp = (MY_KEY_PROVIDER *)kp;
+
+    /* Free any allocated encryption data. */
+    free(my_kp->encryption_data);
+    free(my_kp);
 
     return (0);
 }
@@ -153,6 +167,7 @@ set_my_key_provider(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
     kp->load_key = my_load_key;
     kp->get_key = my_get_key;
     kp->on_key_update = my_on_key_update;
+    kp->terminate = my_terminate;
 
     error_check(conn->set_key_provider(conn, (WT_KEY_PROVIDER *)my_kp, NULL));
     return (0);

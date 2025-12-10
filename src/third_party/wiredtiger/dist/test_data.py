@@ -109,11 +109,14 @@ stat_config = range_config + [
 
 component_config = throttle_config
 
-thread_worker_config = [
+transaction_config = [
     Config('ops_per_transaction', '', r'''
         Defines how many operations a transaction can perform, the range is defined with a minimum
         and a maximum and a random number is chosen between the two using a linear distribution.''',
         type='category', subconfig=range_config),
+]
+
+thread_count = [
     Config('thread_count', 0, r'''
         Specifies the number of threads that will be used to perform a certain function.''', min=0)
 ]
@@ -134,10 +137,10 @@ background_compact_thread_config = throttle_config + [
     Config('free_space_target_mb', '20', r'''
         Minimum amount of space in MB recoverable for compaction to proceed.''')
 ]
-custom_operation_thread_config = thread_worker_config + throttle_config + record_config
-read_thread_config = thread_worker_config + throttle_config + record_config
-remove_thread_config = thread_worker_config + throttle_config
-update_insert_thread_config = thread_worker_config + throttle_config + record_config
+custom_operation_thread_config = thread_count + transaction_config + throttle_config + record_config
+read_thread_config = thread_count + throttle_config + transaction_config + record_config
+remove_thread_config = thread_count + transaction_config + throttle_config
+update_insert_thread_config = thread_count + transaction_config + throttle_config + record_config
 
 #
 # Configuration that applies to the runtime monitor component, this should be a list of statistics
