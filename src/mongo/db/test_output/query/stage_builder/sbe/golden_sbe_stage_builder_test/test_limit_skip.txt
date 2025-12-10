@@ -1,3 +1,3 @@
 # Golden test output of GoldenSbeStageBuilderTest/TestLimitSkip
 [3] limitskip s4 s1 
-[1] scan [s2 = record, s3 = recordId] @"UUID" forward 
+[1] scan generic [s2 = record, s3 = recordId] @"UUID" 

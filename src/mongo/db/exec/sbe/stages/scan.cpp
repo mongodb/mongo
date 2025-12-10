@@ -38,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/stages/generic_scan.h"
 #include "mongo/db/exec/sbe/stages/random_scan.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/values/bson.h"
@@ -604,11 +605,7 @@ PlanState ScanStage::getNext() {
         return trackPlanState(PlanState::IS_EOF);
     }
 
-    if (_state->recordSlot) {
-        _recordAccessor.reset(false,
-                              value::TypeTags::bsonObject,
-                              value::bitcastFrom<const char*>(nextRecord->data.data()));
-    }
+    resetRecordId(nextRecord);
 
     if (_state->recordIdSlot) {
         _recordId = std::move(nextRecord->id);
@@ -720,3 +717,4 @@ size_t ScanStageBase::estimateCompileTimeSize() const {
 
 template class mongo::sbe::ScanStageBaseImpl<mongo::sbe::ScanStage>;
 template class mongo::sbe::ScanStageBaseImpl<mongo::sbe::RandomScanStage>;
+template class mongo::sbe::ScanStageBaseImpl<mongo::sbe::GenericScanStage>;

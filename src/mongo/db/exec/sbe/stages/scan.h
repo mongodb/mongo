@@ -204,7 +204,7 @@ protected:
     };
 
     // Shared logic for getNext()
-    inline void handleEOF(boost::optional<Record>& nextRecord) {
+    inline void handleEOF(const boost::optional<Record>& nextRecord) {
         if (_state->recordIdSlot) {
             auto [tag, val] = sbe::value::makeCopyRecordId(RecordId());
             _recordIdAccessor.reset(true, tag, val);
@@ -213,7 +213,7 @@ protected:
 
     // Shared logic for getNext()
     // Helper to reset record ID if a `recordIdSlot` is present and to track end bounds.
-    inline void resetRecordId(boost::optional<Record>& nextRecord) {
+    inline void resetRecordId(const boost::optional<Record>& nextRecord) {
         if (_state->recordSlot) {
             _recordAccessor.reset(false,
                                   value::TypeTags::bsonObject,

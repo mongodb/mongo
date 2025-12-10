@@ -58,7 +58,8 @@ public:
                               value::TypeTags arrTag,
                               value::Value arrVal,
                               PlanYieldPolicy* yieldPolicy = nullptr,
-                              bool participateInTrialRunTracking = true);
+                              bool participateInTrialRunTracking = true,
+                              bool owned = true);
 
     ~VirtualScanStage() final;
 
@@ -91,6 +92,7 @@ private:
 
     value::TypeTags _arrTag;
     value::Value _arrVal;
+    bool _owned;
 
     std::unique_ptr<value::ViewOfValueAccessor> _outFieldOutputAccessor;
 

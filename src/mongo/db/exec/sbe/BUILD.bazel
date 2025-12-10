@@ -167,6 +167,7 @@ mongo_cc_library(
     name = "query_sbe_storage",
     srcs = [
         "//src/mongo/db/exec/sbe/stages:collection_helpers.cpp",
+        "//src/mongo/db/exec/sbe/stages:generic_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:ix_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:random_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:scan.cpp",
@@ -433,6 +434,23 @@ mongo_cc_benchmark(
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
         "//src/mongo/util:pcre_wrapper",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "sbe_scan_bm",
+    srcs = [
+        "//src/mongo/db/exec/sbe:sbe_scan_bm.cpp",
+    ],
+    deps = [
+        ":query_sbe_stages",
+        ":sbe_plan_stage_test",
+        ":sbe_unittest_base",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/exec:expression_bm_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/unittest",
     ],
 )
 

@@ -204,7 +204,10 @@ public:
      * Note that this method assumes ownership of the SBE Array being passed in.
      */
     std::pair<value::SlotId, std::unique_ptr<PlanStage>> generateVirtualScan(
-        value::TypeTags arrTag, value::Value arrVal, PlanNodeId planNodeId = kEmptyPlanNodeId);
+        value::TypeTags arrTag,
+        value::Value arrVal,
+        PlanNodeId planNodeId = kEmptyPlanNodeId,
+        bool owned = true);
 
     /**
      * This method is similar to generateVirtualScan(), except that the subtree returned outputs to
@@ -261,6 +264,8 @@ public:
     std::pair<value::TypeTags, value::Value> getAllResults(PlanStage* stage,
                                                            value::SlotAccessor* accessor);
 
+    void exhaustStage(PlanStage* stage, value::SlotAccessor* accessor);
+
     /**
      * This method is similar to getAllResults(), except that it supports multiple SlotAccessors.
      * This method returns an array of subarrays. Each subarray contains exactly N elements (where
@@ -296,6 +301,17 @@ public:
                                                      value::TypeTags inputTag,
                                                      value::Value inputVal,
                                                      const MakeStageFn<value::SlotId>& makeStage);
+
+    void runFast(value::TypeTags inputTag, value::Value inputVal, auto makeStage) {
+        auto cctx = makeCompileCtx();
+        auto ctx = cctx.get();
+        auto [scanSlot, scanStage] =
+            generateVirtualScan(inputTag, inputVal, kEmptyPlanNodeId, false /*owned*/);
+        auto [outputSlot, stage] = makeStage(
+            scanSlot, std::move(scanStage), [&]() { return _slotIdGenerator->generate(); });
+        auto resultAccessor = prepareTree(ctx, stage.get(), outputSlot);
+        exhaustStage(stage.get(), resultAccessor);
+    }
 
     /**
      * This method is similar to runTest(), but it allows for streaming input via multiple slots as

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
+#include "mongo/db/exec/sbe/stages/generic_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/project.h"
@@ -161,6 +162,7 @@ std::unique_ptr<sbe::PlanStage> makeScanStage(const CollectionPtr& collection,
                                               PlanYieldPolicy* sbeYieldPolicy) {
     sbe::value::SlotVector scanFieldSlots;
     std::vector<std::string> scanFieldNames;
+    sbe::ScanOpenCallback scanOpenCallback{};
     if (useRandomCursor) {
         return sbe::makeS<sbe::RandomScanStage>(collection->uuid(),
                                                 collection->ns().dbName(),
@@ -174,24 +176,38 @@ std::unique_ptr<sbe::PlanStage> makeScanStage(const CollectionPtr& collection,
                                                 scanFieldSlots,
                                                 sbeYieldPolicy,
                                                 0 /* nodeId */);
+    } else if (minRecordIdSlot) {
+        return sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                          collection->ns().dbName(),
+                                          recordSlot,
+                                          recordIdSlot,
+                                          boost::none /* snapshotIdSlot */,
+                                          boost::none /* indexIdentSlot */,
+                                          boost::none /* indexKeySlot */,
+                                          boost::none /* keyPatternSlot */,
+                                          scanFieldNames,
+                                          scanFieldSlots,
+                                          minRecordIdSlot,
+                                          boost::none /* maxRecordIdSlot */,
+                                          true /* forward */,
+                                          sbeYieldPolicy,
+                                          0 /* nodeId */,
+                                          std::move(scanOpenCallback));
     }
-    sbe::ScanOpenCallback scanOpenCallback{};
-    return sbe::makeS<sbe::ScanStage>(collection->uuid(),
-                                      collection->ns().dbName(),
-                                      recordSlot,
-                                      recordIdSlot,
-                                      boost::none /* snapshotIdSlot */,
-                                      boost::none /* indexIdentSlot */,
-                                      boost::none /* indexKeySlot */,
-                                      boost::none /* keyPatternSlot */,
-                                      scanFieldNames,
-                                      scanFieldSlots,
-                                      minRecordIdSlot,
-                                      boost::none /* maxRecordIdSlot */,
-                                      true /* forward */,
-                                      sbeYieldPolicy,
-                                      0 /* nodeId */,
-                                      std::move(scanOpenCallback));
+    return sbe::makeS<sbe::GenericScanStage>(collection->uuid(),
+                                             collection->ns().dbName(),
+                                             recordSlot,
+                                             recordIdSlot,
+                                             boost::none /* snapshotIdSlot */,
+                                             boost::none /* indexIdentSlot */,
+                                             boost::none /* indexKeySlot */,
+                                             boost::none /* keyPatternSlot */,
+                                             scanFieldNames,
+                                             scanFieldSlots,
+                                             true /* forward */,
+                                             sbeYieldPolicy,
+                                             0 /* nodeId */,
+                                             std::move(scanOpenCallback));
 }
 
 /**

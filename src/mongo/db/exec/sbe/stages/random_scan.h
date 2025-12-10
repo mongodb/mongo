@@ -113,7 +113,6 @@ private:
     inline RecordCursor* getActiveCursor() const {
         return _randomCursor.get();
     }
-
     std::unique_ptr<RecordCursor> _randomCursor;
 };  // class RandomScanStage
 }  // namespace sbe

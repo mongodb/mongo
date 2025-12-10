@@ -60,12 +60,20 @@ void PlanStageTestFixture::assertValuesEqual(value::TypeTags lhsTag,
 }
 
 std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateVirtualScan(
-    value::TypeTags arrTag, value::Value arrVal, PlanNodeId planNodeId) {
-    // The value passed in must be an array.
+    value::TypeTags arrTag,
+    value::Value arrVal,
+    PlanNodeId planNodeId /*= kEmptyPlanNodeId*/,
+    bool owned /*=true*/) {
     invariant(sbe::value::isArray(arrTag));
 
     auto outputSlot = _slotIdGenerator->generate();
-    auto virtualScan = sbe::makeS<sbe::VirtualScanStage>(planNodeId, outputSlot, arrTag, arrVal);
+    auto virtualScan = sbe::makeS<sbe::VirtualScanStage>(planNodeId,
+                                                         outputSlot,
+                                                         arrTag,
+                                                         arrVal,
+                                                         nullptr /*yieldPolicy*/,
+                                                         true /*participateInTrialRunTracking*/,
+                                                         owned /*owned*/);
 
     // Return the VirtualScanStage and its output slot.
     return {outputSlot, std::move(virtualScan)};
@@ -173,6 +181,11 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
 
     guard.reset();
     return {resultsTag, resultsVal};
+}
+
+void PlanStageTestFixture::exhaustStage(PlanStage* stage, value::SlotAccessor* accessor) {
+    for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext()) {
+    }
 }
 
 std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMulti(
