@@ -171,7 +171,7 @@ public:
 
     void addRule(const Rule<Context>& rule) {
         if (rule_detail::hasTag(rule, _tagsToRun)) {
-            _rules.emplace(&rule);
+            _rules.push(&rule);
         }
     }
 
@@ -203,14 +203,46 @@ public:
     }
 
 private:
-    struct HighestPriorityFirst {
-        bool operator()(const Rule<Context>* a, const Rule<Context>* b) const {
-            return a->priority < b->priority;
+    /**
+     * Similar to std::priority_queue, but allows us clear() the queue without changing capacity,
+     * which helps performance when rules are being requeued over and over again.
+     */
+    class RuleQueue {
+    public:
+        const Rule<Context>* pop() {
+            std::pop_heap(_queue.begin(), _queue.end(), _compare);
+            auto& result = _queue.back();
+            _queue.pop_back();
+            return result;
         }
+
+        void push(const Rule<Context>* rule) {
+            _queue.push_back(rule);
+            std::push_heap(_queue.begin(), _queue.end(), _compare);
+        }
+
+        bool empty() const {
+            return _queue.empty();
+        }
+
+        void clear() {
+            _queue.clear();
+        }
+
+        size_t size() const {
+            return _queue.size();
+        }
+
+    private:
+        struct HighestPriorityFirst {
+            bool operator()(const Rule<Context>* a, const Rule<Context>* b) const {
+                return a->priority < b->priority;
+            }
+        };
+
+        HighestPriorityFirst _compare{};
+        std::vector<const Rule<Context>*> _queue;
     };
-    using RuleQueue = std::priority_queue<const Rule<Context>*,
-                                          std::vector<const Rule<Context>*>,
-                                          HighestPriorityFirst>;
 
     enum class NextAction {
         Requeue,
@@ -231,8 +263,7 @@ private:
                 return NextAction::Bail;
             }
 
-            const auto& rule = *_rules.top();
-            _rules.pop();
+            const auto& rule = *_rules.pop();
             const size_t rulesBefore = _rules.size();
 
             LOGV2_DEBUG(11010013,
@@ -264,7 +295,7 @@ private:
     }
 
     void clearRules() {
-        _rules = {};
+        _rules.clear();
     }
 
     Context _context;
