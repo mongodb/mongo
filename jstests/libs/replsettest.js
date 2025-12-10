@@ -316,6 +316,16 @@ export class ReplSetTest {
         return this._maintenancePorts[translatedN];
     }
 
+    getNewConnectionToMaintenancePort(node) {
+        const maintenancePort = this.getMaintenancePort(node);
+        return new Mongo(node.host.split(":")[0] + ":" + maintenancePort);
+    }
+
+    getNewConnectionToMaintenanceSocket(node) {
+        const maintenancePort = this.getMaintenancePort(node);
+        return new Mongo("/tmp/mongodb-" + maintenancePort + ".sock");
+    }
+
     getDbPath(node) {
         // Get a replica set node (check for use of bridge).
         const n = this.getNodeId(node);

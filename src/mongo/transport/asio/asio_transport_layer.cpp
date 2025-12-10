@@ -97,6 +97,8 @@
 namespace mongo {
 namespace transport {
 class AsioReactor;
+class WrappedEndpoint;
+class WrappedResolver;
 }  // namespace transport
 }  // namespace mongo
 namespace asio {
@@ -117,6 +119,12 @@ using TcpInfoOption = SocketOption<IPPROTO_TCP, TCP_INFO, tcp_info>;
 #endif  // __linux__
 
 const Seconds kSessionShutdownTimeout{10};
+
+std::set<mongo::transport::WrappedEndpoint> getEndpoints(
+    const std::vector<int>& ports,
+    const std::vector<std::string>& listenAddrs,
+    const WrappedResolver& resolver,
+    const AsioTransportLayer::Options& listenerOptions);
 
 bool shouldDiscardSocketDueToLostConnectivity(AsioSession::GenericSocket& peerSocket) {
 #ifdef __linux__
@@ -379,7 +387,12 @@ AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
                                        std::unique_ptr<SessionManager> sessionManager)
     : _ingressReactor(std::make_shared<AsioReactor>()),
       _egressReactor(std::make_shared<AsioReactor>()),
-      _acceptorReactor(std::make_shared<AsioReactor>()),
+      _listenerInterfaceMainPort(
+          std::make_unique<ListenerInterface>(_mutex, std::make_shared<AsioReactor>(), this)),
+      _listenerInterfaceMaintenancePort(
+          opts.maintenancePort
+              ? std::make_unique<ListenerInterface>(_mutex, std::make_shared<AsioReactor>(), this)
+              : nullptr),
       _sessionManager(std::move(sessionManager)),
       _listenerOptions(opts),
       _timerService(std::make_unique<TimerService>()) {
@@ -566,6 +579,307 @@ private:
 
     Resolver _resolver;
 };
+
+std::set<mongo::transport::WrappedEndpoint> getEndpoints(
+    const std::vector<int>& ports,
+    const std::vector<std::string>& listenAddrs,
+    WrappedResolver& resolver,
+    const AsioTransportLayer::Options& listenerOptions) {
+    std::set<mongo::transport::WrappedEndpoint> endpoints;
+    for (const auto& port : ports) {
+        for (const auto& listenAddr : listenAddrs) {
+            if (listenAddr.empty()) {
+                LOGV2_WARNING(23020, "Skipping empty bind address");
+                continue;
+            }
+
+            const auto& swAddrs =
+                resolver.resolve(HostAndPort(listenAddr, port), listenerOptions.enableIPv6);
+            if (!swAddrs.isOK()) {
+                LOGV2_WARNING(
+                    23021, "Found no addresses for peer", "peer"_attr = swAddrs.getStatus());
+                continue;
+            }
+            const auto& addrs = swAddrs.getValue();
+            endpoints.insert(addrs.begin(), addrs.end());
+        }
+    }
+    return endpoints;
+}
+
+AsioTransportLayer::ListenerInterface::ListenerInterface(stdx::mutex& sharedMutex,
+                                                         std::shared_ptr<AsioReactor> reactor,
+                                                         AsioTransportLayer* asioTransportLayer)
+    : _sharedMutex(sharedMutex),
+      _acceptorReactor(reactor),
+      _asioTransportLayer(asioTransportLayer) {};
+
+AsioTransportLayer::ListenerInterface::~ListenerInterface() = default;
+
+StatusWith<std::vector<std::unique_ptr<AsioTransportLayer::AcceptorRecord>>>
+AsioTransportLayer::ListenerInterface::_createAcceptorRecords(
+    const std::vector<int>& ports,
+    const std::set<WrappedEndpoint>& endpoints,
+    const Options& listenerOptions) {
+    std::vector<std::unique_ptr<AcceptorRecord>> acceptorRecords;
+    for (const auto& addr : endpoints) {
+#ifndef _WIN32
+        if (addr.family() == AF_UNIX) {
+            if (::unlink(addr.toString().c_str()) == -1) {
+                auto ec = lastPosixError();
+                if (ec != posixError(ENOENT)) {
+                    LOGV2_ERROR(23024,
+                                "Failed to unlink socket file",
+                                "path"_attr = addr.toString().c_str(),
+                                "error"_attr = errorMessage(ec));
+                    fassertFailedNoTrace(40486);
+                }
+            }
+        }
+#endif
+        if (addr.family() == AF_INET6 && !listenerOptions.enableIPv6) {
+            LOGV2_ERROR(23025, "Specified ipv6 bind address, but ipv6 is disabled");
+            fassertFailedNoTrace(40488);
+        }
+
+        GenericAcceptor acceptor(*getReactor());
+        try {
+            acceptor.open(addr->protocol());
+        } catch (std::exception&) {
+            // Allow the server to start when "ipv6: true" and "bindIpAll: true", but the
+            // platform does not support ipv6 (e.g., ipv6 kernel module is not loaded in
+            // Linux).
+            auto addrIsBindAll = [&] {
+                for (auto port : ports) {
+                    if (addr.toString() == fmt::format(":::{}", port)) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            if (errno == EAFNOSUPPORT && listenerOptions.enableIPv6 && addr.family() == AF_INET6 &&
+                addrIsBindAll()) {
+                LOGV2_WARNING(4206501,
+                              "Failed to bind to {address} as the platform does not support ipv6",
+                              "address"_attr = addr.toString());
+                continue;
+            }
+
+            throw;
+        }
+        setSocketOption(
+            acceptor, ReuseAddrOption(true), "acceptor reuse address", logv2::LogSeverity::Info());
+
+        std::error_code ec;
+
+        if (auto af = addr.family(); af == AF_INET || af == AF_INET6) {
+            if (auto ec = tfo::initAcceptorSocket(acceptor))
+                return errorCodeToStatus(ec, "setup tcpFastOpenIsConfigured");
+        }
+        if (addr.family() == AF_INET6) {
+            setSocketOption(
+                acceptor, IPV6OnlyOption(true), "acceptor v6 only", logv2::LogSeverity::Info());
+        }
+
+        (void)acceptor.non_blocking(true, ec);
+        if (ec) {
+            return errorCodeToStatus(ec, "setup non_blocking");
+        }
+
+        (void)acceptor.bind(*addr, ec);
+        if (ec) {
+            return errorCodeToStatus(ec, "setup bind").withContext(addr.toString());
+        }
+
+#ifndef _WIN32
+        if (addr.family() == AF_UNIX) {
+            setUnixDomainSocketPermissions(addr.toString(),
+                                           serverGlobalParams.unixSocketPermissions);
+        }
+#endif
+        auto endpoint = acceptor.local_endpoint(ec);
+        if (ec) {
+            return errorCodeToStatus(ec);
+        }
+        auto hostAndPort = endpointToHostAndPort(endpoint);
+
+        auto record = std::make_unique<AcceptorRecord>(SockAddr(addr->data(), addr->size()),
+                                                       std::move(acceptor));
+
+        if (_listenerPort == 0 && (addr.family() == AF_INET || addr.family() == AF_INET6)) {
+            record->address.setPort(hostAndPort.port());
+            _listenerPort = hostAndPort.port();
+        }
+        acceptorRecords.push_back(std::move(record));
+    }
+    return std::move(acceptorRecords);
+};
+
+StatusWith<std::vector<std::unique_ptr<AsioTransportLayer::AcceptorRecord>>>
+AsioTransportLayer::ListenerInterface::_retrieveAllAcceptorRecords(
+    const std::vector<int>& ports,
+    const std::vector<std::string>& listenIPAddrs,
+    const std::vector<std::string>& listenUnixSocketsAddrs,
+    const Options& listenerOptions) {
+    // Self-deduplicating list of unique endpoint addresses.
+    std::set<WrappedEndpoint> inetEndpoints;
+    std::set<WrappedEndpoint> unixEndpoints;
+    WrappedResolver resolver(*getReactor());
+    std::vector<std::unique_ptr<AcceptorRecord>> acceptorRecords;
+
+    inetEndpoints = getEndpoints(ports, listenIPAddrs, resolver, listenerOptions);
+    auto resultIpAddrs = _createAcceptorRecords(ports, inetEndpoints, listenerOptions);
+    if (!resultIpAddrs.isOK()) {
+        return resultIpAddrs.getStatus();
+    }
+    acceptorRecords = std::move(resultIpAddrs.getValue());
+
+    unixEndpoints = getEndpoints(ports, listenUnixSocketsAddrs, resolver, listenerOptions);
+    auto resultUnixSockets = _createAcceptorRecords(ports, unixEndpoints, listenerOptions);
+    if (!resultUnixSockets.isOK()) {
+        return resultUnixSockets.getStatus();
+    }
+    auto& acceptorRecordsSockets = resultUnixSockets.getValue();
+    acceptorRecords.insert(acceptorRecords.end(),
+                           std::make_move_iterator(acceptorRecordsSockets.begin()),
+                           std::make_move_iterator(acceptorRecordsSockets.end()));
+
+    return std::move(acceptorRecords);
+}
+
+void AsioTransportLayer::ListenerInterface::stopListenerWithLock(
+    stdx::unique_lock<stdx::mutex>& lk) {
+    if (auto oldState = _listener.state; oldState != Listener::State::kShutdown) {
+        _listener.state = Listener::State::kShuttingDown;
+        if (oldState == Listener::State::kActive) {
+            while (_listener.state != Listener::State::kShutdown) {
+                lk.unlock();
+                _acceptorReactor->stop();
+                lk.lock();
+            }
+        }
+    }
+}
+
+void AsioTransportLayer::ListenerInterface::_runListener(std::string threadName) {
+    setThreadName(threadName);
+
+    stdx::unique_lock lk(_sharedMutex);
+    ON_BLOCK_EXIT([&] {
+        if (!lk.owns_lock()) {
+            lk.lock();
+        }
+        _listener.state = Listener::State::kShutdown;
+        _listener.cv.notify_all();
+    });
+    // Because multiple listener interfaces can be active at the same time (one thread per
+    // interface), we must hold the lock when accessing the shared state in the following
+    // operations.  Currently, listener threads run for _listenerInterfaceMainPort and
+    // _listenerInterfaceMaintenancePort.
+    _startListening(lk);
+
+    _listener.state = Listener::State::kActive;
+    _listener.cv.notify_all();
+    while (!_asioTransportLayer->_isShutdown.load() &&
+           (_listener.state == Listener::State::kActive)) {
+        lk.unlock();
+        _acceptorReactor->run();
+        lk.lock();
+    }
+
+    _stopAcceptors(lk);
+}
+
+void AsioTransportLayer::ListenerInterface::startListener(std::string threadName) {
+    _listener.thread =
+        stdx::thread([this, threadName = std::move(threadName)] { _runListener(threadName); });
+}
+
+bool AsioTransportLayer::ListenerInterface::isListenerStarted() const {
+    return _listener.thread.joinable();
+}
+
+void AsioTransportLayer::ListenerInterface::waitListenerThreadJoin() {
+    _listener.thread.join();
+}
+
+void AsioTransportLayer::ListenerInterface::waitUntilListenerStarted(
+    stdx::unique_lock<stdx::mutex>& lk) {
+    _listener.cv.wait(lk, [this] { return _listener.state != Listener::State::kNew; });
+}
+
+
+std::shared_ptr<AsioReactor> AsioTransportLayer::ListenerInterface::getReactor() const {
+    return _acceptorReactor;
+}
+
+AsioTransportLayer::Listener::State AsioTransportLayer::ListenerInterface::getListenerState()
+    const {
+    return _listener.state;
+}
+
+void AsioTransportLayer::ListenerInterface::_startListening(WithLock lk) {
+    if (_asioTransportLayer->_isShutdown.load() ||
+        _listener.state == Listener::State::kShuttingDown) {
+        LOGV2_DEBUG(9484000, 3, "Unable to start listening: transport layer in shutdown");
+        return;
+    }
+
+    const int listenBacklog = serverGlobalParams.listenBacklog
+        ? *serverGlobalParams.listenBacklog
+        : ProcessInfo::getDefaultListenBacklog();
+    for (auto& acceptorRecord : _acceptorRecords) {
+        asio::error_code ec;
+        (void)acceptorRecord->acceptor.listen(listenBacklog, ec);
+        if (ec) {
+            LOGV2_FATAL(31339,
+                        "Error listening for new connections on listen address",
+                        "listenAddrs"_attr = acceptorRecord->address,
+                        "error"_attr = ec.message());
+        }
+        _asioTransportLayer->_acceptConnection(acceptorRecord->acceptor);
+        LOGV2(23015, "Listening on", "address"_attr = acceptorRecord->address);
+    }
+
+    const char* ssl = "off";
+#ifdef MONGO_CONFIG_SSL
+    if (_asioTransportLayer->sslMode() != SSLParams::SSLMode_disabled) {
+        ssl = "on";
+    }
+#endif
+    LOGV2(23016, "Waiting for connections", "port"_attr = _listenerPort, "ssl"_attr = ssl);
+}
+
+void AsioTransportLayer::ListenerInterface::_stopAcceptors(WithLock lk) {
+    // Loop through the acceptors and cancel their calls to async_accept. This will prevent new
+    // connections from being opened.
+    for (auto& acceptorRecord : _acceptorRecords) {
+        acceptorRecord->acceptor.cancel();
+        auto& addr = acceptorRecord->address;
+        if (addr.getType() == AF_UNIX && !addr.isAnonymousUNIXSocket()) {
+            auto path = addr.getAddr();
+            LOGV2(23017, "removing socket file", "path"_attr = path);
+            if (::unlink(path.c_str()) != 0) {
+                auto ec = lastPosixError();
+                LOGV2_WARNING(23022,
+                              "Unable to remove UNIX socket",
+                              "path"_attr = path,
+                              "error"_attr = errorMessage(ec));
+            }
+        }
+    }
+}
+
+void AsioTransportLayer::ListenerInterface::setAcceptorRecords(
+    std::vector<std::unique_ptr<AcceptorRecord>>&& records) {
+    _acceptorRecords = std::move(records);
+}
+
+const std::vector<std::unique_ptr<AsioTransportLayer::AcceptorRecord>>&
+AsioTransportLayer::ListenerInterface::getAcceptorRecords() {
+    return _acceptorRecords;
+}
 
 Status makeConnectError(Status status, const HostAndPort& peer, const WrappedEndpoint& endpoint) {
     std::string errmsg;
@@ -988,164 +1302,94 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
     return mergedFuture;
 }
 
-Status AsioTransportLayer::setup() {
-    std::vector<std::string> listenAddrs;
-    if (_listenerOptions.ipList.empty() && _listenerOptions.isIngress()) {
-        listenAddrs = {"127.0.0.1"};
-        if (_listenerOptions.enableIPv6) {
-            listenAddrs.emplace_back("::1");
-        }
-    } else if (!_listenerOptions.ipList.empty()) {
-        listenAddrs = _listenerOptions.ipList;
-    }
-
-#ifndef _WIN32
-    if (_listenerOptions.useUnixSockets && _listenerOptions.isIngress()) {
-        listenAddrs.push_back(makeUnixSockPath(_listenerOptions.port));
-
-        if (_listenerOptions.loadBalancerPort) {
-            listenAddrs.push_back(makeUnixSockPath(*_listenerOptions.loadBalancerPort));
-        }
-    }
-#endif
+Status AsioTransportLayer::ListenerInterface::setup(
+    const std::vector<int>& ports,
+    const std::vector<std::string>& listenIPAddrs,
+    const std::vector<std::string>& listenUnixSocketsAddrs,
+    Options& listenerOptions) {
 
     if (auto foStatus = tfo::ensureInitialized(); !foStatus.isOK()) {
         return foStatus;
     }
 
-    if (!(_listenerOptions.isIngress()) && !listenAddrs.empty()) {
+    if (!listenerOptions.isIngress() &&
+        (!listenIPAddrs.empty() || !listenUnixSocketsAddrs.empty())) {
         return {ErrorCodes::BadValue,
                 "Cannot bind to listening sockets with ingress networking is disabled"};
     }
 
-    _listenerPort = _listenerOptions.port;
-    WrappedResolver resolver(*_acceptorReactor);
+    auto result =
+        _retrieveAllAcceptorRecords(ports, listenIPAddrs, listenUnixSocketsAddrs, listenerOptions);
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+    setAcceptorRecords(std::move(result.getValue()));
 
-    std::vector<int> ports = {_listenerPort};
+    if ((getAcceptorRecords()).empty() && listenerOptions.isIngress()) {
+        return Status(ErrorCodes::SocketException, "No available addresses/ports to bind to");
+    }
+
+    return Status::OK();
+}
+
+Status AsioTransportLayer::setup() {
+    // Since the load balancer port value is set to zero to disable the port entirely and the
+    // maintenance port cannot be zero (range of possible value starting from 1), the main port is
+    // the only port which could be specified as ephemeral.
+    if (_listenerOptions.port == 0 && _listenerOptions.ipList.size() > 1) {
+        return Status(ErrorCodes::BadValue,
+                      "Port 0 (ephemeral port) is not allowed when"
+                      " listening on multiple IP interfaces");
+    }
+
+    auto getlistenIPAddrs = [&]() {
+        std::vector<std::string> listenAddrs;
+        if (_listenerOptions.ipList.empty() && _listenerOptions.isIngress()) {
+            listenAddrs = {"127.0.0.1"};
+            if (_listenerOptions.enableIPv6) {
+                listenAddrs.emplace_back("::1");
+            }
+        } else if (!_listenerOptions.ipList.empty()) {
+            listenAddrs = _listenerOptions.ipList;
+        }
+        return listenAddrs;
+    };
+
+    auto getUnixDomainSocketAddrs = [&](std::vector<int> ports) -> std::vector<std::string> {
+#ifndef _WIN32
+        std::vector<std::string> listenAddrs;
+        if (_listenerOptions.useUnixSockets && _listenerOptions.isIngress()) {
+            for (const auto port : ports) {
+                listenAddrs.push_back(makeUnixSockPath(port));
+            }
+        }
+        return listenAddrs;
+#else
+        return {};
+#endif
+    };
+
+    const auto listenIPAddrs = getlistenIPAddrs();
+
+    std::vector<int> ports = {_listenerOptions.port};
     if (_listenerOptions.loadBalancerPort) {
         ports.push_back(*_listenerOptions.loadBalancerPort);
     }
-
-    // Self-deduplicating list of unique endpoint addresses.
-    std::set<WrappedEndpoint> endpoints;
-    for (const auto& port : ports) {
-        for (const auto& listenAddr : listenAddrs) {
-            if (listenAddr.empty()) {
-                LOGV2_WARNING(23020, "Skipping empty bind address");
-                continue;
-            }
-
-            const auto& swAddrs =
-                resolver.resolve(HostAndPort(listenAddr, port), _listenerOptions.enableIPv6);
-            if (!swAddrs.isOK()) {
-                LOGV2_WARNING(
-                    23021, "Found no addresses for peer", "peer"_attr = swAddrs.getStatus());
-                continue;
-            }
-            const auto& addrs = swAddrs.getValue();
-            endpoints.insert(addrs.begin(), addrs.end());
-        }
+    const auto listenUnixDomainSocketAddrs = getUnixDomainSocketAddrs(ports);
+    auto status = _listenerInterfaceMainPort->setup(
+        ports, listenIPAddrs, listenUnixDomainSocketAddrs, _listenerOptions);
+    if (!status.isOK()) {
+        return status;
     }
 
-    for (const auto& addr : endpoints) {
-#ifndef _WIN32
-        if (addr.family() == AF_UNIX) {
-            if (::unlink(addr.toString().c_str()) == -1) {
-                auto ec = lastPosixError();
-                if (ec != posixError(ENOENT)) {
-                    LOGV2_ERROR(23024,
-                                "Failed to unlink socket file",
-                                "path"_attr = addr.toString().c_str(),
-                                "error"_attr = errorMessage(ec));
-                    fassertFailedNoTrace(40486);
-                }
-            }
-        }
-#endif
-        if (addr.family() == AF_INET6 && !_listenerOptions.enableIPv6) {
-            LOGV2_ERROR(23025, "Specified ipv6 bind address, but ipv6 is disabled");
-            fassertFailedNoTrace(40488);
-        }
-
-        GenericAcceptor acceptor(*_acceptorReactor);
-        try {
-            acceptor.open(addr->protocol());
-        } catch (std::exception&) {
-            // Allow the server to start when "ipv6: true" and "bindIpAll: true", but the platform
-            // does not support ipv6 (e.g., ipv6 kernel module is not loaded in Linux).
-            auto addrIsBindAll = [&] {
-                for (auto port : ports) {
-                    if (addr.toString() == fmt::format(":::{}", port)) {
-                        return true;
-                    }
-                }
-                return false;
-            };
-
-            if (errno == EAFNOSUPPORT && _listenerOptions.enableIPv6 && addr.family() == AF_INET6 &&
-                addrIsBindAll()) {
-                LOGV2_WARNING(4206501,
-                              "Failed to bind to {address} as the platform does not support ipv6",
-                              "address"_attr = addr.toString());
-                continue;
-            }
-
-            throw;
-        }
-        setSocketOption(
-            acceptor, ReuseAddrOption(true), "acceptor reuse address", logv2::LogSeverity::Info());
-
-        std::error_code ec;
-
-        if (auto af = addr.family(); af == AF_INET || af == AF_INET6) {
-            if (auto ec = tfo::initAcceptorSocket(acceptor))
-                return errorCodeToStatus(ec, "setup tcpFastOpenIsConfigured");
-        }
-        if (addr.family() == AF_INET6) {
-            setSocketOption(
-                acceptor, IPV6OnlyOption(true), "acceptor v6 only", logv2::LogSeverity::Info());
-        }
-
-        (void)acceptor.non_blocking(true, ec);
-        if (ec) {
-            return errorCodeToStatus(ec, "setup non_blocking");
-        }
-
-        (void)acceptor.bind(*addr, ec);
-        if (ec) {
-            return errorCodeToStatus(ec, "setup bind").withContext(addr.toString());
-        }
-
-#ifndef _WIN32
-        if (addr.family() == AF_UNIX) {
-            setUnixDomainSocketPermissions(addr.toString(),
-                                           serverGlobalParams.unixSocketPermissions);
-        }
-#endif
-        auto endpoint = acceptor.local_endpoint(ec);
-        if (ec) {
-            return errorCodeToStatus(ec);
-        }
-        auto hostAndPort = endpointToHostAndPort(endpoint);
-
-        auto record = std::make_unique<AcceptorRecord>(SockAddr(addr->data(), addr->size()),
-                                                       std::move(acceptor));
-
-        if (_listenerOptions.port == 0 && (addr.family() == AF_INET || addr.family() == AF_INET6)) {
-            if (_listenerPort != _listenerOptions.port) {
-                return Status(ErrorCodes::BadValue,
-                              "Port 0 (ephemeral port) is not allowed when"
-                              " listening on multiple IP interfaces");
-            }
-            _listenerPort = hostAndPort.port();
-            record->address.setPort(_listenerPort);
-        }
-
-        _acceptorRecords.push_back(std::move(record));
+    if (_listenerInterfaceMaintenancePort) {
+        std::vector<int> ports = {*_listenerOptions.maintenancePort};
+        const auto listenUnixDomainSocketAddrs = getUnixDomainSocketAddrs(ports);
+        auto status = _listenerInterfaceMaintenancePort->setup(
+            ports, listenIPAddrs, listenUnixDomainSocketAddrs, _listenerOptions);
     }
-
-    if (_acceptorRecords.empty() && _listenerOptions.isIngress()) {
-        return Status(ErrorCodes::SocketException, "No available addresses/ports to bind to");
+    if (!status.isOK()) {
+        return status;
     }
 
 #ifdef MONGO_CONFIG_SSL
@@ -1162,8 +1406,13 @@ Status AsioTransportLayer::setup() {
 std::vector<std::pair<SockAddr, int>> AsioTransportLayer::getListenerSocketBacklogQueueDepths()
     const {
     std::vector<std::pair<SockAddr, int>> queueDepths;
-    for (auto&& record : _acceptorRecords) {
+    for (auto&& record : _listenerInterfaceMainPort->getAcceptorRecords()) {
         queueDepths.push_back({SockAddr(record->address), record->backlogQueueDepth.load()});
+    }
+    if (_listenerInterfaceMaintenancePort) {
+        for (auto&& record : _listenerInterfaceMaintenancePort->getAcceptorRecords()) {
+            queueDepths.push_back({SockAddr(record->address), record->backlogQueueDepth.load()});
+        }
     }
     return queueDepths;
 }
@@ -1172,9 +1421,15 @@ void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
     bob->append("listenerProcessingTime", _listenerProcessingTime.load().toBSON());
     BSONArrayBuilder queueDepthsArrayBuilder(
         bob->subarrayStart("listenerSocketBacklogQueueDepths"));
-    for (const auto& record : _acceptorRecords) {
+    for (const auto& record : _listenerInterfaceMainPort->getAcceptorRecords()) {
         BSONObjBuilder{queueDepthsArrayBuilder.subobjStart()}.append(
             record->address.toString(), record->backlogQueueDepth.load());
+    }
+    if (_listenerInterfaceMaintenancePort) {
+        for (const auto& record : _listenerInterfaceMaintenancePort->getAcceptorRecords()) {
+            BSONObjBuilder{queueDepthsArrayBuilder.subobjStart()}.append(
+                record->address.toString(), record->backlogQueueDepth.load());
+        }
     }
     queueDepthsArrayBuilder.done();
     bob->append("connsDiscardedDueToClientDisconnect", _discardedDueToClientDisconnect.get());
@@ -1193,75 +1448,6 @@ void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
 
 void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder&) const {}
 
-void AsioTransportLayer::_runListener() {
-    setThreadName("listener");
-
-    stdx::unique_lock lk(_mutex);
-    ON_BLOCK_EXIT([&] {
-        if (!lk.owns_lock()) {
-            lk.lock();
-        }
-        _listener.state = Listener::State::kShutdown;
-        _listener.cv.notify_all();
-    });
-
-    if (_isShutdown.load() || _listener.state == Listener::State::kShuttingDown) {
-        LOGV2_DEBUG(9484000, 3, "Unable to start listening: transport layer in shutdown");
-        return;
-    }
-
-    const int listenBacklog = serverGlobalParams.listenBacklog
-        ? *serverGlobalParams.listenBacklog
-        : ProcessInfo::getDefaultListenBacklog();
-    for (auto& acceptorRecord : _acceptorRecords) {
-        asio::error_code ec;
-        (void)acceptorRecord->acceptor.listen(listenBacklog, ec);
-        if (ec) {
-            LOGV2_FATAL(31339,
-                        "Error listening for new connections on listen address",
-                        "listenAddrs"_attr = acceptorRecord->address,
-                        "error"_attr = ec.message());
-        }
-
-        _acceptConnection(acceptorRecord->acceptor);
-        LOGV2(23015, "Listening on", "address"_attr = acceptorRecord->address);
-    }
-
-    const char* ssl = "off";
-#ifdef MONGO_CONFIG_SSL
-    if (sslMode() != SSLParams::SSLMode_disabled) {
-        ssl = "on";
-    }
-#endif
-    LOGV2(23016, "Waiting for connections", "port"_attr = _listenerPort, "ssl"_attr = ssl);
-
-    _listener.state = Listener::State::kActive;
-    _listener.cv.notify_all();
-    while (!_isShutdown.load() && (_listener.state == Listener::State::kActive)) {
-        lk.unlock();
-        _acceptorReactor->run();
-        lk.lock();
-    }
-
-    // Loop through the acceptors and cancel their calls to async_accept. This will prevent new
-    // connections from being opened.
-    for (auto& acceptorRecord : _acceptorRecords) {
-        acceptorRecord->acceptor.cancel();
-        auto& addr = acceptorRecord->address;
-        if (addr.getType() == AF_UNIX && !addr.isAnonymousUNIXSocket()) {
-            auto path = addr.getAddr();
-            LOGV2(23017, "removing socket file", "path"_attr = path);
-            if (::unlink(path.c_str()) != 0) {
-                auto ec = lastPosixError();
-                LOGV2_WARNING(23022,
-                              "Unable to remove UNIX socket",
-                              "path"_attr = path,
-                              "error"_attr = errorMessage(ec));
-            }
-        }
-    }
-}
-
 Status AsioTransportLayer::start() {
     stdx::unique_lock lk(_mutex);
     if (_isShutdown.load()) {
@@ -1270,14 +1456,25 @@ Status AsioTransportLayer::start() {
     }
 
     if (_listenerOptions.isIngress()) {
-        // Only start the listener thread if the TL wasn't shut down before start() was invoked.
-        if (_listener.state == Listener::State::kNew) {
+        // Only start the listener threads if the TL wasn't shut down before start() was invoked.
+        if (_listenerInterfaceMainPort->getListenerState() == Listener::State::kNew &&
+            (!_listenerInterfaceMaintenancePort ||
+             _listenerInterfaceMaintenancePort->getListenerState() == Listener::State::kNew)) {
             invariant(_sessionManager);
-            _listener.thread = stdx::thread([this] { _runListener(); });
-            _listener.cv.wait(lk, [&] { return _listener.state != Listener::State::kNew; });
+            _listenerInterfaceMainPort->startListener("listener");
+            if (_listenerInterfaceMaintenancePort) {
+                _listenerInterfaceMaintenancePort->startListener("listenerForMaintenance");
+            }
+            _listenerInterfaceMainPort->waitUntilListenerStarted(lk);
+            if (_listenerInterfaceMaintenancePort) {
+                _listenerInterfaceMaintenancePort->waitUntilListenerStarted(lk);
+            }
         }
     } else {
-        invariant(_acceptorRecords.empty());
+        invariant(_listenerInterfaceMainPort->getAcceptorRecords().empty());
+        if (_listenerInterfaceMaintenancePort) {
+            invariant(_listenerInterfaceMaintenancePort->getAcceptorRecords().empty());
+        }
     }
 
     return Status::OK();
@@ -1309,26 +1506,25 @@ void AsioTransportLayer::stopAcceptingSessionsWithLock(stdx::unique_lock<stdx::m
         return;
     }
 
-    if (auto oldState = _listener.state; oldState != Listener::State::kShutdown) {
-        _listener.state = Listener::State::kShuttingDown;
-        if (oldState == Listener::State::kActive) {
-            while (_listener.state != Listener::State::kShutdown) {
-                lk.unlock();
-                _acceptorReactor->stop();
-                lk.lock();
-            }
-        }
+    _listenerInterfaceMainPort->stopListenerWithLock(lk);
+    if (_listenerInterfaceMaintenancePort) {
+        _listenerInterfaceMaintenancePort->stopListenerWithLock(lk);
     }
 
-    auto thread = std::exchange(_listener.thread, {});
-    if (!thread.joinable()) {
-        // If the listener never started, then we can return now
+    if (!_listenerInterfaceMainPort->isListenerStarted() &&
+        (!_listenerInterfaceMaintenancePort ||
+         !_listenerInterfaceMaintenancePort->isListenerStarted())) {
+        // If the listeners never started, then we can return now
         return;
     }
 
-    // Release the lock and wait for the thread to die
+    // Release the lock and wait for the threads to die
     lk.unlock();
-    thread.join();
+    _listenerInterfaceMainPort->waitListenerThreadJoin();
+    if (_listenerInterfaceMaintenancePort &&
+        _listenerInterfaceMaintenancePort->isListenerStarted()) {
+        _listenerInterfaceMaintenancePort->waitListenerThreadJoin();
+    }
 }
 
 void AsioTransportLayer::stopAcceptingSessions() {
@@ -1441,7 +1637,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
                     _acceptConnection(acceptor);
                     return;
                 }
-                session->parseProxyProtocolHeader(_acceptorReactor)
+                session->parseProxyProtocolHeader(_listenerInterfaceMainPort->getReactor())
                     .getAsync([this, session = std::move(session), t = std::move(token)](Status s) {
                         if (s.isOK()) {
                             invariant(!!_sessionManager);
@@ -1462,8 +1658,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
             LOGV2_WARNING(23023, "Error accepting new connection", "error"_attr = e);
         }
 
-        // _acceptConnection() is accessed by only one thread (i.e. the listener thread), so an
-        // atomic increment is not required here
+        // TODO(SERVER-114929): Fix possible race condition on _listenerProcessingTime
         _listenerProcessingTime.store(_listenerProcessingTime.load() + timer.elapsed());
         _acceptConnection(acceptor);
     };
@@ -1480,11 +1675,24 @@ void AsioTransportLayer::_trySetListenerSocketBacklogQueueDepth(GenericAcceptor&
     try {
         if (!isTcp(acceptor.local_endpoint().protocol()))
             return;
-        auto matchingRecord =
-            std::find_if(begin(_acceptorRecords), end(_acceptorRecords), [&](const auto& record) {
+        auto matchingRecord = std::ranges::find_if(
+            _listenerInterfaceMainPort->getAcceptorRecords(), [&](const auto& record) {
                 return acceptor.local_endpoint() == record->acceptor.local_endpoint();
             });
-        invariant(matchingRecord != std::end(_acceptorRecords));
+        if (_listenerInterfaceMaintenancePort &&
+            matchingRecord == std::end(_listenerInterfaceMainPort->getAcceptorRecords())) {
+            // No match with the main ports acceptors, search over the maintenance port acceptors
+            matchingRecord = std::ranges::find_if(
+                _listenerInterfaceMaintenancePort->getAcceptorRecords(), [&](const auto& record) {
+                    return acceptor.local_endpoint() == record->acceptor.local_endpoint();
+                });
+            invariant(matchingRecord !=
+                      std::ranges::end(_listenerInterfaceMaintenancePort->getAcceptorRecords()));
+        } else {
+            invariant(matchingRecord !=
+                      std::ranges::end(_listenerInterfaceMainPort->getAcceptorRecords()));
+        }
+
         TcpInfoOption tcpi;
         acceptor.get_option(tcpi);
         (*matchingRecord)->backlogQueueDepth.store(tcpi->tcpi_unacked);

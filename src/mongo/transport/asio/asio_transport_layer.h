@@ -72,6 +72,7 @@ extern FailPoint asioTransportLayerHangDuringAcceptCallback;
 class AsioNetworkingBaton;
 class AsioReactor;
 class AsioSession;
+class WrappedEndpoint;
 
 /**
  * A TransportLayer implementation based on ASIO networking primitives.
@@ -104,6 +105,7 @@ public:
 
         int port = ServerGlobalParams::DefaultDBPort;  // port to bind to
         boost::optional<int> loadBalancerPort;         // accepts load balancer connections
+        boost::optional<int> maintenancePort;          // accepts maintenance connections
         std::vector<std::string> ipList;               // addresses to bind to
 #ifndef _WIN32
         bool useUnixSockets = true;  // whether to allow UNIX sockets in ipList
@@ -212,12 +214,16 @@ public:
         return TransportProtocol::MongoRPC;
     }
 
-    int listenerPort() const {
-        return _listenerPort;
+    int listenerMainPort() const {
+        return _listenerInterfaceMainPort->getListenerPort();
     }
 
     boost::optional<int> loadBalancerPort() const {
         return _listenerOptions.loadBalancerPort;
+    }
+
+    boost::optional<int> maintenancePort() const {
+        return _listenerOptions.maintenancePort;
     }
 
     SessionManager* getSessionManager() const override {
@@ -284,16 +290,14 @@ private:
     // server has already accepted too many of such connections, returns `nullptr`.
     std::unique_ptr<TokenType> _makeParseProxyTokenIfPossible();
 
-    void _runListener();
-
     void _trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor);
 
     stdx::mutex _mutex;
     void stopAcceptingSessionsWithLock(stdx::unique_lock<stdx::mutex> lk);
 
     // There are three reactors that are used by AsioTransportLayer. The _ingressReactor contains
-    // all the accepted sockets and all ingress networking activity. The _acceptorReactor contains
-    // all the sockets in _acceptors.  The _egressReactor contains egress connections.
+    // all the accepted sockets and all ingress networking activity. The _egressReactor contains
+    // egress connections.
     //
     // AsioTransportLayer should never call run() on the _ingressReactor.
     // In synchronous mode, this will cause a massive performance degradation due to
@@ -301,10 +305,6 @@ private:
     // with asynchronously. The additional IO context avoids registering those sockets
     // with the acceptors epoll set, thus avoiding those wakeups.  Calling run will
     // undo that benefit.
-    //
-    // AsioTransportLayer should run its own thread that calls run() on the _acceptorReactor
-    // to process calls to async_accept - this is the equivalent of the "listener" thread in
-    // other TransportLayers.
     //
     // The underlying problem that caused this is here:
     // https://github.com/chriskohlhoff/asio/issues/240
@@ -315,14 +315,12 @@ private:
     // it.
     std::shared_ptr<AsioReactor> _ingressReactor;
     std::shared_ptr<AsioReactor> _egressReactor;
-    std::shared_ptr<AsioReactor> _acceptorReactor;
 
 #ifdef MONGO_CONFIG_SSL
     synchronized_value<std::shared_ptr<const SSLConnectionContext>> _sslContext;
 #endif
 
     struct AcceptorRecord;
-    std::vector<std::unique_ptr<AcceptorRecord>> _acceptorRecords;
 
     // Only used if _listenerOptions.async is false.
     struct Listener {
@@ -343,13 +341,94 @@ private:
         stdx::condition_variable cv;
         State state{State::kNew};
     };
-    Listener _listener;
+
+    class ListenerInterface {
+    public:
+        ListenerInterface(stdx::mutex& sharedMutex,
+                          std::shared_ptr<AsioReactor> reactor,
+                          AsioTransportLayer* layer);
+
+        ~ListenerInterface();
+
+        Status setup(const std::vector<int>& ports,
+                     const std::vector<std::string>& listenIPAddrs,
+                     const std::vector<std::string>& listenUnixSocketsAddr,
+                     Options& listenerOptions);
+
+        void stopListenerWithLock(stdx::unique_lock<stdx::mutex>& lk);
+
+        AsioTransportLayer::Listener::State getListenerState() const;
+
+        std::shared_ptr<AsioReactor> getReactor() const;
+
+        void startListener(std::string threadName);
+
+        bool isListenerStarted() const;
+
+        int getListenerPort() const {
+            return _listenerPort;
+        }
+
+        void waitUntilListenerStarted(stdx::unique_lock<stdx::mutex>& lk);
+
+        void waitListenerThreadJoin();
+
+        void setAcceptorRecords(
+            std::vector<std::unique_ptr<AsioTransportLayer::AcceptorRecord>>&& records);
+
+        const std::vector<std::unique_ptr<AsioTransportLayer::AcceptorRecord>>&
+        getAcceptorRecords();
+
+    private:
+        void _runListener(std::string threadName);
+
+        void _startListening(WithLock lk);
+
+        void _waitForConnections(stdx::unique_lock<stdx::mutex>& lk);
+
+        void _stopAcceptors(WithLock lk);
+
+        StatusWith<std::vector<std::unique_ptr<AsioTransportLayer::AcceptorRecord>>>
+        _createAcceptorRecords(const std::vector<int>& ports,
+                               const std::set<WrappedEndpoint>& endpoints,
+                               const Options& listenerOptions);
+
+        // The lock is not necessary for this method since there are no concurrent operations
+        // accessing the shared state.
+        StatusWith<std::vector<std::unique_ptr<AsioTransportLayer::AcceptorRecord>>>
+        _retrieveAllAcceptorRecords(const std::vector<int>& ports,
+                                    const std::vector<std::string>& listenIPAddrs,
+                                    const std::vector<std::string>& listenUnixSocketsAddrs,
+                                    const Options& listenerOptions);
+
+        // The real incoming port in case of the corresponding listener option port is 0
+        // (ephemeral).
+        int _listenerPort = 0;
+
+        stdx::mutex& _sharedMutex;
+
+        // The _acceptorReactor contains all the sockets in _acceptors.
+        std::shared_ptr<AsioReactor> _acceptorReactor;
+
+        std::vector<std::unique_ptr<AsioTransportLayer::AcceptorRecord>> _acceptorRecords;
+
+        Listener _listener;
+
+        AsioTransportLayer* _asioTransportLayer;
+    };
+
+    // AsioTransportLayer should run its own thread that calls run() on _listenerInterfaceMainPort's
+    // _acceptorReactor to process calls to async_accept on the main port - this is the equivalent
+    // of the "listener" thread in other TransportLayers. If the maintenance port is specified,
+    // AsioTransportLayer should run a second thread that calls run() on
+    // _listenerInterfaceMaintenancePort's _acceptorReactor to process calls to async_accept on the
+    // maintenance port.
+    const std::unique_ptr<ListenerInterface> _listenerInterfaceMainPort;
+    const std::unique_ptr<ListenerInterface> _listenerInterfaceMaintenancePort;
 
     std::shared_ptr<SessionManager> _sessionManager;
 
     Options _listenerOptions;
-    // The real incoming port in case of _listenerOptions.port==0 (ephemeral).
-    int _listenerPort = 0;
 
     Atomic<bool> _isShutdown{false};
 

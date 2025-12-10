@@ -298,7 +298,7 @@ public:
         LOGV2(6109515, "creating test client connection");
         auto& fp = asioTransportLayerHangDuringAcceptCallback;
         auto timesEntered = fp.setMode(FailPoint::alwaysOn);
-        ConnectionThread connectThread(tla().listenerPort(), onConnectFunc);
+        ConnectionThread connectThread(tla().listenerMainPort(), onConnectFunc);
         fp.waitForTimesEntered(timesEntered + 1);
         connectThread.wait();
 
@@ -309,7 +309,7 @@ public:
 
         // Using a second connection as a means to wait for the server to process the closed
         // connection and move on to accept the next connection.
-        ConnectionThread dummyConnection(tla().listenerPort(), nullptr);
+        ConnectionThread dummyConnection(tla().listenerMainPort(), nullptr);
         dummyConnection.wait();
         sessionsCreated.wait(0);
 
@@ -333,7 +333,7 @@ TEST(AsioTransportLayer, ListenerPortZeroTreatedAsEphemeral) {
     TestFixture tf;
     tf.sessionManager().setOnStartSession([&](auto&&) { connected.set(true); });
 
-    int port = tf.tla().listenerPort();
+    int port = tf.tla().listenerMainPort();
     ASSERT_GT(port, 0);
     LOGV2(6109514, "AsioTransportLayer listening", "port"_attr = port);
 
@@ -439,9 +439,9 @@ TEST(AsioTransportLayer, TCPCheckQueueDepth) {
         tf.stopHangDuringAcceptingConnection();
     });
 
-    ConnectionThread connectThread1(tf.tla().listenerPort());
-    ConnectionThread connectThread2(tf.tla().listenerPort());
-    ConnectionThread connectThread3(tf.tla().listenerPort());
+    ConnectionThread connectThread1(tf.tla().listenerMainPort());
+    ConnectionThread connectThread2(tf.tla().listenerMainPort());
+    ConnectionThread connectThread3(tf.tla().listenerMainPort());
 
     tf.waitForHangDuringAcceptingFirstConnection();
     connectThread1.wait();
@@ -456,7 +456,7 @@ TEST(AsioTransportLayer, TCPCheckQueueDepth) {
     ASSERT_EQ(depths.size(), 1);
 
     auto depth = depths[0];
-    ASSERT_EQ(depth.first.getPort(), tf.tla().listenerPort());
+    ASSERT_EQ(depth.first.getPort(), tf.tla().listenerMainPort());
     ASSERT_EQ(depth.second, 2);
 
 
@@ -469,7 +469,8 @@ TEST(AsioTransportLayer, TCPCheckQueueDepth) {
     ASSERT_EQ(queueDepthsArray.size(), 1);
 
     const auto& queueDepthObj = queueDepthsArray[0].Obj();
-    ASSERT_EQ(HostAndPort(queueDepthObj.firstElementFieldName()).port(), tf.tla().listenerPort());
+    ASSERT_EQ(HostAndPort(queueDepthObj.firstElementFieldName()).port(),
+              tf.tla().listenerMainPort());
     ASSERT_EQ(queueDepthObj.firstElement().Int(), 2);
 }
 #endif
@@ -480,7 +481,7 @@ TEST(AsioTransportLayer, ThrowOnNetworkErrorInEnsureSync) {
     tf.sessionManager().setOnStartSession(
         [&](test::SessionThread& st) { mockSessionCreated.set(&st); });
 
-    ConnectionThread connectThread(tf.tla().listenerPort(), &setNoLinger);
+    ConnectionThread connectThread(tf.tla().listenerMainPort(), &setNoLinger);
 
     // We set the timeout to ensure that the setsockopt calls are actually made in ensureSync()
     auto& st = *mockSessionCreated.get();
@@ -508,7 +509,7 @@ TEST(AsioTransportLayer, SourceSyncTimeoutTimesOut) {
         st.session()->setTimeout(Milliseconds{500});
         st.schedule([&](auto& session) { received.set(session.sourceMessage()); });
     });
-    SyncClient conn(tf.tla().listenerPort());
+    SyncClient conn(tf.tla().listenerMainPort());
     ASSERT_EQ(received.get().getStatus(), ErrorCodes::NetworkTimeout);
 }
 
@@ -553,7 +554,7 @@ TEST(AsioTransportLayer, SourceSyncTimeoutSucceeds) {
         st.session()->setTimeout(Milliseconds{500});
         st.schedule([&](auto& session) { received.set(session.sourceMessage()); });
     });
-    SyncClient conn(tf.tla().listenerPort());
+    SyncClient conn(tf.tla().listenerMainPort());
     ping(conn);  // This time we send a message
     ASSERT_OK(received.get().getStatus());
 }
@@ -585,7 +586,7 @@ TEST(AsioTransportLayer, IngressPhysicalNetworkMetricsTest) {
             responsed.promise.setFrom(session.sinkMessage(resp));
         });
     });
-    SyncClient conn(tf.tla().listenerPort());
+    SyncClient conn(tf.tla().listenerMainPort());
     auto stats = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kIngress);
     auto ec = conn.write(req.buf(), req.size());
     ASSERT_FALSE(ec) << errorMessage(ec);
@@ -607,7 +608,7 @@ TEST(AsioTransportLayer, SwitchTimeoutModes) {
     tf.sessionManager().setOnStartSession(
         [&](test::SessionThread& st) { mockSessionCreated.set(&st); });
 
-    SyncClient conn(tf.tla().listenerPort());
+    SyncClient conn(tf.tla().listenerMainPort());
     auto& st = *mockSessionCreated.get();
 
     {
@@ -745,7 +746,7 @@ void runTfoScenario(bool serverOn, bool clientOn, bool expectTfo) {
     test::BlockingQueue<StatusWith<Message>> received;
 
     auto connectOnce = [&] {
-        TfoClient conn(tf.tla().listenerPort());
+        TfoClient conn(tf.tla().listenerMainPort());
         ping(conn);
         ASSERT_OK(received.pop().getStatus());
     };
@@ -1053,7 +1054,7 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
      * The goal is to simulate a server crash, and verify the behavior of the client, during the
      * handshake process.
      */
-    int port = tla().listenerPort();
+    int port = tla().listenerMainPort();
 
     DBClientConnection conn;
     conn.setSoTimeout(1);  // 1 second timeout
@@ -1162,7 +1163,7 @@ public:
         configureSessionManager(*sessionManager);
 
         auto tl = makeTLA(std::move(sessionManager));
-        const auto listenerPort = tl->listenerPort();
+        const auto listenerPort = tl->listenerMainPort();
 
         auto* svcCtx = getServiceContext();
         svcCtx->getService()->setServiceEntryPoint(
@@ -1718,7 +1719,7 @@ private:
         auto tla = checked_cast<AsioTransportLayer*>(
             _sc->getTransportLayerManager()->getDefaultEgressLayer());
 
-        HostAndPort localTarget(testHostName(), tla->listenerPort());
+        HostAndPort localTarget(testHostName(), tla->listenerMainPort());
 
         return _sc->getTransportLayerManager()
             ->getDefaultEgressLayer()

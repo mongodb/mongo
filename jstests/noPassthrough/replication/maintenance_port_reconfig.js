@@ -133,17 +133,16 @@ describe("Tests for maintenance port usage within JS test helpers", function () 
         rs.stopSet();
     });
 
-    // TODO (SERVER-112674) Enable this test once isSelfSlowPath works for the maintenancePort
-    // it("Initiate with maintenance port plus bindIp works when fast resolution does not", () => {
-    //     let ips = "localhost," + getHostName();
-    //     const rs = new ReplSetTest({
-    //         nodes: 1,
-    //         useMaintenancePorts: true,
-    //         nodeOptions: {bind_ip: ips},
-    //     });
-    //     rs.startSet();
-    //     rs.initiate();
+    it("Initiate with maintenance port plus bindIp works when fast resolution does not", () => {
+        let ips = "localhost," + getHostName();
+        const rs = new ReplSetTest({
+            nodes: 1,
+            useMaintenancePorts: true,
+            nodeOptions: {bind_ip: ips},
+        });
+        rs.startSet();
+        rs.initiate();
 
-    //     rs.stopSet();
-    // });
+        rs.stopSet();
+    });
 });

@@ -247,6 +247,29 @@ std::string makeUnixSockPath(int port, StringData label) {
     return stream << port << ".sock";
 }
 
+int parsePortFromUnixSockPath(StringData path) {
+    constexpr StringData extension = ".sock";
+    if (!path.ends_with(extension)) {
+        return -1;
+    }
+    path.remove_suffix(extension.size());
+
+    const auto lastHyphenIndex = path.rfind('-');
+    if (lastHyphenIndex == StringData::npos) {
+        return -1;
+    }
+    path.remove_prefix(lastHyphenIndex + 1);
+
+    int port;
+    const char* const begin = path.data();
+    const char* const end = begin + path.size();
+    const auto result = std::from_chars(begin, end, port);
+    if (result.ec != std::errc{} || result.ptr != end) {
+        return -1;
+    }
+    return port;
+}
+
 #ifndef _WIN32
 void setUnixDomainSocketPermissions(const std::string& path, int permissions) {
     if (::chmod(path.c_str(), permissions) == -1) {

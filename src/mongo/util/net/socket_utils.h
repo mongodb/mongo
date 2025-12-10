@@ -49,6 +49,15 @@ void setSocketKeepAliveParams(int sock,
 
 std::string makeUnixSockPath(int port, StringData label = "");
 
+/**
+ * Extracts the port number from the specified unix domain socket path name, under the assumption
+ * that the path was produced by a call to makeUnixSockPath, which takes a port number as an
+ * argument.
+ * Returns -1 if an error occurs.
+ * Note that this function assumes that the port passed to makeUnixSockPath was not negative.
+ */
+int parsePortFromUnixSockPath(StringData path);
+
 inline bool isUnixDomainSocket(StringData hostname) {
     return hostname.find('/') != std::string::npos;
 }
