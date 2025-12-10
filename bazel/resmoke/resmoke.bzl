@@ -120,6 +120,7 @@ def resmoke_suite_test(
             "//buildscripts/resmokeconfig/loggers:all_files",
             "//src/mongo/util/version:releases.yml",
             "//:generated_resmoke_config",
+            "//:empty_jsconfig",
         ] + select({
             "//bazel/resmoke:in_evergreen_enabled": ["//:installed-dist-test", "//:.resmoke_mongo_version.yml"],
             "//conditions:default": ["//:install-dist-test", "//bazel/resmoke:resmoke_mongo_version"],
