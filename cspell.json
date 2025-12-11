@@ -64,6 +64,7 @@
         "multiversion",
         "MVCC",
         "noops",
+        "OCSF",
         "oplog",
         "optimes",
         "optionenvironment",
