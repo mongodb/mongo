@@ -1,7 +1,8 @@
 /**
  * Tests for the assertion functions in mongo/shell/assert.js.
  */
-const tests = [];
+
+import {describe, it} from "jstests/libs/mochalite.js";
 
 const kDefaultTimeoutMS = 10 * 1000;
 const kSmallTimeoutMS = 200;
@@ -11,786 +12,791 @@ const kAttr = {
     attr1: "some attribute",
 };
 
-/* doassert tests */
+describe("doassert tests", function () {
+    it("callingDoAssertWithStringThrowsException", function () {
+        const expectedError = "hello world";
+        const actualError = assert.throws(() => {
+            doassert(expectedError);
+        });
 
-tests.push(function callingDoAssertWithStringThrowsException() {
-    const expectedError = "hello world";
-    const actualError = assert.throws(() => {
-        doassert(expectedError);
+        assert.eq("Error: " + expectedError, actualError, "doAssert should throw passed msg as exception");
     });
 
-    assert.eq("Error: " + expectedError, actualError, "doAssert should throw passed msg as exception");
-});
+    it("callingDoAssertWithObjectThrowsException", function () {
+        const expectedError = {err: "hello world"};
+        const actualError = assert.throws(() => {
+            doassert(expectedError);
+        });
 
-tests.push(function callingDoAssertWithObjectThrowsException() {
-    const expectedError = {err: "hello world"};
-    const actualError = assert.throws(() => {
-        doassert(expectedError);
+        assert.eq("Error: " + tojson(expectedError), actualError, "doAssert should throw passed object as exception");
     });
 
-    assert.eq("Error: " + tojson(expectedError), actualError, "doAssert should throw passed object as exception");
+    it("callingDoAssertWithStringPassedAsFunctionThrowsException", function () {
+        const expectedError = "hello world";
+        const actualError = assert.throws(() => {
+            doassert(() => {
+                return expectedError;
+            });
+        });
+
+        assert.eq("Error: " + expectedError, actualError, "doAssert should throw passed msg as exception");
+    });
+
+    it("callingDoAssertWithObjectAsFunctionThrowsException", function () {
+        const expectedError = {err: "hello world"};
+        const actualError = assert.throws(() => {
+            doassert(() => {
+                return expectedError;
+            });
+        });
+
+        assert.eq("Error: " + tojson(expectedError), actualError, "doAssert should throw passed object as exception");
+    });
+
+    it("callingDoAssertCorrectlyAttachesWriteErrors", function () {
+        const errorMessage = "Operation was interrupted";
+        const bulkResult = {
+            nModified: 0,
+            n: 0,
+            writeErrors: [{"index": 0, "code": 11601, "errmsg": errorMessage}],
+            upserted: [],
+            ok: 1,
+        };
+
+        let error = assert.throws(() => doassert(errorMessage, new BulkWriteError(bulkResult)));
+        assert.eq(error.writeErrors[0].code, bulkResult.writeErrors[0].code);
+
+        error = assert.throws(() => doassert(errorMessage, new BulkWriteResult(bulkResult)));
+        assert.eq(error.writeErrors[0].code, bulkResult.writeErrors[0].code);
+
+        error = assert.throws(() => doassert(errorMessage, new WriteResult(bulkResult)));
+        assert.eq(error.writeErrors[0].code, bulkResult.writeErrors[0].code);
+
+        error = assert.throws(() => doassert(errorMessage, bulkResult));
+        assert.eq(error.writeErrors[0].code, bulkResult.writeErrors[0].code);
+    });
+
+    it("callingDoAssertCorrectlyAttachesWriteConcernError", function () {
+        const errorMessage = "Operation was interrupted";
+        const bulkResult = {
+            nModified: 0,
+            n: 0,
+            writeConcernErrors: [{code: 6, codeName: "HostUnreachable", errmsg: errorMessage, errInfo: {}}],
+            upserted: [],
+            ok: 1,
+        };
+
+        let error = assert.throws(() => doassert(errorMessage, new BulkWriteError(bulkResult)));
+        assert.eq(error.writeConcernError.code, bulkResult.writeConcernErrors[0].code);
+
+        error = assert.throws(() => doassert(errorMessage, new BulkWriteResult(bulkResult)));
+        assert.eq(error.writeConcernError.code, bulkResult.writeConcernErrors[0].code);
+
+        error = assert.throws(() => doassert(errorMessage, new WriteResult(bulkResult)));
+        assert.eq(error.writeConcernError.code, bulkResult.writeConcernErrors[0].code);
+
+        error = assert.throws(() => doassert(errorMessage, bulkResult));
+        assert.eq(error.writeConcernError.code, bulkResult.writeConcernErrors[0].code);
+    });
 });
 
-tests.push(function callingDoAssertWithStringPassedAsFunctionThrowsException() {
-    const expectedError = "hello world";
-    const actualError = assert.throws(() => {
-        doassert(() => {
-            return expectedError;
+describe("assert tests", function () {
+    it("assertShouldFailForMoreThan3Args", function () {
+        const err = assert.throws(() => {
+            assert(1, 2, 3, 4);
+        });
+        assert.neq(-1, err.message.indexOf("Too many parameters"), "Too many params message should be displayed");
+    });
+
+    it("assertShouldNotThrowExceptionForTrue", function () {
+        assert.doesNotThrow(() => {
+            assert(true, "message");
         });
     });
 
-    assert.eq("Error: " + expectedError, actualError, "doAssert should throw passed msg as exception");
-});
-
-tests.push(function callingDoAssertWithObjectAsFunctionThrowsException() {
-    const expectedError = {err: "hello world"};
-    const actualError = assert.throws(() => {
-        doassert(() => {
-            return expectedError;
+    it("assertShouldThrowExceptionForFalse", function () {
+        const expectedMessage = "message";
+        const err = assert.throws(() => {
+            assert(false, expectedMessage);
         });
+
+        assert.neq(-1, err.message.indexOf(expectedMessage), "assert message should be thrown on error");
     });
 
-    assert.eq("Error: " + tojson(expectedError), actualError, "doAssert should throw passed object as exception");
-});
-
-tests.push(function callingDoAssertCorrectlyAttachesWriteErrors() {
-    const errorMessage = "Operation was interrupted";
-    const bulkResult = {
-        nModified: 0,
-        n: 0,
-        writeErrors: [{"index": 0, "code": 11601, "errmsg": errorMessage}],
-        upserted: [],
-        ok: 1,
-    };
-
-    let error = assert.throws(() => doassert(errorMessage, new BulkWriteError(bulkResult)));
-    assert.eq(error.writeErrors[0].code, bulkResult.writeErrors[0].code);
-
-    error = assert.throws(() => doassert(errorMessage, new BulkWriteResult(bulkResult)));
-    assert.eq(error.writeErrors[0].code, bulkResult.writeErrors[0].code);
-
-    error = assert.throws(() => doassert(errorMessage, new WriteResult(bulkResult)));
-    assert.eq(error.writeErrors[0].code, bulkResult.writeErrors[0].code);
-
-    error = assert.throws(() => doassert(errorMessage, bulkResult));
-    assert.eq(error.writeErrors[0].code, bulkResult.writeErrors[0].code);
-});
-
-tests.push(function callingDoAssertCorrectlyAttachesWriteConcernError() {
-    const errorMessage = "Operation was interrupted";
-    const bulkResult = {
-        nModified: 0,
-        n: 0,
-        writeConcernErrors: [{code: 6, codeName: "HostUnreachable", errmsg: errorMessage, errInfo: {}}],
-        upserted: [],
-        ok: 1,
-    };
-
-    let error = assert.throws(() => doassert(errorMessage, new BulkWriteError(bulkResult)));
-    assert.eq(error.writeConcernError.code, bulkResult.writeConcernErrors[0].code);
-
-    error = assert.throws(() => doassert(errorMessage, new BulkWriteResult(bulkResult)));
-    assert.eq(error.writeConcernError.code, bulkResult.writeConcernErrors[0].code);
-
-    error = assert.throws(() => doassert(errorMessage, new WriteResult(bulkResult)));
-    assert.eq(error.writeConcernError.code, bulkResult.writeConcernErrors[0].code);
-
-    error = assert.throws(() => doassert(errorMessage, bulkResult));
-    assert.eq(error.writeConcernError.code, bulkResult.writeConcernErrors[0].code);
-});
-
-/* assert tests */
-
-tests.push(function assertShouldFailForMoreThan3Args() {
-    const err = assert.throws(() => {
-        assert(1, 2, 3, 4);
-    });
-    assert.neq(-1, err.message.indexOf("Too many parameters"), "Too many params message should be displayed");
-});
-
-tests.push(function assertShouldNotThrowExceptionForTrue() {
-    assert.doesNotThrow(() => {
-        assert(true, "message");
-    });
-});
-
-tests.push(function assertShouldThrowExceptionForFalse() {
-    const expectedMessage = "message";
-    const err = assert.throws(() => {
-        assert(false, expectedMessage);
-    });
-
-    assert.neq(-1, err.message.indexOf(expectedMessage), "assert message should be thrown on error");
-});
-
-tests.push(function assertShouldThrowExceptionForFalseWithDefaultMessage() {
-    const defaultMessage = "assert failed";
-    const err = assert.throws(() => {
-        assert(false);
-    });
-
-    assert.eq(defaultMessage, err.message, "assert message should be thrown on error");
-});
-
-tests.push(function assertShouldThrowExceptionForFalseWithDefaultMessagePrefix() {
-    const prefix = "assert failed";
-    const message = "the assertion failed";
-    const err = assert.throws(() => {
-        assert(false, message);
-    });
-
-    assert.neq(-1, err.message.indexOf(prefix), "assert message should should contain prefix");
-    assert.neq(-1, err.message.indexOf(message), "assert message should should contain original message");
-});
-
-tests.push(function assertShouldNotCallMsgFunctionsOnSuccess() {
-    let called = false;
-
-    assert(true, () => {
-        called = true;
-    });
-
-    assert.eq(false, called, "called should not have been udpated");
-});
-
-tests.push(function assertShouldCallMsgFunctionsOnFailure() {
-    let called = false;
-
-    assert.throws(() => {
-        assert(false, () => {
-            called = true;
-            return "error message";
+    it("assertShouldThrowExceptionForFalseWithDefaultMessage", function () {
+        const defaultMessage = "assert failed";
+        const err = assert.throws(() => {
+            assert(false);
         });
+
+        assert.eq(defaultMessage, err.message, "assert message should be thrown on error");
     });
 
-    assert.eq(true, called, "called should not have been udpated");
-});
+    it("assertShouldThrowExceptionForFalseWithDefaultMessagePrefix", function () {
+        const prefix = "assert failed";
+        const message = "the assertion failed";
+        const err = assert.throws(() => {
+            assert(false, message);
+        });
 
-tests.push(function assertShouldAcceptObjectAsMsg() {
-    const objMsg = {someMessage: 1};
-    const err = assert.throws(() => {
-        assert(false, objMsg);
+        assert.neq(-1, err.message.indexOf(prefix), "assert message should should contain prefix");
+        assert.neq(-1, err.message.indexOf(message), "assert message should should contain original message");
     });
 
-    assert.neq(-1, err.message.indexOf(tojson(objMsg)), "Error message should have included " + tojson(objMsg));
-});
+    it("assertShouldNotCallMsgFunctionsOnSuccess", function () {
+        let called = false;
 
-tests.push(function assertShouldNotAcceptNonObjStringFunctionAsMsg() {
-    const err = assert.throws(() => {
-        assert(true, 1234);
-    });
-
-    assert.neq(-1, err.message.indexOf("msg parameter must be a "));
-});
-
-/* assert.eq tests */
-
-tests.push(function eqShouldPassOnEquality() {
-    assert.doesNotThrow(() => {
-        assert.eq(3, 3);
-    });
-});
-
-tests.push(function eqShouldFailWhenNotEqual() {
-    assert.throws(() => {
-        assert.eq(2, 3);
-    });
-});
-
-tests.push(function eqShouldNotCallMsgFunctionOnSuccess() {
-    let called = false;
-
-    assert.doesNotThrow(() => {
-        assert.eq(3, 3, () => {
+        assert(true, () => {
             called = true;
         });
+
+        assert.eq(false, called, "called should not have been udpated");
     });
 
-    assert.eq(false, called, "msg function should not have been called");
+    it("assertShouldCallMsgFunctionsOnFailure", function () {
+        let called = false;
+
+        assert.throws(() => {
+            assert(false, () => {
+                called = true;
+                return "error message";
+            });
+        });
+
+        assert.eq(true, called, "called should not have been udpated");
+    });
+
+    it("assertShouldAcceptObjectAsMsg", function () {
+        const objMsg = {someMessage: 1};
+        const err = assert.throws(() => {
+            assert(false, objMsg);
+        });
+
+        assert.neq(-1, err.message.indexOf(tojson(objMsg)), "Error message should have included " + tojson(objMsg));
+    });
+
+    it("assertShouldNotAcceptNonObjStringFunctionAsMsg", function () {
+        const err = assert.throws(() => {
+            assert(true, 1234);
+        });
+
+        assert.neq(-1, err.message.indexOf("msg parameter must be a "));
+    });
 });
 
-tests.push(function eqShouldCallMsgFunctionOnFailure() {
-    let called = false;
-
-    assert.throws(() => {
-        assert.eq(1, 3, () => {
-            called = true;
+describe("assert.eq tests", function () {
+    it("eqShouldPassOnEquality", function () {
+        assert.doesNotThrow(() => {
+            assert.eq(3, 3);
         });
     });
 
-    assert.eq(true, called, "msg function should have been called");
-});
-
-tests.push(function eqShouldPassOnObjectsWithSameContent() {
-    const a = {"foo": true};
-    const b = {"foo": true};
-
-    assert.doesNotThrow(
-        () => {
-            assert.eq(a, b);
-        },
-        [],
-        "eq should not throw exception on two objects with the same content",
-    );
-});
-
-/* assert.neq tests */
-
-tests.push(function neqShouldFailOnEquality() {
-    assert.throws(() => {
-        assert.neq(3, 3);
-    });
-});
-
-tests.push(function neqShouldPassWhenNotEqual() {
-    assert.doesNotThrow(() => {
-        assert.neq(2, 3);
-    });
-});
-
-tests.push(function neqShouldFailOnObjectsWithSameContent() {
-    const a = {"foo": true};
-    const b = {"foo": true};
-
-    assert.throws(
-        () => {
-            assert.neq(a, b);
-        },
-        [],
-        "neq should throw exception on two objects with the same content",
-    );
-});
-
-/* assert.hasFields tests */
-
-tests.push(function hasFieldsRequiresAnArrayOfFields() {
-    const object = {field1: 1, field2: 1, field3: 1};
-
-    assert.throws(() => {
-        assert.hasFields(object, "field1");
-    });
-});
-
-tests.push(function hasFieldsShouldPassWhenObjectHasField() {
-    const object = {field1: 1, field2: 1, field3: 1};
-
-    assert.doesNotThrow(() => {
-        assert.hasFields(object, ["field1"]);
-    });
-});
-
-tests.push(function hasFieldsShouldFailWhenObjectDoesNotHaveField() {
-    const object = {field1: 1, field2: 1, field3: 1};
-
-    assert.throws(() => {
-        assert.hasFields(object, ["fieldDoesNotExist"]);
-    });
-});
-
-/* assert.contains tests */
-
-tests.push(function containsShouldOnlyWorkOnArrays() {
-    assert.throws(() => {
-        assert.contains(42, 5);
-    });
-});
-
-tests.push(function containsShouldPassIfArrayContainsValue() {
-    const array = [1, 2, 3];
-
-    assert.doesNotThrow(() => {
-        assert.contains(2, array);
-    });
-});
-
-tests.push(function containsShouldFailIfArrayDoesNotContainValue() {
-    const array = [1, 2, 3];
-
-    assert.throws(() => {
-        assert.contains(42, array);
-    });
-});
-
-/* assert.soon tests */
-
-tests.push(function soonPassesWhenFunctionPasses() {
-    assert.doesNotThrow(() => {
-        assert.soon(() => {
-            return true;
+    it("eqShouldFailWhenNotEqual", function () {
+        assert.throws(() => {
+            assert.eq(2, 3);
         });
     });
-});
 
-tests.push(function soonFailsIfMethodNeverPasses() {
-    assert.throws(() => {
-        assert.soon(
+    it("eqShouldNotCallMsgFunctionOnSuccess", function () {
+        let called = false;
+
+        assert.doesNotThrow(() => {
+            assert.eq(3, 3, () => {
+                called = true;
+            });
+        });
+
+        assert.eq(false, called, "msg function should not have been called");
+    });
+
+    it("eqShouldCallMsgFunctionOnFailure", function () {
+        let called = false;
+
+        assert.throws(() => {
+            assert.eq(1, 3, () => {
+                called = true;
+            });
+        });
+
+        assert.eq(true, called, "msg function should have been called");
+    });
+
+    it("eqShouldPassOnObjectsWithSameContent", function () {
+        const a = {"foo": true};
+        const b = {"foo": true};
+
+        assert.doesNotThrow(
             () => {
-                return false;
+                assert.eq(a, b);
             },
-            "assert message",
-            kSmallTimeoutMS,
-            kSmallRetryIntervalMS,
-            {runHangAnalyzer: false},
+            [],
+            "eq should not throw exception on two objects with the same content",
         );
     });
 });
 
-tests.push(function soonPassesIfMethodEventuallyPasses() {
-    let count = 0;
-    assert.doesNotThrow(() => {
-        assert.soon(
+describe("assert.neq tests", function () {
+    it("neqShouldFailOnEquality", function () {
+        assert.throws(() => {
+            assert.neq(3, 3);
+        });
+    });
+
+    it("neqShouldPassWhenNotEqual", function () {
+        assert.doesNotThrow(() => {
+            assert.neq(2, 3);
+        });
+    });
+
+    it("neqShouldFailOnObjectsWithSameContent", function () {
+        const a = {"foo": true};
+        const b = {"foo": true};
+
+        assert.throws(
             () => {
-                count += 1;
-                return count === 3;
+                assert.neq(a, b);
             },
-            "assert message",
-            kDefaultTimeoutMS,
-            kSmallRetryIntervalMS,
+            [],
+            "neq should throw exception on two objects with the same content",
         );
     });
 });
 
-/* assert.soonNoExcept tests */
+describe("assert.hasFields tests", function () {
+    it("hasFieldsRequiresAnArrayOfFields", function () {
+        const object = {field1: 1, field2: 1, field3: 1};
 
-tests.push(function soonNoExceptEventuallyPassesEvenWithExceptions() {
-    let count = 0;
-    assert.doesNotThrow(() => {
-        assert.soonNoExcept(
-            () => {
-                count += 1;
-                if (count < 3) {
+        assert.throws(() => {
+            assert.hasFields(object, "field1");
+        });
+    });
+
+    it("hasFieldsShouldPassWhenObjectHasField", function () {
+        const object = {field1: 1, field2: 1, field3: 1};
+
+        assert.doesNotThrow(() => {
+            assert.hasFields(object, ["field1"]);
+        });
+    });
+
+    it("hasFieldsShouldFailWhenObjectDoesNotHaveField", function () {
+        const object = {field1: 1, field2: 1, field3: 1};
+
+        assert.throws(() => {
+            assert.hasFields(object, ["fieldDoesNotExist"]);
+        });
+    });
+
+    /* assert.contains tests */
+
+    it("containsShouldOnlyWorkOnArrays", function () {
+        assert.throws(() => {
+            assert.contains(42, 5);
+        });
+    });
+
+    it("containsShouldPassIfArrayContainsValue", function () {
+        const array = [1, 2, 3];
+
+        assert.doesNotThrow(() => {
+            assert.contains(2, array);
+        });
+    });
+
+    it("containsShouldFailIfArrayDoesNotContainValue", function () {
+        const array = [1, 2, 3];
+
+        assert.throws(() => {
+            assert.contains(42, array);
+        });
+    });
+});
+
+describe("assert.soon tests", function () {
+    it("soonPassesWhenFunctionPasses", function () {
+        assert.doesNotThrow(() => {
+            assert.soon(() => {
+                return true;
+            });
+        });
+    });
+
+    it("soonFailsIfMethodNeverPasses", function () {
+        assert.throws(() => {
+            assert.soon(
+                () => {
+                    return false;
+                },
+                "assert message",
+                kSmallTimeoutMS,
+                kSmallRetryIntervalMS,
+                {runHangAnalyzer: false},
+            );
+        });
+    });
+
+    it("soonPassesIfMethodEventuallyPasses", function () {
+        let count = 0;
+        assert.doesNotThrow(() => {
+            assert.soon(
+                () => {
+                    count += 1;
+                    return count === 3;
+                },
+                "assert message",
+                kDefaultTimeoutMS,
+                kSmallRetryIntervalMS,
+            );
+        });
+    });
+});
+
+describe("assert.soonNoExcept tests", function () {
+    it("soonNoExceptEventuallyPassesEvenWithExceptions", function () {
+        let count = 0;
+        assert.doesNotThrow(() => {
+            assert.soonNoExcept(
+                () => {
+                    count += 1;
+                    if (count < 3) {
+                        throw new Error("failed");
+                    }
+                    return true;
+                },
+                "assert message",
+                kDefaultTimeoutMS,
+                kSmallRetryIntervalMS,
+            );
+        });
+    });
+
+    it("soonNoExceptFailsIfExceptionAlwaysThrown", function () {
+        assert.throws(() => {
+            assert.soonNoExcept(
+                () => {
                     throw new Error("failed");
-                }
-                return true;
-            },
-            "assert message",
-            kDefaultTimeoutMS,
-            kSmallRetryIntervalMS,
-        );
+                },
+                "assert message",
+                kSmallTimeoutMS,
+                kSmallRetryIntervalMS,
+                {runHangAnalyzer: false},
+            );
+        });
     });
 });
 
-tests.push(function soonNoExceptFailsIfExceptionAlwaysThrown() {
-    assert.throws(() => {
-        assert.soonNoExcept(
-            () => {
-                throw new Error("failed");
-            },
-            "assert message",
-            kSmallTimeoutMS,
-            kSmallRetryIntervalMS,
-            {runHangAnalyzer: false},
-        );
+describe("assert.retry tests", function () {
+    it("retryPassesAfterAFewAttempts", function () {
+        let count = 0;
+
+        assert.doesNotThrow(() => {
+            assert.retry(
+                () => {
+                    count += 1;
+                    return count === 3;
+                },
+                "assert message",
+                kDefaultRetryAttempts,
+                kSmallRetryIntervalMS,
+            );
+        });
+    });
+
+    it("retryFailsAfterMaxAttempts", function () {
+        assert.throws(() => {
+            assert.retry(
+                () => {
+                    return false;
+                },
+                "assert message",
+                kDefaultRetryAttempts,
+                kSmallRetryIntervalMS,
+                {
+                    runHangAnalyzer: false,
+                },
+            );
+        });
     });
 });
 
-/* assert.retry tests */
+describe("assert.retryNoExcept tests", function () {
+    it("retryNoExceptPassesAfterAFewAttempts", function () {
+        let count = 0;
 
-tests.push(function retryPassesAfterAFewAttempts() {
-    let count = 0;
-
-    assert.doesNotThrow(() => {
-        assert.retry(
-            () => {
-                count += 1;
-                return count === 3;
-            },
-            "assert message",
-            kDefaultRetryAttempts,
-            kSmallRetryIntervalMS,
-        );
+        assert.doesNotThrow(() => {
+            assert.retryNoExcept(
+                () => {
+                    count += 1;
+                    if (count < 3) {
+                        throw new Error("failed");
+                    }
+                    return count === 3;
+                },
+                "assert message",
+                kDefaultRetryAttempts,
+                kSmallRetryIntervalMS,
+            );
+        });
     });
-});
 
-tests.push(function retryFailsAfterMaxAttempts() {
-    assert.throws(() => {
-        assert.retry(
-            () => {
-                return false;
-            },
-            "assert message",
-            kDefaultRetryAttempts,
-            kSmallRetryIntervalMS,
-            {
-                runHangAnalyzer: false,
-            },
-        );
-    });
-});
-
-/* assert.retryNoExcept tests */
-
-tests.push(function retryNoExceptPassesAfterAFewAttempts() {
-    let count = 0;
-
-    assert.doesNotThrow(() => {
-        assert.retryNoExcept(
-            () => {
-                count += 1;
-                if (count < 3) {
+    it("retryNoExceptFailsAfterMaxAttempts", function () {
+        assert.throws(() => {
+            assert.retryNoExcept(
+                () => {
                     throw new Error("failed");
-                }
-                return count === 3;
-            },
-            "assert message",
-            kDefaultRetryAttempts,
-            kSmallRetryIntervalMS,
-        );
+                },
+                "assert message",
+                kDefaultRetryAttempts,
+                kSmallRetryIntervalMS,
+                {
+                    runHangAnalyzer: false,
+                },
+            );
+        });
     });
 });
 
-tests.push(function retryNoExceptFailsAfterMaxAttempts() {
-    assert.throws(() => {
-        assert.retryNoExcept(
-            () => {
-                throw new Error("failed");
-            },
-            "assert message",
-            kDefaultRetryAttempts,
-            kSmallRetryIntervalMS,
-            {
-                runHangAnalyzer: false,
-            },
-        );
+describe("assert.time tests", function () {
+    it("timeIsSuccessfulIfFuncExecutesInTime", function () {
+        assert.doesNotThrow(() => {
+            assert.time(
+                () => {
+                    return true;
+                },
+                "assert message",
+                kDefaultTimeoutMS,
+            );
+        });
+    });
+
+    it("timeFailsIfFuncDoesNotFinishInTime", function () {
+        assert.throws(() => {
+            assert.time(
+                () => {
+                    return true;
+                },
+                "assert message",
+                -5 * 60 * 1000,
+                {runHangAnalyzer: false},
+            );
+        });
     });
 });
 
-/* assert.time tests */
+describe("assert.isnull tests", function () {
+    it("isnullPassesOnNull", function () {
+        assert.doesNotThrow(() => {
+            assert.isnull(null);
+        });
+    });
 
-tests.push(function timeIsSuccessfulIfFuncExecutesInTime() {
-    assert.doesNotThrow(() => {
-        assert.time(
-            () => {
-                return true;
-            },
-            "assert message",
-            kDefaultTimeoutMS,
-        );
+    it("isnullPassesOnUndefined", function () {
+        assert.doesNotThrow(() => {
+            assert.isnull(undefined);
+        });
+    });
+
+    it("isnullFailsOnNotNull", function () {
+        assert.throws(() => {
+            assert.isnull("hello world");
+        });
     });
 });
 
-tests.push(function timeFailsIfFuncDoesNotFinishInTime() {
-    assert.throws(() => {
-        assert.time(
-            () => {
-                return true;
-            },
-            "assert message",
-            -5 * 60 * 1000,
-            {runHangAnalyzer: false},
-        );
+describe("assert.lt tests", function () {
+    it("ltPassesWhenLessThan", function () {
+        assert.doesNotThrow(() => {
+            assert.lt(3, 5);
+        });
+    });
+
+    it("ltFailsWhenNotLessThan", function () {
+        assert.throws(() => {
+            assert.lt(5, 3);
+        });
+    });
+
+    it("ltFailsWhenEqual", function () {
+        assert.throws(() => {
+            assert.lt(5, 5);
+        });
+    });
+
+    it("ltPassesWhenLessThanWithTimestamps", function () {
+        assert.doesNotThrow(() => {
+            assert.lt(Timestamp(3, 0), Timestamp(10, 0));
+        });
+    });
+
+    it("ltFailsWhenNotLessThanWithTimestamps", function () {
+        assert.throws(() => {
+            assert.lt(Timestamp(0, 10), Timestamp(0, 3));
+        });
+    });
+
+    it("ltFailsWhenEqualWithTimestamps", function () {
+        assert.throws(() => {
+            assert.lt(Timestamp(5, 0), Timestamp(5, 0));
+        });
     });
 });
 
-/* assert.isnull tests */
+describe("assert.gt tests", function () {
+    it("gtPassesWhenGreaterThan", function () {
+        assert.doesNotThrow(() => {
+            assert.gt(5, 3);
+        });
+    });
 
-tests.push(function isnullPassesOnNull() {
-    assert.doesNotThrow(() => {
-        assert.isnull(null);
+    it("gtFailsWhenNotGreaterThan", function () {
+        assert.throws(() => {
+            assert.gt(3, 5);
+        });
+    });
+
+    it("gtFailsWhenEqual", function () {
+        assert.throws(() => {
+            assert.gt(5, 5);
+        });
     });
 });
 
-tests.push(function isnullPassesOnUndefined() {
-    assert.doesNotThrow(() => {
-        assert.isnull(undefined);
+describe("assert.lte tests", function () {
+    it("ltePassesWhenLessThan", function () {
+        assert.doesNotThrow(() => {
+            assert.lte(3, 5);
+        });
+    });
+
+    it("lteFailsWhenNotLessThan", function () {
+        assert.throws(() => {
+            assert.lte(5, 3);
+        });
+    });
+
+    it("ltePassesWhenEqual", function () {
+        assert.doesNotThrow(() => {
+            assert.lte(5, 5);
+        });
     });
 });
 
-tests.push(function isnullFailsOnNotNull() {
-    assert.throws(() => {
-        assert.isnull("hello world");
+describe("assert.gte tests", function () {
+    it("gtePassesWhenGreaterThan", function () {
+        assert.doesNotThrow(() => {
+            assert.gte(5, 3);
+        });
+    });
+
+    it("gteFailsWhenNotGreaterThan", function () {
+        assert.throws(() => {
+            assert.gte(3, 5);
+        });
+    });
+
+    it("gtePassesWhenEqual", function () {
+        assert.doesNotThrow(() => {
+            assert.gte(5, 5);
+        });
+    });
+
+    it("gtePassesWhenGreaterThanWithTimestamps", function () {
+        assert.doesNotThrow(() => {
+            assert.gte(Timestamp(0, 10), Timestamp(0, 3));
+        });
+    });
+
+    it("gteFailsWhenNotGreaterThanWithTimestamps", function () {
+        assert.throws(() => {
+            assert.gte(Timestamp(0, 3), Timestamp(0, 10));
+        });
+    });
+
+    it("gtePassesWhenEqualWIthTimestamps", function () {
+        assert.doesNotThrow(() => {
+            assert.gte(Timestamp(5, 0), Timestamp(5, 0));
+        });
     });
 });
 
-/* assert.lt tests */
+describe("assert.betweenIn tests", function () {
+    it("betweenInPassWhenNumberIsBetween", function () {
+        assert.doesNotThrow(() => {
+            assert.betweenIn(3, 4, 5);
+        });
+    });
 
-tests.push(function ltPassesWhenLessThan() {
-    assert.doesNotThrow(() => {
-        assert.lt(3, 5);
+    it("betweenInFailsWhenNumberIsNotBetween", function () {
+        assert.throws(() => {
+            assert.betweenIn(3, 5, 4);
+        });
+    });
+
+    it("betweenInPassWhenNumbersEqual", function () {
+        assert.doesNotThrow(() => {
+            assert.betweenIn(3, 3, 5);
+        });
+        assert.doesNotThrow(() => {
+            assert.betweenIn(3, 5, 5);
+        });
     });
 });
 
-tests.push(function ltFailsWhenNotLessThan() {
-    assert.throws(() => {
-        assert.lt(5, 3);
+describe("assert.betweenEx tests", function () {
+    it("betweenExPassWhenNumberIsBetween", function () {
+        assert.doesNotThrow(() => {
+            assert.betweenEx(3, 4, 5);
+        });
+    });
+
+    it("betweenExFailsWhenNumberIsNotBetween", function () {
+        assert.throws(() => {
+            assert.betweenEx(3, 5, 4);
+        });
+    });
+
+    it("betweenExFailsWhenNumbersEqual", function () {
+        assert.throws(() => {
+            assert.betweenEx(3, 3, 5);
+        });
+        assert.throws(() => {
+            assert.betweenEx(3, 5, 5);
+        });
     });
 });
 
-tests.push(function ltFailsWhenEqual() {
-    assert.throws(() => {
-        assert.lt(5, 5);
+describe("assert.sameMembers tests", function () {
+    it("sameMembersFailsWithInvalidArguments", function () {
+        assert.throws(() => assert.sameMembers());
+        assert.throws(() => assert.sameMembers([]));
+        assert.throws(() => assert.sameMembers({}, {}));
+        assert.throws(() => assert.sameMembers(1, 1));
     });
-});
 
-tests.push(function ltPassesWhenLessThanWithTimestamps() {
-    assert.doesNotThrow(() => {
-        assert.lt(Timestamp(3, 0), Timestamp(10, 0));
+    it("sameMembersFailsWhenLengthsDifferent", function () {
+        assert.throws(() => assert.sameMembers([], [1]));
+        assert.throws(() => assert.sameMembers([], [1]));
+        assert.throws(() => assert.sameMembers([1, 2], [1]));
+        assert.throws(() => assert.sameMembers([1], [1, 2]));
     });
-});
 
-tests.push(function ltFailsWhenNotLessThanWithTimestamps() {
-    assert.throws(() => {
-        assert.lt(Timestamp(0, 10), Timestamp(0, 3));
+    it("sameMembersFailsWhenCountsOfDuplicatesDifferent", function () {
+        assert.throws(() => assert.sameMembers([1, 1], [1, 2]));
+        assert.throws(() => assert.sameMembers([1, 2], [1, 1]));
     });
-});
 
-tests.push(function ltFailsWhenEqualWithTimestamps() {
-    assert.throws(() => {
-        assert.lt(Timestamp(5, 0), Timestamp(5, 0));
+    it("sameMembersFailsWithDifferentObjects", function () {
+        assert.throws(() => assert.sameMembers([{_id: 0, a: 0}], [{_id: 0, a: 1}]));
+        assert.throws(() => assert.sameMembers([{_id: 1, a: 0}], [{_id: 0, a: 0}]));
+        assert.throws(() => {
+            assert.sameMembers([{a: [{b: 0, c: 0}], _id: 0}], [{_id: 0, a: [{c: 0, b: 1}]}]);
+        });
     });
-});
 
-/* assert.gt tests */
-
-tests.push(function gtPassesWhenGreaterThan() {
-    assert.doesNotThrow(() => {
-        assert.gt(5, 3);
+    it("sameMembersFailsWithDifferentBSONTypes", function () {
+        assert.throws(() => {
+            assert.sameMembers(
+                [new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq")],
+                [new BinData(0, "xxxgqwetkqwklEWRbWERKKJREtbq")],
+            );
+        });
+        assert.throws(() => assert.sameMembers([new Timestamp(0, 1)], [new Timestamp(0, 2)]));
     });
-});
 
-tests.push(function gtFailsWhenNotGreaterThan() {
-    assert.throws(() => {
-        assert.gt(3, 5);
+    it("sameMembersFailsWithCustomCompareFn", function () {
+        const compareBinaryEqual = (a, b) => bsonBinaryEqual(a, b);
+        assert.throws(() => {
+            assert.sameMembers([NumberLong(1)], [1], undefined /*msg*/, compareBinaryEqual);
+        });
+        assert.throws(() => {
+            assert.sameMembers(
+                [NumberLong(1), NumberInt(2)],
+                [2, NumberLong(1)],
+                undefined /*msg*/,
+                compareBinaryEqual,
+            );
+        });
     });
-});
 
-tests.push(function gtFailsWhenEqual() {
-    assert.throws(() => {
-        assert.gt(5, 5);
+    it("sameMembersDoesNotSortNestedArrays", function () {
+        assert.throws(() => assert.sameMembers([[1, 2]], [[2, 1]]));
+        assert.throws(() => {
+            assert.sameMembers([{a: [{b: 0}, {b: 1, c: 0}], _id: 0}], [{_id: 0, a: [{c: 0, b: 1}, {b: 0}]}]);
+        });
     });
-});
 
-/* assert.lte tests */
-
-tests.push(function ltePassesWhenLessThan() {
-    assert.doesNotThrow(() => {
-        assert.lte(3, 5);
+    it("sameMembersPassesWithEmptyArrays", function () {
+        assert.sameMembers([], []);
     });
-});
 
-tests.push(function lteFailsWhenNotLessThan() {
-    assert.throws(() => {
-        assert.lte(5, 3);
+    it("sameMembersPassesSingleElement", function () {
+        assert.sameMembers([1], [1]);
     });
-});
 
-tests.push(function ltePassesWhenEqual() {
-    assert.doesNotThrow(() => {
-        assert.lte(5, 5);
+    it("sameMembersPassesWithSameOrder", function () {
+        assert.sameMembers([1, 2], [1, 2]);
+        assert.sameMembers([1, 2, 3], [1, 2, 3]);
     });
-});
 
-/* assert.gte tests */
-
-tests.push(function gtePassesWhenGreaterThan() {
-    assert.doesNotThrow(() => {
-        assert.gte(5, 3);
+    it("sameMembersPassesWithDifferentOrder", function () {
+        assert.sameMembers([2, 1], [1, 2]);
+        assert.sameMembers([1, 2, 3], [3, 1, 2]);
     });
-});
 
-tests.push(function gteFailsWhenNotGreaterThan() {
-    assert.throws(() => {
-        assert.gte(3, 5);
+    it("sameMembersPassesWithDuplicates", function () {
+        assert.sameMembers([1, 1, 2], [1, 1, 2]);
+        assert.sameMembers([1, 1, 2], [1, 2, 1]);
+        assert.sameMembers([2, 1, 1], [1, 1, 2]);
     });
-});
 
-tests.push(function gtePassesWhenEqual() {
-    assert.doesNotThrow(() => {
-        assert.gte(5, 5);
+    it("sameMembersPassesWithSortedNestedArrays", function () {
+        assert.sameMembers([[1, 2]], [[1, 2]]);
+        assert.sameMembers([{a: [{b: 0}, {b: 1, c: 0}], _id: 0}], [{_id: 0, a: [{b: 0}, {c: 0, b: 1}]}]);
     });
-});
 
-tests.push(function gtePassesWhenGreaterThanWithTimestamps() {
-    assert.doesNotThrow(() => {
-        assert.gte(Timestamp(0, 10), Timestamp(0, 3));
+    it("sameMembersPassesWithObjects", function () {
+        assert.sameMembers([{_id: 0, a: 0}], [{_id: 0, a: 0}]);
+        assert.sameMembers([{_id: 0, a: 0}, {_id: 1}], [{_id: 0, a: 0}, {_id: 1}]);
+        assert.sameMembers([{_id: 0, a: 0}, {_id: 1}], [{_id: 1}, {_id: 0, a: 0}]);
     });
-});
 
-tests.push(function gteFailsWhenNotGreaterThanWithTimestamps() {
-    assert.throws(() => {
-        assert.gte(Timestamp(0, 3), Timestamp(0, 10));
+    it("sameMembersPassesWithUnsortedObjects", function () {
+        assert.sameMembers([{a: 0, _id: 1}], [{_id: 1, a: 0}]);
+        assert.sameMembers([{a: [{b: 1, c: 0}], _id: 0}], [{_id: 0, a: [{c: 0, b: 1}]}]);
     });
-});
 
-tests.push(function gtePassesWhenEqualWIthTimestamps() {
-    assert.doesNotThrow(() => {
-        assert.gte(Timestamp(5, 0), Timestamp(5, 0));
-    });
-});
-
-/* assert.betweenIn tests */
-
-tests.push(function betweenInPassWhenNumberIsBetween() {
-    assert.doesNotThrow(() => {
-        assert.betweenIn(3, 4, 5);
-    });
-});
-
-tests.push(function betweenInFailsWhenNumberIsNotBetween() {
-    assert.throws(() => {
-        assert.betweenIn(3, 5, 4);
-    });
-});
-
-tests.push(function betweenInPassWhenNumbersEqual() {
-    assert.doesNotThrow(() => {
-        assert.betweenIn(3, 3, 5);
-    });
-    assert.doesNotThrow(() => {
-        assert.betweenIn(3, 5, 5);
-    });
-});
-
-/* assert.betweenEx tests */
-
-tests.push(function betweenExPassWhenNumberIsBetween() {
-    assert.doesNotThrow(() => {
-        assert.betweenEx(3, 4, 5);
-    });
-});
-
-tests.push(function betweenExFailsWhenNumberIsNotBetween() {
-    assert.throws(() => {
-        assert.betweenEx(3, 5, 4);
-    });
-});
-
-tests.push(function betweenExFailsWhenNumbersEqual() {
-    assert.throws(() => {
-        assert.betweenEx(3, 3, 5);
-    });
-    assert.throws(() => {
-        assert.betweenEx(3, 5, 5);
-    });
-});
-
-/* assert.sameMembers tests */
-
-tests.push(function sameMembersFailsWithInvalidArguments() {
-    assert.throws(() => assert.sameMembers());
-    assert.throws(() => assert.sameMembers([]));
-    assert.throws(() => assert.sameMembers({}, {}));
-    assert.throws(() => assert.sameMembers(1, 1));
-});
-
-tests.push(function sameMembersFailsWhenLengthsDifferent() {
-    assert.throws(() => assert.sameMembers([], [1]));
-    assert.throws(() => assert.sameMembers([], [1]));
-    assert.throws(() => assert.sameMembers([1, 2], [1]));
-    assert.throws(() => assert.sameMembers([1], [1, 2]));
-});
-
-tests.push(function sameMembersFailsWhenCountsOfDuplicatesDifferent() {
-    assert.throws(() => assert.sameMembers([1, 1], [1, 2]));
-    assert.throws(() => assert.sameMembers([1, 2], [1, 1]));
-});
-
-tests.push(function sameMembersFailsWithDifferentObjects() {
-    assert.throws(() => assert.sameMembers([{_id: 0, a: 0}], [{_id: 0, a: 1}]));
-    assert.throws(() => assert.sameMembers([{_id: 1, a: 0}], [{_id: 0, a: 0}]));
-    assert.throws(() => {
-        assert.sameMembers([{a: [{b: 0, c: 0}], _id: 0}], [{_id: 0, a: [{c: 0, b: 1}]}]);
-    });
-});
-
-tests.push(function sameMembersFailsWithDifferentBSONTypes() {
-    assert.throws(() => {
+    it("sameMembersPassesWithBSONTypes", function () {
         assert.sameMembers(
             [new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq")],
-            [new BinData(0, "xxxgqwetkqwklEWRbWERKKJREtbq")],
+            [new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq")],
+        );
+        assert.sameMembers([new Timestamp(0, 1)], [new Timestamp(0, 1)]);
+    });
+
+    it("sameMembersPassesWithOtherTypes", function () {
+        assert.sameMembers([null], [null]);
+        assert.sameMembers([undefined], [undefined]);
+        assert.sameMembers(["a"], ["a"]);
+        assert.sameMembers([null, undefined, "a"], [undefined, "a", null]);
+    });
+
+    it("sameMembersDefaultCompareIsFriendly", function () {
+        assert.sameMembers([NumberLong(1), NumberInt(2)], [2, 1]);
+    });
+
+    it("sameMembersPassesWithCustomCompareFn", function () {
+        const compareBinaryEqual = (a, b) => bsonBinaryEqual(a, b);
+        assert.sameMembers([[1, 2]], [[1, 2]], undefined /*msg*/, compareBinaryEqual);
+        assert.sameMembers(
+            [NumberLong(1), NumberInt(2)],
+            [NumberInt(2), NumberLong(1)],
+            undefined /*msg*/,
+            compareBinaryEqual,
         );
     });
-    assert.throws(() => assert.sameMembers([new Timestamp(0, 1)], [new Timestamp(0, 2)]));
 });
 
-tests.push(function sameMembersFailsWithCustomCompareFn() {
-    const compareBinaryEqual = (a, b) => bsonBinaryEqual(a, b);
-    assert.throws(() => {
-        assert.sameMembers([NumberLong(1)], [1], undefined /*msg*/, compareBinaryEqual);
-    });
-    assert.throws(() => {
-        assert.sameMembers([NumberLong(1), NumberInt(2)], [2, NumberLong(1)], undefined /*msg*/, compareBinaryEqual);
-    });
-});
-
-tests.push(function sameMembersDoesNotSortNestedArrays() {
-    assert.throws(() => assert.sameMembers([[1, 2]], [[2, 1]]));
-    assert.throws(() => {
-        assert.sameMembers([{a: [{b: 0}, {b: 1, c: 0}], _id: 0}], [{_id: 0, a: [{c: 0, b: 1}, {b: 0}]}]);
-    });
-});
-
-tests.push(function sameMembersPassesWithEmptyArrays() {
-    assert.sameMembers([], []);
-});
-
-tests.push(function sameMembersPassesSingleElement() {
-    assert.sameMembers([1], [1]);
-});
-
-tests.push(function sameMembersPassesWithSameOrder() {
-    assert.sameMembers([1, 2], [1, 2]);
-    assert.sameMembers([1, 2, 3], [1, 2, 3]);
-});
-
-tests.push(function sameMembersPassesWithDifferentOrder() {
-    assert.sameMembers([2, 1], [1, 2]);
-    assert.sameMembers([1, 2, 3], [3, 1, 2]);
-});
-
-tests.push(function sameMembersPassesWithDuplicates() {
-    assert.sameMembers([1, 1, 2], [1, 1, 2]);
-    assert.sameMembers([1, 1, 2], [1, 2, 1]);
-    assert.sameMembers([2, 1, 1], [1, 1, 2]);
-});
-
-tests.push(function sameMembersPassesWithSortedNestedArrays() {
-    assert.sameMembers([[1, 2]], [[1, 2]]);
-    assert.sameMembers([{a: [{b: 0}, {b: 1, c: 0}], _id: 0}], [{_id: 0, a: [{b: 0}, {c: 0, b: 1}]}]);
-});
-
-tests.push(function sameMembersPassesWithObjects() {
-    assert.sameMembers([{_id: 0, a: 0}], [{_id: 0, a: 0}]);
-    assert.sameMembers([{_id: 0, a: 0}, {_id: 1}], [{_id: 0, a: 0}, {_id: 1}]);
-    assert.sameMembers([{_id: 0, a: 0}, {_id: 1}], [{_id: 1}, {_id: 0, a: 0}]);
-});
-
-tests.push(function sameMembersPassesWithUnsortedObjects() {
-    assert.sameMembers([{a: 0, _id: 1}], [{_id: 1, a: 0}]);
-    assert.sameMembers([{a: [{b: 1, c: 0}], _id: 0}], [{_id: 0, a: [{c: 0, b: 1}]}]);
-});
-
-tests.push(function sameMembersPassesWithBSONTypes() {
-    assert.sameMembers(
-        [new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq")],
-        [new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq")],
-    );
-    assert.sameMembers([new Timestamp(0, 1)], [new Timestamp(0, 1)]);
-});
-
-tests.push(function sameMembersPassesWithOtherTypes() {
-    assert.sameMembers([null], [null]);
-    assert.sameMembers([undefined], [undefined]);
-    assert.sameMembers(["a"], ["a"]);
-    assert.sameMembers([null, undefined, "a"], [undefined, "a", null]);
-});
-
-tests.push(function sameMembersDefaultCompareIsFriendly() {
-    assert.sameMembers([NumberLong(1), NumberInt(2)], [2, 1]);
-});
-
-tests.push(function sameMembersPassesWithCustomCompareFn() {
-    const compareBinaryEqual = (a, b) => bsonBinaryEqual(a, b);
-    assert.sameMembers([[1, 2]], [[1, 2]], undefined /*msg*/, compareBinaryEqual);
-    assert.sameMembers(
-        [NumberLong(1), NumberInt(2)],
-        [NumberInt(2), NumberLong(1)],
-        undefined /*msg*/,
-        compareBinaryEqual,
-    );
-});
-
-tests.push(function assertCallsHangAnalyzer() {
+it("assertCallsHangAnalyzer", function () {
     function runAssertTest(f) {
         const oldMongoRunner = MongoRunner;
         let runs = 0;
@@ -826,7 +832,7 @@ function assertThrowsErrorWithJson(assertFailureTriggerFn, {msg, attr}) {
     assert.throws(assertFailureTriggerFn, [], "assertFailureTriggerFn");
 }
 
-tests.push(function assertJsonFormat() {
+it("assertJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert(false, "lorem ipsum");
@@ -841,7 +847,7 @@ tests.push(function assertJsonFormat() {
     );
 });
 
-tests.push(function assertEqJsonFormat() {
+it("assertEqJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.eq(5, 2 + 2, "lorem ipsum");
@@ -856,7 +862,7 @@ tests.push(function assertEqJsonFormat() {
     );
 });
 
-tests.push(function assertDocEqJsonFormat() {
+it("assertDocEqJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.docEq({msg: "hello"}, {msg: "goodbye"}, "lorem ipsum", kAttr);
@@ -868,7 +874,7 @@ tests.push(function assertDocEqJsonFormat() {
     );
 });
 
-tests.push(function assertSetEqJsonFormat() {
+it("assertSetEqJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.setEq(new Set([1, 2, 3]), new Set([4, 5]), "lorem ipsum", kAttr);
@@ -880,7 +886,7 @@ tests.push(function assertSetEqJsonFormat() {
     );
 });
 
-tests.push(function assertSameMembersJsonFormat() {
+it("assertSameMembersJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.sameMembers([1, 2], [1], "Oops!", assert._isDocEq, kAttr);
@@ -892,7 +898,7 @@ tests.push(function assertSameMembersJsonFormat() {
     );
 });
 
-tests.push(function assertFuzzySameMembersJsonFormat() {
+it("assertFuzzySameMembersJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.fuzzySameMembers([{soccer: 42}], [{score: 42000}], ["score"], "Oops!", 4, kAttr);
@@ -904,7 +910,7 @@ tests.push(function assertFuzzySameMembersJsonFormat() {
     );
 });
 
-tests.push(function assertNeqJsonFormat() {
+it("assertNeqJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.neq(42, 42, "Oops!", kAttr);
@@ -913,7 +919,7 @@ tests.push(function assertNeqJsonFormat() {
     );
 });
 
-tests.push(function assertHasFieldsJsonFormat() {
+it("assertHasFieldsJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.hasFields({hello: "world"}, ["goodbye"], "Oops!", kAttr);
@@ -925,7 +931,7 @@ tests.push(function assertHasFieldsJsonFormat() {
     );
 });
 
-tests.push(function assertContainsJsonFormat() {
+it("assertContainsJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.contains(3, [14, 15, 926], "Oops!", kAttr);
@@ -937,7 +943,7 @@ tests.push(function assertContainsJsonFormat() {
     );
 });
 
-tests.push(function assertDoesNotContainJsonFormat() {
+it("assertDoesNotContainJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.doesNotContain(3, [3, 23], "Oops!", kAttr);
@@ -946,7 +952,7 @@ tests.push(function assertDoesNotContainJsonFormat() {
     );
 });
 
-tests.push(function assertContainsPrefixJsonFormat() {
+it("assertContainsPrefixJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.containsPrefix("hello", ["hell", "help"], "Oops!", kAttr);
@@ -958,7 +964,7 @@ tests.push(function assertContainsPrefixJsonFormat() {
     );
 });
 
-tests.push(function assertSoonJsonFormat() {
+it("assertSoonJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.soon(() => false, "Oops!", 20, 10, {runHangAnalyzer: false}, kAttr);
@@ -967,7 +973,7 @@ tests.push(function assertSoonJsonFormat() {
     );
 });
 
-tests.push(function assertSoonNoExceptJsonFormat() {
+it("assertSoonNoExceptJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.soonNoExcept(
@@ -985,7 +991,7 @@ tests.push(function assertSoonNoExceptJsonFormat() {
     );
 });
 
-tests.push(function assertRetryJsonFormat() {
+it("assertRetryJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.retry(() => false, "Oops!", 2, 10, {runHangAnalyzer: false}, kAttr);
@@ -994,7 +1000,7 @@ tests.push(function assertRetryJsonFormat() {
     );
 });
 
-tests.push(function assertRetryNoExceptJsonFormat() {
+it("assertRetryNoExceptJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.retryNoExcept(
@@ -1012,7 +1018,7 @@ tests.push(function assertRetryNoExceptJsonFormat() {
     );
 });
 
-tests.push(function assertTimeJsonFormat() {
+it("assertTimeJsonFormat", function () {
     const sleepTimeMS = 20,
         timeoutMS = 10;
     const f = () => {
@@ -1037,7 +1043,7 @@ tests.push(function assertTimeJsonFormat() {
     );
 });
 
-tests.push(function assertThrowsJsonFormat() {
+it("assertThrowsJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.throws(() => true, [], "Oops!", kAttr);
@@ -1046,7 +1052,7 @@ tests.push(function assertThrowsJsonFormat() {
     );
 });
 
-tests.push(function assertThrowsWithCodeJsonFormat() {
+it("assertThrowsWithCodeJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             const err = new Error("disaster");
@@ -1068,7 +1074,7 @@ tests.push(function assertThrowsWithCodeJsonFormat() {
     );
 });
 
-tests.push(function assertDoesNotThrowJsonFormat() {
+it("assertDoesNotThrowJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             const err = new Error("disaster");
@@ -1088,7 +1094,7 @@ tests.push(function assertDoesNotThrowJsonFormat() {
     );
 });
 
-tests.push(function assertCommandWorkedWrongArgumentTypeJsonFormat() {
+it("assertCommandWorkedWrongArgumentTypeJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.commandWorked("cmd", "Oops!");
@@ -1100,7 +1106,7 @@ tests.push(function assertCommandWorkedWrongArgumentTypeJsonFormat() {
     );
 });
 
-tests.push(function assertCommandWorkedJsonFormat() {
+it("assertCommandWorkedJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             const res = {
@@ -1131,7 +1137,7 @@ tests.push(function assertCommandWorkedJsonFormat() {
     );
 });
 
-tests.push(function assertCommandFailedJsonFormat() {
+it("assertCommandFailedJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             const res = {ok: 1, _mongo: "connection to localhost:20000", _commandObj: {hello: 1}};
@@ -1152,7 +1158,7 @@ tests.push(function assertCommandFailedJsonFormat() {
     );
 });
 
-tests.push(function assertCommandFailedWithCodeJsonFormat() {
+it("assertCommandFailedWithCodeJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             const res = {ok: 1, _mongo: "connection to localhost:20000", _commandObj: {hello: 1}};
@@ -1173,7 +1179,7 @@ tests.push(function assertCommandFailedWithCodeJsonFormat() {
     );
 });
 
-tests.push(function assertCommandFailedWithWrongCodeJsonFormat() {
+it("assertCommandFailedWithWrongCodeJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             const res = {
@@ -1205,7 +1211,7 @@ tests.push(function assertCommandFailedWithWrongCodeJsonFormat() {
     );
 });
 
-tests.push(function assertWriteOKJsonFormat() {
+it("assertWriteOKJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             const res = {ok: 0};
@@ -1215,7 +1221,7 @@ tests.push(function assertWriteOKJsonFormat() {
     );
 });
 
-tests.push(function assertWriteErrorJsonFormat() {
+it("assertWriteErrorJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             const res = new WriteResult({nRemoved: 0, writeErrors: [], upserted: []}, 3, {w: "majority"});
@@ -1237,7 +1243,7 @@ tests.push(function assertWriteErrorJsonFormat() {
     );
 });
 
-tests.push(function assertWriteErrorToJsonHasCorrectFields() {
+it("assertWriteErrorToJsonHasCorrectFields", function () {
     // Verify that the json obj has the correct name for the writeErrors field ('writeErrors' instead of 'writeError').
     const writeError = {code: ErrorCodes.NetworkTimeout, errmsg: "Timeout!"};
     const res = new WriteResult({nRemoved: 0, writeErrors: [writeError], upserted: []}, 3, {w: "majority"});
@@ -1248,7 +1254,7 @@ tests.push(function assertWriteErrorToJsonHasCorrectFields() {
     assert.eq(jsonRes.writeError, null);
 });
 
-tests.push(function assertWriteErrorWithCodeJsonFormat() {
+it("assertWriteErrorWithCodeJsonFormat", function () {
     const writeError = {code: ErrorCodes.NetworkTimeout, errmsg: "Timeout!"};
     assertThrowsErrorWithJson(
         () => {
@@ -1273,7 +1279,7 @@ tests.push(function assertWriteErrorWithCodeJsonFormat() {
     );
 });
 
-tests.push(function assertIsNullJsonFormat() {
+it("assertIsNullJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.isnull({ok: 1}, "Oops!", kAttr);
@@ -1282,7 +1288,7 @@ tests.push(function assertIsNullJsonFormat() {
     );
 });
 
-tests.push(function assertLTJsonFormat() {
+it("assertLTJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.lt(41, 18, "Oops!", kAttr);
@@ -1291,7 +1297,7 @@ tests.push(function assertLTJsonFormat() {
     );
 });
 
-tests.push(function assertBetweenJsonFormat() {
+it("assertBetweenJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.between(1, 15, 10, "Oops!", true, kAttr);
@@ -1303,7 +1309,7 @@ tests.push(function assertBetweenJsonFormat() {
     );
 });
 
-tests.push(function assertCloseJsonFormat() {
+it("assertCloseJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.close(123.4567, 123.4678, "Oops!");
@@ -1314,7 +1320,7 @@ tests.push(function assertCloseJsonFormat() {
     );
 });
 
-tests.push(function assertCloseWithinMSJsonFormat() {
+it("assertCloseWithinMSJsonFormat", function () {
     const dateForLog = (arg) => JSON.parse(JSON.stringify(arg));
     const date1 = Date.UTC(1970, 0, 1, 23, 59, 59, 999);
     const date2 = date1 + 10;
@@ -1329,7 +1335,7 @@ tests.push(function assertCloseWithinMSJsonFormat() {
     );
 });
 
-tests.push(function assertIncludesJsonFormat() {
+it("assertIncludesJsonFormat", function () {
     assertThrowsErrorWithJson(
         () => {
             assert.includes("farmacy", "ace", "Oops!", kAttr);
@@ -1341,18 +1347,11 @@ tests.push(function assertIncludesJsonFormat() {
     );
 });
 
-tests.push(function assertIgnoreNonObjectExtraAttr() {
+it("assertIgnoreNonObjectExtraAttr", function () {
     const err = new Error("Oops!");
     err.extraAttr = "not an object";
     err.code = ErrorCodes.JSInterpreterFailure;
     assert.throwsWithCode(() => {
         throw err;
     }, ErrorCodes.JSInterpreterFailure);
-});
-
-/* main */
-
-tests.forEach((test) => {
-    jsTest.log(`Starting tests '${test.name}'`);
-    test();
 });

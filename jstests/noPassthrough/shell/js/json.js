@@ -424,3 +424,35 @@ describe("tojson", function () {
         });
     });
 });
+
+describe("tojsonObject", () => {
+    it("empty object", () => {
+        assert.eq(tojsonObject({}, "", false), "{\n\t\n}");
+        assert.eq(tojsonObject({}, "", true), "{  }");
+        assert.eq(tojsonObject({}, "\t\t", false), "{\n\t\t\t\n\t\t}");
+    });
+
+    it("single field", () => {
+        assert.eq(tojsonObject({a: 1}, "", false), '{\n\t"a" : 1\n}');
+        assert.eq(tojsonObject({a: 1}, "", true), '{ "a" : 1 }');
+        assert.eq(tojsonObject({a: 1}, "\t\t", false), '{\n\t\t\t"a" : 1\n\t\t}');
+    });
+
+    it("multiple fields", () => {
+        assert.eq(tojsonObject({a: 1, b: 2}, "", false), '{\n\t"a" : 1,\n\t"b" : 2\n}');
+        assert.eq(tojsonObject({a: 1, b: 2}, "", true), '{ "a" : 1, "b" : 2 }');
+        assert.eq(tojsonObject({a: 1, b: 2}, "\t\t", false), '{\n\t\t\t"a" : 1,\n\t\t\t"b" : 2\n\t\t}');
+    });
+
+    it("nested fields", () => {
+        assert.eq(
+            tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "", false),
+            '{\n\t"a" : 1,\n\t"b" : {\n\t\t"bb" : 2,\n\t\t"cc" : 3\n\t}\n}',
+        );
+        assert.eq(tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "", true), '{ "a" : 1, "b" : { "bb" : 2, "cc" : 3 } }');
+        assert.eq(
+            tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "\t\t", false),
+            '{\n\t\t\t"a" : 1,\n\t\t\t"b" : {\n\t\t\t\t"bb" : 2,\n\t\t\t\t"cc" : 3\n\t\t\t}\n\t\t}',
+        );
+    });
+});

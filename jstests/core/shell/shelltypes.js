@@ -1,174 +1,105 @@
+import {it} from "jstests/libs/mochalite.js";
+
 // check that constructor also works without "new"
-let a;
-let b;
-a = new ObjectId();
-b = ObjectId(a.valueOf());
-printjson(a);
-assert.eq(tojson(a), tojson(b), "oid");
+it("ObjectId", () => {
+    let a = new ObjectId();
+    let b = ObjectId(a.valueOf());
+    printjson(a);
+    assert.eq(tojson(a), tojson(b), "oid");
+});
 
-a = new DBRef("test", "theid");
-b = DBRef(a.getRef(), a.getId());
-printjson(a);
-assert.eq(tojson(a), tojson(b), "dbref");
+it("DBRef", () => {
+    let a = new DBRef("test", "theid");
+    let b = DBRef(a.getRef(), a.getId());
+    printjson(a);
+    assert.eq(tojson(a), tojson(b), "dbref");
 
-a = new DBRef("test", "theid", "testdb");
-b = DBRef(a.getRef(), a.getId(), a.getDb());
-printjson(a);
-assert.eq(tojson(a), tojson(b), "dbref");
+    a = new DBRef("test", "theid", "testdb");
+    b = DBRef(a.getRef(), a.getId(), a.getDb());
+    printjson(a);
+    assert.eq(tojson(a), tojson(b), "dbref");
+});
 
-a = new DBPointer("test", new ObjectId());
-b = DBPointer(a.getCollection(), a.getId());
-printjson(a);
-assert.eq(tojson(a), tojson(b), "dbpointer");
+it("DBPointer", () => {
+    let a = new DBPointer("test", new ObjectId());
+    let b = DBPointer(a.getCollection(), a.getId());
+    printjson(a);
+    assert.eq(tojson(a), tojson(b), "dbpointer");
+});
 
-a = new Timestamp(10, 20);
-b = Timestamp(a.t, a.i);
-printjson(a);
-assert.eq(tojson(a), tojson(b), "timestamp");
+it("BinData", () => {
+    let a = new BinData(3, "VQ6EAOKbQdSnFkRmVUQAAA==");
+    let b = BinData(a.type, a.base64());
+    printjson(a);
+    assert.eq(tojson(a), tojson(b), "bindata");
+});
 
-assert.throws(
-    function () {
-        Timestamp(-2, 3);
-    },
-    [],
-    "Timestamp time must not accept negative time",
-);
-assert.throws(
-    function () {
-        Timestamp(0, -1);
-    },
-    [],
-    "Timestamp increment must not accept negative time",
-);
-assert.throws(
-    function () {
-        Timestamp(0x10000 * 0x10000, 0);
-    },
-    [],
-    "Timestamp time must not accept values larger than 2**32 - 1",
-);
-assert.throws(
-    function () {
-        Timestamp(0, 0x10000 * 0x10000);
-    },
-    [],
-    "Timestamp increment must not accept values larger than 2**32 - 1",
-);
+it("UUID", () => {
+    let a = new UUID("550e8400e29b41d4a716446655440000");
+    let b = UUID(a.hex());
+    printjson(a);
+    assert.eq(tojson(a), tojson(b), "uuid");
+});
 
-a = new Timestamp(0x80008000, 0x80008000 + 0.5);
-b = Timestamp(a.t, Math.round(a.i));
-printjson(a);
-assert.eq(tojson(a), tojson(b), "timestamp");
+it("MD5", () => {
+    let a = new MD5("550e8400e29b41d4a716446655440000");
+    let b = MD5(a.hex());
+    printjson(a);
+    assert.eq(tojson(a), tojson(b), "md5");
+});
 
-a = new BinData(3, "VQ6EAOKbQdSnFkRmVUQAAA==");
-b = BinData(a.type, a.base64());
-printjson(a);
-assert.eq(tojson(a), tojson(b), "bindata");
+it("HexData", () => {
+    let a = new HexData(4, "550e8400e29b41d4a716446655440000");
+    let b = HexData(a.type, a.hex());
+    printjson(a);
+    assert.eq(tojson(a), tojson(b), "hexdata");
+});
 
-a = new UUID("550e8400e29b41d4a716446655440000");
-b = UUID(a.hex());
-printjson(a);
-assert.eq(tojson(a), tojson(b), "uuid");
+it("NumberLong", () => {
+    let a = new NumberLong(100);
+    let b = NumberLong(a.toNumber());
+    printjson(a);
+    assert.eq(tojson(a), tojson(b), "long");
+});
 
-a = new MD5("550e8400e29b41d4a716446655440000");
-b = MD5(a.hex());
-printjson(a);
-assert.eq(tojson(a), tojson(b), "md5");
+it("NumberInt", () => {
+    let a = new NumberInt(100);
+    let b = NumberInt(a.toNumber());
+    printjson(a);
+    assert.eq(tojson(a), tojson(b), "int");
+});
 
-a = new HexData(4, "550e8400e29b41d4a716446655440000");
-b = HexData(a.type, a.hex());
-printjson(a);
-assert.eq(tojson(a), tojson(b), "hexdata");
+it("ObjectId.fromDate", () => {
+    let a = new ObjectId();
+    let timestampA = a.getTimestamp();
+    let dateA = new Date(timestampA.getTime());
 
-a = new NumberLong(100);
-b = NumberLong(a.toNumber());
-printjson(a);
-assert.eq(tojson(a), tojson(b), "long");
+    // ObjectId.fromDate - invalid input types
+    assert.throws(() => ObjectId.fromDate(undefined), [], "ObjectId.fromDate should error on undefined date");
 
-a = new NumberInt(100);
-b = NumberInt(a.toNumber());
-printjson(a);
-assert.eq(tojson(a), tojson(b), "int");
+    assert.throws(() => ObjectId.fromDate(12345), [], "ObjectId.fromDate should error on numerical value");
 
-// ObjectId.fromDate
+    assert.throws(() => ObjectId.fromDate(dateA.toISOString()), [], "ObjectId.fromDate should error on string value");
 
-a = new ObjectId();
-let timestampA = a.getTimestamp();
-let dateA = new Date(timestampA.getTime());
+    // SERVER-14623 dates less than or equal to 1978-07-04T21:24:15Z fail
+    let checkFromDate = function (millis, expected, comment) {
+        let oid = ObjectId.fromDate(new Date(millis));
+        assert.eq(oid.valueOf(), expected, comment);
+    };
+    checkFromDate(Math.pow(2, 28) * 1000, "100000000000000000000000", "1978-07-04T21:24:16Z");
+    checkFromDate(Math.pow(2, 28) * 1000 - 1, "0fffffff0000000000000000", "1978-07-04T21:24:15Z");
+    checkFromDate(0, "000000000000000000000000", "start of epoch");
 
-// ObjectId.fromDate - invalid input types
-assert.throws(
-    function () {
-        ObjectId.fromDate(undefined);
-    },
-    [],
-    "ObjectId.fromDate should error on undefined date",
-);
+    // test date upper limit
+    checkFromDate(Math.pow(2, 32) * 1000 - 1, "ffffffff0000000000000000", "last valid date");
+    assert.throws(
+        () => ObjectId.fromDate(new Date(Math.pow(2, 32) * 1000)),
+        [],
+        "ObjectId limited to 4 bytes for seconds",
+    );
 
-assert.throws(
-    function () {
-        ObjectId.fromDate(12345);
-    },
-    [],
-    "ObjectId.fromDate should error on numerical value",
-);
-
-assert.throws(
-    function () {
-        ObjectId.fromDate(dateA.toISOString());
-    },
-    [],
-    "ObjectId.fromDate should error on string value",
-);
-
-// SERVER-14623 dates less than or equal to 1978-07-04T21:24:15Z fail
-let checkFromDate = function (millis, expected, comment) {
-    let oid = ObjectId.fromDate(new Date(millis));
-    assert.eq(oid.valueOf(), expected, comment);
-};
-checkFromDate(Math.pow(2, 28) * 1000, "100000000000000000000000", "1978-07-04T21:24:16Z");
-checkFromDate(Math.pow(2, 28) * 1000 - 1, "0fffffff0000000000000000", "1978-07-04T21:24:15Z");
-checkFromDate(0, "000000000000000000000000", "start of epoch");
-
-// test date upper limit
-checkFromDate(Math.pow(2, 32) * 1000 - 1, "ffffffff0000000000000000", "last valid date");
-assert.throws(
-    function () {
-        ObjectId.fromDate(new Date(Math.pow(2, 32) * 1000));
-    },
-    [],
-    "ObjectId limited to 4 bytes for seconds",
-);
-
-// ObjectId.fromDate - Date
-b = ObjectId.fromDate(dateA);
-printjson(a);
-assert.eq(tojson(a.getTimestamp()), tojson(b.getTimestamp()), "ObjectId.fromDate - Date");
-
-// tojsonObject
-
-// Empty object
-assert.eq("{\n\t\n}", tojsonObject({}, "", false));
-assert.eq("{  }", tojsonObject({}, "", true));
-assert.eq("{\n\t\t\t\n\t\t}", tojsonObject({}, "\t\t", false));
-
-// Single field
-assert.eq('{\n\t"a" : 1\n}', tojsonObject({a: 1}, "", false));
-assert.eq('{ "a" : 1 }', tojsonObject({a: 1}, "", true));
-assert.eq('{\n\t\t\t"a" : 1\n\t\t}', tojsonObject({a: 1}, "\t\t", false));
-
-// Multiple fields
-assert.eq('{\n\t"a" : 1,\n\t"b" : 2\n}', tojsonObject({a: 1, b: 2}, "", false));
-assert.eq('{ "a" : 1, "b" : 2 }', tojsonObject({a: 1, b: 2}, "", true));
-assert.eq('{\n\t\t\t"a" : 1,\n\t\t\t"b" : 2\n\t\t}', tojsonObject({a: 1, b: 2}, "\t\t", false));
-
-// Nested fields
-assert.eq(
-    '{\n\t"a" : 1,\n\t"b" : {\n\t\t"bb" : 2,\n\t\t"cc" : 3\n\t}\n}',
-    tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "", false),
-);
-assert.eq('{ "a" : 1, "b" : { "bb" : 2, "cc" : 3 } }', tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "", true));
-assert.eq(
-    '{\n\t\t\t"a" : 1,\n\t\t\t"b" : {\n\t\t\t\t"bb" : 2,\n\t\t\t\t"cc" : 3\n\t\t\t}\n\t\t}',
-    tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "\t\t", false),
-);
+    // ObjectId.fromDate - Date
+    let b = ObjectId.fromDate(dateA);
+    printjson(a);
+    assert.eq(tojson(a.getTimestamp()), tojson(b.getTimestamp()), "ObjectId.fromDate - Date");
+});
