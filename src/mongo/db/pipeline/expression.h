@@ -3110,10 +3110,14 @@ public:
                      boost::intrusive_ptr<Expression> in,
                      const boost::optional<std::string>& idxName,
                      const boost::optional<Variables::Id>& idxId,
+                     const boost::optional<std::string>& thisName,
                      Variables::Id thisVar,
+                     const boost::optional<std::string>& valueName,
                      Variables::Id valueVar)
         : Expression(expCtx, {std::move(input), std::move(initial), std::move(in)}),
+          _thisName(thisName),
           _thisVar(thisVar),
+          _valueName(valueName),
           _valueVar(valueVar),
           _idxName(std::move(idxName)),
           _idxId(idxId) {
@@ -3170,7 +3174,9 @@ public:
                                                 cloneChild(_kIn),
                                                 _idxName,
                                                 _idxId,
+                                                _thisName,
                                                 _thisVar,
+                                                _valueName,
                                                 _valueVar);
     }
 
@@ -3179,8 +3185,14 @@ private:
     static constexpr size_t _kInitial = 1;
     static constexpr size_t _kIn = 2;
 
+    // Name of the variable provided in the 'as' argument, boost::none if not provided.
+    boost::optional<std::string> _thisName;
     Variables::Id _thisVar;
+
+    // Name of the variable provided in the 'valueAs' argument, boost::none if not provided.
+    boost::optional<std::string> _valueName;
     Variables::Id _valueVar;
+
     // Name of the variable provided in the 'arrayIndexAs' argument, boost::none if not provided.
     boost::optional<std::string> _idxName;
     // ID of the variable that represents the array index, boost::none if the feature is not

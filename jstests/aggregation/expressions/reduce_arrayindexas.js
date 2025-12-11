@@ -108,11 +108,156 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "ExposeArrayIndexInMapFilterReduce")
         apiVersion: "1",
         apiStrict: true,
     });
+
+    //
+    // Test 'as' and 'asValue'.
+    //
+
+    test({$reduce: {input: "$simple", initialValue: 0, in: {$add: ["$$this", "$$value"]}}}, 6);
+    test({$reduce: {input: "$simple", initialValue: 0, as: "elem", in: {$add: ["$$elem", "$$value"]}}}, 6);
+    test(
+        {$reduce: {input: "$simple", initialValue: 0, as: "elem", valueAs: "acc", in: {$add: ["$$elem", "$$acc"]}}},
+        6,
+    );
+    test({$reduce: {input: "$simple", initialValue: 0, valueAs: "acc", in: {$add: ["$$this", "$$acc"]}}}, 6);
+
+    // Check nested operators.
+    pipeline = {
+        $reduce: {
+            input: "$matrix",
+            initialValue: 1,
+            as: "elem1",
+            valueAs: "acc1",
+            in: {
+                $multiply: [
+                    "$$acc1",
+                    {
+                        $reduce: {
+                            input: "$$elem1",
+                            initialValue: 0,
+                            as: "elem2",
+                            valueAs: "acc2",
+                            in: {$add: ["$$acc2", "$$elem2", "$$IDX"]},
+                        },
+                    },
+                ],
+            },
+        },
+    };
+    test(pipeline, 4374);
+
+    // Check nested variable shadowing.
+    pipeline = {
+        $reduce: {
+            input: "$matrix",
+            initialValue: 1,
+            as: "elem",
+            valueAs: "acc",
+            in: {
+                $multiply: [
+                    "$$acc",
+                    {
+                        $reduce: {
+                            input: "$$elem",
+                            initialValue: 0,
+                            as: "elem",
+                            valueAs: "acc",
+                            in: {$add: ["$$acc", "$$elem", "$$IDX"]},
+                        },
+                    },
+                ],
+            },
+        },
+    };
+    test(pipeline, 4374);
+
+    //
+    // Test error conditions of 'as' and 'valueAs'.
+    //
+
+    // Can't use defaults $$this/$$value if the new parameters are defined.
+    testError({$reduce: {input: "$simple", initialValue: 0, as: "elem", in: {$add: ["$$this", "$$value"]}}}, 17276);
+    testError(
+        {$reduce: {input: "$simple", initialValue: 0, valueAs: "elem", in: {$add: ["$$this", "$$value"]}}},
+        17276,
+    );
+
+    // Can't use non-user definable names on new parameters.
+    testError(
+        {$reduce: {input: "$simple", initialValue: 0, as: "THIS", in: {$add: ["$$THIS", "$$value"]}}},
+        ErrorCodes.FailedToParse,
+    );
+    testError(
+        {$reduce: {input: "$simple", initialValue: 0, as: "^", in: {$add: ["$$^", "$$value"]}}},
+        ErrorCodes.FailedToParse,
+    );
+    testError(
+        {$reduce: {input: "$simple", initialValue: 0, valueAs: "VALUE", in: {$add: ["$$this", "$$VALUE"]}}},
+        ErrorCodes.FailedToParse,
+    );
+    testError(
+        {$reduce: {input: "$simple", initialValue: 0, valueAs: "^", in: {$add: ["$$this", "$$^"]}}},
+        ErrorCodes.FailedToParse,
+    );
+
+    // Can't use defined variables in the non-'in' arguments.
+    testError({$reduce: {input: "$$i", initialValue: [], in: [], as: "i"}}, 17276);
+    testError({$reduce: {input: "$simple", initialValue: "$$i", in: [], as: "i"}}, 17276);
+    testError({$reduce: {input: "$simple", initialValue: ["$$i"], in: [], as: "i"}}, 17276);
+    testError({$reduce: {input: "$$i", initialValue: [], in: [], valueAs: "i"}}, 17276);
+    testError({$reduce: {input: "$simple", initialValue: "$$i", in: [], valueAs: "i"}}, 17276);
+    testError({$reduce: {input: "$simple", initialValue: ["$$i"], in: [], valueAs: "i"}}, 17276);
+
+    // Can't reuse same variable.
+    testError(
+        {$reduce: {input: "$simple", initialValue: 0, as: "elem", valueAs: "elem", in: {$add: ["$$elem", "$$elem"]}}},
+        9298401,
+    );
+    testError(
+        {
+            $reduce: {
+                input: "$simple",
+                initialValue: 0,
+                as: "elem",
+                arrayIndexAs: "elem",
+                in: {$add: ["$$elem", "$$elem"]},
+            },
+        },
+        9298401,
+    );
+    testError(
+        {
+            $reduce: {
+                input: "$simple",
+                initialValue: 0,
+                valueAs: "elem",
+                arrayIndexAs: "elem",
+                in: {$add: ["$$elem", "$$elem"]},
+            },
+        },
+        9298401,
+    );
+
+    // Can't use new parameters in API Version 1 with apiStrict.
+    pipeline = {$reduce: {input: "$simple", initialValue: 0, as: "elem", in: {$add: ["$$elem", "$$value"]}}};
+    testError(pipeline, ErrorCodes.APIStrictError, {
+        apiVersion: "1",
+        apiStrict: true,
+    });
+    pipeline = {$reduce: {input: "$simple", initialValue: 0, valueAs: "acc", in: {$add: ["$$this", "$$acc"]}}};
+    testError(pipeline, ErrorCodes.APIStrictError, {
+        apiVersion: "1",
+        apiStrict: true,
+    });
 } else {
     // TODO(SERVER-90514): remove these tests when the new features are enabled by default.
     testError(
         {$reduce: {input: "$simple", initialValue: 0, in: {$add: [{$multiply: ["$$this", "$$IDX"]}, "$$value"]}}},
         17276,
+    );
+    testError(
+        {$reduce: {input: "$simple", initialValue: 0, as: "elem", valueAs: "acc", in: {$add: ["$$elem", "$$acc"]}}},
+        40076,
     );
     testError(
         {

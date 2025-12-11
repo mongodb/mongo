@@ -2846,14 +2846,11 @@ intrusive_ptr<Expression> ExpressionReduce::parse(ExpressionContext* const expCt
                 expCtx->getVersionContext(),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
-    // vpsSub is used only to parse 'in', which must have access to $$this and $$value.
-    VariablesParseState vpsSub(vps);
-    auto thisVar = vpsSub.defineVariable("this");
-    auto valueVar = vpsSub.defineVariable("value");
-
     BSONElement inputElem;
     BSONElement initialElem;
     BSONElement inElem;
+    BSONElement asElem;
+    BSONElement valueAsElem;
     BSONElement arrayIndexAsElem;
 
     for (auto&& elem : expr.Obj()) {
@@ -2864,6 +2861,18 @@ intrusive_ptr<Expression> ExpressionReduce::parse(ExpressionContext* const expCt
             initialElem = elem;
         } else if (field == "in") {
             inElem = elem;
+        } else if (isExposeArrayIndexEnabled && field == "as") {
+            assertLanguageFeatureIsAllowed(expCtx->getOperationContext(),
+                                           "as argument of $reduce operator",
+                                           AllowedWithApiStrict::kNeverInVersion1,
+                                           AllowedWithClientType::kAny);
+            asElem = elem;
+        } else if (isExposeArrayIndexEnabled && field == "valueAs") {
+            assertLanguageFeatureIsAllowed(expCtx->getOperationContext(),
+                                           "valueAs argument of $reduce operator",
+                                           AllowedWithApiStrict::kNeverInVersion1,
+                                           AllowedWithClientType::kAny);
+            valueAsElem = elem;
         } else if (isExposeArrayIndexEnabled && field == "arrayIndexAs") {
             assertLanguageFeatureIsAllowed(expCtx->getOperationContext(),
                                            "arrayIndexAs argument of $reduce operator",
@@ -2878,16 +2887,57 @@ intrusive_ptr<Expression> ExpressionReduce::parse(ExpressionContext* const expCt
     uassert(40078, "$reduce requires 'initialValue' to be specified", initialElem);
     uassert(40079, "$reduce requires 'in' to be specified", inElem);
 
-    // Parse "arrayIndexAs". If "arrayIndexAs" is not specified, then write to "IDX" by default.
+    // "vpsSub" gets our variables, "vps" doesn't.
+    VariablesParseState vpsSub(vps);
+
+    auto parseVariableDefinition = [&vpsSub](const BSONElement& elem, StringData defaultName) {
+        boost::optional<std::string> name;
+        if (elem) {
+            name = elem.str();
+            variableValidation::validateNameForUserWrite(*name);
+        }
+        Variables::Id id = vpsSub.defineVariable(!name ? defaultName : *name);
+        return std::make_pair(name, id);
+    };
+
+    // Parse "as". If is not specified, use "this" by default.
+    boost::optional<std::string> thisName;
+    Variables::Id thisId;
+    if (isExposeArrayIndexEnabled) {
+        std::tie(thisName, thisId) = parseVariableDefinition(asElem, "this");
+    } else {
+        // Keep previous behavior if feature flag is disabled.
+        thisId = vpsSub.defineVariable("this");
+    }
+
+    // Parse "valueAs". If is not specified, use "value" by default.
+    boost::optional<std::string> valueName;
+    Variables::Id valueId;
+    if (isExposeArrayIndexEnabled) {
+        std::tie(valueName, valueId) = parseVariableDefinition(valueAsElem, "value");
+    } else {
+        // Keep previous behavior if feature flag is disabled.
+        valueId = vpsSub.defineVariable("value");
+    }
+
+    // Parse "arrayIndexAs". If is not specified, use "IDX" by default.
     boost::optional<std::string> idxName;
     boost::optional<Variables::Id> idxId;
     if (isExposeArrayIndexEnabled) {
-        if (arrayIndexAsElem) {
-            idxName = arrayIndexAsElem.str();
-            variableValidation::validateNameForUserWrite(*idxName);
-        }
-        idxId = vpsSub.defineVariable(!idxName ? "IDX" : *idxName);
+        std::tie(idxName, idxId) = parseVariableDefinition(arrayIndexAsElem, "IDX");
     }
+
+    // Validate uniqueness of the user-defined variables.
+    boost::optional<std::string> repeatedName;
+    if (thisName && (thisName == valueName || thisName == idxName)) {
+        repeatedName = *thisName;
+    } else if (valueName && (valueName == idxName)) {
+        repeatedName = *valueName;
+    }
+
+    uassert(9298401,
+            str::stream() << "Cannot define variables with the same name " << *repeatedName,
+            !repeatedName.has_value());
 
     return make_intrusive<ExpressionReduce>(expCtx,
                                             parseOperand(expCtx, inputElem, vps),
@@ -2895,8 +2945,10 @@ intrusive_ptr<Expression> ExpressionReduce::parse(ExpressionContext* const expCt
                                             parseOperand(expCtx, inElem, vpsSub),
                                             std::move(idxName),
                                             idxId,
-                                            thisVar,
-                                            valueVar);
+                                            std::move(thisName),
+                                            thisId,
+                                            std::move(valueName),
+                                            valueId);
 }
 
 Value ExpressionReduce::evaluate(const Document& root, Variables* variables) const {
@@ -2911,13 +2963,15 @@ intrusive_ptr<Expression> ExpressionReduce::optimize() {
 }
 
 Value ExpressionReduce::serialize(const SerializationOptions& options) const {
-    return Value(
-        Document{{"$reduce",
-                  Document{{"input", _children[_kInput]->serialize(options)},
-                           {"initialValue", _children[_kInitial]->serialize(options)},
-                           {"arrayIndexAs",
-                            _idxName ? Value(options.serializeIdentifier(*_idxName)) : Value()},
-                           {"in", _children[_kIn]->serialize(options)}}}});
+    return Value(Document{
+        {"$reduce",
+         Document{
+             {"input", _children[_kInput]->serialize(options)},
+             {"initialValue", _children[_kInitial]->serialize(options)},
+             {"as", _thisName ? Value(options.serializeIdentifier(*_thisName)) : Value()},
+             {"valueAs", _valueName ? Value(options.serializeIdentifier(*_valueName)) : Value()},
+             {"arrayIndexAs", _idxName ? Value(options.serializeIdentifier(*_idxName)) : Value()},
+             {"in", _children[_kIn]->serialize(options)}}}});
 }
 
 /* ------------------------ ExpressionReplaceBase ------------------------ */
