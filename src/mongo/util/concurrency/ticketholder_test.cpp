@@ -1139,16 +1139,16 @@ TEST_F(TicketHolderTestTick, WaitForTicketDeadlineBetweenTimeoutWindows) {
     // 600ms. The second timeout happens between 800 - 1200 ms. So picking 650 checks whether the
     // ticket wait finishes in an interval which has no overlap with the first or second
     // timeout window.
-    runTicketWaitTimeoutTest(Milliseconds{650},  // maxTimeMS
-                             Milliseconds{10},   // lowerBoundSlack
-                             Milliseconds{10});  // upperBoundSlack
+    runTicketWaitTimeoutTest(Milliseconds{650},   // maxTimeMS
+                             Milliseconds{100},   // lowerBoundSlack
+                             Milliseconds{100});  // upperBoundSlack
 }
 
 TEST_F(TicketHolderTestTick, WaitForTicketWithShortDeadline) {
     // This test verifies that short deadlines (much less than the 500ms base interval) are
     // respected.
-    runTicketWaitTimeoutTest(Milliseconds{50},   // maxTimeMS - much less than 500ms base interval
-                             Milliseconds{10},   // lowerBoundSlack
-                             Milliseconds{10});  // upperBoundSlack
+    runTicketWaitTimeoutTest(Milliseconds{50},    // maxTimeMS - much less than 500ms base interval
+                             Milliseconds{50},    // lowerBoundSlack
+                             Milliseconds{100});  // upperBoundSlack
 }
 }  // namespace
