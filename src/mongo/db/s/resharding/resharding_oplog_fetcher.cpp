@@ -707,15 +707,21 @@ bool ReshardingOplogFetcher::consume(Client* client,
                 }
             }
 
+            boost::optional<Timestamp> currBatchLastOplogTs;
+
+            if (!insertBatches.empty()) {
+                currBatchLastOplogTs = insertBatches.back().lastOplogId.getTs();
+            }
+
             if (postBatchResumeToken) {
-                auto currBatchLastOplogTs = postBatchResumeToken->getField("ts").timestamp();
+                currBatchLastOplogTs = postBatchResumeToken->getField("ts").timestamp();
 
                 // Insert a noop entry with the latest oplog timestamp from the donor's cursor
                 // response. This will allow the fetcher to resume reading from the last oplog entry
                 // it fetched even if that entry is for a different collection, making resuming less
                 // wasteful.
                 if (auto oplogId =
-                        _makeProgressMarkOplogIdIfNeedToInsert(opCtx, currBatchLastOplogTs)) {
+                        _makeProgressMarkOplogIdIfNeedToInsert(opCtx, *currBatchLastOplogTs)) {
                     auto oplog = _makeProgressMarkOplog(opCtx, *oplogId);
 
                     try {
@@ -746,9 +752,11 @@ bool ReshardingOplogFetcher::consume(Client* client,
                         // donor returns will be the same, so it's safe to ignore this error.
                     }
                 }
+            }
 
+            if (currBatchLastOplogTs) {
                 auto timeToFetch = calculateTimeToFetch(
-                    opCtx, batchTimer, currBatchLastOplogTs, prevBatchLastOplogId.getTs());
+                    opCtx, batchTimer, *currBatchLastOplogTs, prevBatchLastOplogId.getTs());
                 _env->metrics()->updateAverageTimeToFetchOplogEntries(_donorShard, timeToFetch);
             }
 

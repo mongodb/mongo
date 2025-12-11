@@ -413,7 +413,7 @@ void ReshardingMetrics::registerDonors(const std::vector<ShardId>& donorShardIds
 
 void ReshardingMetrics::updateAverageTimeToFetchOplogEntries(const ShardId& donorShardId,
                                                              Milliseconds timeToFetch) {
-    std::unique_lock lock(_oplogLatencyMetricsMutex);
+    std::shared_lock lock(_oplogLatencyMetricsMutex);
 
     auto it = _oplogLatencyMetrics.find(donorShardId);
     uassert(10626502,
@@ -425,7 +425,7 @@ void ReshardingMetrics::updateAverageTimeToFetchOplogEntries(const ShardId& dono
 
 void ReshardingMetrics::updateAverageTimeToApplyOplogEntries(const ShardId& donorShardId,
                                                              Milliseconds timeToApply) {
-    std::unique_lock lock(_oplogLatencyMetricsMutex);
+    std::shared_lock lock(_oplogLatencyMetricsMutex);
 
     auto it = _oplogLatencyMetrics.find(donorShardId);
     uassert(10626504,
@@ -437,7 +437,7 @@ void ReshardingMetrics::updateAverageTimeToApplyOplogEntries(const ShardId& dono
 
 boost::optional<Milliseconds> ReshardingMetrics::getAverageTimeToFetchOplogEntries(
     const ShardId& donorShardId) const {
-    std::unique_lock lock(_oplogLatencyMetricsMutex);
+    std::shared_lock lock(_oplogLatencyMetricsMutex);
 
     auto it = _oplogLatencyMetrics.find(donorShardId);
     uassert(10626503,
@@ -449,7 +449,7 @@ boost::optional<Milliseconds> ReshardingMetrics::getAverageTimeToFetchOplogEntri
 
 boost::optional<Milliseconds> ReshardingMetrics::getAverageTimeToApplyOplogEntries(
     const ShardId& donorShardId) const {
-    std::unique_lock lock(_oplogLatencyMetricsMutex);
+    std::shared_lock lock(_oplogLatencyMetricsMutex);
 
     auto it = _oplogLatencyMetrics.find(donorShardId);
     uassert(10626505,
