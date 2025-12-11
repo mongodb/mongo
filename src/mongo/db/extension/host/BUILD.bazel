@@ -98,6 +98,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/test_examples:null_mongo_extension_bad_extension",
         "//src/mongo/db/extension/test_examples:null_stage_descriptor_bad_extension",
         "//src/mongo/db/extension/test_examples:parse_options_mongo_extension",
+        "//src/mongo/db/extension/test_examples:read_n_documents_mongo_extension",
         "//src/mongo/db/extension/test_examples:sharded_execution_serialization_mongo_extension",
         "//src/mongo/db/extension/test_examples:test_options_mongo_extension",
         "//src/mongo/db/extension/test_examples:toaster_mongo_extension",

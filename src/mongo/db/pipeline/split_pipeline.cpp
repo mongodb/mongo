@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 
@@ -131,6 +132,7 @@ public:
                 ->isFeatureFlagShardFilteringDistinctScanEnabled()) {
             _moveGroupFollowingSortFromMergerToShards();
         }
+        _moveIdLookupFromMergerToShards();
         _moveFinalUnwindFromShardsToMerger();
         _propagateDocLimitToShards();
         _limitFieldsSentFromShardsToMerger();
@@ -186,7 +188,7 @@ private:
     void _finishFindSplitPointAfterDeferral(
         boost::intrusive_ptr<DocumentSource> deferredStage,
         boost::optional<BSONObj> mergeSort,
-        DocumentSource::DistributedPlanLogic::movePastFunctionType moveCheckFunc) {
+        const DocumentSource::DistributedPlanLogic::movePastFunctionType& moveCheckFunc) {
         while (_mergePipeHasNext()) {
             auto [current, distributedPlanLogic] = _popFirstMergeStage();
             if (!moveCheckFunc(*current)) {
@@ -281,7 +283,7 @@ private:
                         distributedPlanLogic->canMovePast);
                 auto mergingStageList = distributedPlanLogic->mergingStages;
                 tassert(6448007,
-                        "Only support deferring at most one stage for now.",
+                        "Only support deferring at most one stage.",
                         mergingStageList.size() <= 1);
 
                 _finishFindSplitPointAfterDeferral(
@@ -374,6 +376,43 @@ private:
         } else {
             // The $group can be entirely pushed down to the shards.
             pushdownEntireStage(group);
+        }
+    }
+
+    /**
+     * Move idLookup to the shards if it is in the merging pipeline. It can be pushed down if it is
+     * first in the merging pipeline or is preceded by $limit. If another stage is blocking
+     * pushdown, throw an error - $idLookup can't provide correct results on a merger.
+     */
+    void _moveIdLookupFromMergerToShards() {
+        bool canPushDownIdLookup = true;
+        auto& mergeSources = _splitPipeline.mergePipeline->getSources();
+        for (auto it = mergeSources.begin(); it != mergeSources.end(); ++it) {
+            if (dynamic_cast<DocumentSourceLimit*>(it->get())) {
+                // Technically, swapping $idLookup and $limit can change query results. However,
+                // $vectorSearch will always put a $limit in the merging pipeline, and we are
+                // allowed to (and should, for correctness) swap with it. A non-$vectorSearch
+                // pipeline probably shouldn't try $limit followed by $idLookup, but if it does the
+                // results will still be more useful post-swap.
+                continue;
+            }
+
+            if (dynamic_cast<DocumentSourceInternalSearchIdLookUp*>(it->get())) {
+                uassert(
+                    11027701,
+                    "idLookup is not allowed to run in a merging pipeline but pushdown was blocked",
+                    canPushDownIdLookup);
+
+                // We need to remove the stage from the merge pipeline before we can push it down.
+                auto idLookupStage = *it;
+                mergeSources.erase(it);
+                pushdownEntireStage(idLookupStage);
+                return;
+            }
+
+            // There's a non-$limit stage in the pipeline, so we can't perform an $idLookup
+            // pushdown. Continue the loop so that we can error if we find an $idLookup later.
+            canPushDownIdLookup = false;
         }
     }
 

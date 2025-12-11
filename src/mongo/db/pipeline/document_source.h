@@ -294,7 +294,6 @@ public:
             }
         }
 
-        typedef std::function<bool(const DocumentSource&)> movePastFunctionType;
         // A stage which executes on each shard in parallel, or nullptr if nothing can be done in
         // parallel. For example, a partial $group before a subsequent global $group.
         boost::intrusive_ptr<DocumentSource> shardsStage = nullptr;
@@ -317,11 +316,9 @@ public:
         // If needsSplit is false and this plan has anything that must run on the merging half of
         // the pipeline, it will be deferred until the next stage that sets any non-default value on
         // 'DistributedPlanLogic' or until a following stage causes the given validation
-        // function to return false. By default this will not allow swapping with any
-        // following stages.
-        movePastFunctionType canMovePast = [](const DocumentSource&) {
-            return false;
-        };
+        // function to return false. This function defaults to unset.
+        typedef std::function<bool(const DocumentSource&)> movePastFunctionType;
+        movePastFunctionType canMovePast = {};
     };
 
     /**

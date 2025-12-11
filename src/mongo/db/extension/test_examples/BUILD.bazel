@@ -39,6 +39,7 @@ extensions_with_config(
         ":extension_errors_mongo_extension",
         ":shapify_mongo_extension",
         ":sharded_execution_serialization_mongo_extension",
+        ":read_n_documents_mongo_extension",
         ":explain_mongo_extension",
         ":idle_threads_mongo_extension",
         ":interrupt_mongo_extension",
@@ -74,6 +75,7 @@ pkg_name = "//" + package_name() + "/"
         "foo",
         "foo_v2",
         "bar",
+        "read_n_documents",
     ]
 ]
 

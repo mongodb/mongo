@@ -1212,6 +1212,7 @@ mongo_cc_unit_test(
         "sharded_agg_helpers_test.cpp",
         "sharded_union_test.cpp",
         "skip_and_limit_test.cpp",
+        "split_pipeline_test.cpp",
         "stage_params_to_document_source_registry_test.cpp",
         "tee_buffer_test.cpp",
         "//src/mongo/db/exec/agg:document_source_to_stage_registry_test.cpp",
