@@ -39,7 +39,7 @@ namespace mongo::otel::metrics {
 /**
  * Initializes OpenTelemetry metrics using either the HTTP or file exporter.
  */
-MONGO_MOD_PUBLIC Status initialize();
+MONGO_MOD_PUBLIC Status initialize(const std::string& name);
 
 /**
  * Shuts down the OpenTelemetry metric export process by setting the global MeterProvider to a

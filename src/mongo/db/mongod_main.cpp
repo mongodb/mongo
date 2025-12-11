@@ -2002,7 +2002,7 @@ int mongod_main(int argc, char* argv[]) {
     // initialize_server_global_state::forkServerOrDie) and before the creation of any other threads
     startSignalProcessingThread();
 
-    uassertStatusOK(otel::metrics::initialize());
+    uassertStatusOK(otel::metrics::initialize("mongod"));
 
     auto* service = [] {
         try {
