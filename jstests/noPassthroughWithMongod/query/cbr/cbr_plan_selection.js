@@ -146,7 +146,6 @@ try {
     // we pick the index of the sort.
     assert.eq(winningIndexFromCursor(coll.find({b: 1, c: 1}).sort({b: 1})), "b_1");
     assert.eq(winningIndexFromCursor(coll.find({b: 1, c: 1, d: 1}).sort({b: 1})), "b_1");
-    assert.eq(winningIndexFromCursor(coll.find({b: 1, c: 1, d: 1}).sort({c: 1})), "c_1");
 
     // Sort on the shortest index that can be brought to bear to do the find() and the sort()
     assert.eq(winningIndexFromCursor(coll.find({unique1: 1, unique2: 1}).sort({unique1: 1})), "unique1_1_unique2_1");
@@ -160,6 +159,7 @@ try {
     // If there IS a clear selectivity winner among the other predicates,
     // we pick the index of that predicate.
     assert.eq(winningIndexFromCursor(coll.find({unique1: 1, b: 1, c: 1, d: 1}).sort({b: 1})), "unique1_1");
+    assert.eq(winningIndexFromCursor(coll.find({b: 1, c: 1, d: 1}).sort({c: 1})), "b_1");
 
     /*
      * Plan selection for find() + sort() on different fields.
@@ -220,8 +220,6 @@ try {
 
     // Mixed case: non-selective find() + sort() + limit() may pick the index on the sort field
     // or on the predicate depending on the limit value.
-    // TODO(SERVER-100647): Pushdown stand-alone LIMIT into streaming operators while estimating CE.
-    // This will reduce the cost of the streaming index scan on the sort field and result in choosing this plan in more cases.
     assert.eq(
         winningIndexFromCursor(
             coll
@@ -229,7 +227,7 @@ try {
                 .sort({b: 1})
                 .limit(1),
         ),
-        "unique1_1",
+        "b_1",
     );
     assert.eq(
         winningIndexFromCursor(

@@ -27267,6 +27267,12 @@ Features remaining without representation:
         },
         {"$project": {"field39_Decimal128": 1, "field32_dict_idx": 1}},
     ],
+    // TODO SERVER-114546: [Cost Issue] Impacts samplingCE plan choice
+    // Once we properly estimate the number of FETCH filter leaf estimations, the best plan should avoid the
+    // simple IXSCAN on 'field23_dict_idx_1' + FETCH with a complex filter, and instead pick an OR plan on indexes
+    // 'field4_list_idx_-1_field9_bool_idx_1', 'field15_mixed_idx_1', 'field22_list_idx_1' &
+    // 'field31_list_idx_-1_field7_str_idx_-1'. Note that it will examine more documents and keys, but
+    // actually require less execution time.
     /* clusterSize: 34, queryRank: 13.02 */ [
         {
             "$match": {

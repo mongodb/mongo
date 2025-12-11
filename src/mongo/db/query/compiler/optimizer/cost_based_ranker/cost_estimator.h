@@ -64,50 +64,97 @@ private:
                                const std::vector<CardinalityEstimate>& childCEs,
                                QSNEstimate& qsnEst);
 
-    CostEstimate filterCost(const MatchExpression* filter, const CardinalityEstimate& ce) const;
+    CostEstimate filterCost(StageType stage,
+                            const MatchExpression* filter,
+                            const CardinalityEstimate& ce) const;
 
-    // Cost coefficients based on Bonsai cost calibration
-    static const CostCoefficient defaultIncrement;
+    // Some nodes may have a filter component that is a MatchExpression with one (or more) leaves.
+    // These coefficients represent the cost of evaluating the first leaf for every item that the
+    // node processes.
+    static const CostCoefficient fetchFilterIncrement;
+    static const CostCoefficient indexFilterIncrement;
+    static const CostCoefficient collScanFilterIncrement;
+    // Incremental cost for evaluating one more leaf in the MatchExpression filter for each node.
+    static const CostCoefficient incrementalFetchFilterLeafCost;
+    static const CostCoefficient incrementalIndexFilterLeafCost;
+    static const CostCoefficient incrementalCollScanFilterLeafCost;
 
-    static const CostCoefficient filterStartup;
-    static const CostCoefficient filterIncrement;
+    // Cost for examining one more document in a collection scan.
+    static const CostCoefficient collScanForwardIncrement;
+    static const CostCoefficient collScanBackwardIncrement;
 
-    static const CostCoefficient collScanStartup;
-    static const CostCoefficient collScanIncrement;
+    // Cost for examining one more index key in an index scan. These coefficients represent the cost
+    // of examining a key of an index with one field in the keypattern.
+    static const CostCoefficient indexScanForwardExamineKey;
+    static const CostCoefficient indexScanBackwardExamineKey;
+    // Cost of an index seek.
+    static const CostCoefficient indexForwardSeek;
+    static const CostCoefficient indexBackwardSeek;
+    // Cost of examining a key of an index with one more field in the keypattern.
+    static const CostCoefficient incrementalFieldCost;
 
-    static const CostCoefficient virtScanStartup;
-    static const CostCoefficient virtScanIncrement;
-
-    static const CostCoefficient indexScanStartup;
-    static const CostCoefficient indexScanIncrement;
-
-    static const CostCoefficient fetchStartup;
+    // Cost of a FETCH node to process one item.
     static const CostCoefficient fetchIncrement;
 
-    static const CostCoefficient mergeJoinStartup;
-    static const CostCoefficient mergeJoinIncrement;
+    // Coefficients for the AndHash node.
+    static const CostCoefficient andHashBuild;
+    static const CostCoefficient andHashProbe;
+    static const CostCoefficient andHashOutput;
 
-    // TODO SPM-3658: all constants below need calibration
-    static const CostCoefficient hashJoinStartup;
-    static const CostCoefficient hashJoinBuild;
-    static const CostCoefficient hashJoinIncrement;
+    // SortDefault startup cost and cost to process one more item.
+    static const CostCoefficient sortDefaultStartup;
+    static const CostCoefficient sortDefaultIncrement;
+    // SortDefault's cost to spill one more time.
+    static const CostCoefficient sortDefaultSpillIncrement;
+    // Coefficients for the SortDefault node with a limit. For details on the reasoning behind the
+    // need for 3 other coefficients, see the comment in the function 'updateCutoff' in
+    // 'sorter_template_defs.h'.
+    static const CostCoefficient sortDefaultLimitStartup;
+    static const CostCoefficient sortDefaultLimitC1;
+    static const CostCoefficient sortDefaultLimitC2;
+    static const CostCoefficient sortDefaultLimitC3;
 
-    static const CostCoefficient sortStartup;
-    static const CostCoefficient sortIncrement;
-    static const CostCoefficient sortWithLimitIncrement;
+    // SortSimple startup cost and cost to process one more item.
+    static const CostCoefficient sortSimpleStartup;
+    static const CostCoefficient sortSimpleIncrement;
+    // SortDefault's cost to spill one more time.
+    static const CostCoefficient sortSimpleSpillIncrement;
+    // Coefficients for the SortSimple node with a limit. For details on the reasoning behind the
+    // need for 3 other coefficients, see the comment in the function 'updateCutoff' in
+    // 'sorter_template_defs.h'.
+    static const CostCoefficient sortSimpleLimitStartup;
+    static const CostCoefficient sortSimpleLimitC1;
+    static const CostCoefficient sortSimpleLimitC2;
+    static const CostCoefficient sortSimpleLimitC3;
 
-    static const CostCoefficient sortedMergeStartup;
-    static const CostCoefficient sortedMergeIncrement;
+    // Cost coefficents for the SortedMerge node.
+    static const CostCoefficient sortedMergeInput;
+    static const CostCoefficient sortedMergeOutput;
 
-    static const CostCoefficient projectionStartup;
-    static const CostCoefficient projectionIncrement;
+    // Cost of the different PROJECTION nodes to process one item.
+    static const CostCoefficient simpleProjectionIncrement;
+    static const CostCoefficient coveredProjectionIncrement;
+    static const CostCoefficient defaultProjectionIncrement;
 
-    static const CostCoefficient limitStartup;
+    // Cost of a LIMIT node to process one item.
     static const CostCoefficient limitIncrement;
 
-    static const CostCoefficient skipStartup;
+    // For SKIP: use different coefficients for documents that are skipped and documents that are
+    // passed to the parent stage. Skipping documents is slightly more expensive
+    // than passing them to the parent stage.
     static const CostCoefficient skipIncrement;
     static const CostCoefficient passIncrement;
+
+    // Cost of an OR node to process one item. Includes deduplication.
+    static const CostCoefficient orIncrement;
+
+    // Cost coefficents for the AndSortedNode.
+    static const CostCoefficient andSortedInput;
+    static const CostCoefficient andSortedOutput;
+
+    // Virtual scan costs are not calibrated.
+    static const CostCoefficient virtScanStartup;
+    static const CostCoefficient virtScanIncrement;
 
     EstimateMap& _estimateMap;
 };

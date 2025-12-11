@@ -2442,7 +2442,7 @@
     "rows" :  44379},
 
 {">>>pipeline": [{"$match":{"$or":[{"field9_bool_idx":{"$gte":false},"field29_Timestamp_idx":{"$type":"timestamp"}},{"field24_mixed_idx":{"$all":[]},"field40_list":"v"}]}},{"$project":{"field2_Timestamp_idx":1,"_id":0}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field9_bool_idx_-1_field35_int_idx_1","indexBounds":{"field9_bool_idx":["[true, false]"],"field35_int_idx":["[MinKey, MaxKey]"]}}}},
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field29_Timestamp_idx_1","indexBounds":{"field29_Timestamp_idx":["[Timestamp(0, 0), Timestamp(4294967295, 4294967295)]"]}}}},
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,

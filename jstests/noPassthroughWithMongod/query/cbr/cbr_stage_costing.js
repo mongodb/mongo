@@ -62,7 +62,9 @@ function rootStageCost(cursor) {
 
     if (winningPlan.inputStage) {
         const rootStageCost = winningPlan.costEstimate - winningPlan.inputStage.costEstimate;
-        assert.gt(rootStageCost, 0, "root stage cost is expected to be greater than the inputStage cost");
+        if (winningPlan.cardinalityEstimate > 0) {
+            assert.gt(rootStageCost, 0, "root stage cost is expected to be greater than the inputStage cost");
+        }
         return rootStageCost;
     } else {
         return winningPlan.costEstimate;
@@ -115,16 +117,9 @@ function runTest(planRankerMode) {
         rootStageCost(coll.find({a: {$gt: 1000}}).hint({$natural: 1})),
     );
 
-    // COLLSCAN with filter (cardinality estimate using the current CE method)
-    // has approximately same cost as COLLSCAN with no filter (cardinality estimate from Metadata).
-    assert.lt(
-        rootStageCost(coll.find({a: {$gt: 1}}).hint({$natural: 1})) - rootStageCost(coll.find({}).hint({$natural: 1})),
-        0.2,
-    );
-
-    // The COLLSCAN stage alone is more expensive than just the IXSCAN stage alone (without the
+    // With this collection, the COLLSCAN stage alone is more expensive than just the IXSCAN stage alone (without the
     // FETCH).
-    assert.gt(rootStageCost(coll.find().hint({$natural: 1})), ixscanCost({predicate: {}, hint: {a: 1}}));
+    assert.lt(rootStageCost(coll.find().hint({$natural: 1})), ixscanCost({predicate: {}, hint: {a: 1}}));
 
     // The complete COLLSCAN plan is less expensive than the complete IXCAN plan.
     assert.lt(planCost(coll.find().hint({$natural: 1})), planCost(coll.find().hint({a: 1})));
@@ -139,7 +134,7 @@ function runTest(planRankerMode) {
         assert.close(ixscanCost({predicate: {a: {$lt: 0}}, hint: {a: 1}}), 0.000009);
 
         // IXSCAN cost for an interval containing one document should be small.
-        assert.between(0.01, ixscanCost({predicate: {a: {$lte: 0}}, hint: {a: 1}}), 0.02);
+        assert.between(0.0, ixscanCost({predicate: {a: {$lte: 0}}, hint: {a: 1}}), 0.005);
 
         // IXSCAN cost for an interval containing all documents should be the
         // same as IXSCAN over the entire index.
@@ -179,8 +174,8 @@ function runTest(planRankerMode) {
         ixscanCost({predicate: {a: {$lt: 1, $gte: 0}}, hint: {a: 1}}),
     );
 
-    // TODO(SERVER-98102): IXSCAN cost for two distinct indexes is currently identical
-    assert.eq(
+    // IXSCAN over shorter index should cost less than one over longer index.
+    assert.lt(
         ixscanCost({predicate: {a: {$lt: 500}}, hint: {a: 1}}),
         ixscanCost({predicate: {a: {$lt: 500}}, hint: {a: 1, b: 1}}),
     );
@@ -229,13 +224,13 @@ function runTest(planRankerMode) {
                 rootStageCost(coll.find({a: {$lt: coll.count() / 100}}).hint({a: 1})),
             10,
         );
-    }
 
-    // FETCH cost should be the approximately the same with or without a residual predicate.
-    assert.lt(
-        rootStageCost(coll.find({a: 1, b: 1}).hint({a: 1})) - rootStageCost(coll.find({a: 1}).hint({a: 1})),
-        0.01,
-    );
+        // FETCH cost should be the approximately the same with or without a residual predicate.
+        assert.lt(
+            rootStageCost(coll.find({a: 1, b: 1}).hint({a: 1})) - rootStageCost(coll.find({a: 1}).hint({a: 1})),
+            0.01,
+        );
+    }
 
     // FETCH cost should depend on the number of residual predicates.
     assert.lt(
@@ -251,11 +246,11 @@ function runTest(planRankerMode) {
      */
 
     // Sorting 1 row has neligible cost.
-    assert.lt(rootStageCost(collOneRow.find().sort({a: 1}).hint({$natural: 1})), 0.01);
+    assert.lt(rootStageCost(collOneRow.find().sort({a: 1}).hint({$natural: 1})), 0.03);
 
     // Sorting 1 row has neligible cost.
     if (planRankerMode !== "heuristicCE") {
-        assert.lt(rootStageCost(coll.find({a: 1}).sort({a: 1}).hint({$natural: 1})), 0.01);
+        assert.lt(rootStageCost(coll.find({a: 1}).sort({a: 1}).hint({$natural: 1})), 0.03);
 
         // Sorting 1000 rows has a greater cost than sorting 100, but not 100x.
         assert.lt(
@@ -286,7 +281,7 @@ function runTest(planRankerMode) {
      */
 
     // SORT with a small $limit should have a small cost
-    assert.close(rootStageCost(collOneRow.find().sort({a: 1}).limit(1).hint({$natural: 1})), 0.0002);
+    assert.lt(rootStageCost(collOneRow.find().sort({a: 1}).limit(1).hint({$natural: 1})), 0.03);
 
     // Sorting more input documents is more expensive for the same limit.
     assert.lt(

@@ -169,8 +169,8 @@ const queries = [
     // Predicates that cannot be estimated via a histogram
     {$and: [{a: 3}, {a: {$size: 9}}]},
     {$and: [{a: 3}, {b: {$size: 9}}]},
-    // TODO SPM-3658: Sort cost vs ixscan + fetch cost not estimated propertly, so we choose the
-    // wrong plan {mixed: {$type: 'int'}}
+    // TODO SERVER-99759 uncomment this case
+    // {mixed: {$type: 'int'}},
     {mixed: {$type: "string"}},
     {mixed: {$type: "double"}},
     {bool_field: true},

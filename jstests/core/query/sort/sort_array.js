@@ -10,6 +10,7 @@
  * Tests for sorting documents by fields that contain arrays.
  */
 import {aggPlanHasStage, isQueryPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
 
 let coll = db.jstests_array_sort;
 
@@ -87,16 +88,18 @@ assert.commandWorked(coll.insert({_id: 0, a: [3, 0, 1]}));
 assert.commandWorked(coll.insert({_id: 1, a: [0, 4, -1]}));
 
 // Descending sort, in the presence of an index.
-testAggAndFindSort({
-    filter: {a: {$gte: 2}},
-    sort: {a: -1},
-    project: {_id: 1, a: 1},
-    expected: [
-        {_id: 1, a: [0, 4, -1]},
-        {_id: 0, a: [3, 0, 1]},
-    ],
-    expectBlockingSort: true,
-});
+if (getPlanRankerMode(db) != "heuristicCE") {
+    testAggAndFindSort({
+        filter: {a: {$gte: 2}},
+        sort: {a: -1},
+        project: {_id: 1, a: 1},
+        expected: [
+            {_id: 1, a: [0, 4, -1]},
+            {_id: 0, a: [3, 0, 1]},
+        ],
+        expectBlockingSort: true,
+    });
+}
 
 // Descending sort, in the presence of an index with [minKey, maxKey] bounds has a non-blocking
 // sort.
@@ -192,13 +195,15 @@ testAggAndFindSort({
 });
 
 // Since there are bounds on "x.y" this index cannot provide the sort.
-testAggAndFindSort({
-    filter: {"x.y": 1},
-    sort: {"x.y": -1},
-    project: {_id: 1},
-    expected: [{_id: 0}, {_id: 1}],
-    expectBlockingSort: true,
-});
+if (getPlanRankerMode(db) != "heuristicCE") {
+    testAggAndFindSort({
+        filter: {"x.y": 1},
+        sort: {"x.y": -1},
+        project: {_id: 1},
+        expected: [{_id: 0}, {_id: 1}],
+        expectBlockingSort: true,
+    });
+}
 
 // Since there are bounds on "x.y" and "x.z", this index cannot provide the sort.
 testAggAndFindSort({

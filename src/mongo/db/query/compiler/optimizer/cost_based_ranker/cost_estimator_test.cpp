@@ -56,25 +56,63 @@ TEST(CostEstimator, FullCollScanVsFilteredCollScan) {
     ASSERT_LT(estimates[fullCollScan->root()].cost, estimates[collScanFilter->root()].cost);
 }
 
-TEST(CostEstimator, FilterCost) {
-    // Test that a more complex filter with the same selectivity results in a higher cost scan node.
-    const QSNEstimate cardEst{.inCE = makeCard(100), .outCE = makeCard(50)};
+CostEstimate getCollScanWithFilterCost(const BSONObj& filterObj) {
     EstimateMap estimates;
-
-    BSONObj simplePred = fromjson("{a: {$gt: 5}}");
-    auto cheapPlan = makeCollScanPlan(parse(simplePred));
-    estimates[cheapPlan->root()] = cardEst;
-
-    BSONObj complexPred =
-        fromjson("{a: {$gt: 5, $lt: 10}, b: {$elemMatch: {$gt: 'abc', $lt: 'def'}}}");
-    auto expensivePlan = makeCollScanPlan(parse(complexPred));
-    estimates[expensivePlan->root()] = cardEst;
-
+    auto plan = makeCollScanPlan(parse(filterObj));
+    estimates[plan->root()] = QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(50)};
     CostEstimator costEstimator{estimates};
-    costEstimator.estimatePlan(*cheapPlan);
-    costEstimator.estimatePlan(*expensivePlan);
+    costEstimator.estimatePlan(*plan);
+    return estimates[plan->root()].cost;
+}
 
-    ASSERT_LT(estimates[cheapPlan->root()].cost, estimates[expensivePlan->root()].cost);
+TEST(CostEstimator, FilterCostForSingleLeaf) {
+    auto emptyFilterCost = getCollScanWithFilterCost(fromjson("{}"));
+    auto singleLeafCost = getCollScanWithFilterCost(fromjson("{a: 1}"));
+    auto singleSizeCost = getCollScanWithFilterCost(fromjson("{a: {$size: 5}}"));
+    auto singleAlwaysTrueCost = getCollScanWithFilterCost(fromjson("{$alwaysTrue: 1}"));
+    auto singleAndOneChildCost = getCollScanWithFilterCost(fromjson("{$and: [{a: 1}]}"));
+    auto singleEmptyElemMatchCost =
+        getCollScanWithFilterCost(fromjson("{_id: {$not: {$elemMatch: {}}}}"));
+    auto singleElemMatchOneChild =
+        getCollScanWithFilterCost(fromjson("{a: {$elemMatch: { $gte: 80}}}"));
+
+    // The empty filter '{}' is treated the same way as if there was no filter at all.
+    ASSERT_LT(emptyFilterCost, singleLeafCost);
+
+    // These are all treated as having 1 leaf.
+    ASSERT_EQ(singleLeafCost, singleSizeCost);
+    ASSERT_EQ(singleLeafCost, singleAlwaysTrueCost);
+    ASSERT_EQ(singleLeafCost, singleAndOneChildCost);
+    ASSERT_EQ(singleLeafCost, singleEmptyElemMatchCost);
+    ASSERT_EQ(singleLeafCost, singleElemMatchOneChild);
+}
+
+TEST(CostEstimator, FilterCostForMultipleLeaves) {
+    auto singleLeafCost = getCollScanWithFilterCost(fromjson("{a: {$elemMatch: {$gte: 80}}}"));
+    auto twoLeavesCost =
+        getCollScanWithFilterCost(fromjson("{a: {$elemMatch: {$gte: 80, $lt: 85}}}"));
+    auto fiveLeavesCost =
+        getCollScanWithFilterCost(fromjson("{$and: ["
+                                           "  {a: 1},"
+                                           "  {$or: ["
+                                           "    {b: 2},"
+                                           "    {$and: ["
+                                           "      {c: 3},"
+                                           "      {d: 4},"
+                                           "      {$nor: ["
+                                           "        {e: 5}"
+                                           "      ]}"
+                                           "    ]}"
+                                           "  ]}"
+                                           "]}"));
+    auto incrementalLeafCost = twoLeavesCost - singleLeafCost;
+
+    // More complex filters should have a higher cost
+    ASSERT_LT(singleLeafCost, twoLeavesCost);
+    ASSERT_LT(twoLeavesCost, fiveLeavesCost);
+
+    ASSERT_EQ(fiveLeavesCost,
+              twoLeavesCost + incrementalLeafCost + incrementalLeafCost + incrementalLeafCost);
 }
 
 TEST(CostEstimator, VirtualScan) {

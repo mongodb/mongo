@@ -1208,6 +1208,11 @@ export const pipelines = [
         {"$sort": {"i_idx": -1}},
         {"$skip": 80},
     ],
+    // TODO SERVER-114545: [Cost Issue] Impacts samplingCE plan choice
+    // Once we properly cost multikey indexes, the samplingCE plan should avoid the simple IXSCAN plan on
+    // multikey index 'a_idx', and instead choose an OR plan using the indexes 'z_compound_1', 'a_compound_1'
+    // & 'd_compound_1'. Note that it will examine slightly more documents and keys, but actually require
+    // less execution time.
     /* clusterSize: 366, queryRank: 11.02 */ [
         {
             "$match": {
@@ -3450,6 +3455,11 @@ export const pipelines = [
         },
         {"$sort": {"h_idx": 1}},
     ],
+    // TODO SERVER-114546: [Cost Issue] Impacts samplingCE/histogramCE/automaticCE plan choice
+    // Once we properly estimate the number of FETCH filter leaf estimations, the best plan should avoid
+    // the simple IXSCAN on 'k_compound_1' + FETCH with a complex filter, and instead pick an OR plan on
+    // indexes 'a_idx_1' & 'i_idx_1'. Note that it will examine slightly more documents and keys, but
+    // actually require less execution time.
     /* clusterSize: 174, queryRank: 7.03 */ [
         {
             "$match": {
@@ -5080,6 +5090,10 @@ export const pipelines = [
         },
         {"$skip": 70},
     ],
+    // TODO SERVER-114546: [Cost Issue] Impacts samplingCE/histogramCE/automaticCE plan choice
+    // Once we properly estimate the number of FETCH filter leaf estimations, the best plan should avoid the
+    // simple IXSCAN on 'k_compound_1' + FETCH with a complex filter, and instead pick an OR plan on indexes
+    // 'a_idx_1' & 'i_compound_1'. This should halve the number of examined keys.
     /* clusterSize: 109, queryRank: 16.02 */ [
         {
             "$match": {
@@ -5169,6 +5183,11 @@ export const pipelines = [
         {"$sort": {"a_idx": -1, "z_idx": -1}},
         {"$project": {"a_idx": 1}},
     ],
+    // TODO SERVER-114546: [Cost Issue] Impacts samplingCE/histogramCE/automaticCE plan choice
+    // Once we properly estimate the number of FETCH filter leaf estimations, the best plan should avoid
+    // the simple IXSCAN on 'k_idx_1' + FETCH with a complex filter, and instead pick an OR + SORT plan
+    // on indexes 'a_compound_1' & 'i_compound_1'. Note that it will examine slightly more documents and
+    // keys, but actually require less execution time.
     /* clusterSize: 107, queryRank: 10.02 */ [
         {
             "$match": {
@@ -13421,6 +13440,11 @@ export const pipelines = [
         {"$match": {"$and": [{"a_compound": {"$nin": [19, 12, 9]}}, {"a_compound": {"$elemMatch": {"$lt": 11}}}]}},
         {"$sort": {"z_idx": 1}},
     ],
+    // TODO SERVER-114546: [Cost Issue] Impacts samplingCE/histogramCE/automaticCE plan choice
+    // Once we properly estimate the number of FETCH filter leaf estimations, the best plan should avoid the
+    // simple IXSCAN on 'i_idx_1' + FETCH with a complex filter, and instead pick an OR plan on indexes
+    // 'z_compound_1', 'z_idx_1' & 'c_compound_1'. Note that it will examine slightly more documents and keys,
+    // but actually require less execution time.
     /* clusterSize: 6, queryRank: 9.03 */ [
         {
             "$match": {
@@ -13804,6 +13828,10 @@ export const pipelines = [
         {"$limit": 93},
         {"$project": {"a_idx": 1}},
     ],
+    // TODO SERVER-100611: [CE Issue] Impacts samplingCE/histogramCE/automaticCE plan choice
+    // Once we estimate the number of seeks, we should be able to choose the better plan here which
+    // does an IXSCAN on 'z_compound_1' instead of 'i_compound_1_z_compound_1'. It should also
+    // drastically reduce the number of examined keys.
     /* clusterSize: 161, queryRank: 4.03 */ [
         {"$match": {"i_compound": {"$nin": [18, 17]}, "z_compound": {"$nin": [2, 2, 11, 17]}}},
         {"$skip": 29},

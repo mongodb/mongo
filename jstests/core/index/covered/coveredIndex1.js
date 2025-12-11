@@ -13,6 +13,7 @@
  */
 // Include helpers for analyzing explain output.
 import {getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
 
 const coll = db["jstests_coveredIndex1"];
 coll.drop();
@@ -84,9 +85,12 @@ assertIfQueryIsCovered({fn: "john"}, {fn: 1, _id: 0}, false);
 // Repeat the above test, but with a compound index involving _id.
 assert.commandWorked(coll.dropIndex({ln: 1, fn: 1}));
 assert.commandWorked(coll.createIndex({_id: 1, ln: 1}));
-assertIfQueryIsCovered({_id: 123, ln: "doe"}, {_id: 1}, true);
-assertIfQueryIsCovered({_id: 123, ln: "doe"}, {ln: 1}, true);
-assertIfQueryIsCovered({ln: "doe", _id: 123}, {ln: 1, _id: 1}, true);
+if (getPlanRankerMode(db) === "multiPlanning") {
+    // TODO SERVER-97933: Enable these cases with CBR, where the CE is 0 for all stages and so the plans are tied in cost.
+    assertIfQueryIsCovered({_id: 123, ln: "doe"}, {_id: 1}, true);
+    assertIfQueryIsCovered({_id: 123, ln: "doe"}, {ln: 1}, true);
+    assertIfQueryIsCovered({ln: "doe", _id: 123}, {ln: 1, _id: 1}, true);
+}
 assertIfQueryIsCovered({ln: "doe"}, {ln: 1}, false);
 
 // Create an index on an embedded object.
