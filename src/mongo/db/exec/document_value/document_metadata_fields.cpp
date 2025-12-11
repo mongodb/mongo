@@ -146,13 +146,6 @@ MetaType DocumentMetadataFields::parseMetaType(StringData name) {
     return iter->second;
 }
 
-MetaType DocumentMetadataFields::parseMetaTypeFromQualifiedString(StringData name) {
-    uassert(11390602,
-            str::stream() << "Field name must start with '$' and contain a name after it: " << name,
-            name.starts_with('$') && name.size() > 1);
-    return parseMetaType(name.substr(1));
-}
-
 StringData DocumentMetadataFields::serializeMetaType(MetaType type) {
     const auto nameIter = kMetaTypeToMetaName.find(type);
     tassert(9733900,

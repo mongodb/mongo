@@ -709,24 +709,6 @@ DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
     source.getTimeseriesBucketMaxTime();
 }
 
-TEST(DocumentMetadataFieldsTest, ThrowsOnEmptyOrInvalidOrUnknownQualifiedMetaFieldNames) {
-    // Invalid: missing leading '$'.
-    ASSERT_THROWS_CODE(
-        DocumentMetadataFields::parseMetaTypeFromQualifiedString("score"), DBException, 11390602);
-
-    // Invalid: only '$' with no name.
-    ASSERT_THROWS_CODE(
-        DocumentMetadataFields::parseMetaTypeFromQualifiedString("$"), DBException, 11390602);
-
-    // Unknown metadata field name.
-    ASSERT_THROWS_CODE(DocumentMetadataFields::parseMetaTypeFromQualifiedString("$customScore"),
-                       DBException,
-                       17308);
-
-    // Valid case: should not throw.
-    ASSERT_DOES_NOT_THROW(DocumentMetadataFields::parseMetaTypeFromQualifiedString("$textScore"));
-}
-
 TEST(DocumentMetadataFieldsTest, EqualityOperatorWithEmptyMetadata) {
     DocumentMetadataFields meta1;
     DocumentMetadataFields meta2;
@@ -815,5 +797,4 @@ TEST(DocumentMetadataFieldsTest, EqualityOperatorWithAllFields) {
 
     ASSERT_EQ(meta1, meta2);
 }
-
 }  // namespace mongo

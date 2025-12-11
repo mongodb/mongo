@@ -97,14 +97,6 @@ public:
      */
     static DocumentMetadataFields::MetaType parseMetaType(StringData name);
 
-    /**
-     * Parses the MetaType from a qualified metadata field name (e.g., "$textScore").
-     *
-     * Throws a user exception if the provided field name doesn't start with '$', is only '$', or is
-     * not a recognized metadata type.
-     */
-    static DocumentMetadataFields::MetaType parseMetaTypeFromQualifiedString(StringData name);
-
     static StringData serializeMetaType(DocumentMetadataFields::MetaType type);
 
     /**

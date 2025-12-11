@@ -840,11 +840,14 @@ public:
     }
 };
 
-static constexpr std::string_view kSourceName = "$invalidMetadataSource";
-class InvalidMetadataExecAggStage : public sdk::ExecAggStageSource {
+static constexpr std::string_view kSourceName = "$sortKeySource";
+class ValidateSortKeyMetadataExecStage : public sdk::ExecAggStageSource {
 public:
-    InvalidMetadataExecAggStage(std::string_view name, BSONObj arguments)
+    ValidateSortKeyMetadataExecStage() : sdk::ExecAggStageSource(kSourceName) {}
+
+    ValidateSortKeyMetadataExecStage(std::string_view name, const mongo::BSONObj& arguments)
         : sdk::ExecAggStageSource(name) {}
+
     ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
                                    ::MongoExtensionExecAggStage* execStage) override {
         if (_currentIndex >= _documentsWithMetadata.size()) {
@@ -870,34 +873,43 @@ public:
     void reopen() override {}
     void close() override {}
 
+    static inline auto getInputResults() {
+        return _documentsWithMetadata;
+    }
+
     static inline std::unique_ptr<sdk::ExecAggStageSource> make() {
-        return std::make_unique<InvalidMetadataExecAggStage>(kSourceName, BSONObj());
+        return std::make_unique<ValidateSortKeyMetadataExecStage>();
     }
 
 private:
     static inline const std::vector<std::pair<BSONObj, BSONObj>> _documentsWithMetadata = {
-        {BSON("_id" << 1 << "field1" << "val1"), BSON("$customScore" << 5.0)},
-        {BSON("_id" << 2 << "field2" << "val2"), BSON("searchScore" << 1.5)},
-        {BSON("_id" << 3 << "field2" << "val3"), BSON("$" << 2.0)}};
+        {BSON("_id" << 1 << "field1" << "val1"),
+         BSON("$sortKey" << BSON("val1" << 5.0))},  // SingleElement $sortKey.
+        {BSON("_id" << 2 << "field2" << "val2"),
+         BSON("$sortKey" << BSON("val1" << 1.0 << "val2"
+                                        << 2.0))},  // MultiElement $sortKey passed in a obj type.
+        {BSON("_id" << 3 << "field3" << "val3"),
+         BSON("$sortKey" << BSON_ARRAY(3.0
+                                       << 4.0))},  // MultiElement $sortKey passed in a array type.
+        {BSON("_id" << 4 << "field4" << "val4"), BSON("$sortKey" << BSONObj())},  // Empty $sortKey.
+        {BSON("_id" << 4 << "field4" << "val4"),
+         BSON("$sortKey" << 1.0)}};  // $sortKey is not an obj.
     size_t _currentIndex = 0;
 };
-class InvalidMetadataLogicalAggStage : public sdk::TestLogicalStage<InvalidMetadataExecAggStage> {
-public:
-    InvalidMetadataLogicalAggStage()
-        : sdk::TestLogicalStage<InvalidMetadataExecAggStage>(kSourceName, BSONObj()) {}
-};
-class InvalidMetadataAstNode : public sdk::AggStageAstNode {
-public:
-    InvalidMetadataAstNode() : sdk::AggStageAstNode(kSourceName) {}
 
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<InvalidMetadataLogicalAggStage>();
-    }
+DEFAULT_LOGICAL_STAGE(ValidateSortKeyMetadata);
+
+class ValidateSortKeyMetadataAstStage
+    : public sdk::TestAstNode<ValidateSortKeyMetadataLogicalStage> {
+public:
+    ValidateSortKeyMetadataAstStage()
+        : sdk::TestAstNode<ValidateSortKeyMetadataLogicalStage>(kSourceName, BSONObj()) {}
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<InvalidMetadataAstNode>();
+        return std::make_unique<ValidateSortKeyMetadataAstStage>();
     }
 };
+
 }  // namespace
 
 TEST_F(DocumentSourceExtensionTest, TransformAstNodeWithDefaultGetPropertiesSucceeds) {
@@ -1460,23 +1472,6 @@ TEST_F(DocumentSourceExtensionTest,
     ASSERT_TRUE(secondTransformStage->getNext().isEOF());
 }
 
-TEST_F(DocumentSourceExtensionTest, GetNextResultsForSourceExtensionStageFailsForUnknownMetadata) {
-    auto astNode = new sdk::ExtensionAggStageAstNode(InvalidMetadataAstNode::make());
-    auto astHandle = AggStageAstNodeHandle(astNode);
-
-    auto optimizable =
-        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
-
-    auto extensionStage = exec::agg::buildStage(optimizable);
-    // Verify that error code 17308 is thrown if metadata field is unknown.
-    ASSERT_THROWS_CODE(extensionStage->getNext(), DBException, 17308);
-    // Verify that error code 11390602 is thrown if metadata field doesn't begin with $.
-    ASSERT_THROWS_CODE(extensionStage->getNext(), DBException, 11390602);
-    // Verify that error code 11390602 is thrown if metadata field has only '$' (no name).
-    ASSERT_THROWS_CODE(extensionStage->getNext(), DBException, 11390602);
-    ASSERT_TRUE(extensionStage->getNext().isEOF());
-}
-
 TEST_F(DocumentSourceExtensionTest, ShouldPropagateSourceMetadata) {
     auto sourceAstNode = new sdk::ExtensionAggStageAstNode(
         sdk::shared_test_stages::FruitsAsDocumentsAstNode::make());
@@ -1553,7 +1548,38 @@ TEST_F(DocumentSourceExtensionTest, TransformReceivesSourceMetadata) {
         // Verify metadata match.
         ASSERT_EQ(actualMetadata, expectedMetadata);
     }
-
     ASSERT_TRUE(transformStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceExtensionTest, ShouldPropagateSortKeyMetadata) {
+    auto sourceAstNode = new sdk::ExtensionAggStageAstNode(ValidateSortKeyMetadataAstStage::make());
+    auto sourceAstHandle = AggStageAstNodeHandle(sourceAstNode);
+
+    auto sourceOptimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(sourceAstHandle));
+    auto sourceStage = exec::agg::buildStage(sourceOptimizable);
+    const auto& inputResults = ValidateSortKeyMetadataExecStage::getInputResults();
+
+    // Verify $sortKey is present on first three documents.
+    for (auto index = 0; index < 3; ++index) {
+        auto next = sourceStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        // Take the returned Document by value.
+        const auto& actualDocument = next.releaseDocument();
+        const auto& expectedDocument = Document::createDocumentWithMetadata(
+            inputResults[index].first, inputResults[index].second);
+        ASSERT_DOCUMENT_EQ(actualDocument, expectedDocument);
+        ASSERT_EQ(actualDocument.metadata(), expectedDocument.metadata());
+    }
+    // Verify that an error is thrown if the sort key value is empty.
+    {
+        ASSERT_THROWS_CODE(sourceStage->getNext(), DBException, 31282);
+    }
+    // Verify an error is thrown when the sort key has an invalid type (neither an object nor an
+    // array).
+    {
+        ASSERT_THROWS_CODE(sourceStage->getNext(), DBException, 11503701);
+    }
+    ASSERT_TRUE(sourceStage->getNext().isEOF());
 }
 }  // namespace mongo::extension

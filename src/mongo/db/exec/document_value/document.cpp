@@ -484,13 +484,15 @@ void DocumentStorage::loadLazyMetadata() const {
             } else if (fieldName == Document::metaFieldRandVal) {
                 _metadataFields.setRandVal(elem.Double());
             } else if (fieldName == Document::metaFieldSortKey) {
+                uassert(11503701,
+                        str::stream() << "$sortKey must be an object or array type.Provided type: "
+                                      << elem.type(),
+                        elem.isABSONObj());
                 auto bsonSortKey = elem.Obj();
-
                 // If the sort key has exactly one field, we say it is a "single element key."
                 BSONObjIterator sortKeyIt(bsonSortKey);
                 uassert(31282, "Empty sort key in metadata", sortKeyIt.more());
                 bool isSingleElementKey = !(++sortKeyIt).more();
-
                 _metadataFields.setSortKey(
                     DocumentMetadataFields::deserializeSortKey(isSingleElementKey, bsonSortKey),
                     isSingleElementKey);
