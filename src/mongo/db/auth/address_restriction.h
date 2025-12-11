@@ -40,6 +40,7 @@
 #include "mongo/db/auth/restriction.h"
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/auth/restriction_set.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/cidr.h"
 
 #include <memory>

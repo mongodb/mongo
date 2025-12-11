@@ -56,6 +56,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/invalidating_lru_cache.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/read_through_cache.h"
 
 #include <map>

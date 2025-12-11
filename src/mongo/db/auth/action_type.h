@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type_gen.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <cstdint>
@@ -40,7 +41,7 @@
 #include <string>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * List describing the ActionTypes that should be created.
@@ -56,4 +57,4 @@ StringData toStringData(ActionType a);
 std::string toString(ActionType a);
 std::ostream& operator<<(std::ostream& os, const ActionType& a);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

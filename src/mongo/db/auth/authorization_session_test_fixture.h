@@ -38,6 +38,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 

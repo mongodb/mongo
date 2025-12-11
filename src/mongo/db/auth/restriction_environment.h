@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/sockaddr.h"
 
 #include <memory>
@@ -53,7 +54,7 @@ inline Status validateClientSourceAuthenticationRestrictionMode(StringData mode,
 // It must be constructed and attached to a Client object while a server is accepting a connection.
 // Clients created by internal server operations may not have a RestrictionEnvironment. Clients
 // which attempt to perform authentication or authorization must have a RestrictionEnvironment.
-class RestrictionEnvironment {
+class MONGO_MOD_PUBLIC RestrictionEnvironment {
 public:
     RestrictionEnvironment() = default;
     RestrictionEnvironment(SockAddr clientSource, SockAddr serverAddress)

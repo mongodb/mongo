@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
 #include <memory>
@@ -68,7 +69,7 @@ private:
 /**
  * Type representing an ongoing authentication session.
  */
-class AuthenticationSession {
+class MONGO_MOD_PUBLIC AuthenticationSession {
     AuthenticationSession(const AuthenticationSession&) = delete;
     AuthenticationSession& operator=(const AuthenticationSession&) = delete;
 

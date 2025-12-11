@@ -33,6 +33,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
 #include <memory>
@@ -49,7 +50,7 @@ class OperationContext;
  * AuthorizationManager to throw out its in-memory cache of User objects (which contains the
  * users' credentials, roles, privileges, etc).
  */
-class UserCacheInvalidator {
+class MONGO_MOD_PUBLIC UserCacheInvalidator {
 public:
     using OIDorTimestamp = std::variant<OID, Timestamp>;
 

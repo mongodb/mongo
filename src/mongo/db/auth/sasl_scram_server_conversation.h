@@ -40,6 +40,7 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/icu.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <cstring>

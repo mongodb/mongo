@@ -47,6 +47,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/read_through_cache.h"
 
 #include <algorithm>
@@ -62,7 +63,7 @@
 #include <boost/optional/optional.hpp>
 
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Represents the properties required to request a UserHandle.
@@ -495,4 +496,4 @@ using UserCache = ReadThroughCache<UserRequest::UserRequestCacheKey,
                                    SharedUserAcquisitionStats>;
 using UserHandle = UserCache::ValueHandle;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

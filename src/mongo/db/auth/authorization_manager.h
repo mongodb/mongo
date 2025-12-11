@@ -52,6 +52,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
@@ -60,7 +61,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class AuthorizationSession;
 class Client;
@@ -70,7 +71,7 @@ class ServiceContext;
 /**
  * Internal secret key info.
  */
-struct SystemAuthInfo {
+struct MONGO_MOD_NEEDS_REPLACEMENT SystemAuthInfo {
     std::shared_ptr<UserHandle> getUser() {
         return std::atomic_load(&_user);  // NOLINT
     }
@@ -86,12 +87,13 @@ struct SystemAuthInfo {
 private:
     std::shared_ptr<UserHandle> _user;
 };
+
 extern SystemAuthInfo internalSecurity;
 
 /**
  * How user management functions should structure the BSON representation of privileges and roles.
  */
-enum class AuthenticationRestrictionsFormat {
+enum class MONGO_MOD_PRIVATE AuthenticationRestrictionsFormat {
     kOmit,  // AuthenticationRestrictions should not be included in the BSON representation.
     kShow,  // AuthenticationRestrictions should be included in the BSON representation.
 };
@@ -265,4 +267,4 @@ public:
      * Otherwise, they will be equal to boost::none.
      */
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

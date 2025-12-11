@@ -32,6 +32,7 @@
 
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/ssl_peer_info.h"
 
 #include <boost/optional.hpp>

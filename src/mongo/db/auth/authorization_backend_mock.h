@@ -35,6 +35,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <map>
@@ -46,7 +47,7 @@
 
 namespace mongo::auth {
 
-class AuthorizationBackendMock : public AuthorizationBackendLocal {
+class MONGO_MOD_PUBLIC AuthorizationBackendMock : public AuthorizationBackendLocal {
 public:
     /**
      * Inserts the given user object into the "admin" database.

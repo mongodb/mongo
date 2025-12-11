@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/db/auth/auth_name.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class UserName : public AuthName<UserName> {
+class MONGO_MOD_PUBLIC UserName : public AuthName<UserName> {
 public:
     static constexpr auto kName = "UserName"_sd;
     static constexpr auto kFieldName = "user"_sd;

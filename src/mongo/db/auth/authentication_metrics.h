@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/timer.h"
 

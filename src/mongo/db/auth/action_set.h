@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/util/modules.h"
 
 #include <bitset>
 #include <initializer_list>
@@ -46,7 +47,7 @@ namespace mongo {
  *  If the special ActionType::anyAction is granted to this set, it automatically sets all bits
  *  in the bitmask, indicating that it contains all possible actions.
  */
-class ActionSet {
+class MONGO_MOD_PUBLIC ActionSet {
 public:
     ActionSet() = default;
     ActionSet(std::initializer_list<ActionType> actions);

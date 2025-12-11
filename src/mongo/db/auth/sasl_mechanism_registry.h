@@ -45,6 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
@@ -362,7 +363,7 @@ public:
  * mechanism from. Also capable of producing a list of mechanisms which would be valid for a
  * particular user.
  */
-class SASLServerMechanismRegistry {
+class MONGO_MOD_PUBLIC SASLServerMechanismRegistry {
 public:
     static SASLServerMechanismRegistry& get(Service* service);
     static void set(Service* service, std::unique_ptr<SASLServerMechanismRegistry> registry);

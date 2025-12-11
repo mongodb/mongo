@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_factory.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <iosfwd>
 #include <string>
@@ -58,7 +59,7 @@ namespace mongo {
  * part of the access control system.  See buildResourceSearchList() in
  * authorization_session.cpp for details.
  */
-class ResourcePattern {
+class MONGO_MOD_PUBLIC ResourcePattern {
     friend class AuthorizationContract;
 
 public:
@@ -304,6 +305,6 @@ private:
     NamespaceString _ns;
 };
 
-std::ostream& operator<<(std::ostream& os, const ResourcePattern& pattern);
+MONGO_MOD_FILE_PRIVATE std::ostream& operator<<(std::ostream& os, const ResourcePattern& pattern);
 
 }  // namespace mongo

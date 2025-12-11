@@ -31,6 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -39,7 +40,7 @@ class ServiceContext;
 /**
  * ClusterAuthMode is a thin wrapper around an enum for decorated storage and semantic utility.
  */
-class ClusterAuthMode {
+class MONGO_MOD_PUBLIC ClusterAuthMode {
     enum class Value {
         kUndefined,
         /**

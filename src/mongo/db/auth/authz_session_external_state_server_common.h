@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

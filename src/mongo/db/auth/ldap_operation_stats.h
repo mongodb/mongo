@@ -36,6 +36,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/tick_source.h"
 
@@ -49,7 +50,7 @@ namespace mongo {
  * UserAcquisitionStats object. All methods must be called while holding that UserAcquisitionStats'
  * lock.
  */
-class LDAPOperationStats {
+class MONGO_MOD_PUBLIC LDAPOperationStats {
 public:
     LDAPOperationStats() = default;
     ~LDAPOperationStats() = default;
@@ -156,6 +157,6 @@ private:
      * Metrics associated with binding and search/querying an LDAP server.
      */
     Stats _bindStats;
-    MONGO_MOD_NEEDS_REPLACEMENT Stats _searchStats;  // Used by a friend-ed test.
+    Stats _searchStats;  // Used by a friend-ed test.
 };
 }  // namespace mongo

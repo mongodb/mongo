@@ -31,12 +31,13 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/restriction.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
 namespace mongo {
 
-class RestrictionMock : public UnnamedRestriction {
+class MONGO_MOD_FILE_PRIVATE RestrictionMock : public UnnamedRestriction {
 public:
     explicit RestrictionMock(bool shouldPass) : _shouldPass(shouldPass) {}
 

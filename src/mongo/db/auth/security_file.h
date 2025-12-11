@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <string>
 #include <vector>
 
@@ -45,7 +47,9 @@ class StatusWith;
  * Whitespace within each key will be stripped from the final keys (e.g. "key 1" = "key1").
  *
  * This will return an error if the file was empty or contained invalid characters.
+ *
+ *
  */
-StatusWith<std::vector<std::string>> readSecurityFile(const std::string& filename);
+MONGO_MOD_PUBLIC StatusWith<std::vector<std::string>> readSecurityFile(const std::string& filename);
 
 }  // namespace mongo

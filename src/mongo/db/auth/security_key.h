@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/auth/cluster_auth_mode.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

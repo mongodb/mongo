@@ -36,6 +36,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
@@ -43,7 +44,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class Privilege;
 class TenantId;
@@ -137,4 +138,4 @@ inline bool operator==(const Privilege& lhs, const Privilege& rhs) {
         lhs.getActions() == rhs.getActions();
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

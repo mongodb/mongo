@@ -38,6 +38,7 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <tuple>

@@ -35,6 +35,7 @@
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/database_name.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 
 #include <string>
@@ -58,7 +59,7 @@ namespace auth {
  * Then use getElements(dbname) for isExact() form to get list of T names.
  */
 template <typename T, bool enableForAllDBs>
-class UMCInfoCommandArg {
+class MONGO_MOD_PUBLIC UMCInfoCommandArg {
 public:
     UMCInfoCommandArg() : UMCInfoCommandArg(AllOnCurrentDB{}) {}
     static_assert(std::is_same<UserName, T>::value || std::is_same<RoleName, T>::value,

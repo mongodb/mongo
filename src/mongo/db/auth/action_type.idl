@@ -34,6 +34,7 @@
 # Actions marked "ID only" are not used for permission checks, but to identify events in logs.
 global:
     cpp_namespace: "mongo"
+    mod_visibility: public
 
 imports:
     - "mongo/db/basic_types.idl"

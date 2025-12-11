@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/auth/restriction.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>

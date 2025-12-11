@@ -32,6 +32,7 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace auth {
@@ -41,7 +42,7 @@ namespace auth {
  * that user will be authenticated against the client until this guard dies.
  * This is used in ServiceEntryPoint to scope authentication to a single operation.
  */
-class SecurityTokenAuthenticationGuard {
+class MONGO_MOD_PUBLIC SecurityTokenAuthenticationGuard {
 public:
     SecurityTokenAuthenticationGuard() = delete;
     SecurityTokenAuthenticationGuard(OperationContext*, const ValidatedTenancyScope&);

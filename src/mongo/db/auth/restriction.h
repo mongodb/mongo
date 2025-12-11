@@ -35,6 +35,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/auth/restriction_environment.h"
+#include "mongo/util/modules.h"
 
 #include <sstream>
 #include <string>

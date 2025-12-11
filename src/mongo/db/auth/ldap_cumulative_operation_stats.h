@@ -34,6 +34,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 
 #include <cstdint>
@@ -47,7 +48,7 @@ class LDAPOperationStats;
  * Class used to track statistics associated with LDAP operations for a specfic
  * UserAcquisitionStats object.
  */
-class LDAPCumulativeOperationStats {
+class MONGO_MOD_PUBLIC LDAPCumulativeOperationStats {
 public:
     LDAPCumulativeOperationStats() = default;
     ~LDAPCumulativeOperationStats() = default;

@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/db/auth/auth_name.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Representation of a name of a role in a MongoDB system.
@@ -75,4 +76,4 @@ Container roleNameIteratorToContainer(RoleNameIterator it) {
     return container;
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

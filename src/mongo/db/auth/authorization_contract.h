@@ -36,6 +36,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <bitset>
@@ -59,7 +60,7 @@ namespace mongo {
  * When commands execute other commands via DBDirectClient, we only want
  * the top-level command to accumulate authorization checks.
  */
-class AuthorizationContract {
+class MONGO_MOD_PUBLIC AuthorizationContract {
 public:
     AuthorizationContract() = default;
     AuthorizationContract(bool isTestModeEnabled) : _isTestModeEnabled(isTestModeEnabled) {};

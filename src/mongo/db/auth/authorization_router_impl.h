@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_client_handle.h"
 #include "mongo/db/auth/authorization_router.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 class AuthorizationRouterImpl : public AuthorizationRouter {

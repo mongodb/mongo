@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/oauth_authorization_server_metadata_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/http_client.h"
 
 #include <memory>
@@ -42,7 +43,7 @@ namespace mongo {
 /**
  * Uses RFC8414 to acquire Authorization Server metadata for an issuer.
  */
-class OAuthDiscoveryFactory {
+class MONGO_MOD_PUBLIC OAuthDiscoveryFactory {
 public:
     OAuthDiscoveryFactory(std::unique_ptr<HttpClient> client) : _client(std::move(client)) {}
 

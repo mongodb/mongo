@@ -33,6 +33,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/namespace_string_util.h"
 
 #include <array>

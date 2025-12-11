@@ -36,6 +36,7 @@
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/database_name.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>

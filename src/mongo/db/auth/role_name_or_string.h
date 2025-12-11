@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/database_name.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <type_traits>

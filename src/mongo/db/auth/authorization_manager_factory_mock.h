@@ -35,6 +35,7 @@
 #include "mongo/db/auth/authorization_manager_factory.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -44,7 +45,8 @@ namespace mongo {
  * based on the arguments provided.
  */
 
-class AuthorizationManagerFactoryMock : public AuthorizationManagerFactory {
+class MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS AuthorizationManagerFactoryMock
+    : public AuthorizationManagerFactory {
 
 public:
     std::unique_ptr<AuthorizationManager> createRouter(Service* service) override;

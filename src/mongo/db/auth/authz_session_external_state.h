@@ -34,6 +34,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

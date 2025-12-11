@@ -30,12 +30,13 @@
 #pragma once
 
 #include "mongo/db/auth/user.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 class AuthorizationManager;
 class AuthzSessionExternalState;
-class AuthorizationRouter {
+class MONGO_MOD_PUBLIC AuthorizationRouter {
 public:
     AuthorizationRouter(const AuthorizationRouter&) = delete;
     AuthorizationRouter& operator=(const AuthorizationRouter&) = delete;

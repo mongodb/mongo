@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <compare>
@@ -60,7 +61,7 @@ namespace mongo {
  * Consists of a general "name" part, and a "database name" part.
  */
 template <typename T>
-class AuthName {
+class MONGO_MOD_PUBLIC AuthName {
 public:
     AuthName() = default;
 
@@ -200,7 +201,7 @@ static inline Stream& operator<<(Stream& os, const AuthName<T>& name) {
  * Iterator over an unspecified container of AuthName objects.
  */
 template <typename T>
-class AuthNameIterator {
+class MONGO_MOD_PUBLIC AuthNameIterator {
 public:
     class Impl {
     public:

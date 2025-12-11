@@ -31,6 +31,7 @@
 
 #include "mongo/db/auth/sasl_mechanism_policies.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::auth {
 

@@ -36,11 +36,12 @@
 #include "mongo/db/client.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 
 #include <memory>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 enum UserAcquisitionOpType { kCache, kBind, kSearch, kSuccessfulReferral, kFailedReferral };
 
 /**
@@ -286,4 +287,4 @@ private:
     TickSource* _tickSource;
     UserAcquisitionOpType _type;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

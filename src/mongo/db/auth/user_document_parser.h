@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 

@@ -34,6 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 
 #include <cstdint>
@@ -46,7 +47,7 @@ namespace mongo {
  * Tracks and stores statistics related to user cache access on a per-operation
  * basis. These statistics are tracked and reported from within CurOp.
  */
-class UserCacheAccessStats {
+class MONGO_MOD_PUBLIC UserCacheAccessStats {
     using AccessInterval = std::pair<Microseconds, Microseconds>;
 
 public:

@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class AuthorizationContractGuard {
+class MONGO_MOD_PUBLIC AuthorizationContractGuard {
 public:
     explicit AuthorizationContractGuard(AuthorizationSession* authSession)
         : _authSession(authSession) {

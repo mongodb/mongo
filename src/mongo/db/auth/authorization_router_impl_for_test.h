@@ -31,6 +31,7 @@
 
 #include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
