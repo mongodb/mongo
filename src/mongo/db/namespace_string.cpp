@@ -345,7 +345,11 @@ NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
 // TODO SERVER-101784: Remove this once 9.0 is LTS and viewful time-series collections no longer
 // exist.
 NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
-    invariant(isTimeseriesBucketsCollection(), ns());
+    tassert(11520600,
+            fmt::format(
+                "Cannot convert non system buckets collection '{}' to timeseries view namespace",
+                toStringForErrorMsg()),
+            isTimeseriesBucketsCollection());
     return {dbName(), coll().substr(kTimeseriesBucketsCollectionPrefix.size())};
 }
 
