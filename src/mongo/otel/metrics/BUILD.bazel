@@ -110,3 +110,16 @@ mongo_cc_unit_test(
         "//src/third_party/opentelemetry-cpp/api",
     ],
 )
+
+mongo_cc_library(
+    name = "metric_units",
+    srcs = ["metric_units.cpp"],
+    deps = ["//src/mongo:base"],
+)
+
+mongo_cc_unit_test(
+    name = "metric_units_test",
+    srcs = ["metric_units_test.cpp"],
+    tags = ["mongo_unittest_second_group"],
+    deps = [":metric_units"],
+)
