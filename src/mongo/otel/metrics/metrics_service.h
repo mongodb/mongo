@@ -29,21 +29,54 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/config.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
 
-#include <string>
+#ifdef MONGO_CONFIG_OTEL
+#include <opentelemetry/metrics/meter.h>
+
 
 namespace mongo::otel::metrics {
-/**
- * Initializes OpenTelemetry metrics using either the HTTP or file exporter.
- */
-MONGO_MOD_PUBLIC Status initialize();
 
 /**
- * Shuts down the OpenTelemetry metric export process by setting the global MeterProvider to a
- * NoopMeterProvider.
+ * The MetricsService is the external interface by which API consumers can create Instruments. The
+ * global MeterProvider must be set before ServiceContext construction to ensure that the meter can
+ * be properly initialized.
  */
-MONGO_MOD_PUBLIC void shutdown();
+class MONGO_MOD_PUBLIC MetricsService {
+public:
+    static constexpr StringData kMeterName = "mongodb";
+
+    static MetricsService& get(ServiceContext*);
+
+    MetricsService();
+
+    // TODO SERVER-114945 Remove this method once we can validate meter construction succeeded via
+    // the Instruments it produces
+    opentelemetry::metrics::Meter* getMeter_forTest() const {
+        return _meter.get();
+    }
+
+    // TODO SERVER-114945 Add MetricsService::createUInt64Counter method
+    // TODO SERVER-114954 Implement MetricsService::createUInt64Gauge
+    // TODO SERVER-114955 Implement MetricsService::createDoubleGauge
+    // TODO SERVER-115164 Implement MetricsService::createHistogram method
+
+private:
+    std::shared_ptr<opentelemetry::metrics::Meter> _meter{nullptr};
+};
 }  // namespace mongo::otel::metrics
+#else
+namespace mongo::otel::metrics {
+class MONGO_MOD_PUBLIC MetricsService {
+public:
+    static constexpr StringData kMeterName = "mongodb";
+
+    static MetricsService& get(ServiceContext*);
+
+    MetricsService();
+};
+}  // namespace mongo::otel::metrics
+#endif

@@ -57,12 +57,9 @@ namespace otlp = opentelemetry::exporter::otlp;
 namespace metrics_api = opentelemetry::metrics;
 namespace metrics_sdk = opentelemetry::sdk::metrics;
 
-Status initializeHttp(const std::string& name,
-                      const std::string& endpoint,
-                      const std::string& compression) {
+Status initializeHttp(const std::string& endpoint, const std::string& compression) {
     LOGV2(10500901,
           "Initializing OpenTelemetry metrics using HTTP exporter",
-          "name"_attr = name,
           "endpoint"_attr = endpoint);
 
     opentelemetry::exporter::otlp::OtlpHttpMetricExporterOptions hmeOpts;
@@ -88,17 +85,16 @@ Status initializeHttp(const std::string& name,
     return Status::OK();
 }
 
-Status initializeFile(const std::string& name, const std::string& directory) {
+Status initializeFile(const std::string& directory) {
     LOGV2(10500902,
           "Initializing OpenTelemetry metrics using file exporter",
-          "name"_attr = name,
           "directory"_attr = directory);
 
     auto pid = ProcessId::getCurrent().toString();
 
     opentelemetry::exporter::otlp::OtlpFileMetricExporterOptions fmeOpts;
     otlp::OtlpFileClientFileSystemOptions sysOpts;
-    sysOpts.file_pattern = fmt::format("{}/{}-{}-%Y%m%d-metrics.jsonl", directory, name, pid);
+    sysOpts.file_pattern = fmt::format("{}/mongodb-{}-%Y%m%d-metrics.jsonl", directory, pid);
     fmeOpts.backend_options = sysOpts;
 
     auto exporter = otlp::OtlpFileMetricExporterFactory::Create(fmeOpts);
@@ -143,14 +139,14 @@ void validateOptions() {
 }
 }  // namespace
 
-Status initialize(const std::string& name) {
+Status initialize() {
     try {
         validateOptions();
         if (!gOpenTelemetryMetricsHttpEndpoint.empty()) {
-            return initializeHttp(
-                name, gOpenTelemetryMetricsHttpEndpoint, gOpenTelemetryMetricsCompression);
+            return initializeHttp(gOpenTelemetryMetricsHttpEndpoint,
+                                  gOpenTelemetryMetricsCompression);
         } else if (!gOpenTelemetryMetricsDirectory.empty()) {
-            return initializeFile(name, gOpenTelemetryMetricsDirectory);
+            return initializeFile(gOpenTelemetryMetricsDirectory);
         }
         LOGV2(10500903, "Not initializing OpenTelemetry metrics");
         return Status::OK();
@@ -173,7 +169,7 @@ namespace mongo::otel::metrics {
 /**
  * Initializes OpenTelemetry metrics using either the HTTP or file exporter.
  */
-Status initialize(const std::string&) {
+Status initialize() {
     return Status::OK();
 }
 

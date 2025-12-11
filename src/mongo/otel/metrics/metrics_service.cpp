@@ -27,23 +27,32 @@
  *    it in the license file.
  */
 
-#pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/config.h"
-#include "mongo/util/modules.h"
+#include "mongo/otel/metrics/metrics_service.h"
 
-#include <string>
+#ifdef MONGO_CONFIG_OTEL
+#include <opentelemetry/metrics/provider.h>
+#endif
 
 namespace mongo::otel::metrics {
-/**
- * Initializes OpenTelemetry metrics using either the HTTP or file exporter.
- */
-MONGO_MOD_PUBLIC Status initialize();
 
-/**
- * Shuts down the OpenTelemetry metric export process by setting the global MeterProvider to a
- * NoopMeterProvider.
- */
-MONGO_MOD_PUBLIC void shutdown();
+namespace {
+const auto& getMetricsService = ServiceContext::declareDecoration<MetricsService>();
+}  // namespace
+
+#ifdef MONGO_CONFIG_OTEL
+MetricsService::MetricsService() {
+    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+    invariant(provider, "Attempted to get the MeterProvider after shutdown() was called");
+    _meter = provider->GetMeter(std::string{kMeterName});
+}
+#else
+MetricsService::MetricsService() {}
+#endif
+
+MetricsService& MetricsService::get(ServiceContext* serviceContext) {
+    return getMetricsService(serviceContext);
+}
+
 }  // namespace mongo::otel::metrics
+
