@@ -108,7 +108,9 @@ void ReplicationStateTransitionLockGuard::_unlock() {
     // any exceptions to be thrown between _enqueueLock and waitForLockUntil because that would
     // delay cleaning up any failed RSTL lock attempt state from lock manager.
     invariant(
-        !(_result == LOCK_WAITING && shard_role_details::getLocker(_opCtx)->inAWriteUnitOfWork()));
+        !(_result == LOCK_WAITING && shard_role_details::getLocker(_opCtx)->inAWriteUnitOfWork()),
+        str::stream() << "Lock result: " << _result << ". In a write unit of work: "
+                      << shard_role_details::getLocker(_opCtx)->inAWriteUnitOfWork());
     shard_role_details::getLocker(_opCtx)->unlock(resourceIdReplicationStateTransitionLock);
     _result = LOCK_INVALID;
 }

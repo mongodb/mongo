@@ -289,10 +289,20 @@ void createIndexForApplyOps(OperationContext* opCtx,
                             OplogApplication::Mode mode) {
     // Uncommitted collections support creating indexes using relaxed locking if they are part of a
     // multi-document transaction.
-    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(indexNss, MODE_X) ||
-              (UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, indexNss) &&
-               shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(indexNss, MODE_IX) &&
-               opCtx->inMultiDocumentTransaction()));
+    invariant(
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(indexNss, MODE_X) ||
+            (UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, indexNss) &&
+             shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(indexNss, MODE_IX) &&
+             opCtx->inMultiDocumentTransaction()),
+        str::stream() << "isCollectionLockedForModeX: "
+                      << shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(indexNss,
+                                                                                         MODE_X)
+                      << ", isCreatedCollection: "
+                      << UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, indexNss)
+                      << ", isCollectionLockedForModeIX: "
+                      << shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(indexNss,
+                                                                                         MODE_IX)
+                      << ", inMultiDocumentTransaction: " << opCtx->inMultiDocumentTransaction());
 
     // Check if collection exists.
     auto databaseHolder = DatabaseHolder::get(opCtx);

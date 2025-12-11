@@ -215,7 +215,8 @@ std::pair<Future<void>, TaskExecutor::EventHandle> BaseCloner::runOnExecutorEven
     TaskExecutor* executor) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        invariant(!_active && !_startedAsync);
+        invariant(!_active);
+        invariant(!_startedAsync);
         _startedAsync = true;
     }
     auto pf = makePromiseFuture<void>();

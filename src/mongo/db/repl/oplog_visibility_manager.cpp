@@ -94,7 +94,10 @@ OplogVisibilityManager::const_iterator OplogVisibilityManager::trackTimestamps(
     ON_BLOCK_EXIT(notifyCappedWaitersIfVisibilityChanged(visibilityChanged, _rs));
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    invariant(first <= last && first > _latestTimeSeen);
+    invariant(first <= last && first > _latestTimeSeen,
+              str::stream() << "first timestamp: " << first.toString()
+                            << ", last timestamp: " << last.toString()
+                            << ", lastestTimeSeen: " << _latestTimeSeen.toString());
 
     if (_oplogTimestampList.empty()) {
         visibilityChanged = _setOplogVisibilityTimestamp(lock, first - 1);

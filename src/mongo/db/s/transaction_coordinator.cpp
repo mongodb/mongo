@@ -502,7 +502,8 @@ TransactionCoordinator::~TransactionCoordinator() {
 void TransactionCoordinator::runCommit(OperationContext* opCtx, std::vector<ShardId> participants) {
     if (!_reserveKickOffCommitPromise())
         return;
-    invariant(opCtx != nullptr && opCtx->getClient() != nullptr);
+    invariant(opCtx != nullptr);
+    invariant(opCtx->getClient() != nullptr);
     _updateAssociatedClient(opCtx->getClient());
     _participants = std::move(participants);
     _kickOffCommitPromise.emplaceValue();

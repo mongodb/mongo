@@ -75,7 +75,10 @@ SyncTransactionWithRetries::SyncTransactionWithRetries(
                     std::make_unique<details::DefaultSEPTransactionClientBehaviors>(opCtx)))) {
     // Callers should always provide a yielder when using the API with a session checked out,
     // otherwise commands run by the API won't be able to check out that session.
-    invariant(!OperationContextSession::get(opCtx) || _resourceYielder);
+    invariant(!OperationContextSession::get(opCtx) || _resourceYielder,
+              str::stream() << "session is not checked out by the opCtx: "
+                            << !OperationContextSession::get(opCtx)
+                            << ", yielder is not provided: " << !_resourceYielder);
 }
 
 StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext* opCtx,

@@ -332,7 +332,9 @@ std::size_t TransactionOperations::logOplogEntries(
         }
 
         // A 'prepare' oplog entry should never include a 'partialTxn' field.
-        invariant(!(isPartialTxn && implicitPrepare));
+        invariant(!(isPartialTxn && implicitPrepare),
+                  str::stream() << "isPartialTxn: " << isPartialTxn
+                                << ", implicitPrepare: " << implicitPrepare);
         if (implicitPrepare) {
             applyOpsBuilder.append("prepare", true);
         }

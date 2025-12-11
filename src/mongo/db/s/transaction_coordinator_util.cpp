@@ -275,7 +275,10 @@ void PrepareVoteConsensus::registerVote(const PrepareResponse& vote) {
 }
 
 CoordinatorCommitDecision PrepareVoteConsensus::decision() const {
-    invariant(_numShards == _numCommitVotes + _numAbortVotes + _numNoVotes);
+    invariant(_numShards == _numCommitVotes + _numAbortVotes + _numNoVotes,
+              str::stream() << "numShards: " << _numShards << ", numCommitVotes: "
+                            << _numCommitVotes << ", numAbortVotes: " << _numAbortVotes
+                            << ", numNoVotes: " << _numNoVotes);
 
     CoordinatorCommitDecision decision;
     if (_numCommitVotes == _numShards) {

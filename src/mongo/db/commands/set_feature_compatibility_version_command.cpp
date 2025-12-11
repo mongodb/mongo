@@ -700,7 +700,8 @@ public:
                     !failAfterReachingTransitioningState.shouldFail());
 
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
-                invariant(role && role->has(ClusterRole::ShardServer));
+                invariant(role);
+                invariant(role->has(ClusterRole::ShardServer));
 
                 // This helper function is only for any actions that should be done specifically on
                 // shard servers during phase 1 of the 3-phase setFCV protocol for sharded clusters.
@@ -761,7 +762,8 @@ public:
             }
 
             if (request.getPhase() == SetFCVPhaseEnum::kPrepare) {
-                invariant(role && role->has(ClusterRole::ShardServer));
+                invariant(role);
+                invariant(role->has(ClusterRole::ShardServer));
                 // If we are only running the 'prepare' phase, then we are done
                 return true;
             }

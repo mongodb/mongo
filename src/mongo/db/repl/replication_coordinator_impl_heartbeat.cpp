@@ -733,9 +733,14 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
 
     _setConfigState(lk, kConfigHBReconfiguring);
     auto rsc = _rsConfig.unsafePeek();
-    invariant(!rsc.isInitialized() ||
-              rsc.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm() ||
-              _selfIndex < 0);
+    invariant(
+        !rsc.isInitialized() ||
+            rsc.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm() || _selfIndex < 0,
+        str::stream() << "initialized: " << rsc.isInitialized() << ", old config version and term: "
+                      << rsc.getConfigVersionAndTerm().toString()
+                      << ", new config version and term: "
+                      << newConfig.getConfigVersionAndTerm().toString()
+                      << ", selfIndex: " << _selfIndex);
     _replExecutor
         ->scheduleWork([=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
             _heartbeatReconfigStore(cbData, newConfig);
@@ -1014,9 +1019,14 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     }
 
     invariant(_rsConfigState == kConfigHBReconfiguring);
-    invariant(!rsc.isInitialized() ||
-              rsc.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm() ||
-              _selfIndex < 0);
+    invariant(
+        !rsc.isInitialized() ||
+            rsc.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm() || _selfIndex < 0,
+        str::stream() << "initialized: " << rsc.isInitialized() << ", old config version and term: "
+                      << rsc.getConfigVersionAndTerm().toString()
+                      << ", new config version and term: "
+                      << newConfig.getConfigVersionAndTerm().toString()
+                      << ", selfIndex: " << _selfIndex);
 
     if (!myIndex.isOK()) {
         switch (myIndex.getStatus().code()) {

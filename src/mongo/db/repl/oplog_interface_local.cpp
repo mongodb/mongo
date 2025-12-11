@@ -95,7 +95,8 @@ StatusWith<OplogInterface::Iterator::Value> OplogIteratorLocal::next() {
     }
 
     // Non-yielding collection scans from InternalPlanner will never error.
-    invariant(PlanExecutor::ADVANCED == state || PlanExecutor::IS_EOF == state);
+    invariant(PlanExecutor::ADVANCED == state || PlanExecutor::IS_EOF == state,
+              str::stream() << "Plan Executor state: " << state);
 
     return StatusWith<Value>(std::make_pair(obj.getOwned(), recordId));
 }

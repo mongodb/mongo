@@ -261,7 +261,8 @@ public:
      * {level: "snapshot", atClusterTime: <ts>}.
      */
     void setArgsAtClusterTimeForSnapshot(Timestamp ts) {
-        invariant(_level && _level == ReadConcernLevel::kSnapshotReadConcern);
+        invariant(_level);
+        invariant(_level == ReadConcernLevel::kSnapshotReadConcern);
         // Only overwrite a server-selected atClusterTime, not user-supplied.
         invariant(_atClusterTime.is_initialized() == _atClusterTimeSelected);
         _afterClusterTime = boost::none;

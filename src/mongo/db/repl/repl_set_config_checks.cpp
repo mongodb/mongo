@@ -383,7 +383,9 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
     }
 
     int myIndex = std::distance(newConfig.membersBegin(), meConfigs.front());
-    invariant(myIndex >= 0 && myIndex < newConfig.getNumMembers());
+    invariant(myIndex >= 0 && myIndex < newConfig.getNumMembers(),
+              str::stream() << "myIndex: " << myIndex
+                            << ", numMembers: " << newConfig.getNumMembers());
     return StatusWith<int>(myIndex);
 }
 
