@@ -204,14 +204,16 @@ ReplIndexBuildState::ReplIndexBuildState(const UUID& indexBuildUUID,
                                          const DatabaseName& dbName,
                                          const std::vector<BSONObj>& specs,
                                          const std::vector<std::string>& idents,
-                                         IndexBuildProtocol protocol)
+                                         IndexBuildProtocol protocol,
+                                         Date_t startTime)
     : buildUUID(indexBuildUUID),
       collectionUUID(collUUID),
       dbName(dbName),
       indexNames(extractIndexNames(specs)),
       indexSpecs(specs),
       indexIdents(idents),
-      protocol(protocol) {
+      protocol(protocol),
+      _metrics(IndexBuildMetrics{.startTime = startTime}) {
     _waitForNextAction = std::make_unique<SharedPromise<IndexBuildAction>>();
     if (protocol == IndexBuildProtocol::kTwoPhase)
         commitQuorumLock.emplace(indexBuildUUID.toString());
@@ -720,6 +722,11 @@ void ReplIndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
     builder->append("resumable", !_lastOpTimeBeforeInterceptors.isNull());
 
     _indexBuildState.appendBuildInfo(builder);
+}
+
+IndexBuildMetrics ReplIndexBuildState::getIndexBuildMetrics() const {
+    stdx::lock_guard lk(_mutex);
+    return _metrics;
 }
 
 bool ReplIndexBuildState::_shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx) const {
