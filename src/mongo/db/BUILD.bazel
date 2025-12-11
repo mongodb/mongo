@@ -2432,7 +2432,7 @@ mongo_cc_library(
         "//src/mongo/db/ttl:ttl_collection_cache",
         "//src/mongo/db/ttl:ttl_d",
         "//src/mongo/db/update:update_driver",
-        "//src/mongo/otel/metrics:otel_metrics",
+        "//src/mongo/otel/metrics:metrics_initialization",
         "//src/mongo/otel/traces:tracing_initialization",
         "update_index_data",
     ] + select({
