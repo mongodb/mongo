@@ -1042,7 +1042,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
     // Set up the hasher,
     boost::optional<DbCheckHasher> hasher;
     // Disable throttling for secondaries.
-    DataThrottle dataThrottle(opCtx, []() { return 0; });
+    DataThrottle dataThrottle(opCtx->fastClockSource().now().toMillisSinceEpoch(),
+                              []() { return 0; });
 
     try {
         const DbCheckAcquisition acquisition(

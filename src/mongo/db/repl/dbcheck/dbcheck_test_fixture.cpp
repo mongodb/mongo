@@ -231,7 +231,8 @@ Status DbCheckTest::runHashForCollectionCheck(
         opCtx, kNss, {RecoveryUnit::ReadSource::kNoTimestamp}, PrepareConflictBehavior::kEnforce);
     const auto& collection = acquisition.collection().getCollectionPtr();
     // Disable throttling for testing.
-    DataThrottle dataThrottle(opCtx, []() { return 0; });
+    DataThrottle dataThrottle(opCtx->fastClockSource().now().toMillisSinceEpoch(),
+                              []() { return 0; });
     auto hasher = DbCheckHasher(opCtx,
                                 acquisition,
                                 start,
@@ -258,7 +259,8 @@ Status DbCheckTest::runHashForExtraIndexKeysCheck(
         opCtx, kNss, {RecoveryUnit::ReadSource::kNoTimestamp}, PrepareConflictBehavior::kEnforce);
     const auto& collection = acquisition.collection().getCollectionPtr();
     // Disable throttling for testing.
-    DataThrottle dataThrottle(opCtx, []() { return 0; });
+    DataThrottle dataThrottle(opCtx->fastClockSource().now().toMillisSinceEpoch(),
+                              []() { return 0; });
     auto hasher = DbCheckHasher(opCtx,
                                 acquisition,
                                 batchStart,
@@ -305,7 +307,8 @@ DbCheckCollectionInfo DbCheckTest::createDbCheckCollectionInfo(
         .maxBatchTimeMillis = kDefaultMaxBatchTimeMillis,
         .writeConcern = WriteConcernOptions(),
         .secondaryIndexCheckParameters = params,
-        .dataThrottle = DataThrottle(opCtx, []() { return 0; }),
+        .dataThrottle =
+            DataThrottle(opCtx->fastClockSource().now().toMillisSinceEpoch(), []() { return 0; }),
     };
     return info;
 }
