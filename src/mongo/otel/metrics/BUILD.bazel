@@ -98,3 +98,15 @@ mongo_cc_unit_test(
         "//src/third_party/opentelemetry-cpp/sdk/src/metrics",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "metrics_histogram_test",
+    srcs = [
+        "metrics_histogram_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        "//src/third_party/opentelemetry-cpp/api",
+    ],
+)
