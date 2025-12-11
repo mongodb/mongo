@@ -1,10 +1,10 @@
 load("@poetry//:dependencies.bzl", "dependency")
 
 py_test(
-    name = "test_core_dump_filtering",
+    name = "test_dumper",
     srcs = [
         "__init__.py",
-        "test_core_dump_filtering.py",
+        "test_dumper.py",
     ],
     visibility = ["//visibility:public"],
     deps = [
