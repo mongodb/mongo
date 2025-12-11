@@ -13,53 +13,85 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {assertCommandWorkedInParallelShell} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
+// An array of test cases that will be used to check the delayed secondary oplog replication.
+const tests = [
+    {
+        // TODO(SERVER-72538): Change the test to check this validator only on the specific version under
+        // which it's going to be released.
+        validator: {
+            $expr: {
+                $eq: [
+                    {
+                        $map: {
+                            input: "$a",
+                            arrayIndexAs: "i",
+                            in: "$$i",
+                        },
+                    },
+                    [0, 1, 2],
+                ],
+            },
+        },
+        featureFlag: "featureFlagExposeArrayIndexInMapFilterReduce",
+    },
+    {
+        // '$_testFeatureFlagLatest' is an expression that is permanently enabled in the latest FCV.
+        validator: {$expr: {$eq: ["$stuff", {$_testFeatureFlagLatest: 1}]}},
+    },
+];
+
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();
 const collName = jsTestName();
 
-// '$_testFeatureFlagLatest' is an expression that is permanently enabled in the latest FCV.
-const validatorSpec = {
-    $expr: {$eq: ["$stuff", {$_testFeatureFlagLatest: 1}]},
-};
+for (const test of tests) {
+    if (test.featureFlag) {
+        const res = assert.commandWorked(primary.adminCommand({"getParameter": 1, [test.featureFlag]: 1}));
+        if (!res[test.featureFlag].value) {
+            jsTest.log.warning("Skipping test because the " + test.featureFlag + " feature flag is disabled");
+            continue;
+        }
+    }
 
-// Start creating a collection that has a validator with new query features.
-// Hang it after the validator has been parsed, but before the create entry has been put in the
-// oplog.
-const fpCreate = configureFailPoint(primary, "hangAfterParsingValidator");
+    // Start creating a collection that has a validator with new query features.
+    // Hang it after the validator has been parsed, but before the create entry has been put in the
+    // oplog.
+    const fpCreate = configureFailPoint(primary, "hangAfterParsingValidator");
 
-const awaitCreate = assertCommandWorkedInParallelShell(primary, primary.getDB("test"), {
-    create: collName,
-    validator: validatorSpec,
-});
-fpCreate.wait();
+    const awaitCreate = assertCommandWorkedInParallelShell(primary, primary.getDB("test"), {
+        create: collName,
+        validator: test.validator,
+    });
+    fpCreate.wait();
 
-// Start downgrading to last LTS. Wait until the transition has started, at which point the
-// feature flags controlling the query features will have been disabled. We need to do this in
-// background because the downgrade will hang on the global lock barrier, which happens *after*
-// transitioning.
-const awaitSetFCV = assertCommandWorkedInParallelShell(primary, primary.getDB("admin"), {
-    setFeatureCompatibilityVersion: lastLTSFCV,
-    confirm: true,
-});
-assert.soon(() => {
-    const fcvDoc = assert.commandWorked(
-        primary.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
-    ).featureCompatibilityVersion;
-    return fcvDoc.version == lastLTSFCV;
-});
+    // Start downgrading to last LTS. Wait until the transition has started, at which point the
+    // feature flags controlling the query features will have been disabled. We need to do this in
+    // background because the downgrade will hang on the global lock barrier, which happens *after*
+    // transitioning.
+    const awaitSetFCV = assertCommandWorkedInParallelShell(primary, primary.getDB("admin"), {
+        setFeatureCompatibilityVersion: lastLTSFCV,
+        confirm: true,
+    });
+    assert.soon(() => {
+        const fcvDoc = assert.commandWorked(
+            primary.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+        ).featureCompatibilityVersion;
+        return fcvDoc.version == lastLTSFCV;
+    });
 
-// Now, let the collection creation continue and produce the create oplog entry.
-// The secondaries are already on the last LTS FCV, so they should not re-check feature flags
-// when applying the oplog entry, as they would be using a different FCV than the primary.
-fpCreate.off();
-awaitCreate();
+    // Now, let the collection creation continue and produce the create oplog entry.
+    // The secondaries are already on the last LTS FCV, so they should not re-check feature flags
+    // when applying the oplog entry, as they would be using a different FCV than the primary.
+    fpCreate.off();
+    awaitCreate();
 
-awaitSetFCV();
+    awaitSetFCV();
 
-// Reset for the next test.
-assertDropCollection(primary.getDB("test"), collName);
-assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    // Reset for the next test.
+    assertDropCollection(primary.getDB("test"), collName);
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+}
 
 rst.stopSet();
