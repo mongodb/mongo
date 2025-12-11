@@ -67,6 +67,8 @@ commands:
                       an alternative to slowms and sampleRate. The special value 'unset' removes
                       the filter."
         optional: true
+        # WARNING: If adding a new parameter to this command, be sure to update the 'isReadOnly'
+        # special-case in the authorization logic.
 
   setProfilingFilterGlobally:
     description: "Parser for the 'setProfilingFilterGlobally' command."
