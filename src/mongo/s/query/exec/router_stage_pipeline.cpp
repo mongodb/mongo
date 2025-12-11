@@ -58,6 +58,12 @@ RouterStagePipeline::RouterStagePipeline(std::unique_ptr<Pipeline> mergePipeline
     tassert(11052348, "Merge pipeline cannot be empty", !_mergePipeline->getSources().empty());
     _mergeCursorsStage =
         dynamic_cast<exec::agg::MergeCursorsStage*>(_mergeExecPipeline->getStages().front().get());
+
+    // If there is an initial post batch resume token, set it on the merge cursors stage.
+    if (auto pbrt = _mergePipeline->getContext()->getInitialPostBatchResumeToken();
+        !pbrt.isEmpty()) {
+        _mergeCursorsStage->setInitialHighWaterMark(pbrt.getOwned());
+    }
 }
 
 StatusWith<ClusterQueryResult> RouterStagePipeline::next() {

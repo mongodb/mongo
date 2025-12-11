@@ -15,10 +15,6 @@ selector:
 
     # TODO: SERVER-114511 re-enable this test.
     - jstests/change_streams/migrate_last_chunk_from_shard_event.js
-
-    # TODO:SERVER-113140 Report resumeToken for change streams when batchSize is 0.
-    - jstests/change_streams/report_post_batch_resume_token.js
-    - jstests/change_streams/resume_from_high_water_mark_token.js
   exclude_with_any_tags:
     ##
     # The next tags correspond to the special errors thrown by the

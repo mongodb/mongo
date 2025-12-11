@@ -59,8 +59,6 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
-    - jstests/change_streams/report_post_batch_resume_token.js
-    - jstests/change_streams/resume_from_high_water_mark_token.js
   exclude_with_any_tags:
     - assumes_write_concern_unchanged
     - assumes_against_mongod_not_mongos

@@ -21,4 +21,3 @@ excludes:
   - "change_streams.mongos_passthrough_excludes"
   - "change_streams.sharded_collections_passthrough_excludes"
   - "change_streams.secondary_reads_excludes"
-  - "change_streams.batch_zero_excludes"
