@@ -155,48 +155,48 @@ static const BSONObj kGeoNearDistanceMetaProjection = BSON("$meta" << "geoNearDi
 
 const char kFindCmdName[] = "find";
 
-std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* opCtx,
-                                                             const std::set<ShardId>& shardIds,
-                                                             const CanonicalQuery& query,
-                                                             const boost::optional<UUID> sampleId,
-                                                             bool requestQueryStatsFromRemotes,
-                                                             const UUID& opKey) {
-    std::unique_ptr<FindCommandRequest> findCommand;
-    if (shardIds.size() > 1) {
-        findCommand = uassertStatusOK(ClusterFind::transformQueryForShards(query));
-    } else {
-        // Forwards the FindCommandRequest as is to a single shard so that limit and skip can
-        // be applied on mongod.
-        findCommand = std::make_unique<FindCommandRequest>(query.getFindCommandRequest());
-    }
+BSONObj makeFindCommandForShards(OperationContext* opCtx,
+                                 const std::set<ShardId>& shardIds,
+                                 const CanonicalQuery& query,
+                                 bool requestQueryStatsFromRemotes,
+                                 const UUID& opKey) {
+    auto findCommand = [&]() -> FindCommandRequest {
+        if (shardIds.size() > 1) {
+            return *uassertStatusOK(ClusterFind::transformQueryForShards(query));
+        } else {
+            // Forwards the FindCommandRequest as is to a single shard so that limit and skip can
+            // be applied on mongod.
+            return query.getFindCommandRequest();
+        }
+    }();
 
     // Reset the input request's generic arguments and only set the ones needed for the query.
     // TODO: SERVER-90827 Only reset arguments not suitable for passing through to shards.
     GenericArguments args;
-    std::swap(findCommand->getGenericArguments(), args);
-    findCommand->setUnwrappedReadPref(std::move(args.getUnwrappedReadPref()));
-    findCommand->setMaxTimeMS(args.getMaxTimeMS());
-    findCommand->setReadConcern(std::move(args.getReadConcern()));
+    std::swap(findCommand.getGenericArguments(), args);
+    findCommand.setUnwrappedReadPref(std::move(args.getUnwrappedReadPref()));
+    findCommand.setMaxTimeMS(args.getMaxTimeMS());
+    findCommand.setReadConcern(std::move(args.getReadConcern()));
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     if (readConcernArgs.wasAtClusterTimeSelected()) {
         // If mongos selected atClusterTime or received it from client, transmit it to shard.
-        findCommand->setReadConcern(readConcernArgs);
+        findCommand.setReadConcern(readConcernArgs);
     }
 
     query.getExpCtx()->initializeReferencedSystemVariables();
 
     // Replace the 'letParams' expressions with their values.
-    if (auto letParams = findCommand->getLet()) {
+    if (auto letParams = findCommand.getLet()) {
         const auto& vars = query.getExpCtx()->variables;
         const auto& vps = query.getExpCtx()->variablesParseState;
-        findCommand->setLet(vars.toBSON(vps, *letParams));
+        findCommand.setLet(vars.toBSON(vps, *letParams));
     }
 
     // ExpressionContext may contain previously looked up query settings. Propagate it to the
     // shards.
     if (!query_settings::isDefault(query.getExpCtx()->getQuerySettings())) {
-        findCommand->setQuerySettings(query.getExpCtx()->getQuerySettings());
+        findCommand.setQuerySettings(query.getExpCtx()->getQuerySettings());
     }
 
     // Request metrics if necessary.
@@ -205,7 +205,7 @@ std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* o
         // rate) dictates we should gather metrics, or the user sent the flag to us.
         auto origValue = query.getFindCommandRequest().getIncludeQueryStatsMetrics();
         if (origValue.value_or(false) || requestQueryStatsFromRemotes) {
-            findCommand->setIncludeQueryStatsMetrics(true);
+            findCommand.setIncludeQueryStatsMetrics(true);
         }
     }
 
@@ -214,79 +214,16 @@ std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* o
     // necessarily want to forward all transaction arguments directly from the input request since
     // we may have already started a transaction for internal purposes (e.g. FLE does this).
     if (auto& lsid = opCtx->getLogicalSessionId()) {
-        findCommand->setLsid(generic_argument_util::toLogicalSessionFromClient(*lsid));
+        findCommand.setLsid(generic_argument_util::toLogicalSessionFromClient(*lsid));
     }
-    findCommand->setTxnNumber(opCtx->getTxnNumber());
-    findCommand->setClientOperationKey(opKey);
+    findCommand.setTxnNumber(opCtx->getTxnNumber());
+    findCommand.setClientOperationKey(opKey);
 
-    return findCommand;
-}
-
-/**
- * Constructs the shard requests (ShardId, BSONObj) pairs for the find command by attaching the
- * shardVersion, txnNumber and sampleId if necessary.
- */
-std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
-    OperationContext* opCtx,
-    const CollectionRoutingInfo& cri,
-    const std::set<ShardId>& shardIds,
-    const CanonicalQuery& query,
-    const boost::optional<UUID> sampleId,
-    bool requestQueryStatsFromRemotes,
-    const auto& opKey) {
-    // Choose the shard to sample the query on if needed.
-    const auto sampleShardId = sampleId
-        ? boost::make_optional(analyze_shard_key::getRandomShardId(shardIds))
-        : boost::none;
-
-    // Helper methods for appending additional attributes to the shard command.
-    auto appendVersions = [&](const auto& shardId, auto& cmdBuilder) {
-        if (cri.hasRoutingTable()) {
-            appendShardVersion(cmdBuilder, cri.getShardVersion(shardId));
-        } else if (!query.nss().isOnInternalDb()) {
-            appendShardVersion(cmdBuilder, ShardVersion::UNTRACKED());
-            appendDbVersionIfPresent(cmdBuilder, cri.getDbVersion());
-        }
-    };
-
-    auto appendSampleId = [&](const auto& shardId, auto& cmdBuilder) {
-        if (shardId == sampleShardId) {
-            analyze_shard_key::appendSampleId(&cmdBuilder, *sampleId);
-        }
-    };
-
-    // Constructs the shard request by appending additional attributes to the serialized
-    // 'findCommandToForward'.
-    const auto findCommandToForward = makeFindCommandForShards(
-        opCtx, shardIds, query, sampleId, requestQueryStatsFromRemotes, opKey);
-
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    auto makeShardRequest = [&](const auto& shardId) {
-        const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
-        tassert(11052355,
-                "Expected either non-config shard or valid connection string for the config shard",
-                !shard->isConfig() || shard->getConnString());
-
-        BSONObjBuilder cmdBuilder;
-        findCommandToForward->serialize(&cmdBuilder);
-        appendVersions(shardId, cmdBuilder);
-        appendSampleId(shardId, cmdBuilder);
-
-        auto cmdObj = isRawDataOperation(opCtx) &&
-                findCommandToForward->getNamespaceOrUUID().isNamespaceString() &&
-                findCommandToForward->getNamespaceOrUUID().nss().isTimeseriesBucketsCollection()
-            ? rewriteCommandForRawDataOperation<FindCommandRequest>(
-                  cmdBuilder.obj(), findCommandToForward->getNamespaceOrUUID().nss().coll())
-            : cmdBuilder.obj();
-
-        return AsyncRequestsSender::Request(shardId, std::move(cmdObj), std::move(shard));
-    };
-
-    std::vector<AsyncRequestsSender::Request> requests;
-    requests.reserve(shardIds.size());
-    std::transform(
-        shardIds.begin(), shardIds.end(), std::back_inserter(requests), makeShardRequest);
-    return requests;
+    return isRawDataOperation(opCtx) && findCommand.getNamespaceOrUUID().isNamespaceString() &&
+            findCommand.getNamespaceOrUUID().nss().isTimeseriesBucketsCollection()
+        ? rewriteCommandForRawDataOperation<FindCommandRequest>(
+              findCommand.toBSON(), findCommand.getNamespaceOrUUID().nss().coll())
+        : findCommand.toBSON();
 }
 
 void updateNumHostsTargetedMetrics(OperationContext* opCtx,
@@ -306,7 +243,6 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  RoutingContext& routingCtx,
                                  const CanonicalQuery& query,
                                  const ReadPreferenceSetting& readPref,
-                                 const boost::optional<UUID> sampleId,
                                  std::vector<BSONObj>* results,
                                  bool* partialResultsReturned) {
     const auto& findCommand = query.getFindCommandRequest();
@@ -401,8 +337,10 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         // shards, attaching the shardVersion and session info, if necessary. Attach our own
         // OperationKey as well so establishCursors won't copy each request.
         std::vector<OperationKey> opKeys{UUID::gen()};
-        auto requests = constructRequestsForShards(
-            opCtx, cri, shardIds, query, sampleId, requestQueryStatsFromRemotes, opKeys.front());
+        const auto findCommandToForward = makeFindCommandForShards(
+            opCtx, shardIds, query, requestQueryStatsFromRemotes, opKeys.front());
+        auto requests = buildVersionedRequests(
+            opCtx, query.nss(), cri, shardIds, findCommandToForward, /*eligibleForSampling=*/true);
 
         // The call to establishCursors has its own timeout mechanism that is controlled by the
         // opCtx, so we don't expect runWithDeadline to throw a timeout at this level. We use
@@ -852,12 +790,6 @@ void ClusterFind::runQuery(OperationContext* opCtx,
                            use the classic encoding method by default. */
                         canonical_query_encoder::encodeClassic(*query));
 
-                // Try to generate a sample id for this query here instead of inside
-                // 'runQueryWithoutRetrying()' since it is incorrect to generate multiple sample ids
-                // for a single query.
-                const auto sampleId = analyze_shard_key::tryGenerateSampleId(
-                    opCtx, query->nss(), analyze_shard_key::SampledCommandNameEnum::kFind);
-
                 // If this is a viewless timeseries namespace, run the equivalent aggregation (which
                 // writes its own cursor response into 'result') and short-circuit the normal find
                 // path.
@@ -889,13 +821,8 @@ void ClusterFind::runQuery(OperationContext* opCtx,
 
                     // Do the work to generate the first batch of results. This blocks waiting to
                     // get responses from the shard(s).
-                    auto cursorId = runQueryWithoutRetrying(opCtx,
-                                                            routingCtx,
-                                                            *query,
-                                                            readPref,
-                                                            sampleId,
-                                                            &batch,
-                                                            &partialResultsReturned);
+                    auto cursorId = runQueryWithoutRetrying(
+                        opCtx, routingCtx, *query, readPref, &batch, &partialResultsReturned);
                     CursorResponseBuilder::Options options;
                     options.isInitialResponse = true;
                     if (!opCtx->inMultiDocumentTransaction()) {

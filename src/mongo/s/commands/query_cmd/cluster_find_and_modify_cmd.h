@@ -44,6 +44,7 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -154,19 +155,19 @@ private:
 
     // Catches errors in the given response, and reruns the command if necessary. Uses the given
     // response to construct the findAndModify command result passed to the client.
-    static void _constructResult(OperationContext* opCtx,
-                                 const ShardId& shardId,
-                                 const boost::optional<ShardVersion>& shardVersion,
-                                 const boost::optional<DatabaseVersion>& dbVersion,
-                                 const NamespaceString& nss,
-                                 const BSONObj& cmdObj,
-                                 const Status& responseStatus,
-                                 const BSONObj& response,
-                                 bool isTimeseriesViewRequest,
-                                 BSONObjBuilder* result);
+    static void _handleResponseAndConstructResult(OperationContext* opCtx,
+                                                  const ShardId& shardId,
+                                                  const CollectionRoutingInfo& cri,
+                                                  const NamespaceString& nss,
+                                                  const BSONObj& cmdObj,
+                                                  const Status& responseStatus,
+                                                  const BSONObj& response,
+                                                  bool isTimeseriesViewRequest,
+                                                  BSONObjBuilder* result);
 
     // Two-phase protocol to run a findAndModify command without a shard key or _id.
     static void _runCommandWithoutShardKey(OperationContext* opCtx,
+                                           const CollectionRoutingInfo& cri,
                                            const NamespaceString& nss,
                                            const BSONObj& cmdObj,
                                            bool isTimeseriesViewRequest,
@@ -182,21 +183,19 @@ private:
     // Command invocation to be used if a shard key is specified or the collection is unsharded.
     static void _runCommand(OperationContext* opCtx,
                             const ShardId& shardId,
-                            const boost::optional<ShardVersion>& shardVersion,
-                            const boost::optional<DatabaseVersion>& dbVersion,
+                            const CollectionRoutingInfo& cri,
                             const NamespaceString& nss,
                             const BSONObj& cmdObj,
-                            bool isExplain,
                             boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
                             bool isTimeseriesViewRequest,
-                            BSONObjBuilder* result);
+                            BSONObjBuilder* result,
+                            bool eligibleForSampling = true);
 
     // TODO SERVER-67429: Remove this function.
     static void _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
         OperationContext* opCtx,
         const ShardId& shardId,
-        const boost::optional<ShardVersion>& shardVersion,
-        const boost::optional<DatabaseVersion>& dbVersion,
+        const CollectionRoutingInfo& cri,
         const NamespaceString& nss,
         const BSONObj& cmdObj,
         bool isTimeseriesViewRequest,

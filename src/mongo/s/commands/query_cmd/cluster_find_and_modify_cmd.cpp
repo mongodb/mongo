@@ -32,7 +32,6 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
@@ -50,7 +49,6 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/chunk.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
-#include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/global_catalog/type_collection_common_types_gen.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -60,8 +58,6 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
-#include "mongo/db/router_role/collection_routing_info_targeter.h"
-#include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
@@ -70,9 +66,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
-#include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
@@ -84,7 +78,6 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
-#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query/shard_key_pattern_query_util.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
@@ -407,25 +400,15 @@ BSONObj prepareCmdObjForPassthrough(
     OperationContext* opCtx,
     const BSONObj& cmdObj,
     const NamespaceString& nss,
-    bool isExplain,
-    const boost::optional<DatabaseVersion>& dbVersion,
-    const boost::optional<ShardVersion>& shardVersion,
+    bool eligibleForSampling,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
-    BSONObj filteredCmdObj = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
-    if (!isExplain) {
+    BSONObj newCmdObj = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
+    if (eligibleForSampling) {
         if (auto sampleId = analyze_shard_key::tryGenerateSampleId(
                 opCtx, nss, cmdObj.firstElementFieldNameStringData())) {
-            filteredCmdObj =
-                analyze_shard_key::appendSampleId(std::move(filteredCmdObj), std::move(*sampleId));
+            newCmdObj =
+                analyze_shard_key::appendSampleId(std::move(newCmdObj), std::move(*sampleId));
         }
-    }
-
-    BSONObj newCmdObj(std::move(filteredCmdObj));
-    if (dbVersion) {
-        newCmdObj = appendDbVersionIfPresent(newCmdObj, *dbVersion);
-    }
-    if (shardVersion) {
-        newCmdObj = appendShardVersion(newCmdObj, *shardVersion);
     }
 
     if (opCtx->isRetryableWrite()) {
@@ -783,23 +766,16 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
                 return Status::OK();
             }
 
-            auto shardVersion = cri.hasRoutingTable()
-                ? boost::make_optional(cri.getShardVersion(*shardId))
-                : boost::make_optional(!cri.getDbVersion().isFixed(), ShardVersion::UNTRACKED());
-            auto dbVersion =
-                cri.hasRoutingTable() ? boost::none : boost::make_optional(cri.getDbVersion());
-
             _runCommand(opCtx,
                         *shardId,
-                        shardVersion,
-                        dbVersion,
+                        cri,
                         nss,
                         applyReadWriteConcern(
                             opCtx, false, false, makeExplainCmd(opCtx, cmdObj, verbosity)),
-                        true /* isExplain */,
                         boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
                         isTimeseriesLogicalRequest,
-                        &bob);
+                        &bob,
+                        false /*explain is not eligible for sampling*/);
 
             const auto millisElapsed = timer.millis();
 
@@ -961,16 +937,15 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                     // protocol.
                     _runCommand(opCtx,
                                 *shardId,
-                                cri.getShardVersion(*shardId),
-                                boost::none,
+                                cri,
                                 nss,
                                 applyReadWriteConcern(opCtx, this, cmdObjForShard),
-                                false /* isExplain */,
                                 allowShardKeyUpdatesWithoutFullShardKeyInQuery,
                                 isTimeseriesLogicalRequest,
                                 &result);
                 } else {
                     _runCommandWithoutShardKey(opCtx,
+                                               cri,
                                                nss,
                                                applyReadWriteConcern(opCtx, this, cmdObjForShard),
                                                isTimeseriesLogicalRequest,
@@ -988,11 +963,9 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
 
                 _runCommand(opCtx,
                             shardId,
-                            cri.getShardVersion(shardId),
-                            boost::none,
+                            cri,
                             nss,
                             applyReadWriteConcern(opCtx, this, cmdObjForShard),
-                            false /* isExplain */,
                             boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
                             isTimeseriesLogicalRequest,
                             &result);
@@ -1000,17 +973,14 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         } else {
             getQueryCounters(opCtx).findAndModifyUnshardedCount.increment(1);
 
-            _runCommand(
-                opCtx,
-                cri.getDbPrimaryShardId(),
-                boost::make_optional(!cri.getDbVersion().isFixed(), ShardVersion::UNTRACKED()),
-                cri.getDbVersion(),
-                nss,
-                applyReadWriteConcern(opCtx, this, cmdObjForShard),
-                false /* isExplain */,
-                boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
-                isTimeseriesLogicalRequest,
-                &result);
+            _runCommand(opCtx,
+                        cri.getDbPrimaryShardId(),
+                        cri,
+                        nss,
+                        applyReadWriteConcern(opCtx, this, cmdObjForShard),
+                        boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                        isTimeseriesLogicalRequest,
+                        &result);
         }
     };
 
@@ -1038,16 +1008,15 @@ bool FindAndModifyCmd::getCrudProcessedFromCmd(const BSONObj& cmdObj) {
 
 // Catches errors in the given response, and reruns the command if necessary. Uses the given
 // response to construct the findAndModify command result passed to the client.
-void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
-                                        const ShardId& shardId,
-                                        const boost::optional<ShardVersion>& shardVersion,
-                                        const boost::optional<DatabaseVersion>& dbVersion,
-                                        const NamespaceString& nss,
-                                        const BSONObj& cmdObj,
-                                        const Status& responseStatus,
-                                        const BSONObj& response,
-                                        bool isTimeseriesViewRequest,
-                                        BSONObjBuilder* result) {
+void FindAndModifyCmd::_handleResponseAndConstructResult(OperationContext* opCtx,
+                                                         const ShardId& shardId,
+                                                         const CollectionRoutingInfo& cri,
+                                                         const NamespaceString& nss,
+                                                         const BSONObj& cmdObj,
+                                                         const Status& responseStatus,
+                                                         const BSONObj& response,
+                                                         bool isTimeseriesViewRequest,
+                                                         BSONObjBuilder* result) {
     auto txnRouter = TransactionRouter::get(opCtx);
     bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
 
@@ -1068,14 +1037,8 @@ void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
             opCtx->setQuerySamplingOptions(QuerySamplingOptions::kOptOut);
 
             if (isRetryableWrite) {
-                _handleWouldChangeOwningShardErrorRetryableWriteLegacy(opCtx,
-                                                                       shardId,
-                                                                       shardVersion,
-                                                                       dbVersion,
-                                                                       nss,
-                                                                       cmdObj,
-                                                                       isTimeseriesViewRequest,
-                                                                       result);
+                _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
+                    opCtx, shardId, cri, nss, cmdObj, isTimeseriesViewRequest, result);
             } else {
                 handleWouldChangeOwningShardErrorTransactionLegacy(opCtx,
                                                                    nss,
@@ -1104,6 +1067,7 @@ void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
 
 // Two-phase protocol to run a findAndModify command without a shard key or _id.
 void FindAndModifyCmd::_runCommandWithoutShardKey(OperationContext* opCtx,
+                                                  const CollectionRoutingInfo& cri,
                                                   const NamespaceString& nss,
                                                   const BSONObj& cmdObj,
                                                   bool isTimeseriesViewRequest,
@@ -1115,9 +1079,7 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(OperationContext* opCtx,
         prepareCmdObjForPassthrough(opCtx,
                                     cmdObj,
                                     nss,
-                                    false /* isExplain */,
-                                    boost::none /* dbVersion */,
-                                    boost::none /* shardVersion */,
+                                    true /* eligibleForSampling */,
                                     allowShardKeyUpdatesWithoutFullShardKeyInQuery);
 
     // TODO SERVER-108928 - Handle this inside of prepareCmdObjForPassthrough.
@@ -1166,16 +1128,15 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(OperationContext* opCtx,
     }
 
     // Extract findAndModify command result from the result of the two phase write protocol.
-    _constructResult(opCtx,
-                     shardId,
-                     boost::none /* shardVersion */,
-                     boost::none /* dbVersion */,
-                     nss,
-                     cmdObj,
-                     swRes.getStatus(),
-                     cmdResponse,
-                     isTimeseriesViewRequest,
-                     result);
+    _handleResponseAndConstructResult(opCtx,
+                                      shardId,
+                                      cri,
+                                      nss,
+                                      cmdObj,
+                                      swRes.getStatus(),
+                                      cmdResponse,
+                                      isTimeseriesViewRequest,
+                                      result);
 }
 
 // Two-phase protocol to run an explain for a findAndModify command without a shard key or _id.
@@ -1188,9 +1149,7 @@ void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
         opCtx,
         originalExplainObj,
         nss,
-        true /* isExplain */,
-        boost::none /* dbVersion */,
-        boost::none /* shardVersion */,
+        false /* eligibleForSampling */,
         boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */);
 
     auto explainObj = translateExplainObjForRawData(opCtx, cmdObjForPassthrough, nss);
@@ -1236,62 +1195,62 @@ void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
 void FindAndModifyCmd::_runCommand(
     OperationContext* opCtx,
     const ShardId& shardId,
-    const boost::optional<ShardVersion>& shardVersion,
-    const boost::optional<DatabaseVersion>& dbVersion,
+    const CollectionRoutingInfo& cri,
     const NamespaceString& nss,
     const BSONObj& cmdObj,
-    bool isExplain,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
     bool isTimeseriesViewRequest,
-    BSONObjBuilder* result) {
+    BSONObjBuilder* result,
+    bool eligibleForSampling) {
+
     auto txnRouter = TransactionRouter::get(opCtx);
     bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
 
-    const auto response = [&] {
-        std::vector<AsyncRequestsSender::Request> requests;
-        auto cmdObjForPassthrough =
-            prepareCmdObjForPassthrough(opCtx,
-                                        cmdObj,
-                                        nss,
-                                        isExplain,
-                                        dbVersion,
-                                        shardVersion,
-                                        allowShardKeyUpdatesWithoutFullShardKeyInQuery);
-        requests.emplace_back(shardId, cmdObjForPassthrough);
+    // Pass 'false' to `eligibleForSampling` since scatterGatherVersionedTargetToShards is going to
+    // add those fields.
+    const auto passthroughCmdObj =
+        prepareCmdObjForPassthrough(opCtx,
+                                    cmdObj,
+                                    nss,
+                                    /*eligibleForSampling=*/false,
+                                    allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+    // Create a RoutingContext from the CollectionRoutingInfo.
+    auto routingCtx = RoutingContext::createSynthetic({{nss, cri}});
+    const auto responses = scatterGatherVersionedTargetToShards(
+        opCtx,
+        *routingCtx,
+        nss.dbName(),
+        nss,
+        {shardId},
+        passthroughCmdObj,
+        kPrimaryOnlyReadPreference,
+        isRetryableWrite ? Shard::RetryPolicy::kIdempotent
+                         : Shard::RetryPolicy::kStrictlyNotIdempotent,
+        eligibleForSampling);
 
-        MultiStatementTransactionRequestsSender ars(
-            opCtx,
-            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-            nss.dbName(),
-            requests,
-            kPrimaryOnlyReadPreference,
-            isRetryableWrite ? Shard::RetryPolicy::kIdempotent
-                             : Shard::RetryPolicy::kStrictlyNotIdempotent);
+    tassert(11426400,
+            fmt::format("scatterGatherVersionedTargetToShards returned more than one response "
+                        "despite passing a single shardId: size: {}",
+                        responses.size()),
+            responses.size() == 1);
 
-        auto response = ars.next();
-        invariant(ars.done());
-
-        return uassertStatusOK(std::move(response.swResponse));
-    }();
-
-    _constructResult(opCtx,
-                     shardId,
-                     shardVersion,
-                     dbVersion,
-                     nss,
-                     cmdObj,
-                     getStatusFromCommandResult(response.data),
-                     response.data,
-                     isTimeseriesViewRequest,
-                     result);
+    const auto& response = uassertStatusOK(responses.front().swResponse);
+    _handleResponseAndConstructResult(opCtx,
+                                      shardId,
+                                      cri,
+                                      nss,
+                                      cmdObj,
+                                      getStatusFromCommandResult(response.data),
+                                      response.data,
+                                      isTimeseriesViewRequest,
+                                      result);
 }
 
 // TODO SERVER-67429: Remove this function.
 void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
     OperationContext* opCtx,
     const ShardId& shardId,
-    const boost::optional<ShardVersion>& shardVersion,
-    const boost::optional<DatabaseVersion>& dbVersion,
+    const CollectionRoutingInfo& cri,
     const NamespaceString& nss,
     const BSONObj& cmdObj,
     bool isTimeseriesViewRequest,
@@ -1321,17 +1280,15 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
                                                          isTimeseriesViewRequest)) {
             getQueryCounters(opCtx).findAndModifyNonTargetedShardedCount.increment(1);
             _runCommandWithoutShardKey(
-                opCtx, nss, stripWriteConcern(cmdObj), isTimeseriesViewRequest, result);
+                opCtx, cri, nss, stripWriteConcern(cmdObj), isTimeseriesViewRequest, result);
 
         } else {
             getQueryCounters(opCtx).findAndModifyTargetedShardedCount.increment(1);
             _runCommand(opCtx,
                         shardId,
-                        shardVersion,
-                        dbVersion,
+                        cri,
                         nss,
                         stripWriteConcern(cmdObj),
-                        false /* isExplain */,
                         boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
                         isTimeseriesViewRequest,
                         result);

@@ -462,15 +462,11 @@ public:
                         ? cm.getTimeseriesFields()
                         : boost::none;
 
-                    auto cmdObj =
+                    const auto cmdObj =
                         createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss, timeseriesFields);
 
-                    std::vector<AsyncRequestsSender::Request> requests;
-                    requests.reserve(allShardsContainingChunksForNs.size());
-                    for (const auto& shardId : allShardsContainingChunksForNs) {
-                        requests.emplace_back(
-                            shardId, appendShardVersion(cmdObj, cri.getShardVersion(shardId)));
-                    }
+                    const auto requests = buildVersionedRequests(
+                        opCtx, nss, cri, allShardsContainingChunksForNs, cmdObj);
 
                     MultiStatementTransactionRequestsSender ars(
                         opCtx,
@@ -607,20 +603,14 @@ public:
                 [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                     const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
-                    auto allShardsContainingChunksForNs =
-                        getShardsToTarget(opCtx, cri, nss, parsedInfoFromRequest);
-                    auto cmdObj =
+                    const auto cmdObj =
                         createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss, boost::none);
-
-                    const auto aggExplainCmdObj = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
-
-                    std::vector<AsyncRequestsSender::Request> requests;
-                    requests.reserve(allShardsContainingChunksForNs.size());
-                    for (const auto& shardId : allShardsContainingChunksForNs) {
-                        requests.emplace_back(
-                            shardId,
-                            appendShardVersion(aggExplainCmdObj, cri.getShardVersion(shardId)));
-                    }
+                    const auto requests = buildVersionedRequests(
+                        opCtx,
+                        nss,
+                        cri,
+                        getShardsToTarget(opCtx, cri, nss, parsedInfoFromRequest),
+                        ClusterExplain::wrapAsExplain(cmdObj, verbosity));
 
                     Timer timer;
                     MultiStatementTransactionRequestsSender ars(
