@@ -91,6 +91,11 @@ public:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
         std::unique_ptr<CanonicalQuery> canonicalQuery) final;
 
+    /**
+     * Extracts the WorkingSet used by this planner.
+     */
+    std::unique_ptr<WorkingSet> extractWorkingSet();
+
 protected:
     std::unique_ptr<PlanStage> buildExecutableTree(const QuerySolution& qs);
 

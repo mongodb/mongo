@@ -97,6 +97,10 @@ WorkingSet* ClassicPlannerInterface::ws() const {
     return _plannerData.workingSet.get();
 }
 
+std::unique_ptr<WorkingSet> ClassicPlannerInterface::extractWorkingSet() {
+    return std::move(_plannerData.workingSet);
+}
+
 void ClassicPlannerInterface::addDeleteStage(ParsedDelete* parsedDelete,
                                              projection_ast::Projection* projection,
                                              std::unique_ptr<DeleteStageParams> deleteStageParams) {

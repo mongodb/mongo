@@ -30,6 +30,7 @@
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
@@ -44,9 +45,23 @@ StatusWith<QueryPlanner::PlanRankingResult> PlanRanker::rankPlans(
     CanonicalQuery& query,
     const QueryPlannerParams& plannerParams,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    const MultipleCollectionAccessor& collections) const {
+    const MultipleCollectionAccessor& collections,
+    PlannerData plannerData) {
+    // TODO SERVER-114514: Implement restrictive approach for automaticCE. Then delete this comment
+    // below:
+    // For illustration purposes. We'd use multiplanner for ranking like this:
+    // auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
+    // auto mp =
+    //     classic_runtime_planner::MultiPlanner(std::move(plannerData),
+    //                                           std::move(statusWithMultiPlanSolns.getValue()),
+    //                                           QueryPlanner::PlanRankingResult{});
+    // uassertStatusOK(mp.plan()); <- We could also use runTrials or any other method available.
+    // Once done, extract the WorkingSet from the MultiPlanner and store it here for further
+    // extraction.
+    // _ws.emplace(mp.extractWorkingSet());
     auto rankerMode = plannerParams.planRankerMode;
     if (rankerMode != QueryPlanRankerModeEnum::kMultiPlanning) {
+        _ws = std::move(plannerData.workingSet);
         return CBRPlanRankingStrategy().rankPlans(
             opCtx, query, plannerParams, yieldPolicy, collections);
     } else {
@@ -56,6 +71,7 @@ StatusWith<QueryPlanner::PlanRankingResult> PlanRanker::rankPlans(
          * to select a winning plan at runtime.
          */
         auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
+        _ws = std::move(plannerData.workingSet);
         if (!statusWithMultiPlanSolns.isOK()) {
             return statusWithMultiPlanSolns.getStatus().withContext(
                 str::stream() << "error processing query: " << query.toStringForErrorMsg()
@@ -63,6 +79,13 @@ StatusWith<QueryPlanner::PlanRankingResult> PlanRanker::rankPlans(
         }
         return QueryPlanner::PlanRankingResult{std::move(statusWithMultiPlanSolns.getValue())};
     }
+}
+
+std::unique_ptr<WorkingSet> PlanRanker::extractWorkingSet() {
+    tassert(11484500, "WorkingSet is not initialized", _ws);
+    auto result = std::move(_ws);
+    _ws = nullptr;
+    return result;
 }
 }  // namespace plan_ranking
 }  // namespace mongo

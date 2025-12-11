@@ -45,12 +45,13 @@
 #include <algorithm>
 #include <cstddef>
 #include <deque>
-#include <functional>
 #include <memory>
 #include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+
+// TODO SERVER-115240. Rename and maybe move it to a separate plan scoring directory.
 namespace mongo::plan_ranker {
 
 // Constant used for tie breakers.

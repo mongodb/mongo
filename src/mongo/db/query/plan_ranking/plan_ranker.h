@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -53,7 +54,15 @@ public:
         CanonicalQuery& query,
         const QueryPlannerParams& plannerParams,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
-        const MultipleCollectionAccessor& collections) const;
+        const MultipleCollectionAccessor& collections,
+        // PlannerData for classic multiplanner. We only need the classic one since multiplanning
+        // only runs with classic, even if SBE is enabled.
+        PlannerData multiPlannerData);
+
+    std::unique_ptr<WorkingSet> extractWorkingSet();
+
+private:
+    std::unique_ptr<WorkingSet> _ws;
 };
 }  // namespace plan_ranking
 }  // namespace mongo
