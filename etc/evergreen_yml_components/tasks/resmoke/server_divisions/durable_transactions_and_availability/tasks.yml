@@ -357,8 +357,8 @@ tasks:
           resmoke_jobs_max: 1
 
   # TODO(SERVER-108818): Remove this temporary suite.
-  - <<: *gen_task_template
-    name: concurrency_replication_primary_driven_index_builds_gen
+  - <<: *task_template
+    name: concurrency_replication_primary_driven_index_builds
     tags:
       [
         "assigned_to_jira_team_server_execution",
@@ -372,7 +372,8 @@ tasks:
         "repl",
       ]
     commands:
-      - func: "generate resmoke tasks"
+      - func: "do setup"
+      - func: "run tests"
         vars:
           resmoke_jobs_max: 1
           suite: concurrency_replication_primary_driven_index_builds
@@ -980,16 +981,20 @@ tasks:
           resmoke_args: src/mongo/db/modules/*/jstests/hot_backups/**/*.js
           use_2xlarge_distro: "true"
 
-  - <<: *gen_task_template
-    name: queryableWT_gen
-    tags: ["assigned_to_jira_team_server_integration", "release_critical"]
+  - <<: *task_template
+    name: queryableWT
+    tags:
+      [
+        "assigned_to_jira_team_server_integration",
+        "release_critical",
+        "requires_large_host",
+      ]
     commands:
-      - func: "generate resmoke tasks"
+      - func: "do setup"
+      - func: "run tests"
         vars:
           suite: queryable_wt
-          resmoke_args: src/mongo/db/modules/*/jstests/queryable_wt/*.js
           resmoke_jobs_max: 1
-          use_large_distro: "true"
 
   - <<: *gen_task_template
     name: read_concern_linearizable_passthrough_gen
@@ -1267,8 +1272,8 @@ tasks:
         vars:
           use_large_distro: "true"
 
-  - <<: *gen_task_template
-    name: replica_sets_large_txns_format_jscore_passthrough_gen
+  - <<: *task_template
+    name: replica_sets_large_txns_format_jscore_passthrough
     # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
     tags:
       [
@@ -1283,11 +1288,11 @@ tasks:
         "large",
         "non_maj_read",
         "san",
+        "requires_large_host",
       ]
     commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
+      - func: "do setup"
+      - func: "run tests"
 
   - <<: *gen_task_template
     name: replica_sets_multi_stmt_txn_jscore_passthrough_gen
@@ -1465,8 +1470,8 @@ tasks:
       - func: "generate resmoke tasks"
 
   # TODO(SERVER-108818): Remove this temporary suite.
-  - <<: *gen_task_template
-    name: replica_sets_primary_driven_index_builds_gen
+  - <<: *task_template
+    name: replica_sets_primary_driven_index_builds
     # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
     tags:
       [
@@ -1478,13 +1483,14 @@ tasks:
         "large",
       ]
     commands:
-      - func: "generate resmoke tasks"
+      - func: "do setup"
+      - func: "run tests"
         vars:
           suite: replica_sets_primary_driven_index_builds
 
   # TODO(SERVER-108818): Remove this temporary suite.
-  - <<: *gen_task_template
-    name: auth_primary_driven_index_builds_gen
+  - <<: *task_template
+    name: auth_primary_driven_index_builds
     tags:
       [
         "assigned_to_jira_team_server_execution",
@@ -1493,7 +1499,8 @@ tasks:
         "primary_driven_index_builds",
       ]
     commands:
-      - func: "generate resmoke tasks"
+      - func: "do setup"
+      - func: "run tests"
         vars:
           suite: auth_primary_driven_index_builds
 
@@ -1733,8 +1740,8 @@ tasks:
         vars:
           use_xlarge_distro: "true"
 
-  - <<: *gen_task_template
-    name: sharding_txns_uninitialized_fcv_jscore_passthrough_gen
+  - <<: *task_template
+    name: sharding_txns_uninitialized_fcv_jscore_passthrough
     tags:
       [
         "assigned_to_jira_team_server_repl",
@@ -1748,11 +1755,11 @@ tasks:
         "initsync",
         "uninitialized_fcv",
         "large",
+        "requires_large_host",
       ]
     commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_xlarge_distro: "true"
+      - func: "do setup"
+      - func: "run tests"
 
   - name: tla_plus
     tags: ["assigned_to_jira_team_server_repl", "experimental"]
@@ -2220,8 +2227,8 @@ tasks:
           use_large_distro: "true"
 
     # TODO(SERVER-108818): Remove this temporary suite.
-  - <<: *gen_task_template
-    name: noPassthrough_primary_driven_index_builds_gen
+  - <<: *task_template
+    name: noPassthrough_primary_driven_index_builds
     tags:
       [
         "assigned_to_jira_team_server_execution",
@@ -2232,12 +2239,13 @@ tasks:
         "incompatible_debug_mode",
         "primary_driven_index_builds",
         "requires_execution_on_windows_patch_build",
+        "requires_large_host",
       ]
     commands:
-      - func: "generate resmoke tasks"
+      - func: "do setup"
+      - func: "run tests"
         vars:
           suite: no_passthrough_primary_driven_index_builds
-          use_large_distro: "true"
 
   - <<: *task_template
     name: read_only
@@ -2284,8 +2292,8 @@ tasks:
           resmoke_jobs_max: 1
           use_large_distro: "true"
 
-  - <<: *gen_task_template
-    name: timeseries_crud_jscore_passthrough_gen
+  - <<: *task_template
+    name: timeseries_crud_jscore_passthrough
     tags:
       [
         "assigned_to_jira_team_server_execution",
@@ -2294,7 +2302,8 @@ tasks:
         "timeseries_crud",
       ]
     commands:
-      - func: "generate resmoke tasks"
+      - func: "do setup"
+      - func: "run tests"
         vars:
           suite: timeseries_crud_jscore_passthrough
 

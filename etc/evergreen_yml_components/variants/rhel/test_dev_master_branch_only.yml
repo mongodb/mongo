@@ -140,7 +140,7 @@ variables:
           - rhel8.8-large
       - name: .aggfuzzer !.feature_flag_guarded
       - name: audit
-      - name: auth_audit_gen
+      - name: auth_audit
       - name: auth_gen
       - name: causally_consistent_jscore_txns_passthrough
       - name: .config_fuzzer !.large
@@ -513,7 +513,7 @@ buildvariants:
         distros:
           - rhel8.8-large
       - name: auth_gen
-      - name: auth_audit_gen
+      - name: auth_audit
       - name: causally_consistent_jscore_txns_passthrough
       - name: .concurrency .common !.large !.feature_flag_guarded
       - name: .config_fuzzer !.large

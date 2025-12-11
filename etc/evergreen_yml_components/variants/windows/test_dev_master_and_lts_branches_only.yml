@@ -35,7 +35,7 @@ buildvariants:
           - windows-2022-xxlarge
       - name: .aggfuzzer .common !.feature_flag_guarded
       - name: audit
-      - name: auth_audit_gen
+      - name: auth_audit
       - name: causally_consistent_jscore_txns_passthrough
       - name: .concurrency .common !.feature_flag_guarded
         distros:

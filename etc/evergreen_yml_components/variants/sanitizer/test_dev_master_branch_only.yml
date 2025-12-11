@@ -392,7 +392,7 @@ buildvariants:
       - name: compile_test_serial_TG
       - name: run_unit_tests_8_way_split_TG
       - name: audit
-      - name: auth_audit_gen
+      - name: auth_audit
       - name: fle
       - name: fle2
       - name: .jscore .common !.decimal !.sharding

@@ -318,7 +318,7 @@ buildvariants:
         distros:
           - rhel8.8-xlarge
       - name: retryable_writes_jscore_passthrough_gen
-      - name: retryable_writes_jscore_stepdown_passthrough_gen
+      - name: retryable_writes_jscore_stepdown_passthrough
       - name: sasl
       - name: search
         distros:
@@ -345,20 +345,20 @@ buildvariants:
       - name: aggregation_mongos_pqs_fallback_gen
       - name: aggregation_mongos_pqs_hints_gen
       - name: aggregation_pqs_fallback_gen
-      - name: aggregation_pqs_hints_gen
+      - name: aggregation_pqs_hints
       - name: aggregation_sharded_collections_pqs_fallback_gen
       - name: aggregation_sharded_collections_pqs_hints_gen
       - name: aggregation_sharded_collections_query_shape_hash_stability_gen
       - name: replica_sets_jscore_pqs_fallback_gen
       - name: replica_sets_jscore_pqs_hints_gen
-      - name: replica_sets_jscore_pqs_index_filters_gen
+      - name: replica_sets_jscore_pqs_index_filters
       - name: sharded_collections_pqs_fallback_gen
       - name: sharded_collections_pqs_hints_gen
-      - name: sharded_collections_pqs_index_filters_gen
+      - name: sharded_collections_pqs_index_filters
       - name: sharded_collections_query_shape_hash_stability_gen
       - name: sharding_pqs_fallback_gen
       - name: sharding_pqs_hints_gen
-      - name: sharding_pqs_index_filters_gen
+      - name: sharding_pqs_index_filters
 
   - name: upload-sbom-if-changed
     display_name: "Upload SBOM if changed"

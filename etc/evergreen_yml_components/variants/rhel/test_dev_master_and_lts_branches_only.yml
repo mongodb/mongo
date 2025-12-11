@@ -141,7 +141,7 @@ buildvariants:
         --excludeWithAnyTags=exclude_from_large_txns
     tasks:
       - name: auth_gen
-      - name: auth_audit_gen
+      - name: auth_audit
       - name: causally_consistent_jscore_txns_passthrough
       - name: change_streams
       - name: change_streams_whole_db_passthrough

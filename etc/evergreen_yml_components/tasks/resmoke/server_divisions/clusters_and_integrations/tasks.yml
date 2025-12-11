@@ -662,8 +662,8 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
-  - <<: *gen_task_template
-    name: auth_audit_gen
+  - <<: *task_template
+    name: auth_audit
     tags:
       [
         "assigned_to_jira_team_server_security",
@@ -674,7 +674,8 @@ tasks:
         "patch_build",
       ]
     commands:
-      - func: "generate resmoke tasks"
+      - func: "do setup"
+      - func: "run tests"
 
   - <<: *gen_task_template
     name: auth_gen
@@ -1119,8 +1120,8 @@ tasks:
         vars:
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {network: 2, replication: {heartbeats: 2}}}'"
 
-  - <<: *gen_task_template
-    name: ssl_linear_gen
+  - <<: *task_template
+    name: ssl_linear
     tags:
       [
         "assigned_to_jira_team_server_security",
@@ -1130,13 +1131,14 @@ tasks:
         "patch_build",
       ]
     commands:
-      - func: "generate resmoke tasks"
+      - func: "do setup"
+      - func: "run tests"
         vars:
           suite: ssl_linear
           resmoke_jobs_max: 1
 
-  - <<: *gen_task_template
-    name: ssl_x509_gen
+  - <<: *task_template
+    name: ssl_x509
     tags:
       [
         "assigned_to_jira_team_server_security",
@@ -1146,7 +1148,8 @@ tasks:
         "patch_build",
       ]
     commands:
-      - func: "generate resmoke tasks"
+      - func: "do setup"
+      - func: "run tests"
         vars:
           suite: ssl_x509
 
@@ -1399,12 +1402,13 @@ tasks:
         vars:
           use_large_distro: "true"
 
-  - <<: *gen_task_template
-    name: retryable_writes_jscore_stepdown_passthrough_gen
+  - <<: *task_template
+    name: retryable_writes_jscore_stepdown_passthrough
     tags:
       ["assigned_to_jira_team_server_cluster_scalability", "default", "retry"]
     commands:
-      - func: "generate resmoke tasks"
+      - func: "do setup"
+      - func: "run tests"
 
   ## resharding generational fuzzer ##
   - <<: *jstestfuzz_template
@@ -2856,8 +2860,8 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
 
-  - <<: *gen_task_template
-    name: sharded_causally_consistent_jscore_txns_passthrough_gen
+  - <<: *task_template
+    name: sharded_causally_consistent_jscore_txns_passthrough
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
@@ -2869,10 +2873,11 @@ tasks:
         "txns",
       ]
     commands:
-      - func: "generate resmoke tasks"
+      - func: "do setup"
+      - func: "run tests"
 
-  - <<: *gen_task_template
-    name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
+  - <<: *task_template
+    name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
@@ -2883,7 +2888,8 @@ tasks:
         "jscore",
       ]
     commands:
-      - func: "generate resmoke tasks"
+      - func: "do setup"
+      - func: "run tests"
         vars:
           suite: sharded_causally_consistent_jscore_txns_passthrough
           resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern

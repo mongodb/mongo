@@ -164,7 +164,7 @@ buildvariants:
           - name: archive_dist_test
       - name: .aggfuzzer .common !.feature_flag_guarded
       - name: audit
-      - name: auth_audit_gen
+      - name: auth_audit
       - name: buildscripts_test
       - name: causally_consistent_jscore_txns_passthrough
       - name: .encrypt !.aggregation !.gcm !.feature_flag_guarded
