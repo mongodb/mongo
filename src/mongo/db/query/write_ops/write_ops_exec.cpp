@@ -1505,8 +1505,6 @@ void registerRequestForQueryStats(OperationContext* opCtx,
                                                         std::move(deferredShape->getValue()),
                                                         collection.getCollectionType());
     });
-
-    // TODO(SERVER-110348) Support collecting data-bearing node metrics here.
 }
 
 /**
