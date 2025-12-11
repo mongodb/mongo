@@ -104,13 +104,8 @@ GetNextResult ExtensionStage::doGetNext() {
                 Document{_lastGetNextResult.resultDocument->getUnownedBSONObj()});
             if (_lastGetNextResult.resultMetadata.has_value()) {
                 for (const auto& elem : _lastGetNextResult.resultMetadata->getUnownedBSONObj()) {
-                    auto const fieldName = elem.fieldNameStringData();
-                    uassert(11390602,
-                            str::stream() << "Metadata field must begin with '$' and contain a "
-                                             "field name after it: "
-                                          << fieldName,
-                            fieldName.starts_with('$') && fieldName.size() > 1);
-                    auto metaType = DocumentMetadataFields::parseMetaType(fieldName.substr(1));
+                    auto metaType = DocumentMetadataFields::parseMetaTypeFromQualifiedString(
+                        elem.fieldNameStringData());
                     mutableDoc.metadata().setMetaFieldFromValue(metaType, Value(elem));
                 }
             }

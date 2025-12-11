@@ -97,6 +97,14 @@ public:
      */
     static DocumentMetadataFields::MetaType parseMetaType(StringData name);
 
+    /**
+     * Parses the MetaType from a qualified metadata field name (e.g., "$textScore").
+     *
+     * Throws a user exception if the provided field name doesn't start with '$', is only '$', or is
+     * not a recognized metadata type.
+     */
+    static DocumentMetadataFields::MetaType parseMetaTypeFromQualifiedString(StringData name);
+
     static StringData serializeMetaType(DocumentMetadataFields::MetaType type);
 
     /**
@@ -495,6 +503,8 @@ public:
         _modified = newValue;
     }
 
+    friend bool operator==(const DocumentMetadataFields& lhs, const DocumentMetadataFields& rhs);
+
 private:
     inline void _setCommon(MetaType mt) {
         if (!_holder) {
@@ -535,6 +545,8 @@ private:
         Value scoreDetails;
         // Stream processing related metadata. Only set in Atlas Stream Processing.
         Value stream;
+
+        bool operator==(const MetadataHolder& other) const;
     };
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.
@@ -545,6 +557,10 @@ private:
     // can directly return the underlying BSON.
     bool _modified{false};
 };
+
+bool operator==(const DocumentMetadataFields& lhs, const DocumentMetadataFields& rhs);
+
+bool operator!=(const DocumentMetadataFields& lhs, const DocumentMetadataFields& rhs);
 
 using QueryMetadataBitSet = std::bitset<DocumentMetadataFields::MetaType::kNumFields>;
 

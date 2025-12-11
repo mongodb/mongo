@@ -650,6 +650,15 @@ void Document::toBsonWithMetaDataOnly(BSONObjBuilder* builder) const {
     }
 }
 
+Document Document::createDocumentWithMetadata(const BSONObj& documentBSON,
+                                              const BSONObj& metadataBSON) {
+    MutableDocument document(Document{documentBSON});
+    MutableDocument metadataDocument;
+    metadataDocument.reset(metadataBSON, true);
+    document.setMetadata(metadataDocument.releaseMetadata());
+    return document.freeze();
+}
+
 Document Document::fromBsonWithMetaData(const BSONObj& bson) {
     MutableDocument md;
     md.reset(bson, true);
@@ -824,7 +833,6 @@ void Document::hash_combine(size_t& seed, const StringDataComparator* stringComp
 int Document::compare(const Document& rL,
                       const Document& rR,
                       const StringDataComparator* stringComparator) {
-
     if (&rL.storage() == &rR.storage()) {
         // If the storage is the same (shared between the documents) then the documents must be
         // equal.

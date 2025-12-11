@@ -385,6 +385,14 @@ public:
     }
 
     /**
+     * Creates a Document from a BSONObj and its associated metadata BSONObj.
+     * Used by extension aggregation stage to construct Documents that include metadata to
+     * send to the host.
+     */
+    static Document createDocumentWithMetadata(const BSONObj& documentBSON,
+                                               const BSONObj& metadataBSON);
+
+    /**
      * Like Document(BSONObj) but treats top-level fields with special names as metadata.
      * Special field names are available as static constants on this class with names starting
      * with metaField.

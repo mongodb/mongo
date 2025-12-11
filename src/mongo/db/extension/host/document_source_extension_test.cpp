@@ -1144,68 +1144,6 @@ DEATH_TEST_F(DocumentSourceExtensionTestDeathTest,
         lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
 }
 
-TEST_F(DocumentSourceExtensionTest, ShouldPropagateValidGetNextResultsForSourceExtensionStage) {
-    auto astNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::FruitsAsDocumentsAstNode::make());
-    auto astHandle = AggStageAstNodeHandle(astNode);
-
-    auto optimizable =
-        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
-
-    auto extensionStage = exec::agg::buildStage(optimizable);
-
-    // See sdk::shared_test_stages::SourceExecAggStage for the full test document suite.
-    {
-        auto next = extensionStage->getNext();
-        ASSERT_TRUE(next.isAdvanced());
-        MutableDocument md(Document{BSON("_id" << 1 << "apples" << "red")});
-        DocumentMetadataFields metadata;
-        metadata.setTextScore(5.0);
-        md.setMetadata(std::move(metadata));
-        ASSERT_DOCUMENT_EQ(next.releaseDocument(), md.freeze());
-    }
-    {
-        auto next = extensionStage->getNext();
-        ASSERT_TRUE(next.isAdvanced());
-        MutableDocument md(Document{BSON("_id" << 2 << "oranges" << 5)});
-        DocumentMetadataFields metadata;
-        metadata.setSearchScore(1.5);
-        md.setMetadata(std::move(metadata));
-        ASSERT_DOCUMENT_EQ(next.releaseDocument(), md.freeze());
-    }
-    {
-        auto next = extensionStage->getNext();
-        ASSERT_TRUE(next.isAdvanced());
-        MutableDocument md(Document{BSON("_id" << 3 << "bananas" << false)});
-        DocumentMetadataFields metadata;
-        metadata.setSearchScore(2.0);
-        md.setMetadata(std::move(metadata));
-        ASSERT_DOCUMENT_EQ(next.releaseDocument(), md.freeze());
-    }
-    {
-        auto next = extensionStage->getNext();
-        ASSERT_TRUE(next.isAdvanced());
-        MutableDocument md(Document{BSON("_id" << 4 << "tropical fruits"
-                                               << BSON_ARRAY("rambutan" << "durian" << "lychee"))});
-        DocumentMetadataFields metadata;
-        metadata.setTextScore(4.0);
-        md.setMetadata(std::move(metadata));
-        ASSERT_DOCUMENT_EQ(next.releaseDocument(), md.freeze());
-    }
-    {
-        auto next = extensionStage->getNext();
-        ASSERT_TRUE(next.isAdvanced());
-        MutableDocument md(Document{BSON("_id" << 5 << "pie" << 3.14159)});
-        DocumentMetadataFields metadata;
-        metadata.setSearchScore(5.0);
-        md.setMetadata(std::move(metadata));
-        ASSERT_DOCUMENT_EQ(next.releaseDocument(), md.freeze());
-    }
-    // Verify that the next result after all the documents have been exhausted has a status of EOF.
-    auto eof = extensionStage->getNext();
-    ASSERT_TRUE(eof.isEOF());
-}
-
 TEST_F(DocumentSourceExtensionTest, ShouldPropagateValidGetNextResultsForTransformExtensionStage) {
     // Create the $documents stage with test data. $documents is a source stage.
     auto docSourcesList = DocumentSourceDocuments::createFromBson(
@@ -1548,23 +1486,27 @@ TEST_F(DocumentSourceExtensionTest, ShouldPropagateSourceMetadata) {
         host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(sourceAstHandle));
     auto sourceStage = exec::agg::buildStage(sourceOptimizable);
 
-    std::array<std::pair<const char*, double>, 5> expected = {
-        std::pair{"$textScore", 5.0},
-        std::pair{"$searchScore", 1.5},
-        std::pair{"$searchScore", 2.0},
-        std::pair{"$textScore", 4.0},
-        std::pair{"$searchScore", 5.0},
-    };
+    const auto& inputResults =
+        sdk::shared_test_stages::FruitsAsDocumentsExecAggStage::getInputResults();
+    std::vector<Document> expectedDocuments;
+    for (const auto& inputResult : inputResults) {
+        expectedDocuments.emplace_back(
+            Document::createDocumentWithMetadata(inputResult.first, inputResult.second));
+    }
 
     // Verify metadata is present on output documents.
-    for (size_t i = 0; i < 5; ++i) {
+    for (const auto& expectedDocument : expectedDocuments) {
         auto nextResult = sourceStage->getNext();
         ASSERT_TRUE(nextResult.isAdvanced());
-        BSONObj docWithMeta = nextResult.releaseDocument().toBsonWithMetaData();
 
-        auto [fieldName, expectedVal] = expected[i];
-        ASSERT_TRUE(docWithMeta.hasField(fieldName));
-        ASSERT_EQ(expectedVal, docWithMeta.getField(fieldName).numberDouble());
+        auto actualDoc = nextResult.releaseDocument();
+        const auto& actualMetadata = actualDoc.metadata();
+        const auto& expectedMetadata = expectedDocument.metadata();
+
+        // Verify documents match.
+        ASSERT_DOCUMENT_EQ(actualDoc, expectedDocument);
+        // Verify metadata match.
+        ASSERT_EQ(actualMetadata, expectedMetadata);
     }
     ASSERT_TRUE(sourceStage->getNext().isEOF());
 }
@@ -1587,23 +1529,29 @@ TEST_F(DocumentSourceExtensionTest, TransformReceivesSourceMetadata) {
 
     auto transformStage = exec::agg::buildStageAndStitch(transformOptimizable, sourceStage);
 
-    std::array<std::pair<const char*, double>, 5> expected = {
-        std::pair{"$textScore", 5.0},
-        std::pair{"$searchScore", 1.5},
-        std::pair{"$searchScore", 2.0},
-        std::pair{"$textScore", 4.0},
-        std::pair{"$searchScore", 5.0},
-    };
+    const auto& inputResults =
+        sdk::shared_test_stages::FruitsAsDocumentsExecAggStage::getInputResults();
+    std::vector<Document> expectedDocuments;
+    for (const auto& inputResult : inputResults) {
+        const BSONObj& transformedDocBson =
+            BSON("existingDoc" << inputResult.first << "addedFields" << inputResult.first);
+        expectedDocuments.emplace_back(
+            Document::createDocumentWithMetadata(transformedDocBson, inputResult.second));
+    }
 
     // Verify transform stage output has metadata.
-    for (size_t i = 0; i < 5; ++i) {
+    for (const auto& expectedDocument : expectedDocuments) {
         auto nextResult = transformStage->getNext();
         ASSERT_TRUE(nextResult.isAdvanced());
-        BSONObj docWithMeta = nextResult.releaseDocument().toBsonWithMetaData();
 
-        auto [fieldName, expectedVal] = expected[i];
-        ASSERT_TRUE(docWithMeta.hasField(fieldName));
-        ASSERT_EQ(expectedVal, docWithMeta.getField(fieldName).numberDouble());
+        auto actualDoc = nextResult.releaseDocument();
+        const auto& actualMetadata = actualDoc.metadata();
+        const auto& expectedMetadata = expectedDocument.metadata();
+
+        // Verify documents match.
+        ASSERT_DOCUMENT_EQ(actualDoc, expectedDocument);
+        // Verify metadata match.
+        ASSERT_EQ(actualMetadata, expectedMetadata);
     }
 
     ASSERT_TRUE(transformStage->getNext().isEOF());

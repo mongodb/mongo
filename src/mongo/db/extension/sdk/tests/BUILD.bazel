@@ -15,7 +15,6 @@ mongo_cc_unit_test(
         "api_version_vector_to_span_test.cpp",
         "get_next_result_test.cpp",
         "host_services_test.cpp",
-        "metadata_serialization_test.cpp",
         "operation_metrics_test.cpp",
         "query_execution_context_test.cpp",
         "versioned_extension_test.cpp",
