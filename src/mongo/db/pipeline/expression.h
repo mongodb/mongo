@@ -6036,6 +6036,88 @@ public:
     }
 };
 
+class ExpressionSerializeEJSON : public Expression {
+public:
+    explicit ExpressionSerializeEJSON(ExpressionContext* expCtx,
+                                      boost::intrusive_ptr<Expression> input,
+                                      boost::intrusive_ptr<Expression> relaxed,
+                                      boost::intrusive_ptr<Expression> onError);
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps);
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+
+    const char* getOpName() const;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final;
+
+    const Expression& getInput() const;
+    const Expression* getRelaxed() const;
+    const Expression* getOnError() const;
+
+private:
+    static constexpr StringData _kInput = "input"_sd;
+    static constexpr int _kInputIdx = 0;
+
+    static constexpr StringData _kRelaxed = "relaxed"_sd;
+    static constexpr int _kRelaxedIdx = 1;
+
+    static constexpr StringData _kOnError = "onError"_sd;
+    static constexpr int _kOnErrorIdx = 2;
+};
+
+class ExpressionDeserializeEJSON : public Expression {
+public:
+    explicit ExpressionDeserializeEJSON(ExpressionContext* expCtx,
+                                        boost::intrusive_ptr<Expression> input,
+                                        boost::intrusive_ptr<Expression> onError);
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps);
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+
+    const char* getOpName() const;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final;
+
+    const Expression& getInput() const;
+    const Expression* getOnError() const;
+
+private:
+    static constexpr StringData _kInput = "input"_sd;
+    static constexpr int _kInputIdx = 0;
+
+    static constexpr StringData _kOnError = "onError"_sd;
+    static constexpr int _kOnErrorIdx = 1;
+};
 
 /**
  * ExpressionEncTextSearch is the base class for all encrypted text search expressions. The first

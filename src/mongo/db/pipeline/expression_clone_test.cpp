@@ -307,7 +307,10 @@ MONGO_INITIALIZER_GENERAL(InitExpressionsForCloneTest, ("EndExpressionRegistrati
         fromjson("{$tsSecond: '$foo'}"),
         fromjson("{$unsetField: {field: 'bar', input: '$foo'}}"),
         fromjson("{$toArray: '$foo'}"),
-        fromjson("{$toObject: '$foo'}")};
+        fromjson("{$toObject: '$foo'}"),
+        fromjson("{$serializeEJSON: {input: '$foo'}}"),
+        fromjson("{$deserializeEJSON: {input: '$foo'}}"),
+    };
 
     // Some expressions in the list above may be disable for one reason or another (e.g., they can
     // be hidden behind a feature flag which is not enabled yet). We will remove such expressions

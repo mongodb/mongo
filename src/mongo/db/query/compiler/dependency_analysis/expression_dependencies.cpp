@@ -216,6 +216,8 @@ public:
     void visit(const ExpressionInternalKeyStringValue*) override {}
     void visit(const ExpressionTestFeatureFlagLatest*) override {}
     void visit(const ExpressionTestFeatureFlagLastLTS*) override {}
+    void visit(const ExpressionSerializeEJSON*) override {}
+    void visit(const ExpressionDeserializeEJSON*) override {}
 };
 
 class DependencyVisitor : public DefaultDependencyVisitor {

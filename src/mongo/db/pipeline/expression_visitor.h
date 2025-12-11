@@ -188,6 +188,8 @@ class ExpressionEncStrNormalizedEq;
 class ExpressionCreateObjectId;
 class ExpressionTestFeatureFlagLatest;
 class ExpressionTestFeatureFlagLastLTS;
+class ExpressionSerializeEJSON;
+class ExpressionDeserializeEJSON;
 
 class AccumulatorAvg;
 class AccumulatorFirstN;
@@ -431,6 +433,8 @@ public:
         expression_walker::MaybeConstPtr<IsConst, ExpressionTestFeatureFlagLatest>) = 0;
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst, ExpressionTestFeatureFlagLastLTS>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSerializeEJSON>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDeserializeEJSON>) = 0;
 };
 
 using ExpressionMutableVisitor = ExpressionVisitor<false>;
@@ -618,5 +622,7 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionCreateObjectId*) override {}
     void visit(const ExpressionTestFeatureFlagLatest*) override {}
     void visit(const ExpressionTestFeatureFlagLastLTS*) override {}
+    void visit(const ExpressionSerializeEJSON*) override {}
+    void visit(const ExpressionDeserializeEJSON*) override {}
 };
 }  // namespace mongo

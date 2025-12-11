@@ -210,7 +210,9 @@ public:
         kUUID,
         kOID,
         kTestFeatureFlagLatest,
-        kTestFeatureFlagLastLTS
+        kTestFeatureFlagLastLTS,
+        kSerializeEJSON,
+        kDeserializeEJSON,
     };
 
     explicit ExpressionHashVisitor(H hashState) : _hashState(std::move(hashState)) {}
@@ -903,6 +905,14 @@ public:
 
     void visit(const ExpressionTestFeatureFlagLastLTS* expr) final {
         combine(OpType::kTestFeatureFlagLastLTS);
+    }
+
+    void visit(const ExpressionSerializeEJSON* expr) final {
+        combine(OpType::kSerializeEJSON);
+    }
+
+    void visit(const ExpressionDeserializeEJSON* expr) final {
+        combine(OpType::kDeserializeEJSON);
     }
 
     H moveHashState() {

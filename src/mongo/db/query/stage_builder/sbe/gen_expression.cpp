@@ -421,6 +421,8 @@ public:
     void visit(const ExpressionCreateObjectId* expr) final {}
     void visit(const ExpressionTestFeatureFlagLatest* expr) final {}
     void visit(const ExpressionTestFeatureFlagLastLTS* expr) final {}
+    void visit(const ExpressionSerializeEJSON*) final {}
+    void visit(const ExpressionDeserializeEJSON*) final {}
 
 private:
     ExpressionVisitorContext* _context;
@@ -615,6 +617,8 @@ public:
     void visit(const ExpressionCreateObjectId* expr) final {}
     void visit(const ExpressionTestFeatureFlagLatest* expr) final {}
     void visit(const ExpressionTestFeatureFlagLastLTS* expr) final {}
+    void visit(const ExpressionSerializeEJSON*) final {}
+    void visit(const ExpressionDeserializeEJSON*) final {}
 
 private:
     ExpressionVisitorContext* _context;
@@ -3454,6 +3458,16 @@ public:
     void visit(const ExpressionCreateObjectId* expr) final {
         // TODO(SERVER-107710): Support $createObjectId in SBE.
         unsupportedExpression("$createObjectId");
+    }
+
+    void visit(const ExpressionSerializeEJSON*) override {
+        // TODO(SERVER-114519): Support $serializeEJSON in SBE.
+        unsupportedExpression("$serializeEJSON");
+    }
+
+    void visit(const ExpressionDeserializeEJSON*) override {
+        // TODO(SERVER-114519): Support $deserializeEJSON in SBE.
+        unsupportedExpression("$deserializeEJSON");
     }
 
     void visit(const ExpressionTsSecond* expr) final {
