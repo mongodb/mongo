@@ -41,7 +41,7 @@ class Command {
 
 /**
  * Insert document command.
- * TODO: SERVER-114584 - This command needs to know if the collection already exists.
+ * TODO: SERVER-114857 - This command needs to know if the collection already exists.
  * The insertion behavior may differ depending on whether the collection is already created.
  */
 class InsertDocCommand extends Command {
