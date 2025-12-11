@@ -189,13 +189,14 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
 
     const auto& collection = collOrViewAcquisition.getCollectionPtr();
     const auto* collator = collection ? collection->getDefaultCollator() : nullptr;
-    auto expCtx =
-        ExpressionContextBuilder{}
-            .fromRequest(opCtx, *findCommand, collator, allowDiskUseByDefault.load())
-            .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
-            .mainCollPathArrayness(
-                collection ? CollectionQueryInfo::get(collection).getPathArrayness() : nullptr)
-            .build();
+    auto expCtx = ExpressionContextBuilder{}
+                      .fromRequest(opCtx, *findCommand, collator, allowDiskUseByDefault.load())
+                      .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
+                      .mainCollPathArrayness(
+                          collection && feature_flags::gFeatureFlagPathArrayness.isEnabled()
+                              ? CollectionQueryInfo::get(collection).getPathArrayness()
+                              : nullptr)
+                      .build();
     expCtx->startExpressionCounters();
     auto parsedRequest = uassertStatusOK(parsed_find_command::parse(
         expCtx,
@@ -532,8 +533,9 @@ public:
                     .explain(verbosity)
                     .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
                     .mainCollPathArrayness(
-                        collectionPtr ? CollectionQueryInfo::get(collectionPtr).getPathArrayness()
-                                      : nullptr)
+                        collectionPtr && feature_flags::gFeatureFlagPathArrayness.isEnabled()
+                            ? CollectionQueryInfo::get(collectionPtr).getPathArrayness()
+                            : nullptr)
                     .build();
             expCtx->startExpressionCounters();
 
