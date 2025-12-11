@@ -70,3 +70,6 @@ filters:
     approvers:
       - 10gen/server-validate
       - 10gen/devprod-correctness
+  - "check_system_buckets_metrics.py":
+    approvers:
+      - 10gen/server-catalog-and-routing

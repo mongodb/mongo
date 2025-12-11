@@ -44,6 +44,8 @@ executor:
         TestData:
           isTimeseriesTestSuite: true
   hooks:
+    # ValidateCollections may issue direct system.buckets commands, so run CheckSystemBucketsMetrics first.
+    - class: CheckSystemBucketsMetrics
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

@@ -2610,6 +2610,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:topology_coordinator",
         "//src/mongo/db/repl:wait_for_majority_service",
         "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/stats:system_buckets_metrics",
         "//src/mongo/db/s:query_analysis_writer",
         "//src/mongo/db/global_catalog/ddl:sessions_collection_config_server",
         "//src/mongo/db/s:sharding_commands_d",

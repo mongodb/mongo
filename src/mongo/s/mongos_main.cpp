@@ -93,6 +93,7 @@
 #include "mongo/db/sharding_environment/sharding_initialization.h"
 #include "mongo/db/sharding_environment/version_mongos.h"
 #include "mongo/db/startup_warnings_common.h"
+#include "mongo/db/stats/system_buckets_metrics.h"
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_refresher.h"
 #include "mongo/db/topology/mongos_topology_coordinator.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -541,6 +542,28 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
 #endif
 }
 
+void initializeCommandHooks(ServiceContext* service) {
+    class MongosCommandInvocationHooks final : public CommandInvocationHooks {
+    public:
+        void onBeforeRun(OperationContext* opCtx, CommandInvocation* invocation) override {
+            _transportHook.onBeforeRun(opCtx, invocation);
+            _systemBucketsHook.onBeforeRun(opCtx, invocation);
+        }
+
+        void onAfterRun(OperationContext* opCtx,
+                        CommandInvocation* invocation,
+                        rpc::ReplyBuilderInterface* response) override {
+            _transportHook.onAfterRun(opCtx, invocation, response);
+            _systemBucketsHook.onAfterRun(opCtx, invocation, response);
+        }
+
+        transport::IngressHandshakeMetricsCommandHooks _transportHook{};
+        SystemBucketsMetricsCommandHooks _systemBucketsHook{};
+    };
+
+    CommandInvocationHooks::set(service, std::make_unique<MongosCommandInvocationHooks>());
+}
+
 Status initializeSharding(
     OperationContext* opCtx,
     std::shared_ptr<ReplicaSetChangeNotifier::Listener>* replicaSetChangeListener,
@@ -834,8 +857,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
                       "error"_attr = redact(ex));
     }
 
-    CommandInvocationHooks::set(serviceContext,
-                                std::make_unique<transport::IngressHandshakeMetricsCommandHooks>());
+    initializeCommandHooks(serviceContext);
 
     // Must happen before FTDC, because Periodic Metadata Collustion calls getClusterParameter
     ClusterServerParameterRefresher::start(serviceContext, opCtx);

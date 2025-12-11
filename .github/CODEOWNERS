@@ -288,6 +288,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/rotate_execution_control_params.py @10gen/server-workload-resilience @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/fuzz_runtime_parameters.py @10gen/server-programmability @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/validate.py @10gen/devprod-correctness @10gen/server-validate @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/check_system_buckets_metrics.py @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/testing/testcases/OWNERS.yml
 /buildscripts/resmokelib/testing/testcases/**/query_tester_server_test.py @10gen/query-optimization @svc-auto-approve-bot
@@ -2864,6 +2865,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/stats/**/server_write_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /src/mongo/db/stats/**/api_version_metrics* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/stats/**/change_stream* @10gen/query-execution-change-streams @svc-auto-approve-bot
+/src/mongo/db/stats/**/system_buckets_metrics* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/storage/OWNERS.yml
 /src/mongo/db/storage/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot

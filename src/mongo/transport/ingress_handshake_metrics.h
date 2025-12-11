@@ -124,7 +124,7 @@ private:
  * An implementation of CommandInvocationHooks that ensures IngressHandshakeMetrics::onCommand will
  * be called for each command.
  */
-class IngressHandshakeMetricsCommandHooks : public CommandInvocationHooks {
+class IngressHandshakeMetricsCommandHooks final : public CommandInvocationHooks {
 public:
     void onBeforeRun(OperationContext* opCtx, CommandInvocation* invocation) override;
 

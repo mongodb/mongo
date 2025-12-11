@@ -31,3 +31,6 @@ filters:
   - "change_stream*":
     approvers:
       - 10gen/query-execution-change-streams
+  - "system_buckets_metrics*":
+    approvers:
+      - 10gen/server-catalog-and-routing

@@ -88,6 +88,19 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "system_buckets_metrics",
+    srcs = [
+        "system_buckets_metrics.cpp",
+    ],
+    hdrs = [
+        "system_buckets_metrics.h",
+    ],
+    deps = [
+        "//src/mongo/db:commands",
+    ],
+)
+
+mongo_cc_library(
     name = "transaction_stats",
     srcs = [
         "single_transaction_stats.cpp",

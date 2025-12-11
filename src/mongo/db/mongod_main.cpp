@@ -186,6 +186,7 @@
 #include "mongo/db/sharding_environment/sharding_ready.h"
 #include "mongo/db/startup_recovery.h"
 #include "mongo/db/startup_warnings_mongod.h"
+#include "mongo/db/stats/system_buckets_metrics.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/disk_space_monitor.h"
@@ -404,24 +405,28 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
     class MongodCommandInvocationHooks final : public CommandInvocationHooks {
     public:
         void onBeforeRun(OperationContext* opCtx, CommandInvocation* invocation) override {
-            _nextHook.onBeforeRun(opCtx, invocation);
+            _transportHook.onBeforeRun(opCtx, invocation);
+            _systemBucketsHook.onBeforeRun(opCtx, invocation);
         }
 
         void onBeforeAsyncRun(std::shared_ptr<RequestExecutionContext> rec,
                               CommandInvocation* invocation) override {
-            _nextHook.onBeforeAsyncRun(rec, invocation);
+            _transportHook.onBeforeAsyncRun(rec, invocation);
+            _systemBucketsHook.onBeforeAsyncRun(rec, invocation);
         }
 
         void onAfterRun(OperationContext* opCtx,
                         CommandInvocation* invocation,
                         rpc::ReplyBuilderInterface* response) override {
-            _nextHook.onAfterRun(opCtx, invocation, response);
+            _transportHook.onAfterRun(opCtx, invocation, response);
+            _systemBucketsHook.onAfterRun(opCtx, invocation, response);
             _onAfterRunImpl(opCtx);
         }
 
         void onAfterAsyncRun(std::shared_ptr<RequestExecutionContext> rec,
                              CommandInvocation* invocation) override {
-            _nextHook.onAfterAsyncRun(rec, invocation);
+            _transportHook.onAfterAsyncRun(rec, invocation);
+            _systemBucketsHook.onAfterAsyncRun(rec, invocation);
             _onAfterRunImpl(rec->getOpCtx());
         }
 
@@ -431,7 +436,8 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
             MirrorMaestro::onReceiveMirroredRead(opCtx);
         }
 
-        transport::IngressHandshakeMetricsCommandHooks _nextHook{};
+        transport::IngressHandshakeMetricsCommandHooks _transportHook{};
+        SystemBucketsMetricsCommandHooks _systemBucketsHook{};
     };
 
     CommandInvocationHooks::set(serviceContext, std::make_unique<MongodCommandInvocationHooks>());
