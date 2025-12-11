@@ -33,6 +33,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace detail {

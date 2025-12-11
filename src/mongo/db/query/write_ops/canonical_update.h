@@ -43,6 +43,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>
@@ -70,7 +71,7 @@ class UpdateRequest;
  * The query part of the update is parsed to a CanonicalQuery, which is originally a
  * ParsedFindCommand.
  */
-class CanonicalUpdate {
+class MONGO_MOD_PUBLIC CanonicalUpdate {
     CanonicalUpdate(const CanonicalUpdate&) = delete;
     CanonicalUpdate& operator=(const CanonicalUpdate&) = delete;
 

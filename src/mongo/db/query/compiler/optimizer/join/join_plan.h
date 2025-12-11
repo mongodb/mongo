@@ -31,6 +31,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/util/modules.h"
 
 #include <variant>
 
