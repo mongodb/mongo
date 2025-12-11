@@ -29,17 +29,19 @@
 
 #pragma once
 
+#include "mongo/db/feature_flag.h"
 #include "mongo/util/modules.h"
 
 #include <string>
 
 namespace mongo::extension::host {
 /**
- * The file aggregation_stage_stub_parsers.json contains a list of aggregation stage names with a
- * message per stage name. registerUnloadedExtensionStubParsers() reads that file and registers each
- * stub parser via registerStubParser(). When one of these stages is specified by the user, the stub
- * parser will immediately raise an error and include the provided message rather than the generic
- * "unrecognized stage" message.
+ * The file aggregation_stage_fallback_parsers.json contains a list of aggregation stage names with
+ * a message per stage name and an optional feature flag. registerUnloadedExtensionStubParsers()
+ * reads that file and registers each stub parser via registerStubParser(). When one of these stages
+ * is specified by the user and the feature flag is disabled (or no primary parser is registered),
+ * the stub parser will immediately raise an error and include the provided message rather than the
+ * generic "unrecognized stage" message.
  *
  * We do this in order to provide helpful error messages to users in situations where specific
  * extensions are not loaded. These stub parsers are specified in a file outside of the server
@@ -49,8 +51,11 @@ namespace mongo::extension::host {
 void registerUnloadedExtensionStubParsers();
 
 /**
- * Register stub parsers for an extension stage that is not loaded. This is useful when deploying a
- * cluster that may not have extensions loaded but could restart to load extensions later.
+ * Register a fallback stub parser for an extension stage that is not loaded. This is useful when
+ * deploying a cluster that may not have extensions loaded but could restart to load extensions
+ * later.
  */
-void registerStubParser(std::string stageName, std::string message);
+void registerStubParser(std::string stageName,
+                        std::string message,
+                        FeatureFlag* featureFlag = nullptr);
 }  // namespace mongo::extension::host

@@ -42,7 +42,6 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/shared_library.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 
@@ -121,25 +120,18 @@ host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
 stdx::unordered_map<std::string, LoadedExtension> ExtensionLoader::loadedExtensions;
 
 bool loadExtensions(const std::vector<std::string>& extensionNames) {
-    const bool featureFlagExtensionsAPIEnabled =
-        feature_flags::gFeatureFlagExtensionsAPI.isEnabled();
-
-    ON_BLOCK_EXIT([&] {
-        if (featureFlagExtensionsAPIEnabled) {
-            registerUnloadedExtensionStubParsers();
+    if (!feature_flags::gFeatureFlagExtensionsAPI.isEnabled()) {
+        if (!extensionNames.empty()) {
+            LOGV2_ERROR(10668500,
+                        "Extensions are not allowed with the current configuration. You may need "
+                        "to enable featureFlagExtensionsAPI.");
+            return false;
         }
-    });
-
-    if (extensionNames.empty()) {
         return true;
     }
 
-    if (!featureFlagExtensionsAPIEnabled) {
-        LOGV2_ERROR(10668500,
-                    "Extensions are not allowed with the current configuration. You may need to "
-                    "enable featureFlagExtensionsAPI.");
-        return false;
-    }
+    // Register fallback stub parsers before loading extensions.
+    registerUnloadedExtensionStubParsers();
 
     for (const auto& extension : extensionNames) {
         LOGV2(10668501, "Loading extension", "extensionName"_attr = extension);

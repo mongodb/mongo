@@ -451,13 +451,12 @@ TEST_F(LoadExtensionsTest, LoadStubParser) {
     ASSERT_THROWS_WHAT(Pipeline::parse(pipeline, expCtx), AssertionException, errorMsg);
 }
 
-TEST_F(LoadExtensionsTest, LoadStubParserSilentlySkipsIfExists) {
-    // Register stub parsers for $match. This should silently skip the registration since $match is
-    // already registered.
-    registerStubParser("$match", "This should not work since $match is already registered.");
-
-    std::vector<BSONObj> pipeline = {BSON("$match" << BSON("x" << 1))};
-    ASSERT_DOES_NOT_THROW(Pipeline::parse(pipeline, expCtx));
+DEATH_TEST_F(LoadExtensionsTestDeathTest,
+             LoadStubParserFailsIfPrimaryAlreadyRegistered,
+             "11395100") {
+    // Attempting to register a fallback stub parser for $match should fail because fallback parsers
+    // must be registered before primary parsers.
+    registerStubParser("$match", "This should fail since $match is already registered.");
 }
 
 /*
