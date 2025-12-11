@@ -1,3 +1,0 @@
-base_suite: sharding_jscore_passthrough
-overrides:
-  - "execution_control_params.enable_prioritization"

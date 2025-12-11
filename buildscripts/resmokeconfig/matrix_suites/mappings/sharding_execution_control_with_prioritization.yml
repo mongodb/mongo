@@ -1,3 +1,0 @@
-base_suite: sharding
-overrides:
-  - "execution_control_params.enable_prioritization_testdata_parameter"
