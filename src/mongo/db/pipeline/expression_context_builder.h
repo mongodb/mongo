@@ -77,7 +77,6 @@ public:
     ExpressionContextBuilder& inLookup(bool);
     ExpressionContextBuilder& inUnionWith(bool);
     ExpressionContextBuilder& isParsingViewDefinition(bool);
-    ExpressionContextBuilder& isParsingPipelineUpdate(bool);
     ExpressionContextBuilder& isParsingCollectionValidator(bool);
     ExpressionContextBuilder& isIdHackQuery(bool);
     ExpressionContextBuilder& isFleQuery(bool);

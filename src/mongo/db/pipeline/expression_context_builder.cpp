@@ -174,12 +174,6 @@ ExpressionContextBuilder& ExpressionContextBuilder::isParsingViewDefinition(
     return *this;
 }
 
-ExpressionContextBuilder& ExpressionContextBuilder::isParsingPipelineUpdate(
-    bool isParsingPipelineUpdate) {
-    params.isParsingPipelineUpdate = isParsingPipelineUpdate;
-    return *this;
-}
-
 ExpressionContextBuilder& ExpressionContextBuilder::isParsingCollectionValidator(
     bool isParsingCollectionValidator) {
     params.isParsingCollectionValidator = isParsingCollectionValidator;

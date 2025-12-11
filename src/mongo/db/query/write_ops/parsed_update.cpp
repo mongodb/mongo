@@ -139,12 +139,10 @@ void parseUpdate(boost::intrusive_ptr<ExpressionContext> expCtx, ParsedUpdate& p
         parsedUpdate.driver->setSkipDotsDollarsCheck(true);
     }
 
-    expCtx->setIsParsingPipelineUpdate(true);
     parsedUpdate.driver->parse(*parsedUpdate.modification,
                                *parsedUpdate.arrayFilters,
                                parsedUpdate.request->getUpdateConstants(),
                                parsedUpdate.request->isMulti());
-    expCtx->setIsParsingPipelineUpdate(false);
 }
 
 /**

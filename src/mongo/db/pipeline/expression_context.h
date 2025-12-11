@@ -709,14 +709,6 @@ public:
         _params.isParsingViewDefinition = isParsingViewDefinition;
     }
 
-    bool getIsParsingPipelineUpdate() const {
-        return _params.isParsingPipelineUpdate;
-    }
-
-    void setIsParsingPipelineUpdate(bool isParsingPipelineUpdate) {
-        _params.isParsingPipelineUpdate = isParsingPipelineUpdate;
-    }
-
     bool getIsParsingCollectionValidator() const {
         return _params.isParsingCollectionValidator;
     }
@@ -1132,8 +1124,6 @@ protected:
         bool inUnionWith = false;
         // True if this ExpressionContext is used to parse a view definition pipeline.
         bool isParsingViewDefinition = false;
-        // True if this ExpressionContext is being used to parse an update pipeline.
-        bool isParsingPipelineUpdate = false;
         // True if this ExpressionContext is used to parse a collection validator expression.
         bool isParsingCollectionValidator = false;
         // These fields can be used in a context when API version validations were not enforced

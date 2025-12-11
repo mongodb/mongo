@@ -124,10 +124,6 @@ InternalSearchMongotRemoteSpec prepareInternalSearchMetaMongotSpec(
         return internalSpec;
     }
 
-    uassert(6600901,
-            "Running $searchMeta command in non-allowed context (update pipeline)",
-            !expCtx->getIsParsingPipelineUpdate());
-
     // If 'searchReturnEofImmediately' is set, we return this stage as is because we don't expect to
     // return any results. More precisely, we wish to avoid calling 'planShardedSearch' when no
     // mongot is set up.
