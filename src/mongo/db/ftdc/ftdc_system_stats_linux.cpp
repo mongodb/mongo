@@ -180,7 +180,7 @@ public:
     std::vector<StringData>& get_strings() {
         if (!_names.has_value()) {
             auto drvinfo = get_info();
-            _get_strings(drvinfo->n_stats);
+            _get_strings(drvinfo.has_value() ? drvinfo->n_stats : 0);
         }
 
         return _names.get();
