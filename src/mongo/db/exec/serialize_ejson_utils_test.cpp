@@ -193,6 +193,104 @@ const TestCase testCases[]{
     {MAXKEY, BSON("$maxKey" << 1), BSON("$maxKey" << 1), JsonCompatible::no},
 };
 
+const Value invalidExtendedJsonTestCases[]{
+    // minKey
+    Value(BSON("$minKey" << 0)),
+    Value(BSON("$minKey" << 1 << "extra" << "field")),
+    Value(BSON("extra" << "field" << "$minKey" << 1)),
+    // numberDouble
+    Value(BSON("$numberDouble" << 0)),
+    Value(BSON("$numberDouble" << "inf"_sd)),
+    Value(BSON("$numberDouble" << "infinity"_sd)),
+    Value(BSON("$numberDouble" << "-inf"_sd)),
+    Value(BSON("$numberDouble" << "-infinity"_sd)),
+    Value(BSON("$numberDouble" << "nan"_sd)),
+    Value(BSON("$numberDouble" << "bad"_sd)),
+    Value(BSON("extra" << "field" << "$numberDouble" << "0")),
+    // binData
+    Value(BSON("$binary" << 0)),
+    Value(BSON("$binary" << BSON("base64" << "MTIz"))),
+    Value(BSON("$binary" << BSON("base64" << "MTIz" << "subType" << ""))),
+    Value(BSON("$binary" << BSON("subType" << ""))),
+    Value(BSON("$binary" << BSON("base64" << "MTIz" << "subType" << "444"))),
+    Value(BSON("$binary" << BSON("base64" << "????" << "subType" << "4"))),
+    Value(BSON("$binary" << BSON("base64" << "MTIz" << "subType" << "4" << "extra" << "field"))),
+    Value(BSON("extra" << "field" << "$binary" << "")),
+    Value(BSON("extra" << "field" << "$uuid" << "")),
+    // undefined
+    Value(BSON("$undefined" << false)),
+    Value(BSON("$undefined" << 0)),
+    Value(BSON("extra" << "field" << "$undefined" << true)),
+    // oid
+    Value(BSON("$oid" << "foobar")),
+    Value(BSON("$oid" << 0)),
+    Value(BSON("extra" << "field" << "$oid" << 0)),
+    // date
+    Value(BSON("$date" << "invalid")),
+    Value(BSON("$date" << 0)),
+    Value(BSON("extra" << "field" << "$date" << 0)),
+    // regEx
+    Value(BSON("$regularExpression" << 0)),
+    Value(BSON("$regularExpression" << BSON("pattern" << "foo*"))),
+    Value(BSON("$regularExpression" << BSON("options" << "ig"))),
+    Value(BSON("$regularExpression"
+               << BSON("pattern" << "foo*" << "options" << "ig" << "extra" << "field"))),
+    Value(BSON("extra" << "field" << "$regularExpression"
+                       << BSON("pattern" << "foo*" << "options" << "ig"))),
+    // dbRef
+    Value(BSON("$dbPointer" << BSON("$ref" << "collection" << "$id" << "invalid"))),
+    Value(BSON("$dbPointer" << BSON("$ref" << "collection"))),
+    Value(BSON("$dbPointer" << BSON("$id" << "57e193d7a9cc81b4027498b1"))),
+    Value(BSON("$dbPointer" << BSON("$ref" << "collection" << "$id" << "57e193d7a9cc81b4027498b1"
+                                           << "extra" << "field"))),
+    Value(BSON("extra" << "field" << "$dbPointer"
+                       << BSON("$ref" << "collection" << "$id" << "57e193d7a9cc81b4027498b1"))),
+    // code
+    Value(BSON("$code" << 0)),
+    Value(BSON("extra" << "field" << "$code" << "code")),
+    // symbol
+    Value(BSON("$symbol" << 0)),
+    Value(BSON("extra" << "field" << "$symbol" << "symbol")),
+    // codeWScope
+    Value(BSON("$code" << 0 << "$scope" << BSON("n" << BSON("$numberInt" << "5")))),
+    Value(BSON("$code" << "function() {}" << "$scope" << 0)),
+    Value(BSON("$code" << "function() {}" << "$scope"
+                       << BSON("n" << BSON("$numberInt" << "invalid")))),
+    Value(BSON("$code" << "function() {}" << "$scope" << BSON("n" << BSON("$numberInt" << "5"))
+                       << "extra" << "field")),
+    Value(BSON("extra" << "field" << "$code" << "function() {}" << "$scope"
+                       << BSON("n" << BSON("$numberInt" << "5")))),
+    Value(BSON("$code" << "function() {}" << "extra" << "field" << "$scope"
+                       << BSON("n" << BSON("$numberInt" << "5")))),
+    // numberInt
+    Value(BSON("$numberInt" << 42)),
+    Value(BSON("$numberInt" << "bad")),
+    Value(BSON("extra" << "field" << "$numberInt" << "42")),
+    // timestamp
+    Value(BSON("$timestamp" << BSON("t" << 42))),
+    Value(BSON("$timestamp" << BSON("i" << 1))),
+    Value(BSON("$timestamp" << BSON("t" << "42" << "i" << 1))),
+    Value(BSON("$timestamp" << BSON("t" << 42 << "i" << "1"))),
+    Value(BSON("$timestamp" << BSON("t" << 42 << "i" << 1 << "extra" << "field"))),
+    Value(BSON("extra" << "field" << "$timestamp" << BSON("t" << 42 << "i" << 1))),
+    // numberLong
+    Value(BSON("$numberLong" << 42)),
+    Value(BSON("$numberLong" << "bad")),
+    Value(BSON("extra" << "field" << "$numberLong" << "42")),
+    // numberDecimal
+    Value(BSON("$numberDecimal" << 42)),
+    Value(BSON("$numberDecimal" << "inf")),
+    Value(BSON("$numberDecimal" << "infinity")),
+    Value(BSON("$numberDecimal" << "-inf")),
+    Value(BSON("$numberDecimal" << "-infinity")),
+    Value(BSON("$numberDecimal" << "nan")),
+    Value(BSON("$numberDecimal" << "bad")),
+    Value(BSON("extra" << "field" << "$numberDecimal" << "42")),
+    // maxKey
+    Value(BSON("$maxKey" << 0)),
+    Value(BSON("extra" << "field" << "$maxKey" << 1)),
+};
+
 /**
  * Generate Extended JSON string using the native BSONObj method.
  * This is considered the golden truth value.
@@ -279,6 +377,69 @@ TEST(SerializeExtendedJsonUtilsTest, SerializeThrowsOnSizeLimit) {
     // Throws because of added type wrapper {$numberInt: "1"}.
     ASSERT_THROWS_CODE(
         serializeToExtendedJson(largeValue, false), DBException, ErrorCodes::ConversionFailure);
+}
+
+TEST(SerializeExtendedJsonUtilsTest, DeserializeSucceedsOnTestCases) {
+    for (auto& tc : testCases) {
+        auto testFromCanonical = deserializeFromExtendedJson(tc.canonical);
+        auto testFromRelaxed = deserializeFromExtendedJson(tc.relaxed);
+
+        ASSERT_VALUE_EQ(testFromCanonical, tc.bson);
+        ASSERT_VALUE_EQ(testFromRelaxed, tc.bson);
+    }
+}
+
+// Keys within Relaxed Extended JSON type wrapper objects are unordered, therefore we should allow
+// either order for ScopeWCode.
+TEST(SerializeExtendedJsonUtilsTest, DeserializeSucceedsScopeWCode) {
+    // Canonical CodeWScope input.
+    ASSERT_VALUE_EQ(
+        deserializeFromExtendedJson(Value(BSON("$code" << "function" << "$scope" << BSONObj()))),
+        Value(BSONCodeWScope("function", BSONObj())));
+    // Reversed $scope and $code allowed by Relaxed Extended JSON v2.
+    ASSERT_VALUE_EQ(
+        deserializeFromExtendedJson(Value(BSON("$scope" << BSONObj() << "$code" << "function"))),
+        Value(BSONCodeWScope("function", BSONObj())));
+}
+
+TEST(SerializeExtendedJsonUtilsTest, DeserializeIsNoopWhenAlreadyNonEJSON) {
+    for (const auto& value : testCases) {
+        if (value.jsonCompatible == JsonCompatible::yes) {
+            ASSERT_VALUE_EQ(value.bson, deserializeFromExtendedJson(value.bson));
+        } else {
+            // Check that BSON-only input fails on deserialize.
+            // Not using ASSERT_THROWS_CODE since it doesn't provide an output stream.
+            try {
+                deserializeFromExtendedJson(value.bson);
+            } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
+                // continue
+            } catch (const std::exception& e) {
+                FAIL("Expected to fail with ConversionFailure when deserializing")
+                    << value.bson << " failed with " << e.what() << " instead";
+            }
+        }
+    }
+}
+
+// Test that incorrect input fails with ConversionFailures.
+TEST(SerializeExtendedJsonUtilsTest, DeserializeFailsWithConversionFailureOnInvalidInput) {
+    for (const auto& value : invalidExtendedJsonTestCases) {
+        // Check that invalid input fails on deserialize.
+        // Not using ASSERT_THROWS_CODE since it doesn't provide an output stream.
+        try {
+            deserializeFromExtendedJson(value);
+            FAIL("Expected to fail when deserializing") << value;
+        } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
+            // continue
+        } catch (const std::exception& e) {
+            FAIL("Expected to fail with ConversionFailure when deserializing")
+                << value << " failed with " << e.what() << " instead";
+        }
+    }
+}
+
+TEST(SerializeExtendedJsonUtilsTest, DeserializeThrowsOnMissingValues) {
+    ASSERT_THROWS_CODE(deserializeFromExtendedJson(Value()), DBException, ErrorCodes::BadValue);
 }
 
 }  // namespace

@@ -40,7 +40,15 @@ namespace mongo::exec::expression::serialize_ejson_utils {
  * The 'value' cannot be missing/BSONType::eoo. The parameter 'relaxed' selects between the Relaxed
  * and Canonical specification.
  * Note: In Relaxed mode, the types of numeric values are preserved in the result.
+ * This transformation can be reversed by deserializeFromExtendedJson.
  */
 Value serializeToExtendedJson(const Value& value, bool relaxed);
+
+/**
+ * Transform an Extended JSON-compatible description of a BSON value back into BSON.
+ * The input 'value' can represent either Relaxed Extended JSON or Canonical Extended JSON.
+ * The 'value' cannot be missing/BSONType::eoo. This is the reverse of serializeToExtendedJson.
+ */
+Value deserializeFromExtendedJson(const Value& value);
 
 }  // namespace mongo::exec::expression::serialize_ejson_utils
