@@ -68,11 +68,10 @@ public:
           _timeseries(timeseries),
           _mergeShardId(std::move(mergeShardId)) {
         // TODO(SERVER-112816): The viewless timeseries feature flag should not be checked here,
-        // since $out has no FCV stability guarantee after we release this FixedOperationFCVRegion,
-        // and we do not support long-running operations to acquiring an OFCV yet.
-        VersionContext::FixedOperationFCVRegion fixedOfcvRegion(pExpCtx->getOperationContext());
+        // since $out has no FCV stability guarantee (and we can't acquire an Operation FCV,
+        // because it does not support long-running operations yet.)
         _viewlessTimeseriesEnabled = gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
-            VersionContext::getDecoration(pExpCtx->getOperationContext()));
+            VersionContext(serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     }
 
 private:
