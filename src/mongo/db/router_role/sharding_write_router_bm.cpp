@@ -102,6 +102,9 @@ public:
         auto serviceContext = service.get();
         setGlobalServiceContext(std::move(service));
 
+        // (Generic FCV reference): Test latest FCV behavior.
+        serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+
         setupCatalogCacheMock(serviceContext, _withShardedCollection);
     }
 
