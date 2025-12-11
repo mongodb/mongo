@@ -29,9 +29,13 @@
 
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
+#include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry_mock.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_mock.h"
 #include "mongo/unittest/golden_test.h"
@@ -49,6 +53,36 @@ QuerySolutionMap cloneSolnMap(const QuerySolutionMap& qsm) {
         ret.insert({cq, std::move(newQs)});
     }
     return ret;
+}
+
+IndexDescriptor makeIndexDescriptor(BSONObj indexSpec) {
+
+    IndexSpec spec;
+    spec.version(2).name("name").addKeys(indexSpec);
+    return IndexDescriptor(IndexNames::BTREE, spec.toBSON());
+}
+
+IndexCatalogEntryMock makeIndexCatalogEntry(BSONObj indexSpec) {
+    return IndexCatalogEntryMock{nullptr /*opCtx*/,
+                                 CollectionPtr{},
+                                 "" /*ident*/,
+                                 makeIndexDescriptor(indexSpec),
+                                 false /*isFrozen*/};
+}
+
+IndexCatalogMock makeIndexCatalog(const std::vector<BSONObj>& keyPatterns) {
+    IndexCatalogMock catalog;
+    for (auto&& kp : keyPatterns) {
+        catalog.createIndexEntry(nullptr, nullptr, makeIndexDescriptor(kp), {});
+    }
+    return catalog;
+}
+
+std::vector<std::shared_ptr<const IndexCatalogEntry>> makeIndexCatalogEntries(
+    const std::vector<BSONObj>& keyPatterns) {
+    auto ic = makeIndexCatalog(keyPatterns);
+    std::vector<std::shared_ptr<const IndexCatalogEntry>> idxs(keyPatterns.size());
+    return ic.getEntriesShared(IndexCatalog::InclusionPolicy::kReady);
 }
 
 class ReorderGraphTest : public JoinOrderingTestFixture {
@@ -69,28 +103,17 @@ protected:
         auto cs = makeCollScanPlan(nss, cq->getPrimaryMatchExpression()->clone());
         auto p = std::pair<mongo::CanonicalQuery*, std::unique_ptr<mongo::QuerySolution>>{
             cq.get(), std::move(cs)};
-        solnsPerQuery.insert(std::move(p));
-        idxMap.insert({nss, std::move(params.indexes)});
-
+        jCtx.cbrCqQsns.insert(std::move(p));
+        jCtx.perCollIdxs.emplace(nss, makeIndexCatalogEntries(std::move(params.indexes)));
         return *graph.addNode(nss, std::move(cq), params.embedPath);
     }
 
     void outputSolutions(std::ostream& out) {
-        // Setup collections.
-        for (auto&& nss : namespaces) {
-            createCollection(nss);
-            if (auto it = idxMap.find(nss); it != idxMap.end()) {
-                ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-                    operationContext(), nss, it->second));
-            }
-        }
-        auto mca = multipleCollectionAccessor(operationContext(), namespaces);
-
         // Ensure each solution has a different base node.
         std::set<NodeId> baseNodes;
         for (auto seed : seeds) {
-            auto r = constructSolutionWithRandomOrder(
-                cloneSolnMap(solnsPerQuery), graph, resolvedPaths, mca, seed);
+            auto clonedMap = cloneSolnMap(jCtx.cbrCqQsns);
+            auto r = constructSolutionWithRandomOrder(jCtx, seed);
             ASSERT(r.soln);
             // Ensure our seeds produce different base collections.
             ASSERT(!baseNodes.contains(r.baseNode));
@@ -100,14 +123,6 @@ protected:
             out << r.soln->toString() << std::endl;
         }
     }
-
-    JoinGraph graph;
-    std::vector<std::unique_ptr<CanonicalQuery>> cqs;
-    QuerySolutionMap solnsPerQuery;
-    std::vector<ResolvedPath> resolvedPaths;
-    std::vector<int> seeds;
-    std::vector<NamespaceString> namespaces;
-    std::map<NamespaceString, std::vector<BSONObj>> idxMap;
 };
 
 TEST_F(ReorderGraphTest, SimpleGraph) {
@@ -164,15 +179,9 @@ TEST_F(ReorderGraphTest, SimpleINLJ) {
 
     // Create namespaces with indexes.
     auto id1 = addNssWithEmbedding(
-        {.collName = "a",
-         .embedPath = {},
-         .filter = {},
-         .indexes = {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}});
+        {.collName = "a", .embedPath = {}, .filter = {}, .indexes = {BSON("a" << 1)}});
     auto id2 = addNssWithEmbedding(
-        {.collName = "b",
-         .embedPath = FieldPath{"b"},
-         .filter = {},
-         .indexes = {BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1))}});
+        {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {BSON("b" << 1)}});
 
     resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
@@ -193,15 +202,9 @@ TEST_F(ReorderGraphTest, SimpleINLJSwapEdge) {
 
     // Create namespaces with indexes.
     auto id1 = addNssWithEmbedding(
-        {.collName = "a",
-         .embedPath = {},
-         .filter = {},
-         .indexes = {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}});
+        {.collName = "a", .embedPath = {}, .filter = {}, .indexes = {BSON("a" << 1)}});
     auto id2 = addNssWithEmbedding(
-        {.collName = "b",
-         .embedPath = FieldPath{"b"},
-         .filter = {},
-         .indexes = {BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1))}});
+        {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {BSON("b" << 1)}});
 
     resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
@@ -227,15 +230,9 @@ TEST_F(ReorderGraphTest, MultipleINLJ) {
 
     auto id1 = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
     auto id2 = addNssWithEmbedding(
-        {.collName = "b",
-         .embedPath = FieldPath{"b"},
-         .filter = {},
-         .indexes = {BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1))}});
+        {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {BSON("b" << 1)}});
     auto id3 = addNssWithEmbedding(
-        {.collName = "c",
-         .embedPath = FieldPath{"c"},
-         .filter = {},
-         .indexes = {BSON("v" << 2 << "name" << "c_1" << "key" << BSON("c" << 1))}});
+        {.collName = "c", .embedPath = FieldPath{"c"}, .filter = {}, .indexes = {BSON("c" << 1)}});
 
     resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
@@ -295,17 +292,13 @@ TEST_F(ReorderGraphTest, INLJResidualPred) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
 
     auto id1 = addNssWithEmbedding(
-        {.collName = "a",
-         .embedPath = {},
-         .filter = {},
-         .indexes = {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}});
+        {.collName = "a", .embedPath = {}, .filter = {}, .indexes = {BSON("a" << 1)}});
 
     BSONObj filter = fromjson("{b: {$gt: 5}}");
-    auto id2 = addNssWithEmbedding(
-        {.collName = "b",
-         .embedPath = FieldPath{"b"},
-         .filter = filter,
-         .indexes = {BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1))}});
+    auto id2 = addNssWithEmbedding({.collName = "b",
+                                    .embedPath = FieldPath{"b"},
+                                    .filter = filter,
+                                    .indexes = {BSON("b" << 1)}});
 
     resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
@@ -325,16 +318,12 @@ TEST_F(ReorderGraphTest, INLJUseIndexPrefix) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
 
     auto id1 = addNssWithEmbedding(
-        {.collName = "a",
-         .embedPath = {},
-         .filter = {},
-         .indexes = {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}});
+        {.collName = "a", .embedPath = {}, .filter = {}, .indexes = {BSON("a" << 1)}});
 
     auto id2 = addNssWithEmbedding({.collName = "b",
                                     .embedPath = FieldPath{"b"},
                                     .filter = {},
-                                    .indexes = {BSON("v" << 2 << "name" << "b_1_c_1" << "key"
-                                                         << BSON("b" << 1 << "c" << 1))}});
+                                    .indexes = {BSON("b" << 1 << "c" << 1)}});
 
     resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
@@ -354,15 +343,11 @@ TEST_F(ReorderGraphTest, AvoidINLJOverIneligibleIndex) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
 
     auto id1 = addNssWithEmbedding(
-        {.collName = "a",
-         .embedPath = {},
-         .filter = {},
-         .indexes = {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}});
+        {.collName = "a", .embedPath = {}, .filter = {}, .indexes = {BSON("a" << 1)}});
     auto id2 = addNssWithEmbedding({.collName = "b",
                                     .embedPath = FieldPath{"c"},
                                     .filter = {},
-                                    .indexes = {BSON("v" << 2 << "name" << "b_1_c_1" << "key"
-                                                         << BSON("b" << 1 << "c" << 1))}});
+                                    .indexes = {BSON("b" << 1 << "c" << 1)}});
 
     resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
@@ -381,16 +366,12 @@ TEST_F(ReorderGraphTest, INLJCompoundJoinPredicate) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
 
     auto id1 = addNssWithEmbedding(
-        {.collName = "a",
-         .embedPath = {},
-         .filter = {},
-         .indexes = {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1))}});
+        {.collName = "a", .embedPath = {}, .filter = {}, .indexes = {BSON("a" << 1)}});
 
     auto id2 = addNssWithEmbedding({.collName = "b",
                                     .embedPath = FieldPath{"b"},
                                     .filter = {},
-                                    .indexes = {BSON("v" << 2 << "name" << "c_1_d_1" << "key"
-                                                         << BSON("c" << 1 << "d" << 1))}});
+                                    .indexes = {BSON("c" << 1 << "d" << 1)}});
 
     resolvedPaths = {
         ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
@@ -408,20 +389,6 @@ TEST_F(ReorderGraphTest, INLJCompoundJoinPredicate) {
     outputSolutions(goldenCtx.outStream());
 }
 
-IndexDescriptor makeIndexDescriptor(BSONObj indexSpec) {
-    IndexSpec spec;
-    spec.version(2).name("name").addKeys(indexSpec);
-    return IndexDescriptor(IndexNames::BTREE, spec.toBSON());
-}
-
-IndexCatalogEntryMock makeIndexEntry(BSONObj indexSpec) {
-    return IndexCatalogEntryMock{nullptr /*opCtx*/,
-                                 CollectionPtr{},
-                                 "" /*ident*/,
-                                 makeIndexDescriptor(indexSpec),
-                                 false /*isFrozen*/};
-}
-
 IndexedJoinPredicate makeIndexedPredicate(std::string path) {
     return IndexedJoinPredicate{
         .op = QSNJoinPredicate::ComparisonOp::Eq,
@@ -429,100 +396,89 @@ IndexedJoinPredicate makeIndexedPredicate(std::string path) {
     };
 }
 
-IndexCatalogMock makeIndexCatalog(std::vector<std::string> keyPatterns) {
-    IndexCatalogMock catalog;
-    for (auto&& kp : keyPatterns) {
-        catalog.createIndexEntry(nullptr, nullptr, makeIndexDescriptor(fromjson(kp)), {});
-    }
-    return catalog;
-}
-
 TEST(IndexSatisfiesJoinPredicates, CompoundIndex) {
-    ASSERT_TRUE(
-        indexSatisfiesJoinPredicates(makeIndexEntry(fromjson("{a: 1, b: 1}")),
-                                     std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a")}));
     ASSERT_TRUE(indexSatisfiesJoinPredicates(
-        makeIndexEntry(fromjson("{a: 1, b: 1}")),
+        fromjson("{a: 1, b: 1}"), std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a")}));
+    ASSERT_TRUE(indexSatisfiesJoinPredicates(
+        fromjson("{a: 1, b: 1}"),
         std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a"), makeIndexedPredicate("b")}));
     // Predicates in different order than index components
     ASSERT_TRUE(indexSatisfiesJoinPredicates(
-        makeIndexEntry(fromjson("{a: 1, b: 1}")),
+        fromjson("{a: 1, b: 1}"),
         std::vector<IndexedJoinPredicate>{makeIndexedPredicate("b"), makeIndexedPredicate("a")}));
     ASSERT_TRUE(indexSatisfiesJoinPredicates(
-        makeIndexEntry(fromjson("{a: 1, b: 1, c: 1}")),
+        fromjson("{a: 1, b: 1, c: 1}"),
         std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a"), makeIndexedPredicate("b")}));
 
     // Not using prefix
-    ASSERT_FALSE(
-        indexSatisfiesJoinPredicates(makeIndexEntry(fromjson("{a: 1, b: 1}")),
-                                     std::vector<IndexedJoinPredicate>{makeIndexedPredicate("b")}));
     ASSERT_FALSE(indexSatisfiesJoinPredicates(
-        makeIndexEntry(fromjson("{a: 1, b: 1, c: 1}")),
+        fromjson("{a: 1, b: 1}"), std::vector<IndexedJoinPredicate>{makeIndexedPredicate("b")}));
+    ASSERT_FALSE(indexSatisfiesJoinPredicates(
+        fromjson("{a: 1, b: 1, c: 1}"),
         std::vector<IndexedJoinPredicate>{makeIndexedPredicate("b"), makeIndexedPredicate("c")}));
     ASSERT_FALSE(indexSatisfiesJoinPredicates(
-        makeIndexEntry(fromjson("{a: 1, b: 1, c: 1}")),
+        fromjson("{a: 1, b: 1, c: 1}"),
         std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a"), makeIndexedPredicate("c")}));
     // Not all components eligle to be probed
-    ASSERT_FALSE(
-        indexSatisfiesJoinPredicates(makeIndexEntry(fromjson("{a: 1, b: 1}")),
-                                     std::vector<IndexedJoinPredicate>{makeIndexedPredicate("c")}));
     ASSERT_FALSE(indexSatisfiesJoinPredicates(
-        makeIndexEntry(fromjson("{a: 1, b: 1}")),
+        fromjson("{a: 1, b: 1}"), std::vector<IndexedJoinPredicate>{makeIndexedPredicate("c")}));
+    ASSERT_FALSE(indexSatisfiesJoinPredicates(
+        fromjson("{a: 1, b: 1}"),
         std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a"), makeIndexedPredicate("c")}));
 }
 
 TEST(IndexSatisfiesJoinPredicates, DottedPaths) {
     ASSERT_TRUE(indexSatisfiesJoinPredicates(
-        makeIndexEntry(fromjson("{'a.a': 1, 'b.b': 1}")),
+        fromjson("{'a.a': 1, 'b.b': 1}"),
         std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a.a")}));
     ASSERT_TRUE(indexSatisfiesJoinPredicates(
-        makeIndexEntry(fromjson("{'a.a': 1, 'b.b': 1}")),
+        fromjson("{'a.a': 1, 'b.b': 1}"),
         std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a.a"),
                                           makeIndexedPredicate("b.b")}));
     ASSERT_FALSE(indexSatisfiesJoinPredicates(
-        makeIndexEntry(fromjson("{'a.a': 1, 'b.b': 1}")),
+        fromjson("{'a.a': 1, 'b.b': 1}"),
         std::vector<IndexedJoinPredicate>{makeIndexedPredicate("b.b")}));
 }
 
 TEST(IndexSatisfyingJoinPredicates, PreferShorterKeyPattern) {
-    auto catalog = makeIndexCatalog({
-        "{a: 1, b: 1, c: 1}",
-        "{a: 1, b: 1}",
+    auto indexEntries = makeIndexCatalogEntries({
+        fromjson("{a: 1, b: 1, c: 1}"),
+        fromjson("{a: 1, b: 1}"),
     });
-    auto res = bestIndexSatisfyingJoinPredicates(catalog,
+    auto res = bestIndexSatisfyingJoinPredicates(indexEntries,
                                                  std::vector<IndexedJoinPredicate>{
                                                      makeIndexedPredicate("a"),
                                                      makeIndexedPredicate("b"),
                                                  });
-    ASSERT_TRUE(res.has_value());
-    ASSERT_BSONOBJ_EQ(fromjson("{a: 1, b: 1}"), res->keyPattern);
+    ASSERT_NE(res, nullptr);
+    ASSERT_BSONOBJ_EQ(BSON("a" << 1 << "b" << 1), res->descriptor()->keyPattern());
 }
 
 TEST(IndexSatisfyingJoinPredicates, SameNumberOfKeys) {
-    auto catalog = makeIndexCatalog({
-        "{a: 1, b: 1, d: 1}",
-        "{a: 1, b: 1, c: 1}",
+    auto indexEntries = makeIndexCatalogEntries({
+        fromjson("{a: 1, b: 1, d: 1}"),
+        fromjson("{a: 1, b: 1, c: 1}"),
     });
-    auto res = bestIndexSatisfyingJoinPredicates(catalog,
+    auto res = bestIndexSatisfyingJoinPredicates(indexEntries,
                                                  std::vector<IndexedJoinPredicate>{
                                                      makeIndexedPredicate("a"),
                                                      makeIndexedPredicate("b"),
                                                  });
-    ASSERT_TRUE(res.has_value());
-    ASSERT_BSONOBJ_EQ(fromjson("{a: 1, b: 1, c: 1}"), res->keyPattern);
+    ASSERT_NE(res, nullptr);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: 1, b: 1, c: 1}"), res->descriptor()->keyPattern());
 }
 
 TEST(IndexSatisfyingJoinPredicates, NoSatisfyingIndex) {
-    auto catalog = makeIndexCatalog({
-        "{a: 1, b: 1, d: 1}",
-        "{a: 1, b: 1, c: 1}",
+    auto indexEntries = makeIndexCatalogEntries({
+        fromjson("{a: 1, b: 1, d: 1}"),
+        fromjson("{a: 1, b: 1, c: 1}"),
     });
-    auto res = bestIndexSatisfyingJoinPredicates(catalog,
+    auto res = bestIndexSatisfyingJoinPredicates(indexEntries,
                                                  std::vector<IndexedJoinPredicate>{
                                                      makeIndexedPredicate("a"),
                                                      makeIndexedPredicate("c"),
                                                  });
-    ASSERT_FALSE(res.has_value());
+    ASSERT_EQ(res, nullptr);
 }
 
 }  // namespace mongo::join_ordering

@@ -30,9 +30,11 @@
 #include "mongo/db/query/compiler/optimizer/join/executor.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
+#include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
 #include "mongo/db/query/plan_executor_factory.h"
@@ -103,6 +105,40 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
 
     return AggJoinModel::pipelineEligibleForJoinReordering(pipeline);
 }
+
+bool indexIsValidForINLJ(std::shared_ptr<const IndexCatalogEntry> ice) {
+    auto desc = ice->descriptor();
+    return !desc->isHashedIdIndex() && !desc->hidden() && !desc->isPartial() && !desc->isSparse() &&
+        desc->collation().isEmpty() && !dynamic_cast<WildcardAccessMethod*>(ice->accessMethod());
+}
+
+/**
+ * Pre-process indexes to filter out those ineligible for conversion to INLJ, and output a map of
+ * collection namespaces to indexes available.
+ */
+AvailableIndexes extractINLJEligibleIndexes(const QuerySolutionMap& solns,
+                                            const MultipleCollectionAccessor& mca) {
+    AvailableIndexes perCollIdxs;
+    for (const auto& [cq, _] : solns) {
+        const auto& ns = cq->nss();
+        auto it = perCollIdxs.find(ns);
+        if (it != perCollIdxs.end()) {
+            // We've already pre-processed this collection's indexes.
+            continue;
+        }
+
+        const auto& indexCatalog = *mca.lookupCollection(ns)->getIndexCatalog();
+        std::vector<std::shared_ptr<const IndexCatalogEntry>> entries;
+        for (auto&& ice : indexCatalog.getEntriesShared(IndexCatalog::InclusionPolicy::kReady)) {
+            if (indexIsValidForINLJ(ice)) {
+                entries.emplace_back(ice);
+            }
+        }
+        perCollIdxs.emplace(ns, std::move(entries));
+    }
+    return perCollIdxs;
+}
+
 }  // namespace
 
 /**
@@ -160,25 +196,29 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         return swAccessPlans.getStatus();
     }
 
-    auto& accessPlans = swAccessPlans.getValue();
+    auto& solns = swAccessPlans.getValue().solns;
     const auto qkc = expCtx->getQueryKnobConfiguration();
+
+    // Pre-process indexes per collection to facilitate INLJ enumeration.
+    auto indexesPerColl = extractINLJEligibleIndexes(solns, mca);
+    JoinReorderingContext ctx{
+        .joinGraph = model.graph,
+        .resolvedPaths = model.resolvedPaths,
+        .cbrCqQsns = std::move(solns),
+        .perCollIdxs = std::move(indexesPerColl),
+    };
+
     ReorderedJoinSolution reordered;
     switch (qkc.getJoinReorderMode()) {
         case JoinReorderModeEnum::kBottomUp:
             // Optimize join order using bottom-up Sellinger-style algorithm.
-            reordered = constructSolutionBottomUp(std::move(accessPlans.solns),
-                                                  model.graph,
-                                                  model.resolvedPaths,
-                                                  mca,
+            reordered = constructSolutionBottomUp(std::move(ctx),
                                                   getPlanTreeShape(qkc.getJoinPlanTreeShape()));
             break;
         case JoinReorderModeEnum::kRandom:
             // Randomly reorder joins.
             reordered =
-                constructSolutionWithRandomOrder(std::move(accessPlans.solns),
-                                                 model.graph,
-                                                 model.resolvedPaths,
-                                                 mca,
+                constructSolutionWithRandomOrder(std::move(ctx),
                                                  qkc.getRandomJoinOrderSeed(),
                                                  qkc.getRandomJoinReorderDefaultToHashJoin());
             break;

@@ -9,7 +9,6 @@ exports_files([
     "executor.cpp",
     "single_table_access.cpp",
     "single_table_access.h",
-    "solution_storage.h",
 ])
 
 exports_files(
@@ -79,7 +78,6 @@ mongo_cc_unit_test(
         ":unit_test_helpers",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
-        "//src/mongo/db/shard_role/shard_catalog:index_catalog_mock",
     ],
 )
 

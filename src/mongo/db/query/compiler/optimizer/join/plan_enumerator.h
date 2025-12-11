@@ -29,9 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
-#include "mongo/db/query/compiler/optimizer/join/solution_storage.h"
+#include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
@@ -47,7 +46,7 @@ enum class PlanTreeShape { LEFT_DEEP, RIGHT_DEEP, ZIG_ZAG };
  */
 class PlanEnumeratorContext {
 public:
-    PlanEnumeratorContext(const JoinGraph& joinGraph, const QuerySolutionMap& map);
+    PlanEnumeratorContext(const JoinReorderingContext& ctx) : _ctx{ctx} {}
 
     // Delete copy and move operations to prevent issues with copying '_joinGraph'.
     PlanEnumeratorContext(const PlanEnumeratorContext&) = delete;
@@ -115,7 +114,7 @@ private:
                              const JoinSubset& right,
                              const JoinSubset& subset) const;
 
-    const JoinGraph& _joinGraph;
+    const JoinReorderingContext& _ctx;
 
     // Hold intermediate results of the enumeration algorithm. The index into the outer vector
     // represents the "level". The i'th level contains solutions for the optimal way to join all
@@ -124,9 +123,6 @@ private:
 
     // Memory management for trees so we can reuse nodes.
     JoinPlanNodeRegistry _registry;
-
-    // Holds results from CBR.
-    const QuerySolutionMap& _cqsToQsns;
 };
 
 }  // namespace mongo::join_ordering

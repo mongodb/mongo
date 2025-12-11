@@ -26,14 +26,33 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
+#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/util/modules.h"
+
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo::join_ordering {
 
 // Alias for container maintaining association between a CanonicalQuery and its corresponding
 // solution.
 using QuerySolutionMap = stdx::unordered_map<CanonicalQuery*, std::unique_ptr<QuerySolution>>;
+
+// Maps namespaces to indexes that are available for use by join reordering.
+using AvailableIndexes =
+    absl::flat_hash_map<NamespaceString, std::vector<std::shared_ptr<const IndexCatalogEntry>>>;
+
+/**
+ * A struct tracking all information needed to reorder joins and generate a join plan.
+ */
+struct JoinReorderingContext {
+    const JoinGraph& joinGraph;
+    const std::vector<ResolvedPath>& resolvedPaths;
+    QuerySolutionMap cbrCqQsns;
+    AvailableIndexes perCollIdxs;
+};
 
 }  // namespace mongo::join_ordering

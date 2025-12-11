@@ -43,10 +43,6 @@ namespace {
 static constexpr size_t kBaseLevel = 0;
 }
 
-PlanEnumeratorContext::PlanEnumeratorContext(const JoinGraph& joinGraph,
-                                             const QuerySolutionMap& map)
-    : _joinGraph(joinGraph), _cqsToQsns(map) {}
-
 const std::vector<JoinSubset>& PlanEnumeratorContext::getSubsets(int level) {
     return _joinSubsets[level];
 }
@@ -159,7 +155,7 @@ void PlanEnumeratorContext::addJoinPlan(PlanTreeShape type,
                 5,
                 "Enumerating plan for join subset",
                 "plan"_attr =
-                    _registry.joinPlanNodeToBSON(subset.plans.back(), _joinGraph.numNodes()));
+                    _registry.joinPlanNodeToBSON(subset.plans.back(), _ctx.joinGraph.numNodes()));
 }
 
 void PlanEnumeratorContext::enumerateJoinPlans(PlanTreeShape type,
@@ -178,18 +174,17 @@ void PlanEnumeratorContext::enumerateJoinPlans(PlanTreeShape type,
             "Expected left and right subsets to be disjoint",
             (left.subset & right.subset).none());
 
-    auto joinEdges = _joinGraph.getJoinEdges(left.subset, right.subset);
+    auto joinEdges = _ctx.joinGraph.getJoinEdges(left.subset, right.subset);
     if (joinEdges.empty()) {
         return;
     }
 
-    // TODO SERVER-113717: enumerate INLJ plans.
     addJoinPlan(type, JoinMethod::HJ, left, right, joinEdges, cur);
     addJoinPlan(type, JoinMethod::NLJ, left, right, joinEdges, cur);
 }
 
 void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
-    int numNodes = _joinGraph.numNodes();
+    int numNodes = _ctx.joinGraph.numNodes();
     // Use CombinationSequence to efficiently calculate the final size of each level of the dynamic
     // programming table.
     CombinationSequence cs(numNodes);
@@ -199,8 +194,8 @@ void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
 
     // Initialize base level of joinSubsets, representing single collections (no joins).
     for (int i = 0; i < numNodes; ++i) {
-        const auto* cq = _joinGraph.getNode((NodeId)i).accessPath.get();
-        const auto* qsn = _cqsToQsns.at(cq).get();
+        const auto* cq = _ctx.joinGraph.getNode((NodeId)i).accessPath.get();
+        const auto* qsn = _ctx.cbrCqQsns.at(cq).get();
         _joinSubsets[kBaseLevel].push_back(JoinSubset(NodeSet{}.set(i)));
         _joinSubsets[kBaseLevel].back().plans = {
             _registry.registerBaseNode(_joinSubsets[kBaseLevel].back(), qsn, cq->nss())};
@@ -259,7 +254,7 @@ void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
 }
 
 std::string PlanEnumeratorContext::toString() const {
-    const auto numNodes = _joinGraph.numNodes();
+    const auto numNodes = _ctx.joinGraph.numNodes();
     std::stringstream ss;
     for (size_t level = 0; level < _joinSubsets.size(); level++) {
         ss << "Level " << level << ":\n";
