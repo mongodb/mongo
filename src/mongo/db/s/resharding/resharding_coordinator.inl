@@ -2272,7 +2272,14 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     }
 
     builder.append("statistics", statsBuilder.obj());
-    LOGV2(7763800, "Resharding complete", "info"_attr = builder.obj());
+    if ((_coordinatorDoc.getState() == CoordinatorStateEnum::kDone ||
+         _coordinatorDoc.getState() == CoordinatorStateEnum::kQuiesced) &&
+        !_originalReshardingStatus.has_value()) {
+        LOGV2(7763800, "Resharding complete", "info"_attr = builder.obj());
+        return;
+    }
+
+    LOGV2(10764500, "Resharding coordinator terminated", "info"_attr = builder.obj());
 }
 
 const ShardId& ReshardingCoordinator::_getChangeStreamNotifierShardId() const {
