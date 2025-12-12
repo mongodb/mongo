@@ -293,19 +293,24 @@ def configApply(suites, configfilename, configwrite):
             json.dump(configmap, f, sort_keys=True, indent=4)
     return newsuite
 
-def testsFromArg(tests, loader, arg, scenario):
+def testsFromArg(tests, loader, arg, scenario, skipTests):
     # If a group of test is mentioned, do all tests in that group
     # e.g. 'run.py base'
     groupedfiles = glob.glob(suitedir + os.sep + 'test_' + arg + '*.py')
     if len(groupedfiles) > 0:
         for file in groupedfiles:
-            testsFromArg(tests, loader, os.path.basename(file), scenario)
+            testsFromArg(tests, loader, os.path.basename(file), scenario, skipTests)
         return
 
     # Explicit test class names
     if not arg[0].isdigit():
         if arg.endswith('.py'):
             arg = arg[:-3]
+
+        # Skip tests that are in the skip list.
+        if skipTests and arg in skipTests:
+            return
+
         addScenarioTests(tests, loader, arg, scenario)
         return
 
@@ -334,6 +339,7 @@ if __name__ == '__main__':
     configwrite = False
     dirarg = None
     scenario = ''
+    skipFileForTests = ''
     verbose = 1
     args = sys.argv[1:]
     testargs = []
@@ -398,6 +404,12 @@ if __name__ == '__main__':
                     usage()
                     sys.exit(2)
                 hook_names.append(args.pop(0))
+                continue
+            if option == '-skip-tests-in-file' or option == 'sf':
+                if len(args) == 0:
+                    usage()
+                    sys.exit(2)
+                skipFileForTests = args.pop(0)
                 continue
             if option == '-long' or option == 'l':
                 longtest = True
@@ -595,10 +607,37 @@ if __name__ == '__main__':
                                           extralongtest, zstdtest, ignoreStdout, printOutput,
                                           seedw, seedz, hookmgr, ss_random_prefix, timeout)
 
+    skipTests = []
+    if skipFileForTests:
+        with open(skipFileForTests, 'r') as f:
+            # Read the skip file and process it to get a list of tests to skip.
+            skipTests = f.read().splitlines()
+            # Remove comment lines starting with '#'.
+            skipTests = [test for test in skipTests if not test.lstrip().startswith('#')]
+            # Remove trailing comments and file extensions for each line.
+            skipTests = [re.split(r'\s+#', test)[0].strip().replace('.py', '') for test in skipTests]
+
     # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:
         from discover import defaultTestLoader as loader
         suites = loader.discover(suitedir)
+
+        # Remove tests if the skip list is not empty.
+        if skipTests:
+            def remove_test_from_suite(suite, skipTests):
+                new_suite = unittest.TestSuite()
+                for test in suite:
+                    if type(test) is unittest.TestSuite:
+                        # Recursively process nested suites.
+                        subsuite = remove_test_from_suite(test, skipTests)
+                        if subsuite.countTestCases() > 0:
+                            new_suite.addTest(subsuite)
+                    else:
+                        test_name = test.__class__.__name__
+                        if test_name not in skipTests:
+                            new_suite.addTest(test)
+                return new_suite
+            suites = remove_test_from_suite(suites, skipTests)
 
         # If you have an empty Python file, it comes back as an empty entry in suites
         # and then the sort explodes. Drop empty entries first. Note: this converts
@@ -619,7 +658,7 @@ if __name__ == '__main__':
         tests.addTests(restrictScenario(generate_scenarios(suites), scenario))
     else:
         for arg in testargs:
-            testsFromArg(tests, loader, arg, scenario)
+            testsFromArg(tests, loader, arg, scenario, skipTests)
 
     hookmgr.register_skipped_tests(tests)
 

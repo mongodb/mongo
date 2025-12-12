@@ -66,9 +66,9 @@ endif()
 
 # Needed for SQLite3 on some platforms
 target_link_libraries(sqlite3_lib PUBLIC
-    $<$<BOOL:${WT_POSIX}>:${HAVE_LIBPTHREAD}>
-    $<$<BOOL:${WT_POSIX}>:${HAVE_LIBDL}>
-    $<$<BOOL:${WT_POSIX}>:m>
+    $<$<BOOL:${WT_LINUX}>:${HAVE_LIBPTHREAD}>
+    $<$<BOOL:${WT_LINUX}>:${HAVE_LIBDL}>
+    $<$<BOOL:${WT_LINUX}>:m>
 )
 
 add_library(wt::sqlite3 ALIAS sqlite3_lib)

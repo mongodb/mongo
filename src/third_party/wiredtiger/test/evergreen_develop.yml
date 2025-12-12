@@ -152,7 +152,7 @@ buildvariants:
     - name: memory-model-test
       batchtime: 40320 # 28 days
     - name: s-outdated-fixmes
-      batchtime: 10080 # 7 days
+      batchtime: 1440 # 1 day
 
 - name: lazyfs-tests
   display_name: "~ LazyFS tests"

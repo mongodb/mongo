@@ -24,7 +24,7 @@ SOURCES <source files>
 
 CXX
     Indicates that this is a C++ test.
-    
+
 NO_TEST_UTIL
     Do not link against the test_util library.
 
@@ -165,7 +165,7 @@ function(create_test_executable target)
         )
     endif()
 
-    if (NOT WT_WIN)
+    if (WT_LINUX)
         target_link_libraries(${target} m)
     endif()
 

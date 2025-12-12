@@ -128,6 +128,9 @@
  */
 #define WT_CELL_SIZE_ADJUST (WT_CELL_SHORT_MAX + 1)
 
+/* Don't increase key prefix-compression unless there's a significant gain. */
+#define WTI_CELL_KEY_PREFIX_PREVIOUS_MINIMUM 10
+
 /*
  * WT_CELL --
  *	Variable-length, on-page cell header.

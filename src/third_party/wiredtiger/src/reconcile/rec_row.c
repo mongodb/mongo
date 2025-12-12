@@ -84,9 +84,7 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session, WTI_RECONCILE *r, const void
 {
     WT_BTREE *btree;
     WTI_REC_KV *key;
-    size_t pfx_max;
     uint8_t pfx;
-    const uint8_t *a, *b;
 
     *is_ovflp = false;
 
@@ -111,34 +109,11 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session, WTI_RECONCILE *r, const void
         /*
          * Do prefix compression on the key. We know by definition the previous key sorts before the
          * current key, which means the keys must differ and we just need to compare up to the
-         * shorter of the two keys.
+         * shorter one of the two keys.
          */
         if (r->key_pfx_compress) {
-            /*
-             * We can't compress out more than 256 bytes, limit the comparison to that.
-             */
-            pfx_max = UINT8_MAX;
-            if (size < pfx_max)
-                pfx_max = size;
-            if (r->last->size < pfx_max)
-                pfx_max = r->last->size;
-            for (a = data, b = r->last->data; pfx < pfx_max; ++pfx)
-                if (*a++ != *b++)
-                    break;
-
-            /*
-             * Prefix compression costs CPU and memory when the page is re-loaded, skip unless
-             * there's a reasonable gain. Also, if the previous key was prefix compressed, don't
-             * increase the prefix compression if we aren't getting a reasonable gain. (Groups of
-             * keys with the same prefix can be quickly built without needing to roll forward
-             * through intermediate keys or allocating memory so they can be built faster in the
-             * future, for that reason try and create big groups of keys with the same prefix.)
-             */
-            if (pfx < btree->prefix_compression_min)
-                pfx = 0;
-            else if (r->key_pfx_last != 0 && pfx > r->key_pfx_last &&
-              pfx < r->key_pfx_last + WTI_KEY_PREFIX_PREVIOUS_MINIMUM)
-                pfx = r->key_pfx_last;
+            __wt_cell_compress_prefix_key(
+              r->last, data, size, r->key_pfx_last, btree->prefix_compression_min, &pfx);
 
             if (pfx != 0) {
                 if (is_delta)

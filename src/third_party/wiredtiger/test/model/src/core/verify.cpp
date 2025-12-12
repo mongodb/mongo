@@ -181,7 +181,7 @@ kv_table_verifier::verify(WT_CONNECTION *connection, kv_checkpoint_ptr ckpt)
          * calling verify to avoid EBUSY. We don't need to tolerate non-fatal errors for the final
          * step.
          *
-         * FIXME-WT-15619: The disaggregated check should go away once it's ready.
+         * FIXME-WT-16211: The disaggregated check should go away once it's ready.
          */
         if (!_table.is_disaggregated()) {
             ret = session->verify(session, uri.c_str(), "strict");

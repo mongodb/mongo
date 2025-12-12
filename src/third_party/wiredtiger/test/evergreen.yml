@@ -1229,7 +1229,7 @@ functions:
         # Check if we running in disagg mode.
         disagg_args=""
         if [[ "${disagg_run|false}" == "true" ]]; then
-            # FIXME-WT-15723: Re-evaluate whether setting large cache size is need after cache stuck issue is solved.
+            # FIXME-WT-16228: Re-evaluate whether setting large cache size is need after cache stuck issue is solved.
             disagg_args="-d leader -t row -x -C cache_size=1000MB"
         fi
         ./test_checkpoint ${checkpoint_args} $disagg_args  2>&1
@@ -1246,7 +1246,7 @@ functions:
         ${PREPARE_TEST_ENV}
         disagg_args=""
         if [[ "${disagg_run|false}" == "true" ]]; then
-            # FIXME-WT-15723: Re-evaluate whether setting large cache size is need after cache stuck issue is solved.
+            # FIXME-WT-16228: Re-evaluate whether setting large cache size is need after cache stuck issue is solved.
             disagg_args="-d leader -t row -x -C cache_size=1000MB"
         fi
         ../../../test/evergreen/checkpoint_test_predictable.sh ${times} "${checkpoint_args} $disagg_args"
@@ -1612,7 +1612,7 @@ variables:
       - func: "fetch artifacts"
       - func: "format test disagg"
         vars:
-          # FIXME-WT-15619 Remove this task when disagg verification is working reliably with deltas.
+          # FIXME-WT-16211 Remove this task when disagg verification is working reliably with deltas.
           format_args: disagg.mode=leader ops.verify=1 disagg.leaf_page_delta=0 disagg.internal_page_delta=0
           times: 5
 

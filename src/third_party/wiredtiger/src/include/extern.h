@@ -691,6 +691,8 @@ extern int __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_inmem_unsupported_op(WT_SESSION_IMPL *session, const char *tag)
   WT_GCC_FUNC_DECL_ATTRIBUTE((cold)) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_is_simple_table(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *colconf, bool *is_simplep)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_json_alloc_unpack(WT_SESSION_IMPL *session, const void *buffer, size_t size,
   const char *fmt, WT_JSON *json, bool iskey, va_list ap)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -877,6 +879,8 @@ extern int __wt_prepared_discover_find_item(WT_SESSION_IMPL *session, uint64_t p
 extern int __wt_prepared_discover_remove_item(WT_SESSION_IMPL *session, uint64_t prepared_id)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_progress_backoff(WT_SESSION_IMPL *session, const char *s, uint64_t v)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_random_descent(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags,
   WT_RAND_STATE *rnd) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -2006,9 +2010,16 @@ static WT_INLINE int __wt_buf_set_and_grow(WT_SESSION_IMPL *session, WT_ITEM *bu
   size_t size, size_t buf_size) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_buf_setstr(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *s)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE int __wt_cell_decompress_prefix_key(
+  WT_SESSION_IMPL *session, WT_ITEM *current_key, const void *data, size_t size, uint8_t key_prefix)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_cell_pack_internal_key_addr(WT_SESSION_IMPL *session, WT_ITEM *new_image,
   WT_CELL_UNPACK_ADDR *base_key, WT_CELL_UNPACK_ADDR *base_val, WT_CELL_UNPACK_DELTA_INT *delta,
   bool is_delta, uint8_t **pp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE int __wt_cell_pack_leaf_kv(WT_SESSION_IMPL *session, bool empty_value,
+  const void *key_data, size_t key_size, const void *val_data, size_t val_size,
+  WT_TIME_WINDOW *val_tw, WT_ITEM *new_image, WTI_DISK_LEAF_MERGE_STATE *s)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_cell_pack_value_match(WT_CELL *page_cell, WT_CELL *val_cell,
   const uint8_t *val_data, bool *matchp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_cell_unpack_safe(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk,
@@ -2390,6 +2401,8 @@ static WT_INLINE void __wt_cache_page_inmem_incr_delta_updates(
 static WT_INLINE void __wt_cell_build_addr_kv(WT_SESSION_IMPL *session, WT_CELL_KV *val_kv,
   uint8_t cell_type, WT_PAGE_DELETED *page_del, WT_TIME_AGGREGATE *ta, const void *data,
   size_t data_size);
+static WT_INLINE void __wt_cell_compress_prefix_key(WT_ITEM *last_key, const void *data,
+  size_t size, uint8_t key_pfx_last, u_int prefix_compression_min, uint8_t *pfxp);
 static WT_INLINE void __wt_cell_get_ta(WT_CELL_UNPACK_ADDR *unpack_addr, WT_TIME_AGGREGATE **tap);
 static WT_INLINE void __wt_cell_get_tw(WT_CELL_UNPACK_KV *unpack_value, WT_TIME_WINDOW **twp);
 static WT_INLINE void __wt_cell_kv_copy(WT_SESSION_IMPL *session, uint8_t *p, WT_CELL_KV *kv);

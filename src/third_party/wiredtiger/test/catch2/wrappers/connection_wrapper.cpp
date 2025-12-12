@@ -32,6 +32,7 @@ connection_wrapper::connection_wrapper(const std::string &db_home, const char *c
         utils::throw_if_non_zero(mkdir(_db_home.c_str(), 0700));
     }
     utils::throw_if_non_zero(wiredtiger_open(_db_home.c_str(), nullptr, cfg_str, &_conn));
+    _conn_impl = (WT_CONNECTION_IMPL *)_conn;
 }
 
 connection_wrapper::~connection_wrapper()
@@ -49,7 +50,6 @@ connection_wrapper::create_session(std::string cfg)
     _conn->open_session(_conn, nullptr, cfg.c_str(), &sess);
 
     auto sess_impl = (WT_SESSION_IMPL *)sess;
-    _conn_impl = S2C(sess_impl);
 
     return sess_impl;
 }

@@ -439,7 +439,10 @@ __wt_evict_stats_update(WT_SESSION_IMPL *session)
     WT_STATP_CONN_SET(session, stats, eviction_stable_state_workers,
       __wt_atomic_load_uint32_relaxed(&evict->evict_tune_workers_best));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_attempts_to_queue_page,
-      __wt_atomic_load_uint64_relaxed(&evict->evict_max_eviction_queue_attempts));
+      __wt_atomic_load_uint16_relaxed(&evict->evict_max_eviction_queue_attempts));
+    WT_STATP_CONN_SET(session, stats, eviction_maximum_attempts_to_evict_page,
+      __wt_atomic_load_uint16_relaxed(&evict->evict_max_evict_page_attempts));
+
     /*
      * The number of files with active walks ~= number of hazard pointers in the walk session. Note:
      * reading without locking.

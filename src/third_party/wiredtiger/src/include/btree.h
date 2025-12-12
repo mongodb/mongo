@@ -342,3 +342,59 @@ struct __wt_salvage_cookie {
 #define WT_DELTA_ENABLED_FOR_PAGE(session, type)                   \
     ((type) == WT_PAGE_ROW_LEAF ? WT_DELTA_LEAF_ENABLED(session) : \
                                   WT_DELTA_INT_ENABLED(S2BT(session), S2C(session)))
+
+/*
+ * WTI_DELTA_LEAF_MERGE_STATE --
+ *	The delta's merge state for merging deltas with base image leaf.
+ */
+struct __wti_delta_leaf_merge_state {
+    /* Unpacked delta k/v pair. */
+    WT_CELL_UNPACK_DELTA_LEAF_KV *unpack;
+    /* Prefix decompressed key. */
+    WT_ITEM *current_key;
+    uint8_t *cell;
+    /* Set when we have unpacked and decompressed a k/v pair. */
+    bool unpacked;
+    /* Entries remain that are not merged into the disk image. */
+    uint32_t entries;
+};
+
+/*
+ * WTI_BASE_LEAF_MERGE_STATE --
+ *	The base image's merge state for merging deltas with base image leaf.
+ */
+struct __wti_base_leaf_merge_state {
+    /* Unpacked key. */
+    WT_CELL_UNPACK_KV *unpack_key;
+    /* Unpacked value. */
+    WT_CELL_UNPACK_KV *unpack_value;
+    /* Prefix decompressed key. */
+    WT_ITEM *current_key;
+    /*
+     * Entries remain that are not merged into the disk image. We may have unpacked an entry, but we
+     * only decrement the count when a k/v pair is actually merged into the disk image.
+     */
+    uint32_t entries;
+    uint8_t *cell;
+    /* Set when we have unpacked and decompressed a k/v pair. */
+    bool unpacked;
+    /*
+     * Set when the current key/value pair has an empty value cell. This implies that the next key
+     * cell has been unpacked but not decompressed yet.
+     */
+    bool empty_value_cell;
+};
+
+/*
+ * WTI_DISK_LEAF_MERGE_STATE --
+ *	The new disk image's merge state for merging deltas with base image leaf.
+ */
+struct __wti_disk_leaf_merge_state {
+    WT_ITEM *last_key;
+    uint8_t key_pfx_last;
+    bool key_pfx_compress;
+    bool all_empty_value;
+    bool any_empty_value;
+    uint8_t *p_ptr;
+    uint32_t entries;
+};

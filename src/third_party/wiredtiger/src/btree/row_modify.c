@@ -184,7 +184,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
              * If we restore an update chain in update restore eviction, there should be no update
              * or a restored tombstone on the existing update chain except for btrees with leaf
              * delta enabled or a prepared update if the preserve prepared config is enabled. FIXME-
-             * WT-15619: No need to consider the delta case if we have implemented delta
+             * WT-16211: No need to consider the delta case if we have implemented delta
              * consolidation.
              */
             WT_ASSERT_ALWAYS(session,

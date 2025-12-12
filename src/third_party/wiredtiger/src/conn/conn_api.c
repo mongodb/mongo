@@ -2205,6 +2205,12 @@ __wti_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     else
         FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CORRUPTION_ABORT);
 
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.crash_point_colgroup", &cval));
+    if (cval.val)
+        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_COLGROUP);
+    else
+        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_COLGROUP);
+
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.cursor_copy", &cval));
     if (cval.val)
         FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CURSOR_COPY);
@@ -2722,7 +2728,7 @@ __conn_set_key_provider(WT_CONNECTION *wt_conn, WT_KEY_PROVIDER *key_provider, c
     /*
      * You can only configure the key provider system with early-load set.
      */
-    if (conn->file_system != NULL)
+    if (conn->key_provider != NULL)
         WT_ERR_MSG(session, EINVAL, "key provider system must be configured with early_load set");
 
     conn->key_provider = key_provider;

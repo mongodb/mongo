@@ -128,18 +128,12 @@ class test_cursor13_base(wttest.WiredTigerTestCase):
 
 # Override other cursor tests with cursors cached.
 
-# FIXME-WT-15072: Investigate failed to advance panic failure.
-@wttest.skip_for_hook("disagg", "Disabled due to checking expected table prefix")
 class test_cursor13_01(test_cursor01.test_cursor01, test_cursor13_base):
     pass
 
-# FIXME-WT-15072: Investigate failed to advance panic failure.
-@wttest.skip_for_hook("disagg", "Fails to advance the checkpoint in disagg world")
 class test_cursor13_02(test_cursor02.test_cursor02, test_cursor13_base):
     pass
 
-# FIXME-WT-15072: Investigate failed to advance panic failure.
-@wttest.skip_for_hook("disagg", "Fails to advance the checkpoint in disagg world")
 class test_cursor13_03(test_cursor03.test_cursor03, test_cursor13_base):
     pass
 

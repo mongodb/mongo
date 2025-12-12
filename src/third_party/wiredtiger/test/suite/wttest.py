@@ -625,7 +625,7 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
         passed = not (self.failed() or teardown_failed)
 
         if passed and self.__module__.startswith("test_layered"):
-            # FIXME-WT-15619 and FIXME-WT-15618: We can run verify on layered tables when deltas are
+            # FIXME-WT-16211: We can run verify on layered tables when deltas are
             # written as a full image. Once resolved we can immediately run verify on all layered tests.
             config = self.conn_config
             if hasattr(config, '__call__'):

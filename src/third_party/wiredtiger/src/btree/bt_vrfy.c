@@ -18,7 +18,6 @@ typedef struct {
     WT_ITEM *max_key;  /* Largest key */
     WT_ITEM *max_addr; /* Largest key page */
 
-#define WT_VERIFY_PROGRESS_INTERVAL 100
     uint64_t fcnt; /* Progress counter */
 
     /* Configuration options passed in. */
@@ -586,8 +585,7 @@ __verify_tree(
      *
      * Report progress occasionally.
      */
-    if (++vs->fcnt % WT_VERIFY_PROGRESS_INTERVAL == 0)
-        WT_RET(__wt_progress(session, NULL, vs->fcnt));
+    WT_RET(__wt_progress_backoff(session, NULL, ++vs->fcnt));
 
 #ifdef HAVE_DIAGNOSTIC
     /* Optionally dump the blocks or page in debugging mode. */

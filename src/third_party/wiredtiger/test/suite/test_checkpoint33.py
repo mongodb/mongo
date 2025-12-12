@@ -80,8 +80,6 @@ class test_checkpoint33(test_cc_base, suite_subprocess):
         self.session.rollback_transaction()
         evict_cursor.close()
 
-    # FIXME-WT-14982
-    @wttest.skip_for_hook("disagg", "PALM environment mapsize limitation")
     def test_checkpoint33(self):
 
         if os.environ.get("TSAN_OPTIONS"):
