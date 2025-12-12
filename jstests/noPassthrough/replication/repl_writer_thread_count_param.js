@@ -381,5 +381,90 @@ function testOplogApplication() {
     rst.stopSet();
 }
 
+function testPreparedTransactionWithThreadCountChange() {
+    jsTest.log.info("Testing prepared transaction with replWriterThreadCount change between prepare and commit");
+    clearRawMongoProgramOutput();
+
+    const rst = new ReplSetTest({name: jsTest.name() + "_preparedTxn", nodes: 2});
+    rst.startSet();
+    rst.initiate();
+
+    const primary = rst.getPrimary();
+    const secondary = rst.getSecondary();
+    const dbName = "testPreparedTxnDB";
+    const collName = "testColl";
+    const primaryDB = primary.getDB(dbName);
+
+    assert.commandWorked(primaryDB.createCollection(collName, {writeConcern: {w: "majority"}}));
+
+    // Set replWriterThreadCount to maximum possible value on the secondary.
+    const hostInfoRes = primaryDB.runCommand({hostInfo: 1});
+    const numCores = hostInfoRes.system.numCores;
+    jsTest.log.info("System info: numCores=", numCores);
+    const twoThreadsPerCore = numCores * 2;
+    assert.commandWorked(secondary.adminCommand({setParameter: 1, replWriterThreadCount: twoThreadsPerCore}));
+    let result = secondary.adminCommand({getParameter: 1, replWriterThreadCount: 1});
+    assert.eq(twoThreadsPerCore, result.replWriterThreadCount, "replWriterThreadCount was not set to initial value");
+
+    // Prepare but do not commit a transaction.
+    const session = primary.startSession();
+    const sessionDB = session.getDatabase(dbName);
+    const sessionColl = sessionDB.getCollection(collName);
+
+    session.startTransaction();
+
+    // Insert multiple documents to different collections/namespaces to increase the chance
+    // of using multiple writer threads.
+    const numInserts = twoThreadsPerCore * 10;
+    for (let i = 0; i < numInserts; i++) {
+        assert.commandWorked(sessionColl.insert({_id: i, data: "test" + i}));
+    }
+
+    // Prepare the transaction, storing the requesterIds based on the current writerVectors size (2 * numCores).
+    const prepareTimestamp = assert.commandWorked(
+        session.getDatabase("admin").adminCommand({
+            prepareTransaction: 1,
+            writeConcern: {w: "majority"},
+        }),
+    ).prepareTimestamp;
+
+    jsTest.log.info("Transaction prepared with timestamp: " + tojson(prepareTimestamp));
+    // Wait for oplog application to the secondary.
+    rst.awaitReplication();
+
+    // Reduce the replWriterThreadCount on the secondary.
+    const reducedThreadCount = 1;
+    assert.commandWorked(secondary.adminCommand({setParameter: 1, replWriterMinThreadCount: reducedThreadCount}));
+    assert.commandWorked(secondary.adminCommand({setParameter: 1, replWriterThreadCount: reducedThreadCount}));
+    result = secondary.adminCommand({getParameter: 1, replWriterThreadCount: 1});
+    assert.eq(reducedThreadCount, result.replWriterThreadCount, "replWriterThreadCount was not reduced");
+
+    jsTest.log.info("Reduced replWriterThreadCount from " + twoThreadsPerCore + " to " + reducedThreadCount);
+
+    // Commit the transaction, to test that the server can handle a different number of writer vectors between prepare and commit.
+    const commitTimestamp = Timestamp(prepareTimestamp.getTime(), prepareTimestamp.getInc() + 1);
+    assert.commandWorked(
+        session.getDatabase("admin").adminCommand({
+            commitTransaction: 1,
+            commitTimestamp: commitTimestamp,
+            writeConcern: {w: "majority"},
+        }),
+    );
+
+    jsTest.log.info("Transaction committed successfully");
+
+    // Verify the data was replicated correctly.
+    rst.awaitReplication();
+    const secondaryDB = secondary.getDB(dbName);
+    const count = secondaryDB.getCollection(collName).count();
+    assert.eq(numInserts, count, "Expected " + numInserts + " documents on secondary after commit");
+
+    session.endSession();
+    rst.stopSet();
+
+    jsTest.log.info("testPreparedTransactionWithThreadCountChange passed");
+}
+
 testSettingParameter();
 testOplogApplication();
+testPreparedTransactionWithThreadCountChange();

@@ -394,7 +394,10 @@ void OplogApplierUtils::addDerivedCommitsOrAborts(
     // When this commit refers to a split prepare, we split the commit and add them
     // to the writers that have been assigned split prepare ops.
     for (const auto& sessInfo : *sessionInfos) {
-        addToWriterVectorImpl(sessInfo.requesterId,
+        // The number of workers could have changed since the prepare phase: mod by list size to
+        // make sure we are still in bounds.
+        const auto idx = sessInfo.requesterId % writerVectors->size();
+        addToWriterVectorImpl(idx,
                               writerVectors,
                               commitOrAbortOp,
                               ApplicationInstruction::applySplitPreparedTxnOp,
