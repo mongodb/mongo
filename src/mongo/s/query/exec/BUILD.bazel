@@ -121,6 +121,26 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "target_write_op",
+    srcs = [
+        "target_write_op.cpp",
+        "//src/mongo/s/query:shard_key_pattern_query_util.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:common",
+        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
+        "//src/mongo/db/query:canonical_query_base",
+        "//src/mongo/db/query:query_planner",
+        "//src/mongo/db/query/collation:collator_interface",
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/db/update:update_common",
+        "//src/mongo/s:grid",
+        "//src/mongo/s/write_ops:batch_write_types",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "s_query_exec_test",
     srcs = [

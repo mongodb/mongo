@@ -33,13 +33,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
-#include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
-#include "mongo/db/global_catalog/shard_key_pattern.h"
-#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/router_role/ns_targeter.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
@@ -52,26 +47,14 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
-
-struct TargetOpResult {
-    TargetOpResult() = default;
-
-    TargetOpResult(std::vector<ShardEndpoint> endpoints) : endpoints(std::move(endpoints)) {}
-
-    TargetOpResult(std::vector<ShardEndpoint> endpoints,
-                   bool useTwoPhaseWriteProtocol,
-                   bool isNonTargetedRetryableWriteWithId)
-        : endpoints(std::move(endpoints)),
-          useTwoPhaseWriteProtocol(useTwoPhaseWriteProtocol),
-          isNonTargetedRetryableWriteWithId(isNonTargetedRetryableWriteWithId) {}
-
-    std::vector<ShardEndpoint> endpoints;
-    bool useTwoPhaseWriteProtocol = false;
-    bool isNonTargetedRetryableWriteWithId = false;
-};
+/**
+ * Creates all of the databases referenced by 'nssList' (if they don't already exist), and then
+ * creates and returns a RoutingContext that can be used for targeting write ops.
+ */
+MONGO_MOD_PUBLIC std::unique_ptr<RoutingContext> createDatabasesAndGetRoutingCtx(
+    OperationContext* opCtx, const std::vector<NamespaceString>& nssList);
 
 /**
  * NSTargeter based on a CollectionRoutingInfo implementation. Wraps all exception codepaths and
@@ -212,6 +195,18 @@ public:
                                const ChunkManager& cm);
 
 private:
+    std::unique_ptr<RoutingContext> _createDatabaseAndGetRoutingCtx(OperationContext* opCtx,
+                                                                    const NamespaceString& nss,
+                                                                    bool refresh);
+
+    /**
+     * Initializes and returns the RoutingContext which needs to be used for targeting.
+     * If 'refresh' is true, additionally fetches the latest routing info from the config servers.
+     *
+     * Note: For tracked time-series collections, we use the buckets collection for targeting. If
+     * the user request is on the view namespace, we implicitly transform the request to the buckets
+     * namespace.
+     */
     std::unique_ptr<RoutingContext> _init(OperationContext* opCtx, bool refresh);
 
     // Full namespace of the collection for this targeter
@@ -237,61 +232,4 @@ private:
     // The latest loaded routing cache entry.
     CollectionRoutingInfo _cri;
 };
-
-/**
- * Returns a CanonicalQuery if parsing succeeds.
- *
- * Returns !OK with message if query could not be canonicalized.
- *
- * If 'collation' is empty, we use the collection default collation for targeting.
- */
-StatusWith<std::unique_ptr<CanonicalQuery>> canonicalizeFindQuery(
-    OperationContext* opCtx,
-    boost::intrusive_ptr<mongo::ExpressionContext> expCtx,
-    const NamespaceString& nss,
-    const BSONObj& query,
-    const BSONObj& collation,
-    const CollectionRoutingInfo& cri);
-
-/**
- * Returns a vector of ShardEndpoints for a potentially multi-shard query.
- *
- * Uses the collation specified on the CanonicalQuery for targeting. If there is no query
- * collation, uses the collection default. If 'bypassIsFieldHashedCheck' is true, it skips
- * checking if the shard key was hashed and assumes that any non-collatable shard key was not
- * hashed from a collatable type.
- *
- * Returns !OK with message if query could not be targeted.
- */
-StatusWith<std::vector<ShardEndpoint>> targetQuery(const CollectionRoutingInfo& cri,
-                                                   const CanonicalQuery& query,
-                                                   bool bypassIsFieldHashedCheck);
-
-/**
- * Returns a vector of ShardEndpoints for a potentially multi-shard query.
- *
- * This method is an alternative to _targetQuery that is intended to be used for multi:true
- * upsert queries only.
- *
- * This method attempts to extract a shard key from the CanonicalQuery and then attempts target
- * a single shard using this shard key.
- *
- * Returns !OK with message if a shard key could not be extracted or a single shard could not
- * be targeted due to collation.
- */
-StatusWith<std::vector<ShardEndpoint>> targetQueryForMultiUpsert(const CollectionRoutingInfo& cri,
-                                                                 const CanonicalQuery& query);
-
-/**
- * Returns a ShardEndpoint for an exact shard key query.
- *
- * Also has the side effect of updating the chunks stats with an estimate of the amount of
- * data targeted at this shard key.
- *
- * If 'collation' is empty, we use the collection default collation for targeting.
- */
-StatusWith<ShardEndpoint> targetShardKey(const CollectionRoutingInfo& cri,
-                                         const BSONObj& shardKey,
-                                         const BSONObj& collation);
-
 }  // namespace mongo
