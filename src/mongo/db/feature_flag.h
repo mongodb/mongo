@@ -359,8 +359,6 @@ class IncrementalRolloutFeatureFlag : public FeatureFlag {
 public:
     static const std::vector<const IncrementalRolloutFeatureFlag*>& getAll();
 
-    static IncrementalRolloutFeatureFlag* findByName(StringData flagName);
-
     IncrementalRolloutFeatureFlag(StringData flagName, RolloutPhase phase, bool value)
         : _flagName(std::string{flagName}), _phase(phase), _value(value) {}
 

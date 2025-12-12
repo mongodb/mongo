@@ -53,22 +53,8 @@ ParserMap parserMap;
 
 const LiteParsedDocumentSource::LiteParserInfo&
 LiteParsedDocumentSource::LiteParserRegistration::getParserInfo() const {
-    // If no fallback is set, use the primary parser. This is the standard case for most stages.
-    if (!_fallbackIsSet) {
-        tassert(11395400, "Primary parser must be set if no fallback parser exists", _primaryIsSet);
-        return _primaryParser;
-    }
-
-    // If no primary is set, use the fallback parser. This typically occurs when an extension has
-    // not been loaded. See aggregation_stage_fallback_parsers.json.
-    if (!_primaryIsSet) {
-        tassert(
-            11395401, "Fallback parser must be set if no primary parser exists", _fallbackIsSet);
-        return _fallbackParser;
-    }
-
-    // Both a primary and fallback parser have been set. Check the value of the associated feature
-    // flag to evaluate which parser we should use.
+    // If there's no feature flag toggle, or the feature flag toggle exists and the feature is
+    // enabled in this context, use the primary parser. Otherwise, use the fallback parser.
     if (_primaryParserFeatureFlag == nullptr || _primaryParserFeatureFlag->checkEnabled()) {
         return _primaryParser;
     } else {
@@ -139,17 +125,12 @@ void LiteParsedDocumentSource::registerFallbackParser(const std::string& name,
     // Create a new registration and save the parser as the fallback parser.
     auto& registration = parserMap[name];
 
-    IncrementalRolloutFeatureFlag* ifrFeatureFlag = nullptr;
-    // If parserFeatureFlag is not set, we are adding a fallback parser for a stub stage that isn't
-    // associated with a feature flag.
-    if (parserFeatureFlag != nullptr) {
-        // TODO SERVER-114028 Remove the following dynamic cast and tassert when fallback parsing
-        // supports all feature flags.
-        ifrFeatureFlag = dynamic_cast<IncrementalRolloutFeatureFlag*>(parserFeatureFlag);
-        tassert(11395101,
-                "Fallback parsing only supports IncrementalRolloutFeatureFlags.",
-                ifrFeatureFlag != nullptr);
-    }
+    // TODO SERVER-114028 Remove the following dynamic cast and tassert when fallback parsing
+    // supports all feature flags.
+    auto* ifrFeatureFlag = dynamic_cast<IncrementalRolloutFeatureFlag*>(parserFeatureFlag);
+    tassert(11395101,
+            "Fallback parsing only supports IncrementalRolloutFeatureFlags.",
+            ifrFeatureFlag != nullptr);
 
     registration.setFallbackParser({parser, allowedWithApiStrict, allowedWithClientType},
                                    ifrFeatureFlag);

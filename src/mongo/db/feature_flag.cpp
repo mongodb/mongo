@@ -258,15 +258,6 @@ const std::vector<const IncrementalRolloutFeatureFlag*>& IncrementalRolloutFeatu
     return getMutableAllIncrementalRolloutFeatureFlags();
 }
 
-IncrementalRolloutFeatureFlag* IncrementalRolloutFeatureFlag::findByName(StringData flagName) {
-    for (auto* flag : getAll()) {
-        if (flag->getName() == flagName) {
-            return const_cast<IncrementalRolloutFeatureFlag*>(flag);
-        }
-    }
-    return nullptr;
-}
-
 bool IncrementalRolloutFeatureFlag::checkEnabled() {
     auto checkResult = _value.load();
     (checkResult ? _numTrueChecks : _numFalseChecks).addAndFetch(1);

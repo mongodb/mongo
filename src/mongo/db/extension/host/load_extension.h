@@ -97,7 +97,7 @@ public:
 
     /**
      * Central path for all extension configuration files. Also holds
-     * aggregation_stage_fallback_parsers.json.
+     * aggregation_stage_stub_parsers.json.
      */
     static inline const std::filesystem::path kExtensionConfigPath{"/etc/mongo/extensions"};
 
