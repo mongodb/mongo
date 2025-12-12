@@ -30,11 +30,11 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/duplicate_key_tracker.h"
 #include "mongo/db/index_builds/index_builds_common.h"
+#include "mongo/db/index_builds/side_writes_tracker.h"
 #include "mongo/db/index_builds/skipped_record_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -42,9 +42,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/yieldable.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
@@ -61,11 +59,7 @@ namespace MONGO_MOD_PUBLIC mongo {
 class IndexBuildInterceptor {
 public:
     using RetrySkippedRecordMode = SkippedRecordTracker::RetrySkippedRecordMode;
-
-    /**
-     * Determines if we will yield locks while draining the side tables.
-     */
-    enum class DrainYieldPolicy { kNoYield, kYield };
+    using DrainYieldPolicy = SideWritesTracker::DrainYieldPolicy;
 
     enum class Op { kInsert, kDelete };
 
@@ -107,6 +101,7 @@ public:
      * On success, `numKeysOut` if non-null will contain the number of keys added or removed.
      */
     Status sideWrite(OperationContext* opCtx,
+                     const CollectionPtr& coll,
                      const IndexCatalogEntry* indexCatalogEntry,
                      const KeyStringSet& keys,
                      const KeyStringSet& multikeyMetadataKeys,
@@ -133,14 +128,9 @@ public:
                                         const CollectionPtr&,
                                         const IndexCatalogEntry* indexCatalogEntry) const;
 
-
     /**
-     * Performs a resumable scan on the side writes table, and either inserts or removes each key
-     * from the underlying IndexAccessMethod. This will only insert as many records as are visible
-     * in the current snapshot.
-     *
-     * This is resumable, so subsequent calls will start the scan at the record immediately
-     * following the last inserted record from a previous call to drainWritesIntoIndex.
+     * Drain the writes from the side writes table/tracker into the
+     * index identified by `indexCatalogEntry`.
      */
     Status drainWritesIntoIndex(OperationContext* opCtx,
                                 const CollectionPtr& coll,
@@ -197,7 +187,7 @@ public:
     boost::optional<MultikeyPaths> getMultikeyPaths() const;
 
     std::string getSideWritesTableIdent() const {
-        return std::string{_sideWritesTable->rs()->getIdent()};
+        return _sideWritesTracker.getTableIdent();
     }
 
     boost::optional<std::string> getDuplicateKeyTrackerTableIdent() const {
@@ -216,32 +206,7 @@ public:
 private:
     using SideWriteRecord = std::pair<RecordId, BSONObj>;
 
-    Status _applyWrite(OperationContext* opCtx,
-                       const CollectionPtr& coll,
-                       const IndexCatalogEntry* indexCatalogEntry,
-                       const BSONObj& doc,
-                       const InsertDeleteOptions& options,
-                       TrackDuplicates trackDups,
-                       int64_t* keysInserted,
-                       int64_t* keysDeleted);
-
     bool _checkAllWritesApplied(OperationContext* opCtx, bool fatal) const;
-
-    /**
-     * Yield lock manager locks and abandon the current storage engine snapshot.
-     */
-    void _yield(OperationContext* opCtx,
-                const IndexCatalogEntry* indexCatalogEntry,
-                const Yieldable* yieldable);
-
-    void _checkDrainPhaseFailPoint(OperationContext* opCtx,
-                                   const IndexCatalogEntry* indexCatalogEntry,
-                                   FailPoint* fp,
-                                   long long iteration) const;
-
-    Status _finishSideWrite(OperationContext* opCtx,
-                            const IndexCatalogEntry* indexCatalogEntry,
-                            const std::vector<BSONObj>& toInsert);
 
     // Indicates whether this node should produce any table writes during the index build. When
     // this is false, it means that this node is a secondary and is only applying writes received
@@ -257,25 +222,15 @@ private:
 
     // This temporary record store records intercepted keys that will be written into the index by
     // calling drainWritesIntoIndex(). It is owned by the interceptor and dropped along with it.
-    std::unique_ptr<TemporaryRecordStore> _sideWritesTable;
+    SideWritesTracker _sideWritesTracker;
 
     // Records RecordIds that have been skipped due to indexing errors.
     SkippedRecordTracker _skippedRecordTracker;
 
     std::unique_ptr<DuplicateKeyTracker> _duplicateKeyTracker;
 
-    int64_t _numApplied{0};
-
-    // This allows the counter to be used in a RecoveryUnit rollback handler where the
-    // IndexBuildInterceptor is no longer available (e.g. due to index build cleanup). If there are
-    // additional fields that have to be referenced in commit/rollback handlers, this counter should
-    // be moved to a new IndexBuildsInterceptor::InternalState structure that will be managed as a
-    // shared resource.
-    std::shared_ptr<AtomicWord<long long>> _sideWritesCounter =
-        std::make_shared<AtomicWord<long long>>(0);
-
-    // Whether to skip the check the the number of writes applied is equal to the number of writes
-    // recorded. Resumable index builds to not preserve these counts, so we skip this check for
+    // Whether to skip the check the number of writes applied is equal to the number of writes
+    // recorded. Resumable index builds do not preserve these counts, so we skip this check for
     // index builds that were resumed.
     const bool _skipNumAppliedCheck = false;
 

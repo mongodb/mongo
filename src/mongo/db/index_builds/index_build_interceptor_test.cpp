@@ -186,13 +186,17 @@ protected:
         CatalogTestFixture::tearDown();
     }
 
+    // Reusable function which executes the test and can be run under different configurations (eg.
+    // feature flags).
+    void testSingleInsertIsSavedToSideWritesTable();
+
     boost::optional<AutoGetCollection> _coll;
 
 private:
     NamespaceString _nss = NamespaceString::createNamespaceString_forTest("testDB.interceptor");
 };
 
-TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
+void IndexBuilderInterceptorTest::testSingleInsertIsSavedToSideWritesTable() {
     auto interceptor = createIndexBuildInterceptor(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     const auto entry = getIndexEntry("a_1");
 
@@ -203,6 +207,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
     WriteUnitOfWork wuow(operationContext());
     int64_t numKeys = 0;
     ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                     *_coll.get(),
                                      entry,
                                      {keyString},
                                      {},
@@ -221,6 +226,16 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
     ASSERT_BSONOBJ_EQ(BSON("op" << "i"
                                 << "key" << serializedKeyString),
                       sideWrites[0]);
+}
+
+TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
+    testSingleInsertIsSavedToSideWritesTable();
+}
+
+TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTablePrimaryDriven) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPrimaryDrivenIndexBuilds", true);
+    testSingleInsertIsSavedToSideWritesTable();
 }
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSkippedRecordsIntRidTrackerTable) {
@@ -356,6 +371,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
         WriteUnitOfWork wuow(operationContext());
         int64_t numKeys = 0;
         ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         *_coll.get(),
                                          entry,
                                          {keyString},
                                          {},
@@ -422,6 +438,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
         WriteUnitOfWork wuow(operationContext());
         int64_t numKeys = 0;
         ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         *_coll.get(),
                                          entry,
                                          {keyString},
                                          {},

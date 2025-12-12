@@ -1711,6 +1711,7 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
 
         int64_t inserted = 0;
         status = entry->indexBuildInterceptor()->sideWrite(opCtx,
+                                                           coll,
                                                            entry,
                                                            keys,
                                                            multikeyMetadataKeys,
@@ -1766,9 +1767,10 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
         }
 
         int64_t removed = 0;
-        fassert(31155,
-                entry->indexBuildInterceptor()->sideWrite(
-                    opCtx, entry, keys, {}, {}, IndexBuildInterceptor::Op::kDelete, &removed));
+        fassert(
+            31155,
+            entry->indexBuildInterceptor()->sideWrite(
+                opCtx, coll, entry, keys, {}, {}, IndexBuildInterceptor::Op::kDelete, &removed));
         if (keysDeletedOut) {
             *keysDeletedOut += removed;
         }

@@ -159,6 +159,7 @@ mongo_cc_library(
     srcs = [
         "duplicate_key_tracker.cpp",
         "index_build_interceptor.cpp",
+        "side_writes_tracker.cpp",
         "skipped_record_tracker.cpp",
         ":index_build_interceptor_gen",
     ],
