@@ -873,4 +873,139 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonBinDataValueDoesNotMat
     BSONObj notMatch = BSON("a" << BSONArray());
     ASSERT_FALSE(expr->matchesBSON(notMatch));
 }
+
+//
+// Tests for _id field type validation at parse time.
+// The _id field cannot be Array, RegEx, or Undefined (per storage_validation.cpp).
+// Queries for these types on _id should fail at parse time with InvalidIdField error.
+//
+
+TEST(MatchExpressionParserTest, ParseIdFieldWithArrayTypeReturnsError) {
+    // {_id: {$type: 'array'}} should fail to parse since _id cannot be an array.
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = BSON("_id" << BSON("$type"
+                                    << "array"));
+    auto result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::InvalidIdField);
+}
+
+TEST(MatchExpressionParserTest, ParseIdFieldWithArrayTypeNumericReturnsError) {
+    // {_id: {$type: 4}} should fail to parse since _id cannot be an array.
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = BSON("_id" << BSON("$type" << 4));
+    auto result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::InvalidIdField);
+}
+
+TEST(MatchExpressionParserTest, ParseIdFieldWithRegexTypeReturnsError) {
+    // {_id: {$type: 'regex'}} should fail to parse since _id cannot be a regex.
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = BSON("_id" << BSON("$type"
+                                    << "regex"));
+    auto result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::InvalidIdField);
+}
+
+TEST(MatchExpressionParserTest, ParseIdFieldWithRegexTypeNumericReturnsError) {
+    // {_id: {$type: 11}} should fail to parse since _id cannot be a regex.
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = BSON("_id" << BSON("$type" << 11));
+    auto result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::InvalidIdField);
+}
+
+TEST(MatchExpressionParserTest, ParseIdFieldWithUndefinedTypeReturnsError) {
+    // {_id: {$type: 'undefined'}} should fail to parse since _id cannot be undefined.
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = BSON("_id" << BSON("$type"
+                                    << "undefined"));
+    auto result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::InvalidIdField);
+}
+
+TEST(MatchExpressionParserTest, ParseIdFieldWithUndefinedTypeNumericReturnsError) {
+    // {_id: {$type: 6}} should fail to parse since _id cannot be undefined.
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = BSON("_id" << BSON("$type" << 6));
+    auto result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::InvalidIdField);
+}
+
+TEST(MatchExpressionParserTest, ParseIdFieldWithArrayInTypeArrayReturnsError) {
+    // {_id: {$type: ['array', 'objectId']}} should fail since array is invalid for _id.
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = BSON("_id" << BSON("$type" << BSON_ARRAY("array"
+                                                         << "objectId")));
+    auto result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::InvalidIdField);
+}
+
+TEST(MatchExpressionParserTest, ParseIdFieldWithValidTypeSucceeds) {
+    // {_id: {$type: 'string'}} should succeed since string is valid for _id.
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = BSON("_id" << BSON("$type"
+                                    << "string"));
+    auto result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::TYPE_OPERATOR);
+}
+
+TEST(MatchExpressionParserTest, ParseIdFieldWithObjectIdTypeSucceeds) {
+    // {_id: {$type: 'objectId'}} should succeed since objectId is valid for _id.
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = BSON("_id" << BSON("$type"
+                                    << "objectId"));
+    auto result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::TYPE_OPERATOR);
+}
+
+TEST(MatchExpressionParserTest, ParseIdFieldWithNumberAliasSucceeds) {
+    // {_id: {$type: 'number'}} should succeed since numbers are valid for _id.
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = BSON("_id" << BSON("$type"
+                                    << "number"));
+    auto result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::TYPE_OPERATOR);
+}
+
+TEST(MatchExpressionParserTest, ParseNonIdFieldWithArrayTypeSucceeds) {
+    // {a: {$type: 'array'}} should succeed since 'a' is not _id.
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = BSON("a" << BSON("$type"
+                                  << "array"));
+    auto result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::TYPE_OPERATOR);
+}
+
+TEST(MatchExpressionParserTest, ParseNestedIdPathWithArrayTypeSucceeds) {
+    // {_id.a: {$type: 'array'}} should succeed since '_id.a' is a nested path.
+    // The _id field itself cannot be an array, but nested fields within _id can be.
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = BSON("_id.a" << BSON("$type"
+                                      << "array"));
+    auto result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::TYPE_OPERATOR);
+}
+
+TEST(MatchExpressionParserTest, ParseEmbeddedIdFieldWithArrayTypeSucceeds) {
+    // {a._id: {$type: 'array'}} should succeed since 'a._id' is not the top-level _id.
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = BSON("a._id" << BSON("$type"
+                                      << "array"));
+    auto result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::TYPE_OPERATOR);
+}
+
 }  // namespace mongo
