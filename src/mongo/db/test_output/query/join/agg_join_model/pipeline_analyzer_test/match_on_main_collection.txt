@@ -49,6 +49,17 @@
                 ],
                 "left": {"$numberInt":"0"},
                 "right": {"$numberInt":"2"}
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"1"},
+                        "right": {"$numberInt":"2"}
+                    }
+                ],
+                "left": {"$numberInt":"1"},
+                "right": {"$numberInt":"2"}
             }
         ]
     },

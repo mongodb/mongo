@@ -47,8 +47,11 @@ struct AggJoinModel {
      * Factory function to construct an AggJoinModel instance from a 'pipeline'. If construction
      * succeeds, ownership of the pipeline will be transferred to the 'AggJoinModel'. If
      * construction fails, a status is returned and the pipeline remains unmodified.
+     * * `maxNumberNodesConsideredForImplicitEdges` is the maximum number of nodes allowed in a
+     * connected component to be used for implicit edge finding.
      */
-    static StatusWith<AggJoinModel> constructJoinModel(const Pipeline& pipeline);
+    static StatusWith<AggJoinModel> constructJoinModel(
+        const Pipeline& pipeline, size_t maxNumberNodesConsideredForImplicitEdges);
 
     AggJoinModel(JoinGraph graph,
                  std::vector<ResolvedPath> resolvedPaths,
@@ -92,13 +95,5 @@ struct AggJoinModel {
     std::string toString(bool pretty) const {
         return toBSON().jsonString(/*format*/ ExtendedCanonicalV2_0_0, pretty);
     }
-
-    /**
-     * Find and add implicit (transitive) esges within the graph.
-     * `maxNodes` is the maximum number of nodes allowed in a connected component to be used for
-     * implicit edge finding.
-     * Example: two edges A.a = B.b and B.b = C.c form an implicit edge A.a = C.c.
-     */
-    void addImplicitEdges(size_t maxNodes);
 };
 }  // namespace mongo::join_ordering

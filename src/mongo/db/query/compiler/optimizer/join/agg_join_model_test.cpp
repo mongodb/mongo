@@ -52,6 +52,8 @@ std::vector<BSONObj> pipelineFromJsonArray(StringData jsonArray) {
 
 class PipelineAnalyzerTest : public AggregationContextFixture {
 protected:
+    static constexpr size_t kMaxNumberNodesConsideredForImplicitEdges = 4;
+
     auto makePipeline(StringData query, std::vector<StringData> collNames) {
         stdx::unordered_set<NamespaceString> secondaryNamespaces;
         for (auto&& collName : collNames) {
@@ -96,7 +98,8 @@ TEST_F(PipelineAnalyzerTest, PipelinePrefixEligibleForJoinReorderingNoLocalForei
     // This pipeline's prefix is eligible for reordering.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, kMaxNumberNodesConsideredForImplicitEdges);
     ASSERT_OK(swJoinModel);
 
     auto& joinModel = swJoinModel.getValue();
@@ -114,7 +117,8 @@ TEST_F(PipelineAnalyzerTest, PipelineEligibleForJoinReorderingSingleLookupUnwind
     // This pipeline is eligible for reordering.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, kMaxNumberNodesConsideredForImplicitEdges);
     ASSERT_OK(swJoinModel);
 
     auto& joinModel = swJoinModel.getValue();
@@ -155,7 +159,8 @@ TEST_F(PipelineAnalyzerTest, TwoLookupUnwinds) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, kMaxNumberNodesConsideredForImplicitEdges);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
@@ -174,7 +179,8 @@ TEST_F(PipelineAnalyzerTest, MatchOnMainCollection) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, kMaxNumberNodesConsideredForImplicitEdges);
     ASSERT_OK(swJoinModel);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
@@ -195,7 +201,8 @@ TEST_F(PipelineAnalyzerTest, MatchInSubPipeline) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, kMaxNumberNodesConsideredForImplicitEdges);
     ASSERT_OK(swJoinModel);
 
     const auto& joinModel = swJoinModel.getValue();
@@ -221,7 +228,8 @@ TEST_F(PipelineAnalyzerTest, GroupOnMainCollection) {
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
     // But we fail to construct a model here, because $group isn't pushed into SBE.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, kMaxNumberNodesConsideredForImplicitEdges);
     ASSERT_EQ(swJoinModel.getStatus(), ErrorCodes::QueryFeatureNotAllowed);
 }
 
@@ -241,7 +249,8 @@ TEST_F(PipelineAnalyzerTest, GroupInMiddleIneligible) {
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
     // This should show that our suffix starts at the $group.
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, kMaxNumberNodesConsideredForImplicitEdges);
     ASSERT_OK(swJoinModel);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
@@ -261,7 +270,8 @@ TEST_F(PipelineAnalyzerTest, GroupInSubPipeline) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, kMaxNumberNodesConsideredForImplicitEdges);
     ASSERT_NOT_OK(swJoinModel);
 
     // Ensure we haven't modified our pipeline.
@@ -333,7 +343,8 @@ TEST_F(PipelineAnalyzerTest, IneligibleSubPipelineStage) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, kMaxNumberNodesConsideredForImplicitEdges);
     ASSERT_NOT_OK(swJoinModel);
 
     // Ensure we haven't modified our pipeline.
@@ -406,7 +417,8 @@ TEST_F(PipelineAnalyzerTest, LongPrefix) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, kMaxNumberNodesConsideredForImplicitEdges);
     ASSERT_OK(swJoinModel);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
@@ -425,7 +437,8 @@ TEST_F(PipelineAnalyzerTest, LocalFieldOverride) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
-    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline);
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, kMaxNumberNodesConsideredForImplicitEdges);
     ASSERT_OK(swJoinModel);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;

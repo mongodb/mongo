@@ -157,7 +157,11 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     }
 
     // Try to build JoinGraph.
-    auto swModel = AggJoinModel::constructJoinModel(pipeline);
+    auto swModel =
+        AggJoinModel::constructJoinModel(pipeline,
+                                         pipeline.getContext()
+                                             ->getQueryKnobConfiguration()
+                                             .getMaxNumberNodesConsideredForImplicitEdges());
     if (!swModel.isOK()) {
         // We failed to apply join-reordering, so we take the regular path.
         const auto status = swModel.getStatus();

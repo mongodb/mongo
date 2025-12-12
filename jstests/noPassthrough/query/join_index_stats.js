@@ -79,6 +79,8 @@ const pipeline = [
 ];
 
 assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
+// TODO SERVER-111798: Adding implicit edges creates cycles in the graph, which are not currently supported.
+assert.commandWorked(conn.adminCommand({setParameter: 1, internalMaxNumberNodesConsideredForImplicitEdges: 0}));
 dropAndRecreateColls();
 const explain = coll1.explain().aggregate(pipeline);
 assert(joinOptimizerUsed(explain), "Join optimizer was not used as expected: " + tojson(explain));

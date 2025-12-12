@@ -120,6 +120,8 @@ function runRandomReorderTests(pipeline) {
             internalJoinReorderMode: "random",
             internalEnableJoinOptimization: true,
             internalRandomJoinReorderDefaultToHashJoin: true,
+            // TODO SERVER-111798: Adding implicit edges creates cycles in the graph, which are not supported by the random reordering.
+            internalMaxNumberNodesConsideredForImplicitEdges: 0,
         };
         assert.commandWorked(db.adminCommand({setParameter: 1, ...params}));
         let seed = 0;

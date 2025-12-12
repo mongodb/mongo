@@ -122,6 +122,40 @@ bool isLookupEligible(const DocumentSourceLookUp& lookup) {
         dynamic_cast<DocumentSourceMatch*>(lookup.getResolvedIntrospectionPipeline().peekFront());
 }
 
+/**
+ * Find and add implicit (transitive) edges within the graph.
+ * `maxNodes` is the maximum number of nodes allowed in a connected component to be used for
+ * implicit edge finding.
+ * Example: two edges A.a = B.b and B.b = C.c form an implicit edge A.a = C.c.
+ */
+void addImplicitEdges(JoinGraph& graph,
+                      const std::vector<ResolvedPath>& resolvedPaths,
+                      size_t maxNodes) {
+    DisjointSet ds{resolvedPaths.size()};
+    for (const auto& edge : graph.edges()) {
+        for (const auto& pred : edge.predicates) {
+            if (pred.op == JoinPredicate::Eq) {
+                ds.unite(pred.left, pred.right);
+            }
+        }
+    }
+
+    stdx::unordered_map<size_t, absl::InlinedVector<PathId, 8>> pathSets{};
+    for (size_t i = 0; i < ds.size(); ++i) {
+        auto setId = ds.find(i);
+        tassert(11116502, "Unknown pathId", setId.has_value());
+        auto& pathSet = pathSets[setId.value()];
+        if (pathSet.size() < maxNodes) {
+            const PathId currentPathId = static_cast<PathId>(i);
+            const NodeId currentNodeId = resolvedPaths[currentPathId].nodeId;
+            for (PathId pathId : pathSet) {
+                const NodeId nodeId = resolvedPaths[pathId].nodeId;
+                graph.addSimpleEqualityEdge(nodeId, currentNodeId, pathId, currentPathId);
+            }
+            pathSet.push_back(currentPathId);
+        }
+    }
+}
 }  // namespace
 
 bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
@@ -141,7 +175,8 @@ bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
     });
 }
 
-StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeline) {
+StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
+    const Pipeline& pipeline, size_t maxNumberNodesConsideredForImplicitEdges) {
     // Try to create a CanonicalQuery. We begin by cloning the pipeline (this includes
     // sub-pipelines!) to ensure that if we bail out, this stays idempotent.
     // TODO SERVER-111383: We should see if we can make createCanonicalQuery() idempotent instead.
@@ -232,6 +267,8 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
         return Status(ErrorCodes::QueryFeatureNotAllowed, "Join reordering not allowed");
     }
 
+    addImplicitEdges(graph, resolvedPaths, maxNumberNodesConsideredForImplicitEdges);
+
     return AggJoinModel(
         std::move(graph), std::move(resolvedPaths), std::move(prefix), std::move(suffix));
 }
@@ -249,32 +286,5 @@ BSONObj AggJoinModel::toBSON() const {
     result.append("prefix", pipelineToBSON(prefix));
     result.append("suffix", pipelineToBSON(suffix));
     return result.obj();
-}
-
-void AggJoinModel::addImplicitEdges(size_t maxNodes) {
-    DisjointSet ds{resolvedPaths.size()};
-    for (const auto& edge : graph.edges()) {
-        for (const auto& pred : edge.predicates) {
-            if (pred.op == JoinPredicate::Eq) {
-                ds.unite(pred.left, pred.right);
-            }
-        }
-    }
-
-    stdx::unordered_map<size_t, absl::InlinedVector<PathId, 8>> pathSets{};
-    for (size_t i = 0; i < ds.size(); ++i) {
-        auto setId = ds.find(i);
-        tassert(11116502, "Unknown pathId", setId.has_value());
-        auto& pathSet = pathSets[setId.value()];
-        if (pathSet.size() < maxNodes) {
-            const PathId currentPathId = static_cast<PathId>(i);
-            const NodeId currentNodeId = resolvedPaths[currentPathId].nodeId;
-            for (PathId pathId : pathSet) {
-                const NodeId nodeId = resolvedPaths[pathId].nodeId;
-                graph.addSimpleEqualityEdge(nodeId, currentNodeId, pathId, currentPathId);
-            }
-            pathSet.push_back(currentPathId);
-        }
-    }
 }
 }  // namespace mongo::join_ordering

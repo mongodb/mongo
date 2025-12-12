@@ -77,6 +77,7 @@ public:
     size_t getRandomJoinOrderSeed() const;
     JoinReorderModeEnum getJoinReorderMode() const;
     JoinPlanTreeShapeEnum getJoinPlanTreeShape() const;
+    size_t getMaxNumberNodesConsideredForImplicitEdges() const;
 
     /**
      * Returns whether we can push down fully compatible stages to sbe. This is only true when the
@@ -114,6 +115,7 @@ private:
     int64_t _randomJoinOrderSeed;
     JoinReorderModeEnum _joinReorderMode;
     JoinPlanTreeShapeEnum _joinPlanTreeShape;
+    int64_t _maxNumberNodesConsideredForImplicitEdges;
 
     int64_t _internalQuerySpillingMinAvailableDiskSpaceBytes;
 };

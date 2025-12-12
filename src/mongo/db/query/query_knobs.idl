@@ -565,6 +565,18 @@ server_parameters:
             expr: JoinPlanTreeShapeEnum::kZigZag
         redact: false
 
+    internalMaxNumberNodesConsideredForImplicitEdges:
+        description: >-
+            the maximum number of nodes allowed in a connected component to be used for
+            implicit edge finding."
+        set_at: [startup, runtime]
+        cpp_varname: internalMaxNumberNodesConsideredForImplicitEdges
+        cpp_vartype: AtomicWord<int>
+        default: 4
+        validator:
+            gte: 0
+        redact: false
+
     internalQueryMaxPipelineRewrites:
         description: "Maximum number of pipeline rewrite rules to apply"
         set_at: [startup, runtime]

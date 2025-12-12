@@ -88,6 +88,8 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
     _joinPlanTreeShape = ServerParameterSet::getNodeParameterSet()
                              ->get<JoinPlanTreeShape>("internalJoinPlanTreeShape")
                              ->_data.get();
+    _maxNumberNodesConsideredForImplicitEdges =
+        internalMaxNumberNodesConsideredForImplicitEdges.load();
 }
 
 QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
@@ -124,6 +126,10 @@ JoinReorderModeEnum QueryKnobConfiguration::getJoinReorderMode() const {
 
 JoinPlanTreeShapeEnum QueryKnobConfiguration::getJoinPlanTreeShape() const {
     return _joinPlanTreeShape;
+}
+
+size_t QueryKnobConfiguration::getMaxNumberNodesConsideredForImplicitEdges() const {
+    return _maxNumberNodesConsideredForImplicitEdges;
 }
 
 double QueryKnobConfiguration::getSamplingMarginOfError() const {

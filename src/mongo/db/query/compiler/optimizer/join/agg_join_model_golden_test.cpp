@@ -36,6 +36,8 @@
 namespace mongo::join_ordering {
 class AggJoinModelGoldenTest : public AggregationContextFixture {
 public:
+    static constexpr size_t kMaxNumberNodesConsideredForImplicitEdges = 4;
+
     AggJoinModelGoldenTest() : _cfg{"src/mongo/db/test_output/query/compiler/optimizer/join"} {
         _opCtx = _serviceContext.makeOperationContext();
     }
@@ -46,10 +48,10 @@ public:
         ctx.outStream() << "VARIATION " << variationName << std::endl;
         ctx.outStream() << "input " << toString(pipeline) << std::endl;
 
-        auto joinModel = AggJoinModel::constructJoinModel(*pipeline);
+        auto joinModel =
+            AggJoinModel::constructJoinModel(*pipeline, kMaxNumberNodesConsideredForImplicitEdges);
 
         if (joinModel.isOK()) {
-            joinModel.getValue().addImplicitEdges(4);
             ctx.outStream() << "output: " << joinModel.getValue().toString(/*pretty*/ true)
                             << std::endl;
         } else {
