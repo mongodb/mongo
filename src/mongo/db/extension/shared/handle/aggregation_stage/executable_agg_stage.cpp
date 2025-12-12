@@ -115,7 +115,7 @@ void ExecAggStageHandle::close() {
 
 BSONObj ExecAggStageHandle::explain(mongo::ExplainOptions::Verbosity verbosity) const {
     assertValid();
-    ::MongoExtensionByteBuf* buf;
+    ::MongoExtensionByteBuf* buf{nullptr};
     auto extVerbosity = convertHostVerbosityToExtVerbosity(verbosity);
     invokeCAndConvertStatusToException(
         [&]() { return vtable().explain(get(), extVerbosity, &buf); });
