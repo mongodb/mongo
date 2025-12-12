@@ -37,24 +37,60 @@
 
 namespace mongo {
 
-void BM_PathArraynessBuild(benchmark::State& state) {
-    size_t seed = 1354754;
-    size_t seed2 = 3421354754;
+/**
+ * Preset values determining the number of paths per group based on the desired trie width.
+ */
+std::map<TrieWidth, int> trieWidthPresets = {
+    {TrieWidth::kNarrow, 15}, {TrieWidth::kMediumWidth, 10}, {TrieWidth::kWide, 5}};
 
+/**
+ * Helper used to parse test parameters and generate fieldpaths using that configuration.
+ */
+std::vector<std::pair<std::string, MultikeyComponents>> generatePathsToInsert(
+    benchmark::State& state, size_t seed, size_t seed2) {
     // Number of paths to insert.
     int numberOfPaths = static_cast<int>(state.range(0));
 
+    // Width of trie generated field paths should create.
+    TrieWidth trieWidth = static_cast<TrieWidth>(state.range(3));
+
+    // Width of the generated trie. Paths generated with the same length will be identical, so the
+    // number of distinct lengths controls the variety of the paths, and thus the width of the trie.
+    // We increase the size of each identical group to decrease the width of the trie and vice
+    // versa.
+    int numPathsPerGroup = trieWidthPresets[trieWidth];
+
+    // Depth of the generated trie. This is controlled by skewing the average path length higher or
+    // lower to generate a deeper or shallower trie respectively.
+    TrieDepth trieDepth = static_cast<TrieDepth>(state.range(4));
+
     // Number of distinct lengths of paths.
-    // by default we chose that we have 5 field paths for each length.
-    auto ndvLengths = numberOfPaths / 5;
+    int ndvLengths = numberOfPaths / numPathsPerGroup;
+
     // Maximum length of dotted field paths.
-    int maxLength = static_cast<int>(state.range(1));
+    size_t maxLength = static_cast<size_t>(state.range(1));
+
+    // Maximum length of each component of a dotted field path
+    // The size of the range of possible lengths we choose from is 10 by default, and the bottom
+    // bound must always be at least 1.
+    int maxFieldNameLength = static_cast<int>(2);
+    std::pair<int, int> rangeFieldNameLength(std::max(maxFieldNameLength - 10, 1),
+                                             maxFieldNameLength);
 
     // Generate the fieldpath, multikeycomponents info pairs that will be inserted into the path
     // arrayness data structure.
     std::vector<std::pair<std::string, MultikeyComponents>> pathsToInsert =
         generateRandomFieldPathsWithArraynessInfo(
-            numberOfPaths, maxLength, ndvLengths, seed, seed2);
+            numberOfPaths, maxLength, ndvLengths, seed, seed2, rangeFieldNameLength, trieDepth);
+
+    return pathsToInsert;
+}
+
+void BM_PathArraynessBuild(benchmark::State& state) {
+    size_t seed = 1354754;
+    size_t seed2 = 3421354754;
+
+    auto pathsToInsert = generatePathsToInsert(state, seed, seed2);
 
     for (auto _ : state) {
         PathArrayness pathArrayness;
@@ -68,20 +104,10 @@ void BM_PathArraynessLookup(benchmark::State& state) {
     size_t seed = 1354754;
     size_t seed2 = 3421354754;
 
-    // Number of paths to insert.
-    int numberOfPathsInTrie = static_cast<int>(state.range(0));
+    auto pathsToInsert = generatePathsToInsert(state, seed, seed2);
 
-    // Number of distinct lengths of paths.
-    // by default we chose that we have 5 field paths for each length.
-    auto ndvLengthsInTrie = numberOfPathsInTrie / 5;
     // Maximum length of dotted field paths.
-    int maxLengthInTrie = static_cast<int>(state.range(1));
-
-    // Generate the fieldpath, multikeycomponents info pairs that will be inserted into the path
-    // arrayness data structure.
-    std::vector<std::pair<std::string, MultikeyComponents>> pathsToInsert =
-        generateRandomFieldPathsWithArraynessInfo(
-            numberOfPathsInTrie, maxLengthInTrie, ndvLengthsInTrie, seed, seed2);
+    size_t maxLength = static_cast<size_t>(state.range(1));
 
     // Build the path arrayness data structure.
     PathArrayness pathArrayness;
@@ -90,22 +116,37 @@ void BM_PathArraynessLookup(benchmark::State& state) {
     }
 
     // Number of paths to query.
-    int numberOfPathsQuery = static_cast<int>(state.range(2));
+    size_t numberOfPathsQuery = static_cast<size_t>(state.range(5));
 
     // Number of distinct lengths of paths to query.
-    // by default we chose that we have 5 field paths for each length.
-    auto ndvLengthsQuery = numberOfPathsQuery / 5;
-    int maxLengthQuery = static_cast<int>(state.range(3));
+    // By default we chose that we have 5 field paths for each length.
+    size_t maxLengthQuery = static_cast<size_t>(state.range(6));
 
-    // Generate the fieldpath, multikeycomponents info pairs that will be used to query the
-    // arrayness structure. Here we use only the fieldpath names and discard the multikeycomponents.
-    std::vector<std::pair<std::string, MultikeyComponents>> pathsToQuery =
-        generateRandomFieldPathsWithArraynessInfo(
-            numberOfPathsQuery, maxLengthQuery, ndvLengthsQuery, seed, seed2);
+    // We extract a uniformly distributed selection of the fieldpaths used to build the
+    // PathArrayness trie to be used as the fieldpaths to query, truncating any that exceed
+    // maxLengthQuery. This ensures that we query only paths that exist in the tree while allowing
+    // control over the maximum depth we search to.
+    std::vector<std::string> pathsToQuery;
+    pathsToQuery.reserve(pathsToInsert.size());
+
+    int increment = std::max(pathsToInsert.size() / numberOfPathsQuery, static_cast<size_t>(1));
+
+    std::string truncatedPath;
+    for (size_t i = 0; i < pathsToInsert.size(); i += increment) {
+        if (maxLengthQuery < maxLength) {
+            truncatedPath = truncatePathToLength(pathsToInsert[i].first, maxLengthQuery);
+        } else {
+            truncatedPath = pathsToInsert[i].first;
+        }
+        pathsToQuery.push_back(truncatedPath);
+    }
 
     for (auto _ : state) {
-        for (size_t i = 0; i < pathsToQuery.size(); i++) {
-            pathArrayness.isPathArray(pathsToQuery[i].first);
+        for (size_t i = 0; i < numberOfPathsQuery; i++) {
+            // numberOfPathsQuery could be larger than the number of paths we have, so we take the
+            // modulo of the index in order to wrap back around to the start of the array if that's
+            // the case.
+            pathArrayness.isPathArray(pathsToQuery[i % pathsToQuery.size()]);
         }
     }
 }
@@ -114,15 +155,21 @@ BENCHMARK(BM_PathArraynessBuild)
     ->ArgNames({
         "numberOfPaths",
         "maxLength",
+        "maxFieldNameLength",
+        "trieWidth",
+        "trieDepth",
     })
     ->ArgsProduct({
-        /*numberOfPaths*/ {
-            64  //, 512, 1024, 2048
-        },
+        /*numberOfPaths*/
+        {64, 512, 1024, 2048},
         /*maxLength*/
-        {
-            10  //, 50, 100
-        },
+        {10, 50, 100},
+        /*maxFieldNameLength: */
+        {5, 125, 250},
+        /*trieWidth*/
+        {TrieWidth::kNarrow, TrieWidth::kMediumWidth, TrieWidth::kWide},
+        /*trieDepth*/
+        {TrieDepth::kShallow, TrieDepth::kMediumDepth, TrieDepth::kDeep},
     })
     ->Unit(benchmark::kMillisecond)
     ->Iterations(1);  // Restrict number of iterations to avoid time out.
@@ -131,25 +178,27 @@ BENCHMARK(BM_PathArraynessLookup)
     ->ArgNames({
         "numberOfPaths",
         "maxLength",
+        "maxFieldNameLength",
+        "trieWidth",
+        "trieDepth",
         "numberOfPathsQuery",
         "maxLengthQuery",
     })
     ->ArgsProduct({
-        /*numberOfPaths*/ {
-            64  //, 512, 1024, 2048
-        },
+        /*numberOfPaths*/
+        {64, 512, 1024, 2048},
         /*maxLength*/
-        {
-            10  //, 50, 100
-        },
+        {10, 50, 100},
+        /*maxFieldNameLength: */
+        {5, 125, 250},
+        /*trieWidth*/
+        {TrieWidth::kNarrow, TrieWidth::kMediumWidth, TrieWidth::kWide},
+        /*trieDepth*/
+        {TrieDepth::kShallow, TrieDepth::kMediumDepth, TrieDepth::kDeep},
         /*numberOfPathsQuery*/
-        {
-            50  //, 100, 200
-        },
+        {50, 100, 200},
         /*maxLengthQuery*/
-        {
-            10  //, 50, 100
-        },
+        {10, 50, 100},
     })
     ->Unit(benchmark::kMillisecond)
     ->Iterations(1);  // Restrict number of iterations to avoid time out.

@@ -34,35 +34,77 @@
 namespace mongo {
 
 std::vector<std::pair<std::string, MultikeyComponents>> generateRandomFieldPathsWithArraynessInfo(
-    int numberOfPaths, int maxLength, int ndvLengths, size_t seed, size_t seed2) {
-    std::pair<size_t, size_t> dataInterval = {1, maxLength};
+    int numberOfPaths,
+    int maxLength,
+    int ndvLengths,
+    size_t seed,
+    size_t seed2,
+    std::pair<int, int> rangeFieldNameLength, /*default std::pair(1,4)*/
+    TrieDepth trieDepth /*default TrieDepth::kMediumDepth*/) {
 
+    std::pair<size_t, size_t> dataInterval = {1, maxLength};
     std::vector<stats::SBEValue> data;
+
+    // Determine which distribution to use
+    stats::DistrType distribution;
+    bool invertForRightSkew = false;
+    switch (trieDepth) {
+        case TrieDepth::kShallow:
+            // The Zipfian distribution is left skewed so this will produce more short field paths
+            // than long and thus (on average) a shallower trie.
+            distribution = stats::DistrType::kZipfian;
+            break;
+        case TrieDepth::kMediumDepth:
+            // Field paths' lengths will be evenly distributed
+            distribution = stats::DistrType::kUniform;
+            break;
+        case TrieDepth::kDeep:
+            // Inverting the Zipfian distribution will make it right skewed and produce more long
+            // field paths than short and thus (on average) a deeper trie.
+            distribution = stats::DistrType::kZipfian;
+            invertForRightSkew = true;
+            break;
+    }
+
     // Generate data according to the provided configuration
     ce::generateDataOneField(ndvLengths,
                              numberOfPaths,
                              {ce::parseCollectionType(sbe::value::TypeTags::NumberInt64)},
-                             /*dataDistribution*/ stats::DistrType::kUniform,
+                             distribution,
                              dataInterval,
                              seed,
                              /*arrayTypeLength*/ 0,
                              data);
+
+    // If right skew, invert the generated values
+    if (invertForRightSkew) {
+        for (auto& value : data) {
+            tassert(11202201,
+                    "Expected NumberInt64 type for path length values",
+                    value.getTag() == sbe::value::TypeTags::NumberInt64);
+            int64_t zipfianValue = sbe::value::bitcastTo<int64_t>(value.getValue());
+            // Invert: max - zipfian + min to get right skew
+            int64_t invertedValue = static_cast<int64_t>(dataInterval.second) - zipfianValue +
+                static_cast<int64_t>(dataInterval.first);
+            value = stats::SBEValue{stats::makeInt64Value(invertedValue)};
+        }
+    }
 
     std::vector<std::pair<std::string, MultikeyComponents>> pathsToInsert;
     for (const auto& length : data) {
         std::vector<stats::SBEValue> fieldNames;
         // Generate the strings for the fieldnames. Setting NDV as 5x the number of field paths to
         // generate, to increase variety.
-        // data interval defines the length of the strings (set currently between 1 and 4 character
-        // length)
-        ce::generateDataOneField(/*ndv*/ length.getValue() * 5,
-                                 /*size*/ length.getValue(),
-                                 {ce::parseCollectionType(sbe::value::TypeTags::StringSmall)},
-                                 /*dataDistribution*/ stats::DistrType::kUniform,
-                                 /*dataInterval*/ {1, 4},
-                                 seed2,
-                                 /*arrayTypeLength*/ 0,
-                                 fieldNames);
+        // dataInterval defines the length of the strings
+        ce::generateDataOneField(
+            /*ndv*/ length.getValue() * 5,
+            /*size*/ length.getValue(),
+            {ce::parseCollectionType(sbe::value::TypeTags::StringSmall)},
+            /*dataDistribution*/ stats::DistrType::kUniform,
+            rangeFieldNameLength,
+            seed2,
+            /*arrayTypeLength*/ 0,
+            fieldNames);
 
         // Generate the arrayness of the individual fields randomly.
         std::vector<stats::SBEValue> fieldArrayness;
@@ -86,7 +128,6 @@ std::vector<std::pair<std::string, MultikeyComponents>> generateRandomFieldPaths
 
         int currentDepth = 0;
         for (const auto& fieldName : fieldNames) {
-
             // Add the dots in between.
             if (!fieldPath.str().empty()) {
                 fieldPath << ".";
@@ -158,6 +199,24 @@ stdx::unordered_map<std::string, bool> tranformVectorToMap(
     }
 
     return result;
+}
+
+std::string truncatePathToLength(std::string path, size_t maxLength) {
+    size_t length = 0;
+    size_t lastDotIndex = 0;
+
+    while (length < maxLength) {
+        lastDotIndex = path.find('.', lastDotIndex + 1);
+        length += 1;
+
+        if (lastDotIndex == std::string::npos) {
+            return path;
+        }
+    }
+
+    // We want the path up until the index at which we either hit the end of the path or the
+    // maximum desired length
+    return path.substr(0, lastDotIndex);
 }
 
 }  // namespace mongo
