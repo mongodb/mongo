@@ -738,14 +738,14 @@ private:
                               SbeHashAggIncreasedSpillingModeEnum forceIncreasedSpillingMode) {
         switch (forceIncreasedSpillingMode) {
             case SbeHashAggIncreasedSpillingModeEnum::kAlways:
-                return true;
+                return allowDiskUse;
             case SbeHashAggIncreasedSpillingModeEnum::kNever:
                 return false;
             case SbeHashAggIncreasedSpillingModeEnum::kInDebug:
                 return kDebugBuild && allowDiskUse;
-            default:
-                tasserted(9915702, "Unknown forceIncreasedSpillingMode");
         }
+
+        tasserted(9915702, "Unknown forceIncreasedSpillingMode");
     }
 };
 }  // namespace mongo::stage_builder
