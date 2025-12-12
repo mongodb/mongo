@@ -45,6 +45,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -240,9 +241,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                     _performNoopWriteOnDataShardsAndConfigServer(opCtx, nss(), session, **executor);
                 }
 
-                // Stop migrations before checking indexes considering any concurrent index
-                // creation/drop with migrations could leave the cluster with inconsistent indexes,
-                // PM-2077 should address that.
+                // Stop migrations during most of the execution of the coordinator to guarantee a
+                // stable placement.
                 {
                     const auto session = getNewSession(opCtx);
                     sharding_ddl_util::stopMigrations(
@@ -250,7 +250,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 }
 
                 const auto& ns = nss();
-                auto const shardsWithData = getShardsWithDataForCollection(opCtx, ns);
 
                 // fetch the collection metadata and install it on each shard
                 if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
@@ -263,27 +262,45 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
 
                     const auto session = getNewSession(opCtx);
                     sharding_ddl_util::sendFetchCollMetadataToShards(
-                        opCtx, ns, shardsWithData, session, executor, token);
+                        opCtx,
+                        ns,
+                        getShardsWithDataForCollection(opCtx, ns),
+                        session,
+                        executor,
+                        token);
                 }
 
-                sharding::router::CollectionRouter router(opCtx, ns);
-                router.route("validating indexes for refineCollectionShardKey"_sd,
-                             [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                                 ShardsvrValidateShardKeyCandidate validateRequest(ns);
-                                 validateRequest.setKey(_doc.getNewShardKey());
-                                 validateRequest.setEnforceUniquenessCheck(
-                                     _request.getEnforceUniquenessCheck());
-                                 validateRequest.setDbName(DatabaseName::kAdmin);
+                ShardsvrValidateShardKeyCandidate validateRequest(ns);
+                validateRequest.setKey(_doc.getNewShardKey());
+                validateRequest.setEnforceUniquenessCheck(_request.getEnforceUniquenessCheck());
+                validateRequest.setDbName(DatabaseName::kAdmin);
+                const auto bsonCmd = validateRequest.toBSON();
 
-                                 sharding_util::sendCommandToShardsWithVersion(
-                                     opCtx,
-                                     ns.dbName(),
-                                     validateRequest.toBSON(),
-                                     shardsWithData,
-                                     **executor,
-                                     cri,
-                                     true /* throwOnError */);
-                             });
+                sharding::router::CollectionRouter router(opCtx, ns);
+                router.routeWithRoutingContext(
+                    "validating indexes for refineCollectionShardKey"_sd,
+                    [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                        // TODO SERVER-115323: Consider using a (new) variant of
+                        // sendAuthenticatedCommandToShards()
+                        const auto responses = scatterGatherVersionedTargetByRoutingTable(
+                            opCtx,
+                            routingCtx,
+                            ns,
+                            bsonCmd,
+                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                            Shard::RetryPolicy::kIdempotent,
+                            /*query=*/{},
+                            /*collation=*/{},
+                            /*letParameters=*/boost::none,
+                            /*runtimeConstants=*/boost::none,
+                            /*eligibleForSampling=*/false,
+                            **executor);
+
+                        for (const auto& response : responses) {
+                            uassertStatusOK(
+                                AsyncRequestsSender::Response::getEffectiveStatus(response));
+                        }
+                    });
             }))
         .then(_buildPhaseHandler(
             Phase::kBlockCrud,

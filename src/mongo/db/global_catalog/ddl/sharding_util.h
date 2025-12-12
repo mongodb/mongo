@@ -89,19 +89,6 @@ MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> sendComma
     bool throwOnError = true);
 
 /**
- * Generic utility to send a command to a list of shards attaching the shard version to the request.
- * If `throwOnError=true`, throws in case one of the commands fails.
- */
-MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response>
-sendCommandToShardsWithVersion(OperationContext* opCtx,
-                               const DatabaseName& dbName,
-                               const BSONObj& command,
-                               const std::vector<ShardId>& shardIds,
-                               const std::shared_ptr<executor::TaskExecutor>& executor,
-                               const CollectionRoutingInfo& cri,
-                               bool throwOnError = true);
-
-/**
  * Helper function to create an index on a collection locally.
  */
 MONGO_MOD_NEEDS_REPLACEMENT Status createIndexOnCollection(OperationContext* opCtx,

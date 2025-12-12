@@ -160,7 +160,8 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const std::vector<AsyncRequestsSender::Request>& requests,
-    RoutingContext* routingCtx = nullptr);
+    RoutingContext* routingCtx = nullptr,
+    std::shared_ptr<executor::TaskExecutor> executor = nullptr);
 
 /**
  * Returns a copy of 'cmdObj' with dbVersion appended if it exists in 'dbInfo'
@@ -332,7 +333,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
     const BSONObj& collation,
     const boost::optional<BSONObj>& letParameters,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
-    bool eligibleForSampling = false);
+    bool eligibleForSampling = false,
+    std::shared_ptr<executor::TaskExecutor> executor = nullptr);
 
 /**
  * This overload is for callers which already have a fully initialized 'ExpressionContext' (e.g.
@@ -347,7 +349,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
     Shard::RetryPolicy retryPolicy,
     const BSONObj& query,
     const BSONObj& collation,
-    bool eligibleForSampling = false);
+    bool eligibleForSampling = false,
+    std::shared_ptr<executor::TaskExecutor> executor = nullptr);
 
 /**
  * Utility for dispatching versioned commands on a namespace, deciding which shards to

@@ -168,21 +168,6 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     return processShardResponses(opCtx, dbName, command, requests, executor, throwOnError);
 }
 
-std::vector<AsyncRequestsSender::Response> sendCommandToShardsWithVersion(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const BSONObj& command,
-    const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    const CollectionRoutingInfo& cri,
-    const bool throwOnError) {
-    std::vector<AsyncRequestsSender::Request> requests;
-    for (const auto& shardId : shardIds) {
-        requests.emplace_back(shardId, appendShardVersion(command, cri.getShardVersion(shardId)));
-    }
-    return processShardResponses(opCtx, dbName, command, requests, executor, throwOnError);
-}
-
 Status createIndexOnCollection(OperationContext* opCtx,
                                const NamespaceString& ns,
                                const BSONObj& keys,

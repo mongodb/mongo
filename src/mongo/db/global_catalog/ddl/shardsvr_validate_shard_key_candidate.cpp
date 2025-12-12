@@ -94,7 +94,7 @@ public:
                 uassert(ErrorCodes::NamespaceNotSharded,
                         str::stream()
                             << "Can't execute " << Request::kCommandName
-                            << "on unsharded collection " << redact(ns().toStringForErrorMsg()),
+                            << " on unsharded collection " << redact(ns().toStringForErrorMsg()),
                         coll.getShardingDescription().isSharded());
 
                 shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(

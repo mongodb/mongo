@@ -362,16 +362,12 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
     Shard::RetryPolicy retryPolicy,
     const std::vector<AsyncRequestsSender::Request>& requests,
     bool throwOnStaleShardVersionErrors,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
     RoutingContext* routingCtx = nullptr) {
 
     // Send the requests.
     MultiStatementTransactionRequestsSender ars(
-        opCtx,
-        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-        dbName,
-        requests,
-        readPref,
-        retryPolicy);
+        opCtx, executor, dbName, requests, readPref, retryPolicy);
 
     if (routingCtx && routingCtx->hasNss(nss)) {
         routingCtx->onRequestSentForNss(nss);
@@ -438,15 +434,18 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const std::vector<AsyncRequestsSender::Request>& requests,
-    RoutingContext* routingCtx) {
-    return gatherResponsesImpl(opCtx,
-                               dbName,
-                               nss,
-                               readPref,
-                               retryPolicy,
-                               requests,
-                               true /* throwOnStaleShardVersionErrors */,
-                               routingCtx);
+    RoutingContext* routingCtx,
+    std::shared_ptr<executor::TaskExecutor> executor) {
+    return gatherResponsesImpl(
+        opCtx,
+        dbName,
+        nss,
+        readPref,
+        retryPolicy,
+        requests,
+        true /* throwOnStaleShardVersionErrors */,
+        executor ? executor : Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+        routingCtx);
 }
 
 BSONObj appendDbVersionIfPresent(BSONObj cmdObj, const CachedDatabaseInfo& dbInfo) {
@@ -607,7 +606,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     const BSONObj& collation,
     const boost::optional<BSONObj>& letParameters,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
-    bool eligibleForSampling) {
+    bool eligibleForSampling,
+    std::shared_ptr<executor::TaskExecutor> executor) {
     auto expCtx =
         makeExpressionContextWithDefaultsForTargeter(opCtx,
                                                      nss,
@@ -624,7 +624,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
                                                       retryPolicy,
                                                       query,
                                                       collation,
-                                                      eligibleForSampling);
+                                                      eligibleForSampling,
+                                                      std::move(executor));
 }
 
 [[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
@@ -636,7 +637,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     Shard::RetryPolicy retryPolicy,
     const BSONObj& query,
     const BSONObj& collation,
-    bool eligibleForSampling) {
+    bool eligibleForSampling,
+    std::shared_ptr<executor::TaskExecutor> executor) {
     const auto requests =
         buildVersionedRequestsForTargetedShards(expCtx,
                                                 nss,
@@ -652,7 +654,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
                            readPref,
                            retryPolicy,
                            requests,
-                           &routingCtx);
+                           &routingCtx,
+                           std::move(executor));
 }
 
 std::vector<AsyncRequestsSender::Response>
@@ -686,6 +689,7 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
                                retryPolicy,
                                requests,
                                false /* throwOnStaleShardVersionErrors */,
+                               Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                                &routingCtx);
 }
 
@@ -712,6 +716,7 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
                                retryPolicy,
                                requests,
                                false /* throwOnStaleShardVersionErrors */,
+                               Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                                &routingCtx);
 }
 
