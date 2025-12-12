@@ -50,7 +50,7 @@ public:
     }
 
     /**
-     * Get a read-only byte view of the contents of VecByteBuf.
+     * Get a read-only byte view of the contents of ByteBuf.
      */
     MongoExtensionByteView getByteView() const {
         assertValid();
@@ -58,7 +58,7 @@ public:
     }
 
     /**
-     * Get a read-only string view of the contents of VecByteBuf.
+     * Get a read-only string view of the contents of ByteBuf.
      */
     std::string_view getStringView() const {
         assertValid();

@@ -132,7 +132,7 @@ private:
             const auto& impl =
                 static_cast<const ExtensionLogicalAggStage*>(extLogicalStage)->getImpl();
 
-            *output = new VecByteBuf(impl.serialize());
+            *output = new ByteBuf(impl.serialize());
         });
     }
 
@@ -147,7 +147,7 @@ private:
                 static_cast<const ExtensionLogicalAggStage*>(extLogicalStage)->getImpl();
 
             // Allocate a buffer on the heap. Ownership is transferred to the caller.
-            *output = new VecByteBuf(impl.explain(verbosity));
+            *output = new ByteBuf(impl.explain(verbosity));
         });
     };
 
@@ -263,7 +263,7 @@ private:
             const auto& impl = static_cast<const ExtensionAggStageAstNode*>(astNode)->getImpl();
 
             // Allocate a buffer on the heap. Ownership is transferred to the caller.
-            *properties = new VecByteBuf(impl.getProperties());
+            *properties = new ByteBuf(impl.getProperties());
         });
     }
 
@@ -368,7 +368,7 @@ private:
             const auto& impl = static_cast<const ExtensionAggStageParseNode*>(parseNode)->getImpl();
 
             // Allocate a buffer on the heap. Ownership is transferred to the caller.
-            *queryShape = new VecByteBuf(impl.getQueryShape(ctx));
+            *queryShape = new ByteBuf(impl.getQueryShape(ctx));
         });
     };
 
@@ -680,7 +680,7 @@ private:
             const auto& impl = static_cast<const ExtensionExecAggStage*>(execAggStage)->getImpl();
 
             // Allocate a buffer on the heap. Ownership is transferred to the caller.
-            *output = new VecByteBuf(impl.explain(verbosity));
+            *output = new ByteBuf(impl.explain(verbosity));
         });
     };
 

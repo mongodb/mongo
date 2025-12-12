@@ -98,7 +98,7 @@ private:
 
             const auto& impl = static_cast<const OperationMetricsAdapter*>(metrics)->getImpl();
 
-            *output = new VecByteBuf(impl.serialize());
+            *output = new ByteBuf(impl.serialize());
         });
     }
 

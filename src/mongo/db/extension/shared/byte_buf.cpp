@@ -31,17 +31,17 @@
 
 namespace mongo::extension {
 
-VecByteBuf::VecByteBuf() : ::MongoExtensionByteBuf{&VTABLE} {}
+ByteBuf::ByteBuf() : ::MongoExtensionByteBuf{&VTABLE} {}
 
-VecByteBuf::VecByteBuf(const uint8_t* data, size_t len) : ::MongoExtensionByteBuf{&VTABLE} {
+ByteBuf::ByteBuf(const uint8_t* data, size_t len) : ::MongoExtensionByteBuf{&VTABLE} {
     assign(data, len);
 }
 
-VecByteBuf::VecByteBuf(const BSONObj& obj) : ::MongoExtensionByteBuf{&VTABLE} {
+ByteBuf::ByteBuf(const BSONObj& obj) : ::MongoExtensionByteBuf{&VTABLE} {
     assign(reinterpret_cast<const uint8_t*>(obj.objdata()), static_cast<size_t>(obj.objsize()));
 }
 
-void VecByteBuf::assign(const uint8_t* data, size_t len) {
+void ByteBuf::assign(const uint8_t* data, size_t len) {
     if (len == 0) {
         _buffer.clear();
         return;
@@ -50,19 +50,19 @@ void VecByteBuf::assign(const uint8_t* data, size_t len) {
     _buffer.assign(data, data + len);
 }
 
-void VecByteBuf::_extDestroy(::MongoExtensionByteBuf* buf) noexcept {
-    delete static_cast<VecByteBuf*>(buf);
+void ByteBuf::_extDestroy(::MongoExtensionByteBuf* buf) noexcept {
+    delete static_cast<ByteBuf*>(buf);
 }
 
-MongoExtensionByteView VecByteBuf::_extGetView(const ::MongoExtensionByteBuf* byteBufPtr) noexcept {
-    const auto* vecByteBuf = static_cast<const VecByteBuf*>(byteBufPtr);
-    const auto vecSize = vecByteBuf->_buffer.size();
+MongoExtensionByteView ByteBuf::_extGetView(const ::MongoExtensionByteBuf* byteBufPtr) noexcept {
+    const auto* byteBuf = static_cast<const ByteBuf*>(byteBufPtr);
+    const auto vecSize = byteBuf->_buffer.size();
     const auto* data =
-        (vecSize == 0) ? nullptr : reinterpret_cast<const uint8_t*>(vecByteBuf->_buffer.data());
-    return MongoExtensionByteView{data, vecByteBuf->_buffer.size()};
+        (vecSize == 0) ? nullptr : reinterpret_cast<const uint8_t*>(byteBuf->_buffer.data());
+    return MongoExtensionByteView{data, byteBuf->_buffer.size()};
 }
 
-const ::MongoExtensionByteBufVTable VecByteBuf::VTABLE = {&VecByteBuf::_extDestroy,
-                                                          &VecByteBuf::_extGetView};
+const ::MongoExtensionByteBufVTable ByteBuf::VTABLE = {&ByteBuf::_extDestroy,
+                                                       &ByteBuf::_extGetView};
 
 }  // namespace mongo::extension

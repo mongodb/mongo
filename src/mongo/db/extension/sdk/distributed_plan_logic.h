@@ -140,7 +140,7 @@ private:
                     ->getImpl();
 
             if (!impl.sortPattern.isEmpty()) {
-                *output = new VecByteBuf(impl.sortPattern);
+                *output = new ByteBuf(impl.sortPattern);
             }
         });
     }

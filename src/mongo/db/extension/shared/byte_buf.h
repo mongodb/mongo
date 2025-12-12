@@ -38,17 +38,17 @@
 
 namespace mongo::extension {
 
-class VecByteBuf final : public ::MongoExtensionByteBuf {
+class ByteBuf final : public ::MongoExtensionByteBuf {
 public:
     static const ::MongoExtensionByteBufVTable VTABLE;
 
-    VecByteBuf();
-    VecByteBuf(const uint8_t* data, size_t len);
+    ByteBuf();
+    ByteBuf(const uint8_t* data, size_t len);
     /**
-     * Constructs a VecByteBuf from a BSONObj. The BSONObj must be safe to copy (it must own its
-     * data or the data must outlive this VecByteBuf).
+     * Constructs a ByteBuf from a BSONObj. The BSONObj must be safe to copy (it must own its
+     * data or the data must outlive this ByteBuf).
      */
-    VecByteBuf(const BSONObj& obj);
+    ByteBuf(const BSONObj& obj);
 
     /**
      * Replace contents with [data, data+len). If len==0, clears the buffer.

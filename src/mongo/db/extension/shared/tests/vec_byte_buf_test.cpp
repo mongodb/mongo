@@ -36,16 +36,16 @@
 namespace mongo::extension {
 namespace {
 
-TEST(VecByteBufTest, EmptyCtorHasEmptyView) {
-    auto buf = new VecByteBuf();
+TEST(ByteBufTest, EmptyCtorHasEmptyView) {
+    auto buf = new ByteBuf();
     ExtensionByteBufHandle handle{buf};
     auto sv = handle.getStringView();
     ASSERT_EQ(sv.size(), 0U);
 }
 
-TEST(VecByteBufTest, AssignFromRawBytesCopiesAndIsStable) {
+TEST(ByteBufTest, AssignFromRawBytesCopiesAndIsStable) {
     const uint8_t bytes[] = {1, 2, 3, 4, 5};
-    auto buf = new VecByteBuf();
+    auto buf = new ByteBuf();
     buf->assign(bytes, sizeof(bytes));
 
     ExtensionByteBufHandle handle{buf};
@@ -54,16 +54,16 @@ TEST(VecByteBufTest, AssignFromRawBytesCopiesAndIsStable) {
     ASSERT_EQ(std::memcmp(sv.data(), bytes, sizeof(bytes)), 0);
 }
 
-TEST(VecByteBufTest, AssignToZeroClearsBuffer) {
+TEST(ByteBufTest, AssignToZeroClearsBuffer) {
     const uint8_t bytes[] = {9, 8, 7};
-    auto buf = new VecByteBuf(bytes, sizeof(bytes));
+    auto buf = new ByteBuf(bytes, sizeof(bytes));
     buf->assign(nullptr, 0);
 
     ExtensionByteBufHandle handle{buf};
     ASSERT_TRUE(handle.getStringView().empty());
 }
 
-TEST(VecByteBufTest, ConstructFromBSONCopiesBytesIndependentLifetime) {
+TEST(ByteBufTest, ConstructFromBSONCopiesBytesIndependentLifetime) {
     ExtensionByteBufHandle handle{nullptr};
     {
         // Build a BSONObj with a short lifetime for its owner.
@@ -72,7 +72,7 @@ TEST(VecByteBufTest, ConstructFromBSONCopiesBytesIndependentLifetime) {
         auto original = bob.obj();
 
         // Initialize the byte buffer from the BSONObj while 'original' is alive.
-        ExtensionByteBufHandle tmp{new VecByteBuf(original)};
+        ExtensionByteBufHandle tmp{new ByteBuf(original)};
         handle = std::move(tmp);
     }
 
@@ -82,17 +82,17 @@ TEST(VecByteBufTest, ConstructFromBSONCopiesBytesIndependentLifetime) {
     ASSERT_EQ(roundTrip.getIntField("x"), 42);
 }
 
-TEST(VecByteBufTest, RoundTripBSONWorks) {
+TEST(ByteBufTest, RoundTripBSONWorks) {
     const auto doc = BSON("a" << 1 << "b" << BSON("c" << true));
-    auto buf = new VecByteBuf(doc);
+    auto buf = new ByteBuf(doc);
     ExtensionByteBufHandle handle{buf};
 
     auto from = bsonObjFromByteView(handle.getByteView());
     ASSERT_EQ(from.toString(), doc.toString());
 }
 
-DEATH_TEST(VecByteBufDeathTest, AssignNullWithPositiveLenFails, "10806300") {
-    VecByteBuf buf;
+DEATH_TEST(ByteBufDeathTest, AssignNullWithPositiveLenFails, "10806300") {
+    ByteBuf buf;
     buf.assign(nullptr, 4);
 }
 
@@ -115,7 +115,7 @@ using ExtensionByteBufVTableTestDeathTest = ExtensionByteBufVTableTest;
 DEATH_TEST_F(ExtensionByteBufVTableTestDeathTest,
              InvalidExtensionByteBufVTableFailsGetView,
              "10806301") {
-    auto buf = new VecByteBuf();
+    auto buf = new ByteBuf();
     auto handle = TestExtensionByteBufVTableHandle{buf};
 
     auto vtable = handle.vtable();

@@ -76,7 +76,7 @@ public:
     // ExtensionGetNextResult. In this case, we allocate a new ByteBuf from which we can issue a
     // BSONObj as a view. It is primarily used from our tests.
     static ExtensionBSONObj makeAsByteBuf(const BSONObj& bsonObj) {
-        return ExtensionBSONObj(ExtensionByteBufHandle(new VecByteBuf(bsonObj)));
+        return ExtensionBSONObj(ExtensionByteBufHandle(new ByteBuf(bsonObj)));
     }
 
     // This static method is used to instantiate an ExtensionBSONObj from an existing BSONObj,

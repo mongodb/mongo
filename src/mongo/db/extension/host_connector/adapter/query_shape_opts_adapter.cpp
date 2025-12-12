@@ -46,8 +46,8 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeIdentifier(
             opts->serializeIdentifier(std::string(byteViewAsStringView(identifier)));
 
         // Allocate a buffer on the heap. Ownership is transferred to the caller.
-        *output = new VecByteBuf(reinterpret_cast<uint8_t*>(transformedIdentifier.data()),
-                                 transformedIdentifier.length());
+        *output = new ByteBuf(reinterpret_cast<uint8_t*>(transformedIdentifier.data()),
+                              transformedIdentifier.length());
     });
 }
 
@@ -63,8 +63,8 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeFieldPath(
             opts->serializeFieldPath(std::string(byteViewAsStringView(fieldPath)));
 
         // Allocate a buffer on the heap. Ownership is transferred to the caller.
-        *output = new VecByteBuf(reinterpret_cast<uint8_t*>(transformedFieldPath.data()),
-                                 transformedFieldPath.length());
+        *output = new ByteBuf(reinterpret_cast<uint8_t*>(transformedFieldPath.data()),
+                              transformedFieldPath.length());
     });
 }
 
@@ -94,8 +94,8 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeLiteral(
         // Allocate a buffer on the heap for the output BSONElement with the serialized literal.
         // Ownership is transferred to the caller.
         BSONElement transformedLiteral = bson.firstElement();
-        *output = new VecByteBuf(reinterpret_cast<const uint8_t*>(transformedLiteral.rawdata()),
-                                 transformedLiteral.size());
+        *output = new ByteBuf(reinterpret_cast<const uint8_t*>(transformedLiteral.rawdata()),
+                              transformedLiteral.size());
     });
 }
 
