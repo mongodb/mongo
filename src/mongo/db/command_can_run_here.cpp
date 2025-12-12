@@ -53,6 +53,10 @@ bool commandCanRunHere(OperationContext* opCtx,
         case Command::AllowedOnSecondary::kNever:
             return false;
         case Command::AllowedOnSecondary::kOptIn:
+            // Don't reject reads to localDb collections if the db is not writeable
+            // regardless of secondary read preference settings.
+            if (dbName.isLocalDB())
+                return true;
             // Did the user opt in?
             return ReadPreferenceSetting::get(opCtx).canRunOnSecondary();
     }
