@@ -30,15 +30,20 @@
 #include "mongo/db/global_catalog/ddl/ddl_lock_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
+#include "mongo/db/pipeline/change_stream_read_mode.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
 
 #include <algorithm>
+#include <vector>
 
 #include <boost/optional.hpp>
 
@@ -54,20 +59,63 @@ public:
     void waitForRecovery(OperationContext*) const override {}
 };
 
-void assertSameHistoricalPlacement(
-    const HistoricalPlacement& historicalPlacement,
-    std::vector<std::string> expectedSet,
-    boost::optional<bool> expectedAnyRemovedShardDetected = boost::none) {
-    auto retrievedSet = historicalPlacement.getShards();
-    ASSERT_EQ(retrievedSet.size(), expectedSet.size());
-    std::sort(retrievedSet.begin(), retrievedSet.end());
-    std::sort(expectedSet.begin(), expectedSet.end());
-
-    for (size_t i = 0; i < retrievedSet.size(); i++) {
-        ASSERT_EQ(retrievedSet[i], expectedSet[i]);
+// Helper struct to easily build 'HistoricalPlacement' objects for testing purposes, using a fluent
+// interface.
+struct ExpectedResponseBuilder {
+    ExpectedResponseBuilder() : ExpectedResponseBuilder(HistoricalPlacementStatus::OK) {}
+    explicit ExpectedResponseBuilder(HistoricalPlacementStatus status) {
+        value.setStatus(status);
     }
-    ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::OK);
-    ASSERT_EQ(historicalPlacement.getAnyRemovedShardDetected(), expectedAnyRemovedShardDetected);
+
+    ExpectedResponseBuilder& setShards(std::vector<std::string> shards) {
+        std::vector<ShardId> transformed;
+        std::transform(shards.begin(),
+                       shards.end(),
+                       std::back_inserter(transformed),
+                       [](const auto& value) { return ShardId(value); });
+        value.setShards(std::move(transformed));
+        return *this;
+    }
+
+    ExpectedResponseBuilder& setAnyRemovedShardDetected(
+        const boost::optional<bool>& anyRemovedShardDetected) {
+        value.setAnyRemovedShardDetected(anyRemovedShardDetected);
+        return *this;
+    }
+
+    ExpectedResponseBuilder& setAnyRemovedShardDetected(bool value, ChangeStreamReadMode readMode) {
+        if (readMode == ChangeStreamReadMode::kIgnoreRemovedShards) {
+            setAnyRemovedShardDetected(value);
+        }
+        return *this;
+    }
+
+    ExpectedResponseBuilder& setOpenCursorAt(const boost::optional<Timestamp>& openCursorAt) {
+        value.setOpenCursorAt(openCursorAt);
+        return *this;
+    }
+
+    ExpectedResponseBuilder& setNextPlacementChangedAt(
+        const boost::optional<Timestamp>& nextPlacementChanged) {
+        value.setNextPlacementChangedAt(nextPlacementChanged);
+        return *this;
+    }
+
+    HistoricalPlacement value;
+};
+
+// Check if the two placements are completely equal.
+void assertPlacementsEqual(const HistoricalPlacement& expected, const HistoricalPlacement& actual) {
+    auto sortShards = [](std::vector<ShardId> values) {
+        std::sort(values.begin(), values.end());
+        return values;
+    };
+
+    ASSERT_EQ(expected.getStatus(), actual.getStatus());
+    ASSERT_EQ(sortShards(expected.getShards()), sortShards(actual.getShards()));
+    ASSERT_EQ(expected.getAnyRemovedShardDetected(), actual.getAnyRemovedShardDetected());
+    ASSERT_EQ(expected.getOpenCursorAt(), actual.getOpenCursorAt());
+    ASSERT_EQ(expected.getNextPlacementChangedAt(), actual.getNextPlacementChangedAt());
 }
 
 class GetHistoricalPlacementTestFixture : public ConfigServerTestFixture {
@@ -233,7 +281,9 @@ public:
     HistoricalPlacement getHistoricalPlacementIgnoreRemovedShards(StringData nss, Timestamp ts) {
         return shardingCatalogManager().getHistoricalPlacement(
             operationContext(),
-            NamespaceString::createNamespaceString_forTest(nss),
+            nss.empty() ? boost::optional<NamespaceString>()
+                        : boost::optional<NamespaceString>(
+                              NamespaceString::createNamespaceString_forTest(nss)),
             ts,
             true /* checkIfPointInTimeIsInFuture */,
             true /* ignoreRemovedShards */);
@@ -272,8 +322,8 @@ private:
 };
 
 TEST_F(GetHistoricalPlacementTestFixture, queriesOnShardedCollectionReturnExpectedPlacement) {
-    /*Querying the placementHistory for a sharded collection should return the shards that owned the
-     * collection at the given clusterTime*/
+    /* Querying the placementHistory for a sharded collection should return the shards that owned
+     * the collection at the given clusterTime*/
     auto opCtx = operationContext();
 
     setupConfigPlacementHistory(opCtx,
@@ -293,10 +343,15 @@ TEST_F(GetHistoricalPlacementTestFixture, queriesOnShardedCollectionReturnExpect
             true /* checkIfPointInTimeIsInFuture */,
             ignoreRemovedShards);
 
-        assertSameHistoricalPlacement(
-            historicalPlacement,
-            {"shard1", "shard2"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard1", "shard2"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
     }
 
     for (bool ignoreRemovedShards : {true, false}) {
@@ -308,15 +363,20 @@ TEST_F(GetHistoricalPlacementTestFixture, queriesOnShardedCollectionReturnExpect
             true /* checkIfPointInTimeIsInFuture */,
             ignoreRemovedShards);
 
-        assertSameHistoricalPlacement(
-            historicalPlacement,
-            {"shard3", "shard4"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard3", "shard4"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
     }
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_ShardedCollectionWithPrimary) {
-    /*The primary shard associated to the parent database is already part of the `shards` list of
+    /* The primary shard associated to the parent database is already part of the `shards` list of
      * the collection and it does not appear twice*/
     auto opCtx = operationContext();
 
@@ -339,15 +399,20 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_ShardedCollecti
             true /* checkIfPointInTimeIsInFuture */,
             ignoreRemovedShards);
 
-        assertSameHistoricalPlacement(
-            historicalPlacement,
-            {"shard1", "shard2", "shard3"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard1", "shard2", "shard3"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
     }
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_UnshardedCollection) {
-    /*Querying the placementHistory must report the primary shard for unsharded or non-existing
+    /* Querying the placementHistory must report the primary shard for unsharded or non-existing
      * collections*/
     auto opCtx = operationContext();
 
@@ -368,10 +433,15 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_UnshardedCollec
             true /* checkIfPointInTimeIsInFuture */,
             ignoreRemovedShards);
 
-        assertSameHistoricalPlacement(
-            historicalPlacement,
-            {"shard1"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard1"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
 
         historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
             opCtx,
@@ -380,10 +450,15 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_UnshardedCollec
             true /* checkIfPointInTimeIsInFuture */,
             ignoreRemovedShards);
 
-        assertSameHistoricalPlacement(
-            historicalPlacement,
-            {"shard2"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard2"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
 
         historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
             opCtx,
@@ -392,15 +467,20 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_UnshardedCollec
             true /* checkIfPointInTimeIsInFuture */,
             ignoreRemovedShards);
 
-        assertSameHistoricalPlacement(
-            historicalPlacement,
-            {"shard3"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard3"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
     }
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_DifferentTimestamp) {
-    /*Query the placementHistory at different timestamp should return different results*/
+    /* Query the placementHistory at different timestamp should return different results*/
     auto opCtx = operationContext();
 
     setupConfigPlacementHistory(
@@ -423,10 +503,14 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_DifferentTimest
             true /* checkIfPointInTimeIsInFuture */,
             ignoreRemovedShards);
 
-        assertSameHistoricalPlacement(
-            historicalPlacement,
-            {},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
 
         historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
             opCtx,
@@ -435,10 +519,15 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_DifferentTimest
             true /* checkIfPointInTimeIsInFuture */,
             ignoreRemovedShards);
 
-        assertSameHistoricalPlacement(
-            historicalPlacement,
-            {"shard1"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard1"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
 
         historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
             opCtx,
@@ -447,10 +536,15 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_DifferentTimest
             true /* checkIfPointInTimeIsInFuture */,
             ignoreRemovedShards);
 
-        assertSameHistoricalPlacement(
-            historicalPlacement,
-            {"shard1", "shard2"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard1", "shard2"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
 
         historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
             opCtx,
@@ -459,10 +553,15 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_DifferentTimest
             true /* checkIfPointInTimeIsInFuture */,
             ignoreRemovedShards);
 
-        assertSameHistoricalPlacement(
-            historicalPlacement,
-            {"shard1", "shard2", "shard3"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard1", "shard2", "shard3"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
 
         historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
             opCtx,
@@ -471,10 +570,15 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_DifferentTimest
             true /* checkIfPointInTimeIsInFuture */,
             ignoreRemovedShards);
 
-        assertSameHistoricalPlacement(
-            historicalPlacement,
-            {"shard1", "shard2", "shard3", "shard4"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard1", "shard2", "shard3", "shard4"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
     }
 }
 
@@ -499,7 +603,8 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SameTimestamp) 
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
@@ -508,7 +613,8 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SameTimestamp) 
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard4", "shard5"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard4", "shard5"}).value,
+                          historicalPlacement);
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
@@ -517,7 +623,8 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SameTimestamp) 
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard7", "shard8", "shard9"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard7", "shard8", "shard9"}).value,
+                          historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_InvertedTimestampOrder) {
@@ -540,11 +647,12 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_InvertedTimesta
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard2", "shard3", "shard4"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard2", "shard3", "shard4"}).value,
+                          historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_ReturnPrimaryShardWhenNoShards) {
-    /*Querying the placementHistory must report only the primary shard when an empty list of shards
+    /* Querying the placementHistory must report only the primary shard when an empty list of shards
      * is reported for the collection*/
     auto opCtx = operationContext();
 
@@ -564,7 +672,8 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_ReturnPrimarySh
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1"}).value,
+                          historicalPlacement);
 
     // Note: at timestamp 3 the collection's shard list is not empty
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
@@ -574,7 +683,8 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_ReturnPrimarySh
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture,
@@ -600,7 +710,8 @@ TEST_F(GetHistoricalPlacementTestFixture,
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard2", "shard3", "shard4"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard2", "shard3", "shard4"}).value,
+                          historicalPlacement);
 
     // Note: the primary shard is shard5 at timestamp 3
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
@@ -610,7 +721,8 @@ TEST_F(GetHistoricalPlacementTestFixture,
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard2", "shard3", "shard4"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard2", "shard3", "shard4"}).value,
+                          historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_WithMarkers) {
@@ -660,8 +772,10 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_WithMarkers) {
         Timestamp(2, 0),
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
-    assertSameHistoricalPlacement(historicalPlacement,
-                                  {"shard1", "shard2", "shard3", "shard4", "shard5"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2", "shard3", "shard4", "shard5"})
+                              .value,
+                          historicalPlacement);
 
     // Asking for a timestamp after the closing marker should return the expected shards
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
@@ -670,7 +784,8 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_WithMarkers) {
         Timestamp(3, 0),
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
@@ -678,7 +793,8 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_WithMarkers) {
         Timestamp(6, 0),
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1"}).value,
+                          historicalPlacement);
 }
 
 // Test 'ignoreRemovedShards' mode for a non-existing database.
@@ -686,11 +802,9 @@ TEST_F(GetHistoricalPlacementTestFixture,
        getHistoricalPlacement_RemovedShards_DatabaseDoesNotExist) {
     auto opCtx = operationContext();
 
-    setupConfigPlacementHistory(opCtx,
-                                {
-                                    {Timestamp(1, 0), "db", {"shard1"}},
-                                    {Timestamp(2, 0), "db.collection1", {"shard1"}},
-                                });
+    setupConfigPlacementHistory(
+        opCtx,
+        {{Timestamp(1, 0), "db", {"shard1"}}, {Timestamp(2, 0), "db.collection1", {"shard1"}}});
 
     setupConfigShard(opCtx, 1 /*nShards*/);
 
@@ -698,15 +812,18 @@ TEST_F(GetHistoricalPlacementTestFixture,
 
     HistoricalPlacement historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db-does-not-exist.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db-does-not-exist.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db-does-not-exist.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 }
 
 // Test 'ignoreRemovedShards' mode for a non-existing collection.
@@ -726,370 +843,2795 @@ TEST_F(GetHistoricalPlacementTestFixture,
 
     HistoricalPlacement historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
 
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
 }
 
-// Test 'ignoreRemovedShards' mode with various sets of shards being present in the shard registry.
+// Test 'ignoreRemovedShards' mode with various combinations of shards being removed from the shard
+// registry.
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_RemovedShards) {
     auto opCtx = operationContext();
+
+    PlacementDescriptor oldestClusterTimeSupportedMarker = {
+        Timestamp(0, 5),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString_forTest(),
+        {}};
 
     setupConfigPlacementHistory(
         opCtx,
         {
+            oldestClusterTimeSupportedMarker,
             {Timestamp(1, 0), "db", {"shard1"}},
             {Timestamp(2, 0), "db.collection1", {"shard1", "shard2"}},
             {Timestamp(4, 0), "db.collection1", {"shard1", "shard2", "shard3"}},
             {Timestamp(5, 0), "db.collection1", {"shard1", "shard2", "shard3", "shard4"}},
             {Timestamp(6, 0), "db.collection1", {}},
             {Timestamp(7, 0), "db", {}},
-        });
+        },
+        true);
 
-    setupConfigShard(opCtx, 4 /*nShards*/);
+    setupConfigShard(opCtx, 5 /*nShards*/);
 
-    setShardIdsInShardRegistry(opCtx, {});
+    setShardIdsInShardRegistry(opCtx, {"shard5"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     HistoricalPlacement historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setAnyRemovedShardDetected(false)
+                              .setOpenCursorAt(Timestamp(7, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setAnyRemovedShardDetected(false)
+                              .setOpenCursorAt(Timestamp(7, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setAnyRemovedShardDetected(false)
+                              .setOpenCursorAt(Timestamp(7, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setAnyRemovedShardDetected(false)
+                              .setOpenCursorAt(Timestamp(7, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setAnyRemovedShardDetected(false)
+                              .setOpenCursorAt(Timestamp(7, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard1"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(2, 0))
+                              .setNextPlacementChangedAt(Timestamp(4, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard1", "shard2"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2"})
+                              .setAnyRemovedShardDetected(false)
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3"});
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2"})
+                              .setAnyRemovedShardDetected(false)
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2", "shard3"})
+                              .setAnyRemovedShardDetected(false)
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2", "shard3"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3", "shard4"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2"})
+                              .setAnyRemovedShardDetected(false)
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2", "shard3"})
+                              .setAnyRemovedShardDetected(false)
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(
-        historicalPlacement, {"shard1", "shard2", "shard3", "shard4"}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2", "shard3", "shard4"})
+                              .setAnyRemovedShardDetected(false)
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard4"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2"})
+                              .setAnyRemovedShardDetected(false)
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard4"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2", "shard4"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard1", "shard3"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(2, 0))
+                              .setNextPlacementChangedAt(Timestamp(4, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard3"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard3"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard3"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard3"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard1", "shard3", "shard4"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(2, 0))
+                              .setNextPlacementChangedAt(Timestamp(4, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard3"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard3"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard3", "shard4"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard3", "shard4"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard1", "shard4"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(2, 0))
+                              .setNextPlacementChangedAt(Timestamp(4, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard4"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard4"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, false);
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value,
+        historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard2"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard2"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(2, 0))
+                              .setNextPlacementChangedAt(Timestamp(4, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard2"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard2"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(2, 0))
+                              .setNextPlacementChangedAt(Timestamp(4, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard2"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard2"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard2"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard2"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setAnyRemovedShardDetected(false)
+                              .setOpenCursorAt(Timestamp(7, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard2", "shard3"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard2"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(2, 0))
+                              .setNextPlacementChangedAt(Timestamp(4, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard2"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard2"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(2, 0))
+                              .setNextPlacementChangedAt(Timestamp(4, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard2", "shard3"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard2", "shard3"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard2", "shard3"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard2", "shard3"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setAnyRemovedShardDetected(false)
+                              .setOpenCursorAt(Timestamp(7, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard2", "shard4"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard2"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(2, 0))
+                              .setNextPlacementChangedAt(Timestamp(4, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard2"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard2"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(2, 0))
+                              .setNextPlacementChangedAt(Timestamp(4, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard2"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard2"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard2", "shard4"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard2", "shard4"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setAnyRemovedShardDetected(false)
+                              .setOpenCursorAt(Timestamp(7, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard3"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard3"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard3"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard3"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard3"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard3"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard3"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setAnyRemovedShardDetected(false)
+                              .setOpenCursorAt(Timestamp(7, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard3", "shard4"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard3"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard3"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard3"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard3"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(4, 0))
+                              .setNextPlacementChangedAt(Timestamp(5, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard3", "shard4"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard3", "shard4"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setAnyRemovedShardDetected(false)
+                              .setOpenCursorAt(Timestamp(7, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
 
     setShardIdsInShardRegistry(opCtx, {"shard4"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
     historicalPlacement = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard4"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard4"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard4"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard4"}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard4"})
+                              .setAnyRemovedShardDetected(true)
+                              .setOpenCursorAt(Timestamp(5, 0))
+                              .setNextPlacementChangedAt(Timestamp(6, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, true);
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setAnyRemovedShardDetected(false)
+                              .setOpenCursorAt(Timestamp(7, 0))
+                              .value,
+                          historicalPlacement);
     historicalPlacement =
         getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {}, false);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value,
+                          historicalPlacement);
+}
+
+// Test 'openCursorAt' and 'nextPlacementChanged' for a collection with all shards still being
+// present in the shard registry.
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_OpenCursorAt_Collection_AllShardsPresent) {
+    auto opCtx = operationContext();
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    {Timestamp(1, 0), "db", {"shard2"}},
+                                    {Timestamp(2, 0), "db.collection1", {"shard2", "shard3"}},
+                                    {Timestamp(3, 0), "db.collection1", {"shard1"}},
+                                    {Timestamp(4, 0), "db.collection1", {"shard1", "shard2"}},
+                                    {Timestamp(5, 0), "db.collection1", {}},
+                                    {Timestamp(6, 0), "db", {}},
+                                });
+
+    setupConfigShard(opCtx, 3 /*nShards*/);
+
+    // All shards are still present.
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3"});
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard2"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard2", "shard3"})
+                            .setAnyRemovedShardDetected(false)
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(3, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1", "shard2"})
+                            .setAnyRemovedShardDetected(false)
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard2"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+// Test 'openCursorAt' and 'nextPlacementChanged' for a collection with only some shards still
+// being present in the shard registry.
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_OpenCursorAt_Collection_SomeShardsPresent) {
+    auto opCtx = operationContext();
+
+    PlacementDescriptor oldestClusterTimeSupportedMarker = {
+        Timestamp(0, 5),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString_forTest(),
+        {}};
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    oldestClusterTimeSupportedMarker,
+                                    {Timestamp(1, 0), "db", {"shard2"}},
+                                    {Timestamp(2, 0), "db.collection1", {"shard2", "shard3"}},
+                                    {Timestamp(3, 0), "db.collection1", {"shard1"}},
+                                    {Timestamp(4, 0), "db.collection1", {"shard1", "shard2"}},
+                                    {Timestamp(5, 0), "db.collection1", {}},
+                                    {Timestamp(6, 0), "db", {}},
+                                },
+                                true);
+
+    setupConfigShard(opCtx, 3 /*nShards*/);
+
+    // Only "shard1" is present.
+    setShardIdsInShardRegistry(opCtx, {"shard1"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setShards({"shard1"})
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setShards({"shard1"})
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(3, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(4, 0))
+                            .setNextPlacementChangedAt(Timestamp(5, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setOpenCursorAt(Timestamp(6, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only "shard2" and "shard3" are present.
+    setShardIdsInShardRegistry(opCtx, {"shard2", "shard3"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(1, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard2"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard2", "shard3"})
+                            .setAnyRemovedShardDetected(false)
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard2"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(4, 0))
+                            .setNextPlacementChangedAt(Timestamp(5, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(4, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard2"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(4, 0))
+                            .setNextPlacementChangedAt(Timestamp(5, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(5, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard2"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(6, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+// Test 'openCursorAt' and 'nextPlacementChanged' for a dropped collection, for which the shard is
+// removed after the placement history query timestamp.
+TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_OpenCursorAt_Collection_Removed) {
+    auto opCtx = operationContext();
+
+    PlacementDescriptor oldestClusterTimeSupportedMarker = {
+        Timestamp(0, 5),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString_forTest(),
+        {}};
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    oldestClusterTimeSupportedMarker,
+                                    {Timestamp(1, 0), "db", {"shard1"}},
+                                    {Timestamp(2, 0), "db.collection", {"shard1"}},
+                                    {Timestamp(4, 0), "db.collection", {}},
+                                    {Timestamp(5, 0), "db", {}},
+                                },
+                                true);
+
+    setupConfigShard(opCtx, 2 /*nShards*/);
+
+    // Only "shard2" is present.
+    setShardIdsInShardRegistry(opCtx, {"shard2"});
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setOpenCursorAt(Timestamp(5, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+// Test 'openCursorAt' and 'nextPlacementChanged' for a moved-and-then-dropped collection, for which
+// the shard is removed after the placement history query timestamp.
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_OpenCursorAt_Collection_Moved_Removed_Then_Database_Removed) {
+    auto opCtx = operationContext();
+
+    PlacementDescriptor oldestClusterTimeSupportedMarker = {
+        Timestamp(0, 5),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString_forTest(),
+        {}};
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    oldestClusterTimeSupportedMarker,
+                                    {Timestamp(1, 0), "db", {"shard1"}},
+                                    {Timestamp(2, 0), "db.collection", {"shard2"}},
+                                    {Timestamp(4, 0), "db.collection", {}},
+                                    {Timestamp(5, 0), "db", {}},
+                                },
+                                true);
+
+    setupConfigShard(opCtx, 3 /*nShards*/);
+
+    // Only "shard3" is present.
+    setShardIdsInShardRegistry(opCtx, {"shard3"});
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setOpenCursorAt(Timestamp(5, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+// Test 'openCursorAt' and 'nextPlacementChanged' for a non-existing collection in an existing
+// database.
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_OpenCursorAt_NonExistingCollectionInExistingDatabase) {
+    auto opCtx = operationContext();
+
+    PlacementDescriptor oldestClusterTimeSupportedMarker = {
+        Timestamp(0, 5),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString_forTest(),
+        {}};
+
+    setupConfigPlacementHistory(
+        opCtx,
+        {
+            oldestClusterTimeSupportedMarker,
+            {Timestamp(1, 0), "db", {"shard2"}},
+            {Timestamp(2, 0), "db.collection-unrelated", {"shard2", "shard3"}},
+            {Timestamp(3, 0), "db", {}},
+        },
+        true);
+
+    setupConfigShard(opCtx, 3 /*nShards*/);
+
+    // All shards are present in the shard registry.
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3"});
+
+    {
+        auto actual =
+            getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist",
+                                                                Timestamp(1, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard2"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist",
+                                                                Timestamp(2, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard2"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist",
+                                                                Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only "shard1" is present in the shard registry.
+    setShardIdsInShardRegistry(opCtx, {"shard1"});
+
+    {
+        auto actual =
+            getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist",
+                                                                Timestamp(1, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist",
+                                                                Timestamp(2, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection-does-not-exist",
+                                                                Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+// Test 'openCursorAt' and 'nextPlacementChanged' for a non-existing collection in non-existing
+// database.
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_OpenCursorAt_NonExistingCollectionNonExistingDatabase) {
+    auto opCtx = operationContext();
+
+    PlacementDescriptor oldestClusterTimeSupportedMarker = {
+        Timestamp(0, 5),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString_forTest(),
+        {}};
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    oldestClusterTimeSupportedMarker,
+                                    {Timestamp(1, 0), "db", {"shard1"}},
+                                    {Timestamp(2, 0), "db", {}},
+                                },
+                                true);
+
+    setupConfigShard(opCtx, 2 /*nShards*/);
+
+    // All shards are present in the shard registry.
+    setShardIdsInShardRegistry(opCtx, {"shard1"});
+
+    for (auto ts : {kDawnOfTime,
+                    Timestamp(0, 4),
+                    Timestamp(0, 5),
+                    Timestamp(0, 6),
+                    Timestamp(1, 0),
+                    Timestamp(2, 0),
+                    Timestamp(3, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards(
+            "db-does-not-exist.collection-does-not-exist", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only "shard2" is present in the shard registry.
+    setShardIdsInShardRegistry(opCtx, {"shard2"});
+
+    for (auto ts : {kDawnOfTime,
+                    Timestamp(0, 4),
+                    Timestamp(0, 5),
+                    Timestamp(0, 6),
+                    Timestamp(1, 0),
+                    Timestamp(2, 0),
+                    Timestamp(3, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards(
+            "db-does-not-exist.collection-does-not-exist", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_OpenCursorAt_Collection_ApproximatedResponseBeforeEntries) {
+    auto opCtx = operationContext();
+
+    // Insert the initial content
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    {kDawnOfTime, "", {"shard1", "shard2"}},
+                                    {Timestamp(0, 5), "", {}},
+                                    {Timestamp(1, 0), "db", {"shard1"}},
+                                    {Timestamp(2, 0), "db.collection", {"shard1"}},
+                                    {Timestamp(3, 0), "db.collection", {"shard2"}},
+                                    {Timestamp(4, 0), "db", {"shard2"}},
+                                    {Timestamp(5, 0), "db.collection", {}},
+                                    {Timestamp(6, 0), "db", {}},
+                                });
+
+    setupConfigShard(opCtx, 2 /*nShards*/);
+
+    // All shards are still present.
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2"});
+
+    for (auto ts : {kDawnOfTime, Timestamp(0, 4)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setShards({"shard1", "shard2"})
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(1, 0), Timestamp(2, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard1"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(3, 0), Timestamp(4, 0), Timestamp(5, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard2"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(6, 0), Timestamp(7, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only shard1 is still present.
+    setShardIdsInShardRegistry(opCtx, {"shard1"});
+
+    for (auto ts : {kDawnOfTime, Timestamp(0, 4)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard1"})
+                            .setOpenCursorAt(ts)
+                            .setNextPlacementChangedAt(Timestamp(0, 5))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(1, 0), Timestamp(2, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard1"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(6, 0), Timestamp(7, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only shard2 is still present.
+    setShardIdsInShardRegistry(opCtx, {"shard2"});
+
+    for (auto ts : {kDawnOfTime, Timestamp(0, 4)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(ts)
+                            .setNextPlacementChangedAt(Timestamp(0, 5))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(1, 0), Timestamp(2, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(3, 0), Timestamp(4, 0), Timestamp(5, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard2"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(6, 0), Timestamp(7, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_OpenCursorAt_Collection_ApproximatedResponseInMiddleOfEntries) {
+    auto opCtx = operationContext();
+
+    // Insert the initial content
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    {kDawnOfTime, "", {"shard1", "shard2"}},
+                                    {Timestamp(1, 0), "db", {"shard1"}},
+                                    {Timestamp(2, 0), "db.collection", {"shard1"}},
+                                    {Timestamp(3, 0), "db.collection", {"shard2"}},
+                                    {Timestamp(3, 5), "", {}},
+                                    {Timestamp(4, 0), "db", {"shard2"}},
+                                    {Timestamp(5, 0), "db.collection", {}},
+                                    {Timestamp(6, 0), "db", {}},
+                                });
+
+    setupConfigShard(opCtx, 2 /*nShards*/);
+
+    // All shards are still present.
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2"});
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setShards({"shard1", "shard2"})
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(1, 0), Timestamp(2, 0), Timestamp(3, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setShards({"shard1", "shard2"})
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(3, 5), Timestamp(4, 0), Timestamp(5, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard2"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(6, 0), Timestamp(7, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only shard1 is still present.
+    setShardIdsInShardRegistry(opCtx, {"shard1"});
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard1"})
+                            .setOpenCursorAt(kDawnOfTime)
+                            .setNextPlacementChangedAt(Timestamp(3, 5))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(1, 0), Timestamp(2, 0), Timestamp(3, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard1"})
+                            .setOpenCursorAt(ts)
+                            .setNextPlacementChangedAt(Timestamp(3, 5))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(3, 5), Timestamp(4, 0), Timestamp(5, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setOpenCursorAt(Timestamp(6, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(6, 0), Timestamp(7, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only shard2 is still present.
+    setShardIdsInShardRegistry(opCtx, {"shard2"});
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(kDawnOfTime)
+                            .setNextPlacementChangedAt(Timestamp(3, 5))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(1, 0), Timestamp(2, 0), Timestamp(3, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(ts)
+                            .setNextPlacementChangedAt(Timestamp(3, 5))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(3, 5), Timestamp(4, 0), Timestamp(5, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard2"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(6, 0), Timestamp(7, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db.collection", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+// Test 'openCursorAt' and 'nextPlacementChanged' for a database with all shards still being
+// present in the shard registry.
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_OpenCursorAt_Database_AllShardsPresent) {
+    auto opCtx = operationContext();
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    {Timestamp(1, 0), "db", {"shard1"}},
+                                    {Timestamp(2, 0), "db.collection1", {"shard2"}},
+                                    {Timestamp(3, 0), "db.collection2", {"shard3"}},
+                                    {Timestamp(4, 0), "db.collection1", {}},
+                                    {Timestamp(5, 0), "db.collection2", {}},
+                                    {Timestamp(6, 0), "db", {}},
+                                });
+
+    setupConfigShard(opCtx, 3 /*nShards*/);
+
+    // All shards are still present.
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3"});
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(1, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(2, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1", "shard2"})
+                            .setAnyRemovedShardDetected(false)
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1", "shard2", "shard3"})
+                            .setAnyRemovedShardDetected(false)
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(4, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1", "shard3"})
+                            .setAnyRemovedShardDetected(false)
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(5, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(6, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+// Test 'openCursorAt' and 'nextPlacementChanged' for a database with only some shards still being
+// present in the shard registry.
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_OpenCursorAt_Database_SomeShardsPresent) {
+    auto opCtx = operationContext();
+
+    PlacementDescriptor oldestClusterTimeSupportedMarker = {
+        Timestamp(0, 5),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString_forTest(),
+        {}};
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    oldestClusterTimeSupportedMarker,
+                                    {Timestamp(1, 0), "db", {"shard1"}},
+                                    {Timestamp(2, 0), "db.collection1", {"shard2"}},
+                                    {Timestamp(3, 0), "db.collection2", {"shard3"}},
+                                    {Timestamp(4, 0), "db.collection1", {}},
+                                    {Timestamp(5, 0), "db.collection2", {}},
+                                    {Timestamp(6, 0), "db", {}},
+                                },
+                                true);
+
+    setupConfigShard(opCtx, 3 /*nShards*/);
+
+    // Only shard2 and shard3 are still present.
+    setShardIdsInShardRegistry(opCtx, {"shard2", "shard3"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(1, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard2"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(2, 0))
+                            .setNextPlacementChangedAt(Timestamp(3, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(2, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard2"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(2, 0))
+                            .setNextPlacementChangedAt(Timestamp(3, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard2", "shard3"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .setNextPlacementChangedAt(Timestamp(4, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(4, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard3"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(4, 0))
+                            .setNextPlacementChangedAt(Timestamp(5, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(5, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setOpenCursorAt(Timestamp(6, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(6, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only shard1 is still present.
+    setShardIdsInShardRegistry(opCtx, {"shard1"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(1, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(2, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(2, 0))
+                            .setNextPlacementChangedAt(Timestamp(3, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .setNextPlacementChangedAt(Timestamp(4, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(4, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(4, 0))
+                            .setNextPlacementChangedAt(Timestamp(5, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(5, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(6, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+// Test 'openCursorAt' and 'nextPlacementChanged' for a non-existing database.
+TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_OpenCursorAt_NonExistingDatabase) {
+    auto opCtx = operationContext();
+
+    PlacementDescriptor oldestClusterTimeSupportedMarker = {
+        Timestamp(0, 5),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString_forTest(),
+        {}};
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    oldestClusterTimeSupportedMarker,
+                                    {Timestamp(1, 0), "db", {"shard2"}},
+                                    {Timestamp(2, 0), "db.collection", {"shard2", "shard3"}},
+                                    {Timestamp(3, 0), "db", {}},
+                                },
+                                true);
+
+    setupConfigShard(opCtx, 3 /*nShards*/);
+
+    // All shards are present in the shard registry.
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3"});
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {kDawnOfTime, Timestamp(1, 0), Timestamp(2, 0), Timestamp(3, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db-does-not-exist", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only "shard1" is present in the shard registry.
+    setShardIdsInShardRegistry(opCtx, {"shard1"});
+
+    for (auto ts : {kDawnOfTime, Timestamp(1, 0), Timestamp(2, 0), Timestamp(3, 0)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db-does-not-exist", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_OpenCursorAt_Database_AfterApproximatedResponse) {
+    auto opCtx = operationContext();
+
+    // Insert the initial content
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    {kDawnOfTime, "", {"shard1", "shard2"}},
+                                    {Timestamp(0, 5), "", {}},
+                                    {Timestamp(1, 0), "db", {"shard1"}},
+                                    {Timestamp(2, 0), "db.collection1", {"shard1"}},
+                                    {Timestamp(3, 0), "db.collection1", {"shard2"}},
+                                    {Timestamp(4, 0), "db", {"shard2"}},
+                                    {Timestamp(5, 0), "db.collection2", {"shard1"}},
+                                    {Timestamp(6, 0), "db.collection1", {}},
+                                    {Timestamp(7, 0), "db.collection2", {"shard2"}},
+                                    {Timestamp(8, 0), "db.collection2", {}},
+                                    {Timestamp(9, 0), "db", {}},
+                                });
+
+    setupConfigShard(opCtx, 2 /*nShards*/);
+
+    // All shards are still present.
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2"});
+
+    for (auto ts : {kDawnOfTime, Timestamp(0, 4)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setShards({"shard1", "shard2"})
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(1, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard1"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(2, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard1"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setShards({"shard1", "shard2"})
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(4, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard2"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(5, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setShards({"shard1", "shard2"})
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(6, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setShards({"shard1", "shard2"})
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(7, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard2"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(8, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard2"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(9, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only "shard1" is still present.
+    setShardIdsInShardRegistry(opCtx, {"shard1"});
+
+    for (auto ts : {kDawnOfTime, Timestamp(0, 4)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard1"})
+                            .setOpenCursorAt(ts)
+                            .setNextPlacementChangedAt(Timestamp(0, 5))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(1, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard1"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(2, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard1"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard1"})
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .setNextPlacementChangedAt(Timestamp(4, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(4, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard1"})
+                            .setOpenCursorAt(Timestamp(5, 0))
+                            .setNextPlacementChangedAt(Timestamp(6, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(5, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard1"})
+                            .setOpenCursorAt(Timestamp(5, 0))
+                            .setNextPlacementChangedAt(Timestamp(6, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(6, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard1"})
+                            .setOpenCursorAt(Timestamp(6, 0))
+                            .setNextPlacementChangedAt(Timestamp(7, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(7, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setOpenCursorAt(Timestamp(9, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(8, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setOpenCursorAt(Timestamp(9, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(9, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only "shard2" is still present.
+    setShardIdsInShardRegistry(opCtx, {"shard2"});
+
+    for (auto ts : {kDawnOfTime, Timestamp(0, 4)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(ts)
+                            .setNextPlacementChangedAt(Timestamp(0, 5))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(1, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .setNextPlacementChangedAt(Timestamp(4, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(2, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .setNextPlacementChangedAt(Timestamp(4, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .setNextPlacementChangedAt(Timestamp(4, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(4, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard2"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(5, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(Timestamp(5, 0))
+                            .setNextPlacementChangedAt(Timestamp(6, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(6, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(Timestamp(6, 0))
+                            .setNextPlacementChangedAt(Timestamp(7, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(7, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard2"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(8, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard2"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(9, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+// Test 'openCursorAt' and 'nextPlacementChanged' for the whole cluster with all shards still being
+// present in the shard registry.
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_OpenCursorAt_WholeCluster_AllShardsPresent) {
+    auto opCtx = operationContext();
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    {Timestamp(1, 0), "db1", {"shard1"}},
+                                    {Timestamp(2, 0), "db1.collection1", {"shard2"}},
+                                    {Timestamp(3, 0), "db2", {"shard3"}},
+                                    {Timestamp(4, 0), "db2.collection2", {"shard1"}},
+                                    {Timestamp(5, 0), "db1.collection1", {}},
+                                    {Timestamp(6, 0), "db2.collection2", {}},
+                                    {Timestamp(7, 0), "db1", {}},
+                                    {Timestamp(8, 0), "db2", {}},
+                                });
+
+    setupConfigShard(opCtx, 3 /*nShards*/);
+
+    // All shards are still present.
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2", "shard3"});
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(1, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(2, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1", "shard2"})
+                            .setAnyRemovedShardDetected(false)
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1", "shard2", "shard3"})
+                            .setAnyRemovedShardDetected(false)
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(4, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1", "shard2", "shard3"})
+                            .setAnyRemovedShardDetected(false)
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(5, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1", "shard3"})
+                            .setAnyRemovedShardDetected(false)
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(6, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1", "shard3"})
+                            .setAnyRemovedShardDetected(false)
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(7, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard3"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(8, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+// Test 'openCursorAt' and 'nextPlacementChanged' for the whole cluster with only some shards still
+// being present in the shard registry.
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_OpenCursorAt_WholeCluster_SomeShardsPresent) {
+    auto opCtx = operationContext();
+
+    PlacementDescriptor oldestClusterTimeSupportedMarker = {
+        Timestamp(0, 5),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString_forTest(),
+        {}};
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    oldestClusterTimeSupportedMarker,
+                                    {Timestamp(1, 0), "db1", {"shard1"}},
+                                    {Timestamp(2, 0), "db1.collection1", {"shard2"}},
+                                    {Timestamp(3, 0), "db2", {"shard3"}},
+                                    {Timestamp(4, 0), "db2.collection2", {"shard1"}},
+                                    {Timestamp(5, 0), "db1.collection1", {}},
+                                    {Timestamp(6, 0), "db2.collection2", {}},
+                                    {Timestamp(7, 0), "db1", {}},
+                                    {Timestamp(8, 0), "db2", {}},
+                                },
+                                true);
+
+    setupConfigShard(opCtx, 3 /*nShards*/);
+
+    // Only shard1 and shard2 are still present.
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard3"});
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Query before, at, and directly after oldestClusterTimeSupported marker.
+    for (auto ts : {Timestamp(0, 4), Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(1, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard1"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(2, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(2, 0))
+                            .setNextPlacementChangedAt(Timestamp(3, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1", "shard3"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .setNextPlacementChangedAt(Timestamp(4, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(4, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1", "shard3"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(4, 0))
+                            .setNextPlacementChangedAt(Timestamp(5, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(5, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1", "shard3"})
+                            .setAnyRemovedShardDetected(false)
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(6, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard1", "shard3"})
+                            .setAnyRemovedShardDetected(false)
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(7, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard3"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(8, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only shard2 is still present.
+    setShardIdsInShardRegistry(opCtx, {"shard2"});
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", kDawnOfTime);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Query before oldestClusterTimeSupported marker.
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(0, 4));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Query at oldestClusterTimeSupported marker.
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(0, 5));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Query directly after oldestClusterTimeSupported marker.
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(0, 6));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(1, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(Timestamp(2, 0))
+                            .setNextPlacementChangedAt(Timestamp(3, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(2, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard2"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(2, 0))
+                            .setNextPlacementChangedAt(Timestamp(3, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(3, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard2"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .setNextPlacementChangedAt(Timestamp(4, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(4, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setShards({"shard2"})
+                            .setAnyRemovedShardDetected(true)
+                            .setOpenCursorAt(Timestamp(4, 0))
+                            .setNextPlacementChangedAt(Timestamp(5, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(5, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setOpenCursorAt(Timestamp(8, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(6, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setOpenCursorAt(Timestamp(8, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(7, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setOpenCursorAt(Timestamp(8, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(8, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_OpenCursorAt_WholeCluster_AfterApproximatedResponse) {
+    auto opCtx = operationContext();
+
+    // Insert the initial content
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    {kDawnOfTime, "", {"shard1", "shard2"}},
+                                    {Timestamp(0, 5), "", {}},
+                                    {Timestamp(1, 0), "db1", {"shard1"}},
+                                    {Timestamp(2, 0), "db1.collection1", {"shard1"}},
+                                    {Timestamp(3, 0), "db1.collection1", {"shard2"}},
+                                    {Timestamp(4, 0), "db2", {"shard2"}},
+                                    {Timestamp(5, 0), "db2.collection3", {"shard1"}},
+                                    {Timestamp(6, 0), "db1.collection2", {"shard1"}},
+                                    {Timestamp(7, 0), "db1.collection1", {}},
+                                    {Timestamp(8, 0), "db1.collection2", {"shard2"}},
+                                    {Timestamp(9, 0), "db1.collection2", {}},
+                                    {Timestamp(10, 0), "db1", {}},
+                                    {Timestamp(11, 0), "db2.collection3", {}},
+                                    {Timestamp(12, 0), "db2", {}},
+                                });
+
+    setupConfigShard(opCtx, 2 /*nShards*/);
+
+    // All shards are still present.
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2"});
+
+    for (auto ts : {kDawnOfTime, Timestamp(0, 4)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setShards({"shard1", "shard2"})
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(1, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard1"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(2, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard1"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (int i = 3; i <= 10; ++i) {
+        auto ts = Timestamp(i, 0);
+
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setShards({"shard1", "shard2"})
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(11, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setShards({"shard2"}).setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(12, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only "shard1" is still present.
+    setShardIdsInShardRegistry(opCtx, {"shard1"});
+
+    for (auto ts : {kDawnOfTime, Timestamp(0, 4)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard1"})
+                            .setOpenCursorAt(ts)
+                            .setNextPlacementChangedAt(Timestamp(0, 5))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(1, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard1"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(2, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard1"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (int i = 3; i <= 10; ++i) {
+        auto ts = Timestamp(i, 0);
+
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard1"})
+                            .setOpenCursorAt(ts)
+                            .setNextPlacementChangedAt(Timestamp(i + 1, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(11, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(false)
+                            .setOpenCursorAt(Timestamp(12, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(12, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    // Only "shard2" is still present.
+    setShardIdsInShardRegistry(opCtx, {"shard2"});
+
+    for (auto ts : {kDawnOfTime, Timestamp(0, 4)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(ts)
+                            .setNextPlacementChangedAt(Timestamp(0, 5))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (auto ts : {Timestamp(0, 5), Timestamp(0, 6)}) {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", ts);
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(1, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .setNextPlacementChangedAt(Timestamp(4, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(2, 0));
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(Timestamp(3, 0))
+                            .setNextPlacementChangedAt(Timestamp(4, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    for (int i = 3; i <= 10; ++i) {
+        auto ts = Timestamp(i, 0);
+
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", ts);
+        auto expected = ExpectedResponseBuilder{}
+                            .setAnyRemovedShardDetected(true)
+                            .setShards({"shard2"})
+                            .setOpenCursorAt(ts)
+                            .setNextPlacementChangedAt(Timestamp(i + 1, 0))
+                            .value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(11, 0));
+        auto expected =
+            ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).setShards({"shard2"}).value;
+        assertPlacementsEqual(expected, actual);
+    }
+
+    {
+        auto actual = getHistoricalPlacementIgnoreRemovedShards("", Timestamp(12, 0));
+        auto expected = ExpectedResponseBuilder{}.setAnyRemovedShardDetected(false).value;
+        assertPlacementsEqual(expected, actual);
+    }
+}
+
+using GetHistoricalPlacementTestFixtureDeathTest = GetHistoricalPlacementTestFixture;
+
+// Tests that a tassert is raised when the expected initialization marker for the oldest supported
+// cluster time is missing in the placement history.
+DEATH_TEST_REGEX_F(GetHistoricalPlacementTestFixtureDeathTest,
+                   getHistoricalPlacement_OpenCursorAt_MissingOldestClusterTimeSupportedMarker,
+                   "Tripwire assertion.*11314301") {
+    auto opCtx = operationContext();
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    {Timestamp(1, 0), "db", {"shard1"}},
+                                });
+
+    setupConfigShard(opCtx, 2 /*nShards*/);
+
+    // Only "shard2" is still present.
+    setShardIdsInShardRegistry(opCtx, {"shard2"});
+
+    ASSERT_THROWS_CODE(getHistoricalPlacementIgnoreRemovedShards("db.collection", Timestamp(1, 0)),
+                       AssertionException,
+                       11314301);
+}
+
+// Tests that a tassert is raised when the expected follow-up entry is missing in the placement
+// history for a namespace which was present on a now-removed shard.
+DEATH_TEST_REGEX_F(
+    GetHistoricalPlacementTestFixtureDeathTest,
+    getHistoricalPlacement_OpenCursorAt_MissingFollowUpPlacementHistoryEntryForNamespace,
+    "Tripwire assertion.*11314303") {
+    auto opCtx = operationContext();
+
+    PlacementDescriptor oldestClusterTimeSupportedMarker = {
+        Timestamp(0, 5),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString_forTest(),
+        {}};
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    oldestClusterTimeSupportedMarker,
+                                    {Timestamp(1, 0), "db", {"shard1"}},
+                                });
+
+    setupConfigShard(opCtx, 2 /*nShards*/);
+
+    // Only "shard2" is still present.
+    setShardIdsInShardRegistry(opCtx, {"shard2"});
+
+    ASSERT_THROWS_CODE(getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(2, 0)),
+                       AssertionException,
+                       11314303);
 }
 
 // ######################## PlacementHistory: Query by database ############################
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SingleDatabase) {
-    /*Querying the placementHistory must report all the shards for every collection belonging to
+    /* Querying the placementHistory must report all the shards for every collection belonging to
      * the input db*/
     auto opCtx = operationContext();
 
@@ -1110,15 +3652,20 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SingleDatabase)
             true /* checkIfPointInTimeIsInFuture */,
             ignoreRemovedShards);
 
-        assertSameHistoricalPlacement(
-            historicalPlacement,
-            {"shard1", "shard2", "shard3", "shard4", "shard5"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard1", "shard2", "shard3", "shard4", "shard5"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
     }
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_MultipleDatabases) {
-    /*Querying the placementHistory must report all the shards for every collection belonging to
+    /* Querying the placementHistory must report all the shards for every collection belonging to
      * the input db*/
     auto opCtx = operationContext();
 
@@ -1138,7 +3685,8 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_MultipleDatabas
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
@@ -1147,7 +3695,8 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_MultipleDatabas
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard4", "shard5", "shard6"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard4", "shard5", "shard6"}).value,
+                          historicalPlacement);
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
@@ -1156,11 +3705,12 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_MultipleDatabas
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard7"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard7"}).value,
+                          historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, dbLevelSearch_DifferentTimestamp) {
-    /*Query the placementHistory at different timestamp should return different results*/
+    /* Query the placementHistory at different timestamp should return different results*/
     auto opCtx = operationContext();
 
     setupConfigPlacementHistory(
@@ -1180,7 +3730,7 @@ TEST_F(GetHistoricalPlacementTestFixture, dbLevelSearch_DifferentTimestamp) {
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {});
+    assertPlacementsEqual(HistoricalPlacement{}, historicalPlacement);
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
@@ -1189,7 +3739,8 @@ TEST_F(GetHistoricalPlacementTestFixture, dbLevelSearch_DifferentTimestamp) {
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1"}).value,
+                          historicalPlacement);
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
@@ -1198,7 +3749,8 @@ TEST_F(GetHistoricalPlacementTestFixture, dbLevelSearch_DifferentTimestamp) {
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2"}).value,
+                          historicalPlacement);
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
@@ -1207,7 +3759,8 @@ TEST_F(GetHistoricalPlacementTestFixture, dbLevelSearch_DifferentTimestamp) {
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
@@ -1216,7 +3769,9 @@ TEST_F(GetHistoricalPlacementTestFixture, dbLevelSearch_DifferentTimestamp) {
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3", "shard4"}).value,
+        historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SameTimestamp_repeated) {
@@ -1240,8 +3795,10 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SameTimestamp_r
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement,
-                                  {"shard1", "shard2", "shard3", "shard4", "shard5"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2", "shard3", "shard4", "shard5"})
+                              .value,
+                          historicalPlacement);
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
@@ -1250,7 +3807,9 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_SameTimestamp_r
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard6", "shard7", "shard8", "shard9"});
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard6", "shard7", "shard8", "shard9"}).value,
+        historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_InvertedTimestampOrder_repeated) {
@@ -1273,11 +3832,13 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_InvertedTimesta
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3", "shard4"}).value,
+        historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_NoShardsForDb) {
-    /*Querying the placementHistory must report no shards if the list of shards belonging to every
+    /* Querying the placementHistory must report no shards if the list of shards belonging to every
      * collection and the db is empty*/
     auto opCtx = operationContext();
 
@@ -1297,7 +3858,7 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_NoShardsForDb) 
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {});
+    assertPlacementsEqual(HistoricalPlacement{}, historicalPlacement);
 
     // Note: at timestamp 3 the collection's shard list was not empty
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
@@ -1307,11 +3868,12 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_NoShardsForDb) 
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_NewShardForDb) {
-    /*Querying the placementHistory must correctly identify a new primary for the db*/
+    /* Querying the placementHistory must correctly identify a new primary for the db*/
     auto opCtx = operationContext();
 
     setupConfigPlacementHistory(
@@ -1329,7 +3891,8 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_NewShardForDb) 
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 
     // At timestamp 3 the db shard list was updated with a new primary
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
@@ -1339,7 +3902,9 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_NewShardForDb) 
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard4", "shard1", "shard2", "shard3"});
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard4", "shard1", "shard2", "shard3"}).value,
+        historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_WithMarkers_repeated) {
@@ -1379,8 +3944,10 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_WithMarkers_rep
         Timestamp(2, 0),
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
-    assertSameHistoricalPlacement(historicalPlacement,
-                                  {"shard1", "shard2", "shard3", "shard4", "shard5"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1", "shard2", "shard3", "shard4", "shard5"})
+                              .value,
+                          historicalPlacement);
 
     // Asking for a timestamp after the closing marker should return the expected shards
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
@@ -1389,7 +3956,9 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_WithMarkers_rep
         Timestamp(3, 0),
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3", "shard4"}).value,
+        historicalPlacement);
 
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
@@ -1397,12 +3966,13 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_WithMarkers_rep
         Timestamp(7, 0),
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 }
 
 // ######################## PlacementHistory: Query the entire cluster ##################
 TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_SingleDatabase) {
-    /*Querying the placementHistory must report all the shards for every collection and db*/
+    /* Querying the placementHistory must report all the shards for every collection and db*/
     auto opCtx = operationContext();
 
     setupConfigPlacementHistory(opCtx,
@@ -1422,15 +3992,20 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Sing
                                                             true /* checkIfPointInTimeIsInFuture */,
                                                             ignoreRemovedShards);
 
-        assertSameHistoricalPlacement(
-            historicalPlacement,
-            {"shard1", "shard2", "shard3", "shard4", "shard5"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard1", "shard2", "shard3", "shard4", "shard5"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
     }
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_MultipleDatabases) {
-    /*Querying the placementHistory must report all the shards for every collection and db*/
+    /* Querying the placementHistory must report all the shards for every collection and db*/
     auto opCtx = operationContext();
 
     setupConfigPlacementHistory(opCtx,
@@ -1449,13 +4024,15 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Mult
                                                         true /* checkIfPointInTimeIsInFuture */,
                                                         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(
-        historicalPlacement,
-        {"shard1", "shard2", "shard3", "shard4", "shard5", "shard6", "shard7"});
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}
+            .setShards({"shard1", "shard2", "shard3", "shard4", "shard5", "shard6", "shard7"})
+            .value,
+        historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_DifferentTimestamp) {
-    /*Query the placementHistory at different timestamp should return different results*/
+    /* Query the placementHistory at different timestamp should return different results*/
     auto opCtx = operationContext();
 
     setupConfigPlacementHistory(
@@ -1475,7 +4052,7 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Diff
                                                         true /* checkIfPointInTimeIsInFuture */,
                                                         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {});
+    assertPlacementsEqual(HistoricalPlacement{}, historicalPlacement);
 
     historicalPlacement =
         shardingCatalogManager().getHistoricalPlacement(opCtx,
@@ -1484,7 +4061,8 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Diff
                                                         true /* checkIfPointInTimeIsInFuture */,
                                                         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1"}).value,
+                          historicalPlacement);
 
     historicalPlacement =
         shardingCatalogManager().getHistoricalPlacement(opCtx,
@@ -1493,7 +4071,8 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Diff
                                                         true /* checkIfPointInTimeIsInFuture */,
                                                         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2"}).value,
+                          historicalPlacement);
 
     historicalPlacement =
         shardingCatalogManager().getHistoricalPlacement(opCtx,
@@ -1502,7 +4081,8 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Diff
                                                         true /* checkIfPointInTimeIsInFuture */,
                                                         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 
     historicalPlacement =
         shardingCatalogManager().getHistoricalPlacement(opCtx,
@@ -1511,7 +4091,9 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Diff
                                                         true /* checkIfPointInTimeIsInFuture */,
                                                         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3", "shard4"}).value,
+        historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_SameTimestamp) {
@@ -1536,9 +4118,18 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Same
                                                         true /* checkIfPointInTimeIsInFuture */,
                                                         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(
-        historicalPlacement,
-        {"shard1", "shard2", "shard3", "shard4", "shard5", "shard6", "shard7", "shard8", "shard9"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}
+                              .setShards({"shard1",
+                                          "shard2",
+                                          "shard3",
+                                          "shard4",
+                                          "shard5",
+                                          "shard6",
+                                          "shard7",
+                                          "shard8",
+                                          "shard9"})
+                              .value,
+                          historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture,
@@ -1562,13 +4153,16 @@ TEST_F(GetHistoricalPlacementTestFixture,
                                                         true /* checkIfPointInTimeIsInFuture */,
                                                         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(
-        historicalPlacement,
-        {"shard1", "shard2", "shard3", "shard4", "shard5", "shard6", "shard7", "shard8"});
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}
+            .setShards(
+                {"shard1", "shard2", "shard3", "shard4", "shard5", "shard6", "shard7", "shard8"})
+            .value,
+        historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_NoShards) {
-    /*Querying the placementHistory must report no shards if the list of shards belonging to
+    /* Querying the placementHistory must report no shards if the list of shards belonging to
      * every db.collection and db is empty*/
     auto opCtx = operationContext();
 
@@ -1588,7 +4182,7 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_NoSh
                                                         true /* checkIfPointInTimeIsInFuture */,
                                                         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {});
+    assertPlacementsEqual(HistoricalPlacement{}, historicalPlacement);
 
     // Note: at timestamp 3 the collection was still sharded
     historicalPlacement =
@@ -1598,7 +4192,8 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_NoSh
                                                         true /* checkIfPointInTimeIsInFuture */,
                                                         false /* ignoreRemovedShards */);
 
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_WithMarkers) {
@@ -1637,7 +4232,9 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_With
                                                         Timestamp(2, 0),
                                                         true /* checkIfPointInTimeIsInFuture */,
                                                         false /* ignoreRemovedShards */);
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3", "shard4"}).value,
+        historicalPlacement);
 
     // Asking for a timestamp after the closing marker should return the expected shards
     historicalPlacement =
@@ -1646,7 +4243,8 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_With
                                                         Timestamp(3, 0),
                                                         true /* checkIfPointInTimeIsInFuture */,
                                                         false /* ignoreRemovedShards */);
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 
     historicalPlacement =
         shardingCatalogManager().getHistoricalPlacement(opCtx,
@@ -1654,12 +4252,13 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_With
                                                         Timestamp(5, 0),
                                                         true /* checkIfPointInTimeIsInFuture */,
                                                         false /* ignoreRemovedShards */);
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture,
        GetShardsThatOwnDataAtClusterTime_RegexStage_NssWithPrefix) {
-    /*The regex stage must match correctly the input namespaces*/
+    /* The regex stage must match correctly the input namespaces*/
     auto opCtx = operationContext();
 
     // shards from 4, 5, 6 should never be returned
@@ -1688,8 +4287,8 @@ TEST_F(GetHistoricalPlacementTestFixture,
         Timestamp(12, 0),
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
-
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 
     // no data must be returned since the namespace is not found
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
@@ -1698,8 +4297,7 @@ TEST_F(GetHistoricalPlacementTestFixture,
         Timestamp(12, 0),
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
-
-    assertSameHistoricalPlacement(historicalPlacement, {});
+    assertPlacementsEqual(HistoricalPlacement{}, historicalPlacement);
 
     // database exists
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
@@ -1708,9 +4306,11 @@ TEST_F(GetHistoricalPlacementTestFixture,
         Timestamp(12, 0),
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
-
-    assertSameHistoricalPlacement(historicalPlacement,
-                                  {"shard1", "shard2", "shard3", "shard7", "shard8", "shard9"});
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}
+            .setShards({"shard1", "shard2", "shard3", "shard7", "shard8", "shard9"})
+            .value,
+        historicalPlacement);
 
     // database does not exist
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
@@ -1719,13 +4319,12 @@ TEST_F(GetHistoricalPlacementTestFixture,
         Timestamp(12, 0),
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
-
-    assertSameHistoricalPlacement(historicalPlacement, {});
+    assertPlacementsEqual(HistoricalPlacement{}, historicalPlacement);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture,
        GetShardsThatOwnDataAtClusterTime_RegexStage_DbWithSymbols) {
-    /*The regex stage must correctly escape special character*/
+    /* The regex stage must correctly escape special character*/
     auto opCtx = operationContext();
 
     // shards >= 10 should never be returned
@@ -1752,8 +4351,8 @@ TEST_F(GetHistoricalPlacementTestFixture,
         Timestamp(10, 0),
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
-
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 
     // db|db , db*db  etc... must not be found when querying by collection
     historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
@@ -1762,8 +4361,8 @@ TEST_F(GetHistoricalPlacementTestFixture,
         Timestamp(10, 0),
         true /* checkIfPointInTimeIsInFuture */,
         false /* ignoreRemovedShards */);
-
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2", "shard3"}).value,
+                          historicalPlacement);
 }
 
 // ######################## PlacementHistory: EmptyHistory #####################
@@ -1785,8 +4384,9 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Empt
             Timestamp(4, 0),
             true /* checkIfPointInTimeIsInFuture */,
             false /* ignoreRemovedShards */);
-        ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::NotAvailable);
-        ASSERT(historicalPlacement.getShards().empty());
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{HistoricalPlacementStatus::NotAvailable}.value,
+            historicalPlacement);
     }
 
     // DB-level query
@@ -1797,11 +4397,9 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Empt
             Timestamp(4, 0),
             true /* checkIfPointInTimeIsInFuture */,
             false /* ignoreRemovedShards */);
-
-        ASSERT_EQ(0U, historicalPlacement.getShards().size());
-
-        ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::NotAvailable);
-        ASSERT(historicalPlacement.getShards().empty());
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{HistoricalPlacementStatus::NotAvailable}.value,
+            historicalPlacement);
     }
 
     // Cluster-level query
@@ -1812,15 +4410,15 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Empt
                                                             Timestamp(4, 0),
                                                             true /* checkIfPointInTimeIsInFuture */,
                                                             false /* ignoreRemovedShards */);
-
-        ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::NotAvailable);
-        ASSERT(historicalPlacement.getShards().empty());
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{HistoricalPlacementStatus::NotAvailable}.value,
+            historicalPlacement);
     }
 }
 
 // ######################## PlacementHistory: InvalidOptions #####################
 TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_InvalidOptions) {
-    /*Testing input validation*/
+    /* Testing input validation*/
     auto opCtx = operationContext();
 
     // Invalid namespaces are rejected
@@ -1885,72 +4483,71 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Clea
     const std::vector<std::string> approximatedPlacement{"shard1", "shard2", "shard3", "shard4"};
 
     // db
-    assertSameHistoricalPlacement(shardingCatalogManager().getHistoricalPlacement(
-                                      opCtx,
-                                      NamespaceString::createNamespaceString_forTest("db"),
-                                      earliestClusterTime,
-                                      true /* checkIfPointInTimeIsInFuture */,
-                                      false /* ignoreRemovedShards */),
-                                  {"shard1", "shard2", "shard3", "shard4"});
-    assertSameHistoricalPlacement(shardingCatalogManager().getHistoricalPlacement(
-                                      opCtx,
-                                      NamespaceString::createNamespaceString_forTest("db"),
-                                      earliestClusterTime - 1,
-                                      true /* checkIfPointInTimeIsInFuture */,
-                                      false /* ignoreRemovedShards */),
-                                  approximatedPlacement);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards(approximatedPlacement).value,
+                          shardingCatalogManager().getHistoricalPlacement(
+                              opCtx,
+                              NamespaceString::createNamespaceString_forTest("db"),
+                              earliestClusterTime,
+                              true /* checkIfPointInTimeIsInFuture */,
+                              false /* ignoreRemovedShards */));
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards(approximatedPlacement).value,
+                          shardingCatalogManager().getHistoricalPlacement(
+                              opCtx,
+                              NamespaceString::createNamespaceString_forTest("db"),
+                              earliestClusterTime - 1,
+                              true /* checkIfPointInTimeIsInFuture */,
+                              false /* ignoreRemovedShards */));
 
     // db.collection1
-    assertSameHistoricalPlacement(
-        shardingCatalogManager().getHistoricalPlacement(
-            opCtx,
-            NamespaceString::createNamespaceString_forTest("db.collection1"),
-            earliestClusterTime,
-            true /* checkIfPointInTimeIsInFuture */,
-            false /* ignoreRemovedShards */),
-        {"shard2", "shard3", "shard4"});
-    assertSameHistoricalPlacement(
-        shardingCatalogManager().getHistoricalPlacement(
-            opCtx,
-            NamespaceString::createNamespaceString_forTest("db.collection1"),
-            earliestClusterTime - 1,
-            true /* checkIfPointInTimeIsInFuture */,
-            false /* ignoreRemovedShards */),
-        approximatedPlacement);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard2", "shard3", "shard4"}).value,
+                          shardingCatalogManager().getHistoricalPlacement(
+                              opCtx,
+                              NamespaceString::createNamespaceString_forTest("db.collection1"),
+                              earliestClusterTime,
+                              true /* checkIfPointInTimeIsInFuture */,
+                              false /* ignoreRemovedShards */));
+
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards(approximatedPlacement).value,
+                          shardingCatalogManager().getHistoricalPlacement(
+                              opCtx,
+                              NamespaceString::createNamespaceString_forTest("db.collection1"),
+                              earliestClusterTime - 1,
+                              true /* checkIfPointInTimeIsInFuture */,
+                              false /* ignoreRemovedShards */));
 
     // db.collection2
-    assertSameHistoricalPlacement(
-        shardingCatalogManager().getHistoricalPlacement(
-            opCtx,
-            NamespaceString::createNamespaceString_forTest("db.collection2"),
-            earliestClusterTime,
-            true /* checkIfPointInTimeIsInFuture */,
-            false /* ignoreRemovedShards */),
-        {"shard1", "shard4"});
-    assertSameHistoricalPlacement(
-        shardingCatalogManager().getHistoricalPlacement(
-            opCtx,
-            NamespaceString::createNamespaceString_forTest("db.collection2"),
-            Timestamp(11, 0),
-            true /* checkIfPointInTimeIsInFuture */,
-            false /* ignoreRemovedShards */),
-        approximatedPlacement);
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard4"}).value,
+                          shardingCatalogManager().getHistoricalPlacement(
+                              opCtx,
+                              NamespaceString::createNamespaceString_forTest("db.collection2"),
+                              earliestClusterTime,
+                              true /* checkIfPointInTimeIsInFuture */,
+                              false /* ignoreRemovedShards */));
+
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards(approximatedPlacement).value,
+                          shardingCatalogManager().getHistoricalPlacement(
+                              opCtx,
+                              NamespaceString::createNamespaceString_forTest("db.collection2"),
+                              Timestamp(11, 0),
+                              true /* checkIfPointInTimeIsInFuture */,
+                              false /* ignoreRemovedShards */));
 
     // Whole cluster
-    assertSameHistoricalPlacement(
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards(approximatedPlacement).value,
         shardingCatalogManager().getHistoricalPlacement(opCtx,
                                                         boost::none,
                                                         earliestClusterTime,
                                                         true /* checkIfPointInTimeIsInFuture */,
-                                                        false /* ignoreRemovedShards */),
-        {"shard1", "shard2", "shard3", "shard4"});
-    assertSameHistoricalPlacement(
+                                                        false /* ignoreRemovedShards */));
+
+    assertPlacementsEqual(
+        ExpectedResponseBuilder{}.setShards(approximatedPlacement).value,
         shardingCatalogManager().getHistoricalPlacement(opCtx,
                                                         boost::none,
                                                         Timestamp(11, 0),
                                                         true /* checkIfPointInTimeIsInFuture */,
-                                                        false /* ignoreRemovedShards */),
-        approximatedPlacement);
+                                                        false /* ignoreRemovedShards */));
 }
 
 TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_CleanUp_NewMarkers) {
@@ -1995,10 +4592,12 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Clea
         false /* ignoreRemovedShards */);
 
     // before cleanup
-    assertSameHistoricalPlacement(historicalPlacement_coll1, {"shard1", "shard2"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2"}).value,
+                          historicalPlacement_coll1);
 
     // after cleanup
-    assertSameHistoricalPlacement(historicalPlacement_cleanup_coll1, {"shard1", "shard2"});
+    assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2"}).value,
+                          historicalPlacement_cleanup_coll1);
 }
 
 TEST_F(GetHistoricalPlacementTestFixture,
@@ -2023,50 +4622,53 @@ TEST_F(GetHistoricalPlacementTestFixture,
 
         auto collNss = NamespaceString::createNamespaceString_forTest("db.collection1");
         auto dbOnlyNss = NamespaceString::createNamespaceString_forTest("db");
-        assertSameHistoricalPlacement(
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}.setShards({"shard1", "shard2"}).value,
             shardingCatalogManager().getHistoricalPlacement(opCtx,
                                                             collNss,
                                                             currentConfigTime,
                                                             true /* checkIfPointInTimeIsInFuture */,
-                                                            false /* ignoreRemovedShards */),
-            {"shard1", "shard2"});
-        assertSameHistoricalPlacement(shardingCatalogManager().getHistoricalPlacement(
-                                          opCtx,
-                                          collNss,
-                                          currentConfigTime,
-                                          false /* checkIfPointInTimeIsInFuture */,
-                                          false /* ignoreRemovedShards */),
-                                      {"shard1", "shard2"});
+                                                            false /* ignoreRemovedShards */));
 
-        assertSameHistoricalPlacement(
+        assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2"}).value,
+                              shardingCatalogManager().getHistoricalPlacement(
+                                  opCtx,
+                                  collNss,
+                                  currentConfigTime,
+                                  false /* checkIfPointInTimeIsInFuture */,
+                                  false /* ignoreRemovedShards */));
+
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}.setShards({"shard1", "shard2"}).value,
             shardingCatalogManager().getHistoricalPlacement(opCtx,
                                                             dbOnlyNss,
                                                             currentConfigTime,
                                                             true /* checkIfPointInTimeIsInFuture */,
-                                                            false /* ignoreRemovedShards */),
-            {"shard1", "shard2"});
-        assertSameHistoricalPlacement(shardingCatalogManager().getHistoricalPlacement(
-                                          opCtx,
-                                          dbOnlyNss,
-                                          currentConfigTime,
-                                          false /* checkIfPointInTimeIsInFuture */,
-                                          false /* ignoreRemovedShards */),
-                                      {"shard1", "shard2"});
+                                                            false /* ignoreRemovedShards */));
 
-        assertSameHistoricalPlacement(
+        assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2"}).value,
+                              shardingCatalogManager().getHistoricalPlacement(
+                                  opCtx,
+                                  dbOnlyNss,
+                                  currentConfigTime,
+                                  false /* checkIfPointInTimeIsInFuture */,
+                                  false /* ignoreRemovedShards */));
+
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}.setShards({"shard1", "shard2"}).value,
             shardingCatalogManager().getHistoricalPlacement(opCtx,
                                                             boost::none,
                                                             currentConfigTime,
                                                             true /* checkIfPointInTimeIsInFuture */,
-                                                            false /* ignoreRemovedShards */),
-            {"shard1", "shard2"});
-        assertSameHistoricalPlacement(shardingCatalogManager().getHistoricalPlacement(
-                                          opCtx,
-                                          boost::none,
-                                          currentConfigTime,
-                                          false /* checkIfPointInTimeIsInFuture */,
-                                          false /* ignoreRemovedShards */),
-                                      {"shard1", "shard2"});
+                                                            false /* ignoreRemovedShards */));
+
+        assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1", "shard2"}).value,
+                              shardingCatalogManager().getHistoricalPlacement(
+                                  opCtx,
+                                  boost::none,
+                                  currentConfigTime,
+                                  false /* checkIfPointInTimeIsInFuture */,
+                                  false /* ignoreRemovedShards */));
     }
 }
 
@@ -2105,8 +4707,9 @@ TEST_F(
                                                             timeInTheFuture,
                                                             true /* checkIfPointInTimeIsInFuture */,
                                                             ignoreRemovedShards);
-        ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::FutureClusterTime);
-        ASSERT_EQ(boost::none, historicalPlacement.getAnyRemovedShardDetected());
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{HistoricalPlacementStatus::FutureClusterTime}.value,
+            historicalPlacement);
 
         // Database-level query.
         historicalPlacement =
@@ -2115,8 +4718,9 @@ TEST_F(
                                                             timeInTheFuture,
                                                             true /* checkIfPointInTimeIsInFuture */,
                                                             ignoreRemovedShards);
-        ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::FutureClusterTime);
-        ASSERT_EQ(boost::none, historicalPlacement.getAnyRemovedShardDetected());
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{HistoricalPlacementStatus::FutureClusterTime}.value,
+            historicalPlacement);
 
         // Whole-cluster query.
         historicalPlacement =
@@ -2125,41 +4729,62 @@ TEST_F(
                                                             timeInTheFuture,
                                                             true /* checkIfPointInTimeIsInFuture */,
                                                             ignoreRemovedShards);
-        ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::FutureClusterTime);
-        ASSERT_EQ(boost::none, historicalPlacement.getAnyRemovedShardDetected());
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{HistoricalPlacementStatus::FutureClusterTime}.value,
+            historicalPlacement);
     }
 
     // Ensure that fetching placement history does not return
     // HistoricalPlacementStatus::FutureClusterTime, when requesting placement history from the
     // future config time if 'checkIfPointInTimeIsInFuture' is set to false.
     for (bool ignoreRemovedShards : {true, false}) {
-        assertSameHistoricalPlacement(
-            shardingCatalogManager().getHistoricalPlacement(
-                opCtx,
-                collNss,
-                currentConfigTime,
-                false /* checkIfPointInTimeIsInFuture */,
-                ignoreRemovedShards),
-            {"shard1", "shard2"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
-        assertSameHistoricalPlacement(
-            shardingCatalogManager().getHistoricalPlacement(
-                opCtx,
-                dbOnlyNss,
-                currentConfigTime,
-                false /* checkIfPointInTimeIsInFuture */,
-                ignoreRemovedShards),
-            {"shard1", "shard2"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
-        assertSameHistoricalPlacement(
-            shardingCatalogManager().getHistoricalPlacement(
-                opCtx,
-                boost::none,
-                currentConfigTime,
-                false /* checkIfPointInTimeIsInFuture */,
-                ignoreRemovedShards),
-            {"shard1", "shard2"},
-            expectedValueForAnyRemovedShardDetected(ignoreRemovedShards, false));
+        auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            collNss,
+            currentConfigTime,
+            false /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard1", "shard2"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
+
+        historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            dbOnlyNss,
+            currentConfigTime,
+            false /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard1", "shard2"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
+
+        historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+            opCtx,
+            boost::none,
+            currentConfigTime,
+            false /* checkIfPointInTimeIsInFuture */,
+            ignoreRemovedShards);
+        assertPlacementsEqual(
+            ExpectedResponseBuilder{}
+                .setShards({"shard1", "shard2"})
+                .setAnyRemovedShardDetected(false,
+                                            ignoreRemovedShards
+                                                ? ChangeStreamReadMode::kIgnoreRemovedShards
+                                                : ChangeStreamReadMode::kStrict)
+                .value,
+            historicalPlacement);
     }
 }
 

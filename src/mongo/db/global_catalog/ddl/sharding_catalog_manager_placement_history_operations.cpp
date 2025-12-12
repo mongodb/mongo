@@ -53,6 +53,8 @@
 #include <algorithm>
 #include <vector>
 
+#include <fmt/format.h>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
@@ -74,7 +76,7 @@ public:
             resolvedNamespacesMap[collNs] = {collNs, std::vector<BSONObj>() /* pipeline */};
         }
 
-        _expCtx->setResolvedNamespaces(resolvedNamespacesMap);
+        _expCtx->setResolvedNamespaces(std::move(resolvedNamespacesMap));
     }
 
     PipelineBuilder(const boost::intrusive_ptr<ExpressionContext>& expCtx) : _expCtx(expCtx) {}
@@ -323,277 +325,36 @@ void setInitializationTimeOnPlacementHistory(
           "Initialization metadata of placement.history have been updated",
           "initializationTime"_attr = initializationTime);
 }
-}  // namespace
 
-Status ShardingCatalogManager::createIndexForConfigPlacementHistory(OperationContext* opCtx) {
-    return createIndexOnConfigCollection(opCtx,
-                                         NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                                         BSON(NamespacePlacementType::kNssFieldName
-                                              << 1 << NamespacePlacementType::kTimestampFieldName
-                                              << -1),
-                                         true /*unique*/);
-}
-
-write_ops::InsertCommandRequest
-ShardingCatalogManager::buildInsertReqForPlacementHistoryOperationalBoundaries(
-    const Timestamp& initializationTime, const std::vector<ShardId>& defaultPlacement) {
-    /*
-     * The 'operational boundaries' of config.placementHistory are described through two 'metadata'
-     * documents, both identified by the kConfigPlacementHistoryInitializationMarker namespace:
-     * - initializationTimeInfo: contains the time of the initialization and an empty set of shards.
-     *   It will allow getHistoricalPlacement() to serve accurate responses to queries targeting a
-     * PIT within the [initializationTime, +inf) range.
-     * - approximatedPlacementForPreInitQueries:  contains the cluster topology at the time of the
-     *   initialization and it associated with the 'Dawn of Time' Timestamp(0,1).
-     *   It will allow getHistoricalPlacement() to serve approximated responses to queries
-     *   concerning the [-inf, initializationTime) range.
-     */
-    NamespacePlacementType initializationTimeInfo;
-    initializationTimeInfo.setNss(
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker);
-    initializationTimeInfo.setTimestamp(initializationTime);
-    initializationTimeInfo.setShards({});
-
-    NamespacePlacementType approximatedPlacementForPreInitQueries;
-    approximatedPlacementForPreInitQueries.setNss(
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker);
-    approximatedPlacementForPreInitQueries.setTimestamp(Timestamp(0, 1));
-    approximatedPlacementForPreInitQueries.setShards(defaultPlacement);
-
-    write_ops::InsertCommandRequest insertMarkerRequest(
-        NamespaceString::kConfigsvrPlacementHistoryNamespace);
-    insertMarkerRequest.setDocuments(
-        {initializationTimeInfo.toBSON(), approximatedPlacementForPreInitQueries.toBSON()});
-    return insertMarkerRequest;
-}
-
-
-HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
-    OperationContext* opCtx,
-    const boost::optional<NamespaceString>& nss,
-    const Timestamp& atClusterTime,
-    bool checkIfPointInTimeIsInFuture,
-    bool ignoreRemovedShards) {
-
-    uassert(ErrorCodes::InvalidOptions,
-            "unsupported namespace for historical placement query",
-            !nss || (!nss->dbName().isEmpty() && !nss->isOnInternalDb()));
-
-    // If 'atClusterTime' is greater than current config time, then we can not return correct
-    // placement history and early exit with HistoricalPlacementStatus::FutureClusterTime.
-    const auto vcTime = VectorClock::get(opCtx)->getTime();
-    if (checkIfPointInTimeIsInFuture && atClusterTime > vcTime.configTime().asTimestamp()) {
-        return HistoricalPlacement{{}, HistoricalPlacementStatus::FutureClusterTime};
-    }
-
-    // Acquire a shared lock on config.placementHistory to serialize incoming queries with
-    // inflight attempts to modify its content through InitializePlacementHistoryCoordinator
-    // (this requires making this read operation interruptible).
-    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-    DDLLockManager::ScopedBaseDDLLock placementHistoryLock(
-        opCtx,
-        shard_role_details::getLocker(opCtx),
-        NamespaceString::kConfigsvrPlacementHistoryNamespace,
-        "getHistoricalPlacement" /* reason */,
-        MODE_IS,
-        true /*waitForRecovery*/);
-
-    ResolvedNamespaceMap resolvedNamespaces;
-    resolvedNamespaces[NamespaceString::kConfigsvrPlacementHistoryNamespace] = {
-        NamespaceString::kConfigsvrPlacementHistoryNamespace,
-        std::vector<BSONObj>() /* pipeline */};
-    auto expCtx = ExpressionContextBuilder{}
-                      .opCtx(opCtx)
+/**
+ * Helper class used to do the heavy-lifting for 'ShardingCatalogManager::getHistoricalPlacement()'.
+ */
+class HistoricalPlacementReader {
+public:
+    HistoricalPlacementReader(OperationContext* opCtx,
+                              const boost::optional<NamespaceString>& nss,
+                              const VectorClock::VectorTime& vcTime,
+                              ShardingCatalogClient* localCatalogClient)
+        : _opCtx(opCtx), _nss(nss), _vcTime(vcTime), _localCatalogClient(localCatalogClient) {
+        ResolvedNamespaceMap resolvedNamespaces;
+        resolvedNamespaces[NamespaceString::kConfigsvrPlacementHistoryNamespace] = {
+            NamespaceString::kConfigsvrPlacementHistoryNamespace,
+            std::vector<BSONObj>() /* pipeline */};
+        _expCtx = ExpressionContextBuilder{}
+                      .opCtx(_opCtx)
                       .ns(NamespaceString::kConfigsvrPlacementHistoryNamespace)
                       .resolvedNamespace(std::move(resolvedNamespaces))
                       .build();
-
-    const auto kInitDocumentLabel = NamespaceStringUtil::serialize(
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
-        SerializationContext::stateDefault());
-    constexpr auto kConsistentMetadataAvailable = "consistentMetadataAvailable"_sd;
+    }
 
     // The aggregation is composed by 2 sub pipelines:
-    // 1. The first sub pipeline pulls the 'config.placementHistory' initialization document related
-    //    to the requested 'atClusterTime', whose content will be later processed to determine
-    //    if the query may be served (and if so, through which data).
-    auto initializationDocumentSubPipeline = [&] {
-        DocumentSourceContainer initDocSubPipelineStages;
-        // a. Get the most recent initialization doc that satisfies <= 'atClusterTime'.
-        auto matchStage = DocumentSourceMatch::create(
-            BSON("timestamp" << BSON("$lte" << atClusterTime) << "nss" << kInitDocumentLabel),
-            expCtx);
-        auto sortStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
-        auto limitStage = DocumentSourceLimit::create(expCtx, 1);
-
-        // b. Reformat the content of the initialization document:
-        //  - the 'kConsistentMetadataAvailable' field gives an indication on whether the
-        //    initialization state 'atClusterTime' allows to retrieve accurate placement metadata
-        //    through computation (the 2nd subpipeline)
-        //  - the 'shards' field contains the full composition of cluster when the initialization
-        //    process was run for the last time (and it can be used as an approximated response to
-        //    this query when no computation is possible).
-        auto projectStage = DocumentSourceProject::create(
-            BSON("_id" << 0 << "shards" << 1 << kConsistentMetadataAvailable
-                       << BSON("$eq" << BSON_ARRAY(BSON("$size" << "$shards") << 0))),
-            expCtx,
-            DocumentSourceProject::kStageName);
-
-        initDocSubPipelineStages.emplace_back(std::move(matchStage));
-        initDocSubPipelineStages.emplace_back(std::move(sortStage));
-        initDocSubPipelineStages.emplace_back(std::move(limitStage));
-        initDocSubPipelineStages.emplace_back(std::move(projectStage));
-
-        return Pipeline::create(std::move(initDocSubPipelineStages), expCtx);
-    }();
-
-    // 2. The second sub pipeline retrieves the set of data bearing shards for the nss/whole cluster
-    //    at the requested time, combining the placement metadata of each collection/database name
-    //    that matches the search criteria.
-    auto retrievePlacementSubPipeline = [&] {
-        // The shape of the pipeline varies depending on the search level.
-        const auto clusterLevelSearch = !nss.has_value();
-        const auto dbLevelSearch = !clusterLevelSearch && nss->isDbOnly();
-        const auto collectionLevelSearch = !clusterLevelSearch && !dbLevelSearch;
-        DocumentSourceContainer placementSearchSubPipelineStages;
-
-        if (collectionLevelSearch) {
-            // a. Retrieve the most recent placement doc recorded for both the collection and its
-            //    parent database (note: docs may not be present when the collection was untracked
-            //    or the database/collection were not existing 'atClusterTime').
-            auto matchCollAndParentDbExpr = "^" + pcre_util::quoteMeta(nss->db_forSharding()) +
-                "(\\." + pcre_util::quoteMeta(nss->coll()) + ")?$";
-
-            auto matchStage = DocumentSourceMatch::create(
-                BSON("nss" << BSON("$regex" << matchCollAndParentDbExpr) << "timestamp"
-                           << BSON("$lte" << atClusterTime)),
-                expCtx);
-
-            auto sortByTimestampStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
-
-            auto groupByNamespaceAndTakeLatestPlacementSpec =
-                BSON("_id" << "$nss" << "shards" << BSON("$first" << "$shards"));
-            auto groupByNamespaceStage = DocumentSourceGroup::createFromBson(
-                BSON(DocumentSourceGroup::kStageName
-                     << std::move(groupByNamespaceAndTakeLatestPlacementSpec))
-                    .firstElement(),
-                expCtx);
-
-            // b. Select the placement information about the collection or fallback to the parent
-            //    database; placement information containing an empty set of shards have to be
-            //    discarded (they describe a dropped namespace, which may be treated as a "non
-            //    existing one").
-            //    The sorting is done over the _id field, which contains nss value, as a consequence
-            //    of the projection performed by sortGroupsByNamespaceStage.
-            auto sortGroupsByNamespaceStage = DocumentSourceSort::create(expCtx, BSON("_id" << -1));
-            auto filterOutDroppedNamespacesStage =
-                DocumentSourceMatch::create(BSON("shards" << BSON("$ne" << BSONArray())), expCtx);
-            auto takeFirstNamespaceGroupStage = DocumentSourceLimit::create(expCtx, 1);
-
-            placementSearchSubPipelineStages.emplace_back(std::move(matchStage));
-            placementSearchSubPipelineStages.emplace_back(std::move(sortByTimestampStage));
-            placementSearchSubPipelineStages.emplace_back(std::move(groupByNamespaceStage));
-            placementSearchSubPipelineStages.emplace_back(std::move(sortGroupsByNamespaceStage));
-            placementSearchSubPipelineStages.emplace_back(
-                std::move(filterOutDroppedNamespacesStage));
-            placementSearchSubPipelineStages.emplace_back(std::move(takeFirstNamespaceGroupStage));
-            return Pipeline::create(std::move(placementSearchSubPipelineStages), expCtx);
-        }
-
-        tassert(
-            10719400, "Unexpected kind of search detected", dbLevelSearch || clusterLevelSearch);
-        // a. Retrieve the latest placement information for each collection and database that falls
-        // within
-        //    the search criteria.
-        auto matchNssExpression = [&] {
-            if (clusterLevelSearch) {
-                // Only discard documents containing 'config.placementHistory' initialization
-                // metadata.
-                return BSON("$ne" << kInitDocumentLabel);
-            }
-
-            // Capture documents about the database itself and any tracked collection under it.
-            auto matchDbAndCollectionsExpr =
-                "^" + pcre_util::quoteMeta(nss->db_forSharding()) + "(\\..*)?$";
-            return BSON("$regex" << matchDbAndCollectionsExpr);
-        }();
-
-        auto matchStage = DocumentSourceMatch::create(
-            BSON("nss" << matchNssExpression << "timestamp" << BSON("$lte" << atClusterTime)),
-            expCtx);
-
-        auto sortByTimestampStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
-        auto groupByNamespaceAndTakeLatestPlacementSpec =
-            BSON("_id" << "$nss" << "shards" << BSON("$first" << "$shards"));
-        auto groupByNamespaceStage = DocumentSourceGroup::createFromBson(
-            BSON(DocumentSourceGroup::kStageName
-                 << std::move(groupByNamespaceAndTakeLatestPlacementSpec))
-                .firstElement(),
-            expCtx);
-
-        // b. Merge the placement of each matched namespace into a single set field.
-        auto unwindShardsStage =
-            DocumentSourceUnwind::create(expCtx,
-                                         std::string("shards"),
-                                         false /* preserveNullAndEmptyArrays */,
-                                         boost::none /* indexPath */);
-
-        auto mergeAllGroupsInASingleShardListSpec =
-            BSON("_id" << "" << "shards" << BSON("$addToSet" << "$shards"));
-
-        auto mergeAllGroupsStage = DocumentSourceGroup::createFromBson(
-            BSON(DocumentSourceGroup::kStageName << std::move(mergeAllGroupsInASingleShardListSpec))
-                .firstElement(),
-            expCtx);
-
-        auto projectStage = DocumentSourceProject::create(
-            BSON("_id" << 0 << "shards" << 1), expCtx, DocumentSourceProject::kStageName);
-
-        placementSearchSubPipelineStages.emplace_back(std::move(matchStage));
-        placementSearchSubPipelineStages.emplace_back(std::move(sortByTimestampStage));
-        placementSearchSubPipelineStages.emplace_back(std::move(groupByNamespaceStage));
-        placementSearchSubPipelineStages.emplace_back(std::move(unwindShardsStage));
-        placementSearchSubPipelineStages.emplace_back(std::move(mergeAllGroupsStage));
-        return Pipeline::create(std::move(placementSearchSubPipelineStages), expCtx);
-    }();
-
-    // Compose the main aggregation; first, combine the two sub pipelines within a $facets stage...
-    constexpr auto kInitMetadataRetrievalSubPipelineName = "metadataFromInitDoc"_sd;
-    constexpr auto kPlacementRetrievalSubPipelineName = "computedPlacement"_sd;
-    const auto mainPipeline = [&] {
-        auto facetStageBson = BSON(kInitMetadataRetrievalSubPipelineName
-                                   << initializationDocumentSubPipeline->serializeToBson()
-                                   << kPlacementRetrievalSubPipelineName
-                                   << retrievePlacementSubPipeline->serializeToBson());
-        auto facetStage = DocumentSourceFacet::createFromBson(
-            BSON(DocumentSourceFacet::kStageName << std::move(facetStageBson)).firstElement(),
-            expCtx);
-
-        // ... then merge the results into a single document.
-        // Each subpipeline is expected to produce an array containing at most one element:
-        // - If no initialization document may be retrieved, produce the proper fields to express
-        //   that the response cannot be neither computed nor approximated;
-        // - If the computation of the placement returns an empty result, this means that there was
-        //   no existing collection/database at the requested 'atClusterTime'; this state gets
-        //   remapped into an empty set of shards.
-        auto projectStageBson =
-            BSON("isComputedPlacementAccurate"
-                 << BSON("$ifNull" << BSON_ARRAY(
-                             BSON("$first" << "$metadataFromInitDoc.consistentMetadataAvailable")
-                             << false))
-                 << "placementAtInitTime"
-                 << BSON("$ifNull"
-                         << BSON_ARRAY(BSON("$first" << "$metadataFromInitDoc.shards") << BSONNULL))
-                 << "computedPlacement"
-                 << BSON("$ifNull" << BSON_ARRAY(BSON("$first" << "$computedPlacement.shards")
-                                                 << BSONArray())));
-        auto projectStage = DocumentSourceProject::create(
-            projectStageBson, expCtx, DocumentSourceProject::kStageName);
-
-        return Pipeline::create({std::move(facetStage), std::move(projectStage)}, expCtx);
-    }();
-
-    // 4. Run the aggregation.
+    // 1. The first sub pipeline pulls the 'config.placementHistory' initialization document
+    //    related to the requested 'atClusterTime', whose content will be later processed to
+    //    determine if the query may be served (and if so, through which data).
+    // 2. The second sub pipeline retrieves the set of data bearing shards for the nss/whole
+    //    cluster at the requested time, combining the placement metadata of each
+    //    collection/database name that matches the search criteria.
+    // These two sub pipelines will be executed as facets in a main pipeline.
     // ************************************************************
     // Full pipeline for collection level search:
     // [
@@ -759,77 +520,637 @@ HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
     //     }
     //   }
     // ]
-    auto aggRequest = AggregateCommandRequest(NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                                              mainPipeline->serializeToBson());
+    HistoricalPlacement getHistoricalPlacementStrictMode(Timestamp atClusterTime) {
+        // Compose sub pipelines, which will be used as facets in the main pipeline.
+        auto initializationDocumentSubPipeline =
+            _buildInitializationDocumentSubPipeline(atClusterTime);
+        auto retrievePlacementSubPipeline = _buildRetrievePlacementSubPipeline(atClusterTime);
 
-    // Use a snapshot read at the latest majority committed time to retrieve the most recent
-    // results.
-    const repl::ReadConcernArgs readConcern{vcTime.configTime(),
-                                            repl::ReadConcernLevel::kSnapshotReadConcern};
-    auto aggrResult = _localCatalogClient->runCatalogAggregation(opCtx, aggRequest, readConcern);
-    tassert(10748901,
-            "GetHistoricalPlacement command must return a single document",
-            aggrResult.size() == 1);
+        // Compose and execute the main pipeline using the two facets created above.
+        auto mainPipeline = _buildMainPipeline(std::move(initializationDocumentSubPipeline),
+                                               std::move(retrievePlacementSubPipeline));
 
-    const auto& result = aggrResult.front();
-    LOGV2_DEBUG(10719401,
-                1,
-                "getHistoricalPlacement() query completed",
-                "nss"_attr = nss ? nss->toStringForErrorMsg() : "whole cluster",
-                "atClusterTime"_attr = atClusterTime,
-                "result"_attr = result);
+        auto aggResult = _runLocalCatalogSnapshotQuery(*mainPipeline);
+        tassert(
+            10748901,
+            "Placement query inside _configsvrGetHistoricalPlacement command must return a single "
+            "document",
+            aggResult.size() == 1);
 
-    // Finally, process the result of the aggregation.
-    // The expected schema of its only document is:
-    // {
-    //   computedPlacement: <arrayofShardIds>,
-    //   isComputedPlacementAccurate: <bool>,
-    //   placementAtInitTime: <arrayofShardIds or null>,
-    // }
-    const auto isComputedPlacementAccurate = result.getBoolField("isComputedPlacementAccurate");
-    // No placement data may be returned if no response may be computed 'atClusterTime'
-    // and no approximate data is available from the initialization doc.
-    if (!isComputedPlacementAccurate && result.getField("placementAtInitTime").isNull()) {
-        return HistoricalPlacement{{}, HistoricalPlacementStatus::NotAvailable};
+        const auto& result = aggResult.front();
+        LOGV2_DEBUG(10719401,
+                    1,
+                    "getHistoricalPlacement() query completed",
+                    "nss"_attr = _nss ? _nss->toStringForErrorMsg() : "whole cluster",
+                    "atClusterTime"_attr = atClusterTime,
+                    "result"_attr = result);
+
+        // Finally, process the result of the aggregation.
+        // The expected schema of its only document is:
+        // {
+        //   computedPlacement: <arrayofShardIds>,
+        //   isComputedPlacementAccurate: <bool>,
+        //   placementAtInitTime: <arrayofShardIds or null>,
+        // }
+        const auto isComputedPlacementAccurate =
+            result.getBoolField("isComputedPlacementAccurate"_sd);
+
+        // No placement data may be returned if no response may be computed 'atClusterTime' and no
+        // approximate data is available from the initialization doc.
+        if (!isComputedPlacementAccurate && result.getField("placementAtInitTime"_sd).isNull()) {
+            return HistoricalPlacement{{}, HistoricalPlacementStatus::NotAvailable};
+        }
+
+        const StringData sourceField =
+            isComputedPlacementAccurate ? "computedPlacement"_sd : "placementAtInitTime"_sd;
+
+        std::vector<ShardId> shardIds = [&]() {
+            // Extract all shard ids from the 'fieldName' field of 'result'. The 'sourceField' field
+            // value is expected to be an array of string values.
+            std::vector<ShardId> shards;
+            auto shardsArray = result.getField(sourceField).Obj();
+            for (const auto& shardObj : shardsArray) {
+                shards.push_back(shardObj.String());
+            }
+            return shards;
+        }();
+
+        HistoricalPlacement historicalPlacementResult;
+        historicalPlacementResult.setStatus(HistoricalPlacementStatus::OK);
+        historicalPlacementResult.setShards(std::move(shardIds));
+        return historicalPlacementResult;
     }
 
-    auto extractShardIds = [&](const auto& fieldName) {
-        std::vector<ShardId> shards;
-        auto shardsArray = result.getField(fieldName).Obj();
-        for (const auto& shardObj : shardsArray) {
-            shards.push_back(shardObj.String());
+    HistoricalPlacement getHistoricalPlacementIgnoreRemovedShardsMode(Timestamp atClusterTime) {
+        // Fetch ids of all shards that are present in the local copy of the shard registry. Sort
+        // the shard ids because we will be doing a binary search in them later when we look for
+        // removed shards.
+        // We do not need to worry about a stale shard registry here because the shard registry is
+        // reloaded whenever a shard is added or removed. The reloads happen under the same DDL lock
+        // that is held when branching into the ExpectedResponseBuilder.
+        const std::vector<ShardId> allAvailableShardIds = [this]() {
+            auto shardIds = Grid::get(_opCtx)->shardRegistry()->getAllShardIds(_opCtx);
+            std::sort(shardIds.begin(), shardIds.end());
+            return shardIds;
+        }();
+
+        // Timestamp of the placement history initialization point. Initially empty, but may be
+        // computed once. We keep the initialization point timestamp across multiple possible
+        // iterations of the following while loop.
+        boost::optional<Timestamp> placementHistoryInitializationPoint;
+
+        // This value can be increased at the end of the following loop, so the loop can be executed
+        // multiple times with increasing 'atStartOfSegment' values.
+        Timestamp atStartOfSegment = atClusterTime;
+        while (true) {
+            HistoricalPlacement historicalPlacementResult =
+                getHistoricalPlacementStrictMode(atStartOfSegment);
+
+            if (historicalPlacementResult.getStatus() != HistoricalPlacementStatus::OK) {
+                // Early exit here if the placement status is not available.
+                // The status "FutureClusterTime" cannot occur here.
+                return historicalPlacementResult;
+            }
+
+            // Remove all shards from 'historicalPlacementResult' that are not present anymore in
+            // the current copy of the shard registry. The following call sets the 'shards' and
+            // 'anyRemovedShardDetected' values in the 'historicalPlacementResult'.
+            _removeAllNonAvailableShards(historicalPlacementResult, allAvailableShardIds);
+
+            // If all shards are still present, return the result from the placement history as is.
+            if (!historicalPlacementResult.getAnyRemovedShardDetected().value()) {
+                if (atStartOfSegment > atClusterTime) {
+                    // Set 'openCursorAt' in case we have advanced beyond the original
+                    // 'atClusterTime' value.
+                    historicalPlacementResult.setOpenCursorAt(atStartOfSegment);
+                }
+                return historicalPlacementResult;
+            }
+
+            // At least one of the required shards is missing.
+            // We now need to continue to find the start and end of the segment for which there is
+            // at least one shard available.
+            const auto matchNssExpression = _buildMatchNssExpressionForIgnoreRemovedShardsMode();
+
+            // Determine placement history initialization point if not yet computed. The
+            // initialization point must always be present in the placement history, otherwise this
+            // would violate a design invariant.
+            // TODO SERVER-111901: There is currently the possibility of failing to retrieve an
+            // initialization point upon the execution of the first call to the strict mode query.
+            // This will be fixed by raising an exception in the strict mode query and triggering a
+            // lazy initialization.
+            if (!placementHistoryInitializationPoint.has_value()) {
+                // Only calculate initialization point once per invocation.
+                placementHistoryInitializationPoint = _findPlacementHistoryInitializationPoint();
+            }
+
+            // The end of the segment depends on whether the placement history initialization point
+            // is before or after 'atStartOfSegment'.
+            const boost::optional<Timestamp> nextPlacementChangedAt =
+                [&]() -> boost::optional<Timestamp> {
+                // If the query uses an 'atClusterTime' that predates the time of the last
+                // initialization of the placement history ("placement history initialization
+                // point"), then we cannot trust any placement document that falls within the
+                // [atClusterTime, initializationPoint) range. In such a subcase it is then safe to
+                // take the time of the most recent initialization as the "end of the segment".
+                if (atStartOfSegment < *placementHistoryInitializationPoint) {
+                    // The placement history initialization point is after the 'atStartOfSegment'
+                    // timestamp, so the end of the segment is the placement history reset
+                    // point.
+                    return *placementHistoryInitializationPoint;
+                }
+
+                // The placement history initialization point is before or equal to
+                // 'atStartOfSegment'. This means we need to find the timestamp of the next
+                // placement history entry for the requested namespace with a greater
+                // timestamp than the 'atStartOfSegment' timestamp.
+                return _findNextPlacementHistoryEntryTimestamp(matchNssExpression,
+                                                               atStartOfSegment);
+            }();
+
+            if (!historicalPlacementResult.getShards().empty()) {
+                // At least any of the original shards is still present in the cluster's current
+                // topology. The current 'atStartOfSegment' value is used as the start timestamp of
+                // the segment.
+                historicalPlacementResult.setOpenCursorAt(atStartOfSegment);
+                historicalPlacementResult.setNextPlacementChangedAt(nextPlacementChangedAt);
+                return historicalPlacementResult;
+            }
+
+            // None of the required shards are still present in the cluster's current topology.
+            // We need to skip the current segment and find the next segment in which at least one
+            // shard is still present.
+
+            // There must always be a follow-up placement history entry for the requested namespace,
+            // because a shard cannot be removed from the cluster topology without its associated
+            // databases/collections have been moved over to other shards.
+            tassert(11314303,
+                    str::stream() << "expecting follow-up placement history entry for namespace "
+                                  << (_nss ? _nss->toStringForErrorMsg() : "whole cluster")
+                                  << " to be present in placement history",
+                    nextPlacementChangedAt.has_value());
+
+            // Restart query processing loop with updated 'atStartOfSegment' value in next
+            // iteration.
+            tassert(11314302,
+                    "expecting increasing 'atStartOfSegment' value at end of 'ignoreRemovedShards' "
+                    "loop "
+                    "iteration",
+                    *nextPlacementChangedAt > atStartOfSegment);
+
+            atStartOfSegment = *nextPlacementChangedAt;
         }
-        return shards;
+    }
+
+private:
+    // Scope of a placement history query.
+    enum class PlacementHistoryQueryScope {
+        // Placement history query is made for a single collection.
+        kCollectionLevelScope,
+
+        // Placement history query is made for a single database.
+        kDatabaseLevelScope,
+
+        // Placement history query is made for the whole cluster.
+        kClusterLevelScope,
     };
 
-    const auto sourceField =
-        isComputedPlacementAccurate ? "computedPlacement" : "placementAtInitTime";
+    // Builds a regex string that matches both the collection in the namespace or just its parent
+    // database exactly.
+    std::string _buildRegexForCollectionLevelSearch() const {
+        return fmt::format("^{}(\\.{})?$",
+                           pcre_util::quoteMeta(_nss->db_forSharding()),
+                           pcre_util::quoteMeta(_nss->coll()));
+    }
 
-    std::vector<ShardId> shardIds = extractShardIds(sourceField);
+    // Builds a regex string that matches the database in the namespace exactly, plus all
+    // collections inside this database.
+    std::string _buildRegexForDatabaseLevelSearch() const {
+        return fmt::format("^{}(\\..*)?$", pcre_util::quoteMeta(_nss->db_forSharding()));
+    }
 
-    // Build the result piece by piece because some response fields are only set conditionally.
-    HistoricalPlacement historicalPlacementResult;
-    historicalPlacementResult.setStatus(HistoricalPlacementStatus::OK);
+    // Builds the NamespaceString value for an empty namespace, which can be used to match the
+    // special placement history initialization markers.
+    static std::string _buildInitDocumentLabel() {
+        static std::string namespaceString = NamespaceStringUtil::serialize(
+            ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
+            SerializationContext::stateDefault());
+        return namespaceString;
+    }
 
-    if (ignoreRemovedShards) {
-        // TODO SERVER-111106: Add the remaining missing output parameters here.
+    // Executes the specified query pipeline against the local 'config.placementHistory' collection,
+    // using a snapshot read and the initially set config time value.
+    std::vector<BSONObj> _runLocalCatalogSnapshotQuery(const Pipeline& pipeline) const {
+        auto aggRequest = AggregateCommandRequest(
+            NamespaceString::kConfigsvrPlacementHistoryNamespace, pipeline.serializeToBson());
 
-        // Remove all shards that were mentioned in the placement history that are not present
-        // anymore in the current version of the shard registry.
-        auto allAvailableShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-        std::sort(allAvailableShardIds.begin(), allAvailableShardIds.end());
-        size_t originalNumberOfShardIds = shardIds.size();
+        // Use a snapshot read at the latest majority committed time to retrieve the most recent
+        // results.
+        const repl::ReadConcernArgs readConcern{_vcTime.configTime(),
+                                                repl::ReadConcernLevel::kSnapshotReadConcern};
+        auto aggResult =
+            _localCatalogClient->runCatalogAggregation(_opCtx, aggRequest, readConcern);
+
+        LOGV2_DEBUG(11314300,
+                    3,
+                    "querying placement history in _configsvrGetHistoricalPlacement",
+                    "pipeline"_attr = pipeline.serializeToBson(),
+                    "nss"_attr = _nss ? _nss->toStringForErrorMsg() : "whole cluster",
+                    "result"_attr = aggResult);
+
+        return aggResult;
+    }
+
+    // Determine the scope of the placement history query from namespace.
+    PlacementHistoryQueryScope _getPlacementHistoryQueryScope() const {
+        if (!_nss.has_value()) {
+            return PlacementHistoryQueryScope::kClusterLevelScope;
+        }
+        if (_nss->isDbOnly()) {
+            return PlacementHistoryQueryScope::kDatabaseLevelScope;
+        }
+        return PlacementHistoryQueryScope::kCollectionLevelScope;
+    }
+
+    // Finds the next placement history entry with a 'timestamp' value > 'ts' for the requested
+    // namespace, and returns its 'timestamp' field value if present. Otherwise returns boost::none.
+    boost::optional<Timestamp> _findNextPlacementHistoryEntryTimestamp(
+        const BSONObj& matchNssExpression, Timestamp ts) const {
+        // Builds the pipeline to the placement history entry with a 'timestamp' value > 'ts' for
+        // the requested namespace.
+        // The resulting pipeline is
+        // [
+        //     {$match: {timestamp: {$gt: <ts>}, nss: <matchExpression>}},
+        //     {$sort: {timestamp: -1}},
+        //     {$limit: 1},
+        //     {$project: {timestamp: 1}}
+        // ]
+        // with <ts> being an arbitrary timestamp, and <matchExpression> being one of the following:
+        // - {$ne: ""}                             for whole-cluster placement queries
+        // - {$regex: "^<dbName>(\..*")?$}         for database-level placement queries
+        // - {$regex: "^<dbName>(\.<collName>)?$}  for collection-level placement queries
+        DocumentSourceContainer pipelineStages;
+
+        // The index on 'config.placementHistory' is 'nss_1_timestamp_-1' and may not serve this
+        // pipeline very well.
+        // TODO SERVER-115207: investigate alternative pipelines or indexes to improve this query.
+        pipelineStages.push_back(DocumentSourceMatch::create(
+            BSON("timestamp" << BSON("$gt" << ts) << "nss" << matchNssExpression), _expCtx));
+        pipelineStages.push_back(DocumentSourceSort::create(_expCtx, BSON("timestamp" << 1)));
+        pipelineStages.push_back(DocumentSourceLimit::create(_expCtx, 1));
+        pipelineStages.push_back(DocumentSourceProject::create(
+            BSON("timestamp" << 1), _expCtx, DocumentSourceProject::kStageName));
+
+        auto pipeline = Pipeline::create(std::move(pipelineStages), _expCtx);
+
+        auto aggResult = _runLocalCatalogSnapshotQuery(*pipeline);
+        if (!aggResult.empty()) {
+            return aggResult.front().getField("timestamp"_sd).timestamp();
+        }
+        return boost::none;
+    }
+
+    // Builds the sub-pipeline used for retrieving the placement history initialization document
+    // with a timestamp <= 'atClusterTime'.
+    std::unique_ptr<Pipeline> _buildInitializationDocumentSubPipeline(
+        Timestamp atClusterTime) const {
+        // a. Get the most recent initialization doc that satisfies <= 'atClusterTime'.
+        auto matchStage =
+            DocumentSourceMatch::create(BSON("timestamp" << BSON("$lte" << atClusterTime) << "nss"
+                                                         << _buildInitDocumentLabel()),
+                                        _expCtx);
+        auto sortStage = DocumentSourceSort::create(_expCtx, BSON("timestamp" << -1));
+        auto limitStage = DocumentSourceLimit::create(_expCtx, 1);
+
+        constexpr auto kConsistentMetadataAvailable = "consistentMetadataAvailable"_sd;
+
+        // b. Reformat the content of the initialization document:
+        //  - the 'kConsistentMetadataAvailable' field gives an indication on whether the
+        //    initialization state 'atClusterTime' allows to retrieve accurate placement
+        //    metadata through computation (the 2nd subpipeline)
+        //  - the 'shards' field contains the full composition of cluster when the
+        //    initialization process was run for the last time (and it can be used as an
+        //    approximated response to this query when no computation is possible).
+        auto projectStage = DocumentSourceProject::create(
+            BSON("_id" << 0 << "shards" << 1 << kConsistentMetadataAvailable
+                       << BSON("$eq" << BSON_ARRAY(BSON("$size" << "$shards") << 0))),
+            _expCtx,
+            DocumentSourceProject::kStageName);
+
+        DocumentSourceContainer initDocSubPipelineStages;
+        initDocSubPipelineStages.emplace_back(std::move(matchStage));
+        initDocSubPipelineStages.emplace_back(std::move(sortStage));
+        initDocSubPipelineStages.emplace_back(std::move(limitStage));
+        initDocSubPipelineStages.emplace_back(std::move(projectStage));
+
+        return Pipeline::create(std::move(initDocSubPipelineStages), _expCtx);
+    }
+
+    // Builds the sub-pipeline used to retrieve the placement information for the queried namespace
+    // with a timestamp <= 'atClusterTime'.
+    std::unique_ptr<Pipeline> _buildRetrievePlacementSubPipeline(Timestamp atClusterTime) const {
+        const auto scope = _getPlacementHistoryQueryScope();
+
+        // The shape of the pipeline varies depending on the search level.
+        DocumentSourceContainer placementSearchSubPipelineStages;
+
+        if (scope == PlacementHistoryQueryScope::kCollectionLevelScope) {
+            // a. Retrieve the most recent placement doc recorded for both the collection and its
+            // parent database (note: docs may not be present when the collection was untracked or
+            // the database/collection were not existing 'atClusterTime').
+            auto matchStage = DocumentSourceMatch::create(
+                BSON("nss" << BSON("$regex" << _buildRegexForCollectionLevelSearch()) << "timestamp"
+                           << BSON("$lte" << atClusterTime)),
+                _expCtx);
+
+            auto sortByTimestampStage =
+                DocumentSourceSort::create(_expCtx, BSON("timestamp" << -1));
+
+            auto groupByNamespaceAndTakeLatestPlacementSpec =
+                BSON("_id" << "$nss" << "shards" << BSON("$first" << "$shards"));
+            auto groupByNamespaceStage = DocumentSourceGroup::createFromBson(
+                BSON(DocumentSourceGroup::kStageName
+                     << std::move(groupByNamespaceAndTakeLatestPlacementSpec))
+                    .firstElement(),
+                _expCtx);
+
+            // b. Select the placement information about the collection or fallback to the parent
+            // database; placement information containing an empty set of shards have to be
+            // discarded (they describe a dropped namespace, which may be treated as a "non existing
+            // one"). The sorting is done over the _id field, which contains nss value, as a
+            // consequence of the projection performed by sortGroupsByNamespaceStage.
+            auto sortGroupsByNamespaceStage =
+                DocumentSourceSort::create(_expCtx, BSON("_id" << -1));
+            auto filterOutDroppedNamespacesStage =
+                DocumentSourceMatch::create(BSON("shards" << BSON("$ne" << BSONArray())), _expCtx);
+            auto takeFirstNamespaceGroupStage = DocumentSourceLimit::create(_expCtx, 1);
+
+            placementSearchSubPipelineStages.emplace_back(std::move(matchStage));
+            placementSearchSubPipelineStages.emplace_back(std::move(sortByTimestampStage));
+            placementSearchSubPipelineStages.emplace_back(std::move(groupByNamespaceStage));
+            placementSearchSubPipelineStages.emplace_back(std::move(sortGroupsByNamespaceStage));
+            placementSearchSubPipelineStages.emplace_back(
+                std::move(filterOutDroppedNamespacesStage));
+            placementSearchSubPipelineStages.emplace_back(std::move(takeFirstNamespaceGroupStage));
+            return Pipeline::create(std::move(placementSearchSubPipelineStages), _expCtx);
+        }
+
+        tassert(10719400,
+                "Unexpected kind of search detected",
+                scope == PlacementHistoryQueryScope::kDatabaseLevelScope ||
+                    scope == PlacementHistoryQueryScope::kClusterLevelScope);
+
+        // a. Retrieve the latest placement information for each collection and database that falls
+        // within the search criteria.
+        const auto matchNssExpression = [&] {
+            if (scope == PlacementHistoryQueryScope::kClusterLevelScope) {
+                // Only discard documents containing 'config.placementHistory' initialization
+                // metadata.
+                return BSON("$ne" << _buildInitDocumentLabel());
+            }
+
+            // Capture documents about the database itself and any tracked collection under it.
+            return BSON("$regex" << _buildRegexForDatabaseLevelSearch());
+        }();
+
+        auto matchStage = DocumentSourceMatch::create(
+            BSON("nss" << matchNssExpression << "timestamp" << BSON("$lte" << atClusterTime)),
+            _expCtx);
+
+        auto sortByTimestampStage = DocumentSourceSort::create(_expCtx, BSON("timestamp" << -1));
+        auto groupByNamespaceAndTakeLatestPlacementSpec =
+            BSON("_id" << "$nss" << "shards" << BSON("$first" << "$shards"));
+        auto groupByNamespaceStage = DocumentSourceGroup::createFromBson(
+            BSON(DocumentSourceGroup::kStageName
+                 << std::move(groupByNamespaceAndTakeLatestPlacementSpec))
+                .firstElement(),
+            _expCtx);
+
+        // b. Merge the placement of each matched namespace into a single set field.
+        auto unwindShardsStage =
+            DocumentSourceUnwind::create(_expCtx,
+                                         std::string("shards"),
+                                         false /* preserveNullAndEmptyArrays */,
+                                         boost::none /* indexPath */);
+
+        auto mergeAllGroupsInASingleShardListSpec =
+            BSON("_id" << "" << "shards" << BSON("$addToSet" << "$shards"));
+
+        auto mergeAllGroupsStage = DocumentSourceGroup::createFromBson(
+            BSON(DocumentSourceGroup::kStageName << std::move(mergeAllGroupsInASingleShardListSpec))
+                .firstElement(),
+            _expCtx);
+
+        placementSearchSubPipelineStages.emplace_back(std::move(matchStage));
+        placementSearchSubPipelineStages.emplace_back(std::move(sortByTimestampStage));
+        placementSearchSubPipelineStages.emplace_back(std::move(groupByNamespaceStage));
+        placementSearchSubPipelineStages.emplace_back(std::move(unwindShardsStage));
+        placementSearchSubPipelineStages.emplace_back(std::move(mergeAllGroupsStage));
+
+        return Pipeline::create(std::move(placementSearchSubPipelineStages), _expCtx);
+    }
+
+    std::unique_ptr<Pipeline> _buildMainPipeline(
+        std::unique_ptr<Pipeline> initializationDocumentSubPipeline,
+        std::unique_ptr<Pipeline> retrievePlacementSubPipeline) const {
+
+        constexpr auto kInitMetadataRetrievalSubPipelineName = "metadataFromInitDoc"_sd;
+        constexpr auto kPlacementRetrievalSubPipelineName = "computedPlacement"_sd;
+
+        // Compose the main aggregation; first, combine the two sub pipelines within a $facets
+        // stage...
+        auto facetStageBson = BSON(kInitMetadataRetrievalSubPipelineName
+                                   << initializationDocumentSubPipeline->serializeToBson()
+                                   << kPlacementRetrievalSubPipelineName
+                                   << retrievePlacementSubPipeline->serializeToBson());
+        auto facetStage = DocumentSourceFacet::createFromBson(
+            BSON(DocumentSourceFacet::kStageName << std::move(facetStageBson)).firstElement(),
+            _expCtx);
+
+        // ... then merge the results into a single document.
+        // Each subpipeline is expected to produce an array containing at most one element:
+        // - If no initialization document may be retrieved, produce the proper fields to express
+        //   that the response cannot be neither computed nor approximated;
+        // - If the computation of the placement returns an empty result, this means that there was
+        //   no existing collection/database at the requested 'atClusterTime'; this state gets
+        //   remapped into an empty set of shards.
+        auto projectStageBson =
+            BSON("isComputedPlacementAccurate"
+                 << BSON("$ifNull" << BSON_ARRAY(
+                             BSON("$first" << "$metadataFromInitDoc.consistentMetadataAvailable")
+                             << false))
+                 << "placementAtInitTime"
+                 << BSON("$ifNull"
+                         << BSON_ARRAY(BSON("$first" << "$metadataFromInitDoc.shards") << BSONNULL))
+                 << "computedPlacement"
+                 << BSON("$ifNull" << BSON_ARRAY(BSON("$first" << "$computedPlacement.shards")
+                                                 << BSONArray())));
+        auto projectStage = DocumentSourceProject::create(
+            projectStageBson, _expCtx, DocumentSourceProject::kStageName);
+
+        return Pipeline::create({std::move(facetStage), std::move(projectStage)}, _expCtx);
+    }
+
+    // Removes all shard ids from the 'HistoricalPlacement' that are not present in the
+    // 'allAvailableShardIds' vector. The 'allAvailableShardIds' vector values must be sorted. Also
+    // sets the 'anyRemovedShardDetected' value of the 'HistoricalPlacement' value as a side-effect.
+    void _removeAllNonAvailableShards(HistoricalPlacement& historicalPlacementResult,
+                                      const std::vector<ShardId>& allAvailableShardIds) {
+        // Intentionally create a copy here, because we are about to remove shards from the vector.
+        auto shardIds = historicalPlacementResult.getShards();
+        const size_t originalNumberOfShards = shardIds.size();
         std::erase_if(shardIds, [&](const ShardId& shardId) {
             return !std::binary_search(
                 allAvailableShardIds.begin(), allAvailableShardIds.end(), shardId);
         });
         historicalPlacementResult.setAnyRemovedShardDetected(shardIds.size() <
-                                                             originalNumberOfShardIds);
+                                                             originalNumberOfShards);
+        historicalPlacementResult.setShards(std::move(shardIds));
     }
 
-    historicalPlacementResult.setShards(std::move(shardIds));
+    // Builds a partial match expression to be used on the 'nss' field for a placement history query
+    // in ignoreRemovedShards mode.
+    BSONObj _buildMatchNssExpressionForIgnoreRemovedShardsMode() const {
+        switch (_getPlacementHistoryQueryScope()) {
+            case PlacementHistoryQueryScope::kClusterLevelScope:
+                // Only discard documents containing 'config.placementHistory' initialization
+                // metadata.
+                return BSON("$ne" << _buildInitDocumentLabel());
+            case PlacementHistoryQueryScope::kDatabaseLevelScope:
+                // Capture documents about the database itself and any tracked collection under it.
+                return BSON("$regex" << _buildRegexForDatabaseLevelSearch());
+            case PlacementHistoryQueryScope::kCollectionLevelScope:
+                // Capture documents about the collection and its parent database.
+                return BSON("$regex" << _buildRegexForCollectionLevelSearch());
+        }
 
-    return historicalPlacementResult;
+        MONGO_UNREACHABLE_TASSERT(11314304);
+    }
+
+    // Find placement history initialization point. The placement history initialization point has
+    // an 'nss' value equal to the empty string, a 'shards' value equal to an empty array, and a
+    // 'timestamp' value greater than (0, 1). There must always be a single such entry present.
+    // The placement history initialization and cleanup procedures ensure this. They remove the
+    // existing entries for the initialization point and the approximated response, and inserts the
+    // new documents for the initialization point and the approximated response inside a single
+    // transaction, which is executed atomically.
+    Timestamp _findPlacementHistoryInitializationPoint() {
+        DocumentSourceContainer pipelineStages;
+
+        pipelineStages.push_back(DocumentSourceMatch::create(
+            BSON("timestamp" << BSON("$gt" << Timestamp(0, 1)) << "nss" << _buildInitDocumentLabel()
+                             << "shards" << BSON("$eq" << BSONArray())),
+            _expCtx));
+        pipelineStages.push_back(DocumentSourceLimit::create(_expCtx, 1));
+        pipelineStages.push_back(DocumentSourceProject::create(
+            BSON("timestamp" << 1), _expCtx, DocumentSourceProject::kStageName));
+
+        auto pipeline = Pipeline::create(std::move(pipelineStages), _expCtx);
+
+        auto aggResult = _runLocalCatalogSnapshotQuery(*pipeline);
+        tassert(11314301,
+                "expecting placement history initialization point to be present",
+                aggResult.size() == 1);
+        return aggResult.front().getField("timestamp"_sd).timestamp();
+    }
+
+    // OperationContext used for executing operations. Managed externally, but guaranteed to remain
+    // valid for the lifetime of the placement fetcher.
+    OperationContext* _opCtx;
+
+    // Namespace used for the placement history query.
+    const boost::optional<NamespaceString> _nss;
+
+    // Vector clock time used for the "config.placementHistory" snapshot read.
+    const VectorClock::VectorTime _vcTime;
+
+    // Catalog client used for local reads of "config.placementHistory" collection. Managed
+    // externally, but guaranteed to remain valid for the lifetime of the placement fetcher.
+    ShardingCatalogClient* _localCatalogClient;
+
+    // ExpressionContext used for building pipelines inside the placement fetcher.
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
+};
+
+}  // namespace
+
+Status ShardingCatalogManager::createIndexForConfigPlacementHistory(OperationContext* opCtx) {
+    return createIndexOnConfigCollection(opCtx,
+                                         NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                                         BSON(NamespacePlacementType::kNssFieldName
+                                              << 1 << NamespacePlacementType::kTimestampFieldName
+                                              << -1),
+                                         true /*unique*/);
+}
+
+write_ops::InsertCommandRequest
+ShardingCatalogManager::buildInsertReqForPlacementHistoryOperationalBoundaries(
+    const Timestamp& initializationTime, const std::vector<ShardId>& defaultPlacement) {
+    /*
+     * The 'operational boundaries' of config.placementHistory are described through two 'metadata'
+     * documents, both identified by the kConfigPlacementHistoryInitializationMarker namespace:
+     * - initializationTimeInfo: contains the time of the initialization and an empty set of shards.
+     *   It will allow getHistoricalPlacement() to serve accurate responses to queries targeting a
+     * PIT within the [initializationTime, +inf) range.
+     * - approximatedPlacementForPreInitQueries:  contains the cluster topology at the time of the
+     *   initialization and it associated with the 'Dawn of Time' Timestamp(0,1).
+     *   It will allow getHistoricalPlacement() to serve approximated responses to queries
+     *   concerning the [-inf, initializationTime) range.
+     */
+    NamespacePlacementType initializationTimeInfo;
+    initializationTimeInfo.setNss(
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker);
+    initializationTimeInfo.setTimestamp(initializationTime);
+    initializationTimeInfo.setShards({});
+
+    NamespacePlacementType approximatedPlacementForPreInitQueries;
+    approximatedPlacementForPreInitQueries.setNss(
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker);
+    approximatedPlacementForPreInitQueries.setTimestamp(Timestamp(0, 1));
+    approximatedPlacementForPreInitQueries.setShards(defaultPlacement);
+
+    write_ops::InsertCommandRequest insertMarkerRequest(
+        NamespaceString::kConfigsvrPlacementHistoryNamespace);
+    insertMarkerRequest.setDocuments(
+        {initializationTimeInfo.toBSON(), approximatedPlacementForPreInitQueries.toBSON()});
+    return insertMarkerRequest;
+}
+
+HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
+    OperationContext* opCtx,
+    const boost::optional<NamespaceString>& nss,
+    const Timestamp& atClusterTime,
+    bool checkIfPointInTimeIsInFuture,
+    bool ignoreRemovedShards) {
+
+    uassert(ErrorCodes::InvalidOptions,
+            "unsupported namespace for historical placement query",
+            !nss || (!nss->dbName().isEmpty() && !nss->isOnInternalDb()));
+
+    // Acquire a shared lock on config.placementHistory to serialize incoming queries with
+    // inflight attempts to modify its content through InitializePlacementHistoryCoordinator
+    // (this requires making this read operation interruptible).
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+    DDLLockManager::ScopedBaseDDLLock placementHistoryLock(
+        opCtx,
+        shard_role_details::getLocker(opCtx),
+        NamespaceString::kConfigsvrPlacementHistoryNamespace,
+        "getHistoricalPlacement" /* reason */,
+        MODE_IS,
+        true /*waitForRecovery*/);
+
+    // If 'atClusterTime' is greater than current config time, then we can not return correct
+    // placement history and early exit with HistoricalPlacementStatus::FutureClusterTime.
+    const auto vcTime = VectorClock::get(opCtx)->getTime();
+    if (checkIfPointInTimeIsInFuture && atClusterTime > vcTime.configTime().asTimestamp()) {
+        return HistoricalPlacement{{}, HistoricalPlacementStatus::FutureClusterTime};
+    }
+
+    HistoricalPlacementReader reader(opCtx, nss, vcTime, _localCatalogClient.get());
+    if (ignoreRemovedShards) {
+        return reader.getHistoricalPlacementIgnoreRemovedShardsMode(atClusterTime);
+    }
+    return reader.getHistoricalPlacementStrictMode(atClusterTime);
 }
 
 void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx,
@@ -1001,6 +1322,7 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
     auto callback = [&deleteStatements,
                      &earliestClusterTime](const std::vector<BSONObj>& batch,
                                            const boost::optional<BSONObj>& postBatchResumeToken) {
+        deleteStatements.reserve(batch.size());
         for (const auto& obj : batch) {
             const auto nss = NamespaceStringUtil::deserialize(
                 boost::none, obj["_id"].String(), SerializationContext::stateDefault());

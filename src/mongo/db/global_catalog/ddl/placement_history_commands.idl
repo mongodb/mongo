@@ -91,7 +91,8 @@ commands:
                 default: true
             ignoreRemovedShards:
                 type: bool
-                # TODO SERVER-111106: improve this description.
                 description:
-                    "When true, returns extended placement information for the requested namespace/
-                    cluster, which takes into account the cluster's current topology"
+                    "When true, ignores the shards that have been removed from the system and finds
+                    the earliest point in time at or after 'at', at which the collection/database/databases
+                    was allocated to a shard set of which at least one shard has not been removed
+                    from the system (returned in attribute 'openCursorAt')."
