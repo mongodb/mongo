@@ -29,7 +29,9 @@
 
 #pragma once
 
-namespace mongo {
+#include "mongo/util/modules.h"
+
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * This is the "overload pattern" for use with variant visit calls.
@@ -49,4 +51,4 @@ struct OverloadedVisitor : Ts... {
 template <typename... Ts>
 OverloadedVisitor(Ts...) -> OverloadedVisitor<Ts...>;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

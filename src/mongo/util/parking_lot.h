@@ -32,6 +32,7 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 
 #include <atomic>
 #include <list>
@@ -43,7 +44,7 @@ namespace mongo {
  * ParkingLot.  Specifially, the notify() on this type will be called directly from
  * ParkingLot::unpark(One|All).
  */
-class Notifiable {
+class MONGO_MOD_NEEDS_REPLACEMENT Notifiable {
 public:
     /**
      * A call to notify() must either unblock the notifiable immediately, if it is currently

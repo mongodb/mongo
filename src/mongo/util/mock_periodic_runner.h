@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
-#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
+
+namespace MONGO_MOD_FILE_PRIVATE periodic_runner_detail {
 
 class MockPeriodicJob : public PeriodicRunner::ControllableJob {
 public:
@@ -52,14 +54,16 @@ private:
     PeriodicRunner::PeriodicJob _job;
 };
 
-class MockPeriodicRunner : public PeriodicRunner {
+}  // namespace MONGO_MOD_FILE_PRIVATE periodic_runner_detail
+
+class MONGO_MOD_PUBLIC MockPeriodicRunner : public PeriodicRunner {
 public:
     JobAnchor makeJob(PeriodicJob job) override;
 
     void run(Client* client);
 
 private:
-    std::shared_ptr<MockPeriodicJob> _job;
+    std::shared_ptr<periodic_runner_detail::MockPeriodicJob> _job;
 };
 
 }  // namespace mongo

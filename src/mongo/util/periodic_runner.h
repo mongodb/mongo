@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <functional>
@@ -39,7 +40,7 @@
 
 #include <boost/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class Client;
 class PeriodicJobAnchor;
@@ -55,7 +56,7 @@ class PeriodicJobAnchor;
  *
  * The runner will create client objects that it passes to jobs to use.
  */
-class PeriodicRunner {
+class MONGO_MOD_OPEN PeriodicRunner {
 public:
     using Job = std::function<void(Client* client)>;
     using JobAnchor = PeriodicJobAnchor;
@@ -91,7 +92,7 @@ public:
     /**
      * A ControllableJob allows a user to reschedule the execution of a Job
      */
-    class ControllableJob {
+    class MONGO_MOD_UNFORTUNATELY_OPEN ControllableJob {
     public:
         virtual ~ControllableJob() = default;
 
@@ -153,7 +154,6 @@ public:
  * if the underlying job is gone (e.g. in shutdown).
  */
 class [[nodiscard]] PeriodicJobAnchor {
-public:
     using Job = PeriodicRunner::ControllableJob;
 
 public:
@@ -199,4 +199,4 @@ private:
     std::shared_ptr<Job> _handle;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

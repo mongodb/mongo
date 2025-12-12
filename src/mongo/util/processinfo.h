@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/static_immortal.h"
 
 #include <cstdint>
@@ -45,7 +46,7 @@
 
 namespace mongo {
 
-class ProcessInfo {
+class MONGO_MOD_PUBLIC ProcessInfo {
 public:
     static auto constexpr kTranparentHugepageDirectory = "/sys/kernel/mm/transparent_hugepage";
     static auto constexpr kGlibcTunableEnvVar = "GLIBC_TUNABLES";

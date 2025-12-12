@@ -40,6 +40,7 @@
 
 #include "mongo/platform/compiler.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
@@ -53,7 +54,7 @@ class Environment;
 
 namespace moe = mongo::optionenvironment;
 
-namespace ntservice {
+namespace MONGO_MOD_PUBLIC ntservice {
 struct NtServiceDefaultStrings {
     const wchar_t* serviceName;
     const wchar_t* displayName;
@@ -99,7 +100,7 @@ MONGO_COMPILER_NORETURN void startService();
 
 bool reportStatus(DWORD reportState, DWORD waitHint = 0, DWORD exitCode = 0);
 
-}  // namespace ntservice
+}  // namespace MONGO_MOD_PUBLIC ntservice
 }  // namespace mongo
 
 #endif  // defined(_WIN32)
