@@ -266,17 +266,19 @@ size_t MultiPlanStage::numCandidatePlans() const {
     return _candidates.size();
 }
 
-Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig trialConfig) {
-    if (bestPlanChosen()) {
-        return Status::OK();
-    }
+Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy) {
+    return runTrials(yieldPolicy, getTrialPhaseConfig());
+}
 
-    if (_specificStats.earlyExit) {
-        LOGV2_WARNING(11482700,
-                      "Running trials for multi-plan stage when we have a winning candidate! We "
-                      "should be choosing the best plan instead.",
-                      "query"_attr = _query->toStringShort(false));
-    }
+Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig trialConfig) {
+    tassert(11521900,
+            "Running trials for multi-plan stage when we already have a solution.",
+            !bestPlanChosen());
+
+    tassert(11482700,
+            "Running trials for multi-plan stage when we have a winning candidate! We "
+            "should be choosing the best plan instead.",
+            !_specificStats.earlyExit);
 
     const size_t candidatesSize = _candidates.size();
 
@@ -360,15 +362,8 @@ MultiPlanStage::TrialPhaseConfig MultiPlanStage::getTrialPhaseConfig() const {
     return {numWorks, numResults};
 }
 
-Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
-    return pickBestPlan(yieldPolicy, getTrialPhaseConfig());
-}
-
-Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig trialConfig) {
-    auto runTrialsStatus = runTrials(yieldPolicy, trialConfig);
-    if (runTrialsStatus.isOK() == false) {
-        return runTrialsStatus;
-    }
+Status MultiPlanStage::pickBestPlan() {
+    tassert(11484502, "Picking best plan without having run trials", _specificStats.totalWorks > 0);
 
     // After picking best plan, ranking will own plan stats from candidate solutions (winner and
     // losers).

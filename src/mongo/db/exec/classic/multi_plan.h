@@ -128,14 +128,6 @@ public:
      * Runs the trial period by working all candidate plans in round-robin fashion up to a total of
      * 'maxNumWorksPerPlan' works per plan or until one plan hits EOF or returns 'targetNumResults'
      * results.
-     */
-    Status runTrials(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig trialConfig);
-
-    TrialPhaseConfig getTrialPhaseConfig() const;
-
-    /**
-     * Runs all plans added by addPlan(), ranks them, and picks a best plan. All further calls to
-     * doWork() will return results from the best plan.
      *
      * If Multiplan rate limiting is enabled, the function attempts to obtain a token per candidate
      * plan to proceed with multiplanning. If not enough tokens are available, the function waits
@@ -149,9 +141,16 @@ public:
      * Returns a non-OK status if query planning fails. In particular, this function returns
      * ErrorCodes::QueryPlanKilled if the query plan was killed during a yield.
      */
-    Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
+    Status runTrials(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig trialConfig);
+    Status runTrials(PlanYieldPolicy* yieldPolicy);
 
-    Status pickBestPlan(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig trialConfig);
+    TrialPhaseConfig getTrialPhaseConfig() const;
+
+    /**
+     * Picks a best plan based on the statistics collected during trials. All further calls to
+     * doWork() will return results from the best plan.
+     */
+    Status pickBestPlan();
 
     /**
      * Returns true if a best plan has been chosen.

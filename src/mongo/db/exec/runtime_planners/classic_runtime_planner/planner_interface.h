@@ -198,6 +198,11 @@ public:
      */
     const MultiPlanStats* getSpecificStats() const;
 
+    /**
+     * Picks the best plan among the candidate plans after the trial period has been run.
+     */
+    Status pickBestPlan() const;
+
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
 

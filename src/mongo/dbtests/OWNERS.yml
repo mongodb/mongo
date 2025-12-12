@@ -84,9 +84,6 @@ filters:
   - "plan_ranking.cpp":
     approvers:
       - 10gen/query-optimization
-  - "query_stage_multiplan.cpp":
-    approvers:
-      - 10gen/query-optimization
   - "socktests.cpp":
     approvers:
       - 10gen/server-networking-and-observability

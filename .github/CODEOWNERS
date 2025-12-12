@@ -2993,7 +2993,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/dbtests/**/matchertests.cpp @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/dbtests/**/updatetests.cpp @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/dbtests/**/plan_ranking.cpp @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/dbtests/**/query_stage_multiplan.cpp @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/dbtests/**/socktests.cpp @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/dbtests/**/mock_replica_set* @10gen/server-replication-reviewers @svc-auto-approve-bot
 /src/mongo/dbtests/**/replica_set_tests.cpp @10gen/server-replication-reviewers @svc-auto-approve-bot

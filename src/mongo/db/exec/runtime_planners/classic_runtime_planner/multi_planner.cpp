@@ -55,7 +55,11 @@ MultiPlanner::MultiPlanner(PlannerData plannerData,
 }
 
 Status MultiPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
-    return _multiplanStage->pickBestPlan(planYieldPolicy);
+    auto status = _multiplanStage->runTrials(planYieldPolicy);
+    if (!status.isOK()) {
+        return status;
+    }
+    return _multiplanStage->pickBestPlan();
 }
 
 const MultiPlanStats* MultiPlanner::getSpecificStats() const {
@@ -66,6 +70,10 @@ Status MultiPlanner::runTrials(MultiPlanStage::TrialPhaseConfig trialConfig) {
     auto trialPeriodYieldPolicy = makeClassicYieldPolicy(
         opCtx(), cq()->nss(), static_cast<PlanStage*>(_multiplanStage), yieldPolicy());
     return _multiplanStage->runTrials(trialPeriodYieldPolicy.get(), trialConfig);
+}
+
+Status MultiPlanner::pickBestPlan() const {
+    return _multiplanStage->pickBestPlan();
 }
 
 std::unique_ptr<QuerySolution> MultiPlanner::extractQuerySolution() {

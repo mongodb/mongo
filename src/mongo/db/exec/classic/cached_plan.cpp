@@ -282,7 +282,11 @@ Status CachedPlanStage::replan(const QueryPlannerParams& plannerParams,
     }
 
     // Delegate to the MultiPlanStage's plan selection facility.
-    Status pickBestPlanStatus = multiPlanStage->pickBestPlan(yieldPolicy);
+    auto runTrialsStatus = multiPlanStage->runTrials(yieldPolicy);
+    if (!runTrialsStatus.isOK()) {
+        return runTrialsStatus;
+    }
+    Status pickBestPlanStatus = multiPlanStage->pickBestPlan();
     if (!pickBestPlanStatus.isOK()) {
         return pickBestPlanStatus;
     }

@@ -41,10 +41,8 @@
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
-#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
-#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -164,7 +162,11 @@ Status SubplanStage::choosePlanWholeQuery(const QueryPlannerParams& plannerParam
         }
 
         // Delegate the the MultiPlanStage's plan selection facility.
-        Status planSelectStat = multiPlanStage->pickBestPlan(yieldPolicy);
+        auto trialsRunStatus = multiPlanStage->runTrials(yieldPolicy);
+        if (!trialsRunStatus.isOK()) {
+            return trialsRunStatus;
+        }
+        Status planSelectStat = multiPlanStage->pickBestPlan();
         if (!planSelectStat.isOK()) {
             return planSelectStat;
         }
@@ -324,7 +326,11 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
             multiPlanStage->addPlan(std::move(solutions[ix]), std::move(nextPlanRoot), _ws);
         }
 
-        Status planSelectStat = multiPlanStage->pickBestPlan(yieldPolicy);
+        auto trialsRunStatus = multiPlanStage->runTrials(yieldPolicy);
+        if (!trialsRunStatus.isOK()) {
+            return trialsRunStatus;
+        }
+        Status planSelectStat = multiPlanStage->pickBestPlan();
         if (!planSelectStat.isOK()) {
             return planSelectStat;
         }

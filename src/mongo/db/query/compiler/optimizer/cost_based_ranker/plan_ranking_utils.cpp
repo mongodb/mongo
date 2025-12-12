@@ -105,7 +105,8 @@ const QuerySolution* pickBestPlan(CanonicalQuery* cq,
     }
     // This is what sets a backup plan, should we test for it.
     NoopYieldPolicy yieldPolicy(&opCtx, opCtx.getServiceContext()->getFastClockSource());
-    mps->pickBestPlan(&yieldPolicy).transitional_ignore();
+    ASSERT_OK(mps->runTrials(&yieldPolicy));
+    ASSERT_OK(mps->pickBestPlan());
     ASSERT(mps->bestPlanChosen());
     auto bestPlanIdx = mps->bestPlanIdx();
     ASSERT(bestPlanIdx.has_value());

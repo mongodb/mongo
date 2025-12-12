@@ -113,7 +113,6 @@ mongo_cc_binary(
         "query_stage_ixscan.cpp",
         "query_stage_limit_skip.cpp",
         "query_stage_merge_sort.cpp",
-        "query_stage_multiplan.cpp",
         "query_stage_near.cpp",
         "query_stage_sort.cpp",
         "query_stage_sort_key_generator.cpp",

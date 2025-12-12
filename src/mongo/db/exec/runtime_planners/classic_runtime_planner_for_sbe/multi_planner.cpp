@@ -67,7 +67,8 @@ MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
     }
     auto trialPeriodYieldPolicy = makeClassicYieldPolicy(
         opCtx(), cq()->nss(), static_cast<PlanStage*>(_multiPlanStage.get()), yieldPolicy());
-    uassertStatusOK(_multiPlanStage->pickBestPlan(trialPeriodYieldPolicy.get()));
+    uassertStatusOK(_multiPlanStage->runTrials(trialPeriodYieldPolicy.get()));
+    uassertStatusOK(_multiPlanStage->pickBestPlan());
 }
 
 const MultiPlanStats* MultiPlanner::getSpecificStats() const {
