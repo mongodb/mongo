@@ -43,7 +43,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/s/query/shard_key_pattern_query_util.h"
-#include "mongo/s/shard_targeting_helpers.h"
+#include "mongo/s/query/shard_targeting_collation_helpers.h"
 #include "mongo/util/assert_util.h"
 
 #include <boost/optional/optional.hpp>

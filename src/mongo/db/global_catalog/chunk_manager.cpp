@@ -46,7 +46,7 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
-#include "mongo/s/shard_targeting_helpers.h"
+#include "mongo/s/query/shard_targeting_collation_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

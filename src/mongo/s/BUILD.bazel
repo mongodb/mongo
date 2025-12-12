@@ -52,19 +52,6 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "sharding_helpers",
-    srcs = [
-        "shard_targeting_helpers.cpp",
-    ],
-    no_undefined_ref_DO_NOT_USE = False,
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:common",
-        "//src/mongo/db/query/collation:collator_interface",
-    ],
-)
-
-mongo_cc_library(
     name = "sharding_router_api",
     srcs = [
         "multi_statement_transaction_requests_sender.cpp",
@@ -85,7 +72,6 @@ mongo_cc_library(
         ":async_requests_sender",
         ":grid",
         ":query_analysis_sampler",
-        ":sharding_helpers",
         "//src/mongo/db:internal_transactions_feature_flag",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:shared_request_handling",
@@ -103,6 +89,7 @@ mongo_cc_library(
         "//src/mongo/db/stats:transaction_stats",
         "//src/mongo/db/timeseries:timeseries_metadata",
         "//src/mongo/rpc:command_status",
+        "//src/mongo/s/query:sharding_helpers",
         "//src/mongo/s/query/exec:target_write_op",
         "//src/mongo/util/concurrency:spin_lock",
     ],
@@ -349,7 +336,6 @@ mongo_cc_library(
     deps = [
         ":add_shard_idl",
         ":analyze_shard_key_common",
-        ":sharding_helpers",
         "//src/mongo/client:connection_string",
         "//src/mongo/client:read_preference",
         "//src/mongo/db:common",
@@ -372,6 +358,7 @@ mongo_cc_library(
         "//src/mongo/executor:async_rpc_error_info",
         "//src/mongo/executor:scoped_task_executor",
         "//src/mongo/rpc:command_status",
+        "//src/mongo/s/query:sharding_helpers",
         "//src/mongo/util:caching",
     ],
 )

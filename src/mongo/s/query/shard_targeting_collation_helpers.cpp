@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/shard_targeting_helpers.h"
+#include "mongo/s/query/shard_targeting_collation_helpers.h"
 
 #include "mongo/db/query/collation/collation_index_key.h"
 

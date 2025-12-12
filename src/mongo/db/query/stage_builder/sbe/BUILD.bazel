@@ -182,7 +182,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:recovery_unit_base",
         "//src/mongo/db/storage/key_string",
         "//src/mongo/db/timeseries:bucket_compression",
-        "//src/mongo/s:sharding_helpers",
+        "//src/mongo/s/query:sharding_helpers",
         "//src/mongo/stdx",
         "//src/mongo/util:string_listset",
     ],

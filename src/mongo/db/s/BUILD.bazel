@@ -750,6 +750,7 @@ mongo_cc_library(
         "//src/mongo/s/commands:cluster_commands_common",
         "//src/mongo/s/commands:sharded_cluster_sharding_commands",
         "//src/mongo/s/commands/query_cmd:populate_cursor",
+        "//src/mongo/s/query:shard_targeting_helpers",
     ],
 )
 

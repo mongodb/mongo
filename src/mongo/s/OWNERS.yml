@@ -49,9 +49,6 @@ filters:
   - "cluster_write*":
     approvers:
       - 10gen/query-execution-router
-  - "shard_targeting_helpers*":
-    approvers:
-      - 10gen/query-optimization
   - "append_raw_responses_test.cpp":
     approvers:
       - 10gen/server-networking-and-observability

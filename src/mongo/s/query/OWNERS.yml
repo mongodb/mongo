@@ -21,3 +21,9 @@ filters:
   - "shard_key_pattern_query_util*":
     approvers:
       - 10gen/query-optimization
+  - "shard_targeting_collation_helpers*":
+    approvers:
+      - 10gen/query-optimization
+  - "shard_targeting_helpers*":
+    approvers:
+      - 10gen/query-optimization

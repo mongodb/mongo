@@ -57,6 +57,7 @@
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/exec/collect_query_stats_mongos.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
+#include "mongo/s/query/shard_targeting_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/timer.h"

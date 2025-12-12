@@ -32,3 +32,26 @@ mongo_cc_library(
         "//src/mongo/s/query/exec:router_exec_stage",
     ],
 )
+
+mongo_cc_library(
+    name = "sharding_helpers",
+    srcs = [
+        "shard_targeting_collation_helpers.cpp",
+    ],
+    no_undefined_ref_DO_NOT_USE = False,
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:common",
+        "//src/mongo/db/query/collation:collator_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "shard_targeting_helpers",
+    srcs = [
+        "shard_targeting_helpers.cpp",
+    ],
+    deps = [
+        "//src/mongo/s:sharding_router_api",
+    ],
+)

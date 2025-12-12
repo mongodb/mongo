@@ -457,21 +457,6 @@ bool appendEmptyResultSet(OperationContext* opCtx,
                           const NamespaceString& ns);
 
 /**
- * Returns the shards that would be targeted for the given query according to the given routing
- * info.
- */
-std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                            const CollectionRoutingInfo& cri,
-                                            const BSONObj& query,
-                                            const BSONObj& collation);
-/**
- * Returns the shards that would be targeted for the given query according to the given routing
- * info.
- */
-std::set<ShardId> getTargetedShardsForCanonicalQuery(const CanonicalQuery& query,
-                                                     const CollectionRoutingInfo& cri);
-
-/**
  * Determines the shard(s) to which the given query will be targeted, and builds a separate
  * versioned copy of the command object for each such shard.
  */

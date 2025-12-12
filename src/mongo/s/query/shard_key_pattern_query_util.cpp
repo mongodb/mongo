@@ -61,7 +61,6 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/shard_targeting_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"

@@ -1009,6 +1009,7 @@ mongo_cc_library(
         "//src/mongo/s:async_requests_sender",
         "//src/mongo/s:sharding_router_api",
         "//src/mongo/s/query:cluster_query_knobs",
+        "//src/mongo/s/query:shard_targeting_helpers",
         "//src/mongo/s/query/exec:cluster_cursor",
     ],
 )

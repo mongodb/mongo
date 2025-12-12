@@ -97,6 +97,7 @@
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/s/query/exec/establish_cursors.h"
+#include "mongo/s/query/shard_targeting_helpers.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"

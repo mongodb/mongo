@@ -111,6 +111,7 @@
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/query/exec/collect_query_stats_mongos.h"
 #include "mongo/s/query/exec/establish_cursors.h"
+#include "mongo/s/query/shard_targeting_helpers.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/stdx/thread.h"
