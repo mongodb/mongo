@@ -213,6 +213,21 @@ mongo_cc_library(
     ],
 )
 
+# TODO(SERVER-114573): Remove this target once 9.0 becomes lastLTS.
+mongo_cc_library(
+    name = "upgrade_downgrade_viewless_timeseries",
+    srcs = [
+        "upgrade_downgrade_viewless_timeseries.cpp",
+    ],
+    deps = [
+        ":timeseries_options",
+        ":viewless_timeseries_collection_creation_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "db_timeseries_test",
     srcs = [
@@ -226,6 +241,7 @@ mongo_cc_unit_test(
         "timeseries_update_delete_util_test.cpp",
         "timeseries_write_commands_test.cpp",
         "timeseries_write_util_test.cpp",
+        "upgrade_downgrade_viewless_timeseries_test.cpp",
     ],
     tags = [
         "mongo_unittest_sixth_group",
@@ -238,6 +254,7 @@ mongo_cc_unit_test(
         ":timeseries_extended_range",
         ":timeseries_options",
         ":timeseries_write_util",
+        ":upgrade_downgrade_viewless_timeseries",
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/shard_role",

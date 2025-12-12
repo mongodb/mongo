@@ -69,6 +69,7 @@
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
@@ -165,83 +166,17 @@ void _checkBucketCollectionInconsistencies(
         return;
     }
 
-    const std::string errMsgPrefix = str::stream()
-        << nss.toStringForErrorMsg() << " is a bucket collection but is missing";
-
-    // A bucket collection must always have timeseries options
-    const bool hasTimeseriesOptions = localColl->isTimeseriesCollection();
-    if (!hasTimeseriesOptions) {
-        const std::string errMsg = str::stream() << errMsgPrefix << " the timeseries options";
-        const BSONObj options = localColl->getCollectionOptions().toBSON();
-        inconsistencies.emplace_back(
-            makeInconsistency(MetadataInconsistencyTypeEnum::kMalformedTimeseriesBucketsCollection,
-                              MalformedTimeseriesBucketsCollectionDetails{
-                                  nss, std::move(errMsg), std::move(options)}));
-        return;
-    }
-
-    if (!checkView) {
-        return;
-    }
-
-    // A bucket collection on the primary shard must always be backed by a view in the proper
-    // format. Check if there is a valid view, otherwise return current view/collection options (if
-    // present).
-    const auto [hasValidView, invalidOptions] = [&] {
-        if (const auto& view =
-                localCatalogSnapshot->lookupView(opCtx, nss.getTimeseriesViewNamespace())) {
-            if (view->viewOn() == nss && view->pipeline().size() == 1) {
-                const auto expectedViewPipeline = timeseries::generateViewPipeline(
-                    *localColl->getTimeseriesOptions(), false /* asArray */);
-                const auto expectedInternalUnpackStage =
-                    expectedViewPipeline
-                        .getField(DocumentSourceInternalUnpackBucket::kStageNameInternal)
-                        .Obj();
-                const auto actualPipeline = view->pipeline().front();
-                if (actualPipeline.hasField(
-                        DocumentSourceInternalUnpackBucket::kStageNameInternal)) {
-                    const auto actualInternalUnpackStage =
-                        actualPipeline
-                            .getField(DocumentSourceInternalUnpackBucket::kStageNameInternal)
-                            .Obj()
-                            // Ignore `exclude` field introduced in v5.0 and removed in v5.1
-                            .removeField(DocumentSourceInternalUnpackBucket::kExclude);
-                    if (actualInternalUnpackStage.woCompare(expectedInternalUnpackStage) == 0) {
-                        // The view is in the expected format
-                        return std::make_pair(true, BSONObj());
-                    }
-                }
-            }
-
-            // The view is not in the expected format, return the current options for debugging
-            BSONArrayBuilder pipelineArray;
-            const auto& pipeline = view->pipeline();
-            for (const auto& stage : pipeline) {
-                pipelineArray.append(stage);
-            }
-
-            const BSONObj currentViewOptions = BSON("viewOn" << toStringForLogging(view->viewOn())
-                                                             << "pipeline" << pipelineArray.arr());
-
-            return std::make_pair(false, currentViewOptions);
-        }
-
-        const auto& coll = localCatalogSnapshot->lookupCollectionByNamespace(
-            opCtx, nss.getTimeseriesViewNamespace());
-        if (coll) {
-            // A collection is present rather than a view, return the current options for debugging
-            return std::make_pair(false, coll->getCollectionOptions().toBSON());
-        }
-
-        return std::make_pair(false, BSONObj());
-    }();
-
-    if (!hasValidView) {
-        const std::string errMsg = str::stream() << errMsgPrefix << " a valid view backing it";
-        inconsistencies.emplace_back(
-            makeInconsistency(MetadataInconsistencyTypeEnum::kMalformedTimeseriesBucketsCollection,
-                              MalformedTimeseriesBucketsCollectionDetails{
-                                  nss, std::move(errMsg), std::move(invalidOptions)}));
+    for (auto& inconsistency : timeseries::checkBucketCollectionInconsistencies(
+             opCtx,
+             localColl,
+             checkView,
+             localCatalogSnapshot->lookupView(opCtx, nss.getTimeseriesViewNamespace()).get(),
+             localCatalogSnapshot->lookupCollectionByNamespace(opCtx,
+                                                               nss.getTimeseriesViewNamespace()))) {
+        inconsistencies.emplace_back(makeInconsistency(
+            MetadataInconsistencyTypeEnum::kMalformedTimeseriesBucketsCollection,
+            MalformedTimeseriesBucketsCollectionDetails{
+                nss, std::move(inconsistency.issue), std::move(inconsistency.options)}));
     }
 }
 

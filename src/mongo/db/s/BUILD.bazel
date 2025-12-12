@@ -483,6 +483,7 @@ mongo_cc_library(
         "//src/mongo/db/sharding_environment:sharding_initialization",
         "//src/mongo/db/sharding_environment:sharding_logging",
         "//src/mongo/db/sharding_environment:sharding_runtime_d_params_idl",
+        "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",
         "//src/mongo/db/timeseries/bucket_catalog",
         "//src/mongo/db/topology/vector_clock:vector_clock_mongod",
         "//src/mongo/db/transaction",
