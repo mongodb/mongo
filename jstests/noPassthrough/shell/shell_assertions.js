@@ -852,13 +852,62 @@ it("assertEqJsonFormat", function () {
         () => {
             assert.eq(5, 2 + 2, "lorem ipsum");
         },
-        {msg: "[{a}] and [{b}] are not equal : lorem ipsum", attr: {a: 5, b: 4}},
+        {
+            msg: `\
+expected 5 to equal 4
+\u001b[32m+ expected\u001b[0m \u001b[31m- actual\u001b[0m
+
+\u001b[31m-5\u001b[0m
+\u001b[32m+4\u001b[0m
+ : lorem ipsum`,
+            attr: {},
+        },
     );
     assertThrowsErrorWithJson(
         () => {
             assert.eq(5, 2 + 2, "lorem ipsum", kAttr);
         },
-        {msg: "[{a}] and [{b}] are not equal : lorem ipsum", attr: {a: 5, b: 4, ...kAttr}},
+        {
+            msg: `\
+expected 5 to equal 4
+\u001b[32m+ expected\u001b[0m \u001b[31m- actual\u001b[0m
+
+\u001b[31m-5\u001b[0m
+\u001b[32m+4\u001b[0m
+ : lorem ipsum`,
+            attr: {...kAttr},
+        },
+    );
+
+    assertThrowsErrorWithJson(
+        () => {
+            assert.eq([["a", "c"]], [["a", "b", "c"]]);
+        },
+        {
+            msg: `\
+expected [ [Array] ] to equal [ [Array] ]
+\u001b[32m+ expected\u001b[0m \u001b[31m- actual\u001b[0m
+
+\u001b[31m-[ [ "a", "c" ] ]\u001b[0m
+\u001b[32m+[ [ "a", "b", "c" ] ]\u001b[0m
+`,
+            attr: {},
+        },
+    );
+    assertThrowsErrorWithJson(
+        () => {
+            assert.eq([{a: 1, c: 3}], [{a: 1, b: 2, c: 3}]);
+        },
+        {
+            msg: `\
+expected [ [Object] ] to equal [ [Object] ]
+\u001b[32m+ expected\u001b[0m \u001b[31m- actual\u001b[0m
+
+\u001b[31m-[ { "a" : 1, "c" : 3 } ]\u001b[0m
+\u001b[32m+[ { "a" : 1, "b" : 2, "c" : 3 } ]\u001b[0m
+`,
+            attr: {},
+        },
     );
 });
 

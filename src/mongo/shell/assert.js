@@ -1,3 +1,4 @@
+import {stringdiff, colorize} from "src/mongo/shell/stringdiff.js";
 /**
  * Assertion Library
  */
@@ -267,8 +268,28 @@ assert.eq = function (a, b, msg, attr) {
         return;
     }
 
-    _doassert(msg, `[{a}] and [{b}] are not equal`, {a, b, ...attr});
+    // just use one level of display for a concise but helpful output
+    const shortDisp = (x) => tojson(x, " ", true, tojson.MAX_DEPTH);
+    const aDisplay = shortDisp(a);
+    const bDisplay = shortDisp(b);
+    const diff = patchDiff(a, b);
+
+    _doassert(msg, `expected ${aDisplay} to equal ${bDisplay}\n${diff}\n`, {...attr});
 };
+
+/**
+ * Creates a decorated patch diff with a header and colorized lines.
+ * @param {string} diff
+ * @returns {string}
+ */
+function patchDiff(a, b) {
+    const header = colorize("+ expected\n- actual").replace("\n", " ");
+
+    const multilinestr = (x) => tojson(x, " ");
+    const diff = colorize(stringdiff(multilinestr(a), multilinestr(b)));
+
+    return `${header}\n\n${diff}`;
+}
 
 function _isDocEq(a, b) {
     return a === b || bsonUnorderedFieldsCompare(a, b) === 0;

@@ -261,6 +261,7 @@ MONGOJS_CPP_JSFILES = [
     "query_global.js",
     "session.js",
     "session_global.js",
+    "stringdiff.js",
     "types.js",
     "utils.js",
     "utils_global.js",

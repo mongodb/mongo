@@ -25,6 +25,7 @@ export function stringdiff(oldStr, newStr) {
 const INS = "+";
 const DEL = "-";
 const PAD = " "; // matching lines
+const SEP = "---";
 
 /**
  * Converts a full diff output into a patch format with context windows.
@@ -69,7 +70,7 @@ function patchdiff(fulldiff) {
     for (let i = 0; i < lines.length; i++) {
         if (keep[i]) {
             if (i > 0 && !keep[i - 1] && result.length > 0) {
-                result.push("---");
+                result.push(SEP);
             }
             result.push(lines[i]);
         }
@@ -184,4 +185,26 @@ function backtrack(aLines, bLines, trace, d) {
     }
 
     return diff.join("\n");
+}
+
+const green = (s) => `\x1b[32m${s}\x1b[0m`;
+const red = (s) => `\x1b[31m${s}\x1b[0m`;
+
+/**
+ * Decorates a patch diff with colorized lines.
+ * @param {string} diff
+ * @returns {string}
+ */
+export function colorize(diff) {
+    return diff
+        .split("\n")
+        .map((line) => {
+            if (line.startsWith(INS)) {
+                return green(line);
+            } else if (line.startsWith(DEL) && line != SEP) {
+                return red(line);
+            }
+            return line;
+        })
+        .join("\n");
 }
