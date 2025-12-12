@@ -62,7 +62,7 @@ public:
         // Expands to three stages:
         // 1) Host $match
         // 2) Host $sort
-        // 3) Host $limit (TODO SERVER-109575 this should be an extension $limit once transform
+        // 3) Host $limit (TODO SERVER-114847 this should be an extension $limit once transform
         //    stages are implemented)
         auto* hostServices = sdk::HostServicesHandle::getHostServices();
         out.emplace_back(hostServices->createHostAggStageParseNode(_matchSpec));
