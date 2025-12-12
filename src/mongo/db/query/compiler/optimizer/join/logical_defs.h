@@ -49,6 +49,10 @@ using EdgeId = uint16_t;
  */
 using PathId = uint16_t;
 
+/** Join Predicate's unique identifier.
+ */
+using PredicateId = uint16_t;
+
 struct ResolvedPath {
     NodeId nodeId;
     FieldPath fieldName;

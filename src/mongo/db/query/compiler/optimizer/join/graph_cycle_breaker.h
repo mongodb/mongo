@@ -31,9 +31,45 @@
 
 #include "mongo/db/query/compiler/optimizer/join/adjacency_matrix.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/util/dynamic_bitset.h"
 #include "mongo/util/modules.h"
 
+#include <absl/container/inlined_vector.h>
+
 namespace mongo::join_ordering {
+using Bitset = DynamicBitset<size_t, 1>;
+
+/**
+ * A graph represented as as adjacency list and used for searching cycles of predicates in Join
+ * Graph. The graph's edges correspond to Join Graph's predicates and the nodes correspond to the
+ * predicate's fields represented as PathIds in Join Graph.
+ */
+struct AdjacencyList {
+    /**
+     *  PathId -> {PathId, PredicateId}
+     */
+    std::vector<absl::InlinedVector<std::pair<PathId, PredicateId>, 8>> neighbors;
+
+    /**
+     * PredicateId -> {EdgeId, the predicate index in the edge}
+     */
+    std::vector<std::pair<EdgeId, uint16_t>> predicates;
+};
+
+struct JoinGraphCycles {
+    /**
+     * Each bit corresponds to a predicate, a set bit indicates a predicate forms part of a cycle.
+     */
+    std::vector<Bitset> cycles;
+
+    /**
+     * PredicateId -> {EdgeId, the predicate index in the edge}
+     */
+    std::vector<std::pair<EdgeId, uint16_t>> predicates;
+};
+
+JoinGraphCycles findCycles(AdjacencyList adjList);
+
 /**
  * GraphCycleBreaker is supposed to be created one for a Join Graph and then called for each
  * subgraph to break its cycles.

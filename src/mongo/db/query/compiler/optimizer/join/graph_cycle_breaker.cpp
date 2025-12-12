@@ -31,7 +31,93 @@
 
 #include "mongo/db/query/util/bitset_util.h"
 
+#include <absl/container/flat_hash_set.h>
+
 namespace mongo::join_ordering {
+namespace {
+/**
+ * Backtracking with prunings for finding cycles in an undirected graph.
+ */
+struct GraphCycleFinder {
+public:
+    explicit GraphCycleFinder(const AdjacencyList& adjList)
+        : _adjList(adjList),
+          _edges(adjList.predicates.size()),
+          _blocked(adjList.neighbors.size()) {}
+
+    absl::flat_hash_set<Bitset> findCycles() {
+        // Needed to handle duplicates.
+        absl::flat_hash_set<Bitset> cycles;
+
+        // 'cleared*' bitsets are used to clear their correponding bitsets.
+        const Bitset clearedBlocked{_adjList.neighbors.size()};
+        const Bitset clearedEdges{_adjList.predicates.size()};
+
+        // This loop tries to find cycles starting and ending with every node.
+        for (size_t start = 0; start != _adjList.neighbors.size(); ++start) {
+            if (_adjList.neighbors[start].size() == 0) {
+                continue;
+            }
+
+            // Reset the state to prepare a new search.
+            _blocked &= clearedBlocked;
+            _edges &= clearedEdges;
+
+            findCircuits(static_cast<PathId>(start), static_cast<PathId>(start), cycles);
+        }
+
+        return cycles;
+    }
+
+private:
+    /**
+     * Depth-first search algorithm that identifies all cycles which starts and end with 'start'
+     * node.
+     */
+    bool findCircuits(PathId start, PathId u, absl::flat_hash_set<Bitset>& cycles) {
+        bool isCycleFound = false;
+        _blocked.set(u, true);
+
+        for (const auto& [v, predId] : _adjList.neighbors[u]) {
+            // Consider only nodes which >= start node, since cycles involving nodes < start were
+            // discovered in earlier call of the function. We also don't want to backtrack already
+            // tracked edges.
+            if (v < start || _edges[predId]) {
+                continue;
+            }
+
+            _edges.set(predId, true);
+            if (v == start) {
+                // Found a cycle.
+                cycles.insert(_edges);
+                isCycleFound = true;
+            } else if (!_blocked[v]) {
+                if (findCircuits(start, v, cycles)) {
+                    isCycleFound = true;
+                }
+            }
+            _edges.set(predId, false);
+        }
+        _blocked.set(u, false);
+        return isCycleFound;
+    }
+
+    const AdjacencyList& _adjList;
+    // Edges seen on the path.
+    Bitset _edges;
+    // A node is blocked if it's currently being explored.
+    Bitset _blocked;
+};
+}  // namespace
+
+JoinGraphCycles findCycles(AdjacencyList adjList) {
+    GraphCycleFinder finder(adjList);
+    auto cycles = finder.findCycles();
+
+    return JoinGraphCycles{.cycles = std::vector<Bitset>{cycles.begin(), cycles.end()},
+                           .predicates = std::move(adjList.predicates)};
+}
+
 std::vector<EdgeId> GraphCycleBreaker::breakCycles(std::vector<EdgeId> subgraph) {
     // Performs a cycle detection in undirected graph using DFS. Once a cycle is detected the
     // last edge detected edge of the cycle is removed to break the cycle.
