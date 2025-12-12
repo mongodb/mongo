@@ -29,12 +29,11 @@
 
 #pragma once
 
-#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
 #include <memory>
 
-namespace MONGO_MOD_PUB mongo {
+namespace mongo {
 
 class ServiceContext;
 
@@ -43,4 +42,4 @@ class ServiceContext;
  */
 std::unique_ptr<PeriodicRunner> makePeriodicRunner(ServiceContext* svc);
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

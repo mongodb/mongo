@@ -36,7 +36,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/interruptible.h"
-#include "mongo/util/modules.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -54,7 +53,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace mongo {
 
 namespace producer_consumer_queue_detail {
 
@@ -401,7 +400,7 @@ private:
 };
 
 template <typename CostFunc>
-struct MONGO_MOD_PUBLIC PCQOptions {
+struct PCQOptions {
     // Maximum queue depth in cost func units
     size_t maxQueueDepth = std::numeric_limits<size_t>::max();
 
@@ -448,7 +447,7 @@ struct MONGO_MOD_PUBLIC PCQOptions {
 template <typename T, ProducerKind producerKind, ConsumerKind consumerKind, typename CostFunc>
 class ProducerConsumerQueue {
 public:
-    struct MONGO_MOD_PUBLIC Stats {
+    struct Stats {
         size_t queueDepth;
         size_t waitingConsumers;
         size_t waitingProducers;
@@ -461,10 +460,10 @@ public:
         // count of producers and consumers (blocked, or existing if we're a pipe)
     };
 
-    using Options MONGO_MOD_PUBLIC = PCQOptions<CostFunc>;
+    using Options = PCQOptions<CostFunc>;
 
     // By default the queue depth is unlimited
-    MONGO_MOD_PUBLIC explicit ProducerConsumerQueue(Options options = {})
+    explicit ProducerConsumerQueue(Options options = {})
         : _options(std::move(options)), _producers(_options) {}
 
     ProducerConsumerQueue(const ProducerConsumerQueue&) = delete;
@@ -473,7 +472,7 @@ public:
     ProducerConsumerQueue(ProducerConsumerQueue&&) = delete;
     ProducerConsumerQueue& operator=(ProducerConsumerQueue&&) = delete;
 
-    MONGO_MOD_PUBLIC ~ProducerConsumerQueue() {
+    ~ProducerConsumerQueue() {
         invariant(!_producers);
         invariant(!_consumers);
     }
@@ -481,8 +480,7 @@ public:
     // Pushes the passed T into the queue
     //
     // Leaves T unchanged if an interrupt exception is thrown while waiting for space
-    MONGO_MOD_PUBLIC void push(T&& t,
-                               Interruptible* interruptible = Interruptible::notInterruptible()) {
+    void push(T&& t, Interruptible* interruptible = Interruptible::notInterruptible()) {
         _pushRunner([&](stdx::unique_lock<stdx::mutex>& lk) {
             auto cost = _invokeCostFunc(t, lk);
             uassert(ErrorCodes::ProducerConsumerQueueBatchTooLarge,
@@ -540,7 +538,7 @@ public:
     }
 
     // Pops one T out of the queue
-    MONGO_MOD_PUBLIC T pop(Interruptible* interruptible = Interruptible::notInterruptible()) {
+    T pop(Interruptible* interruptible = Interruptible::notInterruptible()) {
         return _popRunner([&](stdx::unique_lock<stdx::mutex>& lk) {
             _waitForNonEmpty(lk, interruptible);
             return _pop(lk);
@@ -567,7 +565,7 @@ public:
     // Note that if the next item in the queue costs more than our budget, this may return without
     // any items.
     //
-    MONGO_MOD_PUBLIC std::pair<std::deque<T>, size_t> popManyUpTo(
+    std::pair<std::deque<T>, size_t> popManyUpTo(
         size_t budget, Interruptible* interruptible = Interruptible::notInterruptible()) {
         return _popRunner([&](stdx::unique_lock<stdx::mutex>& lk) {
             _waitForNonEmpty(lk, interruptible);
@@ -598,11 +596,11 @@ public:
     }
 
     // Attempts a non-blocking pop of a value
-    MONGO_MOD_PUBLIC boost::optional<T> tryPop() {
+    boost::optional<T> tryPop() {
         return _popRunner([&](stdx::unique_lock<stdx::mutex>& lk) { return _tryPop(lk); });
     }
 
-    MONGO_MOD_PUBLIC Status waitForNonEmptyNoThrow(Interruptible* interruptible) noexcept {
+    Status waitForNonEmptyNoThrow(Interruptible* interruptible) noexcept {
         try {
             waitForNonEmpty(interruptible);
             return Status::OK();
@@ -612,7 +610,7 @@ public:
     }
 
     // Waits until there is at least one item in the queue.
-    MONGO_MOD_PUBLIC void waitForNonEmpty(Interruptible* interruptible) {
+    void waitForNonEmpty(Interruptible* interruptible) {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         _checkConsumerClosed(lk);
         return _waitForNonEmpty(lk, interruptible);
@@ -620,7 +618,7 @@ public:
 
     // Closes the producer end. Consumers will continue to consume until the queue is exhausted, at
     // which time they will begin to throw with an interruption dbexception
-    MONGO_MOD_PUBLIC void closeProducerEnd() {
+    void closeProducerEnd() {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         _producerEndClosed = true;
@@ -629,7 +627,7 @@ public:
     }
 
     // Closes the consumer end. This causes all callers to throw with an interruption dbexception
-    MONGO_MOD_PUBLIC void closeConsumerEnd() {
+    void closeConsumerEnd() {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         _consumerEndClosed = true;
@@ -638,7 +636,7 @@ public:
         _notifyIfNecessary(lk);
     }
 
-    MONGO_MOD_PUBLIC Stats getStats() const {
+    Stats getStats() const {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         Stats stats;
         stats.queueDepth = _current;
@@ -655,7 +653,7 @@ public:
     /**
      * This type wraps up the Producer portion of the PCQ api.  See Pipe for more details.
      */
-    class MONGO_MOD_PUBLIC Producer {
+    class Producer {
     public:
         Producer() = default;
 
@@ -694,7 +692,7 @@ public:
     /**
      * This type wraps up the Consumer portion of the PCQ api.  See Pipe for more details.
      */
-    class MONGO_MOD_PUBLIC Consumer {
+    class Consumer {
     public:
         Consumer() = default;
 
@@ -735,7 +733,7 @@ public:
     /**
      * This type wraps up the Controller portion of the PCQ api.  See Pipe for more details.
      */
-    class MONGO_MOD_PUBLIC Controller {
+    class Controller {
     public:
         Controller() = default;
 
@@ -761,7 +759,7 @@ public:
      *
      * The administrative api is reflected in the "Controller member"
      */
-    class MONGO_MOD_PUBLIC Pipe {
+    class Pipe {
     public:
         explicit Pipe(typename ProducerConsumerQueue::Options options = {})
             : Pipe(std::make_shared<ProducerConsumerQueue>(std::move(options))) {}
@@ -975,4 +973,4 @@ using SingleProducerSingleConsumerQueue = producer_consumer_queue_detail::Produc
     producer_consumer_queue_detail::SingleConsumer,
     CostFunc>;
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

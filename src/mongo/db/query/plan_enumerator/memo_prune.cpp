@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/index_names.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/map_utils.h"
 
 #include <algorithm>
 #include <set>
@@ -254,10 +255,9 @@ bool trimAndAssignment(AndAssignment& oldAssignment, const QueryPruningInfo& que
     // at most 64 indexes.
     std::vector<AssignmentAndPos> resultingIndexesInOrder;
     resultingIndexesInOrder.reserve(prunedAssignmentSet.size());
-    while (!prunedAssignmentSet.empty()) {
-        auto node = prunedAssignmentSet.extract(prunedAssignmentSet.begin());
-        resultingIndexesInOrder.push_back(std::move(node.value()));
-    }
+    extractFromSet(std::move(prunedAssignmentSet), [&](AssignmentAndPos indexAndPos) {
+        resultingIndexesInOrder.push_back(std::move(indexAndPos));
+    });
     std::sort(resultingIndexesInOrder.begin(),
               resultingIndexesInOrder.end(),
               [](const auto& lhs, const auto& rhs) { return lhs.second < rhs.second; });

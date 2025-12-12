@@ -29,37 +29,30 @@
 
 #pragma once
 
-#include "mongo/util/periodic_runner.h"
-#include "mongo/util/tick_source_mock.h"
+#include <utility>
 
 namespace mongo {
 
-class MockPeriodicJob : public PeriodicRunner::ControllableJob {
-public:
-    explicit MockPeriodicJob(PeriodicRunner::PeriodicJob job);
+/*
+ * "moves" keys and values out of the map and passes them into the consumer function to own. This
+ * can be used to avoid copies if the key and value in the map have heap allocations.
+ */
+template <class MapType, class ConsumerType>
+static void extractFromMap(MapType map, const ConsumerType& consumer) {
+    while (!map.empty()) {
+        auto entry = map.extract(map.begin());
+        consumer(std::move(entry.key()), std::move(entry.mapped()));
+    }
+}
 
-    void start() override;
-    void pause() override;
-    void resume() override;
-    void stop() override;
-
-    Milliseconds getPeriod() const override;
-    void setPeriod(Milliseconds period) override;
-
-    void run(Client* client);
-
-private:
-    PeriodicRunner::PeriodicJob _job;
-};
-
-class MockPeriodicRunner : public PeriodicRunner {
-public:
-    JobAnchor makeJob(PeriodicJob job) override;
-
-    void run(Client* client);
-
-private:
-    std::shared_ptr<MockPeriodicJob> _job;
-};
-
+/*
+ * Similar to `extractFromMap` but for sets.
+ */
+template <class SetType, class ConsumerType>
+static void extractFromSet(SetType set, const ConsumerType& consumer) {
+    while (!set.empty()) {
+        auto entry = set.extract(set.begin());
+        consumer(std::move(entry.value()));
+    }
+}
 }  // namespace mongo

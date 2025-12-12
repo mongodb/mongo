@@ -33,7 +33,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>
@@ -43,7 +42,7 @@
 #include <pdh.h>
 #include <pdhmsg.h>
 
-namespace MONGO_MOD_PUB mongo {
+namespace mongo {
 
 class BSONObjBuilder;
 
@@ -292,4 +291,4 @@ private:
     const CounterInfo* _timeBaseTicksCounter{nullptr};
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

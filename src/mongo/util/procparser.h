@@ -32,7 +32,6 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <map>
@@ -45,95 +44,12 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace mongo {
 
 class BSONObjBuilder;
 
 namespace procparser {
 
-enum class FileNrKey {
-    kFileHandlesInUse,
-    kMaxFileHandles,
-};
-
-/**
- * Read from file, and write the specified list of keys into builder.
- *
- * See parseProcStat.
- *
- * Returns Status errors on file reading issues.
- */
-Status parseProcStatFile(StringData filename,
-                         const std::vector<StringData>& keys,
-                         BSONObjBuilder* builder);
-
-/**
- * Read from file, and write the specified list of keys in builder.
- */
-Status parseProcMemInfoFile(StringData filename,
-                            const std::vector<StringData>& keys,
-                            BSONObjBuilder* builder);
-
-/**
- * Read from file, and write the keys found in that file into builder.
- */
-Status parseProcNetstatFile(const std::vector<StringData>& keys,
-                            StringData filename,
-                            BSONObjBuilder* builder);
-
-/**
- * Read from file, and write the keys found in that file into builder.
- * See the above parseProcSockStats for details on the arguments and format
- * of the BSONObj written into builder.
- */
-Status parseProcSockstatFile(const std::map<StringData, std::set<StringData>>& keys,
-                             StringData filename,
-                             BSONObjBuilder* builder);
-
-/**
- * Read from file, and write the specified list of disks in builder.
- */
-Status parseProcDiskStatsFile(StringData filename,
-                              const std::vector<StringData>& disks,
-                              BSONObjBuilder* builder);
-
-/**
- * Read from file, and write the used/free space data for available mounts.
- */
-Status parseProcSelfMountStatsFile(StringData filename, BSONObjBuilder* builder);
-
-/**
- * Get a vector of disks to monitor by enumerating the specified directory.
- *
- * If the directory does not exist, or otherwise permission is denied, returns an empty vector.
- */
-std::vector<std::string> findPhysicalDisks(StringData directory);
-
-/**
- * Read from file, and write the specified list of keys in builder.
- */
-Status parseProcVMStatFile(StringData filename,
-                           const std::vector<StringData>& keys,
-                           BSONObjBuilder* builder);
-
-static const StringData kFileHandlesInUseKey = "sys_file_handles_in_use"_sd;
-static const StringData kMaxFileHandlesKey = "sys_max_file_handles"_sd;
-
-/**
- * Read from file, and write the specified keys in builder.
- */
-Status parseProcSysFsFileNrFile(StringData filename, FileNrKey key, BSONObjBuilder* builder);
-
-/**
- * Read from file, and write the specified keys in builder.
- */
-Status parseProcPressureFile(StringData key, StringData filename, BSONObjBuilder* builder);
-
-//
-// The rest of this file is implementation details that are only in the header to support testing.
-//
-
-namespace MONGO_MOD_FILE_PRIVATE detail {
 /**
  * Reads a string matching /proc/stat format, and writes the values of the specified keys into
  * builder. If fields are not in the "data" parameter, they are omitted. Converts fields
@@ -152,6 +68,17 @@ Status parseProcStat(const std::vector<StringData>& keys,
                      BSONObjBuilder* builder);
 
 /**
+ * Read from file, and write the specified list of keys into builder.
+ *
+ * See parseProcStat.
+ *
+ * Returns Status errors on file reading issues.
+ */
+Status parseProcStatFile(StringData filename,
+                         const std::vector<StringData>& keys,
+                         BSONObjBuilder* builder);
+
+/**
  * Read a string matching /proc/meminfo format, and write the specified list of keys in builder.
  *
  * keys - list of keys to output in BSON. If keys is empty, all keys are outputed.
@@ -163,6 +90,13 @@ Status parseProcMemInfo(const std::vector<StringData>& keys,
                         BSONObjBuilder* builder);
 
 /**
+ * Read from file, and write the specified list of keys in builder.
+ */
+Status parseProcMemInfoFile(StringData filename,
+                            const std::vector<StringData>& keys,
+                            BSONObjBuilder* builder);
+
+/**
  * Read a string matching /proc/net/netstat format, and write the keys
  * found in that string into builder.
  *
@@ -172,6 +106,13 @@ Status parseProcMemInfo(const std::vector<StringData>& keys,
 Status parseProcNetstat(const std::vector<StringData>& keys,
                         StringData data,
                         BSONObjBuilder* builder);
+/**
+ * Read from file, and write the keys found in that file into builder.
+ */
+Status parseProcNetstatFile(const std::vector<StringData>& keys,
+                            StringData filename,
+                            BSONObjBuilder* builder);
+
 
 /**
  * Read a string matching /proc/net/sockstat format, and write the relevant keys found into builder.
@@ -207,6 +148,14 @@ Status parseProcNetstat(const std::vector<StringData>& keys,
 Status parseProcSockstat(const std::map<StringData, std::set<StringData>>& keys,
                          StringData data,
                          BSONObjBuilder* builder);
+/**
+ * Read from file, and write the keys found in that file into builder.
+ * See the above parseProcSockStats for details on the arguments and format
+ * of the BSONObj written into builder.
+ */
+Status parseProcSockstatFile(const std::map<StringData, std::set<StringData>>& keys,
+                             StringData filename,
+                             BSONObjBuilder* builder);
 
 /**
  * Read a string matching /proc/diskstats format, and write the specified list of disks in builder.
@@ -224,6 +173,13 @@ Status parseProcDiskStats(const std::vector<StringData>& disks,
                           BSONObjBuilder* builder);
 
 /**
+ * Read from file, and write the specified list of disks in builder.
+ */
+Status parseProcDiskStatsFile(StringData filename,
+                              const std::vector<StringData>& disks,
+                              BSONObjBuilder* builder);
+
+/**
  * Read a string matching /proc/self/mountinfo format and parse for any existing mounts.
  *
  * data - The string to parse.
@@ -238,6 +194,44 @@ Status parseProcSelfMountStatsImpl(
                                                 boost::system::error_code&)> getSpace);
 
 /**
+ * Read from file, and write the used/free space data for available mounts.
+ */
+Status parseProcSelfMountStatsFile(StringData filename, BSONObjBuilder* builder);
+
+/**
+ * Get a vector of disks to monitor by enumerating the specified directory.
+ *
+ * If the directory does not exist, or otherwise permission is denied, returns an empty vector.
+ */
+std::vector<std::string> findPhysicalDisks(StringData directory);
+
+/**
+ * Read a string matching /proc/vmstat format, and write the specified list of keys in builder.
+ *
+ * keys - list of keys to output in BSON. If keys is empty, all keys are outputed.
+ * data - string to parsee
+ * builder - BSON output
+ */
+Status parseProcVMStat(const std::vector<StringData>& keys,
+                       StringData data,
+                       BSONObjBuilder* builder);
+
+/**
+ * Read from file, and write the specified list of keys in builder.
+ */
+Status parseProcVMStatFile(StringData filename,
+                           const std::vector<StringData>& keys,
+                           BSONObjBuilder* builder);
+
+static const StringData kFileHandlesInUseKey = "sys_file_handles_in_use"_sd;
+static const StringData kMaxFileHandlesKey = "sys_max_file_handles"_sd;
+
+enum class FileNrKey {
+    kFileHandlesInUse,
+    kMaxFileHandles,
+};
+
+/**
  * Read a string matching /proc/fs/sys/file-nr format, and write the specified keys in builder.
  *
  * appendFileHandlesInUse - if true, append the number of currently used file handles with the key
@@ -250,15 +244,9 @@ Status parseProcSelfMountStatsImpl(
 Status parseProcSysFsFileNr(FileNrKey key, StringData data, BSONObjBuilder* builder);
 
 /**
- * Read a string matching /proc/vmstat format, and write the specified list of keys in builder.
- *
- * keys - list of keys to output in BSON. If keys is empty, all keys are outputed.
- * data - string to parsee
- * builder - BSON output
+ * Read from file, and write the specified keys in builder.
  */
-Status parseProcVMStat(const std::vector<StringData>& keys,
-                       StringData data,
-                       BSONObjBuilder* builder);
+Status parseProcSysFsFileNrFile(StringData filename, FileNrKey key, BSONObjBuilder* builder);
 
 static const StringData kPressureSomeTime = "some"_sd;
 static const StringData kPressureFullTime = "full"_sd;
@@ -273,7 +261,10 @@ static const StringData kPressureFullTime = "full"_sd;
  */
 Status parseProcPressure(StringData data, BSONObjBuilder* builder);
 
-}  // namespace MONGO_MOD_FILE_PRIVATE detail
+/**
+ * Read from file, and write the specified keys in builder.
+ */
+Status parseProcPressureFile(StringData key, StringData filename, BSONObjBuilder* builder);
 
 }  // namespace procparser
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

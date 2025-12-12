@@ -87,7 +87,7 @@ class FTDCProcStat : public BaseProcTest {
 public:
     void parseStat(const std::vector<StringData>& keys, StringData input) {
         BSONObjBuilder builder;
-        ASSERT_OK(procparser::detail::parseProcStat(keys, input, 1000, &builder));
+        ASSERT_OK(procparser::parseProcStat(keys, input, 1000, &builder));
         uint64Map = toStringMap(builder.done());
     }
 
@@ -171,7 +171,7 @@ TEST_F(FTDCProcStat, TestWithLessFields) {
 
 TEST_F(FTDCProcStat, TestWithOnlyCpu) {
     BSONObjBuilder builder;
-    ASSERT_NOT_OK(procparser::detail::parseProcStat(keys, "cpu", 1000, &builder));
+    ASSERT_NOT_OK(procparser::parseProcStat(keys, "cpu", 1000, &builder));
 }
 
 TEST_F(FTDCProcStat, TestWithEvenLessFields) {
@@ -183,7 +183,7 @@ TEST_F(FTDCProcStat, TestWithEvenLessFields) {
 
 TEST_F(FTDCProcStat, TestEmpty) {
     BSONObjBuilder builder;
-    ASSERT_NOT_OK(procparser::detail::parseProcStat(keys, "", 1000, &builder));
+    ASSERT_NOT_OK(procparser::parseProcStat(keys, "", 1000, &builder));
 }
 
 
@@ -243,7 +243,7 @@ class FTDCProcMemInfo : public BaseProcTest {
 public:
     void parseMeminfo(const std::vector<StringData>& keys, StringData input) {
         BSONObjBuilder builder;
-        ASSERT_OK(procparser::detail::parseProcMemInfo(keys, input, &builder));
+        ASSERT_OK(procparser::parseProcMemInfo(keys, input, &builder));
         uint64Map = toStringMap(builder.done());
     }
 
@@ -284,7 +284,7 @@ TEST_F(FTDCProcMemInfo, TestMissingKb) {
 
 TEST_F(FTDCProcMemInfo, TestEmptyString) {
     BSONObjBuilder builder;
-    ASSERT_NOT_OK(procparser::detail::parseProcMemInfo(keys, "", &builder));
+    ASSERT_NOT_OK(procparser::parseProcMemInfo(keys, "", &builder));
 }
 
 
@@ -374,7 +374,7 @@ class FTDCProcNetstat : public BaseProcTest {
 public:
     void parseNetstat(const std::vector<StringData>& keys, StringData input) {
         BSONObjBuilder builder;
-        ASSERT_OK(procparser::detail::parseProcNetstat(keys, input, &builder));
+        ASSERT_OK(procparser::parseProcNetstat(keys, input, &builder));
         uint64Map = toStringMap(builder.done());
     }
 
@@ -439,12 +439,12 @@ TEST_F(FTDCProcNetstat, TestNoNewline) {
 
 TEST_F(FTDCProcNetstat, TestSingleLine) {
     BSONObjBuilder builder;
-    ASSERT_NOT_OK(procparser::detail::parseProcNetstat(keys, "pfx1 key1 key2 key3\n", &builder));
+    ASSERT_NOT_OK(procparser::parseProcNetstat(keys, "pfx1 key1 key2 key3\n", &builder));
 }
 
 TEST_F(FTDCProcNetstat, TestEmptyString) {
     BSONObjBuilder builder;
-    ASSERT_NOT_OK(procparser::detail::parseProcNetstat(keys, "", &builder));
+    ASSERT_NOT_OK(procparser::parseProcNetstat(keys, "", &builder));
 }
 
 // Test we can parse the /proc/net/netstat on this machine and assert we have some expected fields
@@ -501,7 +501,7 @@ class FTDCProcDiskStats : public BaseProcTest {
 public:
     void parseDiskStat(const std::vector<StringData>& disks, StringData input) {
         BSONObjBuilder builder;
-        ASSERT_OK(procparser::detail::parseProcDiskStats(disks, input, &builder));
+        ASSERT_OK(procparser::parseProcDiskStats(disks, input, &builder));
         uint64Map = toStringMap(builder.done());
     }
 
@@ -566,9 +566,9 @@ TEST_F(FTDCProcDiskStats, TestDiskStatsNoNumbers) {
 
 TEST_F(FTDCProcDiskStats, TestDiskStatsShortStrings) {
     BSONObjBuilder builder;
-    ASSERT_NOT_OK(procparser::detail::parseProcDiskStats(disks, "8       0", &builder));
-    ASSERT_NOT_OK(procparser::detail::parseProcDiskStats(disks, "8", &builder));
-    ASSERT_NOT_OK(procparser::detail::parseProcDiskStats(disks, "", &builder));
+    ASSERT_NOT_OK(procparser::parseProcDiskStats(disks, "8       0", &builder));
+    ASSERT_NOT_OK(procparser::parseProcDiskStats(disks, "8", &builder));
+    ASSERT_NOT_OK(procparser::parseProcDiskStats(disks, "", &builder));
 }
 
 TEST_F(FTDCProcDiskStats, TestLocalNonExistentStat) {
@@ -659,7 +659,7 @@ public:
 
     void parseNetstat(StringData input) {
         BSONObjBuilder builder;
-        ASSERT_OK(procparser::detail::parseProcSelfMountStatsImpl(input, &builder, &mockGetSpace));
+        ASSERT_OK(procparser::parseProcSelfMountStatsImpl(input, &builder, &mockGetSpace));
         obj = builder.obj();
     }
 
@@ -790,7 +790,7 @@ class FTDCProcVMStat : public BaseProcTest {
 public:
     void parseVMStat(const std::vector<StringData>& keys, StringData input) {
         BSONObjBuilder builder;
-        ASSERT_OK(procparser::detail::parseProcVMStat(keys, input, &builder));
+        ASSERT_OK(procparser::parseProcVMStat(keys, input, &builder));
         uint64Map = toStringMap(builder.done());
     }
 
@@ -817,7 +817,7 @@ TEST_F(FTDCProcVMStat, TestNoValue) {
 
 TEST_F(FTDCProcVMStat, TestEmptyString) {
     BSONObjBuilder builder;
-    ASSERT_NOT_OK(procparser::detail::parseProcVMStat(keys, "", &builder));
+    ASSERT_NOT_OK(procparser::parseProcVMStat(keys, "", &builder));
 }
 
 // Test we can parse the /proc/vmstat on this machine. Also assert we have the expected fields
@@ -861,7 +861,7 @@ class FTDCProcSysFsFileNr : public BaseProcTest {
 public:
     void parseSysFsFileNr(procparser::FileNrKey key, StringData input) {
         BSONObjBuilder builder;
-        ASSERT_OK(procparser::detail::parseProcSysFsFileNr(key, input, &builder));
+        ASSERT_OK(procparser::parseProcSysFsFileNr(key, input, &builder));
         uint64Map = toStringMap(builder.done());
     }
 };
@@ -893,11 +893,11 @@ TEST_F(FTDCProcSysFsFileNr, TestOnlyParseUpToWhatWeNeed2) {
 TEST_F(FTDCProcSysFsFileNr, TestFailure) {
     // Failure cases
     BSONObjBuilder builder;
-    ASSERT_NOT_OK(procparser::detail::parseProcSysFsFileNr(
-        procparser::FileNrKey::kFileHandlesInUse, "", &builder));
-    ASSERT_NOT_OK(procparser::detail::parseProcSysFsFileNr(
-        procparser::FileNrKey::kMaxFileHandles, "", &builder));
-    ASSERT_NOT_OK(procparser::detail::parseProcSysFsFileNr(
+    ASSERT_NOT_OK(
+        procparser::parseProcSysFsFileNr(procparser::FileNrKey::kFileHandlesInUse, "", &builder));
+    ASSERT_NOT_OK(
+        procparser::parseProcSysFsFileNr(procparser::FileNrKey::kMaxFileHandles, "", &builder));
+    ASSERT_NOT_OK(procparser::parseProcSysFsFileNr(
         procparser::FileNrKey::kMaxFileHandles, "1 2\n", &builder));
 }
 
@@ -937,7 +937,7 @@ public:
 
     void parsePressure(StringData input) {
         BSONObjBuilder builder;
-        ASSERT_OK(procparser::detail::parseProcPressure(input, &builder));
+        ASSERT_OK(procparser::parseProcPressure(input, &builder));
         obj = builder.obj();
         uint64Map = toStringMap(obj);
     }
@@ -981,20 +981,20 @@ TEST_F(FTDCProcPressure, TestNonExistentFile) {
 TEST_F(FTDCProcPressure, TestTotalNotFound) {
     BSONObjBuilder builder;
     ASSERT_NOT_OK(
-        procparser::detail::parseProcPressure("some avg10=0.10 avg60=6.50 avg300=1.00", &builder));
+        procparser::parseProcPressure("some avg10=0.10 avg60=6.50 avg300=1.00", &builder));
 }
 
 TEST_F(FTDCProcPressure, TestTotalNotInARow) {
     BSONObjBuilder builder;
-    ASSERT_NOT_OK(procparser::detail::parseProcPressure(
-        "some avg10=0.10 avg60=6.50 avg300=1.00\nfull avg10=2.30 "
-        "avg60=0.00 avg300=0.14 total=10",
-        &builder));
+    ASSERT_NOT_OK(
+        procparser::parseProcPressure("some avg10=0.10 avg60=6.50 avg300=1.00\nfull avg10=2.30 "
+                                      "avg60=0.00 avg300=0.14 total=10",
+                                      &builder));
 }
 
 TEST_F(FTDCProcPressure, TestTotalNotValid) {
     BSONObjBuilder builder;
-    ASSERT_NOT_OK(procparser::detail::parseProcPressure(
+    ASSERT_NOT_OK(procparser::parseProcPressure(
         "some avg10=0.10 avg60=6.50 avg300=1.00 total=invalid", &builder));
 }
 
@@ -1049,7 +1049,7 @@ public:
     // BSONObj of the parsed data.
     BSONObj assertParseSockstat(std::map<StringData, std::set<StringData>> keys, StringData input) {
         BSONObjBuilder builder;
-        ASSERT_OK(procparser::detail::parseProcSockstat(keys, input, &builder));
+        ASSERT_OK(procparser::parseProcSockstat(keys, input, &builder));
         return builder.obj();
     }
 
@@ -1080,7 +1080,7 @@ TEST_F(FTDCProcSockstat, TestSockstatSuccess) {
 TEST_F(FTDCProcSockstat, TestBadSocketString) {
     StringData badString = "I'm not in the right format";
     BSONObjBuilder bob;
-    auto s = procparser::detail::parseProcSockstat(testKeys, badString, &bob);
+    auto s = procparser::parseProcSockstat(testKeys, badString, &bob);
     // No desired keys found so error.
     ASSERT_EQ(s.code(), ErrorCodes::NoSuchKey);
 }
@@ -1088,7 +1088,7 @@ TEST_F(FTDCProcSockstat, TestBadSocketString) {
 TEST_F(FTDCProcSockstat, TestEmptyString) {
     StringData badString = "";
     BSONObjBuilder bob;
-    auto s = procparser::detail::parseProcSockstat(testKeys, badString, &bob);
+    auto s = procparser::parseProcSockstat(testKeys, badString, &bob);
     // No desired keys found so error.
     ASSERT_EQ(s.code(), ErrorCodes::NoSuchKey);
 }
@@ -1096,7 +1096,7 @@ TEST_F(FTDCProcSockstat, TestEmptyString) {
 TEST_F(FTDCProcSockstat, TestStringWithNoNumber) {
     StringData badString = "sockets: used alot";
     BSONObjBuilder bob;
-    auto s = procparser::detail::parseProcSockstat(testKeys, badString, &bob);
+    auto s = procparser::parseProcSockstat(testKeys, badString, &bob);
     ASSERT_EQ(s.code(), ErrorCodes::FailedToParse);
 }
 TEST_F(FTDCProcSockstat, TestGoodSocketString) {

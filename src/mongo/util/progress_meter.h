@@ -34,13 +34,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/modules.h"
 
 #include <mutex>
 #include <string>
 #include <utility>
 
-namespace MONGO_MOD_PUB mongo {
+namespace mongo {
 
 class ProgressMeter {
     ProgressMeter(const ProgressMeter&) = delete;
@@ -174,4 +173,4 @@ private:
     ProgressMeter* _pm;
     OperationContext* _opCtx;
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

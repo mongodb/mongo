@@ -120,7 +120,7 @@ private:
 };
 
 template <typename Result, typename Key, typename Value, typename Time, typename... LookupArgs>
-struct MONGO_MOD_PUBLIC ReadThroughCacheLookup {
+struct MONGO_MOD_OPEN ReadThroughCacheLookup {
     using Fn = unique_function<Result(OperationContext*,
                                       const Key&,
                                       const Value& cachedValue,
@@ -129,7 +129,7 @@ struct MONGO_MOD_PUBLIC ReadThroughCacheLookup {
 };
 
 template <typename Result, typename Key, typename Value, typename... LookupArgs>
-struct MONGO_MOD_PUBLIC
+struct MONGO_MOD_OPEN
     ReadThroughCacheLookup<Result, Key, Value, CacheNotCausallyConsistent, LookupArgs...> {
     using Fn = unique_function<Result(
         OperationContext*, const Key&, const Value& cachedValue, const LookupArgs... lookupArgs)>;
