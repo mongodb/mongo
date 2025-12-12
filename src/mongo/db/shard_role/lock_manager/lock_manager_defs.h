@@ -298,7 +298,9 @@ public:
         return _fullHash & (std::numeric_limits<uint64_t>::max() >> resourceTypeBits);
     }
 
-    std::string toString() const;
+    // String representation of the resource type that omits the parts not intended to be read by
+    // humans. Intended to be used for error messages that are returned to the client.
+    std::string toStringForErrorMessage() const;
 
     template <typename H>
     friend H AbslHashValue(H h, const ResourceId& resource) {
@@ -307,6 +309,7 @@ public:
 
 private:
     friend class ResourceCatalog;
+    friend std::string toStringForLogging(const ResourceId&);
 
     ResourceId(uint64_t fullHash) : _fullHash(fullHash) {}
 
@@ -335,6 +338,8 @@ private:
         return result;
     }();
 };
+
+MONGO_MOD_PUBLIC std::string toStringForLogging(const ResourceId&);
 
 #ifndef MONGO_CONFIG_DEBUG_BUILD
 // Treat the resource ids as 64-bit integers in release mode in order to ensure we do
