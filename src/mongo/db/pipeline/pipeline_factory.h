@@ -87,5 +87,14 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
     const MakePipelineOptions& opts,
     const NamespaceString& originalNs);
 
+/**
+ * Parses a facet sub-pipeline from a vector of raw BSONObjs by sending the raw pipeline through
+ * LiteParsed before creating the Pipeline. This skips top-level validation because facet
+ * sub-pipelines have different validation requirements than top-level pipelines.
+ */
+std::unique_ptr<Pipeline> makeFacetPipeline(const std::vector<BSONObj>& rawPipeline,
+                                            const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                            PipelineValidatorCallback validator = nullptr);
+
 }  // namespace MONGO_MOD_PUBLIC pipeline_factory
 }  // namespace mongo

@@ -119,20 +119,13 @@ public:
 
     /**
      * Like parse, but takes a LiteParsedPipeline instead of raw BSONObjs.
+     * If 'isFacetPipeline' is true, skips top-level validators.
      */
     static std::unique_ptr<Pipeline> parseFromLiteParsed(
         const LiteParsedPipeline& liteParsedPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        PipelineValidatorCallback validator = nullptr);
-
-    /**
-     * Parses sub-pipelines from a $facet aggregation. Like parse(), but skips top-level
-     * validators.
-     */
-    static std::unique_ptr<Pipeline> parseFacetPipeline(
-        const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        PipelineValidatorCallback validator = nullptr);
+        PipelineValidatorCallback validator = nullptr,
+        bool isFacetPipeline = false);
 
     /**
      * Like parse, but takes a BSONElement instead of a vector of objects. 'arrElem' must be an

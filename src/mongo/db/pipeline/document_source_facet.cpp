@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -323,8 +324,8 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
     for (auto&& rawFacet : extractRawPipelines(elem)) {
         const auto facetName = rawFacet.first;
 
-        auto pipeline =
-            Pipeline::parseFacetPipeline(rawFacet.second, expCtx, [](const Pipeline& pipeline) {
+        auto pipeline = pipeline_factory::makeFacetPipeline(
+            rawFacet.second, expCtx, [](const Pipeline& pipeline) {
                 const auto& sources = pipeline.getSources();
                 for (auto& stage : sources) {
                     auto stageConstraints = stage->constraints();

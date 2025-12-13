@@ -174,4 +174,12 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
 
     return makePipeline(resolvedPipeline, subPipelineExpCtx, opts);
 }
+
+std::unique_ptr<Pipeline> makeFacetPipeline(const std::vector<BSONObj>& rawPipeline,
+                                            const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                            PipelineValidatorCallback validator) {
+    LiteParsedPipeline liteParsedPipeline(expCtx->getNamespaceString(), rawPipeline);
+    return Pipeline::parseFromLiteParsed(
+        liteParsedPipeline, expCtx, validator, true /*isFacetPipeline*/);
+}
 }  // namespace mongo::pipeline_factory
