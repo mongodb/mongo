@@ -325,3 +325,12 @@ runBasicJoinTest([
     {$lookup: {from: foreignColl2.getName(), as: "k.y.z", localField: "w.y.d", foreignField: "d"}},
     {$unwind: "$k.y.z"},
 ]);
+
+section("Basic example with a $project excluding a field from the base collection");
+runBasicJoinTest([
+    {$project: {_id: false}},
+    {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
+    {$unwind: "$x"},
+    {$lookup: {from: foreignColl2.getName(), as: "y", localField: "b", foreignField: "b"}},
+    {$unwind: "$y"},
+]);

@@ -1655,8 +1655,11 @@ std::pair<SbStage, PlanStageSlots> generateJoinResult(const BinaryJoinEmbeddingN
         nodes.emplace_back(leftOutputs.get(SlotBasedStageBuilder::kResult));
     }
     for (const auto& field : fieldEffect.getFieldList()) {
-        if ((!node->rightEmbeddingField || field != node->rightEmbeddingField->fullPath()) &&
-            (!node->leftEmbeddingField || field != node->leftEmbeddingField->fullPath())) {
+        if (!fieldEffect.isAllowedField(field)) {
+            paths.emplace_back(field);
+            nodes.emplace_back(ProjectNode::Drop{});
+        } else if ((!node->rightEmbeddingField || field != node->rightEmbeddingField->fullPath()) &&
+                   (!node->leftEmbeddingField || field != node->leftEmbeddingField->fullPath())) {
             paths.emplace_back(field);
             // TODO: SERVER-113230 in case of conflict, we give priority to the left side. Depending
             // on the join graph, an embedding having the same name of a top-level field in the base
