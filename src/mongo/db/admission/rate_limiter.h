@@ -107,13 +107,13 @@ public:
      * Acquire a token or block until one becomes available. Returns an error status if
      * the operationContext is interrupted or the maxQueueDepth is exceeded.
      */
-    Status acquireToken(OperationContext*);
+    Status acquireToken(OperationContext*, double numTokensToConsume = 1.0);
 
     /**
      * Attempts to acquire a token without queuing. Returns an error status if the rate limit
      * and the burst size is exceeded.
      */
-    Status tryAcquireToken();
+    Status tryAcquireToken(double numTokensToConsume = 1.0);
 
     /**
      * Updates metrics for admission granted without having called acquireToken.

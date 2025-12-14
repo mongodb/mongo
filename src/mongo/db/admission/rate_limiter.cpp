@@ -186,7 +186,7 @@ RateLimiter::RateLimiter(double refreshRatePerSec,
 
 RateLimiter::~RateLimiter() = default;
 
-Status RateLimiter::acquireToken(OperationContext* opCtx) {
+Status RateLimiter::acquireToken(OperationContext* opCtx, double numTokensToConsume) {
     _impl->stats.attemptedAdmissions.incrementRelaxed();
 
     // The consumeWithBorrowNonBlocking API consumes a token (possibly leading to a negative
@@ -196,9 +196,10 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
     if (MONGO_unlikely(hangInRateLimiter.shouldFail())) {
         waitForTokenSecs = 60 * 60;  // 1 hour
     } else {
-        waitForTokenSecs = _impl->readScopedTokenBucket()
-                               .consumeWithBorrowNonBlocking(1.0, _impl->nowInSeconds())
-                               .value_or(0);
+        waitForTokenSecs =
+            _impl->readScopedTokenBucket()
+                .consumeWithBorrowNonBlocking(numTokensToConsume, _impl->nowInSeconds())
+                .value_or(0);
     }
 
     if (auto napTime = doubleToMillis(waitForTokenSecs); napTime > Milliseconds{0}) {
@@ -206,7 +207,7 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
         // don't advance the mock clock before the sleep deadline is calculated.
         Date_t deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() + napTime;
         if (auto status = _impl->enqueue(); !status.isOK()) {
-            _impl->readScopedTokenBucket().returnTokens(1.0);
+            _impl->readScopedTokenBucket().returnTokens(numTokensToConsume);
             _impl->stats.rejectedAdmissions.incrementRelaxed();
             return status;
         }
@@ -229,7 +230,7 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
                         "Interrupted while waiting in rate limiter queue",
                         "rateLimiterName"_attr = _impl->name,
                         "exception"_attr = e.toString());
-            _impl->readScopedTokenBucket().returnTokens(1.0);
+            _impl->readScopedTokenBucket().returnTokens(numTokensToConsume);
             return e.toStatus().withContext(
                 fmt::format("Interrupted while waiting in rate limiter queue. rateLimiterName={}",
                             _impl->name));
@@ -242,10 +243,10 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status RateLimiter::tryAcquireToken() {
+Status RateLimiter::tryAcquireToken(double numTokensToConsume) {
     _impl->stats.attemptedAdmissions.incrementRelaxed();
 
-    if (!_impl->readScopedTokenBucket().consume(1.0, _impl->nowInSeconds())) {
+    if (!_impl->readScopedTokenBucket().consume(numTokensToConsume, _impl->nowInSeconds())) {
         _impl->stats.rejectedAdmissions.incrementRelaxed();
         return Status{kRejectedErrorCode,
                       fmt::format("Rate limiter '{}' rate exceeded", _impl->name)};
