@@ -469,7 +469,14 @@ __schema_open_table(WT_SESSION_IMPL *session)
     /* Point to some items in the copy to save re-parsing. */
     WT_RET(__wt_config_gets(session, table_cfg, "columns", &table->colconf));
 
-    WT_RET(__wt_is_simple_table(session, &table->colconf, &table->is_simple));
+    /*
+     * Count the number of columns: tables are "simple" if the columns are not named.
+     */
+    __wt_config_subinit(session, &cparser, &table->colconf);
+    table->is_simple = true;
+    while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
+        table->is_simple = false;
+    WT_RET_NOTFOUND_OK(ret);
 
     /* Check that the columns match the key and value formats. */
     if (!table->is_simple)

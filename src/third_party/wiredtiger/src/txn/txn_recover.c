@@ -799,13 +799,12 @@ __recovery_close_cursors(WT_RECOVERY *r)
 }
 
 /*
- * __recovery_metadata_scan_prefix --
- *     Scan the files matching the prefix referenced from the metadata and call the worker function
- *     for each entry.
+ * __recovery_file_scan_prefix --
+ *     Scan the files matching the prefix referenced from the metadata and gather information about
+ *     them for recovery.
  */
 static int
-__recovery_metadata_scan_prefix(WT_RECOVERY *r, const char *prefix, const char *ignore_suffix,
-  int (*recovery_meta_worker_func)(WT_RECOVERY *, const char *, const char *))
+__recovery_file_scan_prefix(WT_RECOVERY *r, const char *prefix, const char *ignore_suffix)
 {
     WT_CURSOR *c;
     WT_DECL_RET;
@@ -832,87 +831,25 @@ __recovery_metadata_scan_prefix(WT_RECOVERY *r, const char *prefix, const char *
         if (ignore_suffix != NULL && WT_SUFFIX_MATCH(uri, ignore_suffix))
             continue;
         WT_RET(c->get_value(c, &config));
-        WT_RET(recovery_meta_worker_func(r, uri, config));
+        WT_RET(__recovery_setup_file(r, uri, config));
     }
     WT_RET_NOTFOUND_OK(ret);
     return (0);
 }
 
 /*
- * __metadata_clean_incomplete_table --
- *     For each table metadata entry, check that the table was fully created. If not, clean up the
- *     incomplete table.
- */
-static int
-__metadata_clean_incomplete_table(WT_RECOVERY *r, const char *uri, const char *config)
-{
-    WT_DECL_RET;
-    char *cg_meta_value;
-    const char *drop_cfg[] = {WT_CONFIG_BASE(r->session, WT_SESSION_drop), "force=true", NULL};
-    const char *metadata_cfg[] = {config, NULL};
-    const char *name;
-    WT_CONFIG_ITEM cval;
-    WT_ITEM *colgroup;
-
-    cg_meta_value = NULL;
-    WT_ERR(__wt_scr_alloc(r->session, 0, &colgroup));
-    /*
-     * FIXME-WT-16146: Add capability for cleaning up incomplete complex tables and skip checking
-     * tiered shared tables.
-     */
-    bool is_simple;
-    WT_ERR(__wt_config_gets(r->session, metadata_cfg, "columns", &cval));
-    WT_ERR(__wt_is_simple_table(r->session, &cval, &is_simple));
-    if (!is_simple || ((ret = __wt_config_gets(r->session, metadata_cfg, "shared", &cval)) == 0))
-        goto done;
-    WT_ERR_NOTFOUND_OK(ret, false);
-
-    /* Check whether the colgroup exists. */
-    name = uri;
-    WT_PREFIX_SKIP_REQUIRED(r->session, name, "table:");
-    WT_ERR(__wt_buf_fmt(r->session, colgroup, "colgroup:%s", name));
-    WT_ERR_NOTFOUND_OK(__wt_metadata_search(r->session, colgroup->data, &cg_meta_value), true);
-    if (ret == 0)
-        goto done;
-
-    __wt_verbose_level_multi(r->session, WT_VERB_RECOVERY_ALL, WT_VERBOSE_WARNING, "%s %s",
-      "removing incomplete table", uri);
-
-    WT_WITH_SCHEMA_LOCK(r->session,
-      WT_WITH_TABLE_WRITE_LOCK(
-        r->session, ret = __wt_schema_drop(r->session, uri, drop_cfg, false)));
-    WT_ERR(ret);
-
-err:
-done:
-    __wt_free(r->session, cg_meta_value);
-    __wt_scr_free(r->session, &colgroup);
-    return (ret);
-}
-
-/*
  * __recovery_file_scan --
- *     Scan the files referenced from the metadata to clean up incomplete tables and gather
- *     information about them for recovery.
+ *     Scan the files referenced from the metadata and gather information about them for recovery.
  */
 static int
 __recovery_file_scan(WT_RECOVERY *r)
 {
     __wt_verbose_level_multi(r->session, WT_VERB_RECOVERY_ALL, WT_VERBOSE_INFO, "%s",
-      "scanning metadata to remove all incomplete tables");
-
-    /* Scan through all table entries in the metadata and clean up incomplete tables. */
-    __recovery_metadata_scan_prefix(r, "table:", NULL, __metadata_clean_incomplete_table);
-
-    __wt_verbose_level_multi(r->session, WT_VERB_RECOVERY_ALL, WT_VERBOSE_INFO, "%s",
       "scanning metadata to find the largest file ID");
 
-    /*
-     * Scan through all files and tiered entries in the metadata and gather information about each
-     * entry for recovery.
-     */
-    WT_RET(__recovery_metadata_scan_prefix(r, "file:", ".wtobj", __recovery_setup_file));
-    WT_RET(__recovery_metadata_scan_prefix(r, "tiered:", NULL, __recovery_setup_file));
+    /* Scan through all files and tiered entries in the metadata. */
+    WT_RET(__recovery_file_scan_prefix(r, "file:", ".wtobj"));
+    WT_RET(__recovery_file_scan_prefix(r, "tiered:", NULL));
 
     /*
      * Set the connection level file id tracker, as such upon creation of a new file we'll begin
@@ -1142,8 +1079,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[], bool disagg)
     r.backup_only = false;
     WT_ERR(ret);
 
-    /* Scan the metadata to find the live files and their IDs, and clean up any incomplete tables.
-     */
+    /* Scan the metadata to find the live files and their IDs. */
     WT_ERR(__recovery_file_scan(&r));
 
     /*

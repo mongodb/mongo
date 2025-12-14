@@ -12,6 +12,7 @@
  * Define functions that increment histogram statistics for reconstruction of pages with deltas.
  */
 WT_STAT_USECS_HIST_INCR_FUNC(internal_reconstruct, perf_hist_internal_reconstruct_latency)
+WT_STAT_USECS_HIST_INCR_FUNC(leaf_reconstruct, perf_hist_leaf_reconstruct_latency)
 
 /*
  * __evict_force_check --
@@ -162,10 +163,14 @@ __page_read_build_full_disk_image(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM
     incr = 0;
 
     /* Merge deltas directly with the base image to build refs in a single pass. */
-    if (base_dsk->type == WT_PAGE_ROW_LEAF)
+    if (base_dsk->type == WT_PAGE_ROW_LEAF) {
+        time_start = __wt_clock(session);
         WT_ERR(__wti_page_merge_deltas_with_base_image_leaf(
           session, deltas, delta_size, new_image, base_dsk));
-    else {
+        time_stop = __wt_clock(session);
+        __wt_stat_usecs_hist_incr_leaf_reconstruct(session, WT_CLOCKDIFF_US(time_stop, time_start));
+        WT_STAT_CONN_DSRC_INCR(session, cache_read_leaf_delta);
+    } else {
         time_start = __wt_clock(session);
         WT_ERR(__wti_page_merge_deltas_with_base_image_int(session, ref, deltas, delta_size, &refs,
           &refs_entries, &incr, new_image, base_image_addr));
@@ -595,6 +600,7 @@ read:
                 break;
             }
 
+            WT_ASSERT(session, ref->page != NULL);
             /*
              * If a page has grown too large, we'll try and forcibly evict it before making it
              * available to the caller. There are a variety of cases where that's not possible.
@@ -661,6 +667,8 @@ read:
 
 skip_evict:
             page = ref->page;
+            WT_ASSERT(session, page != NULL);
+
             /*
              * Keep track of whether a session is reading leaf pages into the cache. This allows for
              * the session to decide whether pre-fetch would be helpful. It might not work if a

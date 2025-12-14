@@ -2105,8 +2105,11 @@ __rec_set_updates_durable(WT_SESSION_IMPL *session, WT_MULTI *multi)
                     /* The on page value is also a prepared update from the same transaction. */
                     if (WT_TIME_WINDOW_HAS_START_PREPARE(&supd->tw))
                         F_SET(supd->onpage_upd, WT_UPDATE_PREPARE_DURABLE);
-                    else
-                        F_SET(supd->onpage_upd, WT_UPDATE_DURABLE);
+
+                    /*
+                     * Never mark the on-page value as durable to ensure it can be included in a
+                     * future write if the prepared tombstone is rolled back.
+                     */
                 } else {
                     F_SET(supd->onpage_tombstone, WT_UPDATE_DURABLE);
                     F_SET(supd->onpage_upd, WT_UPDATE_DURABLE);

@@ -133,7 +133,7 @@ setup_bm(std::shared_ptr<mock_session> &session, WT_BM *bm, const std::string &f
      * block manager instead
      * .
      */
-    WT_CLEAR(*bm);
+    memset(reinterpret_cast<void *>(bm), 0, sizeof(WT_BM));
     __wti_bm_method_set(bm, false);
 
     // Create the underlying file in the filesystem.

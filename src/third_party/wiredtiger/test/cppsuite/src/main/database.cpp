@@ -41,11 +41,9 @@ database::build_collection_name(const uint64_t id)
 }
 
 void
-database::add_collection(uint64_t key_count)
+database::add_collection(scoped_session &session, uint64_t key_count)
 {
     std::lock_guard<std::mutex> lg(_mtx);
-    if (_session.get() == nullptr)
-        _session = connection_manager::instance().create_session();
     if (_collection_create_config.empty())
         testutil_die(EINVAL, "database: no collection create config specified!");
     uint64_t next_id = _next_collection_id++;
@@ -54,7 +52,7 @@ database::add_collection(uint64_t key_count)
     _collections.emplace(std::piecewise_construct, std::forward_as_tuple(next_id),
       std::forward_as_tuple(next_id, key_count, collection_name));
     testutil_check(
-      _session->create(_session.get(), collection_name.c_str(), _collection_create_config.c_str()));
+      session->create(session.get(), collection_name.c_str(), _collection_create_config.c_str()));
     _operation_tracker->save_schema_operation(
       tracking_operation::CREATE_COLLECTION, next_id, _tsm->get_next_ts());
 }

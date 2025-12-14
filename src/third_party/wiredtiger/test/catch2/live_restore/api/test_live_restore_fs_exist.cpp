@@ -15,7 +15,7 @@
 using namespace utils;
 
 // Wrapper for the calling the C implementation of fs_exists.
-bool
+static bool
 file_exists(live_restore_test_env &env, const std::string &file_name)
 {
     WT_SESSION *session = (WT_SESSION *)env.session;
@@ -33,7 +33,7 @@ file_exists(live_restore_test_env &env, const std::string &file_name)
  * source directories, might have a stop file, and live restore might be in the process of
  * migrating. Then return the result of an fs_exist call.
  */
-bool
+static bool
 test_file_exists(live_restore_test_env *env, HasDest has_dest, HasSource has_source,
   IsMigrating is_migrating, HasStop stop_file_exists)
 {

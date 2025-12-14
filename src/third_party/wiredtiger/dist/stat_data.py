@@ -446,6 +446,7 @@ conn_stats = [
     EvictStat('eviction_walks_stopped', 'eviction walks gave up because they restarted their walk twice'),
     EvictStat('eviction_worker_evict_attempt', 'evict page attempts by eviction worker threads'),
     EvictStat('eviction_worker_evict_fail', 'evict page failures by eviction worker threads'),
+    EvictStat('eviction_worker_lock_wait_time', 'time eviction worker threads spend waiting for locks (usecs)'),
     # Note eviction_worker_evict_attempt - eviction_worker_evict_fail = evict page successes by eviction worker threads.
 
     ##########################################

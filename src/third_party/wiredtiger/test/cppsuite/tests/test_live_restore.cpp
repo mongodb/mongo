@@ -122,21 +122,7 @@ static const int value_size = 50000;
 static const char *SOURCE_PATH = "WT_LIVE_RESTORE_SOURCE";
 static const char *HOME_PATH = DEFAULT_DIR;
 
-/* Declarations to avoid the error raised by -Werror=missing-prototypes. */
-void create_collection(scoped_session &session, bool subdirectory = false);
-void read(scoped_session &session);
-void trigger_fs_truncate(scoped_session &session);
-void write(scoped_session &session, bool fresh_start);
-std::string key_to_str(uint64_t);
-std::string generate_key();
-std::string generate_value();
-void insert(scoped_cursor &cursor, std::string &coll);
-void update(scoped_cursor &cursor, std::string &coll);
-void remove(scoped_session &session, scoped_cursor &cursor, std::string &coll);
-void configure_database(scoped_session &session);
-void reopen_conn(scoped_session &session, const std::string &conn_config, const std::string &home);
-
-void
+static void
 read(scoped_session &session)
 {
     auto cursor = session.open_scoped_cursor(db.get_random_collection(), "next_random=true");
@@ -149,7 +135,7 @@ read(scoped_session &session)
 
 // Truncate from a random key to the end of the file and then call compact. This should
 // result in the backing file on disk being fs_truncated.
-void
+static void
 trigger_fs_truncate(scoped_session &session)
 {
     // Truncate from a random key all the way to the end of the collection and then call compact
@@ -168,19 +154,19 @@ trigger_fs_truncate(scoped_session &session)
     testutil_check(session->compact(session.get(), coll_name.c_str(), nullptr));
 }
 
-std::string
+static std::string
 generate_key()
 {
     return random_generator::instance().generate_random_string(key_size);
 }
 
-std::string
+static std::string
 generate_value()
 {
     return random_generator::instance().generate_pseudo_random_string(value_size);
 }
 
-void
+static void
 insert(scoped_cursor &cursor, std::string &coll)
 {
     std::string key = generate_key();
@@ -190,7 +176,7 @@ insert(scoped_cursor &cursor, std::string &coll)
     testutil_check(cursor->insert(cursor.get()));
 }
 
-void
+static void
 update(scoped_cursor &cursor, std::string &coll)
 {
     std::string key = generate_key();
@@ -199,6 +185,9 @@ update(scoped_cursor &cursor, std::string &coll)
     cursor->set_value(cursor.get(), value.c_str());
     testutil_check(cursor->update(cursor.get()));
 }
+
+/* TODO: Remove declaration and make function static when used. See write() below. */
+void remove(scoped_session &session, scoped_cursor &cursor, std::string &coll);
 
 void
 remove(scoped_session &session, scoped_cursor &cursor, std::string &coll)
@@ -217,7 +206,7 @@ remove(scoped_session &session, scoped_cursor &cursor, std::string &coll)
     testutil_check(cursor->remove(cursor.get()));
 }
 
-void
+static void
 write(scoped_session &session, bool fresh_start)
 {
     /* Force insertions for a duration on a fresh start. */
@@ -245,13 +234,13 @@ write(scoped_session &session, bool fresh_start)
     testutil_assert(false);
 }
 
-void
+static void
 create_collection(scoped_session &session, bool subdirectory)
 {
     db.add_new_collection(session, subdirectory);
 }
 
-void
+static void
 reopen_conn(scoped_session &session, const std::string &conn_config, const std::string &home)
 {
     session.close_session();
@@ -324,7 +313,7 @@ get_stat(WT_CURSOR *cursor, int stat_field, int64_t *valuep)
 }
 
 /* Setup the initial set of collections in the source path. */
-void
+static void
 configure_database(scoped_session &session)
 {
     scoped_cursor cursor = session.open_scoped_cursor("metadata:", "");

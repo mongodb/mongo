@@ -53,13 +53,7 @@ extern "C" {
 #include "test_util.h"
 }
 
-/* Declarations to avoid the error raised by -Werror=missing-prototypes. */
-const std::string parse_configuration_from_file(const std::string &filename);
-void print_help();
-int64_t run_test(const std::string &test_name, const std::string &config,
-  const std::string &wt_open_config, const std::string &home);
-
-const std::string
+static const std::string
 parse_configuration_from_file(const std::string &filename)
 {
     std::string cfg, line, error;
@@ -82,7 +76,7 @@ parse_configuration_from_file(const std::string &filename)
     return (cfg);
 }
 
-void
+static void
 print_help()
 {
     std::cout << "NAME" << std::endl;
@@ -127,7 +121,7 @@ print_help()
  * - test_name: specifies which test to run.
  * - config: defines the configuration used for the test.
  */
-int64_t
+static int64_t
 run_test(const std::string &test_name, const std::string &config, const std::string &wt_open_config,
   const std::string &home)
 {

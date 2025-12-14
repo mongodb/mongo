@@ -96,13 +96,13 @@ public:
             while (tc->running() &&
               std::chrono::system_clock::now() - burst_start <
                 std::chrono::seconds(_burst_duration)) {
-                tc->txn.try_begin();
+                tc->try_begin();
                 auto key = tc->pad_string(std::to_string(start_key + added_count), tc->key_size);
                 /* A return value of true implies the insert was successful. */
                 auto value =
                   random_generator::instance().generate_pseudo_random_string(tc->value_size);
                 if (!tc->insert(cc.write_cursor, cc.coll.id, key, value)) {
-                    tc->txn.rollback();
+                    tc->rollback();
                     added_count = 0;
                     continue;
                 }
@@ -114,7 +114,7 @@ public:
                     if (ret == WT_NOTFOUND) {
                         testutil_check(cc.read_cursor->reset(cc.read_cursor.get()));
                     } else if (ret == WT_ROLLBACK) {
-                        tc->txn.rollback();
+                        tc->rollback();
                         added_count = 0;
                         continue;
                     } else {
@@ -122,17 +122,17 @@ public:
                     }
                 }
 
-                if (tc->txn.can_commit()) {
-                    if (tc->txn.commit()) {
+                if (tc->can_commit()) {
+                    if (tc->commit()) {
                         cc.coll.increase_key_count(added_count);
                         start_key = cc.coll.get_key_count();
                     }
                     added_count = 0;
                 }
             }
-            /* Close out our current txn. */
-            if (tc->txn.active()) {
-                if (tc->txn.commit()) {
+            /* Close out our current  */
+            if (tc->active()) {
+                if (tc->commit()) {
                     logger::log_msg(LOG_TRACE,
                       "Committed an insertion of " + std::to_string(added_count) + " keys.");
                     cc.coll.increase_key_count(added_count);
@@ -148,7 +148,7 @@ public:
             tc->sleep();
         }
         /* Make sure the last transaction is rolled back now the work is finished. */
-        tc->txn.try_rollback();
+        tc->try_rollback();
     }
 
 private:

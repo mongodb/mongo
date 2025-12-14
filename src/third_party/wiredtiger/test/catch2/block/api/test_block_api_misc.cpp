@@ -92,8 +92,7 @@ TEST_CASE("Block manager: addr invalid", "[block_api_misc]")
     // Build Mock session, this will automatically create a mock connection.
     std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
 
-    WT_BM bm;
-    WT_CLEAR(bm);
+    WT_BM bm = {};
     // A session and block manager needs to be initialized otherwise the addr_invalid functionality
     // will crash if it attempts to check various session flags.
     auto path = std::filesystem::current_path();
@@ -152,8 +151,7 @@ TEST_CASE("Block manager: addr string", "[block_api_misc]")
     // Build Mock session, this will automatically create a mock connection.
     std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
 
-    WT_BM bm;
-    WT_CLEAR(bm);
+    WT_BM bm = {};
     auto path = std::filesystem::current_path();
     std::string file_path(path.string() + "/test.wt");
     setup_bm(session, &bm, file_path, ALLOCATION_SIZE, BLOCK_ALLOCATION, OS_CACHE_MAX,
@@ -184,8 +182,7 @@ TEST_CASE("Block manager: addr string", "[block_api_misc]")
 TEST_CASE("Block manager: block header", "[block_api_misc]")
 {
     // Declare a block manager and set it up so that we can use its legal API methods.
-    WT_BM bm;
-    WT_CLEAR(bm);
+    WT_BM bm = {};
     __wti_bm_method_set(&bm, false);
 
     SECTION("Test block header size is correct")
@@ -197,8 +194,7 @@ TEST_CASE("Block manager: block header", "[block_api_misc]")
 TEST_CASE("Block manager: is mapped", "[block_api_misc]")
 {
     // Declare a block manager and set it up so that we can use its legal API methods.
-    WT_BM bm;
-    WT_CLEAR(bm);
+    WT_BM bm = {};
     __wti_bm_method_set(&bm, false);
 
     SECTION("Test block manager is mapped")
@@ -220,8 +216,7 @@ TEST_CASE("Block manager: size and stat", "[block_api_misc]")
     // Build Mock session, this will automatically create a mock connection.
     std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
 
-    WT_BM bm;
-    WT_CLEAR(bm);
+    WT_BM bm = {};
     auto path = std::filesystem::current_path();
     std::string file_path(path.string() + "/test.wt");
     setup_bm(session, &bm, file_path, ALLOCATION_SIZE, BLOCK_ALLOCATION, OS_CACHE_MAX,

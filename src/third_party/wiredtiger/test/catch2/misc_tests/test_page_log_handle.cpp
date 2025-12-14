@@ -11,7 +11,7 @@
 #include "wiredtiger.h"
 #include "../wrappers/mock_session.h"
 
-int
+static int
 mock_plh_open_handle(
   WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t table_id, WT_PAGE_LOG_HANDLE **plh)
 {
@@ -24,14 +24,14 @@ mock_plh_open_handle(
     return (0);
 }
 
-int
+static int
 mock_terminate(WT_PAGE_LOG *page_log, WT_SESSION *session)
 {
     __wt_free((WT_SESSION_IMPL *)session, page_log);
     return (0);
 }
 
-int
+static int
 mock_plh_close(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session)
 {
     WT_UNUSED(plh);
@@ -39,7 +39,7 @@ mock_plh_close(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session)
     return (0);
 }
 
-void
+static void
 setup_page_log_queue(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn_impl = S2C(session);

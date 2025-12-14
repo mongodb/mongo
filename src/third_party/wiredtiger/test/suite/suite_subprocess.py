@@ -184,7 +184,7 @@ class suite_subprocess:
     # Run a method as a subprocess using the run.py machinery.
     # Return the process exit status and the WiredTiger home
     # directory used by the subprocess.
-    def run_subprocess_function(self, directory, funcname, silent=False):
+    def run_subprocess_function(self, directory, funcname):
         testparts = funcname.split('.')
         if len(testparts) != 3:
             raise ValueError('bad function name "' + funcname +
@@ -211,7 +211,7 @@ class suite_subprocess:
             with open("subprocess.out", "w") as wtout:
                 returncode = subprocess.call(
                     procargs, stdout=wtout, stderr=wterr)
-                if returncode != 0 and not silent:
+                if returncode != 0:
                     # This is not necessarily an error, the primary reason to
                     # run in a subprocess is that it may crash.
                     self.show_outputs(procargs,

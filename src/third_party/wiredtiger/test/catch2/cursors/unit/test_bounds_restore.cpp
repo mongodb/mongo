@@ -13,7 +13,7 @@
 #include "../../utils.h"
 #include "../../wrappers/connection_wrapper.h"
 
-bool
+static bool
 validate_cursor_bounds_restore(WT_CURSOR *cursor, uint64_t original_cursor_flags)
 {
     return cursor->flags == original_cursor_flags;

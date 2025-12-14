@@ -15,7 +15,7 @@
 
 using namespace utils;
 
-bool
+static bool
 stop_file_exists(std::string file_name)
 {
     return (testutil_exists(nullptr, (file_name + WTI_LIVE_RESTORE_STOP_FILE_SUFFIX).c_str()));

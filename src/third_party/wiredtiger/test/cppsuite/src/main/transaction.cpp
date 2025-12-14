@@ -30,23 +30,12 @@
 
 #include "src/common/constants.h"
 #include "src/common/logger.h"
-#include "src/common/random_generator.h"
-
-namespace test_harness {
-
-transaction::transaction(
-  configuration *config, timestamp_manager *timestamp_manager, WT_SESSION *session)
-    : _timestamp_manager(timestamp_manager), _session(session)
-{
-    /* Use optional here as our populate threads don't define this configuration. */
-    configuration *transaction_config = config->get_optional_subconfig(OPS_PER_TRANSACTION);
-    if (transaction_config != nullptr) {
-        _min_op_count = transaction_config->get_optional_int(MIN, 1);
-        _max_op_count = transaction_config->get_optional_int(MAX, 1);
-        delete transaction_config;
-    }
+#include "src/storage/scoped_session.h"
+extern "C" {
+#include "test_util.h"
 }
 
+namespace test_harness {
 bool
 transaction::active() const
 {
@@ -54,30 +43,13 @@ transaction::active() const
 }
 
 void
-transaction::add_op()
-{
-    _op_count++;
-}
-
-void
-transaction::begin(const std::string &config)
+transaction::begin(scoped_session &session, const std::string &config)
 {
     testutil_assert(!_in_txn);
     testutil_check(
-      _session->begin_transaction(_session, config.empty() ? nullptr : config.c_str()));
-    /* This randomizes the number of operations to be executed in one transaction. */
-    _target_op_count =
-      random_generator::instance().generate_integer<int64_t>(_min_op_count, _max_op_count);
-    _op_count = 0;
+      session->begin_transaction(session.get(), config.empty() ? nullptr : config.c_str()));
     _in_txn = true;
     _needs_rollback = false;
-}
-
-void
-transaction::try_begin(const std::string &config)
-{
-    if (!_in_txn)
-        begin(config);
 }
 
 /*
@@ -85,12 +57,12 @@ transaction::try_begin(const std::string &config)
  * transaction internally.
  */
 bool
-transaction::commit(const std::string &config)
+transaction::commit(scoped_session &session, const std::string &config)
 {
     int ret = 0;
     testutil_assert(_in_txn && !_needs_rollback);
 
-    ret = _session->commit_transaction(_session, config.empty() ? nullptr : config.c_str());
+    ret = session->commit_transaction(session.get(), config.empty() ? nullptr : config.c_str());
     /*
      * FIXME-WT-9198 Now we are accepting the error code EINVAL because of possible invalid
      * timestamps as we know it can happen due to the nature of the framework. The framework may set
@@ -103,65 +75,29 @@ transaction::commit(const std::string &config)
     if (ret != 0)
         logger::log_msg(LOG_WARN,
           "Failed to commit transaction in commit, received error code: " + std::to_string(ret));
-    _op_count = 0;
     _in_txn = false;
     return (ret == 0);
 }
 
 void
-transaction::rollback(const std::string &config)
+transaction::rollback(scoped_session &session, const std::string &config)
 {
     testutil_assert(_in_txn);
     testutil_check(
-      _session->rollback_transaction(_session, config.empty() ? nullptr : config.c_str()));
+      session->rollback_transaction(session.get(), config.empty() ? nullptr : config.c_str()));
     _needs_rollback = false;
-    _op_count = 0;
     _in_txn = false;
 }
 
 void
-transaction::try_rollback(const std::string &config)
+transaction::set_needs_rollback()
 {
-    if (_in_txn)
-        rollback(config);
-}
-
-int64_t
-transaction::get_op_count() const
-{
-    return _op_count;
-}
-
-int64_t
-transaction::get_target_op_count() const
-{
-    return _target_op_count;
-}
-
-/*
- * FIXME: WT-9198 We're concurrently doing a transaction that contains a bunch of operations while
- * moving the stable timestamp. Eat the occasional EINVAL from the transaction's first commit
- * timestamp being earlier than the stable timestamp.
- */
-int
-transaction::set_commit_timestamp(wt_timestamp_t ts)
-{
-    /* We don't want to set zero timestamps on transactions if we're not using timestamps. */
-    if (!_timestamp_manager->enabled())
-        return 0;
-    const std::string config = COMMIT_TS + "=" + timestamp_manager::decimal_to_hex(ts);
-    return _session->timestamp_transaction(_session, config.c_str());
-}
-
-void
-transaction::set_needs_rollback(bool rollback)
-{
-    _needs_rollback = rollback;
+    _needs_rollback = true;
 }
 
 bool
-transaction::can_commit()
+transaction::needs_rollback()
 {
-    return (!_needs_rollback && _in_txn && _op_count >= _target_op_count);
+    return _needs_rollback;
 }
 } // namespace test_harness

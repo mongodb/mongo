@@ -49,7 +49,7 @@ mock_connection::setup_chunk_cache(
   WT_SESSION_IMPL *session, uint64_t capacity, size_t chunk_size, WT_CHUNKCACHE *&chunkcache)
 {
     chunkcache = &_connection_impl->chunkcache;
-    memset(chunkcache, 0, sizeof(WT_CHUNKCACHE));
+    memset(reinterpret_cast<void *>(chunkcache), 0, sizeof(WT_CHUNKCACHE));
     chunkcache->capacity = capacity;
     chunkcache->chunk_size = chunk_size;
     WT_RET(

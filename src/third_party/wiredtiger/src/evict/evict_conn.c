@@ -341,6 +341,7 @@ __wt_evict_create(WT_SESSION_IMPL *session, const char *cfg[])
     evict->evict_current_queue = evict->evict_fill_queue = &evict->evict_queues[0];
     evict->evict_other_queue = &evict->evict_queues[1];
     evict->evict_urgent_queue = &evict->evict_queues[WTI_EVICT_URGENT_QUEUE];
+    evict->evict_lock_wait_time = 0;
 
     /*
      * We get/set some values in the evict statistics (rather than have two copies), configure them.
@@ -442,6 +443,9 @@ __wt_evict_stats_update(WT_SESSION_IMPL *session)
       __wt_atomic_load_uint16_relaxed(&evict->evict_max_eviction_queue_attempts));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_attempts_to_evict_page,
       __wt_atomic_load_uint16_relaxed(&evict->evict_max_evict_page_attempts));
+
+    WT_STATP_CONN_SET(session, stats, eviction_worker_lock_wait_time,
+      __wt_atomic_load_uint64_relaxed(&evict->evict_lock_wait_time));
 
     /*
      * The number of files with active walks ~= number of hazard pointers in the walk session. Note:

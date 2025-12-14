@@ -63,7 +63,7 @@ struct SizeListWrapper {
     std::vector<WT_SIZE *> _raw_list;
 };
 
-std::unique_ptr<ExtentWrapper>
+static std::unique_ptr<ExtentWrapper>
 create_new_ext()
 {
     /*
@@ -77,7 +77,7 @@ create_new_ext()
     return std::make_unique<ExtentWrapper>(raw);
 }
 
-std::unique_ptr<SizeWrapper>
+static std::unique_ptr<SizeWrapper>
 create_new_sz()
 {
     auto raw = (WT_SIZE *)malloc(sizeof(WT_SIZE));
@@ -95,7 +95,7 @@ create_new_sz()
  * ...
  * L9: X
  */
-void
+static void
 create_default_test_extent_list(ExtentListWrapper &wrapper)
 {
     auto &head = wrapper._list;
@@ -118,7 +118,7 @@ create_default_test_extent_list(ExtentListWrapper &wrapper)
 }
 
 // As above, but for a size list.
-void
+static void
 create_default_test_size_list(SizeListWrapper &wrapper)
 {
     auto &head = wrapper._list;

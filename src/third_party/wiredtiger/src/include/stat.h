@@ -742,6 +742,7 @@ struct __wt_connection_stats {
     int64_t cache_read_restored_tombstone_bytes;
     int64_t cache_hs_insert_full_update;
     int64_t cache_hs_insert_reverse_modify;
+    int64_t eviction_worker_lock_wait_time;
     int64_t eviction_reentry_hs_eviction_milliseconds;
     int64_t cache_bytes_internal;
     int64_t cache_bytes_internal_ingest;

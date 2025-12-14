@@ -38,7 +38,7 @@ struct addr_cookie {
  * performing a bm->read and a file read and making sure that the read() matches the original write
  * buffer.
  */
-void
+static void
 validate_block_contents(WT_BM *bm, const std::shared_ptr<mock_session> &session, WT_ITEM *write_buf,
   addr_cookie cookie, wt_off_t offset, uint32_t size)
 {
@@ -85,7 +85,7 @@ validate_block_contents(WT_BM *bm, const std::shared_ptr<mock_session> &session,
 /*
  * Validate that the bm->write() performed correctly.
  */
-void
+static void
 validate_write_block(WT_BM *bm, const std::shared_ptr<mock_session> &session, WT_ITEM *write_buf,
   addr_cookie cookie, const std::string &expected_str, bool data_checksum)
 {
@@ -119,7 +119,7 @@ validate_write_block(WT_BM *bm, const std::shared_ptr<mock_session> &session, WT
 }
 
 // Test that all previous write performed are still present in the block and file.
-void
+static void
 test_validate_cookies(WT_BM *bm, const std::shared_ptr<mock_session> &session,
   const std::vector<addr_cookie> &cookies, const std::vector<std::string> &expected_strings)
 {
@@ -147,8 +147,7 @@ TEST_CASE("Block manager: file operation read, write and write_size functions", 
     // Build Mock session, this will automatically create a mock connection.
     std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
 
-    WT_BM bm;
-    WT_CLEAR(bm);
+    WT_BM bm = {};
     size_t allocation_size = std::stoi(ALLOCATION_SIZE);
     auto path = std::filesystem::current_path();
     std::string file_path(path.string() + "/test.wt");

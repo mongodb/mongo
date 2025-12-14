@@ -18,7 +18,7 @@
 
 using namespace utils;
 
-int
+static int
 api_call_with_error(
   WT_SESSION_IMPL *session_impl, int err, int sub_level_err, const char *err_msg_content)
 {
@@ -32,13 +32,13 @@ err:
     API_END_RET(session_impl, ret);
 }
 
-int
+static int
 api_call_with_no_error(WT_SESSION_IMPL *session_impl)
 {
     return (api_call_with_error(session_impl, 0, WT_NONE, NULL));
 }
 
-int
+static int
 txn_api_call_with_error(
   WT_SESSION_IMPL *session_impl, int err, int sub_level_err, const char *err_msg_content)
 {
@@ -54,7 +54,7 @@ err:
     return (ret);
 }
 
-int
+static int
 txn_api_call_with_no_error(WT_SESSION_IMPL *session_impl)
 {
     return (txn_api_call_with_error(session_impl, 0, WT_NONE, NULL));

@@ -17,7 +17,7 @@
 
 #include "wt_internal.h"
 
-void
+static void
 unpack_addr_cookie_and_check(const uint8_t *packed, uint32_t block_allocsize, wt_off_t pack_offset,
   uint32_t pack_size, uint32_t pack_checksum)
 {

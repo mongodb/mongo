@@ -30,7 +30,7 @@ open_file(live_restore_test_env &env, std::string file_name, WT_FS_OPEN_FILE_TYP
     return lr_fh;
 }
 
-void
+static void
 validate_lr_fh(WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh, live_restore_test_env &env,
   std::string &file_name, bool is_directory = false)
 {

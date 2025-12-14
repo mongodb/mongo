@@ -36,7 +36,7 @@ uint16_t DIAGNOSTIC_FLAGS[] = {WT_DIAGNOSTIC_ALL, WT_DIAGNOSTIC_CHECKPOINT_VALID
   WT_DIAGNOSTIC_HS_VALIDATE, WT_DIAGNOSTIC_KEY_OUT_OF_ORDER, WT_DIAGNOSTIC_LOG_VALIDATE,
   WT_DIAGNOSTIC_PREPARED, WT_DIAGNOSTIC_SLOW_OPERATION, WT_DIAGNOSTIC_TXN_VISIBILITY};
 
-int
+static int
 check_assertion_fired(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
@@ -56,7 +56,7 @@ check_assertion_fired(WT_SESSION_IMPL *session)
  * Wrapper to call WT_RET_ASSERT. This returns different values depending on whether WT_RET_ASSERT
  * fires or not.
  */
-int
+static int
 call_wt_ret(WT_SESSION_IMPL *session, uint16_t category, bool assert_should_pass)
 {
     WT_RET_ASSERT(session, category, assert_should_pass, ASSERT_RET, "WT_RET raised assert");
@@ -68,7 +68,7 @@ call_wt_ret(WT_SESSION_IMPL *session, uint16_t category, bool assert_should_pass
  * Wrapper to call WT_ERR_ASSERT. This returns different values depending on whether WT_ERR_ASSERT
  * fires or not.
  */
-int
+static int
 call_wt_err(WT_SESSION_IMPL *session, uint16_t category, bool assert_should_pass)
 {
     WT_DECL_RET;
@@ -88,7 +88,7 @@ err:
  * Wrapper to call WT_RET_PANIC_ASSERT. This returns different values depending on whether
  * WT_RET_PANIC_ASSERT fires or not.
  */
-int
+static int
 call_wt_panic(WT_SESSION_IMPL *session, uint16_t category, bool assert_should_pass)
 {
     WT_RET_PANIC_ASSERT(
@@ -101,7 +101,7 @@ call_wt_panic(WT_SESSION_IMPL *session, uint16_t category, bool assert_should_pa
  * Wrapper to call WT_ASSERT_OPTIONAL. This returns different values depending on whether
  * WT_ASSERT_OPTIONAL fires or not.
  */
-int
+static int
 call_wt_optional(WT_SESSION_IMPL *session, uint16_t category, bool assert_should_pass)
 {
     WT_ASSERT_OPTIONAL(session, category, assert_should_pass, "WT_OPTIONAL raised assert");
@@ -110,7 +110,7 @@ call_wt_optional(WT_SESSION_IMPL *session, uint16_t category, bool assert_should
 }
 
 /* Assert that all diagnostic assert categories are off. */
-void
+static void
 all_diag_asserts_off(WT_SESSION_IMPL *session)
 {
     for (uint16_t flag : DIAGNOSTIC_FLAGS) {
@@ -119,7 +119,7 @@ all_diag_asserts_off(WT_SESSION_IMPL *session)
 }
 
 /* Assert that all diagnostic assert categories are on. */
-void
+static void
 all_diag_asserts_on(WT_SESSION_IMPL *session)
 {
     for (uint16_t flag : DIAGNOSTIC_FLAGS) {
@@ -128,7 +128,7 @@ all_diag_asserts_on(WT_SESSION_IMPL *session)
 }
 
 /* Assert that all expected asserts (passed in via the "category" arg) fire. */
-int
+static int
 configured_asserts_abort(WT_SESSION_IMPL *session, uint16_t category)
 {
     int ret = 0;
@@ -145,7 +145,7 @@ configured_asserts_abort(WT_SESSION_IMPL *session, uint16_t category)
 }
 
 /* Assert that the expected asserts don't fire (those not passed in via the "category" arg). */
-int
+static int
 configured_asserts_off(WT_SESSION_IMPL *session, u_int16_t category)
 {
     int ret = 0;

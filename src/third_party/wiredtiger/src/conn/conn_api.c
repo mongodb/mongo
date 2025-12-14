@@ -2205,12 +2205,6 @@ __wti_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     else
         FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CORRUPTION_ABORT);
 
-    WT_RET(__wt_config_gets(session, cfg, "debug_mode.crash_point_colgroup", &cval));
-    if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_COLGROUP);
-    else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_COLGROUP);
-
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.cursor_copy", &cval));
     if (cval.val)
         FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CURSOR_COPY);

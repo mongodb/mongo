@@ -779,7 +779,6 @@ __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *
         F_SET(dsk, WT_PAGE_EMPTY_V_ALL);
     if (!disk_s.any_empty_value)
         F_SET(dsk, WT_PAGE_EMPTY_V_NONE);
-    WT_STAT_CONN_DSRC_INCR(session, cache_read_leaf_delta);
 
     /* Compute final on-disk image size using pointer difference. */
     new_image->size = WT_PTRDIFF(disk_s.p_ptr, new_image->mem);

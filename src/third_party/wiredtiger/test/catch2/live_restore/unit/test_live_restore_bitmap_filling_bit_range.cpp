@@ -68,8 +68,7 @@ TEST_CASE("Test various bitmap filling bit ranges",
     std::shared_ptr<mock_session> mock_session = mock_session::build_test_mock_session();
     WT_SESSION_IMPL *session = mock_session->get_wt_session_impl();
 
-    WTI_LIVE_RESTORE_FILE_HANDLE lr_fh;
-    WT_CLEAR(lr_fh);
+    WTI_LIVE_RESTORE_FILE_HANDLE lr_fh = {};
     // We need to have a non NULL pointer here for the encoding to take place.
     lr_fh.source = reinterpret_cast<WT_FILE_HANDLE *>(0xab);
 

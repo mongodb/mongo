@@ -16,14 +16,14 @@
  * Tests the macros for storing verbose information about the last error of the session.
  */
 
-int
+static int
 test_wt_ret_sub(
   WT_SESSION_IMPL *session_impl, int err, int sub_level_err, const char *err_msg_content)
 {
     WT_RET_SUB(session_impl, err, sub_level_err, "%s", err_msg_content);
 }
 
-int
+static int
 test_wt_err_sub(
   WT_SESSION_IMPL *session_impl, int err, int sub_level_err, const char *err_msg_content)
 {
@@ -33,13 +33,13 @@ err:
     return (ret);
 }
 
-int
+static int
 test_wt_ret_msg(WT_SESSION_IMPL *session_impl, int err, const char *err_msg_content)
 {
     WT_RET_MSG(session_impl, err, "%s", err_msg_content);
 }
 
-int
+static int
 test_wt_err_msg(WT_SESSION_IMPL *session_impl, int err, const char *err_msg_content)
 {
     WT_DECL_RET;

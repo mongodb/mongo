@@ -2118,6 +2118,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: size of tombstones restored when reading a page",
   "cache: the number of times full update inserted to history store",
   "cache: the number of times reverse modify inserted to history store",
+  "cache: time eviction worker threads spend waiting for locks (usecs)",
   "cache: total milliseconds spent inside reentrant history store evictions in a reconciliation",
   "cache: tracked bytes belonging to internal pages in the cache",
   "cache: tracked bytes belonging to internal pages in the cache from the ingest btrees",
@@ -3129,6 +3130,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_read_restored_tombstone_bytes = 0;
     stats->cache_hs_insert_full_update = 0;
     stats->cache_hs_insert_reverse_modify = 0;
+    stats->eviction_worker_lock_wait_time = 0;
     /* not clearing eviction_reentry_hs_eviction_milliseconds */
     /* not clearing cache_bytes_internal */
     /* not clearing cache_bytes_internal_ingest */
@@ -4210,6 +4212,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, cache_read_restored_tombstone_bytes);
     to->cache_hs_insert_full_update += WT_STAT_CONN_READ(from, cache_hs_insert_full_update);
     to->cache_hs_insert_reverse_modify += WT_STAT_CONN_READ(from, cache_hs_insert_reverse_modify);
+    to->eviction_worker_lock_wait_time += WT_STAT_CONN_READ(from, eviction_worker_lock_wait_time);
     to->eviction_reentry_hs_eviction_milliseconds +=
       WT_STAT_CONN_READ(from, eviction_reentry_hs_eviction_milliseconds);
     to->cache_bytes_internal += WT_STAT_CONN_READ(from, cache_bytes_internal);
