@@ -558,12 +558,15 @@ void BackgroundSync::_produce() {
     }
 
     Milliseconds denylistDuration(60000);
+    if (!fetcherReturnStatus.isOK()) {
+        LOGV2_WARNING(21120,
+                      "Oplog fetcher returned error",
+                      "error"_attr = redact(fetcherReturnStatus),
+                      "code"_attr = fetcherReturnStatus.code());
+    }
     if (fetcherReturnStatus.code() == ErrorCodes::OplogOutOfOrder) {
         // This is bad because it means that our source
         // has not returned oplog entries in ascending ts order, and they need to be.
-
-        LOGV2_WARNING(
-            21120, "Oplog fetcher returned error", "error"_attr = redact(fetcherReturnStatus));
         // Do not denylist the server here, it will be denylisted when we try to reuse it,
         // if it can't return a matching oplog start from the last fetch oplog ts field.
         return;
@@ -584,14 +587,16 @@ void BackgroundSync::_produce() {
             "Oplog fetcher discovered we are too stale to sync from sync source. Denylisting "
             "sync source",
             "syncSource"_attr = source,
-            "denylistDuration"_attr = denylistDuration);
+            "denylistDuration"_attr = denylistDuration,
+            "errorCode"_attr = fetcherReturnStatus.code());
         _replCoord->denylistSyncSource(source, Date_t::now() + denylistDuration);
     } else if (fetcherReturnStatus == ErrorCodes::InvalidBSON) {
         LOGV2_WARNING(
             5579701,
             "Oplog fetcher got invalid BSON while querying oplog. Denylisting sync source",
             "syncSource"_attr = source,
-            "denylistDuration"_attr = denylistDuration);
+            "denylistDuration"_attr = denylistDuration,
+            "errorCode"_attr = fetcherReturnStatus.code());
         _replCoord->denylistSyncSource(source, Date_t::now() + denylistDuration);
     } else if (fetcherReturnStatus.code() == ErrorCodes::ShutdownInProgress) {
         if (auto quiesceInfo = fetcherReturnStatus.extraInfo<ShutdownInProgressQuiesceInfo>()) {
