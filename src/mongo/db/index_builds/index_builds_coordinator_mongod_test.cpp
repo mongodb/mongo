@@ -394,7 +394,9 @@ TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumFailsToTurnCommitQuorumF
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 
     ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
-        operationContext(), buildUUID, HostAndPort("test1", 1234)));
+        operationContext(),
+        buildUUID,
+        repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
 
     assertGet(testFoo1Future.getNoThrow());
 }

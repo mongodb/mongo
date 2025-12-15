@@ -418,7 +418,8 @@ int ReplicationCoordinatorMock::getMyId() const {
 }
 
 HostAndPort ReplicationCoordinatorMock::getMyHostAndPort() const {
-    return HostAndPort();
+    // Set to a non-empty value to satisfy the deserializer parser.
+    return HostAndPort("test1", 1234);
 }
 
 boost::optional<int> ReplicationCoordinatorMock::getMyMaintenancePort() const {

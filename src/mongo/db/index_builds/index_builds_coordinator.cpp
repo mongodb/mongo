@@ -1593,7 +1593,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
                       gFeatureFlagIntentRegistration.isEnabled());
 
             // Override the 'signalAction' as this is an initial syncing node.
-            // Don't override it if it's a rollback abort which would be explictly requested
+            // Don't override it if it's a rollback abort which would be explicitly requested
             // by the initial sync code.
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             if (replCoord->getMemberState().startup2() &&

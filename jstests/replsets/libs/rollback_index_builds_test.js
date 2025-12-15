@@ -111,7 +111,7 @@ export class RollbackIndexBuildsTest {
 
                         var errcodes = self.expectedErrors ? self.expectedErrors : [];
                         // This test creates indexes with majority of nodes not available for
-                        // replication. So, disabling index build commit quorum.
+                        // replication, so set index build commit quorum to 1.
                         indexBuilds.push(
                             IndexBuildTest.startIndexBuild(
                                 primary,
@@ -119,7 +119,7 @@ export class RollbackIndexBuildsTest {
                                 indexSpec,
                                 {},
                                 errcodes,
-                                0,
+                                1,
                             ),
                         );
 

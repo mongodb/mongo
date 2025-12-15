@@ -678,7 +678,14 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
     if (!voteMemberList)
         return false;
 
-    bool commitQuorumSatisfied = repl::ReplicationCoordinator::get(opCtx)->isCommitQuorumSatisfied(
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (std::find(voteMemberList->begin(), voteMemberList->end(), replCoord->getMyHostAndPort()) ==
+        voteMemberList->end()) {
+        // Only after primary has committed can we proceed to check for commit quorum satisfied.
+        return false;
+    }
+
+    bool commitQuorumSatisfied = replCoord->isCommitQuorumSatisfied(
         indexBuildEntry.getCommitQuorum(), voteMemberList.value());
 
     if (!commitQuorumSatisfied)

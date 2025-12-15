@@ -680,7 +680,7 @@ protected:
     /**
      * Runs the index build on the caller thread. Handles unregistering the index build and setting
      * the index build's Promise with the outcome of the index build.
-     * 'IndexBuildOptios::replSetAndNotPrimary' is determined at the start of the index build.
+     * 'IndexBuildOptions::replSetAndNotPrimary' is determined at the start of the index build.
      */
     void _runIndexBuild(OperationContext* opCtx,
                         const UUID& buildUUID,
@@ -809,7 +809,7 @@ protected:
     /**
      * Attempt to signal the index build to commit and advance the index build to the
      * kApplyCommitOplogEntry state. Returns true if successful and false if the attempt was
-     * unnecessful and the caller should retry.
+     * unsuccessful and the caller should retry.
      */
     bool _tryCommit(OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);
     /**
