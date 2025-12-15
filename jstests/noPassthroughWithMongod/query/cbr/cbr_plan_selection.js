@@ -116,25 +116,25 @@ try {
     assert.eq(winningIndex({unique1: {$gte: 0}, unique2: {$gte: 0}}), "unique1_1_unique2_1");
     assert.eq(winningIndex({unique1: 1, unique2: {$gte: 0}}), "unique1_1_unique2_1");
 
-    // TODO(SERVER-98102): assert.eq(winningIndex({unique1: {$lt: 0}, unique2: {$lt: 0}}),
+    // TODO(SERVER-97933): assert.eq(winningIndex({unique1: {$lt: 0}, unique2: {$lt: 0}}),
     // "unique1_1_unique2_1");
-    // TODO(SERVER-98102): assert.eq(winningIndex({unique1: 1, unique2: {$lt: 0}}),
+    // TODO(SERVER-97933): assert.eq(winningIndex({unique1: 1, unique2: {$lt: 0}}),
     // "unique1_1_unique2_1");
 
     assert.eq(winningIndex({unique1: 1, constant: 1}), "unique1_1_constant_1");
     assert.eq(winningIndex({unique1: 1, constant: {$gte: 0}}), "unique1_1_constant_1");
 
     assert.eq(winningIndex({unique1: {$gte: 0}, constant: {$gte: 0}}), "unique1_1_constant_1");
-    // TODO(SERVER-98102): assert.eq(winningIndex({unique1: {$lt: 0}, constant: {$gte: 0}}),
+    // TODO(SERVER-97933): assert.eq(winningIndex({unique1: {$lt: 0}, constant: {$gte: 0}}),
     // "unique1_1_constant_1");
 
     // Always choose the index that puts the more selective predicate first
-    // TODO(SERVER-98102): assert.eq(winningIndex({unique1: 1, unique2: {$lt: 0}}),
+    // TODO(SERVER-97933): assert.eq(winningIndex({unique1: 1, unique2: {$lt: 0}}),
     // "unique1_1_unique2_1");
     assert.eq(winningIndex({unique1: {$gte: 500}, unique2: 1}), "unique2_1_unique1_1");
     assert.eq(winningIndex({unique1: {$gte: 500}, unique2: {$in: [1, 2, 3]}}), "unique2_1_unique1_1");
     assert.eq(winningIndex({unique1: 1, unique2: {$gte: 500}}), "unique1_1_unique2_1");
-    // TODO(SERVER-98102): assert.eq(winningIndex({unique1: {$lt: 0}, unique2: 1}),
+    // TODO(SERVER-97933): assert.eq(winningIndex({unique1: {$lt: 0}, unique2: 1}),
     // "unique2_1_unique1_1");
     assert.eq(winningIndex({unique1: {$gt: 500}, unique2: {$gt: 700}}), "unique2_1_unique1_1");
 
