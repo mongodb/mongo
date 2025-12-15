@@ -514,12 +514,11 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
         if (!bounds.size() && !filter) {
             return _collCard;
         }
-        // Try to estimate using transformation to match expression.
+        // TODO(SERVER-115233): This is wrong for some index bounds.
         auto matchExpr = getMatchExpressionFromBounds(bounds, filter.get());
         if (matchExpr) {
-            const auto matchExprPtr = matchExpr.get();
             return _ceCache.getOrCompute(std::move(matchExpr), [&] {
-                return _samplingEstimator->estimateCardinality(matchExprPtr);
+                return _samplingEstimator->estimateRIDs(bounds, filter.get());
             });
         }
         // Rare case, CE not cached.
@@ -627,12 +626,11 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
         ) {
             auto& bounds = static_cast<const IndexScanNode*>(node->children[0].get())->bounds;
             auto ce = [&]() -> CardinalityEstimate {
-                // Try to estimate using transformation to match expression.
+                // TODO(SERVER-115233): This is wrong for some index bounds.
                 auto matchExpr = getMatchExpressionFromBounds(bounds, node->filter.get());
                 if (matchExpr) {
-                    const auto matchExprPtr = matchExpr.get();
                     return _ceCache.getOrCompute(std::move(matchExpr), [&] {
-                        return _samplingEstimator->estimateCardinality(matchExprPtr);
+                        return _samplingEstimator->estimateRIDs(bounds, node->filter.get());
                     });
                 }
                 // Rare case, CE not cached.

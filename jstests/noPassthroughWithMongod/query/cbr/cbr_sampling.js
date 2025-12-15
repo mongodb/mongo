@@ -20,6 +20,10 @@ for (let i = 0; i < 1000; i++) {
     let doc = {a: i, b: [i - 1, i, i + 1]};
     if (i % 2 === 0) {
         doc.c = i;
+        doc.e = 0;
+    }
+    if (i % 100 === 0) {
+        doc.d = "hello";
     }
     docs.push(doc);
 }
@@ -43,8 +47,13 @@ function assertAllPlansUseSampling(query, ce) {
             assert.close(plan.cardinalityEstimate, ce, plan);
         }
         if (plan.stage !== "COLLSCAN") {
-            assert.gt(plan.inputStage.cardinalityEstimate, 0, plan);
-            assert.gt(plan.inputStage.numKeysEstimate, 0, plan);
+            if (ce > 0) {
+                assert.gt(plan.inputStage.cardinalityEstimate, 0, plan);
+                assert.gt(plan.inputStage.numKeysEstimate, 0, plan);
+            } else {
+                assert.gte(plan.inputStage.cardinalityEstimate, 0, plan);
+                assert.gte(plan.inputStage.numKeysEstimate, 0, plan);
+            }
         }
     });
 }
@@ -95,6 +104,18 @@ try {
     // this predicate should include all documents, which is 1000.
     assertAllPlansUseSampling({a: {$lt: 1000}}, 1000);
     assertAllPlansUseSampling({a: {$lt: 1000}}, 1000);
+
+    // SERVER-109891 Check that $type, $ne, $regex works
+    assertAllPlansUseSampling({a: {$type: "double"}}, 1000);
+    assertAllPlansUseSampling({a: {$ne: "test"}}, 1000);
+    assertAllPlansUseSampling({b: {$type: "double"}}, 1000);
+    assertAllPlansUseSampling({c: {$type: "double"}}, 500);
+    assertAllPlansUseSampling({e: {$ne: 0}}, 500);
+
+    assertAllPlansUseSampling({a: {$type: "string"}}, 0);
+    assertAllPlansUseSampling({d: {$type: "string"}}, 10);
+    assertAllPlansUseSampling({d: /^h/}, 10);
+    assertAllPlansUseSampling({d: /^e/}, 0);
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
