@@ -71,6 +71,8 @@ core.bson:
     - src/mongo/db/hasher* # TODO move to bson/ or at least rename to be less generic
 
 core.idl:
+  meta:
+    fully_marked: true
   files:
     - src/mongo/idl/
     - src/mongo/db/basic_types.*

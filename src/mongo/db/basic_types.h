@@ -33,11 +33,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/overloaded_visitor.h"
-
-#include <variant>
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

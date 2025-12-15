@@ -37,12 +37,12 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
@@ -60,6 +60,23 @@
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+
+// This file is mostly utilities for usage by the generated IDL parsers which are
+// considered part of the module with the .idl file, rather than the core.idl module.
+// These utilities are not for general consumption outside of this module.
+//
+// A handful of things in this file are used externally in non-generated code. The ones that should
+// be are explicitly marked PUBLIC. The ones that shouldn't are marked NEEDS_REPLACEMENT.
+//
+// TODO: Clean up this file and put everything that isn't intended to be public in a namespace like
+// idl_parser_helpers to make that clear. And probably put it in a different header then the stuff
+// that is intended to be public.
+//
+// You can use the following command to see everything used outside of generated idl parsers:
+// clang-format off
+// jq '.[] | select((.loc | startswith("src/mongo/idl/idl_parser.h")) and (.display_name | startswith("IDLParserContext") | not)) | .used_from |= map((.locs |= map(select(test("^bazel-out/.*_gen\\.(h|cpp):") | not))) | select(.locs != [] and .mod != "core.idl")) | select(.used_from != [])' merged_decls.json
+// clang-format on
+MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS;
 
 namespace mongo {
 
@@ -178,7 +195,7 @@ inline auto idlPreparsedValue(stdx::type_identity<multiversion::FeatureCompatibi
  * `type_identity<T>` argument.
  */
 template <typename T, typename... A>
-T preparsedValue(A&&... args) {
+MONGO_MOD_NEEDS_REPLACEMENT T preparsedValue(A&&... args) {
     using preparsed_value_adl_barrier::idlPreparsedValue;
     return idlPreparsedValue(stdx::type_identity<T>{}, std::forward<A>(args)...);
 }
@@ -330,8 +347,11 @@ struct BasicOrderOps<boost::optional<T>> {
  *
  * This class is responsible for throwing all error messages the IDL generated parsers throw,
  * and provide utility methods like checking a BSON type or set of BSON types.
+ *
+ * TODO: Split this class into the parts that should be public and the parts that are only for
+ * internal use by generated code.
  */
-class IDLParserContext {
+class MONGO_MOD_NEEDS_REPLACEMENT IDLParserContext {
     IDLParserContext(const IDLParserContext&) = delete;
     IDLParserContext& operator=(const IDLParserContext&) = delete;
 
@@ -543,7 +563,7 @@ private:
  * This class is used to record information about deserialization which a caller can later use to
  * perform extra parsing validation.
  */
-class DeserializationContext {
+class MONGO_MOD_PUBLIC DeserializationContext {
 public:
     /**
      * Marks that an unstable struct field was parsed.
@@ -585,7 +605,10 @@ void throwComparisonError(
  * Throw an error when a user calls a setter and it fails the comparison.
  */
 template <typename T>
-void throwComparisonError(StringData fieldName, StringData op, T actualValue, T expectedValue) {
+MONGO_MOD_NEEDS_REPLACEMENT void throwComparisonError(StringData fieldName,
+                                                      StringData op,
+                                                      T actualValue,
+                                                      T expectedValue) {
     uasserted(ErrorCodes::BadValue,
               str::stream() << "BSON field '" << fieldName << "' value must be " << op << " "
                             << expectedValue << ", actual value '" << actualValue << "'");
@@ -630,29 +653,16 @@ bool parseBoolean(BSONElement element);
  * Generated enums specialize this with their element count.
  */
 template <typename E>
-constexpr inline size_t idlEnumCount = 0;
+MONGO_MOD_PUBLIC constexpr inline size_t idlEnumCount = 0;
 
 namespace idl {
-
-/**
- * Parse an IDL-defined struct from a document, throwing an exception if any unstable fields are
- * encountered.
- */
-template <typename T>
-T parseApiStrict(const BSONObj& cmdObj, const IDLParserContext& ctx) {
-    DeserializationContext dctx;
-    auto cmd = T::parse(cmdObj, ctx, &dctx);
-    dctx.validateApiStrict();
-    return cmd;
-}
-
 /**
  * Parse an IDL-defined command from a command request document.
  * If the request includes apiStrict: true along with any unstable fields, an exception will be
  * thrown.
  */
 template <typename T>
-T parseCommandDocument(const BSONObj& cmdObj, const IDLParserContext& ctx) {
+MONGO_MOD_PUBLIC T parseCommandDocument(const BSONObj& cmdObj, const IDLParserContext& ctx) {
     DeserializationContext dctx;
     auto cmd = T::parse(cmdObj, ctx, &dctx);
     if (cmd.getGenericArguments().getApiStrict().value_or(false)) {
@@ -667,7 +677,7 @@ T parseCommandDocument(const BSONObj& cmdObj, const IDLParserContext& ctx) {
  * thrown.
  */
 template <typename T>
-T parseCommandRequest(const OpMsgRequest& req, const IDLParserContext& ctx) {
+MONGO_MOD_PUBLIC T parseCommandRequest(const OpMsgRequest& req, const IDLParserContext& ctx) {
     DeserializationContext dctx;
     auto cmd = T::parse(req, ctx, &dctx);
     if (cmd.getGenericArguments().getApiStrict().value_or(false)) {

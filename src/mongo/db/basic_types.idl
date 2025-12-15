@@ -42,6 +42,7 @@ global:
         - "mongo/util/uuid.h"
         - "mongo/idl/command_generic_argument.h"
         - "mongo/idl/basic_types_serialization.h"
+    mod_visibility: public
 
 types:
     string:

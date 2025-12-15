@@ -32,8 +32,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_parameter.h"
+#include "mongo/util/modules.h"
 
 #include <concepts>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace idl_server_parameter_detail {

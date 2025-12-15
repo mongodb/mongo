@@ -37,9 +37,12 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/util/modules.h"
 
+// This file has utilities for usage by the generated IDL parsers which are
+// considered part of the module with the .idl file, rather than the core.idl
+// module. These utilities are not for general consumption outside of this module.
+MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS;
 
-namespace MONGO_MOD_PUB mongo {
-namespace idl {
+namespace mongo::idl {
 
 // Serializers and deserializers for basic_types.idl
 
@@ -55,5 +58,4 @@ Timestamp deserializeTimestamp(const BSONElement& bsonElem);
 // Asserts that the BSONElement has bson type Timestamp.
 LogicalTime deserializeLogicalTime(const BSONElement& e);
 
-}  // namespace idl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo::idl
