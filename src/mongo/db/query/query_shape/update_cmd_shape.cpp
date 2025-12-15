@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -228,9 +229,7 @@ void UpdateCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
     }
 
     auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
-        expCtx,
-        &updateRequest,
-        makeExtensionsCallback<ExtensionsCallbackReal>(opCtx, &updateRequest.getNsString())));
+        expCtx, &updateRequest, makeExtensionsCallback<ExtensionsCallbackNoop>()));
 
     UpdateCmdShapeComponents{parsedUpdate, _components.let, opts}.appendTo(bob, opts, expCtx);
 }

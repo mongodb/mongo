@@ -30,6 +30,7 @@
 #include "mongo/db/query/query_shape/update_cmd_shape.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_shape/update_cmd_builder.h"
@@ -53,9 +54,13 @@ public:
         _expCtx = make_intrusive<ExpressionContextForTest>();
     }
 
-    std::vector<UpdateCmdShape> makeShapesFromUpdate(StringData updateCmd) {
-        auto updateRequest = UpdateCommandRequest::parseOwned(fromjson(updateCmd));
+    std::vector<UpdateCmdShape> makeShapesFromUpdate(BSONObj updateCmd) {
+        auto updateRequest = UpdateCommandRequest::parseOwned(std::move(updateCmd));
         return makeShapesFromUpdateRequest(updateRequest);
+    }
+
+    std::vector<UpdateCmdShape> makeShapesFromUpdate(StringData updateCmd) {
+        return makeShapesFromUpdate(fromjson(updateCmd));
     }
 
     std::vector<UpdateCmdShape> makeShapesFromUpdateRequest(
@@ -71,17 +76,16 @@ public:
             _expCtx = makeBlankExpressionContext(
                 _operationContext.get(), updateRequest.getNamespace(), updateRequest.getLet());
 
-            auto parsedUpdate = uassertStatusOK(
-                parsed_update_command::parse(_expCtx,
-                                             &request,
-                                             makeExtensionsCallback<ExtensionsCallbackReal>(
-                                                 _operationContext.get(), &request.getNsString())));
+            auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
+                _expCtx, &request, makeExtensionsCallback<ExtensionsCallbackNoop>()));
             shapes.emplace_back(updateRequest, parsedUpdate, _expCtx);
         }
         return shapes;
     }
 
-    UpdateCmdShape makeOneShapeFromUpdate(StringData updateCmd) {
+    template <typename T>
+    requires std::is_same_v<T, StringData> || std::is_same_v<T, BSONObj>
+    UpdateCmdShape makeOneShapeFromUpdate(T updateCmd) {
         auto shapes = makeShapesFromUpdate(updateCmd);
         ASSERT_EQ(shapes.size(), 1);
         return shapes.front();
@@ -1533,6 +1537,53 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithStageAliasesShape) {
         })",
         shape.toBson(_operationContext.get(),
                      SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, WhereUpdateShape) {
+    auto cmd = BSON(
+        "update" << "testColl" << "updates"
+                 << BSON_ARRAY(BSON(
+                        "q" << BSON("$where" << BSONCode("function(){ sleep(1000); return true;}"))
+                            << "u" << BSON("$set" << BSON("item" << "ABC123"))))
+                 << "$db" << "testDB");
+    auto shape = makeOneShapeFromUpdate(cmd);
+
+    ASSERT_BSONOBJ_EQ(  // NOLINT
+        BSON("cmdNs" << BSON("db" << "testDB" << "coll" << "testColl") << "command" << "update"
+                     << "q" << BSON("$where" << BSONCode("return ?;")) << "u"
+                     << BSON("$set" << BSON("item" << "?")) << "multi" << false << "upsert"
+                     << false),
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            cmdNs: {
+                db: "testDB",
+                coll: "testColl"
+            },
+            command: "update",
+            q: { $where: "?javascript" },
+            u: { $set: { item: "?string" } },
+            multi: false,
+            upsert: false })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            cmdNs: {
+                db: "HASH<testDB>",
+                coll: "HASH<testColl>"
+            },
+            command: "update",
+            q: { $where: "?javascript" },
+            u: { $set: { "HASH<item>": "?string" } },
+            multi: false,
+            upsert: false })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
