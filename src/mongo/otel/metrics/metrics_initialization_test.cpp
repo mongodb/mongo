@@ -34,14 +34,14 @@
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/metrics/metrics_initialization.h"
 #include "mongo/otel/metrics/metrics_settings_gen.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
 #include <opentelemetry/metrics/noop.h>
 #include <opentelemetry/metrics/provider.h>
 
-namespace mongo {
-namespace otel {
+namespace mongo::otel::metrics {
 namespace {
 
 class OtelMetricsInitializationTest : public unittest::Test {
@@ -64,44 +64,40 @@ private:
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagOtelMetrics", true};
 };
 
-bool isNoop(opentelemetry::metrics::MeterProvider* provider) {
-    return !!dynamic_cast<opentelemetry::metrics::NoopMeterProvider*>(provider);
-}
-
 TEST_F(OtelMetricsInitializationTest, NoMeterProvider) {
-    ASSERT_OK(metrics::initialize());
+    ASSERT_OK(initialize());
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    ASSERT_TRUE(isNoop(provider.get()));
+    ASSERT_TRUE(isNoopMeterProvider(provider.get()));
 }
 
 TEST_F(OtelMetricsInitializationTest, Shutdown) {
     RAIIServerParameterControllerForTest param{"openTelemetryMetricsDirectory", getMetricsPath()};
-    ASSERT_OK(metrics::initialize());
+    ASSERT_OK(initialize());
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    ASSERT_FALSE(isNoop(provider.get()));
+    ASSERT_FALSE(isNoopMeterProvider(provider.get()));
     ASSERT_NOT_EQUALS(provider.get(), nullptr);
 
-    metrics::shutdown();
+    shutdown();
     provider = opentelemetry::metrics::Provider::GetMeterProvider();
     ASSERT_EQ(provider.get(), nullptr);
 }
 
 TEST_F(OtelMetricsInitializationTest, FileMeterProvider) {
     RAIIServerParameterControllerForTest param{"openTelemetryMetricsDirectory", getMetricsPath()};
-    ASSERT_OK(metrics::initialize());
+    ASSERT_OK(initialize());
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    ASSERT_FALSE(isNoop(provider.get()));
+    ASSERT_FALSE(isNoopMeterProvider(provider.get()));
 }
 
 TEST_F(OtelMetricsInitializationTest, HttpMeterProvider) {
     RAIIServerParameterControllerForTest param{"openTelemetryMetricsHttpEndpoint",
                                                "http://localhost:4318/v1/traces"};
-    ASSERT_OK(metrics::initialize());
+    ASSERT_OK(initialize());
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    ASSERT_FALSE(isNoop(provider.get()));
+    ASSERT_FALSE(isNoopMeterProvider(provider.get()));
 }
 
 TEST_F(OtelMetricsInitializationTest, HttpAndDirectory) {
@@ -109,37 +105,37 @@ TEST_F(OtelMetricsInitializationTest, HttpAndDirectory) {
                                                    "http://localhost:4318/v1/traces"};
     RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory",
                                                         getMetricsPath()};
-    auto status = metrics::initialize();
+    auto status = initialize();
     ASSERT_FALSE(status.isOK());
     ASSERT_EQ(status.codeString(), "InvalidOptions");
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    ASSERT_TRUE(isNoop(provider.get()));
+    ASSERT_TRUE(isNoopMeterProvider(provider.get()));
 }
 
 TEST_F(OtelMetricsInitializationTest, FeatureFlagDisabledNoParams) {
     RAIIServerParameterControllerForTest featureFlagController{"featureFlagOtelMetrics", false};
-    ASSERT_OK(metrics::initialize());
+    ASSERT_OK(initialize());
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    ASSERT_TRUE(isNoop(provider.get()));
+    ASSERT_TRUE(isNoopMeterProvider(provider.get()));
 }
 
 TEST_F(OtelMetricsInitializationTest, FeatureFlagDisabledDirectorySet) {
     RAIIServerParameterControllerForTest featureFlagController{"featureFlagOtelMetrics", false};
     RAIIServerParameterControllerForTest param{"openTelemetryMetricsDirectory", getMetricsPath()};
-    ASSERT_EQ(metrics::initialize().code(), ErrorCodes::InvalidOptions);
+    ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    ASSERT_TRUE(isNoop(provider.get()));
+    ASSERT_TRUE(isNoopMeterProvider(provider.get()));
 }
 
 TEST_F(OtelMetricsInitializationTest, FeatureFlagDisabledHttpSet) {
     RAIIServerParameterControllerForTest featureFlagController{"featureFlagOtelMetrics", false};
     RAIIServerParameterControllerForTest param{"openTelemetryMetricsHttpEndpoint",
                                                "http://localhost:4318/v1/traces"};
-    ASSERT_EQ(metrics::initialize().code(), ErrorCodes::InvalidOptions);
+    ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    ASSERT_TRUE(isNoop(provider.get()));
+    ASSERT_TRUE(isNoopMeterProvider(provider.get()));
 }
 
 TEST_F(OtelMetricsInitializationTest, InvalidCompressionParam) {
@@ -148,9 +144,9 @@ TEST_F(OtelMetricsInitializationTest, InvalidCompressionParam) {
                                                        "http://localhost:4318/v1/traces"};
         RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
                                                               "foo"};
-        ASSERT_EQ(metrics::initialize().code(), ErrorCodes::InvalidOptions);
+        ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
         auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-        ASSERT_TRUE(isNoop(provider.get()));
+        ASSERT_TRUE(isNoopMeterProvider(provider.get()));
     }
 
     RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory",
@@ -158,9 +154,9 @@ TEST_F(OtelMetricsInitializationTest, InvalidCompressionParam) {
     for (const auto& value : {"gzip", "foo"}) {
         RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
                                                               value};
-        ASSERT_EQ(metrics::initialize().code(), ErrorCodes::InvalidOptions);
+        ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
         auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-        ASSERT_TRUE(isNoop(provider.get()));
+        ASSERT_TRUE(isNoopMeterProvider(provider.get()));
     }
 }
 
@@ -171,13 +167,13 @@ TEST_F(OtelMetricsInitializationTest, ValidCompressionParam) {
         for (const auto& value : {"gzip", "none"}) {
             RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
                                                                   value};
-            ASSERT_OK(metrics::initialize());
+            ASSERT_OK(initialize());
 
             auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-            ASSERT_FALSE(isNoop(provider.get()));
+            ASSERT_FALSE(isNoopMeterProvider(provider.get()));
             ASSERT_NOT_EQUALS(provider.get(), nullptr);
 
-            metrics::shutdown();
+            shutdown();
         }
     }
 
@@ -185,16 +181,15 @@ TEST_F(OtelMetricsInitializationTest, ValidCompressionParam) {
                                                         getMetricsPath()};
     RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
                                                           "none"};
-    ASSERT_OK(metrics::initialize());
+    ASSERT_OK(initialize());
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    ASSERT_FALSE(isNoop(provider.get()));
+    ASSERT_FALSE(isNoopMeterProvider(provider.get()));
     ASSERT_NOT_EQUALS(provider.get(), nullptr);
 
-    metrics::shutdown();
+    shutdown();
 }
 }  // namespace
-}  // namespace otel
-}  // namespace mongo
+}  // namespace mongo::otel::metrics
 
 #endif

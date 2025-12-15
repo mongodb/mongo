@@ -36,7 +36,7 @@
 
 #ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/metrics/meter.h>
-
+#include <opentelemetry/metrics/provider.h>
 
 namespace mongo::otel::metrics {
 
@@ -51,21 +51,18 @@ public:
 
     static MetricsService& get(ServiceContext*);
 
-    MetricsService();
-
     // TODO SERVER-114945 Remove this method once we can validate meter construction succeeded via
     // the Instruments it produces
     opentelemetry::metrics::Meter* getMeter_forTest() const {
-        return _meter.get();
+        auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+        invariant(provider, "Attempted to get the MeterProvider after shutdown() was called");
+        return provider->GetMeter(std::string{kMeterName}).get();
     }
 
     // TODO SERVER-114945 Add MetricsService::createUInt64Counter method
     // TODO SERVER-114954 Implement MetricsService::createUInt64Gauge
     // TODO SERVER-114955 Implement MetricsService::createDoubleGauge
     // TODO SERVER-115164 Implement MetricsService::createHistogram method
-
-private:
-    std::shared_ptr<opentelemetry::metrics::Meter> _meter{nullptr};
 };
 }  // namespace mongo::otel::metrics
 #else
@@ -75,8 +72,6 @@ public:
     static constexpr StringData kMeterName = "mongodb";
 
     static MetricsService& get(ServiceContext*);
-
-    MetricsService();
 };
 }  // namespace mongo::otel::metrics
 #endif

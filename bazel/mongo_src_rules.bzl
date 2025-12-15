@@ -513,6 +513,7 @@ def mongo_cc_library(
         visibility = visibility,
         deps = deps + cc_deps,
         exec_properties = exec_properties,
+        testonly = testonly,
     )
 
 def _mongo_cc_binary_and_test(

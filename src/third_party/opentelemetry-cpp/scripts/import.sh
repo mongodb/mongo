@@ -54,7 +54,6 @@ rm -rf sdk/src/logs
 # Uneeded  exporters
 rm -rf exporters/elasticsearch
 rm -rf exporters/etw
-rm -rf exporters/memory
 rm -rf exporters/ostream
 rm -rf exporters/prometheus
 rm -rf exporters/zipkin
@@ -72,6 +71,7 @@ git apply "${PATCHES_DIR}/0002-Build-system-changes-for-opentelemetry-cpp.patch"
 git apply "${PATCHES_DIR}/0003-Build-system-changes-for-opentelemetry-cpp.patch"
 git apply "${PATCHES_DIR}/0001-SERVER-100631-update-api-BUILD.patch"
 git apply "${PATCHES_DIR}/0001-SERVER-106258-vendor-OpenTelemetry-gRPC-exporter.patch"
+git apply "${PATCHES_DIR}/0004-SERVER-115315-vendor-memory-exporter.patch"
 
 cp -R ${DIST}/* ${LIBDIR}/
 echo ${DIST}

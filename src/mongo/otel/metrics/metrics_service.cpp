@@ -30,25 +30,11 @@
 
 #include "mongo/otel/metrics/metrics_service.h"
 
-#ifdef MONGO_CONFIG_OTEL
-#include <opentelemetry/metrics/provider.h>
-#endif
-
 namespace mongo::otel::metrics {
 
 namespace {
 const auto& getMetricsService = ServiceContext::declareDecoration<MetricsService>();
 }  // namespace
-
-#ifdef MONGO_CONFIG_OTEL
-MetricsService::MetricsService() {
-    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    invariant(provider, "Attempted to get the MeterProvider after shutdown() was called");
-    _meter = provider->GetMeter(std::string{kMeterName});
-}
-#else
-MetricsService::MetricsService() {}
-#endif
 
 MetricsService& MetricsService::get(ServiceContext* serviceContext) {
     return getMetricsService(serviceContext);

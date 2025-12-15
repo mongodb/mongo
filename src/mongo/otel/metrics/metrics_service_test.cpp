@@ -31,9 +31,8 @@
 
 #include "mongo/config.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/metrics/metrics_initialization.h"
-#include "mongo/unittest/temp_dir.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 #include <opentelemetry/metrics/provider.h>
@@ -42,41 +41,19 @@
 namespace mongo::otel::metrics {
 namespace {
 
-/**
- * Helper class that initializes OpenTelemetry metrics before ServiceContextTest
- * creates the ServiceContext. This ensures MetricsService decoration gets a real
- * SDK MeterProvider instead of a NoopMeterProvider.
- */
-class MetricsInitializationHelper {
-public:
-    MetricsInitializationHelper()
-        : _featureFlagController("featureFlagOtelMetrics", true),
-          _directoryController("openTelemetryMetricsDirectory", _tempMetricsDir.path()) {
-        // Initialize metrics before ServiceContext is created
-        auto status = metrics::initialize();
-        invariant(status.isOK(), status.reason());
-    }
 
-    ~MetricsInitializationHelper() {
-        metrics::shutdown();
-    }
+class MetricsServiceTest : public ServiceContextTest {};
 
-private:
-    unittest::TempDir _tempMetricsDir{"otel_metrics_test"};
-    RAIIServerParameterControllerForTest _featureFlagController;
-    RAIIServerParameterControllerForTest _directoryController;
-};
-
-// MetricsInitializationHelper must come before ServiceContextTest in inheritance
-// so that metrics are initialized before ServiceContext is created.
-class MetricsServiceTest : public MetricsInitializationHelper, public ServiceContextTest {};
-
+// Assert that when a valid MeterProvider in place, we create a working Meter implementation with
+// the expected metadata.
 TEST_F(MetricsServiceTest, MeterIsInitialized) {
+    // Set up a valid MeterProvider.
+    OtelMetricsCapturer metricsCapturer;
+
     const auto& metricsService = MetricsService::get(getServiceContext());
     auto* meter = metricsService.getMeter_forTest();
     ASSERT_TRUE(meter);
 
-    // Cast to SDK Meter to access GetInstrumentationScope
     auto* sdkMeter = dynamic_cast<opentelemetry::sdk::metrics::Meter*>(meter);
     ASSERT_TRUE(sdkMeter);
 
@@ -85,18 +62,11 @@ TEST_F(MetricsServiceTest, MeterIsInitialized) {
     ASSERT_EQ(scope->GetName(), std::string{MetricsService::kMeterName});
 }
 
-// Assert that we create a NoopMeter if the global MeterProvider hasn't been set before
-// initialization.
-class MetricsServiceBadInitializationTest : public ServiceContextTest {};
-
-bool isNoop(opentelemetry::metrics::Meter* provider) {
-    return !!dynamic_cast<opentelemetry::metrics::NoopMeter*>(provider);
-}
-
-TEST_F(MetricsServiceBadInitializationTest, ServiceContextInitBeforeMeterProvider) {
+// Assert that we create a NoopMeter if the global MeterProvider hasn't been set.
+TEST_F(MetricsServiceTest, ServiceContextInitBeforeMeterProvider) {
     const auto& metricsService = MetricsService::get(getServiceContext());
     auto* meter = metricsService.getMeter_forTest();
-    ASSERT_TRUE(isNoop(meter));
+    ASSERT_TRUE(isNoopMeter(meter));
 }
 
 }  // namespace
