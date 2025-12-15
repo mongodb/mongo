@@ -31,10 +31,21 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/util/str.h"
 
 namespace mongo::join_ordering {
 namespace {
+NodeSet getBitset(const JoinPlanNode& node) {
+    return std::visit(
+        OverloadedVisitor{[](const JoiningNode& join) { return join.bitset; },
+                          [](const INLJRHSNode& ip) { return NodeSet().set(ip.node); },
+                          [](const BaseNode& base) {
+                              return NodeSet().set(base.node);
+                          }},
+        node);
+}
+
 /**
  * Helper to pretty-print NodeSet.
  */
@@ -57,20 +68,29 @@ std::string joinMethodToString(JoinMethod method) {
 
     MONGO_UNREACHABLE_TASSERT(11336901);
 }
+
+std::string joinNodeStringPrefix(const JoinPlanNode& node,
+                                 size_t numNodesToPrint,
+                                 std::string indentStr) {
+    return str::stream() << indentStr << "[" << nodeSetToString(getBitset(node), numNodesToPrint)
+                         << "]";
+}
 }  // namespace
 
 std::string BaseNode::toString(size_t numNodesToPrint, std::string indentStr) const {
-    return str::stream() << indentStr << "[" << nodeSetToString(bitset, numNodesToPrint) << "]["
+    return str::stream() << joinNodeStringPrefix(*this, numNodesToPrint, indentStr) << "["
                          << nss.toString_forTest() << "] " << soln->summaryString();
 }
 
-std::string JoiningNode::toString(size_t numNodesToPrint, std::string indentStr) const {
-    auto ss = std::stringstream() << indentStr << "[" << nodeSetToString(bitset, numNodesToPrint)
-                                  << "] ";
-    const auto methodStr = joinMethodToString(method);
+std::string INLJRHSNode::toString(size_t numNodesToPrint, std::string indentStr) const {
+    return str::stream() << joinNodeStringPrefix(*this, numNodesToPrint, indentStr) << "["
+                         << nss.toString_forTest() << "] INDEX_PROBE "
+                         << entry->descriptor()->keyPattern();
+}
 
-    ss << methodStr;
-    return ss.str();
+std::string JoiningNode::toString(size_t numNodesToPrint, std::string indentStr) const {
+    return str::stream() << joinNodeStringPrefix(*this, numNodesToPrint, indentStr) << " "
+                         << joinMethodToString(method);
 }
 
 std::string JoinSubset::toString(size_t numNodesToPrint) const {
@@ -91,11 +111,19 @@ JoinPlanNodeId JoinPlanNodeRegistry::registerJoinNode(const JoinSubset& subset,
     return id;
 }
 
-JoinPlanNodeId JoinPlanNodeRegistry::registerBaseNode(const JoinSubset& subset,
+JoinPlanNodeId JoinPlanNodeRegistry::registerBaseNode(NodeId node,
                                                       const QuerySolution* soln,
                                                       const NamespaceString& nss) {
+    tassert(11371702, "Expected an initialized qsn", soln);
     JoinPlanNodeId id = _allJoinPlans.size();
-    _allJoinPlans.emplace_back(BaseNode{soln, nss, subset.subset});
+    _allJoinPlans.emplace_back(BaseNode{soln, nss, node});
+    return id;
+}
+
+JoinPlanNodeId JoinPlanNodeRegistry::registerINLJRHSNode(
+    NodeId node, std::shared_ptr<const IndexCatalogEntry> entry, const NamespaceString& nss) {
+    JoinPlanNodeId id = _allJoinPlans.size();
+    _allJoinPlans.emplace_back(INLJRHSNode{std::move(entry), nss, node});
     return id;
 }
 
@@ -106,6 +134,9 @@ std::string JoinPlanNodeRegistry::joinPlanNodeToString(JoinPlanNodeId nodeId,
     const auto& node = get(nodeId);
     std::visit(OverloadedVisitor{
                    [&indentStr, &ss, numNodesToPrint](const BaseNode& n) {
+                       ss << n.toString(numNodesToPrint, indentStr);
+                   },
+                   [&indentStr, &ss, numNodesToPrint](const INLJRHSNode& n) {
                        ss << n.toString(numNodesToPrint, indentStr);
                    },
                    [this, &indentStr, &ss, numNodesToPrint](const JoiningNode& n) {
@@ -135,24 +166,34 @@ std::string JoinPlanNodeRegistry::joinPlansToString(const JoinPlans& plans,
 }
 
 NodeSet JoinPlanNodeRegistry::getBitset(JoinPlanNodeId id) const {
-    return std::visit([](const auto& n) { return n.bitset; }, get(id));
+    return std::visit(
+        OverloadedVisitor{[](const JoiningNode& join) { return join.bitset; },
+                          [](const INLJRHSNode& ip) { return NodeSet().set(ip.node); },
+                          [](const BaseNode& base) {
+                              return NodeSet().set(base.node);
+                          }},
+        get(id));
 }
 
 BSONObj JoinPlanNodeRegistry::joinPlanNodeToBSON(JoinPlanNodeId nodeId,
                                                  size_t numNodesToPrint) const {
     return std::visit(
-        OverloadedVisitor{[this, numNodesToPrint](const JoiningNode& join) {
-                              return BSON("subset"
-                                          << nodeSetToString(join.bitset, numNodesToPrint)
-                                          << "method" << joinMethodToString(join.method) << "left"
-                                          << joinPlanNodeToBSON(join.left, numNodesToPrint)
-                                          << "right"
-                                          << joinPlanNodeToBSON(join.right, numNodesToPrint));
-                          },
-                          [numNodesToPrint](const BaseNode& base) {
-                              return BSON("subset" << nodeSetToString(base.bitset, numNodesToPrint)
-                                                   << "accessPath" << base.soln->summaryString());
-                          }},
+        OverloadedVisitor{
+            [this, numNodesToPrint](const JoiningNode& join) {
+                return BSON("subset" << nodeSetToString(join.bitset, numNodesToPrint) << "method"
+                                     << joinMethodToString(join.method) << "left"
+                                     << joinPlanNodeToBSON(join.left, numNodesToPrint) << "right"
+                                     << joinPlanNodeToBSON(join.right, numNodesToPrint));
+            },
+            [numNodesToPrint](const INLJRHSNode& ip) {
+                return BSON("subset" << nodeSetToString(ip.node, numNodesToPrint) << "accessPath"
+                                     << (str::stream() << "INDEX_PROBE "
+                                                       << ip.entry->descriptor()->keyPattern()));
+            },
+            [numNodesToPrint](const BaseNode& base) {
+                return BSON("subset" << nodeSetToString(base.node, numNodesToPrint) << "accessPath"
+                                     << base.soln->summaryString());
+            }},
         get(nodeId));
 }
 

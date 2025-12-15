@@ -85,7 +85,7 @@ DEATH_TEST(PlanEnumeratorHelpersDeathTest, TooManyInvocationsOfCombinationSequen
 
 class JoinPlanEnumeratorTest : public JoinOrderingTestFixture {
 public:
-    void initGraph(size_t numNodes) {
+    void initGraph(size_t numNodes, bool withIndexes = false) {
         for (size_t i = 0; i < numNodes; i++) {
             auto nss =
                 NamespaceString::createNamespaceString_forTest("test", str::stream() << "nss" << i);
@@ -95,19 +95,27 @@ public:
             jCtx.cbrCqQsns.insert(
                 {cq.get(), makeCollScanPlan(nss, cq->getPrimaryMatchExpression()->clone())});
             ASSERT_TRUE(graph.addNode(nss, std::move(cq), boost::none).has_value());
+
+            if (withIndexes) {
+                jCtx.perCollIdxs.emplace(
+                    nss, makeIndexCatalogEntries({BSON(fieldName << (i % 2 ? 1 : -1))}));
+            }
+
+            resolvedPaths.emplace_back(ResolvedPath{(NodeId)i, FieldPath(fieldName)});
         }
     }
 
     void testLargeSubset(unittest::GoldenTestContext* goldenCtx,
                          PlanTreeShape shape,
-                         size_t numNodes) {
-        initGraph(numNodes);
+                         size_t numNodes,
+                         bool withIndexes = false) {
+        initGraph(numNodes, withIndexes);
 
         for (size_t i = 1; i < numNodes; ++i) {
             // Make the graph fully connected in order to ensure we generate as many plans as
             // possible.
             for (size_t j = 0; j < i; ++j) {
-                ASSERT_TRUE(graph.addSimpleEqualityEdge((NodeId)j, (NodeId)i, 0, 1).has_value());
+                ASSERT_TRUE(graph.addSimpleEqualityEdge((NodeId)j, (NodeId)i, j, i).has_value());
             }
         }
 
@@ -290,14 +298,29 @@ TEST_F(JoinPlanEnumeratorTest, LeftDeep8Nodes) {
     testLargeSubset(&goldenCtx, PlanTreeShape::LEFT_DEEP, 8);
 }
 
+TEST_F(JoinPlanEnumeratorTest, LeftDeep8NodesINLJ) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    testLargeSubset(&goldenCtx, PlanTreeShape::LEFT_DEEP, 8, true /* withIndexes */);
+}
+
 TEST_F(JoinPlanEnumeratorTest, RightDeep8Nodes) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     testLargeSubset(&goldenCtx, PlanTreeShape::RIGHT_DEEP, 8);
 }
 
+TEST_F(JoinPlanEnumeratorTest, RightDeep8NodesINLJ) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    testLargeSubset(&goldenCtx, PlanTreeShape::RIGHT_DEEP, 8, true /* withIndexes */);
+}
+
 TEST_F(JoinPlanEnumeratorTest, ZigZag8Nodes) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     testLargeSubset(&goldenCtx, PlanTreeShape::ZIG_ZAG, 8);
+}
+
+TEST_F(JoinPlanEnumeratorTest, ZigZag8NodesINLJ) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    testLargeSubset(&goldenCtx, PlanTreeShape::ZIG_ZAG, 8, true /* withIndexes */);
 }
 
 TEST_F(JoinPlanEnumeratorTest, InitialzeLargeSubsets) {

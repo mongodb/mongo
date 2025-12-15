@@ -35,6 +35,9 @@
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry_mock.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_mock.h"
 #include "mongo/unittest/golden_test_base.h"
 #include "mongo/util/modules.h"
 
@@ -45,6 +48,16 @@ namespace mongo::join_ordering {
  */
 MultipleCollectionAccessor multipleCollectionAccessor(OperationContext* opCtx,
                                                       std::vector<NamespaceString> namespaces);
+
+/**
+ * Helpers used to mock index information for unit tests without requiring a
+ * MultipleCollectionAccessor.
+ */
+IndexDescriptor makeIndexDescriptor(BSONObj indexSpec);
+IndexCatalogEntryMock makeIndexCatalogEntry(BSONObj indexSpec);
+IndexCatalogMock makeIndexCatalog(const std::vector<BSONObj>& keyPatterns);
+std::vector<std::shared_ptr<const IndexCatalogEntry>> makeIndexCatalogEntries(
+    const std::vector<BSONObj>& keyPatterns);
 
 /**
  * Text fixture with helpful functions for manipulating the catalog, constructing samples and

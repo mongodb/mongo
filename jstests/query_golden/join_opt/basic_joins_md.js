@@ -139,21 +139,41 @@ function runBasicJoinTest(pipeline) {
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false, true /* noLineBreak*/);
         const seed420HJResults = coll.aggregate(pipeline).toArray();
         verifyExplainOutput(pipeline, true /* joinOptExpectedInExplainOutput */);
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, seed420HJResults),
+            "Results differ between no join opt and seed 420 HJ",
+        );
 
         assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinReorderDefaultToHashJoin: false}));
-
         foreignColl1.createIndex({a: 1});
         foreignColl2.createIndex({b: 1});
         subSection("With fixed order, index join");
+
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false, true /* noLineBreak*/);
-        const seedINJResults = coll.aggregate(pipeline).toArray();
         verifyExplainOutput(pipeline, true /* joinOptExpectedInExplainOutput */);
+        const seedINLJResults = coll.aggregate(pipeline).toArray();
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, seedINLJResults),
+            "Results differ between no join opt and INLJ",
+        );
+
+        subSection("With bottom-up plan enumeration and indexes");
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalJoinReorderMode: "bottomUp",
+                internalJoinPlanTreeShape: "leftDeep",
+            }),
+        );
+        outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
+        const bottomUpINLJResults = coll.aggregate(pipeline).toArray();
+        assert(
+            _resultSetsEqualUnordered(noJoinOptResults, bottomUpINLJResults),
+            "Results differ between no join opt and INLJ",
+        );
+
         foreignColl1.dropIndex({a: 1});
         foreignColl2.dropIndex({b: 1});
-        assert(
-            _resultSetsEqualUnordered(noJoinOptResults, seedINJResults),
-            "Results differ between no join opt and INJ",
-        );
     } finally {
         // Reset flags.
         assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));

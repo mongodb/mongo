@@ -30,6 +30,7 @@
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
@@ -173,6 +174,10 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoinPlan(const JoinReorderingCont
                                  [&qsn](const BaseNode& base) {
                                      // TODO SERVER-111913: Avoid this clone
                                      qsn = base.soln->root()->clone();
+                                 },
+                                 [&ctx, &qsn, &registry](const INLJRHSNode& ip) {
+                                     qsn = createIndexProbeQSN(ctx.joinGraph.getNode(ip.node),
+                                                               ip.entry);
                                  }},
                registry.get(nodeId));
     return qsn;
@@ -187,9 +192,11 @@ NodeId getLeftmostNodeIdOfJoinPlan(const JoinReorderingContext& ctx,
                                             return getLeftmostNodeIdOfJoinPlan(
                                                 ctx, join.left, registry);
                                         },
-                                        [](const BaseNode& base) {
-                                            BitsetIterator<kMaxNodesInJoin> it = begin(base.bitset);
-                                            return (NodeId)*it;
+                                        [](const BaseNode& base) { return base.node; },
+                                        [](const INLJRHSNode&) {
+                                            // By definition, this should never happen.
+                                            MONGO_UNREACHABLE_TASSERT(11371704);
+                                            return (NodeId)0;
                                         }},
                       registry.get(nodeId));
 }

@@ -106,7 +106,7 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
     return AggJoinModel::pipelineEligibleForJoinReordering(pipeline);
 }
 
-bool indexIsValidForINLJ(std::shared_ptr<const IndexCatalogEntry> ice) {
+bool indexIsValidForINLJ(const std::shared_ptr<const IndexCatalogEntry>& ice) {
     auto desc = ice->descriptor();
     return !desc->isHashedIdIndex() && !desc->hidden() && !desc->isPartial() && !desc->isSparse() &&
         desc->collation().isEmpty() && !dynamic_cast<WildcardAccessMethod*>(ice->accessMethod());
@@ -121,8 +121,7 @@ AvailableIndexes extractINLJEligibleIndexes(const QuerySolutionMap& solns,
     AvailableIndexes perCollIdxs;
     for (const auto& [cq, _] : solns) {
         const auto& ns = cq->nss();
-        auto it = perCollIdxs.find(ns);
-        if (it != perCollIdxs.end()) {
+        if (perCollIdxs.contains(ns)) {
             // We've already pre-processed this collection's indexes.
             continue;
         }

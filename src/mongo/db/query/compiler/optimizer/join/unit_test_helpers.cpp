@@ -36,6 +36,35 @@ namespace mongo::join_ordering {
 
 using namespace cost_based_ranker;
 
+IndexDescriptor makeIndexDescriptor(BSONObj indexSpec) {
+    IndexSpec spec;
+    spec.version(2).name("name").addKeys(indexSpec);
+    return IndexDescriptor(IndexNames::BTREE, spec.toBSON());
+}
+
+IndexCatalogEntryMock makeIndexCatalogEntry(BSONObj indexSpec) {
+    return IndexCatalogEntryMock{nullptr /*opCtx*/,
+                                 CollectionPtr{},
+                                 "" /*ident*/,
+                                 makeIndexDescriptor(indexSpec),
+                                 false /*isFrozen*/};
+}
+
+IndexCatalogMock makeIndexCatalog(const std::vector<BSONObj>& keyPatterns) {
+    IndexCatalogMock catalog;
+    for (auto&& kp : keyPatterns) {
+        catalog.createIndexEntry(nullptr, nullptr, makeIndexDescriptor(kp), {});
+    }
+    return catalog;
+}
+
+std::vector<std::shared_ptr<const IndexCatalogEntry>> makeIndexCatalogEntries(
+    const std::vector<BSONObj>& keyPatterns) {
+    auto ic = makeIndexCatalog(keyPatterns);
+    std::vector<std::shared_ptr<const IndexCatalogEntry>> idxs(keyPatterns.size());
+    return ic.getEntriesShared(IndexCatalog::InclusionPolicy::kReady);
+}
+
 MultipleCollectionAccessor multipleCollectionAccessor(OperationContext* opCtx,
                                                       std::vector<NamespaceString> namespaces) {
     auto mainAcquisitionReq = CollectionAcquisitionRequest::fromOpCtx(

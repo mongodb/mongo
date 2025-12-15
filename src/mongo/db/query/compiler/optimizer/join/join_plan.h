@@ -31,6 +31,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/util/bitset_util.h"
 #include "mongo/util/modules.h"
 
 #include <variant>
@@ -40,9 +41,10 @@ namespace mongo::join_ordering {
 // Forward declarations.
 struct JoiningNode;
 struct BaseNode;
+struct INLJRHSNode;
 
 using JoinPlanNodeId = size_t;
-using JoinPlanNode = std::variant<JoiningNode, BaseNode>;
+using JoinPlanNode = std::variant<JoiningNode, BaseNode, INLJRHSNode>;
 using JoinPlans = std::vector<JoinPlanNodeId>;
 
 /**
@@ -62,6 +64,11 @@ struct JoinSubset {
 
     inline bool isBaseCollectionAccess() const {
         return subset.count() == 1;
+    }
+
+    NodeId getNodeId() const {
+        tassert(11371703, "Must have just one node", isBaseCollectionAccess());
+        return (NodeId)*begin(subset);
     }
 
     inline JoinPlanNodeId bestPlan() const {
@@ -99,11 +106,29 @@ enum class JoinMethod {
 struct BaseNode {
     // Pointer to best access path obtained by CBR.
     const QuerySolution* soln;
+
     // Namespace this access path corresponds to.
     const NamespaceString& nss;
 
-    // Keeps a copy of the bitset representing the subgraph this originated from.
-    const NodeSet bitset;
+    // Corresponds to node in the graph this represents a base table access to.
+    const NodeId node;
+
+    std::string toString(size_t numNodesToPrint = kMaxNodesInJoin,
+                         std::string indentStr = "") const;
+};
+
+/**
+ * A JoinPlan node representing the right hand side of a INLJ join (an index probe).
+ */
+struct INLJRHSNode {
+    // The index that will be used to construct an IndexProbe QSN.
+    std::shared_ptr<const IndexCatalogEntry> entry;
+
+    // Namespace this access path corresponds to.
+    const NamespaceString& nss;
+
+    // Corresponds to node in the graph this represents a base table access to.
+    const NodeId node;
 
     std::string toString(size_t numNodesToPrint = kMaxNodesInJoin,
                          std::string indentStr = "") const;
@@ -146,9 +171,12 @@ public:
                                     JoinMethod method,
                                     JoinPlanNodeId left,
                                     JoinPlanNodeId right);
-    JoinPlanNodeId registerBaseNode(const JoinSubset& subset,
+    JoinPlanNodeId registerBaseNode(NodeId node,
                                     const QuerySolution* soln,
                                     const NamespaceString& nss);
+    JoinPlanNodeId registerINLJRHSNode(NodeId node,
+                                       std::shared_ptr<const IndexCatalogEntry> entry,
+                                       const NamespaceString& nss);
 
     const JoinPlanNode& get(JoinPlanNodeId id) const {
         return _allJoinPlans[id];

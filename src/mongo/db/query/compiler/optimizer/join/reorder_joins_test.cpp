@@ -35,9 +35,6 @@
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
-#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
-#include "mongo/db/shard_role/shard_catalog/index_catalog_entry_mock.h"
-#include "mongo/db/shard_role/shard_catalog/index_catalog_mock.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -53,36 +50,6 @@ QuerySolutionMap cloneSolnMap(const QuerySolutionMap& qsm) {
         ret.insert({cq, std::move(newQs)});
     }
     return ret;
-}
-
-IndexDescriptor makeIndexDescriptor(BSONObj indexSpec) {
-
-    IndexSpec spec;
-    spec.version(2).name("name").addKeys(indexSpec);
-    return IndexDescriptor(IndexNames::BTREE, spec.toBSON());
-}
-
-IndexCatalogEntryMock makeIndexCatalogEntry(BSONObj indexSpec) {
-    return IndexCatalogEntryMock{nullptr /*opCtx*/,
-                                 CollectionPtr{},
-                                 "" /*ident*/,
-                                 makeIndexDescriptor(indexSpec),
-                                 false /*isFrozen*/};
-}
-
-IndexCatalogMock makeIndexCatalog(const std::vector<BSONObj>& keyPatterns) {
-    IndexCatalogMock catalog;
-    for (auto&& kp : keyPatterns) {
-        catalog.createIndexEntry(nullptr, nullptr, makeIndexDescriptor(kp), {});
-    }
-    return catalog;
-}
-
-std::vector<std::shared_ptr<const IndexCatalogEntry>> makeIndexCatalogEntries(
-    const std::vector<BSONObj>& keyPatterns) {
-    auto ic = makeIndexCatalog(keyPatterns);
-    std::vector<std::shared_ptr<const IndexCatalogEntry>> idxs(keyPatterns.size());
-    return ic.getEntriesShared(IndexCatalog::InclusionPolicy::kReady);
 }
 
 class ReorderGraphTest : public JoinOrderingTestFixture {
