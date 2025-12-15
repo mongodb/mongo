@@ -45,17 +45,12 @@ static std::vector<std::string> verifyPath(std::vector<std::string> path) {
     return path;
 }
 
-MultiKeyDottedPathIterator::MultiKeyDottedPathIterator(const BSONObj* obj, const std::string& path)
-    : _obj(obj), _components(verifyPath(absl::StrSplit(path, "."))) {
+MultiKeyDottedPathIterator::MultiKeyDottedPathIterator(const std::string& path)
+    : _obj(&nullObj), _components(verifyPath(absl::StrSplit(path, "."))) {
     _stack.reserve(_components.size());
 }
-void MultiKeyDottedPathIterator::resetObj(const BSONObj* obj) {
-    _obj = obj;
-    _initialized = false;
-    _stack.clear();
-}
 
-std::pair<BSONElement, bool> MultiKeyDottedPathIterator::_nextElementResume() {
+BSONElement MultiKeyDottedPathIterator::getNext() {
     auto&& [iterator, pathIndex] = *_stack.rbegin();
     auto elem = iterator.next();
 
@@ -68,15 +63,27 @@ std::pair<BSONElement, bool> MultiKeyDottedPathIterator::_nextElementResume() {
     return _getFirstElementRooted(pathIndex + 1, elem);
 }
 
+static bool isNumericPathComponent(const std::string& component) {
+    return (component.size() == 1 || component[0] != '0') && str::isAllDigits(component);
+}
 
-std::pair<BSONElement, bool> MultiKeyDottedPathIterator::_getFirstElementRootedArray(
-    size_t idx, BSONElement arr) {
+
+BSONElement MultiKeyDottedPathIterator::_getFirstElementRootedArray(size_t idx, BSONElement arr) {
+    if (idx + 1 < _components.size() && isNumericPathComponent(_components[idx + 1])) {
+        const BSONElement nestedElement = arr.embeddedObject()[_components[idx + 1]];
+        if (nestedElement.type() != BSONType::array ||
+            (idx + 2 == _components.size() &&
+             !nestedElement.embeddedObject().firstElement().eoo())) {
+            return _getFirstElementRooted(idx + 2, nestedElement);
+        }
+        arr = nestedElement;
+        idx++;
+    }
     auto it = BSONObjIterator(arr.embeddedObject());
     if (!it.more()) {
         // Empty array
         // Yield undefined if leaf, null otherwise.
-        return std::make_pair((idx == _components.size() - 1) ? undefinedElt : nullElt,
-                              _stack.size() == 0);
+        return (idx == _components.size() - 1) ? undefinedElt : nullElt;
     }
     auto item = it.next();
     if (it.more()) {

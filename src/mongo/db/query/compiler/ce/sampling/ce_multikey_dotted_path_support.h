@@ -44,73 +44,60 @@ namespace mongo::ce {
  * Returns undefined for leaf empty arrays, null for non-leaf
  * empty arrays.
  * This essentially emulates the behaviour of multikey indices.
- * [obj] must stay valid throughout its iteration.
  */
 class MultiKeyDottedPathIterator {
 public:
-    MultiKeyDottedPathIterator(const BSONObj* obj, const std::string& path);
+    MultiKeyDottedPathIterator(const std::string& path);
     // Changes the object the iterator is working with.
-    // The next call to nextElement() starts from scratch.
-    void resetObj(const BSONObj* obj);
-    // Returns the next BSONElement the btree key generator
+    // Returns the first BSONElement the btree key generator
     // would use in the keystring for this field (referred to
     // later as a "multikey element").
-    // If the second field is true, there are no more
-    // elements to iterate over.
     // Note that because of the way the btree key generator
-    // works, iterating over an object always returns at least
-    // one multikey element.
+    // works, the first multikey element always exists.
+    // The next call to getNext/hasNext starts from scratch.
+    // [obj] must stay valid throughout its iteration.
+    MONGO_COMPILER_ALWAYS_INLINE BSONElement resetObj(const BSONObj* obj) {
+        _obj = obj;
+        _stack.clear();
+        return _getFirstElementRooted(0, *_obj);
+    }
+    // Returns the next multikey element for this field.
     // Do not call this past the end of the iteration.
-    MONGO_COMPILER_ALWAYS_INLINE std::pair<BSONElement, bool> nextElement() {
-        if (!_initialized) {
-            // Accessing the very first element
-            _initialized = true;
-            return _getFirstElementRooted(0, *_obj);
-        } else {
-            return _nextElementResume();
-        }
+    BSONElement getNext();
+    // Returns if there are further multikey elements to
+    // iterate.
+    MONGO_COMPILER_ALWAYS_INLINE bool hasNext() const {
+        return _stack.size() > 0;
     }
 
 private:
-    // Resumes an existing iteration. Called by nextElement().
-    std::pair<BSONElement, bool> _nextElementResume();
     // Given an array, extracts the first multikey element from it
     // by unwinding it.
     // [rootIdx] is the index of the current path component.
-    std::pair<BSONElement, bool> _getFirstElementRootedArray(size_t rootIdx, BSONElement arr);
+    BSONElement _getFirstElementRootedArray(size_t rootIdx, BSONElement arr);
     // Given a BSON element, extracts the first multikey element from it.
     // If the given element is an array, unwinds it.
-    MONGO_COMPILER_ALWAYS_INLINE std::pair<BSONElement, bool> _getFirstElementRooted(
-        size_t idx, BSONElement elem) {
+    MONGO_COMPILER_ALWAYS_INLINE BSONElement _getFirstElementRooted(size_t idx, BSONElement elem) {
         for (; idx < _components.size(); idx++) {
-            const BSONType elemType = elem.type();
-            if (elemType != BSONType::array && elemType != BSONType::object) {
-                return std::make_pair(nullElt, _stack.size() == 0);
+            if (elem.type() != BSONType::array && elem.type() != BSONType::object) {
+                return nullElt;
             }
 
             const BSONObj obj = elem.embeddedObject();
-            const BSONElement nestedElem = obj[_components[idx]];
-            if (nestedElem.type() == BSONType::eoo) {
-                return std::make_pair(nullElt, _stack.size() == 0);
-            }
+            elem = obj[_components[idx]];
 
-            if (nestedElem.type() == BSONType::array) {
-                return _getFirstElementRootedArray(idx, nestedElem);
-            } else {
-                elem = nestedElem;
+            if (elem.type() == BSONType::array) {
+                return _getFirstElementRootedArray(idx, elem);
             }
         }
 
-        return std::make_pair(elem, _stack.size() == 0);
+        return elem.eoo() ? nullElt : elem;
     }
     // Given a BSON object, extracts the first multikey element from it.
     // If the given element is an array, unwinds it.
-    MONGO_COMPILER_ALWAYS_INLINE std::pair<BSONElement, bool> _getFirstElementRooted(
-        size_t idx, const BSONObj& obj) {
+    MONGO_COMPILER_ALWAYS_INLINE BSONElement _getFirstElementRooted(size_t idx,
+                                                                    const BSONObj& obj) {
         const BSONElement nestedElem = obj[_components[idx]];
-        if (nestedElem.type() == BSONType::eoo) {
-            return std::make_pair(nullElt, _stack.size() == 0);
-        }
 
         if (nestedElem.type() == BSONType::array) {
             return _getFirstElementRootedArray(idx, nestedElem);
@@ -121,11 +108,7 @@ private:
 
 private:
     const BSONObj* _obj;
-    std::vector<std::string> _components;
-    // True if nextElement() has ever been called
-    // since the iterator was constructed or the last
-    // call to resetObj().
-    bool _initialized = false;
+    const std::vector<std::string> _components;
     // As we are iterating the object, we need to keep track of
     // the arrays (as we need to unwind them).
     // We do this by pushing (iterator, path index) pairs to a stack.

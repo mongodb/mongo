@@ -190,20 +190,16 @@ public:
                                 BSONComparatorInterfaceBase<BSONElement>::Hasher,
                                 BSONComparatorInterfaceBase<BSONElement>::EqualTo>;
 
-        if (sample.size() == 0) {
-            return;
-        }
         const auto bsonElmComparator =
             BSONElementComparator(BSONElementComparator::FieldNamesMode::kIgnore, nullptr);
         const auto hasher = BSONComparatorInterfaceBase<BSONElement>::Hasher(&bsonElmComparator);
         const auto equalTo = BSONComparatorInterfaceBase<BSONElement>::EqualTo(&bsonElmComparator);
         std::vector<MultiKeyDottedPathIterator> iterators;
         // TODO(SERVER-114759) Optimize non-multikey indices
-        std::transform(
-            bounds.fields.begin(),
-            bounds.fields.end(),
-            std::back_inserter(iterators),
-            [&](auto&& oil) { return MultiKeyDottedPathIterator(&sample[0], oil.name); });
+        std::transform(bounds.fields.begin(),
+                       bounds.fields.end(),
+                       std::back_inserter(iterators),
+                       [&](auto&& oil) { return MultiKeyDottedPathIterator(oil.name); });
         BSONElementSet elemSet(0, hasher, equalTo);
 
         // TODO(SERVER-114756): We can be more clever with retrieving the fields
@@ -215,23 +211,23 @@ public:
             for (size_t fieldIdx = 0; fieldIdx < iterators.size() && count > 0; fieldIdx++) {
                 auto&& it = iterators[fieldIdx];
                 const auto& oil = bounds.fields[fieldIdx];
-                it.resetObj(&sample[sampleIdx]);
                 elemSet.clear();
 
-                auto [element, isLast] = it.nextElement();
-                // The first element will always be there
                 size_t elementCount = 0;
+                BSONElement element = it.resetObj(&sample[sampleIdx]);
+                bool hasNext;
                 while (true) {
+                    hasNext = it.hasNext();
                     if (elemSet.insert(element).second) {
                         elementCount += matches(oil, element);
                         if (elementCount > 0 && skipDuplicateMatches) {
                             break;
                         }
                     }
-                    if (isLast) {
+                    if (!hasNext) {
                         break;
                     }
-                    std::tie(element, isLast) = it.nextElement();
+                    element = it.getNext();
                 }
                 if (elementCount != 1) {
                     count = elementCount;
