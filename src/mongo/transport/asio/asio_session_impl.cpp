@@ -177,6 +177,15 @@ CommonAsioSession::CommonAsioSession(
         if (tl->loadBalancerPort()) {
             _isConnectedToLoadBalancerPort = _local.port() == *tl->loadBalancerPort();
         }
+        if (tl->maintenancePort()) {
+#ifdef __linux__
+            _isConnectedToMaintenancePort = _localAddr.isIP()
+                ? _local.port() == *tl->maintenancePort()
+                : parsePortFromUnixSockPath(_localAddr.toString(true)) == *tl->maintenancePort();
+#else
+            _isConnectedToMaintenancePort = _local.port() == *tl->maintenancePort();
+#endif
+        }
     } catch (...) {
         LOGV2_DEBUG(9079002,
                     1,
@@ -213,6 +222,10 @@ CommonAsioSession::CommonAsioSession(
 bool CommonAsioSession::isConnectedToLoadBalancerPort() const {
     return MONGO_unlikely(clientIsConnectedToLoadBalancerPort.shouldFail()) ||
         _isConnectedToLoadBalancerPort;
+}
+
+bool CommonAsioSession::isConnectedToMaintenancePort() const {
+    return _isConnectedToMaintenancePort;
 }
 
 bool CommonAsioSession::isLoadBalancerPeer() const {

@@ -261,7 +261,6 @@ TransportLayerManagerImpl::makeDefaultEgressTransportLayer() {
         std::make_unique<transport::AsioTransportLayer>(opts, nullptr));
 }
 
-// TODO: SERVER-112674 Open and listen for connections on maintenancePort
 std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConfig(
     const ServerGlobalParams* config,
     ServiceContext* svcCtx,
@@ -279,6 +278,7 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
     {
         AsioTransportLayer::Options opts(config);
         opts.loadBalancerPort = std::move(loadBalancerPort);
+        opts.maintenancePort = std::move(maintenancePort);
 
         auto sm = std::make_unique<AsioSessionManager>(svcCtx, observers);
         auto tl = std::make_unique<AsioTransportLayer>(opts, std::move(sm));

@@ -184,6 +184,12 @@ public:
     virtual void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) = 0;
 
     /**
+     * Returns true if the connection is on the maintenance port or corresponding unix socket.
+     */
+    virtual bool isConnectedToMaintenancePort() const = 0;
+
+
+    /**
      * Returns true if this session binds to the operation state, which implies open cursors and
      * in-progress transactions should be killed upon client disconnection.
      */

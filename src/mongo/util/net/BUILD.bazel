@@ -283,6 +283,17 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "socket_utils_test",
+    srcs = [
+        "socket_utils_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        "//src/mongo/unittest",
+    ],
+)
+
 mongo_cc_library(
     name = "ssl_util",
     srcs = [
