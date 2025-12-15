@@ -250,6 +250,7 @@ mongo_cc_unit_test(
     srcs = [
         "//src/mongo/scripting/mozjs:asan_handles_test.cpp",
         "//src/mongo/scripting/mozjs:implscope_test.cpp",
+        "//src/mongo/scripting/mozjs:jscustomallocator_test.cpp",
         "//src/mongo/scripting/mozjs:module_loader_test.cpp",
     ],
     copts = select({
