@@ -31,8 +31,8 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/extension/host/load_extension.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/logv2/log.h"
 
@@ -45,7 +45,7 @@ namespace mongo::extension::host {
 namespace {
 const std::filesystem::path& getExtensionStubParserFile() {
     static const std::filesystem::path kExtensionStubParserPath = [] {
-        constexpr auto kFileName = "aggregation_stage_stub_parsers.json";
+        constexpr auto kFileName = "aggregation_stage_fallback_parsers.json";
         if (getTestCommandsEnabled()) {
             return std::filesystem::current_path() /
                 std::filesystem::path{"src/mongo/db/extension/test_examples"} / kFileName;
@@ -56,42 +56,43 @@ const std::filesystem::path& getExtensionStubParserFile() {
     return kExtensionStubParserPath;
 }
 
-
 /**
  * The structure of the stub parser file looks like:
  * {
  *   "stubParsers": [
  *      {"stageName": "$foo", "message": "$foo is not available because..."},
- *      {"stageName": "$bar", "message": "$bar is not available because..."},
+ *      {"stageName": "$bar", "message": "$bar is not available because...", "featureFlag":
+ * "<nameOfExistingFeatureFlag>"},
  *   ]
  * }
  */
 static constexpr StringData kExtensionStubParserField = "stubParsers"_sd;
 static constexpr StringData kExtensionStubParserStageNameField = "stageName"_sd;
 static constexpr StringData kExtensionStubParserMessageField = "message"_sd;
+static constexpr StringData kExtensionStubParserFeatureFlagField = "featureFlag"_sd;
 }  // namespace
 
-DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(StubParser);
-ALLOCATE_STAGE_PARAMS_ID(stubParser, StubParserStageParams::id);
-
-void registerStubParser(std::string stageName, std::string message) {
+void registerStubParser(std::string stageName, std::string message, FeatureFlag* featureFlag) {
     LOGV2(10918509,
-          "Registering stub parser for extension stage",
+          "Registering fallback stub parser for extension stage",
           "stageName"_attr = stageName,
           "message"_attr = message);
-    LiteParsedDocumentSource::registerParser(stageName,
-                                             StubParserLiteParsed::parse,
-                                             AllowedWithApiStrict::kAlways,
-                                             AllowedWithClientType::kAny);
-    DocumentSource::registerParser(
-        std::move(stageName),
-        [message = std::move(message)](BSONElement elem,
-                                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
-            -> std::list<boost::intrusive_ptr<DocumentSource>> { uasserted(10918500, message); },
-        nullptr /* featureFlag */,
-        // Since skipIfExists is true, if the stage is already registered, this registration will be
-        // silently skipped.
-        true /* skipIfExists */);
+
+    // Register a fallback parser that throws the appropriate error. Since this throws during
+    // LiteParse, we never reach DocumentSource parsing and DocumentSource registration is not
+    // needed.
+    auto stubParser = [message = std::move(message)](
+                          const NamespaceString&,
+                          const BSONElement&,
+                          const LiteParserOptions&) -> std::unique_ptr<LiteParsedDocumentSource> {
+        uasserted(10918500, message);
+    };
+
+    LiteParsedDocumentSource::registerFallbackParser(std::move(stageName),
+                                                     std::move(stubParser),
+                                                     featureFlag,
+                                                     AllowedWithApiStrict::kAlways,
+                                                     AllowedWithClientType::kAny);
 }
 
 void registerUnloadedExtensionStubParsers() {
@@ -139,13 +140,18 @@ void registerUnloadedExtensionStubParsers() {
         const auto& stubObj = elem.Obj();
         const auto& stageNameElem = stubObj[kExtensionStubParserStageNameField];
         const auto& messageElem = stubObj[kExtensionStubParserMessageField];
+        const auto& featureFlagElem = stubObj[kExtensionStubParserFeatureFlagField];
 
-        if (stageNameElem.type() != BSONType::string || messageElem.type() != BSONType::string) {
-            LOGV2_WARNING_OPTIONS(
-                10918505,
-                {logv2::LogTag::kStartupWarnings},
-                "Stub parsers expect both 'stageName' and 'message' fields to be strings",
-                "stubEntry"_attr = stubObj.toString());
+        bool stageNameIsString = stageNameElem.type() == BSONType::string;
+        bool messageIsString = messageElem.type() == BSONType::string;
+        bool featureFlagIsStringIfExists =
+            featureFlagElem.type() == BSONType::eoo || featureFlagElem.type() == BSONType::string;
+        if (!stageNameIsString || !messageIsString || !featureFlagIsStringIfExists) {
+            LOGV2_WARNING_OPTIONS(10918505,
+                                  {logv2::LogTag::kStartupWarnings},
+                                  "Stub parsers expect 'stageName', 'message', and optional "
+                                  "'featureFlag' fields to be strings",
+                                  "stubEntry"_attr = stubObj.toString());
             continue;
         }
 
@@ -160,7 +166,20 @@ void registerUnloadedExtensionStubParsers() {
             continue;
         }
 
-        registerStubParser(std::move(stageName), std::move(message));
+        FeatureFlag* featureFlag = nullptr;
+        if (featureFlagElem.type() == BSONType::string) {
+            const auto featureFlagName = featureFlagElem.String();
+            featureFlag = IncrementalRolloutFeatureFlag::findByName(featureFlagName);
+            if (!featureFlag) {
+                LOGV2_WARNING_OPTIONS(11395402,
+                                      {logv2::LogTag::kStartupWarnings},
+                                      "Stub parser references unknown feature flag",
+                                      "stageName"_attr = stageName,
+                                      "featureFlagName"_attr = featureFlagName);
+            }
+        }
+
+        registerStubParser(std::move(stageName), std::move(message), featureFlag);
     }
 }
 }  // namespace mongo::extension::host

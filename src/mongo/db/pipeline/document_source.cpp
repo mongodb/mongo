@@ -31,23 +31,12 @@
 
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/pipeline/change_stream_constants.h"
-#include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_redact.h"
-#include "mongo/db/pipeline/document_source_sample.h"
-#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
-#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/duration.h"
 #include "mongo/util/string_map.h"
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -70,24 +59,13 @@ bool DocumentSource::isInParserMap(StringData stageName) {
     return parserMap.find(stageName) != parserMap.end();
 }
 
-void DocumentSource::registerParser(std::string name,
-                                    Parser parser,
-                                    FeatureFlag* featureFlag,
-                                    bool skipIfExists) {
+void DocumentSource::registerParser(std::string name, Parser parser, FeatureFlag* featureFlag) {
     // Set of aggregation stages that are allowed to be overridden (via extensions).
     static const stdx::unordered_set<StringData> allowedOverrideStages = {
         DocumentSourceVectorSearch::kStageName,
     };
 
     auto it = parserMap.find(name);
-    if (skipIfExists && it != parserMap.end()) {
-        // Short-circuit if the stage is already registered and skipIfExists is true.
-        LOGV2_DEBUG(10918508,
-                    2,
-                    "Silently skipping registration of parser since name already exists",
-                    "name"_attr = name);
-        return;
-    }
 
     // Allow override only for stages in the allowed list, otherwise assert on duplicates.
     if (it != parserMap.end() && !allowedOverrideStages.contains(name)) {
@@ -103,14 +81,13 @@ void DocumentSource::registerParser(std::string name,
 
 void DocumentSource::registerParser(std::string name,
                                     SimpleParser simpleParser,
-                                    FeatureFlag* featureFlag,
-                                    bool skipIfExists) {
+                                    FeatureFlag* featureFlag) {
     Parser parser = [simpleParser = std::move(simpleParser)](
                         BSONElement stageSpec, const intrusive_ptr<ExpressionContext>& expCtx)
         -> std::list<intrusive_ptr<DocumentSource>> {
         return {simpleParser(std::move(stageSpec), expCtx)};
     };
-    return registerParser(std::move(name), std::move(parser), std::move(featureFlag), skipIfExists);
+    return registerParser(std::move(name), std::move(parser), featureFlag);
 }
 
 DocumentSource::Id DocumentSource::allocateId(StringData name) {
