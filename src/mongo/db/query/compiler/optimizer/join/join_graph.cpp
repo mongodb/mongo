@@ -118,6 +118,21 @@ std::vector<EdgeId> JoinGraph::getJoinEdges(NodeSet left, NodeSet right) const {
     return result;
 }
 
+std::vector<EdgeId> JoinGraph::getEdgesForSubgraph(NodeSet nodes) const {
+    std::vector<EdgeId> edges;
+    if (nodes.count() <= 1) {
+        // There are no self-edges.
+        return edges;
+    }
+    for (const auto& [edgeBitset, edgeId] : _edgeMap) {
+        // Subset check: all of this edge's bits are included in 'nodes'.
+        if ((edgeBitset & nodes) == edgeBitset) {
+            edges.push_back(edgeId);
+        }
+    }
+    return edges;
+}
+
 NodeSet JoinGraph::getNeighbors(NodeId nodeIndex) const {
     NodeSet neighbors;
     for (const JoinEdge& edge : _edges) {

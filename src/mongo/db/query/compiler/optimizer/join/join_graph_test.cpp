@@ -229,4 +229,51 @@ TEST(JoinGraph, GetNeighborsCycle) {
     ASSERT_EQ(graph.getNeighbors(c), makeNodeSet(b, d));
     ASSERT_EQ(graph.getNeighbors(d), makeNodeSet(a, c));
 }
+
+namespace {
+void assertEdgesEq(std::vector<EdgeId> a, std::vector<EdgeId> b) {
+    std::sort(a.begin(), a.end());
+    std::sort(b.begin(), b.end());
+    ASSERT_EQ(a, b);
+}
+}  // namespace
+
+TEST(JoinGraph, GetEdgesForSubgraph) {
+    /** Construct a graph like so
+     * a -- b -- c
+     *          / \
+     *         d -- e
+     */
+    JoinGraph graph{};
+    auto a = *graph.addNode(makeNSS("a"), nullptr, boost::none);
+    auto b = *graph.addNode(makeNSS("b"), nullptr, FieldPath("b"));
+    auto c = *graph.addNode(makeNSS("c"), nullptr, FieldPath("c"));
+    auto d = *graph.addNode(makeNSS("d"), nullptr, FieldPath("d"));
+    auto e = *graph.addNode(makeNSS("e"), nullptr, FieldPath("d"));
+
+    auto ab = *graph.addSimpleEqualityEdge(a, b, 0, 1);
+    auto bc = *graph.addSimpleEqualityEdge(b, c, 1, 2);
+    auto cd = *graph.addSimpleEqualityEdge(c, d, 2, 3);
+    auto de = *graph.addSimpleEqualityEdge(d, e, 3, 4);
+    auto ce = *graph.addSimpleEqualityEdge(c, e, 2, 4);
+
+    assertEdgesEq(graph.getEdgesForSubgraph(makeNodeSet(a)), std::vector<EdgeId>{});
+
+    assertEdgesEq(graph.getEdgesForSubgraph(makeNodeSet(a, b)), std::vector<EdgeId>{ab});
+    assertEdgesEq(graph.getEdgesForSubgraph(makeNodeSet(a, c)), std::vector<EdgeId>{});
+    assertEdgesEq(graph.getEdgesForSubgraph(makeNodeSet(c, d)), std::vector<EdgeId>{cd});
+
+    assertEdgesEq(graph.getEdgesForSubgraph(makeNodeSet(a, b, c)), (std::vector<EdgeId>{ab, bc}));
+    assertEdgesEq(graph.getEdgesForSubgraph(makeNodeSet(a, b, e)), std::vector<EdgeId>{ab});
+
+    assertEdgesEq(graph.getEdgesForSubgraph(makeNodeSet(a, b, c, d)),
+                  (std::vector<EdgeId>{ab, bc, cd}));
+    assertEdgesEq(graph.getEdgesForSubgraph(makeNodeSet(a, b, c, e)),
+                  (std::vector<EdgeId>{ab, bc, ce}));
+    assertEdgesEq(graph.getEdgesForSubgraph(makeNodeSet(a, b, d, e)),
+                  (std::vector<EdgeId>{ab, de}));
+
+    assertEdgesEq(graph.getEdgesForSubgraph(makeNodeSet(a, b, c, d, e)),
+                  (std::vector<EdgeId>{ab, bc, cd, de, ce}));
+}
 }  // namespace mongo::join_ordering

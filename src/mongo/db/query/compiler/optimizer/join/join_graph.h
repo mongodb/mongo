@@ -161,6 +161,11 @@ public:
      */
     std::vector<EdgeId> getJoinEdges(NodeSet left, NodeSet right) const;
 
+    /**
+     * Returns a list of edges that connect the nodes in 'nodes'.
+     */
+    std::vector<EdgeId> getEdgesForSubgraph(NodeSet nodes) const;
+
     /** Get neighbors of the given node.
      */
     NodeSet getNeighbors(NodeId nodeIndex) const;
