@@ -97,7 +97,6 @@ variables:
       --bolt_profile_use=False
       --opt=on
       --build_otel=True
-      --build_enterprise=False
       --jobs=1600
     unittest_library_compile_flags: >-
       --linkstatic=False
