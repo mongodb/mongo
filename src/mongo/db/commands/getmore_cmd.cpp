@@ -802,7 +802,7 @@ public:
             auto ret = reply->getBodyBuilder().asTempObj();
             CursorGetMoreReply::parse(
                 IDLParserContext{"CursorGetMoreReply", false /* apiStrict */, tenantId},
-                ret.removeField("ok"));
+                ret.removeField("ok", BSONObj::WireMessageSizeTrait{}));
         }
 
         const GetMoreCommandRequest _cmd;

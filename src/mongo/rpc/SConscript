@@ -176,6 +176,7 @@ if wiredtiger:
     env.CppUnitTest(
         target='rpc_test',
         source=[
+            'data_type_wire_message_payload_test.cpp',
             'get_status_from_command_result_test.cpp',
             'metadata/client_metadata_test.cpp',
             'metadata/egress_metadata_hook_list_test.cpp',

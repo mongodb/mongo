@@ -107,6 +107,14 @@ public:
         constexpr static int MaxSize = BufferMaxSize;
     };
 
+    /**
+     * Special size trait for validating wire messages, which may have a small size overhead for
+     * metadata compared to other BSON objects.
+     */
+    struct WireMessageSizeTrait {
+        constexpr static int MaxSize = BSONObjMaxWireMessageSize;
+    };
+
     // Declared in bsonobj_comparator_interface.h.
     class ComparatorInterface;
 
@@ -345,9 +353,17 @@ public:
 
     /**
      * Remove specified field and return a new object with the remaining fields.
-     * slowish as builds a full new object
+     * Slowish, as it builds a full new object.
+     * This uses the DefaultSizeTrait to validate the size of the resulting BSONObj.
      */
     BSONObj removeField(StringData name) const;
+
+    /**
+     * Remove specified field and return a new object with the remaining fields.
+     * Same as above, but using the WireMessageSizeTrait to validate the size of the resulting
+     * BSONObj.
+     */
+    BSONObj removeField(StringData name, WireMessageSizeTrait) const;
 
     /**
      * Remove specified fields and return a new object with the remaining fields.
