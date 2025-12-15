@@ -41,7 +41,7 @@ ENTERPRISE_DEFINES = select({
 })
 
 FORTIFY_DEFINE = select({
-    "@//bazel/config:opt_on_linux": ["_FORTIFY_SOURCE=3"],
+    "@//bazel/config:opt_on_linux": ["_FORTIFY_SOURCE=2"],
     "@//conditions:default": [],
 })
 
