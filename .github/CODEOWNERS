@@ -288,6 +288,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/rotate_execution_control_params.py @10gen/server-workload-resilience @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/fuzz_runtime_parameters.py @10gen/server-programmability @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/validate.py @10gen/devprod-correctness @10gen/server-validate @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/simulate_crash.py @10gen/query-execution-router @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/check_system_buckets_metrics.py @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/testing/testcases/OWNERS.yml

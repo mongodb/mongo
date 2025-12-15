@@ -131,6 +131,11 @@ class FuzzRuntimeParameters(interface.Hook):
                 k: v for k, v in runtime_mongod_params.items() if "flowControl" not in k
             }
 
+        auditingEnabled = config.MONGOD_EXTRA_CONFIG.get("auditRuntimeConfiguration", "off") == "on"
+        if not auditingEnabled:
+            # auditConfig requires auditing to be enabled, so we should not fuzz it if auditing is disabled.
+            del cluster_params["auditConfig"]
+
         validate_runtime_parameter_spec(runtime_mongod_params)
         validate_runtime_parameter_spec(runtime_mongos_params)
         validate_runtime_parameter_spec(cluster_params)

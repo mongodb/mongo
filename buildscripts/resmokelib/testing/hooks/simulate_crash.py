@@ -149,7 +149,9 @@ class SimulateCrash(bghook.BGHook):
             # When restarting the node for validation purposes, we need to mirror some
             # configuration options applied to the original standalone invocation.
             extra_configs = [
-                "--" + cfg_k for (cfg_k, cfg_v) in config.MONGOD_EXTRA_CONFIG.items() if cfg_v
+                f"--{cfg_k}" + ("" if cfg_v is True else f"={cfg_v}")
+                for cfg_k, cfg_v in config.MONGOD_EXTRA_CONFIG.items()
+                if cfg_v
             ]
 
             mdb = process.Process(

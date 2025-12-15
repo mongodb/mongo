@@ -590,8 +590,10 @@ class TestRunner(Subcommand):
 
         if config.MONGOD_EXTRA_CONFIG:
             for k, v in config.MONGOD_EXTRA_CONFIG.items():
-                if v:
+                if v is True:
                     local_resmoke_invocation_with_params += f" --{k}"
+                elif v:  # truthy but not True
+                    local_resmoke_invocation_with_params += f" --{k}={v}"
 
         if config.MONGOS_SET_PARAMETERS and config.MONGOS_SET_PARAMETERS != "{}":
             local_resmoke_invocation_with_params += f" --mongosSetParameters='{self._get_fuzzed_param_resmoke_invocation(config.MONGOS_SET_PARAMETERS)}'"

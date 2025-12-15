@@ -225,7 +225,14 @@ def generate_encryption_config(rng: random.Random):
 def generate_normal_mongo_parameters(rng, value):
     """Returns the value assigned the mongod or mongos parameter based on the fields of the parameters in the config_fuzzer_limits.py."""
 
-    if "isUniform" in value:
+    if "document" in value:
+        ret = {}
+        for doc_key, doc_value in value["document"].items():
+            if "exclude_prob" in doc_value and rng.random() < doc_value["exclude_prob"]:
+                # Exclude this key from the document
+                continue
+            ret[doc_key] = generate_normal_mongo_parameters(rng, doc_value)
+    elif "isUniform" in value:
         ret = rng.uniform(value["min"], value["max"])
     elif "isRandomizedChoice" in value:
         choices = value["choices"]

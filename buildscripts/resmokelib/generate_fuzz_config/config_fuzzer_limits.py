@@ -673,12 +673,75 @@ config_fuzzer_params = {
     },
     "cluster": {
         "configServerReadPreferenceForCatalogQueries": {
-            "choices": [{"mustAlwaysUseNearest": True}, {"mustAlwaysUseNearest": False}],
+            "choices": [{"mustAlwaysUseNearest": True}, {"mustAlwaysUseNearest": False}, {}],
             "period": 10,
             "fuzz_at": ["cluster"],
         },
         "onlyTargetDataOwningShardsForMultiWrites": {
-            "choices": [{"enabled": True}, {"enabled": False}],
+            "choices": [{"enabled": True}, {"enabled": False}, {}],
+            "period": 10,
+            "fuzz_at": ["cluster"],
+        },
+        "fleCompactionOptions": {
+            "document": {
+                "maxCompactionSize": {
+                    "exclude_prob": 0.5,
+                    "min": 1,
+                    "max": 2147483647,  # int max
+                },
+                "maxAnchorCompactionSize": {"exclude_prob": 0.5, "min": 1, "max": 2147483647},
+                "maxESCEntriesPerCompactionDelete": {"exclude_prob": 0.5, "min": 1, "max": 350000},
+                "compactAnchorPaddingFactor": {
+                    "exclude_prob": 0.5,
+                    "min": 0,
+                    "max": 1,
+                    "isUniform": True,
+                },
+            },
+            "period": 10,
+            "fuzz_at": ["cluster"],
+        },
+        "fleAllowTotalTagOverheadToExceedBSONLimit": {
+            "choices": [{"shouldOverride": True}, {"shouldOverride": False}, {}],
+            "period": 10,
+            "fuzz_at": ["cluster"],
+        },
+        "fleDisableSubstringPreviewParameterLimits": {
+            "choices": [{"shouldOverride": True}, {"shouldOverride": False}, {}],
+            "period": 10,
+            "fuzz_at": ["cluster"],
+        },
+        "auditConfig": {
+            "document": {
+                "auditAuthorizationSuccess": {"choices": [True, False]},
+                "filter": {
+                    "document": {
+                        # Only a very small subset of possible filter expressions, since any match
+                        # expression can be used.
+                        "atype": {
+                            "exclude_prob": 0.3,
+                            "choices": [
+                                "authenticate",
+                                "authCheck",
+                                "createCollection",
+                                "dropCollection",
+                                {"$in": ["authenticate", "createCollection"]},
+                            ],
+                        },
+                        "users.user": {"exclude_prob": 0.7, "choices": ["admin", "user", "abc"]},
+                        "users.db": {"exclude_prob": 0.7, "choices": ["admin", "test", "db"]},
+                        "roles.role": {"exclude_prob": 0.7, "choices": ["role1", "role2"]},
+                        "roles.db": {"exclude_prob": 0.7, "choices": ["admin", "test", "db"]},
+                        "result": {
+                            "exclude_prob": 0.5,
+                            "isRandomizedChoice": True,
+                            "lower_bound": 0,
+                            "upper_bound": 500,
+                            "choices": [0, 13, 18, 26, 334],
+                        },
+                    },
+                },
+            },
             "period": 10,
             "fuzz_at": ["cluster"],
         },
@@ -689,6 +752,13 @@ config_fuzzer_extra_configs = {
     "mongod": {
         "directoryperdb": {"choices": [True, False]},
         "wiredTigerDirectoryForIndexes": {"choices": [True, False]},
+        "auditDestination": {"default": "console"},
+        "auditRuntimeConfiguration": {"choices": ["on", "off"]},
+        "auditSchema": {"choices": ["mongo", "OCSF"]},
     },
-    "mongos": {},
+    "mongos": {
+        "auditDestination": {"default": "console"},
+        "auditRuntimeConfiguration": {"choices": ["on", "off"]},
+        "auditSchema": {"choices": ["mongo", "OCSF"]},
+    },
 }

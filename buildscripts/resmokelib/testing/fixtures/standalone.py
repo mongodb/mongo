@@ -527,7 +527,7 @@ class MongodLauncher(object):
             "wiredTigerEngineConfigString": self.config.WT_ENGINE_CONFIG,
             "wiredTigerIndexConfigString": self.config.WT_INDEX_CONFIG,
         }
-        shortcut_opts.update(self.config.MONGOD_EXTRA_CONFIG)
+        shortcut_opts.update({k: v for k, v in self.config.MONGOD_EXTRA_CONFIG.items() if v})
 
         if self.config.STORAGE_ENGINE == "inMemory":
             shortcut_opts["inMemorySizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
