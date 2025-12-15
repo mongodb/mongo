@@ -173,6 +173,37 @@ public:
     }
 
     /**
+     * Return true if all bits of this bitset are set.
+     * Important: The size of the DynamicBitset is rounded up to a factor of 8 * sizeof(T) (the size
+     * of the underlying container type T). This means the bitset might be larger than the size
+     * passed to the constructor. If this is an issue, consider using 'allInPrefix' function.
+     */
+    MONGO_COMPILER_ALWAYS_INLINE bool all() const {
+        for (auto&& e : _storage)
+            if (e != kOnes)
+                return false;
+        return true;
+    }
+
+    /**
+     * Returns true if all of the first `n` bits are set.
+     */
+    bool allInPrefix(size_t n) const {
+        if (n > size())
+            return false;
+        auto iter = _storage.data();
+        for (auto end = iter + n / kBitsPerBlock; iter != end; ++iter)
+            if (*iter != kOnes)
+                return false;
+
+        if (auto part = n % kBitsPerBlock) {
+            const BlockType mask = maskbit(part) - 1;
+            return (*iter & mask) == mask;
+        }
+        return true;
+    }
+
+    /**
      * Compute AND of this subset and subset 'other' and assign the result to this subset. The
      * bitsets must have the same size.
      */
@@ -228,6 +259,12 @@ public:
         return result;
     }
 
+    /** Returns a bool equivalent to `(*this)[index]`. */
+    MONGO_COMPILER_ALWAYS_INLINE bool test(size_t index) const {
+        assertBitIndex(index);
+        return _storage[getBlockIndex(index)] & maskbit(getBitIndex(index));
+    }
+
     /**
      * Return a reference to 'index'-th bit. Using the reference you may change read or set the bit.
      */
@@ -242,6 +279,10 @@ public:
     MONGO_COMPILER_ALWAYS_INLINE bool operator[](size_t index) const {
         assertBitIndex(index);
         return _storage[getBlockIndex(index)] & maskbit(getBitIndex(index));
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE void clear() {
+        std::fill(_storage.begin(), _storage.end(), kZero);
     }
 
     /**

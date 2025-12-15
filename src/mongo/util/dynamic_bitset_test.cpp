@@ -91,6 +91,18 @@ TEST(DynamicBitsetTests, Not) {
     ASSERT_EQ(Bitset("1110001110000000"), ~Bitset("0001110001111111"));
 }
 
+TEST(DynamicBitsetTests, GetUsingTest) {
+    Bitset bitset("100001010111001");
+    ASSERT_TRUE(bitset.test(0));
+    ASSERT_FALSE(bitset.test(1));
+    ASSERT_TRUE(bitset.test(4));
+    ASSERT_TRUE(bitset.test(5));
+    ASSERT_FALSE(bitset.test(6));
+    ASSERT_TRUE(bitset.test(9));
+    ASSERT_FALSE(bitset.test(10));
+    ASSERT_TRUE(bitset.test(14));
+}
+
 TEST(DynamicBitsetTests, SetAndGetSmall) {
     Bitset bitset(8);
 
@@ -133,6 +145,19 @@ TEST(DynamicBitsetTests, SetAndGetLargeBitset) {
     largeBitset.set(31, false);
     largeBitset.set(2, true);
     ASSERT_EQ(Bitset("01000000000000000000000000000110"), largeBitset);
+}
+
+TEST(DynamicBitsetTests, Clear) {
+    {
+        Bitset bitset("11111111111111111111111111111111");
+        bitset.clear();
+        ASSERT_EQ(bitset, Bitset(32));
+    }
+    {
+        Bitset bitset("10000001000000100001000000000001");
+        bitset.clear();
+        ASSERT_EQ(bitset, Bitset(32));
+    }
 }
 
 TEST(DynamicBitsetTests, SetAll) {
@@ -296,6 +321,48 @@ TEST(DynamicBitsetTests, None) {
     ASSERT_TRUE(Bitset("00000000").none());
     ASSERT_FALSE((~Bitset(32)).none());
     ASSERT_FALSE(Bitset("11110111").none());
+}
+
+TEST(DynamicBitsetTests, All) {
+    ASSERT_FALSE(Bitset("1").all());
+    ASSERT_TRUE(Bitset("11111111").all());
+    ASSERT_FALSE(Bitset("111111111111").all());
+    ASSERT_TRUE(Bitset("1111111111111111").all());
+}
+
+TEST(DynamicBitsetTests, allInPrefix) {
+    ASSERT_TRUE(Bitset("1").allInPrefix(1));
+    {
+        // 0 blocks case.
+        Bitset bitset;
+        ASSERT_TRUE(bitset.allInPrefix(0));
+        ASSERT_FALSE(bitset.allInPrefix(1));
+    }
+    {
+        // 1 Block case
+        Bitset bitset("11111111");
+        ASSERT_TRUE(bitset.allInPrefix(0));
+        ASSERT_TRUE(bitset.allInPrefix(1));
+        ASSERT_TRUE(bitset.allInPrefix(4));
+        ASSERT_TRUE(bitset.allInPrefix(8));
+    }
+    {
+        // 2 blocks case
+        Bitset bitset("1111111111111111");
+        ASSERT_TRUE(bitset.allInPrefix(8));
+        ASSERT_TRUE(bitset.allInPrefix(9));
+        ASSERT_TRUE(bitset.allInPrefix(12));
+        ASSERT_TRUE(bitset.allInPrefix(16));
+    }
+    {
+        // 2+ blocks case
+        Bitset bitset(
+            "11101111"
+            "11111111"
+            "11111111");
+        for (size_t i = 0; i <= 40; ++i)
+            ASSERT_EQ(bitset.allInPrefix(i), i <= 20) << i;
+    }
 }
 
 TEST(DynamicBitsetTests, Less) {
