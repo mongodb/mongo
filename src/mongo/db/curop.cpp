@@ -805,7 +805,10 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
 
     _updateExecutionTimers();
 
-    if (!opCtx->inMultiDocumentTransaction()) {
+    // Record execution and delinquency stats for the top-level operation only. We don't want to
+    // double count stats from child operations (e.g., bulk writes, sub-operations in aggregations)
+    // that share the same ExecutionAdmissionContext.
+    if (!parent() && !opCtx->inMultiDocumentTransaction()) {
         // If we're not in a txn, we record information about delinquent ticket acquisitions to the
         // Queue's stats.
         if (auto ticketingSystem =
