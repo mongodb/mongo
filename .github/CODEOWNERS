@@ -2200,6 +2200,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/modules/atlas/src/disagg_storage/**/pali_* @10gen/server-pali @svc-auto-approve-bot
 /src/mongo/db/modules/atlas/src/disagg_storage/**/page_* @10gen/server-pali @svc-auto-approve-bot
 /src/mongo/db/modules/atlas/src/disagg_storage/**/oplog_provider* @10gen/server-pali @svc-auto-approve-bot
+/src/mongo/db/modules/atlas/src/disagg_storage/**/log_* @10gen/server-pali @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/atlas/src/disagg_storage/block_cache/OWNERS.yml
 /src/mongo/db/modules/atlas/src/disagg_storage/block_cache/**/* @10gen/server-pali @svc-auto-approve-bot
