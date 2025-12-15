@@ -18,8 +18,6 @@
 
 #include "wasm/WasmDebug.h"
 
-#include "mozilla/BinarySearch.h"
-
 #include "debugger/Debugger.h"
 #include "debugger/Environment.h"
 #include "debugger/Frame.h"
@@ -39,15 +37,12 @@ using namespace js;
 using namespace js::jit;
 using namespace js::wasm;
 
-using mozilla::BinarySearchIf;
-
 DebugState::DebugState(const Code& code, const Module& module)
     : code_(&code),
       module_(&module),
       enterFrameTrapsEnabled_(false),
       enterAndLeaveFrameTrapsCounter_(0) {
-  MOZ_RELEASE_ASSERT(code.metadata().debugEnabled);
-  MOZ_RELEASE_ASSERT(code.hasTier(Tier::Debug));
+  MOZ_RELEASE_ASSERT(code.debugEnabled());
 }
 
 void DebugState::trace(JSTracer* trc) {
@@ -64,29 +59,33 @@ void DebugState::finalize(JS::GCContext* gcx) {
   }
 }
 
-static const CallSite* SlowCallSiteSearchByOffset(const MetadataTier& metadata,
-                                                  uint32_t offset) {
-  for (const CallSite& callSite : metadata.callSites) {
-    if (callSite.lineOrBytecode() == offset &&
-        callSite.kind() == CallSiteDesc::Breakpoint) {
-      return &callSite;
+static bool SlowCallSiteSearchByOffset(const CodeBlock& code, uint32_t offset,
+                                       CallSite* callSite) {
+  for (uint32_t callSiteIndex = 0; callSiteIndex < code.callSites.length();
+       callSiteIndex++) {
+    if (code.callSites.kind(callSiteIndex) == CallSiteKind::Breakpoint &&
+        code.callSites.bytecodeOffset(callSiteIndex).offset() == offset) {
+      *callSite = code.callSites.get(callSiteIndex, code.inliningContext);
+      return true;
     }
   }
-  return nullptr;
+  return false;
 }
 
 bool DebugState::getLineOffsets(size_t lineno, Vector<uint32_t>* offsets) {
-  const CallSite* callsite =
-      SlowCallSiteSearchByOffset(metadata(Tier::Debug), lineno);
-  return !(callsite && !offsets->append(lineno));
+  CallSite callSite;
+  return !SlowCallSiteSearchByOffset(debugCode(), lineno, &callSite) ||
+         offsets->append(lineno);
 }
 
 bool DebugState::getAllColumnOffsets(Vector<ExprLoc>* offsets) {
-  for (const CallSite& callSite : metadata(Tier::Debug).callSites) {
-    if (callSite.kind() != CallSite::Breakpoint) {
+  for (uint32_t callSiteIndex = 0;
+       callSiteIndex < debugCode().callSites.length(); callSiteIndex++) {
+    if (debugCode().callSites.kind(callSiteIndex) != CallSiteKind::Breakpoint) {
       continue;
     }
-    uint32_t offset = callSite.lineOrBytecode();
+    uint32_t offset =
+        debugCode().callSites.bytecodeOffset(callSiteIndex).offset();
     if (!offsets->emplaceBack(
             offset,
             JS::WasmFunctionIndex::DefaultBinarySourceColumnNumberOneOrigin,
@@ -99,7 +98,8 @@ bool DebugState::getAllColumnOffsets(Vector<ExprLoc>* offsets) {
 
 bool DebugState::getOffsetLocation(uint32_t offset, uint32_t* lineno,
                                    JS::LimitedColumnNumberOneOrigin* column) {
-  if (!SlowCallSiteSearchByOffset(metadata(Tier::Debug), offset)) {
+  CallSite callSite;
+  if (!SlowCallSiteSearchByOffset(debugCode(), offset, &callSite)) {
     return false;
   }
   *lineno = offset;
@@ -127,7 +127,7 @@ bool DebugState::incrementStepperCount(JSContext* cx, Instance* instance,
   }
 
   enableDebuggingForFunction(instance, funcIndex);
-  enableDebugTrap(instance);
+  enableDebugTrapping(instance);
 
   return true;
 }
@@ -135,7 +135,7 @@ bool DebugState::incrementStepperCount(JSContext* cx, Instance* instance,
 void DebugState::decrementStepperCount(JS::GCContext* gcx, Instance* instance,
                                        uint32_t funcIndex) {
   const CodeRange& codeRange =
-      codeRanges(Tier::Debug)[funcToCodeRangeIndex(funcIndex)];
+      debugCode().codeRanges[funcToCodeRangeIndex(funcIndex)];
   MOZ_ASSERT(codeRange.isFunction());
 
   MOZ_ASSERT(!stepperCounters_.empty());
@@ -152,11 +152,12 @@ void DebugState::decrementStepperCount(JS::GCContext* gcx, Instance* instance,
   bool anyEnterAndLeave = enterAndLeaveFrameTrapsCounter_ > 0;
 
   bool keepDebugging = false;
-  for (const CallSite& callSite : callSites(Tier::Debug)) {
-    if (callSite.kind() != CallSite::Breakpoint) {
+  for (uint32_t callSiteIndex = 0;
+       callSiteIndex < debugCode().callSites.length(); callSiteIndex++) {
+    if (debugCode().callSites.kind(callSiteIndex) != CallSiteKind::Breakpoint) {
       continue;
     }
-    uint32_t offset = callSite.returnAddressOffset();
+    uint32_t offset = debugCode().callSites.returnAddressOffset(callSiteIndex);
     if (codeRange.begin() <= offset && offset <= codeRange.end()) {
       keepDebugging = keepDebugging || breakpointSites_.has(offset);
     }
@@ -165,27 +166,26 @@ void DebugState::decrementStepperCount(JS::GCContext* gcx, Instance* instance,
   if (!keepDebugging && !anyEnterAndLeave) {
     disableDebuggingForFunction(instance, funcIndex);
     if (!anyStepping && !anyBreakpoints) {
-      disableDebugTrap(instance);
+      disableDebugTrapping(instance);
     }
   }
 }
 
 bool DebugState::hasBreakpointTrapAtOffset(uint32_t offset) {
-  return SlowCallSiteSearchByOffset(metadata(Tier::Debug), offset);
+  CallSite callSite;
+  return SlowCallSiteSearchByOffset(debugCode(), offset, &callSite);
 }
 
 void DebugState::toggleBreakpointTrap(JSRuntime* rt, Instance* instance,
                                       uint32_t offset, bool enabled) {
-  const CallSite* callSite =
-      SlowCallSiteSearchByOffset(metadata(Tier::Debug), offset);
-  if (!callSite) {
+  CallSite callSite;
+  if (!SlowCallSiteSearchByOffset(debugCode(), offset, &callSite)) {
     return;
   }
-  size_t debugTrapOffset = callSite->returnAddressOffset();
+  size_t debugTrapOffset = callSite.returnAddressOffset();
 
-  const ModuleSegment& codeSegment = code_->segment(Tier::Debug);
   const CodeRange* codeRange =
-      code_->lookupFuncRange(codeSegment.base() + debugTrapOffset);
+      code_->lookupFuncRange(debugCode().base() + debugTrapOffset);
   MOZ_ASSERT(codeRange);
 
   uint32_t funcIndex = codeRange->funcIndex();
@@ -199,11 +199,11 @@ void DebugState::toggleBreakpointTrap(JSRuntime* rt, Instance* instance,
 
   if (enabled) {
     enableDebuggingForFunction(instance, funcIndex);
-    enableDebugTrap(instance);
+    enableDebugTrapping(instance);
   } else if (!anyEnterAndLeave) {
     disableDebuggingForFunction(instance, funcIndex);
     if (!anyStepping && !anyBreakpoints) {
-      disableDebugTrap(instance);
+      disableDebugTrapping(instance);
     }
   }
 }
@@ -302,13 +302,13 @@ void DebugState::disableDebuggingForFunction(Instance* instance,
   instance->setDebugFilter(funcIndex, false);
 }
 
-void DebugState::enableDebugTrap(Instance* instance) {
-  instance->setDebugTrapHandler(code_->segment(Tier::Debug).base() +
-                                metadata(Tier::Debug).debugTrapOffset);
+void DebugState::enableDebugTrapping(Instance* instance) {
+  instance->setDebugStub(code_->sharedStubs().base() +
+                         code_->debugStubOffset());
 }
 
-void DebugState::disableDebugTrap(Instance* instance) {
-  instance->setDebugTrapHandler(nullptr);
+void DebugState::disableDebugTrapping(Instance* instance) {
+  instance->setDebugStub(nullptr);
 }
 
 void DebugState::adjustEnterAndLeaveFrameTrapsState(JSContext* cx,
@@ -323,14 +323,15 @@ void DebugState::adjustEnterAndLeaveFrameTrapsState(JSContext* cx,
     return;
   }
 
-  MOZ_RELEASE_ASSERT(&instance->metadata() == &metadata());
-  uint32_t numFuncs = metadata().debugNumFuncs();
+  MOZ_RELEASE_ASSERT(&instance->codeMeta() == &codeMeta());
+  MOZ_RELEASE_ASSERT(instance->codeMetaForAsmJS() == codeMetaForAsmJS());
+  uint32_t numFuncs = codeMeta().numFuncs();
   if (enabled) {
     MOZ_ASSERT(enterAndLeaveFrameTrapsCounter_ > 0);
     for (uint32_t funcIdx = 0; funcIdx < numFuncs; funcIdx++) {
       enableDebuggingForFunction(instance, funcIdx);
     }
-    enableDebugTrap(instance);
+    enableDebugTrapping(instance);
   } else {
     MOZ_ASSERT(enterAndLeaveFrameTrapsCounter_ == 0);
     bool anyEnabled = false;
@@ -341,13 +342,12 @@ void DebugState::adjustEnterAndLeaveFrameTrapsState(JSContext* cx,
       for (auto iter = breakpointSites_.iter();
            !iter.done() && !mustLeaveEnabled; iter.next()) {
         WasmBreakpointSite* site = iter.get().value();
-        const CallSite* callSite =
-            SlowCallSiteSearchByOffset(metadata(Tier::Debug), site->offset);
-        if (callSite) {
-          size_t debugTrapOffset = callSite->returnAddressOffset();
-          const ModuleSegment& codeSegment = code_->segment(Tier::Debug);
+        CallSite callSite;
+        const CodeBlock& codeBlock = debugCode();
+        if (SlowCallSiteSearchByOffset(codeBlock, site->offset, &callSite)) {
+          size_t debugTrapOffset = callSite.returnAddressOffset();
           const CodeRange* codeRange =
-              code_->lookupFuncRange(codeSegment.base() + debugTrapOffset);
+              code_->lookupFuncRange(codeBlock.base() + debugTrapOffset);
           MOZ_ASSERT(codeRange);
           mustLeaveEnabled = codeRange->funcIndex() == funcIdx;
         }
@@ -359,7 +359,7 @@ void DebugState::adjustEnterAndLeaveFrameTrapsState(JSContext* cx,
       }
     }
     if (!anyEnabled) {
-      disableDebugTrap(instance);
+      disableDebugTrapping(instance);
     }
   }
 }
@@ -378,8 +378,8 @@ void DebugState::ensureEnterFrameTrapsState(JSContext* cx, Instance* instance,
 bool DebugState::debugGetLocalTypes(uint32_t funcIndex, ValTypeVector* locals,
                                     size_t* argsLength,
                                     StackResults* stackResults) {
-  const TypeContext& types = *metadata().types;
-  const FuncType& funcType = metadata().debugFuncType(funcIndex);
+  const TypeContext& types = *codeMeta().types;
+  const FuncType& funcType = codeMeta().getFuncType(funcIndex);
   const ValTypeVector& args = funcType.args();
   const ValTypeVector& results = funcType.results();
   ResultType resultType(ResultType::Vector(results));
@@ -392,19 +392,17 @@ bool DebugState::debugGetLocalTypes(uint32_t funcIndex, ValTypeVector* locals,
   }
 
   // Decode local var types from wasm binary function body.
-  const CodeRange& range =
-      codeRanges(Tier::Debug)[funcToCodeRangeIndex(funcIndex)];
-  // In wasm, the Code points to the function start via funcLineOrBytecode.
-  size_t offsetInModule = range.funcLineOrBytecode();
-  Decoder d(bytecode().begin() + offsetInModule, bytecode().end(),
-            offsetInModule,
+  const BytecodeRange& funcRange = codeTailMeta().funcDefRange(funcIndex);
+  BytecodeSpan funcBytecode = codeTailMeta().funcDefBody(funcIndex);
+  Decoder d(funcBytecode.data(), funcBytecode.data() + funcBytecode.size(),
+            funcRange.start,
             /* error = */ nullptr);
   return DecodeValidatedLocalEntries(types, d, locals);
 }
 
 bool DebugState::getGlobal(Instance& instance, uint32_t globalIndex,
                            MutableHandleValue vp) {
-  const GlobalDesc& global = metadata().globals[globalIndex];
+  const GlobalDesc& global = codeMeta().globals[globalIndex];
 
   if (global.isConstant()) {
     LitVal value = global.constantValue();
@@ -482,7 +480,8 @@ bool DebugState::getSourceMappingURL(JSContext* cx,
                                      MutableHandleString result) const {
   result.set(nullptr);
 
-  for (const CustomSection& customSection : module_->customSections()) {
+  for (const CustomSection& customSection :
+       module_->moduleMeta().customSections) {
     const Bytes& sectionName = customSection.name;
     if (strlen(SourceMappingURLSectionName) != sectionName.length() ||
         memcmp(SourceMappingURLSectionName, sectionName.begin(),
@@ -512,7 +511,7 @@ bool DebugState::getSourceMappingURL(JSContext* cx,
   }
 
   // Check presence of "SourceMap:" HTTP response header.
-  char* sourceMapURL = metadata().sourceMapURL.get();
+  char* sourceMapURL = codeMeta().sourceMapURL().get();
   if (sourceMapURL && strlen(sourceMapURL)) {
     JS::UTF8Chars utf8Chars(sourceMapURL, strlen(sourceMapURL));
     JSString* str = JS_NewStringCopyUTF8N(cx, utf8Chars);
@@ -524,11 +523,12 @@ bool DebugState::getSourceMappingURL(JSContext* cx,
   return true;
 }
 
-void DebugState::addSizeOfMisc(MallocSizeOf mallocSizeOf,
-                               Metadata::SeenSet* seenMetadata,
-                               Code::SeenSet* seenCode, size_t* code,
-                               size_t* data) const {
-  code_->addSizeOfMiscIfNotSeen(mallocSizeOf, seenMetadata, seenCode, code,
-                                data);
-  module_->addSizeOfMisc(mallocSizeOf, seenMetadata, seenCode, code, data);
+void DebugState::addSizeOfMisc(
+    mozilla::MallocSizeOf mallocSizeOf, CodeMetadata::SeenSet* seenCodeMeta,
+    CodeMetadataForAsmJS::SeenSet* seenCodeMetaForAsmJS,
+    Code::SeenSet* seenCode, size_t* code, size_t* data) const {
+  code_->addSizeOfMiscIfNotSeen(mallocSizeOf, seenCodeMeta,
+                                seenCodeMetaForAsmJS, seenCode, code, data);
+  module_->addSizeOfMisc(mallocSizeOf, seenCodeMeta, seenCodeMetaForAsmJS,
+                         seenCode, code, data);
 }

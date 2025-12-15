@@ -19,6 +19,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "jit/CompilationDependencyTracker.h"
 #include "jit/CompileInfo.h"
 #include "jit/CompileWrappers.h"
 #include "jit/JitAllocPolicy.h"
@@ -40,7 +41,8 @@ class MIRGenerator final {
   MIRGenerator(CompileRealm* realm, const JitCompileOptions& options,
                TempAllocator* alloc, MIRGraph* graph,
                const CompileInfo* outerInfo,
-               const OptimizationInfo* optimizationInfo);
+               const OptimizationInfo* optimizationInfo,
+               const wasm::CodeMetadata* wasmCodeMeta = nullptr);
 
   void initMinWasmMemory0Length(uint64_t init) { minWasmMemory0Length_ = init; }
 
@@ -108,7 +110,7 @@ class MIRGenerator final {
   }
 
   // Whether the main thread is trying to cancel this build.
-  bool shouldCancel(const char* why) { return cancelBuild_; }
+  bool shouldCancel(const char* why) const { return cancelBuild_; }
   void cancel() { cancelBuild_ = true; }
 
   bool compilingWasm() const { return outerInfo_->compilingWasm(); }
@@ -117,10 +119,9 @@ class MIRGenerator final {
     MOZ_ASSERT(compilingWasm());
     return wasmMaxStackArgBytes_;
   }
-  void initWasmMaxStackArgBytes(uint32_t n) {
+  void accumulateWasmMaxStackArgBytes(uint32_t n) {
     MOZ_ASSERT(compilingWasm());
-    MOZ_ASSERT(wasmMaxStackArgBytes_ == 0);
-    wasmMaxStackArgBytes_ = n;
+    wasmMaxStackArgBytes_ = std::max(n, wasmMaxStackArgBytes_);
   }
   uint64_t minWasmMemory0Length() const { return minWasmMemory0Length_; }
 
@@ -176,6 +177,7 @@ class MIRGenerator final {
 
  public:
   GraphSpewer& graphSpewer() { return gs_; }
+  CompilationDependencyTracker tracker;
 };
 
 }  // namespace jit

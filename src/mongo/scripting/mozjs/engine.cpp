@@ -140,6 +140,14 @@ void MozJSScriptEngine::setJSHeapLimitMB(int limit) {
     gJSHeapLimitMB.store(limit);
 }
 
+bool MozJSScriptEngine::getJSUseLegacyMemoryTracking() const {
+    return gJSUseLegacyMemoryTracking.load();
+}
+
+void MozJSScriptEngine::setJSUseLegacyMemoryTracking(bool shouldUseLegacy) {
+    gJSUseLegacyMemoryTracking.store(shouldUseLegacy);
+}
+
 std::string MozJSScriptEngine::getLoadPath() const {
     return _loadPath;
 }

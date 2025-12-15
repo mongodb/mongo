@@ -29,11 +29,18 @@ TryEmitter::TryEmitter(BytecodeEmitter* bce, Kind kind, ControlKind controlKind)
       state_(State::Start)
 #endif
 {
-  if (controlKind_ == ControlKind::Syntactic) {
+  MOZ_ASSERT_IF(controlKind_ == ControlKind::Disposal,
+                kind_ == Kind::TryFinally);
+
+  if (requiresControlInfo()) {
     controlInfo_.emplace(
         bce_, hasFinally() ? StatementKind::Finally : StatementKind::Try);
   }
 }
+
+#ifdef DEBUG
+bool TryEmitter::hasControlInfo() { return controlInfo_.isSome(); }
+#endif
 
 bool TryEmitter::emitTry() {
   MOZ_ASSERT(state_ == State::Start);
@@ -332,5 +339,5 @@ bool TryEmitter::emitEnd() {
 }
 
 bool TryEmitter::shouldUpdateRval() const {
-  return controlKind_ == ControlKind::Syntactic && !bce_->sc->noScriptRval();
+  return requiresControlInfo() && !bce_->sc->noScriptRval();
 }

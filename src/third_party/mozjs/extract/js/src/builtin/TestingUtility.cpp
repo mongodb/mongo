@@ -297,9 +297,9 @@ JS::UniqueChars js::StringToLocale(JSContext* cx, JS::Handle<JSObject*> callee,
   return locale;
 }
 
-bool js::ValidateLazinessOfStencilAndGlobal(
-    JSContext* cx, const js::frontend::CompilationStencil& stencil) {
-  if (cx->realm()->behaviors().discardSource() && stencil.canLazilyParse) {
+bool js::ValidateLazinessOfStencilAndGlobal(JSContext* cx,
+                                            const JS::Stencil* stencil) {
+  if (cx->realm()->behaviors().discardSource() && stencil->canLazilyParse()) {
     JS_ReportErrorASCII(cx,
                         "Stencil compiled with with lazy parse option cannot "
                         "be used in a realm with discardSource");

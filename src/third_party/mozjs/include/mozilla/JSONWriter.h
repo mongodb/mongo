@@ -250,8 +250,8 @@ class JSONWriter {
   static constexpr Span<const char> scTopObjectEndString = MakeStringSpan("}");
   static constexpr Span<const char> scTrueString = MakeStringSpan("true");
 
-  JSONWriteFunc& mWriter;
   const UniquePtr<JSONWriteFunc> mMaybeOwnedWriter;
+  JSONWriteFunc& mWriter;
   Vector<bool, 8> mNeedComma;     // do we need a comma at depth N?
   Vector<bool, 8> mNeedNewlines;  // do we need newlines at depth N?
   size_t mDepth;                  // the current nesting depth
@@ -352,8 +352,8 @@ class JSONWriter {
 
   explicit JSONWriter(UniquePtr<JSONWriteFunc> aWriter,
                       CollectionStyle aStyle = MultiLineStyle)
-      : mWriter(*aWriter),
-        mMaybeOwnedWriter(std::move(aWriter)),
+      : mMaybeOwnedWriter(std::move(aWriter)),
+        mWriter(*mMaybeOwnedWriter),
         mNeedComma(),
         mNeedNewlines(),
         mDepth(0) {
@@ -365,7 +365,7 @@ class JSONWriter {
 
   // Returns the JSONWriteFunc passed in at creation, for temporary use. The
   // JSONWriter object still owns the JSONWriteFunc.
-  JSONWriteFunc& WriteFunc() const { return mWriter; }
+  JSONWriteFunc& WriteFunc() const MOZ_LIFETIME_BOUND { return mWriter; }
 
   // For all the following functions, the "Prints:" comment indicates what the
   // basic output looks like. However, it doesn't indicate the whitespace and

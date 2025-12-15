@@ -40,7 +40,7 @@ st.shardColl(coll, {_id: 1}, {_id: 0}, {_id: 0});
             explain: {
                 aggregate: coll.getName(),
                 pipeline: [
-                    {$addFields: {a: {$range: [0, 1000000]}}},
+                    {$addFields: {a: {$range: [0, 250000]}}},
                     {$unwind: "$a"}, // Create a number of documents to be executed by the accumulator.
                     {$group: {_id: "$groupBy", count: largeAccumulator}},
                 ],

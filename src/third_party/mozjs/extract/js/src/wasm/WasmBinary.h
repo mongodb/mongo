@@ -26,6 +26,7 @@
 
 #include "js/WasmFeatures.h"
 
+#include "wasm/WasmBinaryTypes.h"
 #include "wasm/WasmCompile.h"
 #include "wasm/WasmCompileArgs.h"
 #include "wasm/WasmConstants.h"
@@ -35,11 +36,6 @@
 
 namespace js {
 namespace wasm {
-
-using mozilla::DebugOnly;
-using mozilla::Maybe;
-
-struct ModuleEnvironment;
 
 // The Opcode compactly and safely represents the primary opcode plus any
 // extension, with convenient predicates and accessors.
@@ -115,21 +111,6 @@ class Opcode {
   bool operator==(const Opcode& that) const { return bits_ == that.bits_; }
   bool operator!=(const Opcode& that) const { return bits_ != that.bits_; }
 };
-
-// This struct captures the bytecode offset of a section's payload (so not
-// including the header) and the size of the payload.
-
-struct SectionRange {
-  uint32_t start;
-  uint32_t size;
-
-  uint32_t end() const { return start + size; }
-  bool operator==(const SectionRange& rhs) const {
-    return start == rhs.start && size == rhs.size;
-  }
-};
-
-using MaybeSectionRange = Maybe<SectionRange>;
 
 // The Encoder class appends bytes to the Bytes object it is given during
 // construction. The client is responsible for the Bytes's lifetime and must
@@ -326,7 +307,6 @@ class Decoder {
   const size_t offsetInModule_;
   UniqueChars* error_;
   UniqueCharsVector* warnings_;
-  bool resilientMode_;
 
   template <class T>
   [[nodiscard]] bool read(T* out) {
@@ -356,7 +336,7 @@ class Decoder {
 
   template <typename UInt>
   [[nodiscard]] bool readVarU(UInt* out) {
-    DebugOnly<const uint8_t*> before = cur_;
+    mozilla::DebugOnly<const uint8_t*> before = cur_;
     const unsigned numBits = sizeof(UInt) * CHAR_BIT;
     const unsigned remainderBits = numBits % 7;
     const unsigned numBitsInSevens = numBits - remainderBits;
@@ -419,27 +399,24 @@ class Decoder {
 
  public:
   Decoder(const uint8_t* begin, const uint8_t* end, size_t offsetInModule,
-          UniqueChars* error, UniqueCharsVector* warnings = nullptr,
-          bool resilientMode = false)
+          UniqueChars* error, UniqueCharsVector* warnings = nullptr)
       : beg_(begin),
         end_(end),
         cur_(begin),
         offsetInModule_(offsetInModule),
         error_(error),
-        warnings_(warnings),
-        resilientMode_(resilientMode) {
+        warnings_(warnings) {
     MOZ_ASSERT(begin <= end);
   }
-  explicit Decoder(const Bytes& bytes, size_t offsetInModule = 0,
+  explicit Decoder(BytecodeSpan span, size_t offsetInModule = 0,
                    UniqueChars* error = nullptr,
                    UniqueCharsVector* warnings = nullptr)
-      : beg_(bytes.begin()),
-        end_(bytes.end()),
-        cur_(bytes.begin()),
+      : beg_(span.data()),
+        end_(span.data() + span.size()),
+        cur_(span.data()),
         offsetInModule_(offsetInModule),
         error_(error),
-        warnings_(warnings),
-        resilientMode_(false) {}
+        warnings_(warnings) {}
 
   // These convenience functions use currentOffset() as the errorOffset.
   bool fail(const char* msg) { return fail(currentOffset(), msg); }
@@ -461,7 +438,6 @@ class Decoder {
     MOZ_ASSERT(cur_ <= end_);
     return cur_ == end_;
   }
-  bool resilientMode() const { return resilientMode_; }
 
   size_t bytesRemain() const {
     MOZ_ASSERT(end_ >= cur_);
@@ -572,12 +548,12 @@ class Decoder {
 
   // See "section" description in Encoder.
 
-  [[nodiscard]] bool readSectionHeader(uint8_t* id, SectionRange* range);
+  [[nodiscard]] bool readSectionHeader(uint8_t* id, BytecodeRange* range);
 
-  [[nodiscard]] bool startSection(SectionId id, ModuleEnvironment* env,
-                                  MaybeSectionRange* range,
+  [[nodiscard]] bool startSection(SectionId id, CodeMetadata* codeMeta,
+                                  MaybeBytecodeRange* range,
                                   const char* sectionName);
-  [[nodiscard]] bool finishSection(const SectionRange& range,
+  [[nodiscard]] bool finishSection(const BytecodeRange& range,
                                    const char* sectionName);
 
   // Custom sections do not cause validation errors unless the error is in
@@ -585,26 +561,27 @@ class Decoder {
 
   [[nodiscard]] bool startCustomSection(const char* expected,
                                         size_t expectedLength,
-                                        ModuleEnvironment* env,
-                                        MaybeSectionRange* range);
+                                        CodeMetadata* codeMeta,
+                                        MaybeBytecodeRange* range);
 
   template <size_t NameSizeWith0>
   [[nodiscard]] bool startCustomSection(const char (&name)[NameSizeWith0],
-                                        ModuleEnvironment* env,
-                                        MaybeSectionRange* range) {
+                                        CodeMetadata* codeMeta,
+                                        MaybeBytecodeRange* range) {
     MOZ_ASSERT(name[NameSizeWith0 - 1] == '\0');
-    return startCustomSection(name, NameSizeWith0 - 1, env, range);
+    return startCustomSection(name, NameSizeWith0 - 1, codeMeta, range);
   }
 
-  void finishCustomSection(const char* name, const SectionRange& range);
-  void skipAndFinishCustomSection(const SectionRange& range);
+  [[nodiscard]] bool finishCustomSection(const char* name,
+                                         const BytecodeRange& range);
+  void skipAndFinishCustomSection(const BytecodeRange& range);
 
-  [[nodiscard]] bool skipCustomSection(ModuleEnvironment* env);
+  [[nodiscard]] bool skipCustomSection(CodeMetadata* codeMeta);
 
   // The Name section has its own optional subsections.
 
   [[nodiscard]] bool startNameSubsection(NameType nameType,
-                                         Maybe<uint32_t>* endOffset);
+                                         mozilla::Maybe<uint32_t>* endOffset);
   [[nodiscard]] bool finishNameSubsection(uint32_t endOffset);
   [[nodiscard]] bool skipNameSubsection();
 
@@ -728,10 +705,6 @@ inline bool Decoder::readPackedType(const TypeContext& types,
     }
     case uint8_t(TypeCode::Ref):
     case uint8_t(TypeCode::NullableRef): {
-#ifdef ENABLE_WASM_GC
-      if (!features.gc) {
-        return fail("gc not enabled");
-      }
       bool nullable = code == uint8_t(TypeCode::NullableRef);
       RefType refType;
       if (!readHeapType(types, features, nullable, &refType)) {
@@ -739,9 +712,6 @@ inline bool Decoder::readPackedType(const TypeContext& types,
       }
       *type = refType;
       return true;
-#else
-      break;
-#endif
     }
     case uint8_t(TypeCode::AnyRef):
     case uint8_t(TypeCode::I31Ref):
@@ -751,15 +721,8 @@ inline bool Decoder::readPackedType(const TypeContext& types,
     case uint8_t(TypeCode::NullFuncRef):
     case uint8_t(TypeCode::NullExternRef):
     case uint8_t(TypeCode::NullAnyRef): {
-#ifdef ENABLE_WASM_GC
-      if (!features.gc) {
-        return fail("gc not enabled");
-      }
       *type = RefType::fromTypeCode(TypeCode(code), true);
       return true;
-#else
-      break;
-#endif
     }
     default: {
       if (!T::isValidTypeCode(TypeCode(code))) {
@@ -810,7 +773,6 @@ inline bool Decoder::readHeapType(const TypeContext& types,
         *type = RefType::fromTypeCode(TypeCode(code), nullable);
         return true;
       }
-#ifdef ENABLE_WASM_GC
       case uint8_t(TypeCode::AnyRef):
       case uint8_t(TypeCode::I31Ref):
       case uint8_t(TypeCode::EqRef):
@@ -819,29 +781,20 @@ inline bool Decoder::readHeapType(const TypeContext& types,
       case uint8_t(TypeCode::NullFuncRef):
       case uint8_t(TypeCode::NullExternRef):
       case uint8_t(TypeCode::NullAnyRef):
-        if (!features.gc) {
-          return fail("gc not enabled");
-        }
         *type = RefType::fromTypeCode(TypeCode(code), nullable);
         return true;
-#endif
       default:
         return fail("invalid heap type");
     }
   }
 
-#ifdef ENABLE_WASM_GC
-  if (features.gc) {
-    int32_t x;
-    if (!readVarS32(&x) || x < 0 || uint32_t(x) >= types.length()) {
-      return fail("invalid heap type index");
-    }
-    const TypeDef* typeDef = &types.type(x);
-    *type = RefType::fromTypeDef(typeDef, nullable);
-    return true;
+  int32_t x;
+  if (!readVarS32(&x) || x < 0 || uint32_t(x) >= types.length()) {
+    return fail("invalid heap type index");
   }
-#endif
-  return fail("invalid heap type");
+  const TypeDef* typeDef = &types.type(x);
+  *type = RefType::fromTypeDef(typeDef, nullable);
+  return true;
 }
 
 inline bool Decoder::readRefType(const TypeContext& types,

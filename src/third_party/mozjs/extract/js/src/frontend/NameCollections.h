@@ -23,29 +23,7 @@
 #include "js/Utility.h"      // js_new, js_delete
 #include "js/Vector.h"       // Vector
 
-namespace js {
-
-namespace detail {
-
-// For InlineMap<TrivialTaggedParserAtomIndex>.
-// See DefaultKeyPolicy definition in InlineTable.h for more details.
-template <>
-class DefaultKeyPolicy<frontend::TrivialTaggedParserAtomIndex> {
- public:
-  DefaultKeyPolicy() = delete;
-  DefaultKeyPolicy(const frontend::TrivialTaggedParserAtomIndex&) = delete;
-
-  static bool isTombstone(const frontend::TrivialTaggedParserAtomIndex& atom) {
-    return atom.isNull();
-  }
-  static void setToTombstone(frontend::TrivialTaggedParserAtomIndex& atom) {
-    atom = frontend::TrivialTaggedParserAtomIndex::null();
-  }
-};
-
-}  // namespace detail
-
-namespace frontend {
+namespace js::frontend {
 
 class FunctionBox;
 
@@ -449,7 +427,6 @@ class PooledVectorPtr : public PooledCollectionPtr<Vector, PooledVectorPtr> {
   }
 };
 
-}  // namespace frontend
-}  // namespace js
+}  // namespace js::frontend
 
 #endif  // frontend_NameCollections_h

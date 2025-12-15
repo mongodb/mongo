@@ -32,6 +32,8 @@ static inline MIRType ToMIRType(ABIType argType) {
       return MIRType::Int32;
     case ABIType::Int64:
       return MIRType::Int64;
+    case ABIType::Void:
+      return MIRType::None;
     default:
       break;
   }

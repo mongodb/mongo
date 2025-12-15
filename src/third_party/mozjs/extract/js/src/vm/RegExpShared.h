@@ -85,7 +85,7 @@ class RegExpShared
   friend class RegExpZone;
 
   struct RegExpCompilation {
-    HeapPtr<jit::JitCode*> jitCode;
+    GCPtr<jit::JitCode*> jitCode;
     ByteCode* byteCode = nullptr;
 
     bool compiled(CodeKind kind = CodeKind::Any) const {
@@ -373,29 +373,7 @@ class RegExpRealm {
    *  Indices: Has a |groups| property. If |hasIndices| is set, used
    *           for the |.indices| property of the result object.
    */
-  HeapPtr<SharedShape*> matchResultShapes_[ResultShapeKind::NumKinds];
-
-  /*
-   * The shape of RegExp.prototype object that satisfies following:
-   *   * RegExp.prototype.flags getter is not modified
-   *   * RegExp.prototype.global getter is not modified
-   *   * RegExp.prototype.ignoreCase getter is not modified
-   *   * RegExp.prototype.multiline getter is not modified
-   *   * RegExp.prototype.dotAll getter is not modified
-   *   * RegExp.prototype.sticky getter is not modified
-   *   * RegExp.prototype.unicode getter is not modified
-   *   * RegExp.prototype.exec is an own data property
-   *   * RegExp.prototype[@@match] is an own data property
-   *   * RegExp.prototype[@@search] is an own data property
-   */
-  HeapPtr<Shape*> optimizableRegExpPrototypeShape_;
-
-  /*
-   * The shape of RegExp instance that satisfies following:
-   *   * lastProperty is lastIndex
-   *   * prototype is RegExp.prototype
-   */
-  HeapPtr<Shape*> optimizableRegExpInstanceShape_;
+  GCPtr<SharedShape*> matchResultShapes_[ResultShapeKind::NumKinds];
 
   SharedShape* createMatchResultShape(JSContext* cx, ResultShapeKind kind);
 
@@ -438,37 +416,19 @@ class RegExpRealm {
     return createMatchResultShape(cx, kind);
   }
 
-  Shape* getOptimizableRegExpPrototypeShape() {
-    return optimizableRegExpPrototypeShape_;
-  }
-  void setOptimizableRegExpPrototypeShape(Shape* shape) {
-    optimizableRegExpPrototypeShape_ = shape;
-  }
-  Shape* getOptimizableRegExpInstanceShape() {
-    return optimizableRegExpInstanceShape_;
-  }
-  void setOptimizableRegExpInstanceShape(Shape* shape) {
-    optimizableRegExpInstanceShape_ = shape;
-  }
-
-  static constexpr size_t offsetOfOptimizableRegExpPrototypeShape() {
-    return offsetof(RegExpRealm, optimizableRegExpPrototypeShape_);
-  }
-  static constexpr size_t offsetOfOptimizableRegExpInstanceShape() {
-    return offsetof(RegExpRealm, optimizableRegExpInstanceShape_);
-  }
   static constexpr size_t offsetOfRegExpStatics() {
     return offsetof(RegExpRealm, regExpStatics);
   }
   static constexpr size_t offsetOfNormalMatchResultShape() {
-    static_assert(sizeof(HeapPtr<SharedShape*>) == sizeof(uintptr_t));
+    static_assert(sizeof(GCPtr<SharedShape*>) == sizeof(uintptr_t));
     return offsetof(RegExpRealm, matchResultShapes_) +
            ResultShapeKind::Normal * sizeof(uintptr_t);
   }
 };
 
-RegExpRunStatus ExecuteRegExpAtomRaw(RegExpShared* re, JSLinearString* input,
-                                     size_t start, MatchPairs* matchPairs);
+RegExpRunStatus ExecuteRegExpAtomRaw(RegExpShared* re,
+                                     const JSLinearString* input, size_t start,
+                                     MatchPairs* matchPairs);
 
 } /* namespace js */
 

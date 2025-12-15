@@ -38,7 +38,7 @@ def extract_unmangled(func):
     return func.split("$")[-1]
 
 
-class Test(object):
+class Test:
     def __init__(self, indir, outdir, cfg, verbose=0):
         self.indir = indir
         self.outdir = outdir
@@ -56,12 +56,7 @@ class Test(object):
         env["CCACHE_DISABLE"] = "1"
         if "-fexceptions" not in options and "-fno-exceptions" not in options:
             options += " -fno-exceptions"
-        cmd = "{CXX} -c {source} -O3 -std=c++17 -fplugin={sixgill} -fplugin-arg-xgill-mangle=1 {options}".format(  # NOQA: E501
-            source=self.infile(source),
-            CXX=self.cfg.cxx,
-            sixgill=self.cfg.sixgill_plugin,
-            options=options,
-        )
+        cmd = f"{self.cfg.cxx} -c {self.infile(source)} -O3 -std=c++17 -fplugin={self.cfg.sixgill_plugin} -fplugin-arg-xgill-mangle=1 {options}"
         if self.cfg.verbose > 0:
             print("Running %s" % cmd)
         subprocess.check_call(["sh", "-c", cmd])
@@ -89,12 +84,10 @@ class Test(object):
 
     def run_analysis_script(self, startPhase="gcTypes", upto=None):
         open("defaults.py", "w").write(
-            """\
+            f"""\
 analysis_scriptdir = '{scriptdir}'
-sixgill_bin = '{bindir}'
-""".format(
-                scriptdir=scriptdir, bindir=self.cfg.sixgill_bin
-            )
+sixgill_bin = '{self.cfg.sixgill_bin}'
+"""
         )
         cmd = [
             sys.executable,
@@ -118,7 +111,7 @@ sixgill_bin = '{bindir}'
 
     def load_text_file(self, filename, extract=lambda l: l):
         fullpath = os.path.join(self.outdir, filename)
-        values = (extract(line.strip()) for line in open(fullpath, "r"))
+        values = (extract(line.strip()) for line in open(fullpath))
         return list(filter(lambda _: _ is not None, values))
 
     def load_json_file(self, filename, reviver=None):

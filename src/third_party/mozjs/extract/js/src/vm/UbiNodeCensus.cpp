@@ -876,7 +876,7 @@ bool ByAllocationStack::report(JSContext* cx, CountBase& countBase,
       return false;
     }
 
-    if (!MapObject::set(cx, map, stackVal, stackReport)) {
+    if (!map->set(cx, stackVal, stackReport)) {
       return false;
     }
   }
@@ -887,7 +887,7 @@ bool ByAllocationStack::report(JSContext* cx, CountBase& countBase,
       return false;
     }
     RootedValue noStack(cx, StringValue(cx->names().noStack));
-    if (!MapObject::set(cx, map, noStack, noStackReport)) {
+    if (!map->set(cx, noStack, noStackReport)) {
       return false;
     }
   }

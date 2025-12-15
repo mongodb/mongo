@@ -26,10 +26,6 @@
 namespace js {
 namespace wasm {
 
-using jit::FloatRegister;
-using jit::Register;
-using jit::Register64;
-
 // ValType and location for a single result: either in a register or on the
 // stack.
 
@@ -37,9 +33,9 @@ class ABIResult {
   ValType type_;
   enum class Location { Gpr, Gpr64, Fpr, Stack } loc_;
   union {
-    Register gpr_;
-    Register64 gpr64_;
-    FloatRegister fpr_;
+    jit::Register gpr_;
+    jit::Register64 gpr64_;
+    jit::FloatRegister fpr_;
     uint32_t stackOffset_;
   };
 
@@ -95,15 +91,15 @@ class ABIResult {
   static constexpr size_t StackSizeOfV128 = sizeof(V128);
 #endif
 
-  ABIResult(ValType type, Register gpr)
+  ABIResult(ValType type, jit::Register gpr)
       : type_(type), loc_(Location::Gpr), gpr_(gpr) {
     validate();
   }
-  ABIResult(ValType type, Register64 gpr64)
+  ABIResult(ValType type, jit::Register64 gpr64)
       : type_(type), loc_(Location::Gpr64), gpr64_(gpr64) {
     validate();
   }
-  ABIResult(ValType type, FloatRegister fpr)
+  ABIResult(ValType type, jit::FloatRegister fpr)
       : type_(type), loc_(Location::Fpr), fpr_(fpr) {
     validate();
   }
@@ -115,15 +111,15 @@ class ABIResult {
   ValType type() const { return type_; }
   bool onStack() const { return loc_ == Location::Stack; }
   bool inRegister() const { return !onStack(); }
-  Register gpr() const {
+  jit::Register gpr() const {
     MOZ_ASSERT(loc_ == Location::Gpr);
     return gpr_;
   }
-  Register64 gpr64() const {
+  jit::Register64 gpr64() const {
     MOZ_ASSERT(loc_ == Location::Gpr64);
     return gpr64_;
   }
-  FloatRegister fpr() const {
+  jit::FloatRegister fpr() const {
     MOZ_ASSERT(loc_ == Location::Fpr);
     return fpr_;
   }
@@ -251,19 +247,19 @@ extern bool GenerateBuiltinThunk(jit::MacroAssembler& masm,
                                  ExitReason exitReason, void* funcPtr,
                                  CallableOffsets* offsets);
 
-extern bool GenerateImportFunctions(const ModuleEnvironment& env,
-                                    const FuncImportVector& imports,
-                                    CompiledCode* code);
-
-extern bool GenerateStubs(const ModuleEnvironment& env,
+extern bool GenerateStubs(const CodeMetadata& codeMeta,
                           const FuncImportVector& imports,
                           const FuncExportVector& exports, CompiledCode* code);
+
+extern bool GenerateEntryStubs(const CodeMetadata& codeMeta,
+                               const FuncExportVector& exports,
+                               CompiledCode* code);
 
 extern bool GenerateEntryStubs(jit::MacroAssembler& masm,
                                size_t funcExportIndex, const FuncExport& fe,
                                const FuncType& funcType,
-                               const Maybe<jit::ImmPtr>& callee, bool isAsmJS,
-                               CodeRangeVector* codeRanges);
+                               const mozilla::Maybe<jit::ImmPtr>& callee,
+                               bool isAsmJS, CodeRangeVector* codeRanges);
 
 extern void GenerateTrapExitRegisterOffsets(jit::RegisterOffsets* offsets,
                                             size_t* numWords);

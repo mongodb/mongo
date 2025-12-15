@@ -8,7 +8,7 @@
 
 #include "gc/HashUtil.h"
 #include "js/Printer.h"  // js::GenericPrinter, js::Fprinter
-#include "util/StringBuffer.h"
+#include "util/StringBuilder.h"
 #include "vm/JSContext.h"
 #include "vm/JSONPrinter.h"  // js::JSONPrinter
 #include "vm/Realm.h"

@@ -22,6 +22,7 @@
 #include "jit/JitRuntime.h"
 #include "jit/MacroAssembler.h"
 #include "jit/MoveEmitter.h"
+#include "jit/ProcessExecutableMemory.h"
 #include "js/ScalarType.h"  // js::Scalar::Type
 #include "util/Memory.h"
 #include "vm/BigIntType.h"
@@ -221,6 +222,33 @@ void MacroAssemblerARM::convertInt32ToFloat32(const Address& src,
   as_vcvt(dest, VFPRegister(scratch).sintOverlay());
 }
 
+void MacroAssemblerARM::convertFloat32ToFloat16(FloatRegister src,
+                                                FloatRegister dest) {
+  MOZ_ASSERT(ARMFlags::HasFPHalfPrecision());
+  MOZ_ASSERT(src.isSingle());
+  MOZ_ASSERT(dest.isSingle());
+
+  as_vcvtb_s2h(dest, src);
+}
+
+void MacroAssemblerARM::convertFloat16ToFloat32(FloatRegister src,
+                                                FloatRegister dest) {
+  MOZ_ASSERT(ARMFlags::HasFPHalfPrecision());
+  MOZ_ASSERT(src.isSingle());
+  MOZ_ASSERT(dest.isSingle());
+
+  as_vcvtb_h2s(dest, src);
+}
+
+void MacroAssemblerARM::convertInt32ToFloat16(Register src,
+                                              FloatRegister dest) {
+  // Convert Int32 to Float32.
+  convertInt32ToFloat32(src, dest);
+
+  // Convert Float32 to Float16.
+  convertFloat32ToFloat16(dest, dest);
+}
+
 bool MacroAssemblerARM::alu_dbl(Register src1, Imm32 imm, Register dest,
                                 ALUOp op, SBit s, Condition c) {
   if ((s == SetCC && !condsAreSafe(op)) || !can_dbl(op)) {
@@ -313,7 +341,9 @@ void MacroAssemblerARM::ma_nop() { as_nop(); }
 BufferOffset MacroAssemblerARM::ma_movPatchable(Imm32 imm_, Register dest,
                                                 Assembler::Condition c) {
   int32_t imm = imm_.value;
-  if (HasMOVWT()) {
+  if (ARMFlags::HasMOVWT()) {
+    AutoForbidPoolsAndNops afp(this,
+                               /* max number of instructions in scope = */ 2);
     BufferOffset offset = as_movw(dest, Imm16(imm & 0xffff), c);
     as_movt(dest, Imm16(imm >> 16 & 0xffff), c);
     return offset;
@@ -382,7 +412,7 @@ void MacroAssemblerARM::ma_mov(Imm32 imm, Register dest,
   }
 
   // Try movw/movt.
-  if (HasMOVWT()) {
+  if (ARMFlags::HasMOVWT()) {
     // ARMv7 supports movw/movt. movw zero-extends its 16 bit argument,
     // so we can set the register this way. movt leaves the bottom 16
     // bits in tact, so we always need a movw.
@@ -1269,7 +1299,7 @@ void MacroAssemblerARM::ma_vpush(VFPRegister r) {
 
 // Barriers
 void MacroAssemblerARM::ma_dmb(BarrierOption option) {
-  if (HasDMBDSBISB()) {
+  if (ARMFlags::HasDMBDSBISB()) {
     as_dmb(option);
   } else {
     as_dmb_trap();
@@ -1277,7 +1307,7 @@ void MacroAssemblerARM::ma_dmb(BarrierOption option) {
 }
 
 void MacroAssemblerARM::ma_dsb(BarrierOption option) {
-  if (HasDMBDSBISB()) {
+  if (ARMFlags::HasDMBDSBISB()) {
     as_dsb(option);
   } else {
     as_dsb_trap();
@@ -1407,7 +1437,7 @@ static inline uint32_t DoubleLowWord(double d) {
 
 void MacroAssemblerARM::ma_vimm(double value, FloatRegister dest,
                                 Condition cc) {
-  if (HasVFPv3()) {
+  if (ARMFlags::HasVFPv3()) {
     if (DoubleLowWord(value) == 0) {
       if (DoubleHighWord(value) == 0) {
         // To zero a register, load 1.0, then execute dN <- dN - dN
@@ -1430,7 +1460,7 @@ void MacroAssemblerARM::ma_vimm(double value, FloatRegister dest,
 void MacroAssemblerARM::ma_vimm_f32(float value, FloatRegister dest,
                                     Condition cc) {
   VFPRegister vd = VFPRegister(dest).singleOverlay();
-  if (HasVFPv3()) {
+  if (ARMFlags::HasVFPv3()) {
     if (IsPositiveZero(value)) {
       // To zero a register, load 1.0, then execute sN <- sN - sN.
       as_vimm(vd, VFPImm::One, cc);
@@ -1905,33 +1935,6 @@ FaultingCodeOffset MacroAssemblerARMCompat::loadDouble(const BaseIndex& src,
   return FaultingCodeOffset(boffset.getOffset());
 }
 
-void MacroAssemblerARMCompat::loadFloatAsDouble(const Address& address,
-                                                FloatRegister dest) {
-  ScratchRegisterScope scratch(asMasm());
-
-  VFPRegister rt = dest;
-  ma_vldr(address, rt.singleOverlay(), scratch);
-  as_vcvt(rt, rt.singleOverlay());
-}
-
-void MacroAssemblerARMCompat::loadFloatAsDouble(const BaseIndex& src,
-                                                FloatRegister dest) {
-  // VFP instructions don't even support register Base + register Index modes,
-  // so just add the index, then handle the offset like normal.
-  Register base = src.base;
-  Register index = src.index;
-  uint32_t scale = Imm32::ShiftOf(src.scale).value;
-  int32_t offset = src.offset;
-  VFPRegister rt = dest;
-
-  ScratchRegisterScope scratch(asMasm());
-  SecondScratchRegisterScope scratch2(asMasm());
-
-  as_add(scratch, base, lsl(index, scale));
-  ma_vldr(Address(scratch, offset), rt.singleOverlay(), scratch2);
-  as_vcvt(rt, rt.singleOverlay());
-}
-
 FaultingCodeOffset MacroAssemblerARMCompat::loadFloat32(const Address& address,
                                                         FloatRegister dest) {
   ScratchRegisterScope scratch(asMasm());
@@ -1956,6 +1959,22 @@ FaultingCodeOffset MacroAssemblerARMCompat::loadFloat32(const BaseIndex& src,
   BufferOffset boffset = ma_vldr(Address(scratch, offset),
                                  VFPRegister(dest).singleOverlay(), scratch2);
   return FaultingCodeOffset(boffset.getOffset());
+}
+
+FaultingCodeOffset MacroAssemblerARMCompat::loadFloat16(const Address& address,
+                                                        FloatRegister dest,
+                                                        Register scratch) {
+  auto fco = load16ZeroExtend(address, scratch);
+  ma_vxfer(scratch, dest);
+  return fco;
+}
+
+FaultingCodeOffset MacroAssemblerARMCompat::loadFloat16(const BaseIndex& src,
+                                                        FloatRegister dest,
+                                                        Register scratch) {
+  auto fco = load16ZeroExtend(src, scratch);
+  ma_vxfer(scratch, dest);
+  return fco;
 }
 
 void MacroAssemblerARMCompat::store8(Imm32 imm, const Address& address) {
@@ -2174,69 +2193,44 @@ void MacroAssemblerARMCompat::storePtr(Register src, AbsoluteAddress dest) {
 
 // Note: this function clobbers the input register.
 void MacroAssembler::clampDoubleToUint8(FloatRegister input, Register output) {
-  if (HasVFPv3()) {
-    Label notSplit;
-    {
-      ScratchDoubleScope scratchDouble(*this);
-      MOZ_ASSERT(input != scratchDouble);
-      loadConstantDouble(0.5, scratchDouble);
+  ScratchDoubleScope scratchDouble(*this);
+  MOZ_ASSERT(input != scratchDouble);
 
-      ma_vadd(input, scratchDouble, scratchDouble);
-      // Convert the double into an unsigned fixed point value with 24 bits of
-      // precision. The resulting number will look like 0xII.DDDDDD
-      as_vcvtFixed(scratchDouble, false, 24, true);
-    }
+  Label done;
 
-    // Move the fixed point value into an integer register.
-    {
-      ScratchFloat32Scope scratchFloat(*this);
-      as_vxfer(output, InvalidReg, scratchFloat.uintOverlay(), FloatToCore);
-    }
+  // Set to zero if NaN.
+  compareDouble(input, NoVFPRegister);
+  ma_mov(Imm32(0), output, VFP_Unordered);
+  ma_b(&done, VFP_Unordered);
 
-    ScratchRegisterScope scratch(*this);
+  // Do the conversion to an integer.
+  as_vcvt(VFPRegister(scratchDouble).uintOverlay(), VFPRegister(input));
 
-    // See if this value *might* have been an exact integer after adding
-    // 0.5. This tests the 1/2 through 1/16,777,216th places, but 0.5 needs
-    // to be tested out to the 1/140,737,488,355,328th place.
-    ma_tst(output, Imm32(0x00ffffff), scratch);
-    // Convert to a uint8 by shifting out all of the fraction bits.
-    ma_lsr(Imm32(24), output, output);
-    // If any of the bottom 24 bits were non-zero, then we're good, since
-    // this number can't be exactly XX.0
-    ma_b(&notSplit, NonZero);
-    as_vxfer(scratch, InvalidReg, input, FloatToCore);
-    as_cmp(scratch, Imm8(0));
-    // If the lower 32 bits of the double were 0, then this was an exact number,
-    // and it should be even.
-    as_bic(output, output, Imm8(1), LeaveCC, Zero);
-    bind(&notSplit);
-  } else {
-    ScratchDoubleScope scratchDouble(*this);
-    MOZ_ASSERT(input != scratchDouble);
-    loadConstantDouble(0.5, scratchDouble);
+  // Copy the converted value out.
+  as_vxfer(output, InvalidReg, scratchDouble, FloatToCore);
 
-    Label outOfRange;
-    ma_vcmpz(input);
-    // Do the add, in place so we can reference it later.
-    ma_vadd(input, scratchDouble, input);
-    // Do the conversion to an integer.
-    as_vcvt(VFPRegister(scratchDouble).uintOverlay(), VFPRegister(input));
-    // Copy the converted value out.
-    as_vxfer(output, InvalidReg, scratchDouble, FloatToCore);
-    as_vmrs(pc);
-    ma_mov(Imm32(0), output, Overflow);  // NaN => 0
-    ma_b(&outOfRange, Overflow);         // NaN
-    as_cmp(output, Imm8(0xff));
-    ma_mov(Imm32(0xff), output, Above);
-    ma_b(&outOfRange, Above);
-    // Convert it back to see if we got the same value back.
-    as_vcvt(scratchDouble, VFPRegister(scratchDouble).uintOverlay());
-    // Do the check.
-    as_vcmp(scratchDouble, input);
-    as_vmrs(pc);
-    as_bic(output, output, Imm8(1), LeaveCC, Zero);
-    bind(&outOfRange);
-  }
+  // Clamp to 255.
+  as_cmp(output, Imm8(0xff));
+  ma_mov(Imm32(0xff), output, Above);
+  ma_b(&done, AboveOrEqual);
+
+  // Convert it back to see if we got the same value back.
+  as_vcvt(scratchDouble, VFPRegister(scratchDouble).uintOverlay());
+  ma_vsub(input, scratchDouble, input);
+
+  loadConstantDouble(0.5, scratchDouble);
+
+  // Do the check.
+  compareDouble(input, scratchDouble);
+
+  // Round up if > 0.5.
+  as_add(output, output, Imm8(1), LeaveCC, VFP_GreaterThan);
+
+  // Round up if == 0.5 and output is odd.
+  as_add(output, output, Imm8(1), LeaveCC, VFP_Equal);
+  as_bic(output, output, Imm8(1), LeaveCC, VFP_Equal);
+
+  bind(&done);
 }
 
 void MacroAssemblerARMCompat::cmp32(Register lhs, Imm32 rhs) {
@@ -2915,44 +2909,6 @@ void MacroAssemblerARMCompat::boxNonDouble(JSValueType type, Register src,
   ma_mov(ImmType(type), dest.typeReg());
 }
 
-void MacroAssemblerARMCompat::boolValueToDouble(const ValueOperand& operand,
-                                                FloatRegister dest) {
-  VFPRegister d = VFPRegister(dest);
-  loadConstantDouble(1.0, dest);
-  as_cmp(operand.payloadReg(), Imm8(0));
-  // If the source is 0, then subtract the dest from itself, producing 0.
-  as_vsub(d, d, d, Equal);
-}
-
-void MacroAssemblerARMCompat::int32ValueToDouble(const ValueOperand& operand,
-                                                 FloatRegister dest) {
-  // Transfer the integral value to a floating point register.
-  VFPRegister vfpdest = VFPRegister(dest);
-  as_vxfer(operand.payloadReg(), InvalidReg, vfpdest.sintOverlay(),
-           CoreToFloat);
-  // Convert the value to a double.
-  as_vcvt(vfpdest, vfpdest.sintOverlay());
-}
-
-void MacroAssemblerARMCompat::boolValueToFloat32(const ValueOperand& operand,
-                                                 FloatRegister dest) {
-  VFPRegister d = VFPRegister(dest).singleOverlay();
-  loadConstantFloat32(1.0, dest);
-  as_cmp(operand.payloadReg(), Imm8(0));
-  // If the source is 0, then subtract the dest from itself, producing 0.
-  as_vsub(d, d, d, Equal);
-}
-
-void MacroAssemblerARMCompat::int32ValueToFloat32(const ValueOperand& operand,
-                                                  FloatRegister dest) {
-  // Transfer the integral value to a floating point register.
-  VFPRegister vfpdest = VFPRegister(dest).singleOverlay();
-  as_vxfer(operand.payloadReg(), InvalidReg, vfpdest.sintOverlay(),
-           CoreToFloat);
-  // Convert the value to a float.
-  as_vcvt(vfpdest, vfpdest.sintOverlay());
-}
-
 void MacroAssemblerARMCompat::loadConstantFloat32(float f, FloatRegister dest) {
   ma_vimm_f32(f, dest);
 }
@@ -3347,21 +3303,6 @@ void MacroAssemblerARMCompat::simulatorStop(const char* msg) {
 #endif
 }
 
-void MacroAssemblerARMCompat::ensureDouble(const ValueOperand& source,
-                                           FloatRegister dest, Label* failure) {
-  Label isDouble, done;
-  asMasm().branchTestDouble(Assembler::Equal, source.typeReg(), &isDouble);
-  asMasm().branchTestInt32(Assembler::NotEqual, source.typeReg(), failure);
-
-  convertInt32ToDouble(source.payloadReg(), dest);
-  jump(&done);
-
-  bind(&isDouble);
-  unboxDouble(source, dest);
-
-  bind(&done);
-}
-
 void MacroAssemblerARMCompat::breakpoint(Condition cc) {
   ma_ldr(DTRAddr(r12, DtrRegImmShift(r12, LSL, 0, IsDown)), r12, Offset, cc);
 }
@@ -3371,7 +3312,8 @@ void MacroAssemblerARMCompat::checkStackAlignment() {
 }
 
 void MacroAssemblerARMCompat::handleFailureWithHandlerTail(
-    Label* profilerExitTail, Label* bailoutTail) {
+    Label* profilerExitTail, Label* bailoutTail,
+    uint32_t* returnValueCheckOffset) {
   // Reserve space for exception information.
   int size = (sizeof(ResumeFromException) + 7) & ~7;
 
@@ -3386,13 +3328,15 @@ void MacroAssemblerARMCompat::handleFailureWithHandlerTail(
   asMasm().callWithABI<Fn, HandleException>(
       ABIType::General, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
 
+  *returnValueCheckOffset = asMasm().currentOffset();
+
   Label entryFrame;
   Label catch_;
   Label finally;
   Label returnBaseline;
   Label returnIon;
   Label bailout;
-  Label wasm;
+  Label wasmInterpEntry;
   Label wasmCatch;
 
   {
@@ -3413,8 +3357,9 @@ void MacroAssemblerARMCompat::handleFailureWithHandlerTail(
                     Imm32(ExceptionResumeKind::ForcedReturnIon), &returnIon);
   asMasm().branch32(Assembler::Equal, r0, Imm32(ExceptionResumeKind::Bailout),
                     &bailout);
-  asMasm().branch32(Assembler::Equal, r0, Imm32(ExceptionResumeKind::Wasm),
-                    &wasm);
+  asMasm().branch32(Assembler::Equal, r0,
+                    Imm32(ExceptionResumeKind::WasmInterpEntry),
+                    &wasmInterpEntry);
   asMasm().branch32(Assembler::Equal, r0, Imm32(ExceptionResumeKind::WasmCatch),
                     &wasmCatch);
 
@@ -3533,17 +3478,16 @@ void MacroAssemblerARMCompat::handleFailureWithHandlerTail(
   }
   jump(bailoutTail);
 
-  // If we are throwing and the innermost frame was a wasm frame, reset SP and
-  // FP; SP is pointing to the unwound return address to the wasm entry, so
-  // we can just ret().
-  bind(&wasm);
+  // Reset SP and FP; SP is pointing to the unwound return address to the wasm
+  // interpreter entry, so we can just ret().
+  bind(&wasmInterpEntry);
   {
     ScratchRegisterScope scratch(asMasm());
     ma_ldr(Address(sp, ResumeFromException::offsetOfFramePointer()), r11,
            scratch);
     ma_ldr(Address(sp, ResumeFromException::offsetOfStackPointer()), sp,
            scratch);
-    ma_mov(Imm32(int32_t(wasm::FailInstanceReg)), InstanceReg);
+    ma_mov(Imm32(int32_t(wasm::InterpFailInstanceReg)), InstanceReg);
   }
   as_dtr(IsLoad, 32, PostIndex, pc, DTRAddr(sp, DtrOffImm(4)));
 
@@ -3804,6 +3748,13 @@ void MacroAssemblerARMCompat::ceilf(FloatRegister input, Register output,
   }
 
   bind(&fin);
+}
+
+void MacroAssemblerARMCompat::mov(CodeLabel* label, Register dest) {
+  BufferOffset bo =
+      ma_movPatchable(ImmPtr(/* placeholder */ nullptr), dest, Always);
+  label->patchAt()->bind(bo.getOffset());
+  label->setLinkMode(CodeLabel::MoveImmediate);
 }
 
 CodeOffset MacroAssemblerARMCompat::toggledJump(Label* label) {
@@ -4327,6 +4278,7 @@ void MacroAssembler::Push(const ImmGCPtr ptr) {
 }
 
 void MacroAssembler::Push(FloatRegister reg) {
+  MOZ_ASSERT(reg.isFloat(), "simd128 not supported");
   VFPRegister r = VFPRegister(reg);
   ma_vpush(VFPRegister(reg));
   adjustFrame(r.size());
@@ -4343,6 +4295,7 @@ void MacroAssembler::Pop(Register reg) {
 }
 
 void MacroAssembler::Pop(FloatRegister reg) {
+  MOZ_ASSERT(reg.isFloat(), "simd128 not supported");
   ma_vpop(reg);
   adjustFrame(-reg.size());
 }
@@ -4463,6 +4416,22 @@ void MacroAssembler::patchFarJump(CodeOffset farJump, uint32_t targetOffset) {
   *u32 = (targetOffset - addOffset) - 8;
 }
 
+void MacroAssembler::patchFarJump(uint8_t* farJump, uint8_t* target) {
+  uint32_t* u32 = reinterpret_cast<uint32_t*>(farJump);
+  MOZ_ASSERT(*u32 == UINT32_MAX);
+
+  uint8_t* addPtr = reinterpret_cast<uint8_t*>(u32) - 4;
+  MOZ_ASSERT(reinterpret_cast<Instruction*>(addPtr)->is<InstALU>());
+
+  int32_t distance = target - addPtr;
+  MOZ_RELEASE_ASSERT(mozilla::Abs(distance) <=
+                     (intptr_t)jit::MaxCodeBytesPerProcess);
+
+  // When pc is read as the operand of the add, its value is the address of
+  // the add instruction + 8.
+  *u32 = distance - 8;
+}
+
 CodeOffset MacroAssembler::nopPatchableToCall() {
   AutoForbidPoolsAndNops afp(this,
                              /* max number of instructions in scope = */ 1);
@@ -4483,6 +4452,27 @@ void MacroAssembler::patchCallToNop(uint8_t* call) {
   MOZ_ASSERT(reinterpret_cast<Instruction*>(inst)->is<InstBLImm>() ||
              reinterpret_cast<Instruction*>(inst)->is<InstNOP>());
   new (inst) InstNOP();
+}
+
+CodeOffset MacroAssembler::move32WithPatch(Register dest) {
+  return movWithPatch(ImmWord(uintptr_t(-1)), dest);
+}
+
+void MacroAssembler::patchMove32(CodeOffset offset, Imm32 n) {
+  Register dest;
+  Assembler::RelocStyle rs;
+
+  {
+    BufferInstructionIterator iter(BufferOffset(offset.offset()), &m_buffer);
+    DebugOnly<const uint32_t*> val = GetPtr32Target(iter, &dest, &rs);
+    MOZ_ASSERT(uint32_t((const uint32_t*)val) == uint32_t(-1));
+  }
+
+  // Patch over actual instructions.
+  {
+    BufferInstructionIterator iter(BufferOffset(offset.offset()), &m_buffer);
+    MacroAssembler::ma_mov_patch(n, dest, Always, rs, iter);
+  }
 }
 
 void MacroAssembler::pushReturnAddress() { push(lr); }
@@ -4548,7 +4538,7 @@ void MacroAssembler::callWithABIPost(uint32_t stackAdjust, ABIType result,
 
   // Calls to native functions in wasm pass through a thunk which already
   // fixes up the return value for us.
-  if (!callFromWasm && !UseHardFpABI()) {
+  if (!callFromWasm && !ARMFlags::UseHardFpABI()) {
     switch (result) {
       case ABIType::Float64:
         // Move double from r0/r1 to ReturnFloatReg.
@@ -4630,35 +4620,46 @@ void MacroAssembler::enterFakeExitFrameForWasm(Register cxreg, Register scratch,
   enterFakeExitFrame(cxreg, scratch, type);
 }
 
+CodeOffset MacroAssembler::sub32FromMemAndBranchIfNegativeWithPatch(
+    Address address, Label* label) {
+  ScratchRegisterScope value32(*this);
+  SecondScratchRegisterScope scratch(*this);
+  MOZ_ASSERT(scratch != address.base);
+  ma_ldr(address, value32, scratch);
+  // -128 is arbitrary, but makes `*address` count upwards, which may help
+  // to identify cases where the subsequent ::patch..() call was forgotten.
+  ma_sub(Imm32(-128), value32, scratch, SetCC);
+  // Points immediately after the insn to patch
+  CodeOffset patchPoint = CodeOffset(currentOffset());
+  // This assumes that ma_str does not change the condition codes.
+  ma_str(value32, address, scratch);
+  ma_b(label, Assembler::Signed);
+  return patchPoint;
+}
+
+void MacroAssembler::patchSub32FromMemAndBranchIfNegative(CodeOffset offset,
+                                                          Imm32 imm) {
+  int32_t val = imm.value;
+  // Patching it to zero would make the insn pointless
+  MOZ_RELEASE_ASSERT(val >= 1 && val <= 127);
+  BufferInstructionIterator iter(BufferOffset(offset.offset() - 4), &m_buffer);
+  uint32_t* instrPtr = const_cast<uint32_t*>(iter.cur()->raw());
+  // 31   27   23   19 15 11
+  // |    |    |    |  |  |
+  // 1110 0010 1001 Rn Rd imm12 = ADDS Rd, Rn, #imm12 // (expected)
+  // 1110 0010 0101 Rn Rd imm12 = SUBS Rd, Rn, #imm12 // (replacement)
+  uint32_t oldInstr = *instrPtr;
+  // Check opcode bits and imm field are as expected
+  MOZ_ASSERT((oldInstr >> 20) == 0b1110'0010'1001U);
+  MOZ_ASSERT((oldInstr & 0xFFF) == 128);           // as created above
+  uint32_t newInstr = (0b1110'0010'0101U << 20) |  // opcode bits
+                      (oldInstr & 0x000FF000U) |   // existing register fields
+                      (val & 0xFFF);               // #val
+  *instrPtr = newInstr;
+}
+
 // ===============================================================
 // Move instructions
-
-void MacroAssembler::moveValue(const TypedOrValueRegister& src,
-                               const ValueOperand& dest) {
-  if (src.hasValue()) {
-    moveValue(src.valueReg(), dest);
-    return;
-  }
-
-  MIRType type = src.type();
-  AnyRegister reg = src.typedReg();
-
-  if (!IsFloatingPointType(type)) {
-    if (reg.gpr() != dest.payloadReg()) {
-      mov(reg.gpr(), dest.payloadReg());
-    }
-    mov(ImmWord(MIRTypeToTag(type)), dest.typeReg());
-    return;
-  }
-
-  ScratchDoubleScope scratch(*this);
-  FloatRegister freg = reg.fpu();
-  if (type == MIRType::Float32) {
-    convertFloat32ToDouble(freg, scratch);
-    freg = scratch;
-  }
-  ma_vxfer(freg, dest.payloadReg(), dest.typeReg());
-}
 
 void MacroAssembler::moveValue(const ValueOperand& src,
                                const ValueOperand& dest) {
@@ -4762,6 +4763,7 @@ void MacroAssembler::branchValueIsNurseryCell(Condition cond,
 void MacroAssembler::branchTestValue(Condition cond, const ValueOperand& lhs,
                                      const Value& rhs, Label* label) {
   MOZ_ASSERT(cond == Equal || cond == NotEqual);
+  MOZ_ASSERT(!rhs.isNaN());
   // If cond == NotEqual, branch when a.payload != b.payload || a.tag !=
   // b.tag. If the payloads are equal, compare the tags. If the payloads are
   // not equal, short circuit true (NotEqual).
@@ -4777,6 +4779,22 @@ void MacroAssembler::branchTestValue(Condition cond, const ValueOperand& lhs,
     ma_cmp(lhs.payloadReg(), Imm32(rhs.toNunboxPayload()), scratch);
   }
   ma_cmp(lhs.typeReg(), Imm32(rhs.toNunboxTag()), scratch, Equal);
+  ma_b(label, cond);
+}
+
+void MacroAssembler::branchTestNaNValue(Condition cond, const ValueOperand& val,
+                                        Register temp, Label* label) {
+  MOZ_ASSERT(cond == Equal || cond == NotEqual);
+  ScratchRegisterScope scratch(*this);
+
+  // When testing for NaN, we want to ignore the sign bit.
+  static_assert(JS::detail::CanonicalizedNaNSignBit == 0);
+  const uint32_t SignBit = mozilla::FloatingPoint<double>::kSignBit >> 32;
+  as_bic(temp, val.typeReg(), Imm8(SignBit));
+
+  Value expected = DoubleValue(JS::GenericNaN());
+  ma_cmp(val.payloadReg(), Imm32(expected.toNunboxPayload()), scratch);
+  ma_cmp(temp, Imm32(expected.toNunboxTag()), scratch, Equal);
   ma_b(label, cond);
 }
 
@@ -4892,40 +4910,32 @@ void MacroAssembler::wasmTruncateFloat32ToInt32(FloatRegister input,
                       isSaturating, oolEntry);
 }
 
-void MacroAssembler::oolWasmTruncateCheckF32ToI32(FloatRegister input,
-                                                  Register output,
-                                                  TruncFlags flags,
-                                                  wasm::BytecodeOffset off,
-                                                  Label* rejoin) {
+void MacroAssembler::oolWasmTruncateCheckF32ToI32(
+    FloatRegister input, Register output, TruncFlags flags,
+    const wasm::TrapSiteDesc& trapSiteDesc, Label* rejoin) {
   outOfLineWasmTruncateToIntCheck(input, MIRType::Float32, MIRType::Int32,
-                                  flags, rejoin, off);
+                                  flags, rejoin, trapSiteDesc);
 }
 
-void MacroAssembler::oolWasmTruncateCheckF64ToI32(FloatRegister input,
-                                                  Register output,
-                                                  TruncFlags flags,
-                                                  wasm::BytecodeOffset off,
-                                                  Label* rejoin) {
+void MacroAssembler::oolWasmTruncateCheckF64ToI32(
+    FloatRegister input, Register output, TruncFlags flags,
+    const wasm::TrapSiteDesc& trapSiteDesc, Label* rejoin) {
   outOfLineWasmTruncateToIntCheck(input, MIRType::Double, MIRType::Int32, flags,
-                                  rejoin, off);
+                                  rejoin, trapSiteDesc);
 }
 
-void MacroAssembler::oolWasmTruncateCheckF32ToI64(FloatRegister input,
-                                                  Register64 output,
-                                                  TruncFlags flags,
-                                                  wasm::BytecodeOffset off,
-                                                  Label* rejoin) {
+void MacroAssembler::oolWasmTruncateCheckF32ToI64(
+    FloatRegister input, Register64 output, TruncFlags flags,
+    const wasm::TrapSiteDesc& trapSiteDesc, Label* rejoin) {
   outOfLineWasmTruncateToIntCheck(input, MIRType::Float32, MIRType::Int64,
-                                  flags, rejoin, off);
+                                  flags, rejoin, trapSiteDesc);
 }
 
-void MacroAssembler::oolWasmTruncateCheckF64ToI64(FloatRegister input,
-                                                  Register64 output,
-                                                  TruncFlags flags,
-                                                  wasm::BytecodeOffset off,
-                                                  Label* rejoin) {
+void MacroAssembler::oolWasmTruncateCheckF64ToI64(
+    FloatRegister input, Register64 output, TruncFlags flags,
+    const wasm::TrapSiteDesc& trapSiteDesc, Label* rejoin) {
   outOfLineWasmTruncateToIntCheck(input, MIRType::Double, MIRType::Int64, flags,
-                                  rejoin, off);
+                                  rejoin, trapSiteDesc);
 }
 
 void MacroAssembler::wasmLoad(const wasm::MemoryAccessDesc& access,
@@ -5844,6 +5854,8 @@ void MacroAssembler::atomicEffectOpJS(Scalar::Type arrayType,
   AtomicEffectOp(*this, nullptr, arrayType, sync, op, value, mem, temp);
 }
 
+void MacroAssembler::atomicPause() { as_yield(); }
+
 // ========================================================================
 // Primitive atomic operations.
 
@@ -5918,7 +5930,7 @@ inline void EmitRemainderOrQuotient(bool isRemainder, MacroAssembler& masm,
   // Currently this helper can't handle this situation.
   MOZ_ASSERT(lhsOutput != rhs);
 
-  if (HasIDIV()) {
+  if (ARMFlags::HasIDIV()) {
     if (isRemainder) {
       masm.remainder32(rhs, lhsOutput, isUnsigned);
     } else {
@@ -5965,11 +5977,23 @@ void MacroAssembler::flexibleQuotient32(
                           volatileLiveRegs);
 }
 
+void MacroAssembler::flexibleQuotientPtr(
+    Register rhs, Register srcDest, bool isUnsigned,
+    const LiveRegisterSet& volatileLiveRegs) {
+  flexibleQuotient32(rhs, srcDest, isUnsigned, volatileLiveRegs);
+}
+
 void MacroAssembler::flexibleRemainder32(
     Register rhs, Register srcDest, bool isUnsigned,
     const LiveRegisterSet& volatileLiveRegs) {
   EmitRemainderOrQuotient(true, *this, rhs, srcDest, isUnsigned,
                           volatileLiveRegs);
+}
+
+void MacroAssembler::flexibleRemainderPtr(
+    Register rhs, Register srcDest, bool isUnsigned,
+    const LiveRegisterSet& volatileLiveRegs) {
+  flexibleRemainder32(rhs, srcDest, isUnsigned, volatileLiveRegs);
 }
 
 void MacroAssembler::flexibleDivMod32(Register rhs, Register lhsOutput,
@@ -5978,7 +6002,7 @@ void MacroAssembler::flexibleDivMod32(Register rhs, Register lhsOutput,
   // Currently this helper can't handle this situation.
   MOZ_ASSERT(lhsOutput != rhs);
 
-  if (HasIDIV()) {
+  if (ARMFlags::HasIDIV()) {
     mov(lhsOutput, remOutput);
     remainder32(rhs, remOutput, isUnsigned);
     quotient32(rhs, lhsOutput, isUnsigned);
@@ -6097,7 +6121,6 @@ void MacroAssembler::shiftIndex32AndAdd(Register indexTemp32, int shift,
   addPtr(indexTemp32, pointer);
 }
 
-#ifdef ENABLE_WASM_TAIL_CALLS
 void MacroAssembler::wasmMarkCallAsSlow() { ma_and(lr, lr, lr); }
 
 const int32_t SlowCallMarker = 0xe00ee00e;
@@ -6119,7 +6142,6 @@ CodeOffset MacroAssembler::wasmMarkedSlowCall(const wasm::CallSiteDesc& desc,
   wasmMarkCallAsSlow();
   return offset;
 }
-#endif  // ENABLE_WASM_TAIL_CALLS
 
 //}}} check_macroassembler_style
 
@@ -6190,7 +6212,7 @@ void MacroAssemblerARM::wasmTruncateToInt32(FloatRegister input,
 
 void MacroAssemblerARM::outOfLineWasmTruncateToIntCheck(
     FloatRegister input, MIRType fromType, MIRType toType, TruncFlags flags,
-    Label* rejoin, wasm::BytecodeOffset trapOffset) {
+    Label* rejoin, const wasm::TrapSiteDesc& trapSiteDesc) {
   // On ARM, saturating truncation codegen handles saturating itself rather
   // than relying on out-of-line fixup code.
   if (flags & TRUNC_SATURATING) {
@@ -6273,10 +6295,10 @@ void MacroAssemblerARM::outOfLineWasmTruncateToIntCheck(
 
   // Handle errors.
   bind(&fail);
-  asMasm().wasmTrap(wasm::Trap::IntegerOverflow, trapOffset);
+  asMasm().wasmTrap(wasm::Trap::IntegerOverflow, trapSiteDesc);
 
   bind(&inputIsNaN);
-  asMasm().wasmTrap(wasm::Trap::InvalidConversionToInteger, trapOffset);
+  asMasm().wasmTrap(wasm::Trap::InvalidConversionToInteger, trapSiteDesc);
 }
 
 void MacroAssemblerARM::wasmLoadImpl(const wasm::MemoryAccessDesc& access,
@@ -6292,7 +6314,7 @@ void MacroAssemblerARM::wasmLoadImpl(const wasm::MemoryAccessDesc& access,
   MOZ_ASSERT(!access.isWidenSimd128Load());
 
   access.assertOffsetInGuardPages();
-  uint32_t offset = access.offset();
+  uint32_t offset = access.offset32();
 
   Scalar::Type type = access.type();
 
@@ -6304,8 +6326,7 @@ void MacroAssemblerARM::wasmLoadImpl(const wasm::MemoryAccessDesc& access,
     }
   }
 
-  bool isSigned = type == Scalar::Int8 || type == Scalar::Int16 ||
-                  type == Scalar::Int32 || type == Scalar::Int64;
+  bool isSigned = Scalar::isSignedIntType(type);
   unsigned byteSize = access.byteSize();
 
   // NOTE: the generated code must match the assembly code in gen_load in
@@ -6351,7 +6372,7 @@ void MacroAssemblerARM::wasmLoadImpl(const wasm::MemoryAccessDesc& access,
       // FP loads can't use VLDR as that has stringent alignment checks and will
       // SIGBUS on unaligned accesses.  Choose a different strategy depending on
       // the available hardware. We don't gate Wasm on the presence of NEON.
-      if (HasNEON()) {
+      if (ARMFlags::HasNEON()) {
         // NEON available: The VLD1 multiple-single-elements variant will only
         // trap if SCTRL.A==1, but we already assume (for integer accesses) that
         // the hardware/OS handles that transparently.
@@ -6414,7 +6435,7 @@ void MacroAssemblerARM::wasmStoreImpl(const wasm::MemoryAccessDesc& access,
   MOZ_ASSERT(ptr == ptrScratch);
 
   access.assertOffsetInGuardPages();
-  uint32_t offset = access.offset();
+  uint32_t offset = access.offset32();
   unsigned byteSize = access.byteSize();
   Scalar::Type type = access.type();
 
@@ -6459,7 +6480,7 @@ void MacroAssemblerARM::wasmStoreImpl(const wasm::MemoryAccessDesc& access,
       ma_add(memoryBase, ptr, scratch);
 
       // See comments above at wasmLoadImpl for more about this logic.
-      if (HasNEON()) {
+      if (ARMFlags::HasNEON()) {
         if (byteSize == 4 && (val.code() & 1)) {
           ScratchFloat32Scope fscratch(asMasm());
           as_vmov(fscratch, val);

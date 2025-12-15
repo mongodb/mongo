@@ -28,7 +28,7 @@ class TaggedParserAtomIndex;
 }  // namespace frontend
 
 class GlobalObject;
-class StringBuffer;
+class StringBuilder;
 
 [[nodiscard]] extern bool InitRuntimeNumberState(JSRuntime* rt);
 
@@ -59,8 +59,9 @@ extern JSLinearString* Int32ToStringWithHeap(JSContext* cx, int32_t i,
 
 extern JSLinearString* Int32ToStringPure(JSContext* cx, int32_t i);
 
-extern JSString* Int32ToStringWithBase(JSContext* cx, int32_t i, int32_t base,
-                                       bool lowerCase);
+template <AllowGC allowGC>
+extern JSLinearString* Int32ToStringWithBase(JSContext* cx, int32_t i,
+                                             int32_t base, bool lowerCase);
 
 extern JSAtom* Int32ToAtom(JSContext* cx, int32_t si);
 
@@ -72,10 +73,10 @@ extern bool IsInteger(double d);
 
 /*
  * Convert an integer or double (contained in the given value) to a string and
- * append to the given buffer.
+ * append to the given string builder.
  */
-[[nodiscard]] extern bool NumberValueToStringBuffer(const Value& v,
-                                                    StringBuffer& sb);
+[[nodiscard]] extern bool NumberValueToStringBuilder(const Value& v,
+                                                     StringBuilder& sb);
 
 extern JSLinearString* IndexToString(JSContext* cx, uint32_t index);
 
@@ -226,7 +227,7 @@ double CharsToNumber(const CharT* chars, size_t length);
                                              double* result);
 
 // Infallible version of StringToNumber for linear strings.
-extern double LinearStringToNumber(JSLinearString* str);
+extern double LinearStringToNumber(const JSLinearString* str);
 
 // Parse the input string as if Number.parseInt had been called.
 extern bool NumberParseInt(JSContext* cx, JS::HandleString str, int32_t radix,
@@ -305,6 +306,20 @@ template <typename CharT>
                                                            Value* vp);
 
 [[nodiscard]] extern bool num_valueOf(JSContext* cx, unsigned argc, Value* vp);
+
+static inline bool IsNumberIndex(const Value& v) {
+  if (v.isInt32() && v.toInt32() >= 0) {
+    return true;
+  }
+
+  int64_t i;
+  if (v.isDouble() && mozilla::NumberEqualsInt64(v.toDouble(), &i) && i >= 0 &&
+      i <= MAX_ARRAY_INDEX) {
+    return true;
+  }
+
+  return false;
+}
 
 /*
  * Returns true if the given value is definitely an index: that is, the value
@@ -387,6 +402,40 @@ static MOZ_ALWAYS_INLINE bool IsDefinitelyIndex(const Value& v,
 [[nodiscard]] static inline bool ToIndex(JSContext* cx, JS::HandleValue v,
                                          uint64_t* index) {
   return ToIndex(cx, v, JSMSG_BAD_INDEX, index);
+}
+
+/**
+ * Convert |value| to an integer and clamp it to a valid integer index within
+ * the range `[0..length]`.
+ */
+template <typename ArrayLength>
+[[nodiscard]] extern bool ToIntegerIndexSlow(JSContext* cx, Handle<Value> value,
+                                             ArrayLength length,
+                                             ArrayLength* result);
+
+template <typename ArrayLength>
+[[nodiscard]] static inline bool ToIntegerIndex(JSContext* cx,
+                                                Handle<Value> value,
+                                                ArrayLength length,
+                                                ArrayLength* result) {
+  static_assert(std::is_unsigned_v<ArrayLength>);
+
+  // Optimize for the common case when |value| is an int32 to avoid unnecessary
+  // floating point computations.
+  if (value.isInt32()) {
+    int32_t relative = value.toInt32();
+
+    if (relative >= 0) {
+      *result = std::min(ArrayLength(relative), length);
+    } else if (mozilla::Abs(relative) <= length) {
+      *result = length - mozilla::Abs(relative);
+    } else {
+      *result = 0;
+    }
+    return true;
+  }
+
+  return ToIntegerIndexSlow(cx, value, length, result);
 }
 
 } /* namespace js */

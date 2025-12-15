@@ -12,129 +12,237 @@
 #include <stdint.h>
 
 #define JS_PREF_CLASS_FIELDS \
-  static bool array_grouping_;\
-  static bool arraybuffer_transfer_;\
-  static bool destructuring_fuse_;\
-  static bool experimental_arraybuffer_resizable_;\
-  static bool experimental_new_set_methods_;\
+  static bool atomics_wait_async_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> dom_alloc_site_;\
+  static bool experimental_atomics_pause_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> experimental_dictionary_teleporting_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> experimental_error_capture_stack_trace_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> experimental_error_iserror_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> experimental_import_attributes_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> experimental_json_parse_with_source_;\
+  static bool experimental_math_sumprecise_;\
+  static bool experimental_promise_try_;\
+  static bool experimental_regexp_duplicate_named_groups_;\
+  static bool experimental_regexp_modifiers_;\
+  static bool experimental_self_hosted_cache_;\
   static mozilla::Atomic<bool, mozilla::Relaxed> experimental_shadow_realms_;\
-  static bool experimental_sharedarraybuffer_growable_;\
+  static bool experimental_temporal_;\
+  static bool experimental_uint8array_base64_;\
   static bool experimental_weakrefs_expose_cleanupSome_;\
+  static uint32_t ion_regalloc_;\
   static bool property_error_message_fix_;\
   static bool site_based_pretenuring_;\
   static mozilla::Atomic<uint32_t, mozilla::Relaxed> tests_uint32_pref_;\
-  static bool use_emulates_undefined_fuse_;\
   static mozilla::Atomic<bool, mozilla::Relaxed> use_fdlibm_for_sin_cos_tan_;\
-  static bool wasm_branch_hinting_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> warn_asmjs_deprecation_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_branch_hinting_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_call_ref_inlining_;\
+  static mozilla::Atomic<uint32_t, mozilla::Relaxed> wasm_call_ref_inlining_percent_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_direct_inlining_;\
+  static bool wasm_disable_huge_memory_;\
   static bool wasm_exnref_;\
-  static bool wasm_gc_;\
-  static bool wasm_js_promise_integration_;\
-  static bool wasm_js_string_builtins_;\
-  static bool wasm_memory64_;\
-  static bool wasm_memory_control_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_gc_;\
+  static mozilla::Atomic<uint32_t, mozilla::Relaxed> wasm_inlining_level_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_js_promise_integration_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_js_string_builtins_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_lazy_tiering_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_lazy_tiering_for_gc_;\
+  static mozilla::Atomic<uint32_t, mozilla::Relaxed> wasm_lazy_tiering_level_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_lazy_tiering_synchronous_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_memory64_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_memory_control_;\
   static bool wasm_moz_intgemm_;\
-  static bool wasm_multi_memory_;\
-  static bool wasm_relaxed_simd_;\
-  static bool wasm_tail_calls_;\
-  static bool wasm_test_serialization_;\
-  static bool weakrefs_;\
-  static bool well_formed_unicode_strings_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_multi_memory_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_relaxed_simd_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_tail_calls_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_test_serialization_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_trace_api_;\
+  static mozilla::Atomic<uint32_t, mozilla::Relaxed> wasm_unroll_factor_;\
+  static mozilla::Atomic<bool, mozilla::Relaxed> wasm_unroll_loops_;\
 
 
 #define JS_PREF_CLASS_FIELDS_INIT \
-  bool JS::Prefs::array_grouping_{true};\
-  bool JS::Prefs::arraybuffer_transfer_{true};\
-  bool JS::Prefs::destructuring_fuse_{true};\
-  bool JS::Prefs::experimental_arraybuffer_resizable_{true};\
-  bool JS::Prefs::experimental_new_set_methods_{true};\
+  bool JS::Prefs::atomics_wait_async_{false};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::dom_alloc_site_{true};\
+  bool JS::Prefs::experimental_atomics_pause_{true};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::experimental_dictionary_teleporting_{true};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::experimental_error_capture_stack_trace_{true};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::experimental_error_iserror_{true};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::experimental_import_attributes_{true};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::experimental_json_parse_with_source_{true};\
+  bool JS::Prefs::experimental_math_sumprecise_{true};\
+  bool JS::Prefs::experimental_promise_try_{true};\
+  bool JS::Prefs::experimental_regexp_duplicate_named_groups_{true};\
+  bool JS::Prefs::experimental_regexp_modifiers_{true};\
+  bool JS::Prefs::experimental_self_hosted_cache_{false};\
   mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::experimental_shadow_realms_{false};\
-  bool JS::Prefs::experimental_sharedarraybuffer_growable_{true};\
+  bool JS::Prefs::experimental_temporal_{true};\
+  bool JS::Prefs::experimental_uint8array_base64_{true};\
   bool JS::Prefs::experimental_weakrefs_expose_cleanupSome_{false};\
-  bool JS::Prefs::property_error_message_fix_{false};\
+  uint32_t JS::Prefs::ion_regalloc_{0};\
+  bool JS::Prefs::property_error_message_fix_{true};\
   bool JS::Prefs::site_based_pretenuring_{true};\
   mozilla::Atomic<uint32_t, mozilla::Relaxed> JS::Prefs::tests_uint32_pref_{1};\
-  bool JS::Prefs::use_emulates_undefined_fuse_{true};\
-  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::use_fdlibm_for_sin_cos_tan_{false};\
-  bool JS::Prefs::wasm_branch_hinting_{false};\
-  bool JS::Prefs::wasm_exnref_{false};\
-  bool JS::Prefs::wasm_gc_{true};\
-  bool JS::Prefs::wasm_js_promise_integration_{false};\
-  bool JS::Prefs::wasm_js_string_builtins_{false};\
-  bool JS::Prefs::wasm_memory64_{false};\
-  bool JS::Prefs::wasm_memory_control_{false};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::use_fdlibm_for_sin_cos_tan_{true};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::warn_asmjs_deprecation_{true};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_branch_hinting_{false};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_call_ref_inlining_{true};\
+  mozilla::Atomic<uint32_t, mozilla::Relaxed> JS::Prefs::wasm_call_ref_inlining_percent_{40};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_direct_inlining_{true};\
+  bool JS::Prefs::wasm_disable_huge_memory_{false};\
+  bool JS::Prefs::wasm_exnref_{true};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_gc_{false};\
+  mozilla::Atomic<uint32_t, mozilla::Relaxed> JS::Prefs::wasm_inlining_level_{5};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_js_promise_integration_{false};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_js_string_builtins_{true};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_lazy_tiering_{true};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_lazy_tiering_for_gc_{true};\
+  mozilla::Atomic<uint32_t, mozilla::Relaxed> JS::Prefs::wasm_lazy_tiering_level_{5};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_lazy_tiering_synchronous_{false};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_memory64_{true};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_memory_control_{false};\
   bool JS::Prefs::wasm_moz_intgemm_{false};\
-  bool JS::Prefs::wasm_multi_memory_{true};\
-  bool JS::Prefs::wasm_relaxed_simd_{false};\
-  bool JS::Prefs::wasm_tail_calls_{true};\
-  bool JS::Prefs::wasm_test_serialization_{false};\
-  bool JS::Prefs::weakrefs_{true};\
-  bool JS::Prefs::well_formed_unicode_strings_{true};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_multi_memory_{true};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_relaxed_simd_{false};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_tail_calls_{false};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_test_serialization_{false};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_trace_api_{false};\
+  mozilla::Atomic<uint32_t, mozilla::Relaxed> JS::Prefs::wasm_unroll_factor_{3};\
+  mozilla::Atomic<bool, mozilla::Relaxed> JS::Prefs::wasm_unroll_loops_{false};\
 
 
 #define FOR_EACH_JS_PREF(MACRO) \
-  MACRO("array_grouping", array_grouping, bool, setAtStartup_array_grouping, true)\
-  MACRO("arraybuffer_transfer", arraybuffer_transfer, bool, setAtStartup_arraybuffer_transfer, true)\
-  MACRO("destructuring_fuse", destructuring_fuse, bool, setAtStartup_destructuring_fuse, true)\
-  MACRO("experimental.arraybuffer_resizable", experimental_arraybuffer_resizable, bool, setAtStartup_experimental_arraybuffer_resizable, true)\
-  MACRO("experimental.new_set_methods", experimental_new_set_methods, bool, setAtStartup_experimental_new_set_methods, true)\
+  MACRO("atomics_wait_async", atomics_wait_async, bool, setAtStartup_atomics_wait_async, true)\
+  MACRO("dom_alloc_site", dom_alloc_site, bool, set_dom_alloc_site, false)\
+  MACRO("experimental.atomics_pause", experimental_atomics_pause, bool, setAtStartup_experimental_atomics_pause, true)\
+  MACRO("experimental.dictionary_teleporting", experimental_dictionary_teleporting, bool, set_experimental_dictionary_teleporting, false)\
+  MACRO("experimental.error_capture_stack_trace", experimental_error_capture_stack_trace, bool, set_experimental_error_capture_stack_trace, false)\
+  MACRO("experimental.error_iserror", experimental_error_iserror, bool, set_experimental_error_iserror, false)\
+  MACRO("experimental.import_attributes", experimental_import_attributes, bool, set_experimental_import_attributes, false)\
+  MACRO("experimental.json_parse_with_source", experimental_json_parse_with_source, bool, set_experimental_json_parse_with_source, false)\
+  MACRO("experimental.math_sumprecise", experimental_math_sumprecise, bool, setAtStartup_experimental_math_sumprecise, true)\
+  MACRO("experimental.promise_try", experimental_promise_try, bool, setAtStartup_experimental_promise_try, true)\
+  MACRO("experimental.regexp_duplicate_named_groups", experimental_regexp_duplicate_named_groups, bool, setAtStartup_experimental_regexp_duplicate_named_groups, true)\
+  MACRO("experimental.regexp_modifiers", experimental_regexp_modifiers, bool, setAtStartup_experimental_regexp_modifiers, true)\
+  MACRO("experimental.self_hosted_cache", experimental_self_hosted_cache, bool, setAtStartup_experimental_self_hosted_cache, true)\
   MACRO("experimental.shadow_realms", experimental_shadow_realms, bool, set_experimental_shadow_realms, false)\
-  MACRO("experimental.sharedarraybuffer_growable", experimental_sharedarraybuffer_growable, bool, setAtStartup_experimental_sharedarraybuffer_growable, true)\
+  MACRO("experimental.temporal", experimental_temporal, bool, setAtStartup_experimental_temporal, true)\
+  MACRO("experimental.uint8array_base64", experimental_uint8array_base64, bool, setAtStartup_experimental_uint8array_base64, true)\
   MACRO("experimental.weakrefs.expose_cleanupSome", experimental_weakrefs_expose_cleanupSome, bool, setAtStartup_experimental_weakrefs_expose_cleanupSome, true)\
+  MACRO("ion.regalloc", ion_regalloc, uint32_t, setAtStartup_ion_regalloc, true)\
   MACRO("property_error_message_fix", property_error_message_fix, bool, setAtStartup_property_error_message_fix, true)\
   MACRO("site_based_pretenuring", site_based_pretenuring, bool, setAtStartup_site_based_pretenuring, true)\
   MACRO("tests.uint32-pref", tests_uint32_pref, uint32_t, set_tests_uint32_pref, false)\
-  MACRO("use_emulates_undefined_fuse", use_emulates_undefined_fuse, bool, setAtStartup_use_emulates_undefined_fuse, true)\
   MACRO("use_fdlibm_for_sin_cos_tan", use_fdlibm_for_sin_cos_tan, bool, set_use_fdlibm_for_sin_cos_tan, false)\
-  MACRO("wasm_branch_hinting", wasm_branch_hinting, bool, setAtStartup_wasm_branch_hinting, true)\
+  MACRO("warn_asmjs_deprecation", warn_asmjs_deprecation, bool, set_warn_asmjs_deprecation, false)\
+  MACRO("wasm_branch_hinting", wasm_branch_hinting, bool, set_wasm_branch_hinting, false)\
+  MACRO("wasm_call_ref_inlining", wasm_call_ref_inlining, bool, set_wasm_call_ref_inlining, false)\
+  MACRO("wasm_call_ref_inlining_percent", wasm_call_ref_inlining_percent, uint32_t, set_wasm_call_ref_inlining_percent, false)\
+  MACRO("wasm_direct_inlining", wasm_direct_inlining, bool, set_wasm_direct_inlining, false)\
+  MACRO("wasm_disable_huge_memory", wasm_disable_huge_memory, bool, setAtStartup_wasm_disable_huge_memory, true)\
   MACRO("wasm_exnref", wasm_exnref, bool, setAtStartup_wasm_exnref, true)\
-  MACRO("wasm_gc", wasm_gc, bool, setAtStartup_wasm_gc, true)\
-  MACRO("wasm_js_promise_integration", wasm_js_promise_integration, bool, setAtStartup_wasm_js_promise_integration, true)\
-  MACRO("wasm_js_string_builtins", wasm_js_string_builtins, bool, setAtStartup_wasm_js_string_builtins, true)\
-  MACRO("wasm_memory64", wasm_memory64, bool, setAtStartup_wasm_memory64, true)\
-  MACRO("wasm_memory_control", wasm_memory_control, bool, setAtStartup_wasm_memory_control, true)\
+  MACRO("wasm_gc", wasm_gc, bool, set_wasm_gc, false)\
+  MACRO("wasm_inlining_level", wasm_inlining_level, uint32_t, set_wasm_inlining_level, false)\
+  MACRO("wasm_js_promise_integration", wasm_js_promise_integration, bool, set_wasm_js_promise_integration, false)\
+  MACRO("wasm_js_string_builtins", wasm_js_string_builtins, bool, set_wasm_js_string_builtins, false)\
+  MACRO("wasm_lazy_tiering", wasm_lazy_tiering, bool, set_wasm_lazy_tiering, false)\
+  MACRO("wasm_lazy_tiering_for_gc", wasm_lazy_tiering_for_gc, bool, set_wasm_lazy_tiering_for_gc, false)\
+  MACRO("wasm_lazy_tiering_level", wasm_lazy_tiering_level, uint32_t, set_wasm_lazy_tiering_level, false)\
+  MACRO("wasm_lazy_tiering_synchronous", wasm_lazy_tiering_synchronous, bool, set_wasm_lazy_tiering_synchronous, false)\
+  MACRO("wasm_memory64", wasm_memory64, bool, set_wasm_memory64, false)\
+  MACRO("wasm_memory_control", wasm_memory_control, bool, set_wasm_memory_control, false)\
   MACRO("wasm_moz_intgemm", wasm_moz_intgemm, bool, setAtStartup_wasm_moz_intgemm, true)\
-  MACRO("wasm_multi_memory", wasm_multi_memory, bool, setAtStartup_wasm_multi_memory, true)\
-  MACRO("wasm_relaxed_simd", wasm_relaxed_simd, bool, setAtStartup_wasm_relaxed_simd, true)\
-  MACRO("wasm_tail_calls", wasm_tail_calls, bool, setAtStartup_wasm_tail_calls, true)\
-  MACRO("wasm_test_serialization", wasm_test_serialization, bool, setAtStartup_wasm_test_serialization, true)\
-  MACRO("weakrefs", weakrefs, bool, setAtStartup_weakrefs, true)\
-  MACRO("well_formed_unicode_strings", well_formed_unicode_strings, bool, setAtStartup_well_formed_unicode_strings, true)\
+  MACRO("wasm_multi_memory", wasm_multi_memory, bool, set_wasm_multi_memory, false)\
+  MACRO("wasm_relaxed_simd", wasm_relaxed_simd, bool, set_wasm_relaxed_simd, false)\
+  MACRO("wasm_tail_calls", wasm_tail_calls, bool, set_wasm_tail_calls, false)\
+  MACRO("wasm_test_serialization", wasm_test_serialization, bool, set_wasm_test_serialization, false)\
+  MACRO("wasm_trace_api", wasm_trace_api, bool, set_wasm_trace_api, false)\
+  MACRO("wasm_unroll_factor", wasm_unroll_factor, uint32_t, set_wasm_unroll_factor, false)\
+  MACRO("wasm_unroll_loops", wasm_unroll_loops, bool, set_wasm_unroll_loops, false)\
 
 
 #define SET_JS_PREFS_FROM_BROWSER_PREFS \
-  JS::Prefs::setAtStartup_array_grouping(mozilla::StaticPrefs::javascript_options_array_grouping());\
-  JS::Prefs::setAtStartup_arraybuffer_transfer(mozilla::StaticPrefs::javascript_options_arraybuffer_transfer());\
-  JS::Prefs::setAtStartup_destructuring_fuse(mozilla::StaticPrefs::javascript_options_destructuring_fuse());\
-  JS::Prefs::setAtStartup_experimental_arraybuffer_resizable(mozilla::StaticPrefs::javascript_options_experimental_arraybuffer_resizable());\
-  JS::Prefs::setAtStartup_experimental_new_set_methods(mozilla::StaticPrefs::javascript_options_experimental_new_set_methods());\
+  JS::Prefs::setAtStartup_atomics_wait_async(mozilla::StaticPrefs::javascript_options_atomics_wait_async());\
+  JS::Prefs::set_dom_alloc_site(mozilla::StaticPrefs::javascript_options_dom_alloc_site());\
+  JS::Prefs::setAtStartup_experimental_atomics_pause(mozilla::StaticPrefs::javascript_options_experimental_atomics_pause());\
+  JS::Prefs::set_experimental_dictionary_teleporting(mozilla::StaticPrefs::javascript_options_experimental_dictionary_teleporting());\
+  JS::Prefs::set_experimental_error_capture_stack_trace(mozilla::StaticPrefs::javascript_options_experimental_error_capture_stack_trace());\
+  JS::Prefs::set_experimental_error_iserror(mozilla::StaticPrefs::javascript_options_experimental_error_iserror());\
+  JS::Prefs::set_experimental_import_attributes(mozilla::StaticPrefs::javascript_options_experimental_import_attributes());\
+  JS::Prefs::set_experimental_json_parse_with_source(mozilla::StaticPrefs::javascript_options_experimental_json_parse_with_source());\
+  JS::Prefs::setAtStartup_experimental_math_sumprecise(mozilla::StaticPrefs::javascript_options_experimental_math_sumprecise());\
+  JS::Prefs::setAtStartup_experimental_promise_try(mozilla::StaticPrefs::javascript_options_experimental_promise_try());\
+  JS::Prefs::setAtStartup_experimental_regexp_duplicate_named_groups(mozilla::StaticPrefs::javascript_options_experimental_regexp_duplicate_named_groups());\
+  JS::Prefs::setAtStartup_experimental_regexp_modifiers(mozilla::StaticPrefs::javascript_options_experimental_regexp_modifiers());\
+  JS::Prefs::setAtStartup_experimental_self_hosted_cache(mozilla::StaticPrefs::javascript_options_experimental_self_hosted_cache());\
   JS::Prefs::set_experimental_shadow_realms(mozilla::StaticPrefs::javascript_options_experimental_shadow_realms());\
-  JS::Prefs::setAtStartup_experimental_sharedarraybuffer_growable(mozilla::StaticPrefs::javascript_options_experimental_sharedarraybuffer_growable());\
+  JS::Prefs::setAtStartup_experimental_temporal(mozilla::StaticPrefs::javascript_options_experimental_temporal());\
+  JS::Prefs::setAtStartup_experimental_uint8array_base64(mozilla::StaticPrefs::javascript_options_experimental_uint8array_base64());\
   JS::Prefs::setAtStartup_experimental_weakrefs_expose_cleanupSome(mozilla::StaticPrefs::javascript_options_experimental_weakrefs_expose_cleanupSome());\
+  JS::Prefs::setAtStartup_ion_regalloc(mozilla::StaticPrefs::javascript_options_ion_regalloc());\
   JS::Prefs::setAtStartup_property_error_message_fix(mozilla::StaticPrefs::javascript_options_property_error_message_fix());\
   JS::Prefs::setAtStartup_site_based_pretenuring(mozilla::StaticPrefs::javascript_options_site_based_pretenuring_DoNotUseDirectly());\
   JS::Prefs::set_tests_uint32_pref(mozilla::StaticPrefs::javascript_options_tests_uint32_pref());\
-  JS::Prefs::setAtStartup_use_emulates_undefined_fuse(mozilla::StaticPrefs::javascript_options_use_emulates_undefined_fuse_DoNotUseDirectly());\
   JS::Prefs::set_use_fdlibm_for_sin_cos_tan(mozilla::StaticPrefs::javascript_options_use_fdlibm_for_sin_cos_tan());\
-  JS::Prefs::setAtStartup_wasm_branch_hinting(mozilla::StaticPrefs::javascript_options_wasm_branch_hinting());\
+  JS::Prefs::set_warn_asmjs_deprecation(mozilla::StaticPrefs::javascript_options_warn_asmjs_deprecation());\
+  JS::Prefs::set_wasm_branch_hinting(mozilla::StaticPrefs::javascript_options_wasm_branch_hinting());\
+  JS::Prefs::set_wasm_call_ref_inlining(mozilla::StaticPrefs::javascript_options_wasm_call_ref_inlining());\
+  JS::Prefs::set_wasm_call_ref_inlining_percent(mozilla::StaticPrefs::javascript_options_wasm_call_ref_inlining_percent());\
+  JS::Prefs::set_wasm_direct_inlining(mozilla::StaticPrefs::javascript_options_wasm_direct_inlining());\
+  JS::Prefs::setAtStartup_wasm_disable_huge_memory(mozilla::StaticPrefs::javascript_options_wasm_disable_huge_memory());\
   JS::Prefs::setAtStartup_wasm_exnref(mozilla::StaticPrefs::javascript_options_wasm_exnref());\
-  JS::Prefs::setAtStartup_wasm_gc(mozilla::StaticPrefs::javascript_options_wasm_gc());\
-  JS::Prefs::setAtStartup_wasm_js_promise_integration(mozilla::StaticPrefs::javascript_options_wasm_js_promise_integration());\
-  JS::Prefs::setAtStartup_wasm_js_string_builtins(mozilla::StaticPrefs::javascript_options_wasm_js_string_builtins());\
-  JS::Prefs::setAtStartup_wasm_memory64(mozilla::StaticPrefs::javascript_options_wasm_memory64());\
-  JS::Prefs::setAtStartup_wasm_memory_control(mozilla::StaticPrefs::javascript_options_wasm_memory_control());\
+  JS::Prefs::set_wasm_gc(mozilla::StaticPrefs::javascript_options_wasm_gc());\
+  JS::Prefs::set_wasm_inlining_level(mozilla::StaticPrefs::javascript_options_wasm_inlining_level());\
+  JS::Prefs::set_wasm_js_promise_integration(mozilla::StaticPrefs::javascript_options_wasm_js_promise_integration());\
+  JS::Prefs::set_wasm_js_string_builtins(mozilla::StaticPrefs::javascript_options_wasm_js_string_builtins());\
+  JS::Prefs::set_wasm_lazy_tiering(mozilla::StaticPrefs::javascript_options_wasm_lazy_tiering());\
+  JS::Prefs::set_wasm_lazy_tiering_for_gc(mozilla::StaticPrefs::javascript_options_wasm_lazy_tiering_for_gc());\
+  JS::Prefs::set_wasm_lazy_tiering_level(mozilla::StaticPrefs::javascript_options_wasm_lazy_tiering_level());\
+  JS::Prefs::set_wasm_lazy_tiering_synchronous(mozilla::StaticPrefs::javascript_options_wasm_lazy_tiering_synchronous());\
+  JS::Prefs::set_wasm_memory64(mozilla::StaticPrefs::javascript_options_wasm_memory64());\
+  JS::Prefs::set_wasm_memory_control(mozilla::StaticPrefs::javascript_options_wasm_memory_control());\
   JS::Prefs::setAtStartup_wasm_moz_intgemm(mozilla::StaticPrefs::javascript_options_wasm_moz_intgemm());\
-  JS::Prefs::setAtStartup_wasm_multi_memory(mozilla::StaticPrefs::javascript_options_wasm_multi_memory());\
-  JS::Prefs::setAtStartup_wasm_relaxed_simd(mozilla::StaticPrefs::javascript_options_wasm_relaxed_simd());\
-  JS::Prefs::setAtStartup_wasm_tail_calls(mozilla::StaticPrefs::javascript_options_wasm_tail_calls());\
-  JS::Prefs::setAtStartup_wasm_test_serialization(mozilla::StaticPrefs::javascript_options_wasm_test_serialization());\
-  JS::Prefs::setAtStartup_weakrefs(mozilla::StaticPrefs::javascript_options_weakrefs());\
-  JS::Prefs::setAtStartup_well_formed_unicode_strings(mozilla::StaticPrefs::javascript_options_well_formed_unicode_strings());\
+  JS::Prefs::set_wasm_multi_memory(mozilla::StaticPrefs::javascript_options_wasm_multi_memory());\
+  JS::Prefs::set_wasm_relaxed_simd(mozilla::StaticPrefs::javascript_options_wasm_relaxed_simd());\
+  JS::Prefs::set_wasm_tail_calls(mozilla::StaticPrefs::javascript_options_wasm_tail_calls());\
+  JS::Prefs::set_wasm_test_serialization(mozilla::StaticPrefs::javascript_options_wasm_test_serialization());\
+  JS::Prefs::set_wasm_trace_api(mozilla::StaticPrefs::javascript_options_wasm_trace_api());\
+  JS::Prefs::set_wasm_unroll_factor(mozilla::StaticPrefs::javascript_options_wasm_unroll_factor());\
+  JS::Prefs::set_wasm_unroll_loops(mozilla::StaticPrefs::javascript_options_wasm_unroll_loops());\
 
 
 #define SET_NON_STARTUP_JS_PREFS_FROM_BROWSER_PREFS \
+  JS::Prefs::set_dom_alloc_site(mozilla::StaticPrefs::javascript_options_dom_alloc_site());\
+  JS::Prefs::set_experimental_dictionary_teleporting(mozilla::StaticPrefs::javascript_options_experimental_dictionary_teleporting());\
+  JS::Prefs::set_experimental_error_capture_stack_trace(mozilla::StaticPrefs::javascript_options_experimental_error_capture_stack_trace());\
+  JS::Prefs::set_experimental_error_iserror(mozilla::StaticPrefs::javascript_options_experimental_error_iserror());\
+  JS::Prefs::set_experimental_import_attributes(mozilla::StaticPrefs::javascript_options_experimental_import_attributes());\
+  JS::Prefs::set_experimental_json_parse_with_source(mozilla::StaticPrefs::javascript_options_experimental_json_parse_with_source());\
   JS::Prefs::set_experimental_shadow_realms(mozilla::StaticPrefs::javascript_options_experimental_shadow_realms());\
   JS::Prefs::set_tests_uint32_pref(mozilla::StaticPrefs::javascript_options_tests_uint32_pref());\
   JS::Prefs::set_use_fdlibm_for_sin_cos_tan(mozilla::StaticPrefs::javascript_options_use_fdlibm_for_sin_cos_tan());\
+  JS::Prefs::set_warn_asmjs_deprecation(mozilla::StaticPrefs::javascript_options_warn_asmjs_deprecation());\
+  JS::Prefs::set_wasm_branch_hinting(mozilla::StaticPrefs::javascript_options_wasm_branch_hinting());\
+  JS::Prefs::set_wasm_call_ref_inlining(mozilla::StaticPrefs::javascript_options_wasm_call_ref_inlining());\
+  JS::Prefs::set_wasm_call_ref_inlining_percent(mozilla::StaticPrefs::javascript_options_wasm_call_ref_inlining_percent());\
+  JS::Prefs::set_wasm_direct_inlining(mozilla::StaticPrefs::javascript_options_wasm_direct_inlining());\
+  JS::Prefs::set_wasm_gc(mozilla::StaticPrefs::javascript_options_wasm_gc());\
+  JS::Prefs::set_wasm_inlining_level(mozilla::StaticPrefs::javascript_options_wasm_inlining_level());\
+  JS::Prefs::set_wasm_js_promise_integration(mozilla::StaticPrefs::javascript_options_wasm_js_promise_integration());\
+  JS::Prefs::set_wasm_js_string_builtins(mozilla::StaticPrefs::javascript_options_wasm_js_string_builtins());\
+  JS::Prefs::set_wasm_lazy_tiering(mozilla::StaticPrefs::javascript_options_wasm_lazy_tiering());\
+  JS::Prefs::set_wasm_lazy_tiering_for_gc(mozilla::StaticPrefs::javascript_options_wasm_lazy_tiering_for_gc());\
+  JS::Prefs::set_wasm_lazy_tiering_level(mozilla::StaticPrefs::javascript_options_wasm_lazy_tiering_level());\
+  JS::Prefs::set_wasm_lazy_tiering_synchronous(mozilla::StaticPrefs::javascript_options_wasm_lazy_tiering_synchronous());\
+  JS::Prefs::set_wasm_memory64(mozilla::StaticPrefs::javascript_options_wasm_memory64());\
+  JS::Prefs::set_wasm_memory_control(mozilla::StaticPrefs::javascript_options_wasm_memory_control());\
+  JS::Prefs::set_wasm_multi_memory(mozilla::StaticPrefs::javascript_options_wasm_multi_memory());\
+  JS::Prefs::set_wasm_relaxed_simd(mozilla::StaticPrefs::javascript_options_wasm_relaxed_simd());\
+  JS::Prefs::set_wasm_tail_calls(mozilla::StaticPrefs::javascript_options_wasm_tail_calls());\
+  JS::Prefs::set_wasm_test_serialization(mozilla::StaticPrefs::javascript_options_wasm_test_serialization());\
+  JS::Prefs::set_wasm_trace_api(mozilla::StaticPrefs::javascript_options_wasm_trace_api());\
+  JS::Prefs::set_wasm_unroll_factor(mozilla::StaticPrefs::javascript_options_wasm_unroll_factor());\
+  JS::Prefs::set_wasm_unroll_loops(mozilla::StaticPrefs::javascript_options_wasm_unroll_loops());\
 
 
 

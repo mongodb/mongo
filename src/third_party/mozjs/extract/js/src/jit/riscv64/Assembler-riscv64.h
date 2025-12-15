@@ -89,9 +89,6 @@ struct ScratchRegisterScope : public AutoRegisterScope {
 
 class MacroAssembler;
 
-inline Imm32 Imm64::secondHalf() const { return hi(); }
-inline Imm32 Imm64::firstHalf() const { return low(); }
-
 static constexpr uint32_t ABIStackAlignment = 8;
 static constexpr uint32_t CodeAlignment = 16;
 static constexpr uint32_t JitStackAlignment = 8;
@@ -363,7 +360,7 @@ class Assembler : public AssemblerShared,
   static int target_at(Instruction* instruction, BufferOffset pos,
                        bool is_internal, Instruction* instruction2 = nullptr);
   uint32_t next_link(Label* label, bool is_internal);
-  static uintptr_t target_address_at(Instruction* pos);
+  static uint64_t target_address_at(Instruction* pos);
   static void set_target_value_at(Instruction* pc, uint64_t target);
   void target_at_put(BufferOffset pos, BufferOffset target_pos,
                      bool trampoline = false);
@@ -388,7 +385,7 @@ class Assembler : public AssemblerShared,
 #ifdef DEBUG
     if (!oom()) {
       DEBUG_PRINTF(
-          "0x%lx(%lx):",
+          "0x%" PRIx64 "(%" PRIxPTR "):",
           (uint64_t)editSrc(BufferOffset(currentOffset() - sizeof(Instr))),
           currentOffset() - sizeof(Instr));
       disassembleInstr(x, JitSpewEnabled(JitSpew_Codegen));
@@ -399,7 +396,7 @@ class Assembler : public AssemblerShared,
   virtual void emit(uint64_t x) { MOZ_CRASH(); }
   virtual void emit(uint32_t x) {
     DEBUG_PRINTF(
-        "0x%lx(%lx): uint32_t: %d\n",
+        "0x%" PRIx64 "(%" PRIxPTR "): uint32_t: %" PRId32 "\n",
         (uint64_t)editSrc(BufferOffset(currentOffset() - sizeof(Instr))),
         currentOffset() - sizeof(Instr), x);
     m_buffer.putInt(x);
@@ -466,7 +463,7 @@ class Assembler : public AssemblerShared,
   void retarget(Label* label, Label* target);
   static uint32_t NopSize() { return 4; }
 
-  static uintptr_t GetPointer(uint8_t* instPtr) {
+  static uint64_t GetPointer(uint8_t* instPtr) {
     Instruction* inst = (Instruction*)instPtr;
     return Assembler::ExtractLoad64Value(inst);
   }
@@ -513,20 +510,20 @@ class Assembler : public AssemblerShared,
   // Assembler Pseudo Instructions (Tables 25.2, 25.3, RISC-V Unprivileged ISA)
   void break_(uint32_t code, bool break_as_stop = false);
   void nop();
-  void RV_li(Register rd, intptr_t imm);
+  void RV_li(Register rd, int64_t imm);
   static int RV_li_count(int64_t imm, bool is_get_temp_reg = false);
   void GeneralLi(Register rd, int64_t imm);
-  static int GeneralLiCount(intptr_t imm, bool is_get_temp_reg = false);
-  void RecursiveLiImpl(Register rd, intptr_t imm);
-  void RecursiveLi(Register rd, intptr_t imm);
-  static int RecursiveLiCount(intptr_t imm);
-  static int RecursiveLiImplCount(intptr_t imm);
+  static int GeneralLiCount(int64_t imm, bool is_get_temp_reg = false);
+  void RecursiveLiImpl(Register rd, int64_t imm);
+  void RecursiveLi(Register rd, int64_t imm);
+  static int RecursiveLiCount(int64_t imm);
+  static int RecursiveLiImplCount(int64_t imm);
   // Returns the number of instructions required to load the immediate
-  static int li_estimate(intptr_t imm, bool is_get_temp_reg = false);
+  static int li_estimate(int64_t imm, bool is_get_temp_reg = false);
   // Loads an immediate, always using 8 instructions, regardless of the value,
   // so that it can be modified later.
-  void li_constant(Register rd, intptr_t imm);
-  void li_ptr(Register rd, intptr_t imm);
+  void li_constant(Register rd, int64_t imm);
+  void li_ptr(Register rd, int64_t imm);
 };
 
 class ABIArgGenerator {
@@ -598,7 +595,7 @@ class Operand {
   explicit Operand(const Address& addr)
       : tag(MEM), rm_(addr.base.code()), offset_(addr.offset) {}
 
-  explicit Operand(intptr_t immediate) : tag(IMM), rm_() { value_ = immediate; }
+  explicit Operand(int64_t immediate) : tag(IMM), rm_() { value_ = immediate; }
   // Register.
   Operand(const Register rm) : tag(REG), rm_(rm.code()) {}
   // Return true if this is a register operand.
@@ -606,7 +603,7 @@ class Operand {
   bool is_freg() const { return tag == FREG; }
   bool is_mem() const { return tag == MEM; }
   bool is_imm() const { return tag == IMM; }
-  inline intptr_t immediate() const {
+  inline int64_t immediate() const {
     MOZ_ASSERT(is_imm());
     return value_;
   }
@@ -636,7 +633,7 @@ class Operand {
   Tag tag;
   uint32_t rm_;
   int32_t offset_;
-  intptr_t value_;  // valid if rm_ == no_reg
+  int64_t value_;  // valid if rm_ == no_reg
 
   friend class Assembler;
   friend class MacroAssembler;

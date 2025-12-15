@@ -191,6 +191,7 @@ class DebuggerFrame : public NativeObject {
   [[nodiscard]] static DebuggerFrame* check(JSContext* cx, HandleValue thisv);
 
   bool isOnStack() const;
+  bool isOnStackOrSuspendedWasmStack() const;
 
   bool isSuspended() const;
 
@@ -251,6 +252,11 @@ class DebuggerFrame : public NativeObject {
    * Debugger.Frame object to any hooks.
    */
   bool resume(const FrameIter& iter);
+
+  /*
+   * Called when JS PI sets aside the suspendable stack frames.
+   */
+  void suspendWasmFrame(JS::GCContext* gcx);
 
   bool hasAnyHooks() const;
 

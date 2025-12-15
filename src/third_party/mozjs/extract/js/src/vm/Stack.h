@@ -807,7 +807,8 @@ class InterpreterStack {
   }
 
  public:
-  InterpreterStack() : allocator_(DEFAULT_CHUNK_SIZE), frameCount_(0) {}
+  InterpreterStack()
+      : allocator_(DEFAULT_CHUNK_SIZE, js::MallocArena), frameCount_(0) {}
 
   ~InterpreterStack() { MOZ_ASSERT(frameCount_ == 0); }
 

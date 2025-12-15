@@ -39,7 +39,7 @@ class Buffer final {
    * Construct zero-lenth Buffer (without actually pointing to a heap
    * allocation).
    */
-  Buffer() : mData(nullptr), mLength(0){};
+  Buffer() : mData(nullptr), mLength(0) {};
 
   /**
    * Construct from raw parts.

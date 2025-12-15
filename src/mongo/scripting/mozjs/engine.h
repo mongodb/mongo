@@ -69,6 +69,9 @@ public:
     int getJSHeapLimitMB() const override;
     void setJSHeapLimitMB(int limit) override;
 
+    bool getJSUseLegacyMemoryTracking() const override;
+    void setJSUseLegacyMemoryTracking(bool shouldUseLegacyEngine) override;
+
     std::string getLoadPath() const override;
     void setLoadPath(const std::string& loadPath) override;
 

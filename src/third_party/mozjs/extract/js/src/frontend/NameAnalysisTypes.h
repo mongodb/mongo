@@ -124,13 +124,10 @@ static inline BindingKind DeclarationKindToBindingKind(DeclarationKind kind) {
       return BindingKind::Let;
 
     case DeclarationKind::Const:
-#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-    // We treat using as a const for now. (Bug 1897609)
-    case DeclarationKind::AwaitUsing:
-#endif
       return BindingKind::Const;
 
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    case DeclarationKind::AwaitUsing:
     case DeclarationKind::Using:
       return BindingKind::Using;
 #endif
@@ -196,7 +193,7 @@ class DeclaredNameInfo {
     // enforce creating an environment object whenever we encounter
     // a using declaration. This is temporary for prototyping
     // this must be optimized. (Bug 1899502)
-    if (kind == DeclarationKind::Using) {
+    if (kind == DeclarationKind::Using || kind == DeclarationKind::AwaitUsing) {
       closedOver_ = true;
     }
 #endif

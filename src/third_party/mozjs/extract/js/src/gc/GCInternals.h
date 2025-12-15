@@ -19,11 +19,15 @@
 #include "gc/Cell.h"
 #include "gc/GC.h"
 #include "gc/GCContext.h"
+#include "gc/GCMarker.h"
 #include "vm/GeckoProfiler.h"
 #include "vm/HelperThreads.h"
 #include "vm/JSContext.h"
 
 namespace js {
+
+class GCMarker;
+
 namespace gc {
 
 /*
@@ -191,8 +195,6 @@ class MOZ_RAII AutoRunParallelTask : public GCParallelTask {
   }
 };
 
-GCAbortReason IsIncrementalGCUnsafe(JSRuntime* rt);
-
 #ifdef JS_GC_ZEAL
 
 class MOZ_RAII AutoStopVerifyingBarriers {
@@ -299,6 +301,28 @@ class AutoSetThreadIsSweeping : public AutoSetThreadGCUseT<GCUse::Sweeping> {
 #endif
 };
 
+class MOZ_RAII AutoDisallowPreWriteBarrier {
+ public:
+  explicit AutoDisallowPreWriteBarrier(JS::GCContext* gcx) {
+#ifdef DEBUG
+    gcx_ = gcx;
+    MOZ_ASSERT(gcx->preWriteBarrierAllowed_);
+    gcx->preWriteBarrierAllowed_ = false;
+#endif
+  }
+  ~AutoDisallowPreWriteBarrier() {
+#ifdef DEBUG
+    MOZ_ASSERT(!gcx_->preWriteBarrierAllowed_);
+    gcx_->preWriteBarrierAllowed_ = true;
+#endif
+  }
+
+ private:
+#ifdef DEBUG
+  JS::GCContext* gcx_;
+#endif
+};
+
 #ifdef JSGC_HASH_TABLE_CHECKS
 void CheckHashTablesAfterMovingGC(JSRuntime* rt);
 void CheckHeapAfterGC(JSRuntime* rt);
@@ -321,6 +345,16 @@ struct MinorSweepingTracer final
   template <typename T>
   void onEdge(T** thingp, const char* name);
   friend class GenericTracerImpl<MinorSweepingTracer>;
+};
+
+class MOZ_RAII AutoUpdateMarkStackRanges {
+  GCMarker& marker_;
+
+ public:
+  explicit AutoUpdateMarkStackRanges(GCMarker& marker) : marker_(marker) {
+    marker_.updateRangesAtStartOfSlice();
+  }
+  ~AutoUpdateMarkStackRanges() { marker_.updateRangesAtEndOfSlice(); }
 };
 
 extern void DelayCrossCompartmentGrayMarking(GCMarker* maybeMarker,

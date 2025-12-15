@@ -86,14 +86,15 @@ void JitRuntime::generateBaselineInterpreterEntryTrampoline(
                        &notFunction);
 
     // CalleeToken is a function, load |nformals| into scratch
-    masm.movePtr(callee, scratch);
-    masm.andPtr(Imm32(uint32_t(CalleeTokenMask)), scratch);
+    masm.andPtr(Imm32(uint32_t(CalleeTokenMask)), callee, scratch);
     masm.loadFunctionArgCount(scratch, scratch);
 
     // Take max(nformals, argc).
     Label noUnderflow;
     masm.branch32(Assembler::AboveOrEqual, nargs, scratch, &noUnderflow);
-    { masm.movePtr(scratch, nargs); }
+    {
+      masm.movePtr(scratch, nargs);
+    }
     masm.bind(&noUnderflow);
 
     // Add 1 to nargs if constructing.

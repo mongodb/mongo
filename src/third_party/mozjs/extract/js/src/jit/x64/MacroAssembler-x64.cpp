@@ -492,7 +492,6 @@ void MacroAssemblerX64::boxValue(JSValueType type, Register src,
                                  Register dest) {
   MOZ_ASSERT(src != dest);
 
-  JSValueShiftedTag tag = (JSValueShiftedTag)JSVAL_TYPE_TO_SHIFTED_TAG(type);
 #ifdef DEBUG
   if (type == JSVAL_TYPE_INT32 || type == JSVAL_TYPE_BOOLEAN) {
     Label upper32BitsZeroed;
@@ -502,12 +501,13 @@ void MacroAssemblerX64::boxValue(JSValueType type, Register src,
     bind(&upper32BitsZeroed);
   }
 #endif
-  mov(ImmShiftedTag(tag), dest);
+  mov(ImmShiftedTag(type), dest);
   orq(src, dest);
 }
 
-void MacroAssemblerX64::handleFailureWithHandlerTail(Label* profilerExitTail,
-                                                     Label* bailoutTail) {
+void MacroAssemblerX64::handleFailureWithHandlerTail(
+    Label* profilerExitTail, Label* bailoutTail,
+    uint32_t* returnValueCheckOffset) {
   // Reserve space for exception information.
   subq(Imm32(sizeof(ResumeFromException)), rsp);
   movq(rsp, rax);
@@ -519,13 +519,15 @@ void MacroAssemblerX64::handleFailureWithHandlerTail(Label* profilerExitTail,
   asMasm().callWithABI<Fn, HandleException>(
       ABIType::General, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
 
+  *returnValueCheckOffset = asMasm().currentOffset();
+
   Label entryFrame;
   Label catch_;
   Label finally;
   Label returnBaseline;
   Label returnIon;
   Label bailout;
-  Label wasm;
+  Label wasmInterpEntry;
   Label wasmCatch;
 
   load32(Address(rsp, ResumeFromException::offsetOfKind()), rax);
@@ -542,8 +544,9 @@ void MacroAssemblerX64::handleFailureWithHandlerTail(Label* profilerExitTail,
                     Imm32(ExceptionResumeKind::ForcedReturnIon), &returnIon);
   asMasm().branch32(Assembler::Equal, rax, Imm32(ExceptionResumeKind::Bailout),
                     &bailout);
-  asMasm().branch32(Assembler::Equal, rax, Imm32(ExceptionResumeKind::Wasm),
-                    &wasm);
+  asMasm().branch32(Assembler::Equal, rax,
+                    Imm32(ExceptionResumeKind::WasmInterpEntry),
+                    &wasmInterpEntry);
   asMasm().branch32(Assembler::Equal, rax,
                     Imm32(ExceptionResumeKind::WasmCatch), &wasmCatch);
 
@@ -628,13 +631,12 @@ void MacroAssemblerX64::handleFailureWithHandlerTail(Label* profilerExitTail,
   move32(Imm32(1), ReturnReg);
   jump(bailoutTail);
 
-  // If we are throwing and the innermost frame was a wasm frame, reset SP and
-  // FP; SP is pointing to the unwound return address to the wasm entry, so
-  // we can just ret().
-  bind(&wasm);
+  // Reset SP and FP; SP is pointing to the unwound return address to the wasm
+  // interpreter entry, so we can just ret().
+  bind(&wasmInterpEntry);
   loadPtr(Address(rsp, ResumeFromException::offsetOfFramePointer()), rbp);
   loadPtr(Address(rsp, ResumeFromException::offsetOfStackPointer()), rsp);
-  movePtr(ImmPtr((const void*)wasm::FailInstanceReg), InstanceReg);
+  movePtr(ImmPtr((const void*)wasm::InterpFailInstanceReg), InstanceReg);
   masm.ret();
 
   // Found a wasm catch handler, restore state and jump to it.
@@ -732,6 +734,68 @@ void MacroAssemblerX64::convertDoubleToPtr(FloatRegister src, Register dest,
   vucomisd(scratch, src);
   j(Assembler::Parity, fail);
   j(Assembler::NotEqual, fail);
+}
+
+// This operation really consists of five phases, in order to enforce the
+// restriction that on x64, srcDest must be rax and rdx will be clobbered.
+//
+//     Input: { rhs, lhsOutput }
+//
+//  [PUSH] Preserve registers
+//  [MOVE] Generate moves to specific registers
+//
+//  [DIV] Input: { regForRhs, RAX }
+//  [DIV] extend RAX into RDX
+//  [DIV] x64 Division operator
+//  [DIV] Ouptut: { RAX, RDX }
+//
+//  [MOVE] Move specific registers to outputs
+//  [POP] Restore registers
+//
+//    Output: { lhsOutput, remainderOutput }
+void MacroAssemblerX64::flexibleDivMod64(Register rhs, Register lhsOutput,
+                                         bool isUnsigned, bool isDiv) {
+  if (lhsOutput == rhs) {
+    movq(ImmWord(isDiv ? 1 : 0), lhsOutput);
+    return;
+  }
+
+  // Choose a register that is neither rdx nor rax to hold the rhs;
+  // rbx is chosen arbitrarily, and will be preserved if necessary.
+  Register regForRhs = (rhs == rax || rhs == rdx) ? rbx : rhs;
+
+  // Add registers we will be clobbering as live, but also remove the set we
+  // do not restore.
+  LiveGeneralRegisterSet preserve;
+  preserve.add(rdx);
+  preserve.add(rax);
+  preserve.add(regForRhs);
+
+  preserve.takeUnchecked(lhsOutput);
+
+  asMasm().PushRegsInMask(preserve);
+
+  // Shuffle input into place.
+  asMasm().moveRegPair(lhsOutput, rhs, rax, regForRhs);
+  if (oom()) {
+    return;
+  }
+
+  // Sign extend rax into rdx to make (rdx:rax): idiv/udiv are 128-bit.
+  if (isUnsigned) {
+    movq(ImmWord(0), rdx);
+    udivq(regForRhs);
+  } else {
+    cqo();
+    idivq(regForRhs);
+  }
+
+  Register result = isDiv ? rax : rdx;
+  if (result != lhsOutput) {
+    movq(result, lhsOutput);
+  }
+
+  asMasm().PopRegsInMask(preserve);
 }
 
 //{{{ check_macroassembler_style
@@ -841,30 +905,6 @@ void MacroAssembler::callWithABINoProfiler(const Address& fun, ABIType result) {
 // ===============================================================
 // Move instructions
 
-void MacroAssembler::moveValue(const TypedOrValueRegister& src,
-                               const ValueOperand& dest) {
-  if (src.hasValue()) {
-    moveValue(src.valueReg(), dest);
-    return;
-  }
-
-  MIRType type = src.type();
-  AnyRegister reg = src.typedReg();
-
-  if (!IsFloatingPointType(type)) {
-    boxValue(ValueTypeFromMIRType(type), reg.gpr(), dest.valueReg());
-    return;
-  }
-
-  ScratchDoubleScope scratch(*this);
-  FloatRegister freg = reg.fpu();
-  if (type == MIRType::Float32) {
-    convertFloat32ToDouble(freg, scratch);
-    freg = scratch;
-  }
-  boxDouble(freg, dest, freg);
-}
-
 void MacroAssembler::moveValue(const ValueOperand& src,
                                const ValueOperand& dest) {
   if (src == dest) {
@@ -876,6 +916,21 @@ void MacroAssembler::moveValue(const ValueOperand& src,
 void MacroAssembler::moveValue(const Value& src, const ValueOperand& dest) {
   movWithPatch(ImmWord(src.asRawBits()), dest.valueReg());
   writeDataRelocation(src);
+}
+
+// ===============================================================
+// Arithmetic functions
+
+void MacroAssembler::flexibleQuotientPtr(
+    Register rhs, Register srcDest, bool isUnsigned,
+    const LiveRegisterSet& volatileLiveRegs) {
+  flexibleDivMod64(rhs, srcDest, isUnsigned, /* isDiv= */ true);
+}
+
+void MacroAssembler::flexibleRemainderPtr(
+    Register rhs, Register srcDest, bool isUnsigned,
+    const LiveRegisterSet& volatileLiveRegs) {
+  flexibleDivMod64(rhs, srcDest, isUnsigned, /* isDiv= */ false);
 }
 
 // ===============================================================
@@ -936,10 +991,27 @@ void MacroAssembler::branchValueIsNurseryCell(Condition cond,
 void MacroAssembler::branchTestValue(Condition cond, const ValueOperand& lhs,
                                      const Value& rhs, Label* label) {
   MOZ_ASSERT(cond == Equal || cond == NotEqual);
+  MOZ_ASSERT(!rhs.isNaN());
   ScratchRegisterScope scratch(*this);
   MOZ_ASSERT(lhs.valueReg() != scratch);
   moveValue(rhs, ValueOperand(scratch));
   cmpPtr(lhs.valueReg(), scratch);
+  j(cond, label);
+}
+
+void MacroAssembler::branchTestNaNValue(Condition cond, const ValueOperand& val,
+                                        Register temp, Label* label) {
+  MOZ_ASSERT(cond == Equal || cond == NotEqual);
+  ScratchRegisterScope scratch(*this);
+
+  // When testing for NaN, we want to ignore the sign bit.
+  movq(ImmWord(~mozilla::FloatingPoint<double>::kSignBit), scratch);
+  andq(val.valueReg(), scratch);
+
+  // Compare against a NaN with sign bit 0.
+  static_assert(JS::detail::CanonicalizedNaNSignBit == 0);
+  moveValue(DoubleValue(JS::GenericNaN()), ValueOperand(temp));
+  cmpPtr(scratch, temp);
   j(cond, label);
 }
 
@@ -1180,13 +1252,12 @@ void MacroAssembler::wasmStore(const wasm::MemoryAccessDesc& access,
       movq(value.gpr(), dstAddr);
       break;
     case Scalar::Float32: {
-      FaultingCodeOffset fco =
-          storeUncanonicalizedFloat32(value.fpu(), dstAddr);
+      FaultingCodeOffset fco = storeFloat32(value.fpu(), dstAddr);
       append(access, wasm::TrapMachineInsn::Store32, fco);
       break;
     }
     case Scalar::Float64: {
-      FaultingCodeOffset fco = storeUncanonicalizedDouble(value.fpu(), dstAddr);
+      FaultingCodeOffset fco = storeDouble(value.fpu(), dstAddr);
       append(access, wasm::TrapMachineInsn::Store64, fco);
       break;
     }
@@ -1653,7 +1724,6 @@ void MacroAssembler::wasmBoundsCheck64(Condition cond, Register64 index,
   }
 }
 
-#ifdef ENABLE_WASM_TAIL_CALLS
 void MacroAssembler::wasmMarkCallAsSlow() {
   static_assert(InstanceReg == r14);
   orPtr(Imm32(0), r14);
@@ -1667,7 +1737,6 @@ void MacroAssembler::wasmCheckSlowCallsite(Register ra, Label* notSlow,
   cmp32(Address(ra, 0), Imm32(SlowCallMarker));
   j(Assembler::NotEqual, notSlow);
 }
-#endif  // ENABLE_WASM_TAIL_CALLS
 
 // ========================================================================
 // Integer compare-then-conditionally-load/move operations.

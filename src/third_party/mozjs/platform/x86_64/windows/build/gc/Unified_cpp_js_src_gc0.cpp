@@ -26,6 +26,15 @@
 #error "gc/Barrier.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
+#include "gc/BufferAllocator.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "gc/BufferAllocator.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "gc/BufferAllocator.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "gc/Compacting.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "gc/Compacting.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -42,14 +51,5 @@
 #endif
 #ifdef INITGUID
 #error "gc/FinalizationObservers.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "gc/GC.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/GC.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "gc/GC.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

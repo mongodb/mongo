@@ -11,6 +11,19 @@ namespace js {
 
 enum class CompletionKind : uint8_t { Normal, Return, Throw };
 
+inline const char* CompletionKindName(CompletionKind kind) {
+  switch (kind) {
+    case CompletionKind::Normal:
+      return "Normal";
+    case CompletionKind::Return:
+      return "Return";
+    case CompletionKind::Throw:
+      return "Throw";
+    default:
+      MOZ_CRASH("Unknown CompletionKind");
+  }
+}
+
 }  // namespace js
 
 #endif  // vm_CompletionKind_h

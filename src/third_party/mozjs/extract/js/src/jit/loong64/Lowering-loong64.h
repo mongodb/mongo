@@ -18,16 +18,14 @@ class LIRGeneratorLOONG64 : public LIRGeneratorShared {
       : LIRGeneratorShared(gen, graph, lirGraph) {}
 
   LTableSwitch* newLTableSwitch(const LAllocation& in,
-                                const LDefinition& inputCopy,
-                                MTableSwitch* ins);
-  LTableSwitchV* newLTableSwitchV(MTableSwitch* ins);
+                                const LDefinition& inputCopy);
+  LTableSwitchV* newLTableSwitchV(const LBoxAllocation& in);
 
   void lowerForShift(LInstructionHelper<1, 2, 0>* ins, MDefinition* mir,
                      MDefinition* lhs, MDefinition* rhs);
-  template <size_t Temps>
-  void lowerForShiftInt64(
-      LInstructionHelper<INT64_PIECES, INT64_PIECES + 1, Temps>* ins,
-      MDefinition* mir, MDefinition* lhs, MDefinition* rhs);
+  template <class LInstr>
+  void lowerForShiftInt64(LInstr* ins, MDefinition* mir, MDefinition* lhs,
+                          MDefinition* rhs);
 
   void lowerForALU(LInstructionHelper<1, 1, 0>* ins, MDefinition* mir,
                    MDefinition* input);
@@ -46,12 +44,6 @@ class LIRGeneratorLOONG64 : public LIRGeneratorShared {
   template <size_t Temps>
   void lowerForFPU(LInstructionHelper<1, 2, Temps>* ins, MDefinition* mir,
                    MDefinition* lhs, MDefinition* rhs);
-
-  void lowerForCompareI64AndBranch(MTest* mir, MCompare* comp, JSOp op,
-                                   MDefinition* left, MDefinition* right,
-                                   MBasicBlock* ifTrue, MBasicBlock* ifFalse);
-  void lowerForBitAndAndBranch(LBitAndAndBranch* baab, MInstruction* mir,
-                               MDefinition* lhs, MDefinition* rhs);
 
   // Returns a box allocation. reg2 is ignored on 64-bit platforms.
   LBoxAllocation useBoxFixed(MDefinition* mir, Register reg1, Register reg2,
@@ -84,10 +76,10 @@ class LIRGeneratorLOONG64 : public LIRGeneratorShared {
   void lowerUModI64(MMod* mod);
   void lowerUrshD(MUrsh* mir);
   void lowerPowOfTwoI(MPow* mir);
-  void lowerBigIntDiv(MBigIntDiv* ins);
-  void lowerBigIntMod(MBigIntMod* ins);
-  void lowerBigIntLsh(MBigIntLsh* ins);
-  void lowerBigIntRsh(MBigIntRsh* ins);
+  void lowerBigIntPtrDiv(MBigIntPtrDiv* ins);
+  void lowerBigIntPtrMod(MBigIntPtrMod* ins);
+  void lowerBigIntPtrLsh(MBigIntPtrLsh* ins);
+  void lowerBigIntPtrRsh(MBigIntPtrRsh* ins);
   void lowerTruncateDToInt32(MTruncateToInt32* ins);
   void lowerTruncateFToInt32(MTruncateToInt32* ins);
   void lowerBuiltinInt64ToFloatingPoint(MBuiltinInt64ToFloatingPoint* ins);

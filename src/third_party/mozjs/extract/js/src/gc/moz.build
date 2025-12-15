@@ -28,6 +28,7 @@ UNIFIED_SOURCES += [
     "Allocator.cpp",
     "AtomMarking.cpp",
     "Barrier.cpp",
+    "BufferAllocator.cpp",
     "Compacting.cpp",
     "FinalizationObservers.cpp",
     "GC.cpp",
@@ -36,7 +37,6 @@ UNIFIED_SOURCES += [
     "Heap.cpp",
     "MallocedBlockCache.cpp",
     "Marking.cpp",
-    "Memory.cpp",
     "Nursery.cpp",
     "ParallelMarking.cpp",
     "Pretenuring.cpp",
@@ -53,9 +53,12 @@ UNIFIED_SOURCES += [
     "Zone.cpp",
 ]
 
-# StoreBuffer.cpp cannot be built in unified mode because its template
-#   instantiations may or may not be needed depending on what it gets bundled
-#   with.
 SOURCES += [
+    #   Memory.cpp cannot be built in unified mode because it includes
+    #   platform specific headers which conflict with our code on MinGW.
+    "Memory.cpp",
+    #   StoreBuffer.cpp cannot be built in unified mode because its template
+    #   instantiations may or may not be needed depending on what it gets
+    #   bundled with.
     "StoreBuffer.cpp",
 ]

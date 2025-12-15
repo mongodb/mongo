@@ -7,6 +7,8 @@
 #ifndef gc_AtomMarking_h
 #define gc_AtomMarking_h
 
+#include "mozilla/Atomics.h"
+
 #include "NamespaceImports.h"
 #include "js/Vector.h"
 #include "threading/ProtectedData.h"
@@ -24,8 +26,12 @@ class GCRuntime;
 // This class manages state used for marking atoms during GCs.
 // See AtomMarking.cpp for details.
 class AtomMarkingRuntime {
-  // Unused arena atom bitmap indexes. Protected by the GC lock.
-  js::GCLockData<Vector<size_t, 0, SystemAllocPolicy>> freeArenaIndexes;
+  // Unused arena atom bitmap indexes.
+  js::MainThreadData<Vector<size_t, 0, SystemAllocPolicy>> freeArenaIndexes;
+
+  // Background sweep state for |freeArenaIndexes|.
+  js::GCLockData<Vector<size_t, 0, SystemAllocPolicy>> pendingFreeArenaIndexes;
+  mozilla::Atomic<bool, mozilla::Relaxed> hasPendingFreeArenaIndexes;
 
   inline void markChildren(JSContext* cx, JSAtom*);
   inline void markChildren(JSContext* cx, JS::Symbol* symbol);
@@ -37,11 +43,13 @@ class AtomMarkingRuntime {
 
   AtomMarkingRuntime() : allocatedWords(0) {}
 
-  // Mark an arena as holding things in the atoms zone.
-  void registerArena(Arena* arena, const AutoLockGC& lock);
+  // Allocate an index in the atom marking bitmap for a new arena.
+  size_t allocateIndex(GCRuntime* gc);
 
-  // Mark an arena as no longer holding things in the atoms zone.
-  void unregisterArena(Arena* arena, const AutoLockGC& lock);
+  // Free an index in the atom marking bitmap.
+  void freeIndex(size_t index, const AutoLockGC& lock);
+
+  void mergePendingFreeArenaIndexes(GCRuntime* gc);
 
   // Update the atom marking bitmaps in all collected zones according to the
   // atoms zone mark bits.

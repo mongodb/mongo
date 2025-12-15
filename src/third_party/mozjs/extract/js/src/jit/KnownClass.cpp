@@ -6,6 +6,7 @@
 
 #include "jit/KnownClass.h"
 
+#include "jit/MIR-wasm.h"
 #include "jit/MIR.h"
 #include "vm/ArrayObject.h"
 #include "vm/Iteration.h"

@@ -250,8 +250,6 @@ class BaseShape : public gc::TenuredCellWithNonGCPointer<const JSClass> {
   BaseShape& operator=(const BaseShape& other) = delete;
 
  public:
-  void finalize(JS::GCContext* gcx) {}
-
   BaseShape(JSContext* cx, const JSClass* clasp, JS::Realm* realm,
             TaggedProto proto);
 

@@ -28,184 +28,12 @@
 #include "wasm/WasmCompile.h"
 #include "wasm/WasmCompileArgs.h"
 #include "wasm/WasmModuleTypes.h"
+#include "wasm/WasmOpIter.h"
 #include "wasm/WasmProcess.h"
 #include "wasm/WasmTypeDef.h"
 
 namespace js {
 namespace wasm {
-
-using mozilla::Some;
-
-// ModuleEnvironment contains all the state necessary to process or render
-// functions, and all of the state necessary to validate all aspects of the
-// functions.
-//
-// A ModuleEnvironment is created by decoding all the sections before the wasm
-// code section and then used immutably during. When compiling a module using a
-// ModuleGenerator, the ModuleEnvironment holds state shared between the
-// ModuleGenerator thread and background compile threads. All the threads
-// are given a read-only view of the ModuleEnvironment, thus preventing race
-// conditions.
-
-struct ModuleEnvironment {
-  // Constant parameters for the entire compilation:
-  const ModuleKind kind;
-  const FeatureArgs features;
-
-  // Module fields decoded from the module environment (or initialized while
-  // validating an asm.js module) and immutable during compilation:
-  Maybe<uint32_t> dataCount;
-  MemoryDescVector memories;
-  MutableTypeContext types;
-  FuncDescVector funcs;
-  BranchHintCollection branchHints;
-  uint32_t numFuncImports;
-  uint32_t numGlobalImports;
-  GlobalDescVector globals;
-  TagDescVector tags;
-  TableDescVector tables;
-  Uint32Vector asmJSSigToTableIndex;
-  ImportVector imports;
-  ExportVector exports;
-  Maybe<uint32_t> startFuncIndex;
-  ModuleElemSegmentVector elemSegments;
-  MaybeSectionRange codeSection;
-
-  // The start offset of the FuncImportInstanceData[] section of the instance
-  // data. There is one entry for every imported function.
-  uint32_t funcImportsOffsetStart;
-  // The start offset of the TypeDefInstanceData[] section of the instance
-  // data. There is one entry for every type.
-  uint32_t typeDefsOffsetStart;
-  // The start offset of the MemoryInstanceData[] section of the instance data.
-  // There is one entry for every memory.
-  uint32_t memoriesOffsetStart;
-  // The start offset of the TableInstanceData[] section of the instance data.
-  // There is one entry for every table.
-  uint32_t tablesOffsetStart;
-  // The start offset of the tag section of the instance data. There is one
-  // entry for every tag.
-  uint32_t tagsOffsetStart;
-
-  // Fields decoded as part of the wasm module tail:
-  DataSegmentEnvVector dataSegments;
-  CustomSectionEnvVector customSections;
-  Maybe<uint32_t> nameCustomSectionIndex;
-  Maybe<Name> moduleName;
-  NameVector funcNames;
-
-  // Indicates whether the branch hint section was successfully parsed.
-  bool parsedBranchHints;
-
-  explicit ModuleEnvironment(FeatureArgs features,
-                             ModuleKind kind = ModuleKind::Wasm)
-      : kind(kind),
-        features(features),
-        numFuncImports(0),
-        numGlobalImports(0),
-        funcImportsOffsetStart(UINT32_MAX),
-        typeDefsOffsetStart(UINT32_MAX),
-        memoriesOffsetStart(UINT32_MAX),
-        tablesOffsetStart(UINT32_MAX),
-        tagsOffsetStart(UINT32_MAX),
-        parsedBranchHints(false) {}
-
-  [[nodiscard]] bool init() {
-    types = js_new<TypeContext>(features);
-    return types;
-  }
-
-  size_t numTables() const { return tables.length(); }
-  size_t numTypes() const { return types->length(); }
-  size_t numFuncs() const { return funcs.length(); }
-  size_t numFuncDefs() const { return funcs.length() - numFuncImports; }
-
-  bool funcIsImport(uint32_t funcIndex) const {
-    return funcIndex < numFuncImports;
-  }
-  size_t numMemories() const { return memories.length(); }
-
-#define WASM_FEATURE(NAME, SHORT_NAME, ...) \
-  bool SHORT_NAME##Enabled() const { return features.SHORT_NAME; }
-  JS_FOR_WASM_FEATURES(WASM_FEATURE)
-#undef WASM_FEATURE
-  Shareable sharedMemoryEnabled() const { return features.sharedMemory; }
-  bool simdAvailable() const { return features.simd; }
-
-  bool isAsmJS() const { return kind == ModuleKind::AsmJS; }
-  // A builtin module is a host constructed wasm module that exports host
-  // functionality, using special opcodes. Otherwise, it has the same rules
-  // as wasm modules and so it does not get a new ModuleKind.
-  bool isBuiltinModule() const { return features.isBuiltinModule; }
-
-  bool hugeMemoryEnabled(uint32_t memoryIndex) const {
-    return !isAsmJS() && memoryIndex < memories.length() &&
-           IsHugeMemoryEnabled(memories[memoryIndex].indexType());
-  }
-  bool usesSharedMemory(uint32_t memoryIndex) const {
-    return memoryIndex < memories.length() && memories[memoryIndex].isShared();
-  }
-
-  void declareFuncExported(uint32_t funcIndex, bool eager, bool canRefFunc) {
-    FuncFlags flags = funcs[funcIndex].flags;
-
-    // Set the `Exported` flag, if not set.
-    flags = FuncFlags(uint8_t(flags) | uint8_t(FuncFlags::Exported));
-
-    // Merge in the `Eager` and `CanRefFunc` flags, if they're set. Be sure
-    // to not unset them if they've already been set.
-    if (eager) {
-      flags = FuncFlags(uint8_t(flags) | uint8_t(FuncFlags::Eager));
-    }
-    if (canRefFunc) {
-      flags = FuncFlags(uint8_t(flags) | uint8_t(FuncFlags::CanRefFunc));
-    }
-
-    funcs[funcIndex].flags = flags;
-  }
-
-  uint32_t offsetOfFuncImportInstanceData(uint32_t funcIndex) const {
-    MOZ_ASSERT(funcIndex < numFuncImports);
-    return funcImportsOffsetStart + funcIndex * sizeof(FuncImportInstanceData);
-  }
-
-  uint32_t offsetOfTypeDefInstanceData(uint32_t typeIndex) const {
-    MOZ_ASSERT(typeIndex < types->length());
-    return typeDefsOffsetStart + typeIndex * sizeof(TypeDefInstanceData);
-  }
-
-  uint32_t offsetOfTypeDef(uint32_t typeIndex) const {
-    return offsetOfTypeDefInstanceData(typeIndex) +
-           offsetof(TypeDefInstanceData, typeDef);
-  }
-  uint32_t offsetOfSuperTypeVector(uint32_t typeIndex) const {
-    return offsetOfTypeDefInstanceData(typeIndex) +
-           offsetof(TypeDefInstanceData, superTypeVector);
-  }
-
-  uint32_t offsetOfMemoryInstanceData(uint32_t memoryIndex) const {
-    MOZ_ASSERT(memoryIndex < memories.length());
-    return memoriesOffsetStart + memoryIndex * sizeof(MemoryInstanceData);
-  }
-  uint32_t offsetOfTableInstanceData(uint32_t tableIndex) const {
-    MOZ_ASSERT(tableIndex < tables.length());
-    return tablesOffsetStart + tableIndex * sizeof(TableInstanceData);
-  }
-
-  uint32_t offsetOfTagInstanceData(uint32_t tagIndex) const {
-    MOZ_ASSERT(tagIndex < tags.length());
-    return tagsOffsetStart + tagIndex * sizeof(TagInstanceData);
-  }
-
-  bool addDefinedFunc(
-      ValTypeVector&& params, ValTypeVector&& results,
-      bool declareForRef = false,
-      Maybe<CacheableName>&& optionalExportedName = mozilla::Nothing());
-
-  bool addImportedFunc(ValTypeVector&& params, ValTypeVector&& results,
-                       CacheableName&& importModName,
-                       CacheableName&& importFieldName);
-};
 
 // ElemSegmentFlags provides methods for decoding and encoding the flags field
 // of an element segment. This is needed as the flags field has a non-trivial
@@ -237,11 +65,11 @@ class ElemSegmentFlags {
     encoded_ = uint32_t(kind) | uint32_t(payload);
   }
 
-  static Maybe<ElemSegmentFlags> construct(uint32_t encoded) {
+  static mozilla::Maybe<ElemSegmentFlags> construct(uint32_t encoded) {
     if (encoded > uint32_t(Flags::AllFlags)) {
-      return Nothing();
+      return mozilla::Nothing();
     }
-    return Some(ElemSegmentFlags(encoded));
+    return mozilla::Some(ElemSegmentFlags(encoded));
   }
 
   uint32_t encoded() const { return encoded_; }
@@ -258,22 +86,22 @@ class ElemSegmentFlags {
 // OpIter specialized for validation.
 
 class NothingVector {
-  Nothing unused_;
+  mozilla::Nothing unused_;
 
  public:
   bool reserve(size_t size) { return true; }
   bool resize(size_t length) { return true; }
-  Nothing& operator[](size_t) { return unused_; }
-  Nothing& back() { return unused_; }
+  mozilla::Nothing& operator[](size_t) { return unused_; }
+  mozilla::Nothing& back() { return unused_; }
   size_t length() const { return 0; }
-  bool append(Nothing& nothing) { return true; }
-  void infallibleAppend(Nothing& nothing) {}
+  bool append(mozilla::Nothing& nothing) { return true; }
+  void infallibleAppend(mozilla::Nothing& nothing) {}
 };
 
 struct ValidatingPolicy {
-  using Value = Nothing;
+  using Value = mozilla::Nothing;
   using ValueVector = NothingVector;
-  using ControlItem = Nothing;
+  using ControlItem = mozilla::Nothing;
 };
 
 template <typename Policy>
@@ -283,7 +111,10 @@ using ValidatingOpIter = OpIter<ValidatingPolicy>;
 
 // Shared subtyping function across validation.
 
-[[nodiscard]] bool CheckIsSubtypeOf(Decoder& d, const ModuleEnvironment& env,
+[[nodiscard]] bool CheckIsSubtypeOf(Decoder& d, const CodeMetadata& codeMeta,
+                                    size_t opcodeOffset, ResultType subType,
+                                    ResultType superType);
+[[nodiscard]] bool CheckIsSubtypeOf(Decoder& d, const CodeMetadata& codeMeta,
                                     size_t opcodeOffset, StorageType subType,
                                     StorageType superType);
 
@@ -303,19 +134,19 @@ using ValidatingOpIter = OpIter<ValidatingPolicy>;
 // to generate the full local entries for use in validation
 
 [[nodiscard]] bool DecodeLocalEntriesWithParams(Decoder& d,
-                                                const ModuleEnvironment& env,
+                                                const CodeMetadata& codeMeta,
                                                 uint32_t funcIndex,
                                                 ValTypeVector* locals);
 
 // Returns whether the given [begin, end) prefix of a module's bytecode starts a
-// code section and, if so, returns the SectionRange of that code section.
+// code section and, if so, returns the BytecodeRange of that code section.
 // Note that, even if this function returns 'false', [begin, end) may actually
 // be a valid module in the special case when there are no function defs and the
 // code section is not present. Such modules can be valid so the caller must
 // handle this special case.
 
 [[nodiscard]] bool StartsCodeSection(const uint8_t* begin, const uint8_t* end,
-                                     SectionRange* codeSection);
+                                     BytecodeRange* codeSection);
 
 // Calling DecodeModuleEnvironment decodes all sections up to the code section
 // and performs full validation of all those sections. The client must then
@@ -323,21 +154,61 @@ using ValidatingOpIter = OpIter<ValidatingPolicy>;
 // and finally call DecodeModuleTail to decode all remaining sections after the
 // code section (again, performing full validation).
 
-[[nodiscard]] bool DecodeModuleEnvironment(Decoder& d, ModuleEnvironment* env);
+[[nodiscard]] bool DecodeModuleEnvironment(Decoder& d, CodeMetadata* codeMeta,
+                                           ModuleMetadata* moduleMeta);
 
-[[nodiscard]] bool ValidateFunctionBody(const ModuleEnvironment& env,
+[[nodiscard]] bool ValidateFunctionBody(const CodeMetadata& codeMeta,
                                         uint32_t funcIndex, uint32_t bodySize,
                                         Decoder& d);
 
-[[nodiscard]] bool DecodeModuleTail(Decoder& d, ModuleEnvironment* env);
+[[nodiscard]] bool DecodeModuleTail(Decoder& d, CodeMetadata* codeMeta,
+                                    ModuleMetadata* meta);
 
 // Validate an entire module, returning true if the module was validated
 // successfully. If Validate returns false:
 //  - if *error is null, the caller should report out-of-memory
 //  - otherwise, there was a legitimate error described by *error
 
-[[nodiscard]] bool Validate(JSContext* cx, const ShareableBytes& bytecode,
+[[nodiscard]] bool Validate(JSContext* cx, const BytecodeSource& bytecode,
                             const FeatureOptions& options, UniqueChars* error);
+
+struct NopOpDumper {
+  void dumpOpBegin(OpBytes op) {}
+  void dumpOpEnd() {}
+  void dumpTypeIndex(uint32_t typeIndex, bool asTypeUse = false) {}
+  void dumpFuncIndex(uint32_t funcIndex) {}
+  void dumpTableIndex(uint32_t tableIndex) {}
+  void dumpGlobalIndex(uint32_t globalIndex) {}
+  void dumpMemoryIndex(uint32_t memoryIndex) {}
+  void dumpElemIndex(uint32_t elemIndex) {}
+  void dumpDataIndex(uint32_t dataIndex) {}
+  void dumpTagIndex(uint32_t tagIndex) {}
+  void dumpLocalIndex(uint32_t localIndex) {}
+  void dumpBlockType(BlockType type) {}
+  void dumpI32Const(int32_t constant) {}
+  void dumpI64Const(int64_t constant) {}
+  void dumpF32Const(float constant) {}
+  void dumpF64Const(double constant) {}
+  void dumpV128Const(V128 constant) {}
+  void dumpVectorMask(V128 mask) {}
+  void dumpRefType(RefType type) {}
+  void dumpHeapType(RefType type) {}
+  void dumpValType(ValType type) {}
+  void dumpTryTableCatches(const TryTableCatchVector& catches) {}
+  void dumpLinearMemoryAddress(LinearMemoryAddress<mozilla::Nothing> addr) {}
+  void dumpBlockDepth(uint32_t relativeDepth) {}
+  void dumpBlockDepths(const Uint32Vector& relativeDepths) {}
+  void dumpFieldIndex(uint32_t fieldIndex) {}
+  void dumpNumElements(uint32_t numElements) {}
+  void dumpLaneIndex(uint32_t laneIndex) {}
+
+  void startScope() {};
+  void endScope() {};
+};
+
+template <class T>
+[[nodiscard]] bool ValidateOps(ValidatingOpIter& iter, T& dumper,
+                               const CodeMetadata& codeMeta);
 
 }  // namespace wasm
 }  // namespace js

@@ -321,6 +321,8 @@
 #include "js/GCAPI.h"
 #include "js/HashTable.h"
 #include "js/HeapAPI.h"
+#include "threading/LockGuard.h"
+#include "threading/Mutex.h"
 #include "threading/ProtectedData.h"
 
 // Macro to define scheduling tunables for GC parameters. Expands its argument
@@ -382,11 +384,11 @@
    *                                                                           \
    * Multiple of threshold.bytes() which triggers a non-incremental GC.        \
    *                                                                           \
-   * The small heap limit must be greater than 1.3 to maintain performance on  \
+   * The small heap limit must be at least 1.7 to maintain performance on      \
    * splay-latency.                                                            \
    */                                                                          \
   _(JSGC_SMALL_HEAP_INCREMENTAL_LIMIT, double, smallHeapIncrementalLimit,      \
-    ConvertTimes100, CheckIncrementalLimit, 1.50)                              \
+    ConvertTimes100, CheckIncrementalLimit, 1.70)                              \
   _(JSGC_LARGE_HEAP_INCREMENTAL_LIMIT, double, largeHeapIncrementalLimit,      \
     ConvertTimes100, CheckIncrementalLimit, 1.10)                              \
                                                                                \
@@ -498,7 +500,14 @@
    * JSGC_GENERATE_MISSING_ALLOC_SITES                                         \
    */                                                                          \
   _(JSGC_GENERATE_MISSING_ALLOC_SITES, bool, generateMissingAllocSites,        \
-    ConvertBool, NoCheck, false)
+    ConvertBool, NoCheck, false)                                               \
+                                                                               \
+  /*                                                                           \
+   * JSGC_NURSERY_MAX_TIME_GOAL_MS                                             \
+   */                                                                          \
+  _(JSGC_NURSERY_MAX_TIME_GOAL_MS, mozilla::TimeDuration,                      \
+    nurseryMaxTimeGoalMS, ConvertMillis, NoCheck,                              \
+    mozilla::TimeDuration::FromMilliseconds(4))
 
 namespace js {
 
@@ -521,9 +530,6 @@ namespace TuningDefaults {
 /* JSGC_MIN_EMPTY_CHUNK_COUNT */
 static const uint32_t MinEmptyChunkCount = 1;
 
-/* JSGC_MAX_EMPTY_CHUNK_COUNT */
-static const uint32_t MaxEmptyChunkCount = 30;
-
 /* JSGC_SLICE_TIME_BUDGET_MS */
 static const int64_t DefaultTimeBudgetMS = 0;  // Unlimited by default.
 
@@ -535,6 +541,9 @@ static const bool PerZoneGCEnabled = false;
 
 /* JSGC_COMPACTING_ENABLED */
 static const bool CompactingEnabled = true;
+
+/* JSGC_NURSERY_ENABLED */
+static const bool NurseryEnabled = true;
 
 /* JSGC_PARALLEL_MARKING_ENABLED */
 static const bool ParallelMarkingEnabled = false;
@@ -590,17 +599,19 @@ class GCSchedulingState {
    * growth factor is a measure of how large (as a percentage of the last GC)
    * the heap is allowed to grow before we try to schedule another GC.
    */
-  mozilla::Atomic<bool, mozilla::ReleaseAcquire> inHighFrequencyGCMode_;
+  mozilla::Atomic<bool, mozilla::Relaxed> inHighFrequencyGCMode_;
 
  public:
   GCSchedulingState() : inHighFrequencyGCMode_(false) {}
 
   bool inHighFrequencyGCMode() const { return inHighFrequencyGCMode_; }
 
-  void updateHighFrequencyMode(const mozilla::TimeStamp& lastGCTime,
-                               const mozilla::TimeStamp& currentTime,
-                               const GCSchedulingTunables& tunables);
-  void updateHighFrequencyModeForReason(JS::GCReason reason);
+  void updateHighFrequencyModeOnGCStart(JS::GCOptions options,
+                                        const mozilla::TimeStamp& lastGCTime,
+                                        const mozilla::TimeStamp& currentTime,
+                                        const GCSchedulingTunables& tunables);
+  void updateHighFrequencyModeOnSliceStart(JS::GCOptions options,
+                                           JS::GCReason reason);
 };
 
 struct TriggerResult {
@@ -609,7 +620,7 @@ struct TriggerResult {
   size_t thresholdBytes;
 };
 
-using AtomicByteCount = mozilla::Atomic<size_t, mozilla::ReleaseAcquire>;
+using AtomicByteCount = mozilla::Atomic<size_t, mozilla::Relaxed>;
 
 /*
  * Tracks the size of allocated data. This is used for both GC and malloc data.
@@ -655,10 +666,13 @@ class HeapSize {
     MOZ_ASSERT(retainedBytes_ <= bytes_);
   }
 
-  void addBytes(size_t nbytes) {
+  void addBytes(size_t nbytes, bool updateRetainedSize = false) {
     mozilla::DebugOnly<size_t> initialBytes(bytes_);
     MOZ_ASSERT(initialBytes + nbytes > initialBytes);
     bytes_ += nbytes;
+    if (updateRetainedSize) {
+      retainedBytes_ += nbytes;
+    }
   }
   void removeBytes(size_t nbytes, bool updateRetainedSize) {
     if (updateRetainedSize) {

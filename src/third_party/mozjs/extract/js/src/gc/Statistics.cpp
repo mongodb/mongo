@@ -37,6 +37,8 @@ using mozilla::Maybe;
 using mozilla::TimeDuration;
 using mozilla::TimeStamp;
 
+using JS::SliceBudget;
+
 static const size_t BYTES_PER_MB = 1024 * 1024;
 
 /*
@@ -82,6 +84,11 @@ JS_PUBLIC_API const char* JS::ExplainGCReason(JS::GCReason reason) {
     default:
       MOZ_CRASH("bad GC reason");
   }
+}
+
+JS_PUBLIC_API const char* JS::ExplainGCAbortReason(uint32_t val) {
+  GCAbortReason reason = static_cast<GCAbortReason>(val);
+  return js::gcstats::ExplainAbortReason(reason);
 }
 
 JS_PUBLIC_API bool JS::InternalGCReason(JS::GCReason reason) {
@@ -173,6 +180,12 @@ class PhaseIter {
   Phase get() const { return phase; }
   operator Phase() const { return phase; }
 };
+
+JS_PUBLIC_API const char* JS::GetGCPhaseName(uint32_t val) {
+  PhaseKind kind = static_cast<PhaseKind>(val);
+  MOZ_RELEASE_ASSERT(kind < PhaseKind::LIMIT);
+  return phaseKinds[kind].name;
+}
 
 static double t(TimeDuration duration) { return duration.ToMilliseconds(); }
 
@@ -386,7 +399,7 @@ UniqueChars Statistics::formatCompactSummaryMessage() const {
                  zoneStats.collectedZoneCount, zoneStats.zoneCount,
                  zoneStats.sweptZoneCount, zoneStats.collectedCompartmentCount,
                  zoneStats.compartmentCount, zoneStats.sweptCompartmentCount,
-                 double(preTotalHeapBytes) / BYTES_PER_MB,
+                 double(preTotalGCHeapBytes) / BYTES_PER_MB,
                  int32_t(counts[COUNT_NEW_CHUNK] - counts[COUNT_DESTROY_CHUNK]),
                  counts[COUNT_NEW_CHUNK] + counts[COUNT_DESTROY_CHUNK]);
   if (!fragments.append(DuplicateString(buffer))) {
@@ -498,7 +511,7 @@ UniqueChars Statistics::formatDetailedDescription() const {
       zoneStats.compartmentCount, zoneStats.sweptCompartmentCount,
       getCount(COUNT_MINOR_GC), getCount(COUNT_STOREBUFFER_OVERFLOW),
       mmu20 * 100., mmu50 * 100., t(sccTotal), t(sccLongest),
-      double(preTotalHeapBytes) / BYTES_PER_MB,
+      double(preTotalGCHeapBytes) / BYTES_PER_MB,
       getCount(COUNT_NEW_CHUNK) - getCount(COUNT_DESTROY_CHUNK),
       getCount(COUNT_NEW_CHUNK) + getCount(COUNT_DESTROY_CHUNK),
       double(ArenaSize * getCount(COUNT_ARENA_RELOCATED)) / BYTES_PER_MB);
@@ -714,8 +727,11 @@ void Statistics::formatJsonDescription(JSONPrinter& json) const {
     json.property("nonincremental_reason",
                   ExplainAbortReason(nonincrementalReason_));
   }
-  json.property("allocated_bytes", preTotalHeapBytes);
-  json.property("post_heap_size", postTotalHeapBytes);
+  json.property("allocated_bytes", preTotalGCHeapBytes);
+  json.property("post_heap_size", postTotalGCHeapBytes);
+
+  json.property("pre_malloc_heap_size", preTotalMallocHeapBytes);
+  json.property("post_malloc_heap_size", postTotalMallocHeapBytes);
 
   uint32_t addedChunks = getCount(COUNT_NEW_CHUNK);
   if (addedChunks) {
@@ -778,9 +794,11 @@ Statistics::Statistics(GCRuntime* gc)
       nonincrementalReason_(GCAbortReason::None),
       creationTime_(TimeStamp::Now()),
       tenuredAllocsSinceMinorGC(0),
-      preTotalHeapBytes(0),
-      postTotalHeapBytes(0),
-      preCollectedHeapBytes(0),
+      preTotalGCHeapBytes(0),
+      postTotalGCHeapBytes(0),
+      preCollectedGCHeapBytes(0),
+      preTotalMallocHeapBytes(0),
+      postTotalMallocHeapBytes(0),
       startingMinorGCNumber(0),
       startingMajorGCNumber(0),
       startingSliceNumber(0),
@@ -820,6 +838,9 @@ Statistics::Statistics(GCRuntime* gc)
                      "Report major GCs taking more than N milliseconds for "
                      "all or just the main runtime\n",
                      &enableProfiling_, &profileWorkers_, &profileThreshold_);
+
+  const char* env = getenv("JS_GC_BUFFER_STATS");
+  enableBufferAllocStats_ = env && atoi(env);
 }
 
 Statistics::~Statistics() {
@@ -986,10 +1007,6 @@ void Statistics::beginGC(JS::GCOptions options, const TimeStamp& currentTime) {
   gcOptions = options;
   nonincrementalReason_ = GCAbortReason::None;
 
-  preTotalHeapBytes = gc->heapSize.bytes();
-
-  preCollectedHeapBytes = 0;
-
   startingMajorGCNumber = gc->majorGCCount();
   startingSliceNumber = gc->gcNumber();
 
@@ -998,17 +1015,37 @@ void Statistics::beginGC(JS::GCOptions options, const TimeStamp& currentTime) {
   }
 
   totalGCTime_ = TimeDuration::Zero();
+
+  preTotalGCHeapBytes = 0;
+  postTotalGCHeapBytes = 0;
+  preCollectedGCHeapBytes = 0;
+  preTotalMallocHeapBytes = 0;
+  postTotalMallocHeapBytes = 0;
 }
 
-void Statistics::measureInitialHeapSize() {
-  MOZ_ASSERT(preCollectedHeapBytes == 0);
-  for (GCZonesIter zone(gc); !zone.done(); zone.next()) {
-    preCollectedHeapBytes += zone->gcHeapSize.bytes();
+void Statistics::measureInitialHeapSizes() {
+  MOZ_ASSERT(preTotalGCHeapBytes == 0);
+  MOZ_ASSERT(preCollectedGCHeapBytes == 0);
+  MOZ_ASSERT(preTotalMallocHeapBytes == 0);
+
+  preTotalGCHeapBytes = gc->heapSize.bytes();
+
+  for (AllZonesIter zone(gc); !zone.done(); zone.next()) {
+    preTotalMallocHeapBytes += zone->mallocHeapSize.bytes();
+    if (zone->wasGCStarted()) {
+      preCollectedGCHeapBytes += zone->gcHeapSize.bytes();
+    }
   }
 }
 
 void Statistics::endGC() {
-  postTotalHeapBytes = gc->heapSize.bytes();
+  MOZ_ASSERT(postTotalGCHeapBytes == 0);
+  MOZ_ASSERT(postTotalMallocHeapBytes == 0);
+
+  postTotalGCHeapBytes = gc->heapSize.bytes();
+  for (AllZonesIter zone(gc); !zone.done(); zone.next()) {
+    postTotalMallocHeapBytes += zone->mallocHeapSize.bytes();
+  }
 
   sendGCTelemetry();
 }
@@ -1097,7 +1134,7 @@ void Statistics::sendGCTelemetry() {
     }
   }
 
-  if (!lastSlice.wasReset() && preCollectedHeapBytes != 0) {
+  if (!lastSlice.wasReset() && preCollectedGCHeapBytes != 0) {
     size_t bytesSurvived = 0;
     for (ZonesIter zone(runtime, WithAtoms); !zone.done(); zone.next()) {
       if (zone->wasCollected()) {
@@ -1105,14 +1142,14 @@ void Statistics::sendGCTelemetry() {
       }
     }
 
-    MOZ_ASSERT(preCollectedHeapBytes >= bytesSurvived);
+    MOZ_ASSERT(preCollectedGCHeapBytes >= bytesSurvived);
     double survivalRate =
-        100.0 * double(bytesSurvived) / double(preCollectedHeapBytes);
+        100.0 * double(bytesSurvived) / double(preCollectedGCHeapBytes);
     runtime->metrics().GC_TENURED_SURVIVAL_RATE(survivalRate);
 
     // Calculate 'effectiveness' in MB / second, on main thread only for now.
     if (!runtime->parentRuntime) {
-      size_t bytesFreed = preCollectedHeapBytes - bytesSurvived;
+      size_t bytesFreed = preCollectedGCHeapBytes - bytesSurvived;
       TimeDuration clampedTotal =
           TimeDuration::Max(total, TimeDuration::FromMilliseconds(1));
       double effectiveness =
@@ -1244,14 +1281,18 @@ void Statistics::endSlice() {
     }
   }
 
-  if (!aborted &&
-      ShouldPrintProfile(gc->rt, enableProfiling_, profileWorkers_,
-                         profileThreshold_, slices_.back().duration())) {
-    printSliceProfile();
-  }
-
-  // Slice callbacks should only fire for the outermost level.
   if (!aborted) {
+    if (ShouldPrintProfile(gc->rt, enableProfiling_, profileWorkers_,
+                           profileThreshold_, slices_.back().duration())) {
+      printSliceProfile();
+    }
+
+    if (enableBufferAllocStats_ && gc->rt->isMainRuntime()) {
+      maybePrintProfileHeaders();
+      BufferAllocator::printStats(gc, creationTime(), true, profileFile());
+    }
+
+    // Slice callbacks should only fire for the outermost level.
     if (sliceCallback) {
       JSContext* cx = context();
       JS::GCDescription desc(!gc->fullGCRequested, last, gcOptions,
@@ -1313,18 +1354,28 @@ void Statistics::sendSliceTelemetry(const SliceData& slice) {
       // Record the longest phase in any long slice.
       if (wasLongSlice) {
         PhaseKind longest = LongestPhaseSelfTimeInMajorGC(slice.phaseTimes);
-        reportLongestPhaseInMajorGC(longest, [runtime](auto sample) {
-          runtime->metrics().GC_SLOW_PHASE(sample);
-        });
+        reportLongestPhaseInMajorGC(
+            longest,
+            [runtime](auto sample) {
+              runtime->metrics().GC_SLOW_PHASE(sample);
+            },
+            [runtime](auto sample) {
+              runtime->metrics().GC_GLEAN_SLOW_PHASE(sample);
+            });
 
         // If the longest phase was waiting for parallel tasks then record the
         // longest task.
         if (longest == PhaseKind::JOIN_PARALLEL_TASKS) {
           PhaseKind longestParallel =
               FindLongestPhaseKind(slice.maxParallelTimes);
-          reportLongestPhaseInMajorGC(longestParallel, [runtime](auto sample) {
-            runtime->metrics().GC_SLOW_TASK(sample);
-          });
+          reportLongestPhaseInMajorGC(
+              longestParallel,
+              [runtime](auto sample) {
+                runtime->metrics().GC_SLOW_TASK(sample);
+              },
+              [runtime](auto sample) {
+                runtime->metrics().GC_GLEAN_SLOW_TASK(sample);
+              });
         }
       }
     }
@@ -1334,11 +1385,14 @@ void Statistics::sendSliceTelemetry(const SliceData& slice) {
   }
 }
 
-template <typename Fn>
-void Statistics::reportLongestPhaseInMajorGC(PhaseKind longest, Fn reportFn) {
+template <typename LegacyFn, typename GleanFn>
+void Statistics::reportLongestPhaseInMajorGC(PhaseKind longest,
+                                             LegacyFn legacyReportFn,
+                                             GleanFn gleanReportFn) {
   if (longest != PhaseKind::NONE) {
     uint8_t bucket = phaseKinds[longest].telemetryBucket;
-    reportFn(bucket);
+    legacyReportFn(bucket);
+    gleanReportFn(static_cast<uint32_t>(longest));
   }
 }
 
@@ -1518,7 +1572,7 @@ void Statistics::recordParallelPhase(PhaseKind phaseKind,
                                      TimeDuration duration) {
   MOZ_ASSERT(CurrentThreadCanAccessRuntime(gc->rt));
 
-  if (aborted) {
+  if (slices_.empty()) {
     return;
   }
 
@@ -1607,9 +1661,14 @@ double Statistics::computeMMU(TimeDuration window) const {
 void Statistics::maybePrintProfileHeaders() {
   static int printedHeader = 0;
   if ((printedHeader++ % 200) == 0) {
-    printProfileHeader();
+    if (enableProfiling_) {
+      printProfileHeader();
+    }
     if (gc->nursery().enableProfiling()) {
       gc->nursery().printProfileHeader();
+    }
+    if (enableBufferAllocStats_) {
+      BufferAllocator::printStatsHeader(profileFile());
     }
   }
 }
@@ -1626,7 +1685,8 @@ void Statistics::maybePrintProfileHeaders() {
   _("Reason", 20, "%-20.20s", reason)                 \
   _("States", 6, "%6s", formatGCStates(slice))        \
   _("FSNR", 4, "%4s", formatGCFlags(slice))           \
-  _("SizeKB", 8, "%8zu", sizeKB)                      \
+  _("SizeKB", 8, "%8zu", gcSizeKB)                    \
+  _("MllcKB", 8, "%8zu", mallocSizeKB)                \
   _("Zs", 3, "%3zu", zoneCount)                       \
   _("Cs", 3, "%3zu", compartmentCount)                \
   _("Rs", 3, "%3zu", realmCount)                      \
@@ -1637,10 +1697,6 @@ void Statistics::maybePrintProfileHeaders() {
   FOR_EACH_GC_PROFILE_SLICE_METADATA(_)
 
 void Statistics::printProfileHeader() {
-  if (!enableProfiling_) {
-    return;
-  }
-
   Sprinter sprinter;
   if (!sprinter.init()) {
     return;
@@ -1692,7 +1748,8 @@ void Statistics::printSliceProfile() {
   JSRuntime* runtime = gc->rt;
   TimeDuration timestamp = TimeBetween(creationTime(), slice.end);
   const char* reason = ExplainGCReason(slice.reason);
-  size_t sizeKB = gc->heapSize.bytes() / 1024;
+  size_t gcSizeKB = gc->heapSize.bytes() / 1024;
+  size_t mallocSizeKB = getMallocHeapSize() / 1024;
   size_t zoneCount = zoneStats.zoneCount;
   size_t compartmentCount = zoneStats.compartmentCount;
   size_t realmCount = zoneStats.realmCount;
@@ -1710,6 +1767,14 @@ void Statistics::printSliceProfile() {
     return;
   }
   fputs(str.get(), profileFile());
+}
+
+size_t Statistics::getMallocHeapSize() {
+  size_t bytes = 0;
+  for (AllZonesIter zone(gc); !zone.done(); zone.next()) {
+    bytes += zone->mallocHeapSize.bytes();
+  }
+  return bytes;
 }
 
 Statistics::ProfileDurations Statistics::getProfileTimes(

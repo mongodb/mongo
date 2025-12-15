@@ -339,7 +339,7 @@ struct VectorTesting;
  */
 template <typename T, size_t MinInlineCapacity = 0,
           class AllocPolicy = MallocAllocPolicy>
-class MOZ_NON_PARAM Vector final : private AllocPolicy {
+class MOZ_NON_PARAM MOZ_GSL_OWNER Vector final : private AllocPolicy {
   /* utilities */
   static constexpr bool kElemIsPod =
       std::is_trivial_v<T> && std::is_standard_layout_v<T>;

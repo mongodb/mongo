@@ -387,6 +387,7 @@ static_assert(sizeof(TimeStampValue) > 8);
  */
 class TimeStamp {
  public:
+  using DurationType = TimeDuration;
   /**
    * Initialize to the "null" moment
    */

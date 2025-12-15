@@ -7,8 +7,6 @@
 # <https://wiki.mozilla.org/Javascript:SpiderMonkey:ExactStackRooting>.
 
 ac_add_options --enable-ctypes
-ac_add_options --enable-optimize
-ac_add_options --disable-debug
 ac_add_options --enable-project=js
 ac_add_options --enable-nspr-build
 ac_add_options --disable-jemalloc

@@ -266,6 +266,8 @@ public:
 
     virtual int getJSHeapLimitMB() const = 0;
     virtual void setJSHeapLimitMB(int limit) = 0;
+    virtual bool getJSUseLegacyMemoryTracking() const = 0;
+    virtual void setJSUseLegacyMemoryTracking(bool shouldUseLegacy) = 0;
 
     virtual std::string getLoadPath() const = 0;
     virtual void setLoadPath(const std::string& loadPath) = 0;

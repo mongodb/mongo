@@ -42,6 +42,7 @@
 #include "vm/PromiseObject.h"  // js::PromiseObject
 #include "vm/SharedImmutableStringsCache.h"
 #include "vm/Warnings.h"  // js::WarnNumberUC
+#include "wasm/WasmPI.h"
 #include "wasm/WasmSignalHandlers.h"
 
 #include "debugger/DebugAPI-inl.h"
@@ -53,8 +54,6 @@ using namespace js;
 
 using mozilla::Atomic;
 using mozilla::DebugOnly;
-using mozilla::NegativeInfinity;
-using mozilla::PositiveInfinity;
 
 /* static */ MOZ_THREAD_LOCAL(JSContext*) js::TlsContext;
 /* static */
@@ -141,8 +140,8 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
       liveSABs(0),
       beforeWaitCallback(nullptr),
       afterWaitCallback(nullptr),
+      offthreadBaselineCompilationEnabled_(false),
       offthreadIonCompilationEnabled_(true),
-      parallelParsingEnabled_(true),
       autoWritableJitCodeActive_(false),
       oomCallback(nullptr),
       debuggerMallocSizeOf(ReturnZeroSize),
@@ -216,10 +215,6 @@ void JSRuntime::destroyRuntime() {
 
   watchtowerTestingLog.ref().reset();
 
-  // Caches might hold on ScriptData which are saved in the ScriptDataTable.
-  // Clear all stencils from caches to remove ScriptDataTable entries.
-  caches().purgeStencils();
-
   if (gc.wasInitialized()) {
     /*
      * Finish any in-progress GCs first.
@@ -233,12 +228,12 @@ void JSRuntime::destroyRuntime() {
     sourceHook = nullptr;
 
     /*
-     * Cancel any pending, in progress or completed Ion compilations and
-     * parse tasks. Waiting for wasm and compression tasks is done
+     * Cancel any pending, in progress or completed baseline/Ion compilations
+     * and parse tasks. Waiting for wasm and compression tasks is done
      * synchronously (on the main thread or during parse tasks), so no
      * explicit canceling is needed for these.
      */
-    CancelOffThreadIonCompile(this);
+    CancelOffThreadCompile(this);
     CancelOffThreadDelazify(this);
     CancelOffThreadCompressions(this);
 
@@ -294,6 +289,8 @@ void JSRuntime::setTelemetryCallback(
 
 void JSRuntime::setUseCounter(JSObject* obj, JSUseCounter counter) {
   if (useCounterCallback) {
+    // A use counter callback cannot GC.
+    JS::AutoSuppressGCAnalysis suppress;
     (*useCounterCallback)(obj, counter);
   }
 }
@@ -389,13 +386,23 @@ void JSRuntime::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
       wasmInstances.lock()->sizeOfExcludingThis(mallocSizeOf);
 }
 
+static bool InvokeInterruptCallbacks(JSContext* cx) {
+  bool stop = false;
+  for (JSInterruptCallback cb : cx->interruptCallbacks()) {
+    if (!cb(cx)) {
+      stop = true;
+    }
+  }
+  return stop;
+}
+
 static bool HandleInterrupt(JSContext* cx, bool invokeCallback) {
   MOZ_ASSERT(!cx->zone()->isAtomsZone());
 
   cx->runtime()->gc.gcIfRequested();
 
-  // A worker thread may have requested an interrupt after finishing an Ion
-  // compilation.
+  // A worker thread may have requested an interrupt after finishing an
+  // offthread compilation.
   jit::AttachFinishedCompilations(cx);
 
   // Don't call the interrupt callback if we only interrupted for GC or Ion.
@@ -410,11 +417,16 @@ static bool HandleInterrupt(JSContext* cx, bool invokeCallback) {
     return true;
   }
 
-  bool stop = false;
-  for (JSInterruptCallback cb : cx->interruptCallbacks()) {
-    if (!cb(cx)) {
-      stop = true;
-    }
+  bool stop;
+#ifdef ENABLE_WASM_JSPI
+  if (IsSuspendableStackActive(cx)) {
+    stop = wasm::CallOnMainStack(
+        cx, reinterpret_cast<wasm::CallOnMainStackFn>(InvokeInterruptCallbacks),
+        (void*)cx);
+  } else
+#endif
+  {
+    stop = InvokeInterruptCallbacks(cx);
   }
 
   if (!stop) {
@@ -452,6 +464,7 @@ static bool HandleInterrupt(JSContext* cx, bool invokeCallback) {
     chars = u"(stack not available)";
   }
   WarnNumberUC(cx, JSMSG_TERMINATED, chars);
+  cx->reportUncatchableException();
   return false;
 }
 
@@ -556,22 +569,16 @@ SharedScriptDataTableHolder& JSRuntime::scriptDataTableHolder() {
   return scriptDataTableHolder_;
 }
 
-GlobalObject* JSRuntime::getIncumbentGlobal(JSContext* cx) {
+bool JSRuntime::getHostDefinedData(JSContext* cx,
+                                   JS::MutableHandle<JSObject*> data) const {
   MOZ_ASSERT(cx->jobQueue);
 
-  JSObject* obj = cx->jobQueue->getIncumbentGlobal(cx);
-  if (!obj) {
-    return nullptr;
-  }
-
-  MOZ_ASSERT(obj->is<GlobalObject>(),
-             "getIncumbentGlobalCallback must return a global!");
-  return &obj->as<GlobalObject>();
+  return cx->jobQueue->getHostDefinedData(cx, data);
 }
 
 bool JSRuntime::enqueuePromiseJob(JSContext* cx, HandleFunction job,
                                   HandleObject promise,
-                                  Handle<GlobalObject*> incumbentGlobal) {
+                                  HandleObject hostDefinedData) {
   MOZ_ASSERT(cx->jobQueue,
              "Must select a JobQueue implementation using JS::JobQueue "
              "or js::UseInternalJobQueues before using Promises");
@@ -594,7 +601,7 @@ bool JSRuntime::enqueuePromiseJob(JSContext* cx, HandleFunction job,
     }
   }
   return cx->jobQueue->enqueuePromiseJob(cx, promise, job, allocationSite,
-                                         incumbentGlobal);
+                                         hostDefinedData);
 }
 
 void JSRuntime::addUnhandledRejectedPromise(JSContext* cx,
@@ -842,5 +849,17 @@ void JSRuntime::ensureRealmIsRecordingAllocations(
     // Ensure the probability is up to date with the current combination of
     // debuggers and runtime profiling.
     global->realm()->chooseAllocationSamplingProbability();
+  }
+}
+
+void js::HasSeenObjectEmulateUndefinedFuse::popFuse(JSContext* cx) {
+  js::InvalidatingRuntimeFuse::popFuse(cx);
+  MOZ_ASSERT(cx->global());
+  cx->runtime()->setUseCounter(cx->global(), JSUseCounter::ISHTMLDDA_FUSE);
+}
+
+void js::HasSeenArrayExceedsInt32LengthFuse::popFuse(JSContext* cx) {
+  if (intact()) {
+    js::InvalidatingRuntimeFuse::popFuse(cx);
   }
 }

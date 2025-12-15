@@ -33,7 +33,11 @@
 #include "jit/arm64/vixl/Globals-vixl.h"
 #include "jit/arm64/vixl/Utils-vixl.h"
 
-#define VIXL_USE_AARCH64_CPU_HELPERS
+// Mozilla change: Don't use VIXL_USE_AARCH64_CPU_HELPERS for the simulator, so
+// that we get consistent simulator behavior across architectures.
+#if defined(__aarch64__) && !defined(JS_SIMULATOR_ARM64)
+  #define VIXL_USE_AARCH64_CPU_HELPERS
+#endif
 
 namespace vixl {
 

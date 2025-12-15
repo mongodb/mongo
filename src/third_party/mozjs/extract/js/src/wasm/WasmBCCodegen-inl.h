@@ -195,7 +195,7 @@ RegRef BaseCompiler::captureReturnedRef() {
 //
 // Miscellaneous.
 
-void BaseCompiler::trap(Trap t) const { masm.wasmTrap(t, bytecodeOffset()); }
+void BaseCompiler::trap(Trap t) const { masm.wasmTrap(t, trapSiteDesc()); }
 
 void BaseCompiler::cmp64Set(Assembler::Condition cond, RegI64 lhs, RegI64 rhs,
                             RegI32 dest) {

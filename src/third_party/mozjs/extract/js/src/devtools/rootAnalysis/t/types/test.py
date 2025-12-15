@@ -1,6 +1,5 @@
 # flake8: noqa: F821
 
-from collections import defaultdict
 
 test.compile("source.cpp")
 test.run_analysis_script()

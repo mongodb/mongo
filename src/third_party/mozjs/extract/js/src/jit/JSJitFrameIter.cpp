@@ -38,16 +38,16 @@ JSJitFrameIter::JSJitFrameIter(const JitActivation* activation)
   MOZ_ASSERT(!TlsContext.get()->inUnsafeCallWithABI);
 }
 
-JSJitFrameIter::JSJitFrameIter(const JitActivation* activation,
-                               FrameType frameType, uint8_t* fp)
-    : current_(fp), type_(frameType), activation_(activation) {
+JSJitFrameIter::JSJitFrameIter(const JitActivation* activation, uint8_t* fp,
+                               bool unwinding)
+    : current_(fp), type_(FrameType::Exit), activation_(activation) {
   // This constructor is only used when resuming iteration after iterating Wasm
   // frames in the same JitActivation so ignore activation_->bailoutData().
-  //
-  // Note: FrameType::JSJitToWasm is used for JIT => Wasm calls through the Wasm
-  // JIT entry trampoline. FrameType::Exit is used for direct Ion => Wasm calls.
-  MOZ_ASSERT(fp > activation->jsOrWasmExitFP());
-  MOZ_ASSERT(type_ == FrameType::JSJitToWasm || type_ == FrameType::Exit);
+  if (unwinding) {
+    MOZ_ASSERT(fp == activation->jsExitFP());
+  } else {
+    MOZ_ASSERT(fp > activation->jsOrWasmExitFP());
+  }
   MOZ_ASSERT(!TlsContext.get()->inUnsafeCallWithABI);
 }
 
@@ -405,9 +405,6 @@ void JSJitFrameIter::dump() const {
     case FrameType::Exit:
       fprintf(stderr, " Exit frame\n");
       break;
-    case FrameType::JSJitToWasm:
-      fprintf(stderr, " Wasm exit frame\n");
-      break;
   };
   fputc('\n', stderr);
 }
@@ -623,7 +620,8 @@ bool JSJitProfilingFrameIterator::tryInitWithTable(JitcodeGlobalTable* table,
   JSScript* callee = frameScript();
 
   MOZ_ASSERT(entry->isIon() || entry->isIonIC() || entry->isBaseline() ||
-             entry->isBaselineInterpreter() || entry->isDummy());
+             entry->isBaselineInterpreter() || entry->isDummy() ||
+             entry->isSelfHostedShared());
 
   // Treat dummy lookups as an empty frame sequence.
   if (entry->isDummy()) {
@@ -659,6 +657,14 @@ bool JSJitProfilingFrameIterator::tryInitWithTable(JitcodeGlobalTable* table,
       return false;
     }
 
+    type_ = FrameType::BaselineJS;
+    resumePCinCurrentFrame_ = pc;
+    return true;
+  }
+
+  if (entry->isSelfHostedShared()) {
+    // Shared entries don't track who the callee is, so we can't check
+    // lastProfilingCallSite
     type_ = FrameType::BaselineJS;
     resumePCinCurrentFrame_ = pc;
     return true;
@@ -811,7 +817,6 @@ void JSJitProfilingFrameIterator::moveToNextFrame(CommonFrameLayout* frame) {
     case FrameType::TrampolineNative:
     case FrameType::Exit:
     case FrameType::Bailout:
-    case FrameType::JSJitToWasm:
       // Rectifier and Baseline Interpreter entry frames are handled before
       // this switch. The other frame types can't call JS functions directly.
       break;

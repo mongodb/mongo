@@ -43,6 +43,7 @@ extern bool InitializeDateTimeFormatObject(
     JSContext* cx, JS::Handle<JSObject*> obj, JS::Handle<JS::Value> thisValue,
     JS::Handle<JS::Value> locales, JS::Handle<JS::Value> options,
     JS::Handle<JSString*> required, JS::Handle<JSString*> defaults,
+    JS::Handle<JS::Value> toLocaleStringTimeZone,
     DateTimeFormatOptions dtfOptions, JS::MutableHandle<JS::Value> result);
 
 /**
@@ -101,7 +102,12 @@ constexpr size_t INITIAL_CHAR_BUFFER_SIZE = 32;
 
 void AddICUCellMemory(JSObject* obj, size_t nbytes);
 
+void RemoveICUCellMemory(JSObject* obj, size_t nbytes);
+
 void RemoveICUCellMemory(JS::GCContext* gcx, JSObject* obj, size_t nbytes);
+
+JSLinearString* CanonicalizeTimeZone(JSContext* cx,
+                                     JS::Handle<JSString*> timeZone);
 }  // namespace intl
 
 }  // namespace js

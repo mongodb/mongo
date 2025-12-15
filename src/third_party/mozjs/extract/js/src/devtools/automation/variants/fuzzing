@@ -4,10 +4,12 @@
     "debug": false,
     "compiler": "clang",
     "env": {
-        "JITTEST_EXTRA_ARGS": "--jitflags=none",
-        "JSTESTS_EXTRA_ARGS": "--jitflags=none",
         "LLVM_SYMBOLIZER": "{MOZ_FETCHES_DIR}/llvm-symbolizer/bin/llvm-symbolizer",
         "ASAN_SYMBOLIZER_PATH": "{MOZ_FETCHES_DIR}/llvm-symbolizer/bin/llvm-symbolizer"
+    },
+    "extra-args": {
+        "jit-test": ["--jitflags=none"],
+        "jstests": ["--jitflags=none"]
     },
     "use_minidump": false
 }

@@ -109,7 +109,7 @@ static bool IsAsciiLowercaseAlpha(mozilla::Span<const CharT> span) {
   return std::all_of(ptr, ptr + length, mozilla::IsAsciiLowercaseAlpha<CharT>);
 }
 
-static bool IsAsciiLowercaseAlpha(JSLinearString* str) {
+static bool IsAsciiLowercaseAlpha(const JSLinearString* str) {
   JS::AutoCheckCannotGC nogc;
   if (str->hasLatin1Chars()) {
     return IsAsciiLowercaseAlpha<Latin1Char>(str->latin1Range(nogc));
@@ -127,7 +127,7 @@ static bool IsAsciiAlpha(mozilla::Span<const CharT> span) {
   return std::all_of(ptr, ptr + length, mozilla::IsAsciiAlpha<CharT>);
 }
 
-static bool IsAsciiAlpha(JSLinearString* str) {
+static bool IsAsciiAlpha(const JSLinearString* str) {
   JS::AutoCheckCannotGC nogc;
   if (str->hasLatin1Chars()) {
     return IsAsciiAlpha<Latin1Char>(str->latin1Range(nogc));

@@ -201,6 +201,11 @@ inline bool operator<=(const void* a, const SharedMem<T>& b) {
 }
 
 template <typename T>
+inline bool operator<(const SharedMem<T>& a, const SharedMem<T>& b) {
+  return a.unwrap() < b.unwrap();
+}
+
+template <typename T>
 inline bool operator<(const void* a, const SharedMem<T>& b) {
   return a < b.unwrap();
 }

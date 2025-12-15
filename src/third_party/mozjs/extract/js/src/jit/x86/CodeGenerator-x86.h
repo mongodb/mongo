@@ -18,15 +18,13 @@ class OutOfLineTruncateFloat32;
 
 class CodeGeneratorX86 : public CodeGeneratorX86Shared {
  protected:
-  CodeGeneratorX86(MIRGenerator* gen, LIRGraph* graph, MacroAssembler* masm);
+  CodeGeneratorX86(MIRGenerator* gen, LIRGraph* graph, MacroAssembler* masm,
+                   const wasm::CodeMetadata* wasmCodeMeta);
 
-  ValueOperand ToValue(LInstruction* ins, size_t pos);
-  ValueOperand ToTempValue(LInstruction* ins, size_t pos);
-
-  void emitBigIntDiv(LBigIntDiv* ins, Register dividend, Register divisor,
-                     Register output, Label* fail);
-  void emitBigIntMod(LBigIntMod* ins, Register dividend, Register divisor,
-                     Register output, Label* fail);
+  void emitBigIntPtrDiv(LBigIntPtrDiv* ins, Register dividend, Register divisor,
+                        Register output);
+  void emitBigIntPtrMod(LBigIntPtrMod* ins, Register dividend, Register divisor,
+                        Register output);
 
   template <typename T>
   void emitWasmLoad(T* ins);
@@ -41,7 +39,7 @@ class CodeGeneratorX86 : public CodeGeneratorX86Shared {
   void visitOutOfLineTruncateFloat32(OutOfLineTruncateFloat32* ool);
 };
 
-typedef CodeGeneratorX86 CodeGeneratorSpecific;
+using CodeGeneratorSpecific = CodeGeneratorX86;
 
 }  // namespace jit
 }  // namespace js

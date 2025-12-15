@@ -12,142 +12,18 @@
 #include "gc/Heap.h"
 #include "gc/Zone.h"
 
-inline js::gc::ArenaList::ArenaList() { clear(); }
-
-inline js::gc::ArenaList::ArenaList(ArenaList&& other) { moveFrom(other); }
-
-inline js::gc::ArenaList::~ArenaList() { MOZ_ASSERT(isEmpty()); }
-
-void js::gc::ArenaList::moveFrom(ArenaList& other) {
-  other.check();
-
-  head_ = other.head_;
-  cursorp_ = other.isCursorAtHead() ? &head_ : other.cursorp_;
-  other.clear();
-
-  check();
+bool js::gc::ArenaList::hasNonFullArenas() const {
+  // Non-full arenas are kept at the start so we can check the first one.
+  return !isEmpty() && !first()->isFull();
 }
 
-js::gc::ArenaList& js::gc::ArenaList::operator=(ArenaList&& other) {
-  MOZ_ASSERT(isEmpty());
-  moveFrom(other);
-  return *this;
-}
-
-inline js::gc::ArenaList::ArenaList(Arena* head, Arena* arenaBeforeCursor)
-    : head_(head),
-      cursorp_(arenaBeforeCursor ? &arenaBeforeCursor->next : &head_) {
-  check();
-}
-
-// This does checking just of |head_| and |cursorp_|.
-void js::gc::ArenaList::check() const {
-#ifdef DEBUG
-  // If the list is empty, it must have this form.
-  MOZ_ASSERT_IF(!head_, cursorp_ == &head_);
-
-  // If there's an arena following the cursor, it must not be full.
-  Arena* cursor = *cursorp_;
-  MOZ_ASSERT_IF(cursor, cursor->hasFreeThings());
-#endif
-}
-
-void js::gc::ArenaList::clear() {
-  head_ = nullptr;
-  cursorp_ = &head_;
-  check();
-}
-
-bool js::gc::ArenaList::isEmpty() const {
-  check();
-  return !head_;
-}
-
-js::gc::Arena* js::gc::ArenaList::head() const {
-  check();
-  return head_;
-}
-
-bool js::gc::ArenaList::isCursorAtHead() const {
-  check();
-  return cursorp_ == &head_;
-}
-
-bool js::gc::ArenaList::isCursorAtEnd() const {
-  check();
-  return !*cursorp_;
-}
-
-js::gc::Arena* js::gc::ArenaList::arenaAfterCursor() const {
-  check();
-  return *cursorp_;
-}
-
-js::gc::Arena* js::gc::ArenaList::takeNextArena() {
-  check();
-  Arena* arena = *cursorp_;
-  if (!arena) {
-    return nullptr;
-  }
-  cursorp_ = &arena->next;
-  check();
-  return arena;
-}
-
-void js::gc::ArenaList::insertAtCursor(Arena* a) {
-  check();
-  a->next = *cursorp_;
-  *cursorp_ = a;
-  // At this point, the cursor is sitting before |a|. Move it after |a|
-  // if necessary.
-  if (!a->hasFreeThings()) {
-    cursorp_ = &a->next;
-  }
-  check();
-}
-
-void js::gc::ArenaList::insertBeforeCursor(Arena* a) {
-  check();
-  a->next = *cursorp_;
-  *cursorp_ = a;
-  cursorp_ = &a->next;
-  check();
-}
-
-js::gc::ArenaList& js::gc::ArenaList::insertListWithCursorAtEnd(
-    ArenaList& other) {
-  check();
-  other.check();
-  MOZ_ASSERT(other.isCursorAtEnd());
-
-  if (other.isEmpty()) {
-    return *this;
-  }
-
-  // Insert the full arenas of |other| after those of |this|.
-  *other.cursorp_ = *cursorp_;
-  *cursorp_ = other.head_;
-  cursorp_ = other.cursorp_;
-  check();
-
-  other.clear();
-  return *this;
-}
-
-js::gc::Arena* js::gc::ArenaList::takeFirstArena() {
-  check();
-  Arena* arena = head_;
-  if (!arena) {
+js::gc::Arena* js::gc::ArenaList::takeInitialNonFullArena() {
+  Arena* arena = first();
+  if (!arena || arena->isFull()) {
     return nullptr;
   }
 
-  head_ = arena->next;
-  arena->next = nullptr;
-  if (cursorp_ == &arena->next) {
-    cursorp_ = &head_;
-  }
-
-  check();
+  moveFrontToBack();
 
   return arena;
 }
@@ -213,8 +89,13 @@ void js::gc::SortedArenaList::insertAt(Arena* arena, size_t nfree) {
   }
 }
 
+bool js::gc::SortedArenaList::hasEmptyArenas() const {
+  return !buckets[emptyIndex()].isEmpty();
+}
+
 void js::gc::SortedArenaList::extractEmptyTo(Arena** destListHeadPtr) {
   MOZ_ASSERT(!isConvertedToArenaList);
+  MOZ_ASSERT(destListHeadPtr);
   check();
 
   Bucket& bucket = buckets[emptyIndex()];
@@ -242,16 +123,15 @@ js::gc::ArenaList js::gc::SortedArenaList::convertToArenaList(
     }
   }
 
-  // The cursor of the returned ArenaList needs to be between the last full
-  // arena and the first arena with space. Record that here.
-  Arena* lastFullArena = buckets[0].last();
-
-  Bucket result;
-  for (size_t i = 0; i < bucketsUsed(); ++i) {
-    result.append(std::move(buckets[i]));
+  // The returned ArenaList needs to contain all non-full arenas in order
+  // of increasing free space, followed by all full arenas.
+  ArenaList result;
+  size_t used = bucketsUsed();
+  for (size_t i = 1; i <= used; ++i) {
+    size_t bucket = i % used;  // [1, used) then 0.
+    result.append(std::move(buckets[bucket]));
   }
-
-  return ArenaList(result.release(), lastFullArena);
+  return result;
 }
 
 void js::gc::SortedArenaList::restoreFromArenaList(
@@ -264,20 +144,23 @@ void js::gc::SortedArenaList::restoreFromArenaList(
   // Group the ArenaList elements into SinglyLinkedList buckets, where the
   // boundaries between buckets are retrieved from |bucketLast|.
 
-  Arena* remaining = list.head();
-  list.clear();
+  Arena* remaining = list.release();
 
-  for (size_t i = 0; i < bucketsUsed(); i++) {
-    MOZ_ASSERT(buckets[i].isEmpty());
-    if (bucketLast[i]) {
+  size_t used = bucketsUsed();
+  for (size_t i = 1; i <= used; ++i) {
+    size_t bucket = i % used;  // [1, used) then 0.
+    MOZ_ASSERT(buckets[bucket].isEmpty());
+    if (bucketLast[bucket]) {
+      MOZ_ASSERT(remaining);
       Arena* first = remaining;
-      Arena* last = bucketLast[i];
+      Arena* last = bucketLast[bucket];
       remaining = last->next;
       last->next = nullptr;
-      new (&buckets[i]) Bucket(first, last);
+      new (&buckets[bucket]) Bucket(first, last);
     }
   }
 
+  MOZ_ASSERT(!remaining);
   check();
 }
 
@@ -362,17 +245,12 @@ JSRuntime* js::gc::ArenaLists::runtimeFromAnyThread() {
 }
 
 js::gc::Arena* js::gc::ArenaLists::getFirstArena(AllocKind thingKind) const {
-  return arenaList(thingKind).head();
+  return arenaList(thingKind).first();
 }
 
 js::gc::Arena* js::gc::ArenaLists::getFirstCollectingArena(
     AllocKind thingKind) const {
-  return collectingArenaList(thingKind).head();
-}
-
-js::gc::Arena* js::gc::ArenaLists::getArenaAfterCursor(
-    AllocKind thingKind) const {
-  return arenaList(thingKind).arenaAfterCursor();
+  return collectingArenaList(thingKind).first();
 }
 
 bool js::gc::ArenaLists::arenaListsAreEmpty() const {
@@ -392,11 +270,7 @@ bool js::gc::ArenaLists::arenaListsAreEmpty() const {
 }
 
 bool js::gc::ArenaLists::doneBackgroundFinalize(AllocKind kind) const {
-  return concurrentUse(kind) != ConcurrentUse::BackgroundFinalize;
-}
-
-bool js::gc::ArenaLists::needBackgroundFinalizeWait(AllocKind kind) const {
-  return concurrentUse(kind) == ConcurrentUse::BackgroundFinalize;
+  return concurrentUse(kind) == ConcurrentUse::None;
 }
 
 void js::gc::ArenaLists::clearFreeLists() { freeLists().clear(); }

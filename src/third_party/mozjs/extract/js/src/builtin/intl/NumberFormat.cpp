@@ -74,7 +74,9 @@ const JSClass NumberFormatObject::class_ = {
     JSCLASS_HAS_RESERVED_SLOTS(NumberFormatObject::SLOT_COUNT) |
         JSCLASS_HAS_CACHED_PROTO(JSProto_NumberFormat) |
         JSCLASS_FOREGROUND_FINALIZE,
-    &NumberFormatObject::classOps_, &NumberFormatObject::classSpec_};
+    &NumberFormatObject::classOps_,
+    &NumberFormatObject::classSpec_,
+};
 
 const JSClass& NumberFormatObject::protoClass_ = PlainObject::class_;
 
@@ -117,12 +119,13 @@ const ClassSpec NumberFormatObject::classSpec_ = {
     numberFormat_methods,
     numberFormat_properties,
     nullptr,
-    ClassSpec::DontDefineConstructor};
+    ClassSpec::DontDefineConstructor,
+};
 
 /**
  * 15.1.1 Intl.NumberFormat ( [ locales [ , options ] ] )
  *
- * ES2024 Intl draft rev 74ca7099f103d143431b2ea422ae640c6f43e3e6
+ * ES2025 Intl draft rev 5ea95f8a98d660e94c177d6f5e88c6d2962123b1
  */
 static bool NumberFormat(JSContext* cx, const CallArgs& args, bool construct) {
   AutoJSConstructorProfilerEntry pseudoFrame(cx, "Intl.NumberFormat");
@@ -147,7 +150,7 @@ static bool NumberFormat(JSContext* cx, const CallArgs& args, bool construct) {
   HandleValue locales = args.get(0);
   HandleValue options = args.get(1);
 
-  // Step 3.
+  // Steps 3-33.
   return intl::InitializeNumberFormatObject(cx, numberFormat, thisValue,
                                             locales, options, args.rval());
 }
@@ -951,7 +954,7 @@ static bool IsNonDecimalNumber(mozilla::Range<const CharT> chars) {
   return false;
 }
 
-static bool IsNonDecimalNumber(JSLinearString* str) {
+static bool IsNonDecimalNumber(const JSLinearString* str) {
   JS::AutoCheckCannotGC nogc;
   return str->hasLatin1Chars() ? IsNonDecimalNumber(str->latin1Range(nogc))
                                : IsNonDecimalNumber(str->twoByteRange(nogc));

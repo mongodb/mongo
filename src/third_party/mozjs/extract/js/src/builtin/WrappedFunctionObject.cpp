@@ -17,7 +17,7 @@
 #include "js/Exception.h"
 #include "js/TypeDecls.h"
 #include "js/Value.h"
-#include "util/StringBuffer.h"
+#include "util/StringBuilder.h"
 #include "vm/Compartment.h"
 #include "vm/Interpreter.h"
 #include "vm/JSFunction.h"

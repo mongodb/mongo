@@ -122,7 +122,7 @@ PlainObject* PlainObject::createWithTemplateFromDifferentRealm(
 SharedShape* GlobalObject::createPlainObjectShapeWithDefaultProto(
     JSContext* cx, gc::AllocKind kind) {
   PlainObjectSlotsKind slotsKind = PlainObjectSlotsKindFromAllocKind(kind);
-  HeapPtr<SharedShape*>& shapeRef =
+  GCPtr<SharedShape*>& shapeRef =
       cx->global()->data().plainObjectShapesWithDefaultProto[slotsKind];
   MOZ_ASSERT(!shapeRef);
 

@@ -38,6 +38,7 @@ _(GuardFuse, 1, true, 1)\
 _(GuardAnyClass, 1 + 1, true, 1)\
 _(GuardGlobalGeneration, 1 + 1, true, 1)\
 _(HasClassResult, 1 + 1, true, 1)\
+_(HasShapeResult, 1 + 1, true, 1)\
 _(CallRegExpMatcherResult, 1 + 1 + 1 + 1, true, 5)\
 _(CallRegExpSearcherResult, 1 + 1 + 1 + 1, true, 5)\
 _(RegExpSearcherLastLimitResult, 0, true, 1)\
@@ -48,8 +49,6 @@ _(RegExpFlagResult, 1 + 4, true, 2)\
 _(CallSubstringKernelResult, 1 + 1 + 1, true, 5)\
 _(StringReplaceStringResult, 1 + 1 + 1, true, 5)\
 _(StringSplitStringResult, 1 + 1, true, 5)\
-_(RegExpPrototypeOptimizableResult, 1, true, 4)\
-_(RegExpInstanceOptimizableResult, 1 + 1, true, 4)\
 _(GetFirstDollarIndexResult, 1, true, 5)\
 _(GuardCompartment, 1 + 1 + 1, false, 2)\
 _(GuardIsExtensible, 1, true, 1)\
@@ -69,6 +68,7 @@ _(GuardFunctionScript, 1 + 1 + 1, true, 1)\
 _(GuardSpecificAtom, 1 + 1, true, 4)\
 _(GuardSpecificSymbol, 1 + 1, true, 1)\
 _(GuardSpecificInt32, 1 + 4, true, 1)\
+_(GuardSpecificValue, 1 + 1, true, 1)\
 _(GuardNoDenseElements, 1, true, 1)\
 _(GuardStringToIndex, 1 + 1, true, 4)\
 _(GuardStringToInt32, 1 + 1, true, 4)\
@@ -98,6 +98,7 @@ _(GuardFunctionIsConstructor, 1, true, 1)\
 _(GuardNotClassConstructor, 1, true, 1)\
 _(GuardArrayIsPacked, 1, true, 1)\
 _(GuardArgumentsObjectFlags, 1 + 1, true, 1)\
+_(GuardObjectHasSameRealm, 1, true, 1)\
 _(LoadObject, 1 + 1, true, 1)\
 _(LoadProtoObject, 1 + 1 + 1, true, 1)\
 _(LoadProto, 1 + 1, true, 1)\
@@ -110,6 +111,8 @@ _(TruncateDoubleToUInt32, 1 + 1, true, 4)\
 _(DoubleToUint8Clamped, 1 + 1, true, 2)\
 _(MegamorphicLoadSlotResult, 1 + 1, true, 4)\
 _(MegamorphicLoadSlotByValueResult, 1 + 1, true, 4)\
+_(MegamorphicLoadSlotPermissiveResult, 1 + 1, true, 4)\
+_(MegamorphicLoadSlotByValuePermissiveResult, 1 + 1, true, 4)\
 _(MegamorphicStoreSlot, 1 + 1 + 1 + 1, true, 5)\
 _(MegamorphicSetElement, 1 + 1 + 1 + 1, true, 5)\
 _(MegamorphicHasPropResult, 1 + 1 + 1, true, 4)\
@@ -166,10 +169,14 @@ _(NewArrayIteratorResult, 1, true, 5)\
 _(NewStringIteratorResult, 1, true, 5)\
 _(NewRegExpStringIteratorResult, 1, true, 5)\
 _(ObjectCreateResult, 1, true, 5)\
-_(NewArrayFromLengthResult, 1 + 1, true, 5)\
+_(NewArrayFromLengthResult, 1 + 1 + 1, true, 5)\
 _(NewTypedArrayFromLengthResult, 1 + 1, true, 5)\
 _(NewTypedArrayFromArrayBufferResult, 1 + 1 + 1 + 1, true, 5)\
 _(NewTypedArrayFromArrayResult, 1 + 1, true, 5)\
+_(NewMapObjectResult, 1, true, 5)\
+_(NewSetObjectResult, 1, true, 5)\
+_(NewMapObjectFromIterableResult, 1 + 1, true, 5)\
+_(NewSetObjectFromIterableResult, 1 + 1, true, 5)\
 _(NewStringObjectResult, 1 + 1, true, 5)\
 _(StringFromCharCodeResult, 1, true, 5)\
 _(StringFromCodePointResult, 1, true, 5)\
@@ -192,6 +199,7 @@ _(MathSignNumberToInt32Result, 1, true, 2)\
 _(MathImulResult, 1 + 1, true, 1)\
 _(MathSqrtNumberResult, 1, true, 1)\
 _(MathFRoundNumberResult, 1, true, 1)\
+_(MathF16RoundNumberResult, 1, true, 4)\
 _(MathRandomResult, 1, true, 3)\
 _(MathHypot2NumberResult, 1 + 1, true, 4)\
 _(MathHypot3NumberResult, 1 + 1 + 1, true, 4)\
@@ -224,6 +232,7 @@ _(AtomicsXorResult, 1 + 1 + 1 + 1 + 1 + 1, true, 4)\
 _(AtomicsLoadResult, 1 + 1 + 1 + 1, true, 2)\
 _(AtomicsStoreResult, 1 + 1 + 1 + 1 + 1, true, 2)\
 _(AtomicsIsLockFreeResult, 1, true, 1)\
+_(AtomicsPauseResult, 0, true, 1)\
 _(CallNativeSetter, 1 + 1 + 1 + 1 + 1, true, 5)\
 _(CallScriptedSetter, 1 + 1 + 1 + 1 + 1, true, 3)\
 _(CallInlinedSetter, 1 + 1 + 1 + 1 + 1 + 1, true, 3)\
@@ -242,6 +251,7 @@ _(CallWasmFunction, 1 + 1 + 1 + 4 + 1 + 1, true, 3)\
 _(GuardWasmArg, 1 + 1, true, 2)\
 _(CallNativeFunction, 1 + 1 + 1 + 4 + 1, true, 4)\
 _(CallDOMFunction, 1 + 1 + 1 + 1 + 4, true, 4)\
+_(CallDOMFunctionWithAllocSite, 1 + 1 + 1 + 1 + 4 + 1, true, 4)\
 _(CallClassHook, 1 + 1 + 1 + 4 + 1, true, 4)\
 _(CallInlinedFunction, 1 + 1 + 1 + 1 + 4, true, 4)\
 _(CallScriptedProxyGetResult, 1 + 1 + 1 + 1 + 1 + 4, true, 4)\
@@ -272,6 +282,7 @@ _(LoadFunctionLengthResult, 1, true, 2)\
 _(LoadFunctionNameResult, 1, true, 2)\
 _(LoadBoundFunctionNumArgs, 1 + 1, true, 1)\
 _(LoadBoundFunctionTarget, 1 + 1, true, 1)\
+_(LoadBoundFunctionArgument, 1 + 4 + 1, true, 2)\
 _(GuardBoundFunctionIsConstructor, 1, true, 1)\
 _(LoadArrayBufferByteLengthInt32Result, 1, true, 1)\
 _(LoadArrayBufferByteLengthDoubleResult, 1, true, 1)\
@@ -332,6 +343,14 @@ _(BigIntMulResult, 1 + 1, true, 5)\
 _(BigIntDivResult, 1 + 1, true, 5)\
 _(BigIntModResult, 1 + 1, true, 5)\
 _(BigIntPowResult, 1 + 1, true, 5)\
+_(BigIntToIntPtr, 1 + 1, true, 1)\
+_(IntPtrToBigIntResult, 1, true, 5)\
+_(BigIntPtrAdd, 1 + 1 + 1, true, 1)\
+_(BigIntPtrSub, 1 + 1 + 1, true, 1)\
+_(BigIntPtrMul, 1 + 1 + 1, true, 1)\
+_(BigIntPtrDiv, 1 + 1 + 1, true, 1)\
+_(BigIntPtrMod, 1 + 1 + 1, true, 1)\
+_(BigIntPtrPow, 1 + 1 + 1, true, 2)\
 _(Int32BitOrResult, 1 + 1, true, 1)\
 _(Int32BitXorResult, 1 + 1, true, 1)\
 _(Int32BitAndResult, 1 + 1, true, 1)\
@@ -345,15 +364,24 @@ _(BigIntBitAndResult, 1 + 1, true, 5)\
 _(BigIntLeftShiftResult, 1 + 1, true, 5)\
 _(BigIntRightShiftResult, 1 + 1, true, 5)\
 _(BigIntNotResult, 1, true, 5)\
+_(BigIntPtrBitOr, 1 + 1 + 1, true, 1)\
+_(BigIntPtrBitXor, 1 + 1 + 1, true, 1)\
+_(BigIntPtrBitAnd, 1 + 1 + 1, true, 1)\
+_(BigIntPtrLeftShift, 1 + 1 + 1, true, 3)\
+_(BigIntPtrRightShift, 1 + 1 + 1, true, 3)\
+_(BigIntPtrNot, 1 + 1, true, 1)\
 _(Int32NegationResult, 1, true, 1)\
 _(DoubleNegationResult, 1, true, 1)\
 _(BigIntNegationResult, 1, true, 5)\
+_(BigIntPtrNegation, 1 + 1, true, 1)\
 _(Int32IncResult, 1, true, 1)\
 _(Int32DecResult, 1, true, 1)\
 _(DoubleIncResult, 1, true, 1)\
 _(DoubleDecResult, 1, true, 1)\
 _(BigIntIncResult, 1, true, 5)\
 _(BigIntDecResult, 1, true, 5)\
+_(BigIntPtrInc, 1 + 1, true, 1)\
+_(BigIntPtrDec, 1 + 1, true, 1)\
 _(LoadInt32TruthyResult, 1, true, 2)\
 _(LoadDoubleTruthyResult, 1, true, 2)\
 _(LoadStringTruthyResult, 1, true, 2)\
@@ -364,7 +392,8 @@ _(LoadValueResult, 1, false, 1)\
 _(LoadOperandResult, 1, true, 1)\
 _(NewPlainObjectResult, 4 + 4 + 1 + 1 + 1, true, 4)\
 _(NewArrayObjectResult, 4 + 1 + 1, true, 4)\
-_(CallStringConcatResult, 1 + 1, true, 5)\
+_(NewFunctionCloneResult, 1 + 1 + 1, true, 4)\
+_(ConcatStringsResult, 1 + 1 + 1, true, 5)\
 _(CallStringObjectConcatResult, 1 + 1, false, 5)\
 _(CallIsSuspendedGeneratorResult, 1, false, 2)\
 _(CompareStringResult, 1 + 1 + 1, true, 5)\
@@ -388,6 +417,8 @@ _(SetHasStringResult, 1 + 1, true, 5)\
 _(SetHasSymbolResult, 1 + 1, true, 3)\
 _(SetHasBigIntResult, 1 + 1, true, 3)\
 _(SetHasObjectResult, 1 + 1, true, 3)\
+_(SetDeleteResult, 1 + 1, true, 5)\
+_(SetAddResult, 1 + 1, true, 5)\
 _(SetSizeResult, 1, true, 1)\
 _(MapHasResult, 1 + 1, true, 5)\
 _(MapHasNonGCThingResult, 1 + 1, true, 3)\
@@ -401,13 +432,20 @@ _(MapGetStringResult, 1 + 1, true, 5)\
 _(MapGetSymbolResult, 1 + 1, true, 3)\
 _(MapGetBigIntResult, 1 + 1, true, 3)\
 _(MapGetObjectResult, 1 + 1, true, 3)\
+_(MapDeleteResult, 1 + 1, true, 5)\
+_(MapSetResult, 1 + 1 + 1, true, 5)\
 _(MapSizeResult, 1, true, 1)\
+_(DateFillLocalTimeSlots, 1, true, 4)\
+_(DateHoursFromSecondsIntoYearResult, 1, true, 2)\
+_(DateMinutesFromSecondsIntoYearResult, 1, true, 2)\
+_(DateSecondsFromSecondsIntoYearResult, 1, true, 2)\
 _(ArrayFromArgumentsObjectResult, 1 + 1, true, 5)\
 _(CloseIterScriptedResult, 1 + 1 + 1 + 4, true, 5)\
 _(CallPrintString, sizeof(uintptr_t), false, 1)\
 _(Breakpoint, 0, false, 1)\
 _(WrapResult, 0, false, 4)\
 _(Bailout, 0, true, 0)\
+_(AssertFloat32Result, 1 + 1, true, 1)\
 _(AssertRecoveredOnBailoutResult, 1 + 1, true, 1)\
 _(AssertPropertyLookup, 1 + 1 + 1, true, 4)
 
@@ -606,6 +644,12 @@ void hasClassResult(ObjOperandId obj, const void* clasp) {\
   writeRawPointerField(clasp);\
   assertLengthMatches();\
 }\
+void hasShapeResult(ObjOperandId obj, Shape* shape) {\
+  writeOp(CacheOp::HasShapeResult);\
+  writeOperandId(obj);\
+  writeShapeField(shape);\
+  assertLengthMatches();\
+}\
 void callRegExpMatcherResult(ObjOperandId regexp, StringOperandId input, Int32OperandId lastIndex, JitCode* stub) {\
   writeOp(CacheOp::CallRegExpMatcherResult);\
   writeOperandId(regexp);\
@@ -670,17 +714,6 @@ void stringSplitStringResult(StringOperandId str, StringOperandId separator) {\
   writeOp(CacheOp::StringSplitStringResult);\
   writeOperandId(str);\
   writeOperandId(separator);\
-  assertLengthMatches();\
-}\
-void regExpPrototypeOptimizableResult(ObjOperandId proto) {\
-  writeOp(CacheOp::RegExpPrototypeOptimizableResult);\
-  writeOperandId(proto);\
-  assertLengthMatches();\
-}\
-void regExpInstanceOptimizableResult(ObjOperandId regexp, ObjOperandId proto) {\
-  writeOp(CacheOp::RegExpInstanceOptimizableResult);\
-  writeOperandId(regexp);\
-  writeOperandId(proto);\
   assertLengthMatches();\
 }\
 void getFirstDollarIndexResult(StringOperandId str) {\
@@ -792,6 +825,12 @@ void guardSpecificInt32(Int32OperandId num, int32_t expected) {\
   writeOp(CacheOp::GuardSpecificInt32);\
   writeOperandId(num);\
   writeInt32Imm(expected);\
+  assertLengthMatches();\
+}\
+void guardSpecificValue(ValOperandId val, const Value& expected) {\
+  writeOp(CacheOp::GuardSpecificValue);\
+  writeOperandId(val);\
+  writeValueField(expected);\
   assertLengthMatches();\
 }\
 void guardNoDenseElements(ObjOperandId obj) {\
@@ -981,6 +1020,11 @@ void guardArgumentsObjectFlags(ObjOperandId obj, uint32_t flags) {\
   writeByteImm(flags);\
   assertLengthMatches();\
 }\
+void guardObjectHasSameRealm(ObjOperandId obj) {\
+  writeOp(CacheOp::GuardObjectHasSameRealm);\
+  writeOperandId(obj);\
+  assertLengthMatches();\
+}\
 ObjOperandId loadObject(JSObject* obj) {\
   writeOp(CacheOp::LoadObject);\
   ObjOperandId result(newOperandId());\
@@ -1076,6 +1120,18 @@ void megamorphicLoadSlotResult(ObjOperandId obj, jsid name) {\
 }\
 void megamorphicLoadSlotByValueResult(ObjOperandId obj, ValOperandId id) {\
   writeOp(CacheOp::MegamorphicLoadSlotByValueResult);\
+  writeOperandId(obj);\
+  writeOperandId(id);\
+  assertLengthMatches();\
+}\
+void megamorphicLoadSlotPermissiveResult(ObjOperandId obj, jsid name) {\
+  writeOp(CacheOp::MegamorphicLoadSlotPermissiveResult);\
+  writeOperandId(obj);\
+  writeIdField(name);\
+  assertLengthMatches();\
+}\
+void megamorphicLoadSlotByValuePermissiveResult(ObjOperandId obj, ValOperandId id) {\
+  writeOp(CacheOp::MegamorphicLoadSlotByValuePermissiveResult);\
   writeOperandId(obj);\
   writeOperandId(id);\
   assertLengthMatches();\
@@ -1415,10 +1471,11 @@ void objectCreateResult(JSObject* templateObject) {\
   writeObjectField(templateObject);\
   assertLengthMatches();\
 }\
-void newArrayFromLengthResult(JSObject* templateObject, Int32OperandId length) {\
+void newArrayFromLengthResult(JSObject* templateObject, Int32OperandId length, gc::AllocSite* site) {\
   writeOp(CacheOp::NewArrayFromLengthResult);\
   writeObjectField(templateObject);\
   writeOperandId(length);\
+  writeAllocSiteField(site);\
   assertLengthMatches();\
 }\
 void newTypedArrayFromLengthResult(JSObject* templateObject, Int32OperandId length) {\
@@ -1439,6 +1496,28 @@ void newTypedArrayFromArrayResult(JSObject* templateObject, ObjOperandId array) 
   writeOp(CacheOp::NewTypedArrayFromArrayResult);\
   writeObjectField(templateObject);\
   writeOperandId(array);\
+  assertLengthMatches();\
+}\
+void newMapObjectResult(JSObject* templateObject) {\
+  writeOp(CacheOp::NewMapObjectResult);\
+  writeObjectField(templateObject);\
+  assertLengthMatches();\
+}\
+void newSetObjectResult(JSObject* templateObject) {\
+  writeOp(CacheOp::NewSetObjectResult);\
+  writeObjectField(templateObject);\
+  assertLengthMatches();\
+}\
+void newMapObjectFromIterableResult(JSObject* templateObject, ValOperandId iterable) {\
+  writeOp(CacheOp::NewMapObjectFromIterableResult);\
+  writeObjectField(templateObject);\
+  writeOperandId(iterable);\
+  assertLengthMatches();\
+}\
+void newSetObjectFromIterableResult(JSObject* templateObject, ValOperandId iterable) {\
+  writeOp(CacheOp::NewSetObjectFromIterableResult);\
+  writeObjectField(templateObject);\
+  writeOperandId(iterable);\
   assertLengthMatches();\
 }\
 void newStringObjectResult(JSObject* templateObject, StringOperandId str) {\
@@ -1555,6 +1634,11 @@ void mathSqrtNumberResult(NumberOperandId input) {\
 }\
 void mathFRoundNumberResult(NumberOperandId input) {\
   writeOp(CacheOp::MathFRoundNumberResult);\
+  writeOperandId(input);\
+  assertLengthMatches();\
+}\
+void mathF16RoundNumberResult(NumberOperandId input) {\
+  writeOp(CacheOp::MathF16RoundNumberResult);\
   writeOperandId(input);\
   assertLengthMatches();\
 }\
@@ -1785,6 +1869,10 @@ void atomicsIsLockFreeResult(Int32OperandId value) {\
   writeOperandId(value);\
   assertLengthMatches();\
 }\
+void atomicsPauseResult() {\
+  writeOp(CacheOp::AtomicsPauseResult);\
+  assertLengthMatches();\
+}\
 private:\
 void callNativeSetter_(ObjOperandId receiver, JSObject* setter, ValOperandId rhs, bool sameRealm, uint32_t nargsAndFlags) {\
   writeOp(CacheOp::CallNativeSetter);\
@@ -1906,13 +1994,13 @@ void callBoundScriptedFunction(ObjOperandId callee, ObjOperandId target, Int32Op
   writeUInt32Imm(numBoundArgs);\
   assertLengthMatches();\
 }\
-void callWasmFunction(ObjOperandId callee, Int32OperandId argc, CallFlags flags, uint32_t argcFixed, const void* funcExport, JSObject* instance) {\
+void callWasmFunction(ObjOperandId callee, Int32OperandId argc, CallFlags flags, uint32_t argcFixed, const void* funcType, JSObject* instance) {\
   writeOp(CacheOp::CallWasmFunction);\
   writeOperandId(callee);\
   writeOperandId(argc);\
   writeCallFlagsImm(flags);\
   writeUInt32Imm(argcFixed);\
-  writeRawPointerField(funcExport);\
+  writeRawPointerField(funcType);\
   writeObjectField(instance);\
   assertLengthMatches();\
 }\
@@ -1941,6 +2029,18 @@ void callDOMFunction_(ObjOperandId callee, Int32OperandId argc, ObjOperandId thi
   writeOperandId(thisObj);\
   writeCallFlagsImm(flags);\
   writeUInt32Imm(argcFixed);\
+  assertLengthMatches();\
+}\
+public:\
+private:\
+void callDOMFunctionWithAllocSite_(ObjOperandId callee, Int32OperandId argc, ObjOperandId thisObj, CallFlags flags, uint32_t argcFixed, gc::AllocSite* site) {\
+  writeOp(CacheOp::CallDOMFunctionWithAllocSite);\
+  writeOperandId(callee);\
+  writeOperandId(argc);\
+  writeOperandId(thisObj);\
+  writeCallFlagsImm(flags);\
+  writeUInt32Imm(argcFixed);\
+  writeAllocSiteField(site);\
   assertLengthMatches();\
 }\
 public:\
@@ -2163,6 +2263,15 @@ ObjOperandId loadBoundFunctionTarget(ObjOperandId obj) {\
   writeOp(CacheOp::LoadBoundFunctionTarget);\
   writeOperandId(obj);\
   ObjOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+ValOperandId loadBoundFunctionArgument(ObjOperandId obj, uint32_t index) {\
+  writeOp(CacheOp::LoadBoundFunctionArgument);\
+  writeOperandId(obj);\
+  writeUInt32Imm(index);\
+  ValOperandId result(newOperandId());\
   writeOperandId(result);\
   assertLengthMatches();\
   return result;\
@@ -2546,6 +2655,73 @@ void bigIntPowResult(BigIntOperandId lhs, BigIntOperandId rhs) {\
   writeOperandId(rhs);\
   assertLengthMatches();\
 }\
+IntPtrOperandId bigIntToIntPtr(BigIntOperandId input) {\
+  writeOp(CacheOp::BigIntToIntPtr);\
+  writeOperandId(input);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+void intPtrToBigIntResult(IntPtrOperandId input) {\
+  writeOp(CacheOp::IntPtrToBigIntResult);\
+  writeOperandId(input);\
+  assertLengthMatches();\
+}\
+IntPtrOperandId bigIntPtrAdd(IntPtrOperandId lhs, IntPtrOperandId rhs) {\
+  writeOp(CacheOp::BigIntPtrAdd);\
+  writeOperandId(lhs);\
+  writeOperandId(rhs);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+IntPtrOperandId bigIntPtrSub(IntPtrOperandId lhs, IntPtrOperandId rhs) {\
+  writeOp(CacheOp::BigIntPtrSub);\
+  writeOperandId(lhs);\
+  writeOperandId(rhs);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+IntPtrOperandId bigIntPtrMul(IntPtrOperandId lhs, IntPtrOperandId rhs) {\
+  writeOp(CacheOp::BigIntPtrMul);\
+  writeOperandId(lhs);\
+  writeOperandId(rhs);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+IntPtrOperandId bigIntPtrDiv(IntPtrOperandId lhs, IntPtrOperandId rhs) {\
+  writeOp(CacheOp::BigIntPtrDiv);\
+  writeOperandId(lhs);\
+  writeOperandId(rhs);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+IntPtrOperandId bigIntPtrMod(IntPtrOperandId lhs, IntPtrOperandId rhs) {\
+  writeOp(CacheOp::BigIntPtrMod);\
+  writeOperandId(lhs);\
+  writeOperandId(rhs);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+IntPtrOperandId bigIntPtrPow(IntPtrOperandId lhs, IntPtrOperandId rhs) {\
+  writeOp(CacheOp::BigIntPtrPow);\
+  writeOperandId(lhs);\
+  writeOperandId(rhs);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
 void int32BitOrResult(Int32OperandId lhs, Int32OperandId rhs) {\
   writeOp(CacheOp::Int32BitOrResult);\
   writeOperandId(lhs);\
@@ -2623,6 +2799,59 @@ void bigIntNotResult(BigIntOperandId input) {\
   writeOperandId(input);\
   assertLengthMatches();\
 }\
+IntPtrOperandId bigIntPtrBitOr(IntPtrOperandId lhs, IntPtrOperandId rhs) {\
+  writeOp(CacheOp::BigIntPtrBitOr);\
+  writeOperandId(lhs);\
+  writeOperandId(rhs);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+IntPtrOperandId bigIntPtrBitXor(IntPtrOperandId lhs, IntPtrOperandId rhs) {\
+  writeOp(CacheOp::BigIntPtrBitXor);\
+  writeOperandId(lhs);\
+  writeOperandId(rhs);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+IntPtrOperandId bigIntPtrBitAnd(IntPtrOperandId lhs, IntPtrOperandId rhs) {\
+  writeOp(CacheOp::BigIntPtrBitAnd);\
+  writeOperandId(lhs);\
+  writeOperandId(rhs);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+IntPtrOperandId bigIntPtrLeftShift(IntPtrOperandId lhs, IntPtrOperandId rhs) {\
+  writeOp(CacheOp::BigIntPtrLeftShift);\
+  writeOperandId(lhs);\
+  writeOperandId(rhs);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+IntPtrOperandId bigIntPtrRightShift(IntPtrOperandId lhs, IntPtrOperandId rhs) {\
+  writeOp(CacheOp::BigIntPtrRightShift);\
+  writeOperandId(lhs);\
+  writeOperandId(rhs);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+IntPtrOperandId bigIntPtrNot(IntPtrOperandId input) {\
+  writeOp(CacheOp::BigIntPtrNot);\
+  writeOperandId(input);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
 void int32NegationResult(Int32OperandId input) {\
   writeOp(CacheOp::Int32NegationResult);\
   writeOperandId(input);\
@@ -2637,6 +2866,14 @@ void bigIntNegationResult(BigIntOperandId input) {\
   writeOp(CacheOp::BigIntNegationResult);\
   writeOperandId(input);\
   assertLengthMatches();\
+}\
+IntPtrOperandId bigIntPtrNegation(IntPtrOperandId input) {\
+  writeOp(CacheOp::BigIntPtrNegation);\
+  writeOperandId(input);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
 }\
 void int32IncResult(Int32OperandId input) {\
   writeOp(CacheOp::Int32IncResult);\
@@ -2667,6 +2904,22 @@ void bigIntDecResult(BigIntOperandId input) {\
   writeOp(CacheOp::BigIntDecResult);\
   writeOperandId(input);\
   assertLengthMatches();\
+}\
+IntPtrOperandId bigIntPtrInc(IntPtrOperandId input) {\
+  writeOp(CacheOp::BigIntPtrInc);\
+  writeOperandId(input);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+IntPtrOperandId bigIntPtrDec(IntPtrOperandId input) {\
+  writeOp(CacheOp::BigIntPtrDec);\
+  writeOperandId(input);\
+  IntPtrOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
 }\
 void loadInt32TruthyResult(ValOperandId input) {\
   writeOp(CacheOp::LoadInt32TruthyResult);\
@@ -2724,10 +2977,18 @@ void newArrayObjectResult(uint32_t arrayLength, Shape* shape, gc::AllocSite* sit
   writeAllocSiteField(site);\
   assertLengthMatches();\
 }\
-void callStringConcatResult(StringOperandId lhs, StringOperandId rhs) {\
-  writeOp(CacheOp::CallStringConcatResult);\
+void newFunctionCloneResult(JSObject* canonical, gc::AllocKind allocKind, gc::AllocSite* site) {\
+  writeOp(CacheOp::NewFunctionCloneResult);\
+  writeObjectField(canonical);\
+  writeAllocKindImm(allocKind);\
+  writeAllocSiteField(site);\
+  assertLengthMatches();\
+}\
+void concatStringsResult(StringOperandId lhs, StringOperandId rhs, JitCode* stub) {\
+  writeOp(CacheOp::ConcatStringsResult);\
   writeOperandId(lhs);\
   writeOperandId(rhs);\
+  writeJitCodeField(stub);\
   assertLengthMatches();\
 }\
 void callStringObjectConcatResult(ValOperandId lhs, ValOperandId rhs) {\
@@ -2876,6 +3137,18 @@ void setHasObjectResult(ObjOperandId set, ObjOperandId obj) {\
   writeOperandId(obj);\
   assertLengthMatches();\
 }\
+void setDeleteResult(ObjOperandId set, ValOperandId val) {\
+  writeOp(CacheOp::SetDeleteResult);\
+  writeOperandId(set);\
+  writeOperandId(val);\
+  assertLengthMatches();\
+}\
+void setAddResult(ObjOperandId set, ValOperandId key) {\
+  writeOp(CacheOp::SetAddResult);\
+  writeOperandId(set);\
+  writeOperandId(key);\
+  assertLengthMatches();\
+}\
 void setSizeResult(ObjOperandId set) {\
   writeOp(CacheOp::SetSizeResult);\
   writeOperandId(set);\
@@ -2953,9 +3226,42 @@ void mapGetObjectResult(ObjOperandId map, ObjOperandId obj) {\
   writeOperandId(obj);\
   assertLengthMatches();\
 }\
+void mapDeleteResult(ObjOperandId map, ValOperandId val) {\
+  writeOp(CacheOp::MapDeleteResult);\
+  writeOperandId(map);\
+  writeOperandId(val);\
+  assertLengthMatches();\
+}\
+void mapSetResult(ObjOperandId map, ValOperandId key, ValOperandId val) {\
+  writeOp(CacheOp::MapSetResult);\
+  writeOperandId(map);\
+  writeOperandId(key);\
+  writeOperandId(val);\
+  assertLengthMatches();\
+}\
 void mapSizeResult(ObjOperandId map) {\
   writeOp(CacheOp::MapSizeResult);\
   writeOperandId(map);\
+  assertLengthMatches();\
+}\
+void dateFillLocalTimeSlots(ObjOperandId date) {\
+  writeOp(CacheOp::DateFillLocalTimeSlots);\
+  writeOperandId(date);\
+  assertLengthMatches();\
+}\
+void dateHoursFromSecondsIntoYearResult(ValOperandId secondsIntoYear) {\
+  writeOp(CacheOp::DateHoursFromSecondsIntoYearResult);\
+  writeOperandId(secondsIntoYear);\
+  assertLengthMatches();\
+}\
+void dateMinutesFromSecondsIntoYearResult(ValOperandId secondsIntoYear) {\
+  writeOp(CacheOp::DateMinutesFromSecondsIntoYearResult);\
+  writeOperandId(secondsIntoYear);\
+  assertLengthMatches();\
+}\
+void dateSecondsFromSecondsIntoYearResult(ValOperandId secondsIntoYear) {\
+  writeOp(CacheOp::DateSecondsFromSecondsIntoYearResult);\
+  writeOperandId(secondsIntoYear);\
   assertLengthMatches();\
 }\
 void arrayFromArgumentsObjectResult(ObjOperandId obj, Shape* shape) {\
@@ -2987,6 +3293,12 @@ void wrapResult() {\
 }\
 void bailout() {\
   writeOp(CacheOp::Bailout);\
+  assertLengthMatches();\
+}\
+void assertFloat32Result(ValOperandId val, bool mustBeFloat32) {\
+  writeOp(CacheOp::AssertFloat32Result);\
+  writeOperandId(val);\
+  writeBoolImm(mustBeFloat32);\
   assertLengthMatches();\
 }\
 void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
@@ -3200,19 +3512,6 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   StringOperandId strId = reader.stringOperandId();\
   StringOperandId separatorId = reader.stringOperandId();\
   return emitStringSplitStringResult(strId, separatorId);\
-}\
-\
-[[nodiscard]] bool emitRegExpPrototypeOptimizableResult(ObjOperandId protoId);\
-[[nodiscard]] bool emitRegExpPrototypeOptimizableResult(CacheIRReader& reader) {\
-  ObjOperandId protoId = reader.objOperandId();\
-  return emitRegExpPrototypeOptimizableResult(protoId);\
-}\
-\
-[[nodiscard]] bool emitRegExpInstanceOptimizableResult(ObjOperandId regexpId, ObjOperandId protoId);\
-[[nodiscard]] bool emitRegExpInstanceOptimizableResult(CacheIRReader& reader) {\
-  ObjOperandId regexpId = reader.objOperandId();\
-  ObjOperandId protoId = reader.objOperandId();\
-  return emitRegExpInstanceOptimizableResult(regexpId, protoId);\
 }\
 \
 [[nodiscard]] bool emitGetFirstDollarIndexResult(StringOperandId strId);\
@@ -3487,6 +3786,12 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitGuardArgumentsObjectFlags(objId, flags);\
 }\
 \
+[[nodiscard]] bool emitGuardObjectHasSameRealm(ObjOperandId objId);\
+[[nodiscard]] bool emitGuardObjectHasSameRealm(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  return emitGuardObjectHasSameRealm(objId);\
+}\
+\
 [[nodiscard]] bool emitLoadObject(ObjOperandId resultId, uint32_t objOffset);\
 [[nodiscard]] bool emitLoadObject(CacheIRReader& reader) {\
   ObjOperandId resultId = reader.objOperandId();\
@@ -3557,6 +3862,20 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   ObjOperandId objId = reader.objOperandId();\
   ValOperandId idId = reader.valOperandId();\
   return emitMegamorphicLoadSlotByValueResult(objId, idId);\
+}\
+\
+[[nodiscard]] bool emitMegamorphicLoadSlotPermissiveResult(ObjOperandId objId, uint32_t nameOffset);\
+[[nodiscard]] bool emitMegamorphicLoadSlotPermissiveResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t nameOffset = reader.stubOffset();\
+  return emitMegamorphicLoadSlotPermissiveResult(objId, nameOffset);\
+}\
+\
+[[nodiscard]] bool emitMegamorphicLoadSlotByValuePermissiveResult(ObjOperandId objId, ValOperandId idId);\
+[[nodiscard]] bool emitMegamorphicLoadSlotByValuePermissiveResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  ValOperandId idId = reader.valOperandId();\
+  return emitMegamorphicLoadSlotByValuePermissiveResult(objId, idId);\
 }\
 \
 [[nodiscard]] bool emitMegamorphicStoreSlot(ObjOperandId objId, uint32_t nameOffset, ValOperandId rhsId, bool strict);\
@@ -3837,11 +4156,12 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitObjectCreateResult(templateObjectOffset);\
 }\
 \
-[[nodiscard]] bool emitNewArrayFromLengthResult(uint32_t templateObjectOffset, Int32OperandId lengthId);\
+[[nodiscard]] bool emitNewArrayFromLengthResult(uint32_t templateObjectOffset, Int32OperandId lengthId, uint32_t siteOffset);\
 [[nodiscard]] bool emitNewArrayFromLengthResult(CacheIRReader& reader) {\
   uint32_t templateObjectOffset = reader.stubOffset();\
   Int32OperandId lengthId = reader.int32OperandId();\
-  return emitNewArrayFromLengthResult(templateObjectOffset, lengthId);\
+  uint32_t siteOffset = reader.stubOffset();\
+  return emitNewArrayFromLengthResult(templateObjectOffset, lengthId, siteOffset);\
 }\
 \
 [[nodiscard]] bool emitNewTypedArrayFromLengthResult(uint32_t templateObjectOffset, Int32OperandId lengthId);\
@@ -3865,6 +4185,32 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   uint32_t templateObjectOffset = reader.stubOffset();\
   ObjOperandId arrayId = reader.objOperandId();\
   return emitNewTypedArrayFromArrayResult(templateObjectOffset, arrayId);\
+}\
+\
+[[nodiscard]] bool emitNewMapObjectResult(uint32_t templateObjectOffset);\
+[[nodiscard]] bool emitNewMapObjectResult(CacheIRReader& reader) {\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  return emitNewMapObjectResult(templateObjectOffset);\
+}\
+\
+[[nodiscard]] bool emitNewSetObjectResult(uint32_t templateObjectOffset);\
+[[nodiscard]] bool emitNewSetObjectResult(CacheIRReader& reader) {\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  return emitNewSetObjectResult(templateObjectOffset);\
+}\
+\
+[[nodiscard]] bool emitNewMapObjectFromIterableResult(uint32_t templateObjectOffset, ValOperandId iterableId);\
+[[nodiscard]] bool emitNewMapObjectFromIterableResult(CacheIRReader& reader) {\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  ValOperandId iterableId = reader.valOperandId();\
+  return emitNewMapObjectFromIterableResult(templateObjectOffset, iterableId);\
+}\
+\
+[[nodiscard]] bool emitNewSetObjectFromIterableResult(uint32_t templateObjectOffset, ValOperandId iterableId);\
+[[nodiscard]] bool emitNewSetObjectFromIterableResult(CacheIRReader& reader) {\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  ValOperandId iterableId = reader.valOperandId();\
+  return emitNewSetObjectFromIterableResult(templateObjectOffset, iterableId);\
 }\
 \
 [[nodiscard]] bool emitNewStringObjectResult(uint32_t templateObjectOffset, StringOperandId strId);\
@@ -3992,6 +4338,12 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
 [[nodiscard]] bool emitMathFRoundNumberResult(CacheIRReader& reader) {\
   NumberOperandId inputId = reader.numberOperandId();\
   return emitMathFRoundNumberResult(inputId);\
+}\
+\
+[[nodiscard]] bool emitMathF16RoundNumberResult(NumberOperandId inputId);\
+[[nodiscard]] bool emitMathF16RoundNumberResult(CacheIRReader& reader) {\
+  NumberOperandId inputId = reader.numberOperandId();\
+  return emitMathF16RoundNumberResult(inputId);\
 }\
 \
 [[nodiscard]] bool emitMathHypot2NumberResult(NumberOperandId firstId, NumberOperandId secondId);\
@@ -4237,6 +4589,11 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitAtomicsIsLockFreeResult(valueId);\
 }\
 \
+[[nodiscard]] bool emitAtomicsPauseResult();\
+[[nodiscard]] bool emitAtomicsPauseResult(CacheIRReader& reader) {\
+  return emitAtomicsPauseResult();\
+}\
+\
 [[nodiscard]] bool emitCallInt32ToString(Int32OperandId inputId, StringOperandId resultId);\
 [[nodiscard]] bool emitCallInt32ToString(CacheIRReader& reader) {\
   Int32OperandId inputId = reader.int32OperandId();\
@@ -4425,6 +4782,14 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   ObjOperandId objId = reader.objOperandId();\
   ObjOperandId resultId = reader.objOperandId();\
   return emitLoadBoundFunctionTarget(objId, resultId);\
+}\
+\
+[[nodiscard]] bool emitLoadBoundFunctionArgument(ObjOperandId objId, uint32_t index, ValOperandId resultId);\
+[[nodiscard]] bool emitLoadBoundFunctionArgument(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t index = reader.uint32Immediate();\
+  ValOperandId resultId = reader.valOperandId();\
+  return emitLoadBoundFunctionArgument(objId, index, resultId);\
 }\
 \
 [[nodiscard]] bool emitGuardBoundFunctionIsConstructor(ObjOperandId objId);\
@@ -4775,6 +5140,67 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitBigIntPowResult(lhsId, rhsId);\
 }\
 \
+[[nodiscard]] bool emitBigIntToIntPtr(BigIntOperandId inputId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntToIntPtr(CacheIRReader& reader) {\
+  BigIntOperandId inputId = reader.bigIntOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntToIntPtr(inputId, resultId);\
+}\
+\
+[[nodiscard]] bool emitIntPtrToBigIntResult(IntPtrOperandId inputId);\
+[[nodiscard]] bool emitIntPtrToBigIntResult(CacheIRReader& reader) {\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  return emitIntPtrToBigIntResult(inputId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrAdd(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrAdd(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrAdd(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrSub(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrSub(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrSub(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrMul(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrMul(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrMul(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrDiv(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrDiv(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrDiv(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrMod(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrMod(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrMod(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrPow(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrPow(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrPow(lhsId, rhsId, resultId);\
+}\
+\
 [[nodiscard]] bool emitInt32BitOrResult(Int32OperandId lhsId, Int32OperandId rhsId);\
 [[nodiscard]] bool emitInt32BitOrResult(CacheIRReader& reader) {\
   Int32OperandId lhsId = reader.int32OperandId();\
@@ -4865,6 +5291,53 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitBigIntNotResult(inputId);\
 }\
 \
+[[nodiscard]] bool emitBigIntPtrBitOr(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrBitOr(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrBitOr(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrBitXor(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrBitXor(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrBitXor(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrBitAnd(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrBitAnd(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrBitAnd(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrLeftShift(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrLeftShift(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrLeftShift(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrRightShift(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrRightShift(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrRightShift(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrNot(IntPtrOperandId inputId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrNot(CacheIRReader& reader) {\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrNot(inputId, resultId);\
+}\
+\
 [[nodiscard]] bool emitInt32NegationResult(Int32OperandId inputId);\
 [[nodiscard]] bool emitInt32NegationResult(CacheIRReader& reader) {\
   Int32OperandId inputId = reader.int32OperandId();\
@@ -4881,6 +5354,13 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
 [[nodiscard]] bool emitBigIntNegationResult(CacheIRReader& reader) {\
   BigIntOperandId inputId = reader.bigIntOperandId();\
   return emitBigIntNegationResult(inputId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrNegation(IntPtrOperandId inputId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrNegation(CacheIRReader& reader) {\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrNegation(inputId, resultId);\
 }\
 \
 [[nodiscard]] bool emitInt32IncResult(Int32OperandId inputId);\
@@ -4917,6 +5397,20 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
 [[nodiscard]] bool emitBigIntDecResult(CacheIRReader& reader) {\
   BigIntOperandId inputId = reader.bigIntOperandId();\
   return emitBigIntDecResult(inputId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrInc(IntPtrOperandId inputId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrInc(CacheIRReader& reader) {\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrInc(inputId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrDec(IntPtrOperandId inputId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrDec(CacheIRReader& reader) {\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrDec(inputId, resultId);\
 }\
 \
 [[nodiscard]] bool emitLoadInt32TruthyResult(ValOperandId inputId);\
@@ -4961,11 +5455,12 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitLoadOperandResult(inputId);\
 }\
 \
-[[nodiscard]] bool emitCallStringConcatResult(StringOperandId lhsId, StringOperandId rhsId);\
-[[nodiscard]] bool emitCallStringConcatResult(CacheIRReader& reader) {\
+[[nodiscard]] bool emitConcatStringsResult(StringOperandId lhsId, StringOperandId rhsId, uint32_t stubOffset);\
+[[nodiscard]] bool emitConcatStringsResult(CacheIRReader& reader) {\
   StringOperandId lhsId = reader.stringOperandId();\
   StringOperandId rhsId = reader.stringOperandId();\
-  return emitCallStringConcatResult(lhsId, rhsId);\
+  uint32_t stubOffset = reader.stubOffset();\
+  return emitConcatStringsResult(lhsId, rhsId, stubOffset);\
 }\
 \
 [[nodiscard]] bool emitCallIsSuspendedGeneratorResult(ValOperandId valId);\
@@ -5108,6 +5603,20 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitSetHasObjectResult(setId, objId);\
 }\
 \
+[[nodiscard]] bool emitSetDeleteResult(ObjOperandId setId, ValOperandId valId);\
+[[nodiscard]] bool emitSetDeleteResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitSetDeleteResult(setId, valId);\
+}\
+\
+[[nodiscard]] bool emitSetAddResult(ObjOperandId setId, ValOperandId keyId);\
+[[nodiscard]] bool emitSetAddResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  ValOperandId keyId = reader.valOperandId();\
+  return emitSetAddResult(setId, keyId);\
+}\
+\
 [[nodiscard]] bool emitSetSizeResult(ObjOperandId setId);\
 [[nodiscard]] bool emitSetSizeResult(CacheIRReader& reader) {\
   ObjOperandId setId = reader.objOperandId();\
@@ -5184,10 +5693,49 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitMapGetObjectResult(mapId, objId);\
 }\
 \
+[[nodiscard]] bool emitMapDeleteResult(ObjOperandId mapId, ValOperandId valId);\
+[[nodiscard]] bool emitMapDeleteResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitMapDeleteResult(mapId, valId);\
+}\
+\
+[[nodiscard]] bool emitMapSetResult(ObjOperandId mapId, ValOperandId keyId, ValOperandId valId);\
+[[nodiscard]] bool emitMapSetResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ValOperandId keyId = reader.valOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitMapSetResult(mapId, keyId, valId);\
+}\
+\
 [[nodiscard]] bool emitMapSizeResult(ObjOperandId mapId);\
 [[nodiscard]] bool emitMapSizeResult(CacheIRReader& reader) {\
   ObjOperandId mapId = reader.objOperandId();\
   return emitMapSizeResult(mapId);\
+}\
+\
+[[nodiscard]] bool emitDateFillLocalTimeSlots(ObjOperandId dateId);\
+[[nodiscard]] bool emitDateFillLocalTimeSlots(CacheIRReader& reader) {\
+  ObjOperandId dateId = reader.objOperandId();\
+  return emitDateFillLocalTimeSlots(dateId);\
+}\
+\
+[[nodiscard]] bool emitDateHoursFromSecondsIntoYearResult(ValOperandId secondsIntoYearId);\
+[[nodiscard]] bool emitDateHoursFromSecondsIntoYearResult(CacheIRReader& reader) {\
+  ValOperandId secondsIntoYearId = reader.valOperandId();\
+  return emitDateHoursFromSecondsIntoYearResult(secondsIntoYearId);\
+}\
+\
+[[nodiscard]] bool emitDateMinutesFromSecondsIntoYearResult(ValOperandId secondsIntoYearId);\
+[[nodiscard]] bool emitDateMinutesFromSecondsIntoYearResult(CacheIRReader& reader) {\
+  ValOperandId secondsIntoYearId = reader.valOperandId();\
+  return emitDateMinutesFromSecondsIntoYearResult(secondsIntoYearId);\
+}\
+\
+[[nodiscard]] bool emitDateSecondsFromSecondsIntoYearResult(ValOperandId secondsIntoYearId);\
+[[nodiscard]] bool emitDateSecondsFromSecondsIntoYearResult(CacheIRReader& reader) {\
+  ValOperandId secondsIntoYearId = reader.valOperandId();\
+  return emitDateSecondsFromSecondsIntoYearResult(secondsIntoYearId);\
 }\
 \
 [[nodiscard]] bool emitArrayFromArgumentsObjectResult(ObjOperandId objId, uint32_t shapeOffset);\
@@ -5216,6 +5764,13 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
 [[nodiscard]] bool emitBailout();\
 [[nodiscard]] bool emitBailout(CacheIRReader& reader) {\
   return emitBailout();\
+}\
+\
+[[nodiscard]] bool emitAssertFloat32Result(ValOperandId valId, bool mustBeFloat32);\
+[[nodiscard]] bool emitAssertFloat32Result(CacheIRReader& reader) {\
+  ValOperandId valId = reader.valOperandId();\
+  bool mustBeFloat32 = reader.readBool();\
+  return emitAssertFloat32Result(valId, mustBeFloat32);\
 }\
 \
 [[nodiscard]] bool emitAssertRecoveredOnBailoutResult(ValOperandId valId, bool mustBeRecovered);\
@@ -5266,6 +5821,13 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   ObjOperandId objId = reader.objOperandId();\
   uint32_t claspOffset = reader.stubOffset();\
   return emitHasClassResult(objId, claspOffset);\
+}\
+\
+[[nodiscard]] bool emitHasShapeResult(ObjOperandId objId, uint32_t shapeOffset);\
+[[nodiscard]] bool emitHasShapeResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t shapeOffset = reader.stubOffset();\
+  return emitHasShapeResult(objId, shapeOffset);\
 }\
 \
 [[nodiscard]] bool emitCallRegExpMatcherResult(ObjOperandId regexpId, StringOperandId inputId, Int32OperandId lastIndexId, uint32_t stubOffset);\
@@ -5359,6 +5921,13 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   SymbolOperandId symId = reader.symbolOperandId();\
   uint32_t expectedOffset = reader.stubOffset();\
   return emitGuardSpecificSymbol(symId, expectedOffset);\
+}\
+\
+[[nodiscard]] bool emitGuardSpecificValue(ValOperandId valId, uint32_t expectedOffset);\
+[[nodiscard]] bool emitGuardSpecificValue(CacheIRReader& reader) {\
+  ValOperandId valId = reader.valOperandId();\
+  uint32_t expectedOffset = reader.stubOffset();\
+  return emitGuardSpecificValue(valId, expectedOffset);\
 }\
 \
 [[nodiscard]] bool emitLoadArgumentFixedSlot(ValOperandId resultId, uint8_t slotIndex);\
@@ -5600,15 +6169,15 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitCallBoundScriptedFunction(calleeId, targetId, argcId, flags, numBoundArgs);\
 }\
 \
-[[nodiscard]] bool emitCallWasmFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed, uint32_t funcExportOffset, uint32_t instanceOffset);\
+[[nodiscard]] bool emitCallWasmFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed, uint32_t funcTypeOffset, uint32_t instanceOffset);\
 [[nodiscard]] bool emitCallWasmFunction(CacheIRReader& reader) {\
   ObjOperandId calleeId = reader.objOperandId();\
   Int32OperandId argcId = reader.int32OperandId();\
   CallFlags flags = reader.callFlags();\
   uint32_t argcFixed = reader.uint32Immediate();\
-  uint32_t funcExportOffset = reader.stubOffset();\
+  uint32_t funcTypeOffset = reader.stubOffset();\
   uint32_t instanceOffset = reader.stubOffset();\
-  return emitCallWasmFunction(calleeId, argcId, flags, argcFixed, funcExportOffset, instanceOffset);\
+  return emitCallWasmFunction(calleeId, argcId, flags, argcFixed, funcTypeOffset, instanceOffset);\
 }\
 \
 [[nodiscard]] bool emitCallNativeFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed, bool ignoresReturnValue);\
@@ -5629,6 +6198,17 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   CallFlags flags = reader.callFlags();\
   uint32_t argcFixed = reader.uint32Immediate();\
   return emitCallDOMFunction(calleeId, argcId, thisObjId, flags, argcFixed);\
+}\
+\
+[[nodiscard]] bool emitCallDOMFunctionWithAllocSite(ObjOperandId calleeId, Int32OperandId argcId, ObjOperandId thisObjId, CallFlags flags, uint32_t argcFixed, uint32_t siteOffset);\
+[[nodiscard]] bool emitCallDOMFunctionWithAllocSite(CacheIRReader& reader) {\
+  ObjOperandId calleeId = reader.objOperandId();\
+  Int32OperandId argcId = reader.int32OperandId();\
+  ObjOperandId thisObjId = reader.objOperandId();\
+  CallFlags flags = reader.callFlags();\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  uint32_t siteOffset = reader.stubOffset();\
+  return emitCallDOMFunctionWithAllocSite(calleeId, argcId, thisObjId, flags, argcFixed, siteOffset);\
 }\
 \
 [[nodiscard]] bool emitCallClassHook(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed, uint32_t targetOffset);\
@@ -5802,6 +6382,14 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   uint32_t shapeOffset = reader.stubOffset();\
   uint32_t siteOffset = reader.stubOffset();\
   return emitNewArrayObjectResult(arrayLength, shapeOffset, siteOffset);\
+}\
+\
+[[nodiscard]] bool emitNewFunctionCloneResult(uint32_t canonicalOffset, gc::AllocKind allocKind, uint32_t siteOffset);\
+[[nodiscard]] bool emitNewFunctionCloneResult(CacheIRReader& reader) {\
+  uint32_t canonicalOffset = reader.stubOffset();\
+  gc::AllocKind allocKind = reader.allocKind();\
+  uint32_t siteOffset = reader.stubOffset();\
+  return emitNewFunctionCloneResult(canonicalOffset, allocKind, siteOffset);\
 }\
 \
 [[nodiscard]] bool emitCallStringObjectConcatResult(ValOperandId lhsId, ValOperandId rhsId);\
@@ -6054,6 +6642,13 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitHasClassResult(objId, claspOffset);\
 }\
 \
+[[nodiscard]] bool emitHasShapeResult(ObjOperandId objId, uint32_t shapeOffset);\
+[[nodiscard]] bool emitHasShapeResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t shapeOffset = reader.stubOffset();\
+  return emitHasShapeResult(objId, shapeOffset);\
+}\
+\
 [[nodiscard]] bool emitCallRegExpMatcherResult(ObjOperandId regexpId, StringOperandId inputId, Int32OperandId lastIndexId, uint32_t stubOffset);\
 [[nodiscard]] bool emitCallRegExpMatcherResult(CacheIRReader& reader) {\
   ObjOperandId regexpId = reader.objOperandId();\
@@ -6128,19 +6723,6 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   StringOperandId strId = reader.stringOperandId();\
   StringOperandId separatorId = reader.stringOperandId();\
   return emitStringSplitStringResult(strId, separatorId);\
-}\
-\
-[[nodiscard]] bool emitRegExpPrototypeOptimizableResult(ObjOperandId protoId);\
-[[nodiscard]] bool emitRegExpPrototypeOptimizableResult(CacheIRReader& reader) {\
-  ObjOperandId protoId = reader.objOperandId();\
-  return emitRegExpPrototypeOptimizableResult(protoId);\
-}\
-\
-[[nodiscard]] bool emitRegExpInstanceOptimizableResult(ObjOperandId regexpId, ObjOperandId protoId);\
-[[nodiscard]] bool emitRegExpInstanceOptimizableResult(CacheIRReader& reader) {\
-  ObjOperandId regexpId = reader.objOperandId();\
-  ObjOperandId protoId = reader.objOperandId();\
-  return emitRegExpInstanceOptimizableResult(regexpId, protoId);\
 }\
 \
 [[nodiscard]] bool emitGetFirstDollarIndexResult(StringOperandId strId);\
@@ -6259,6 +6841,13 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   Int32OperandId numId = reader.int32OperandId();\
   int32_t expected = reader.int32Immediate();\
   return emitGuardSpecificInt32(numId, expected);\
+}\
+\
+[[nodiscard]] bool emitGuardSpecificValue(ValOperandId valId, uint32_t expectedOffset);\
+[[nodiscard]] bool emitGuardSpecificValue(CacheIRReader& reader) {\
+  ValOperandId valId = reader.valOperandId();\
+  uint32_t expectedOffset = reader.stubOffset();\
+  return emitGuardSpecificValue(valId, expectedOffset);\
 }\
 \
 [[nodiscard]] bool emitGuardNoDenseElements(ObjOperandId objId);\
@@ -6446,6 +7035,12 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitGuardArgumentsObjectFlags(objId, flags);\
 }\
 \
+[[nodiscard]] bool emitGuardObjectHasSameRealm(ObjOperandId objId);\
+[[nodiscard]] bool emitGuardObjectHasSameRealm(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  return emitGuardObjectHasSameRealm(objId);\
+}\
+\
 [[nodiscard]] bool emitLoadObject(ObjOperandId resultId, uint32_t objOffset);\
 [[nodiscard]] bool emitLoadObject(CacheIRReader& reader) {\
   ObjOperandId resultId = reader.objOperandId();\
@@ -6531,6 +7126,20 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   ObjOperandId objId = reader.objOperandId();\
   ValOperandId idId = reader.valOperandId();\
   return emitMegamorphicLoadSlotByValueResult(objId, idId);\
+}\
+\
+[[nodiscard]] bool emitMegamorphicLoadSlotPermissiveResult(ObjOperandId objId, uint32_t nameOffset);\
+[[nodiscard]] bool emitMegamorphicLoadSlotPermissiveResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t nameOffset = reader.stubOffset();\
+  return emitMegamorphicLoadSlotPermissiveResult(objId, nameOffset);\
+}\
+\
+[[nodiscard]] bool emitMegamorphicLoadSlotByValuePermissiveResult(ObjOperandId objId, ValOperandId idId);\
+[[nodiscard]] bool emitMegamorphicLoadSlotByValuePermissiveResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  ValOperandId idId = reader.valOperandId();\
+  return emitMegamorphicLoadSlotByValuePermissiveResult(objId, idId);\
 }\
 \
 [[nodiscard]] bool emitMegamorphicStoreSlot(ObjOperandId objId, uint32_t nameOffset, ValOperandId rhsId, bool strict);\
@@ -6918,11 +7527,12 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitObjectCreateResult(templateObjectOffset);\
 }\
 \
-[[nodiscard]] bool emitNewArrayFromLengthResult(uint32_t templateObjectOffset, Int32OperandId lengthId);\
+[[nodiscard]] bool emitNewArrayFromLengthResult(uint32_t templateObjectOffset, Int32OperandId lengthId, uint32_t siteOffset);\
 [[nodiscard]] bool emitNewArrayFromLengthResult(CacheIRReader& reader) {\
   uint32_t templateObjectOffset = reader.stubOffset();\
   Int32OperandId lengthId = reader.int32OperandId();\
-  return emitNewArrayFromLengthResult(templateObjectOffset, lengthId);\
+  uint32_t siteOffset = reader.stubOffset();\
+  return emitNewArrayFromLengthResult(templateObjectOffset, lengthId, siteOffset);\
 }\
 \
 [[nodiscard]] bool emitNewTypedArrayFromLengthResult(uint32_t templateObjectOffset, Int32OperandId lengthId);\
@@ -6946,6 +7556,32 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   uint32_t templateObjectOffset = reader.stubOffset();\
   ObjOperandId arrayId = reader.objOperandId();\
   return emitNewTypedArrayFromArrayResult(templateObjectOffset, arrayId);\
+}\
+\
+[[nodiscard]] bool emitNewMapObjectResult(uint32_t templateObjectOffset);\
+[[nodiscard]] bool emitNewMapObjectResult(CacheIRReader& reader) {\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  return emitNewMapObjectResult(templateObjectOffset);\
+}\
+\
+[[nodiscard]] bool emitNewSetObjectResult(uint32_t templateObjectOffset);\
+[[nodiscard]] bool emitNewSetObjectResult(CacheIRReader& reader) {\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  return emitNewSetObjectResult(templateObjectOffset);\
+}\
+\
+[[nodiscard]] bool emitNewMapObjectFromIterableResult(uint32_t templateObjectOffset, ValOperandId iterableId);\
+[[nodiscard]] bool emitNewMapObjectFromIterableResult(CacheIRReader& reader) {\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  ValOperandId iterableId = reader.valOperandId();\
+  return emitNewMapObjectFromIterableResult(templateObjectOffset, iterableId);\
+}\
+\
+[[nodiscard]] bool emitNewSetObjectFromIterableResult(uint32_t templateObjectOffset, ValOperandId iterableId);\
+[[nodiscard]] bool emitNewSetObjectFromIterableResult(CacheIRReader& reader) {\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  ValOperandId iterableId = reader.valOperandId();\
+  return emitNewSetObjectFromIterableResult(templateObjectOffset, iterableId);\
 }\
 \
 [[nodiscard]] bool emitNewStringObjectResult(uint32_t templateObjectOffset, StringOperandId strId);\
@@ -7085,6 +7721,12 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
 [[nodiscard]] bool emitMathFRoundNumberResult(CacheIRReader& reader) {\
   NumberOperandId inputId = reader.numberOperandId();\
   return emitMathFRoundNumberResult(inputId);\
+}\
+\
+[[nodiscard]] bool emitMathF16RoundNumberResult(NumberOperandId inputId);\
+[[nodiscard]] bool emitMathF16RoundNumberResult(CacheIRReader& reader) {\
+  NumberOperandId inputId = reader.numberOperandId();\
+  return emitMathF16RoundNumberResult(inputId);\
 }\
 \
 [[nodiscard]] bool emitMathRandomResult(uint32_t rngOffset);\
@@ -7342,6 +7984,11 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitAtomicsIsLockFreeResult(valueId);\
 }\
 \
+[[nodiscard]] bool emitAtomicsPauseResult();\
+[[nodiscard]] bool emitAtomicsPauseResult(CacheIRReader& reader) {\
+  return emitAtomicsPauseResult();\
+}\
+\
 [[nodiscard]] bool emitCallNativeSetter(ObjOperandId receiverId, uint32_t setterOffset, ValOperandId rhsId, bool sameRealm, uint32_t nargsAndFlagsOffset);\
 [[nodiscard]] bool emitCallNativeSetter(CacheIRReader& reader) {\
   ObjOperandId receiverId = reader.objOperandId();\
@@ -7463,15 +8110,15 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitCallBoundScriptedFunction(calleeId, targetId, argcId, flags, numBoundArgs);\
 }\
 \
-[[nodiscard]] bool emitCallWasmFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed, uint32_t funcExportOffset, uint32_t instanceOffset);\
+[[nodiscard]] bool emitCallWasmFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed, uint32_t funcTypeOffset, uint32_t instanceOffset);\
 [[nodiscard]] bool emitCallWasmFunction(CacheIRReader& reader) {\
   ObjOperandId calleeId = reader.objOperandId();\
   Int32OperandId argcId = reader.int32OperandId();\
   CallFlags flags = reader.callFlags();\
   uint32_t argcFixed = reader.uint32Immediate();\
-  uint32_t funcExportOffset = reader.stubOffset();\
+  uint32_t funcTypeOffset = reader.stubOffset();\
   uint32_t instanceOffset = reader.stubOffset();\
-  return emitCallWasmFunction(calleeId, argcId, flags, argcFixed, funcExportOffset, instanceOffset);\
+  return emitCallWasmFunction(calleeId, argcId, flags, argcFixed, funcTypeOffset, instanceOffset);\
 }\
 \
 [[nodiscard]] bool emitGuardWasmArg(ValOperandId argId, wasm::ValType::Kind type);\
@@ -7499,6 +8146,17 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   CallFlags flags = reader.callFlags();\
   uint32_t argcFixed = reader.uint32Immediate();\
   return emitCallDOMFunction(calleeId, argcId, thisObjId, flags, argcFixed);\
+}\
+\
+[[nodiscard]] bool emitCallDOMFunctionWithAllocSite(ObjOperandId calleeId, Int32OperandId argcId, ObjOperandId thisObjId, CallFlags flags, uint32_t argcFixed, uint32_t siteOffset);\
+[[nodiscard]] bool emitCallDOMFunctionWithAllocSite(CacheIRReader& reader) {\
+  ObjOperandId calleeId = reader.objOperandId();\
+  Int32OperandId argcId = reader.int32OperandId();\
+  ObjOperandId thisObjId = reader.objOperandId();\
+  CallFlags flags = reader.callFlags();\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  uint32_t siteOffset = reader.stubOffset();\
+  return emitCallDOMFunctionWithAllocSite(calleeId, argcId, thisObjId, flags, argcFixed, siteOffset);\
 }\
 \
 [[nodiscard]] bool emitCallClassHook(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed, uint32_t targetOffset);\
@@ -7734,6 +8392,14 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   ObjOperandId objId = reader.objOperandId();\
   ObjOperandId resultId = reader.objOperandId();\
   return emitLoadBoundFunctionTarget(objId, resultId);\
+}\
+\
+[[nodiscard]] bool emitLoadBoundFunctionArgument(ObjOperandId objId, uint32_t index, ValOperandId resultId);\
+[[nodiscard]] bool emitLoadBoundFunctionArgument(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t index = reader.uint32Immediate();\
+  ValOperandId resultId = reader.valOperandId();\
+  return emitLoadBoundFunctionArgument(objId, index, resultId);\
 }\
 \
 [[nodiscard]] bool emitGuardBoundFunctionIsConstructor(ObjOperandId objId);\
@@ -8153,6 +8819,67 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitBigIntPowResult(lhsId, rhsId);\
 }\
 \
+[[nodiscard]] bool emitBigIntToIntPtr(BigIntOperandId inputId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntToIntPtr(CacheIRReader& reader) {\
+  BigIntOperandId inputId = reader.bigIntOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntToIntPtr(inputId, resultId);\
+}\
+\
+[[nodiscard]] bool emitIntPtrToBigIntResult(IntPtrOperandId inputId);\
+[[nodiscard]] bool emitIntPtrToBigIntResult(CacheIRReader& reader) {\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  return emitIntPtrToBigIntResult(inputId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrAdd(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrAdd(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrAdd(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrSub(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrSub(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrSub(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrMul(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrMul(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrMul(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrDiv(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrDiv(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrDiv(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrMod(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrMod(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrMod(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrPow(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrPow(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrPow(lhsId, rhsId, resultId);\
+}\
+\
 [[nodiscard]] bool emitInt32BitOrResult(Int32OperandId lhsId, Int32OperandId rhsId);\
 [[nodiscard]] bool emitInt32BitOrResult(CacheIRReader& reader) {\
   Int32OperandId lhsId = reader.int32OperandId();\
@@ -8243,6 +8970,53 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitBigIntNotResult(inputId);\
 }\
 \
+[[nodiscard]] bool emitBigIntPtrBitOr(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrBitOr(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrBitOr(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrBitXor(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrBitXor(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrBitXor(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrBitAnd(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrBitAnd(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrBitAnd(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrLeftShift(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrLeftShift(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrLeftShift(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrRightShift(IntPtrOperandId lhsId, IntPtrOperandId rhsId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrRightShift(CacheIRReader& reader) {\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrRightShift(lhsId, rhsId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrNot(IntPtrOperandId inputId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrNot(CacheIRReader& reader) {\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrNot(inputId, resultId);\
+}\
+\
 [[nodiscard]] bool emitInt32NegationResult(Int32OperandId inputId);\
 [[nodiscard]] bool emitInt32NegationResult(CacheIRReader& reader) {\
   Int32OperandId inputId = reader.int32OperandId();\
@@ -8259,6 +9033,13 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
 [[nodiscard]] bool emitBigIntNegationResult(CacheIRReader& reader) {\
   BigIntOperandId inputId = reader.bigIntOperandId();\
   return emitBigIntNegationResult(inputId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrNegation(IntPtrOperandId inputId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrNegation(CacheIRReader& reader) {\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrNegation(inputId, resultId);\
 }\
 \
 [[nodiscard]] bool emitInt32IncResult(Int32OperandId inputId);\
@@ -8295,6 +9076,20 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
 [[nodiscard]] bool emitBigIntDecResult(CacheIRReader& reader) {\
   BigIntOperandId inputId = reader.bigIntOperandId();\
   return emitBigIntDecResult(inputId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrInc(IntPtrOperandId inputId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrInc(CacheIRReader& reader) {\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrInc(inputId, resultId);\
+}\
+\
+[[nodiscard]] bool emitBigIntPtrDec(IntPtrOperandId inputId, IntPtrOperandId resultId);\
+[[nodiscard]] bool emitBigIntPtrDec(CacheIRReader& reader) {\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  return emitBigIntPtrDec(inputId, resultId);\
 }\
 \
 [[nodiscard]] bool emitLoadInt32TruthyResult(ValOperandId inputId);\
@@ -8357,11 +9152,20 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitNewArrayObjectResult(arrayLength, shapeOffset, siteOffset);\
 }\
 \
-[[nodiscard]] bool emitCallStringConcatResult(StringOperandId lhsId, StringOperandId rhsId);\
-[[nodiscard]] bool emitCallStringConcatResult(CacheIRReader& reader) {\
+[[nodiscard]] bool emitNewFunctionCloneResult(uint32_t canonicalOffset, gc::AllocKind allocKind, uint32_t siteOffset);\
+[[nodiscard]] bool emitNewFunctionCloneResult(CacheIRReader& reader) {\
+  uint32_t canonicalOffset = reader.stubOffset();\
+  gc::AllocKind allocKind = reader.allocKind();\
+  uint32_t siteOffset = reader.stubOffset();\
+  return emitNewFunctionCloneResult(canonicalOffset, allocKind, siteOffset);\
+}\
+\
+[[nodiscard]] bool emitConcatStringsResult(StringOperandId lhsId, StringOperandId rhsId, uint32_t stubOffset);\
+[[nodiscard]] bool emitConcatStringsResult(CacheIRReader& reader) {\
   StringOperandId lhsId = reader.stringOperandId();\
   StringOperandId rhsId = reader.stringOperandId();\
-  return emitCallStringConcatResult(lhsId, rhsId);\
+  uint32_t stubOffset = reader.stubOffset();\
+  return emitConcatStringsResult(lhsId, rhsId, stubOffset);\
 }\
 \
 [[nodiscard]] bool emitCompareStringResult(JSOp op, StringOperandId lhsId, StringOperandId rhsId);\
@@ -8520,6 +9324,20 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitSetHasObjectResult(setId, objId);\
 }\
 \
+[[nodiscard]] bool emitSetDeleteResult(ObjOperandId setId, ValOperandId valId);\
+[[nodiscard]] bool emitSetDeleteResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitSetDeleteResult(setId, valId);\
+}\
+\
+[[nodiscard]] bool emitSetAddResult(ObjOperandId setId, ValOperandId keyId);\
+[[nodiscard]] bool emitSetAddResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  ValOperandId keyId = reader.valOperandId();\
+  return emitSetAddResult(setId, keyId);\
+}\
+\
 [[nodiscard]] bool emitSetSizeResult(ObjOperandId setId);\
 [[nodiscard]] bool emitSetSizeResult(CacheIRReader& reader) {\
   ObjOperandId setId = reader.objOperandId();\
@@ -8610,10 +9428,49 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
   return emitMapGetObjectResult(mapId, objId);\
 }\
 \
+[[nodiscard]] bool emitMapDeleteResult(ObjOperandId mapId, ValOperandId valId);\
+[[nodiscard]] bool emitMapDeleteResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitMapDeleteResult(mapId, valId);\
+}\
+\
+[[nodiscard]] bool emitMapSetResult(ObjOperandId mapId, ValOperandId keyId, ValOperandId valId);\
+[[nodiscard]] bool emitMapSetResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ValOperandId keyId = reader.valOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitMapSetResult(mapId, keyId, valId);\
+}\
+\
 [[nodiscard]] bool emitMapSizeResult(ObjOperandId mapId);\
 [[nodiscard]] bool emitMapSizeResult(CacheIRReader& reader) {\
   ObjOperandId mapId = reader.objOperandId();\
   return emitMapSizeResult(mapId);\
+}\
+\
+[[nodiscard]] bool emitDateFillLocalTimeSlots(ObjOperandId dateId);\
+[[nodiscard]] bool emitDateFillLocalTimeSlots(CacheIRReader& reader) {\
+  ObjOperandId dateId = reader.objOperandId();\
+  return emitDateFillLocalTimeSlots(dateId);\
+}\
+\
+[[nodiscard]] bool emitDateHoursFromSecondsIntoYearResult(ValOperandId secondsIntoYearId);\
+[[nodiscard]] bool emitDateHoursFromSecondsIntoYearResult(CacheIRReader& reader) {\
+  ValOperandId secondsIntoYearId = reader.valOperandId();\
+  return emitDateHoursFromSecondsIntoYearResult(secondsIntoYearId);\
+}\
+\
+[[nodiscard]] bool emitDateMinutesFromSecondsIntoYearResult(ValOperandId secondsIntoYearId);\
+[[nodiscard]] bool emitDateMinutesFromSecondsIntoYearResult(CacheIRReader& reader) {\
+  ValOperandId secondsIntoYearId = reader.valOperandId();\
+  return emitDateMinutesFromSecondsIntoYearResult(secondsIntoYearId);\
+}\
+\
+[[nodiscard]] bool emitDateSecondsFromSecondsIntoYearResult(ValOperandId secondsIntoYearId);\
+[[nodiscard]] bool emitDateSecondsFromSecondsIntoYearResult(CacheIRReader& reader) {\
+  ValOperandId secondsIntoYearId = reader.valOperandId();\
+  return emitDateSecondsFromSecondsIntoYearResult(secondsIntoYearId);\
 }\
 \
 [[nodiscard]] bool emitArrayFromArgumentsObjectResult(ObjOperandId objId, uint32_t shapeOffset);\
@@ -8635,6 +9492,13 @@ void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
 [[nodiscard]] bool emitBailout();\
 [[nodiscard]] bool emitBailout(CacheIRReader& reader) {\
   return emitBailout();\
+}\
+\
+[[nodiscard]] bool emitAssertFloat32Result(ValOperandId valId, bool mustBeFloat32);\
+[[nodiscard]] bool emitAssertFloat32Result(CacheIRReader& reader) {\
+  ValOperandId valId = reader.valOperandId();\
+  bool mustBeFloat32 = reader.readBool();\
+  return emitAssertFloat32Result(valId, mustBeFloat32);\
 }\
 \
 [[nodiscard]] bool emitAssertRecoveredOnBailoutResult(ValOperandId valId, bool mustBeRecovered);\
@@ -8684,6 +9548,7 @@ _(GuardFuse)\
 _(GuardAnyClass)\
 _(GuardGlobalGeneration)\
 _(HasClassResult)\
+_(HasShapeResult)\
 _(CallRegExpMatcherResult)\
 _(CallRegExpSearcherResult)\
 _(RegExpSearcherLastLimitResult)\
@@ -8694,8 +9559,6 @@ _(RegExpFlagResult)\
 _(CallSubstringKernelResult)\
 _(StringReplaceStringResult)\
 _(StringSplitStringResult)\
-_(RegExpPrototypeOptimizableResult)\
-_(RegExpInstanceOptimizableResult)\
 _(GetFirstDollarIndexResult)\
 _(GuardIsExtensible)\
 _(GuardIsNativeObject)\
@@ -8714,6 +9577,7 @@ _(GuardFunctionScript)\
 _(GuardSpecificAtom)\
 _(GuardSpecificSymbol)\
 _(GuardSpecificInt32)\
+_(GuardSpecificValue)\
 _(GuardNoDenseElements)\
 _(GuardStringToIndex)\
 _(GuardStringToInt32)\
@@ -8741,6 +9605,7 @@ _(GuardFunctionIsConstructor)\
 _(GuardNotClassConstructor)\
 _(GuardArrayIsPacked)\
 _(GuardArgumentsObjectFlags)\
+_(GuardObjectHasSameRealm)\
 _(LoadObject)\
 _(LoadProtoObject)\
 _(LoadProto)\
@@ -8753,6 +9618,8 @@ _(TruncateDoubleToUInt32)\
 _(DoubleToUint8Clamped)\
 _(MegamorphicLoadSlotResult)\
 _(MegamorphicLoadSlotByValueResult)\
+_(MegamorphicLoadSlotPermissiveResult)\
+_(MegamorphicLoadSlotByValuePermissiveResult)\
 _(MegamorphicStoreSlot)\
 _(MegamorphicSetElement)\
 _(MegamorphicHasPropResult)\
@@ -8813,6 +9680,10 @@ _(NewArrayFromLengthResult)\
 _(NewTypedArrayFromLengthResult)\
 _(NewTypedArrayFromArrayBufferResult)\
 _(NewTypedArrayFromArrayResult)\
+_(NewMapObjectResult)\
+_(NewSetObjectResult)\
+_(NewMapObjectFromIterableResult)\
+_(NewSetObjectFromIterableResult)\
 _(NewStringObjectResult)\
 _(StringFromCharCodeResult)\
 _(StringFromCodePointResult)\
@@ -8835,6 +9706,7 @@ _(MathSignNumberToInt32Result)\
 _(MathImulResult)\
 _(MathSqrtNumberResult)\
 _(MathFRoundNumberResult)\
+_(MathF16RoundNumberResult)\
 _(MathRandomResult)\
 _(MathHypot2NumberResult)\
 _(MathHypot3NumberResult)\
@@ -8867,6 +9739,7 @@ _(AtomicsXorResult)\
 _(AtomicsLoadResult)\
 _(AtomicsStoreResult)\
 _(AtomicsIsLockFreeResult)\
+_(AtomicsPauseResult)\
 _(CallNativeSetter)\
 _(CallScriptedSetter)\
 _(CallInlinedSetter)\
@@ -8885,6 +9758,7 @@ _(CallWasmFunction)\
 _(GuardWasmArg)\
 _(CallNativeFunction)\
 _(CallDOMFunction)\
+_(CallDOMFunctionWithAllocSite)\
 _(CallClassHook)\
 _(CallInlinedFunction)\
 _(CallScriptedProxyGetResult)\
@@ -8915,6 +9789,7 @@ _(LoadFunctionLengthResult)\
 _(LoadFunctionNameResult)\
 _(LoadBoundFunctionNumArgs)\
 _(LoadBoundFunctionTarget)\
+_(LoadBoundFunctionArgument)\
 _(GuardBoundFunctionIsConstructor)\
 _(LoadArrayBufferByteLengthInt32Result)\
 _(LoadArrayBufferByteLengthDoubleResult)\
@@ -8975,6 +9850,14 @@ _(BigIntMulResult)\
 _(BigIntDivResult)\
 _(BigIntModResult)\
 _(BigIntPowResult)\
+_(BigIntToIntPtr)\
+_(IntPtrToBigIntResult)\
+_(BigIntPtrAdd)\
+_(BigIntPtrSub)\
+_(BigIntPtrMul)\
+_(BigIntPtrDiv)\
+_(BigIntPtrMod)\
+_(BigIntPtrPow)\
 _(Int32BitOrResult)\
 _(Int32BitXorResult)\
 _(Int32BitAndResult)\
@@ -8988,15 +9871,24 @@ _(BigIntBitAndResult)\
 _(BigIntLeftShiftResult)\
 _(BigIntRightShiftResult)\
 _(BigIntNotResult)\
+_(BigIntPtrBitOr)\
+_(BigIntPtrBitXor)\
+_(BigIntPtrBitAnd)\
+_(BigIntPtrLeftShift)\
+_(BigIntPtrRightShift)\
+_(BigIntPtrNot)\
 _(Int32NegationResult)\
 _(DoubleNegationResult)\
 _(BigIntNegationResult)\
+_(BigIntPtrNegation)\
 _(Int32IncResult)\
 _(Int32DecResult)\
 _(DoubleIncResult)\
 _(DoubleDecResult)\
 _(BigIntIncResult)\
 _(BigIntDecResult)\
+_(BigIntPtrInc)\
+_(BigIntPtrDec)\
 _(LoadInt32TruthyResult)\
 _(LoadDoubleTruthyResult)\
 _(LoadStringTruthyResult)\
@@ -9006,7 +9898,8 @@ _(LoadValueTruthyResult)\
 _(LoadOperandResult)\
 _(NewPlainObjectResult)\
 _(NewArrayObjectResult)\
-_(CallStringConcatResult)\
+_(NewFunctionCloneResult)\
+_(ConcatStringsResult)\
 _(CompareStringResult)\
 _(CompareObjectResult)\
 _(CompareSymbolResult)\
@@ -9028,6 +9921,8 @@ _(SetHasStringResult)\
 _(SetHasSymbolResult)\
 _(SetHasBigIntResult)\
 _(SetHasObjectResult)\
+_(SetDeleteResult)\
+_(SetAddResult)\
 _(SetSizeResult)\
 _(MapHasResult)\
 _(MapHasNonGCThingResult)\
@@ -9041,10 +9936,17 @@ _(MapGetStringResult)\
 _(MapGetSymbolResult)\
 _(MapGetBigIntResult)\
 _(MapGetObjectResult)\
+_(MapDeleteResult)\
+_(MapSetResult)\
 _(MapSizeResult)\
+_(DateFillLocalTimeSlots)\
+_(DateHoursFromSecondsIntoYearResult)\
+_(DateMinutesFromSecondsIntoYearResult)\
+_(DateSecondsFromSecondsIntoYearResult)\
 _(ArrayFromArgumentsObjectResult)\
 _(CloseIterScriptedResult)\
 _(Bailout)\
+_(AssertFloat32Result)\
 _(AssertRecoveredOnBailoutResult)\
 _(AssertPropertyLookup)
 
@@ -9262,6 +10164,14 @@ void spewHasClassResult(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewHasShapeResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::HasShapeResult);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewField("shapeOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
 void spewCallRegExpMatcherResult(CacheIRReader& reader) {\
   spewOp(CacheOp::CallRegExpMatcherResult);\
   spewOperandId("regexpId", reader.objOperandId());\
@@ -9352,20 +10262,6 @@ void spewStringSplitStringResult(CacheIRReader& reader) {\
   spewOperandId("strId", reader.stringOperandId());\
   spewArgSeparator();\
   spewOperandId("separatorId", reader.stringOperandId());\
-  spewOpEnd();\
-}\
-\
-void spewRegExpPrototypeOptimizableResult(CacheIRReader& reader) {\
-  spewOp(CacheOp::RegExpPrototypeOptimizableResult);\
-  spewOperandId("protoId", reader.objOperandId());\
-  spewOpEnd();\
-}\
-\
-void spewRegExpInstanceOptimizableResult(CacheIRReader& reader) {\
-  spewOp(CacheOp::RegExpInstanceOptimizableResult);\
-  spewOperandId("regexpId", reader.objOperandId());\
-  spewArgSeparator();\
-  spewOperandId("protoId", reader.objOperandId());\
   spewOpEnd();\
 }\
 \
@@ -9504,6 +10400,14 @@ void spewGuardSpecificInt32(CacheIRReader& reader) {\
   spewOperandId("numId", reader.int32OperandId());\
   spewArgSeparator();\
   spewInt32Imm("expected", reader.int32Immediate());\
+  spewOpEnd();\
+}\
+\
+void spewGuardSpecificValue(CacheIRReader& reader) {\
+  spewOp(CacheOp::GuardSpecificValue);\
+  spewOperandId("valId", reader.valOperandId());\
+  spewArgSeparator();\
+  spewField("expectedOffset", reader.stubOffset());\
   spewOpEnd();\
 }\
 \
@@ -9729,6 +10633,12 @@ void spewGuardArgumentsObjectFlags(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewGuardObjectHasSameRealm(CacheIRReader& reader) {\
+  spewOp(CacheOp::GuardObjectHasSameRealm);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
 void spewLoadObject(CacheIRReader& reader) {\
   spewOp(CacheOp::LoadObject);\
   spewOperandId("resultId", reader.objOperandId());\
@@ -9825,6 +10735,22 @@ void spewMegamorphicLoadSlotResult(CacheIRReader& reader) {\
 \
 void spewMegamorphicLoadSlotByValueResult(CacheIRReader& reader) {\
   spewOp(CacheOp::MegamorphicLoadSlotByValueResult);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("idId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMegamorphicLoadSlotPermissiveResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MegamorphicLoadSlotPermissiveResult);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewField("nameOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
+void spewMegamorphicLoadSlotByValuePermissiveResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MegamorphicLoadSlotByValuePermissiveResult);\
   spewOperandId("objId", reader.objOperandId());\
   spewArgSeparator();\
   spewOperandId("idId", reader.valOperandId());\
@@ -10270,6 +11196,8 @@ void spewNewArrayFromLengthResult(CacheIRReader& reader) {\
   spewField("templateObjectOffset", reader.stubOffset());\
   spewArgSeparator();\
   spewOperandId("lengthId", reader.int32OperandId());\
+  spewArgSeparator();\
+  spewField("siteOffset", reader.stubOffset());\
   spewOpEnd();\
 }\
 \
@@ -10298,6 +11226,34 @@ void spewNewTypedArrayFromArrayResult(CacheIRReader& reader) {\
   spewField("templateObjectOffset", reader.stubOffset());\
   spewArgSeparator();\
   spewOperandId("arrayId", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewNewMapObjectResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::NewMapObjectResult);\
+  spewField("templateObjectOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
+void spewNewSetObjectResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::NewSetObjectResult);\
+  spewField("templateObjectOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
+void spewNewMapObjectFromIterableResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::NewMapObjectFromIterableResult);\
+  spewField("templateObjectOffset", reader.stubOffset());\
+  spewArgSeparator();\
+  spewOperandId("iterableId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewNewSetObjectFromIterableResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::NewSetObjectFromIterableResult);\
+  spewField("templateObjectOffset", reader.stubOffset());\
+  spewArgSeparator();\
+  spewOperandId("iterableId", reader.valOperandId());\
   spewOpEnd();\
 }\
 \
@@ -10443,6 +11399,12 @@ void spewMathSqrtNumberResult(CacheIRReader& reader) {\
 \
 void spewMathFRoundNumberResult(CacheIRReader& reader) {\
   spewOp(CacheOp::MathFRoundNumberResult);\
+  spewOperandId("inputId", reader.numberOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMathF16RoundNumberResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MathF16RoundNumberResult);\
   spewOperandId("inputId", reader.numberOperandId());\
   spewOpEnd();\
 }\
@@ -10765,6 +11727,11 @@ void spewAtomicsIsLockFreeResult(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewAtomicsPauseResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::AtomicsPauseResult);\
+  spewOpEnd();\
+}\
+\
 void spewCallNativeSetter(CacheIRReader& reader) {\
   spewOp(CacheOp::CallNativeSetter);\
   spewOperandId("receiverId", reader.objOperandId());\
@@ -10933,7 +11900,7 @@ void spewCallWasmFunction(CacheIRReader& reader) {\
   spewArgSeparator();\
   spewUInt32Imm("argcFixed", reader.uint32Immediate());\
   spewArgSeparator();\
-  spewField("funcExportOffset", reader.stubOffset());\
+  spewField("funcTypeOffset", reader.stubOffset());\
   spewArgSeparator();\
   spewField("instanceOffset", reader.stubOffset());\
   spewOpEnd();\
@@ -10972,6 +11939,22 @@ void spewCallDOMFunction(CacheIRReader& reader) {\
   spewCallFlagsImm("flags", reader.callFlags());\
   spewArgSeparator();\
   spewUInt32Imm("argcFixed", reader.uint32Immediate());\
+  spewOpEnd();\
+}\
+\
+void spewCallDOMFunctionWithAllocSite(CacheIRReader& reader) {\
+  spewOp(CacheOp::CallDOMFunctionWithAllocSite);\
+  spewOperandId("calleeId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("argcId", reader.int32OperandId());\
+  spewArgSeparator();\
+  spewOperandId("thisObjId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewCallFlagsImm("flags", reader.callFlags());\
+  spewArgSeparator();\
+  spewUInt32Imm("argcFixed", reader.uint32Immediate());\
+  spewArgSeparator();\
+  spewField("siteOffset", reader.stubOffset());\
   spewOpEnd();\
 }\
 \
@@ -11262,6 +12245,16 @@ void spewLoadBoundFunctionTarget(CacheIRReader& reader) {\
   spewOperandId("objId", reader.objOperandId());\
   spewArgSeparator();\
   spewOperandId("resultId", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewLoadBoundFunctionArgument(CacheIRReader& reader) {\
+  spewOp(CacheOp::LoadBoundFunctionArgument);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewUInt32Imm("index", reader.uint32Immediate());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.valOperandId());\
   spewOpEnd();\
 }\
 \
@@ -11741,6 +12734,80 @@ void spewBigIntPowResult(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewBigIntToIntPtr(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntToIntPtr);\
+  spewOperandId("inputId", reader.bigIntOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewIntPtrToBigIntResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::IntPtrToBigIntResult);\
+  spewOperandId("inputId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrAdd(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrAdd);\
+  spewOperandId("lhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("rhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrSub(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrSub);\
+  spewOperandId("lhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("rhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrMul(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrMul);\
+  spewOperandId("lhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("rhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrDiv(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrDiv);\
+  spewOperandId("lhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("rhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrMod(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrMod);\
+  spewOperandId("lhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("rhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrPow(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrPow);\
+  spewOperandId("lhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("rhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
 void spewInt32BitOrResult(CacheIRReader& reader) {\
   spewOp(CacheOp::Int32BitOrResult);\
   spewOperandId("lhsId", reader.int32OperandId());\
@@ -11843,6 +12910,64 @@ void spewBigIntNotResult(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewBigIntPtrBitOr(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrBitOr);\
+  spewOperandId("lhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("rhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrBitXor(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrBitXor);\
+  spewOperandId("lhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("rhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrBitAnd(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrBitAnd);\
+  spewOperandId("lhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("rhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrLeftShift(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrLeftShift);\
+  spewOperandId("lhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("rhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrRightShift(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrRightShift);\
+  spewOperandId("lhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("rhsId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrNot(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrNot);\
+  spewOperandId("inputId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
 void spewInt32NegationResult(CacheIRReader& reader) {\
   spewOp(CacheOp::Int32NegationResult);\
   spewOperandId("inputId", reader.int32OperandId());\
@@ -11858,6 +12983,14 @@ void spewDoubleNegationResult(CacheIRReader& reader) {\
 void spewBigIntNegationResult(CacheIRReader& reader) {\
   spewOp(CacheOp::BigIntNegationResult);\
   spewOperandId("inputId", reader.bigIntOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrNegation(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrNegation);\
+  spewOperandId("inputId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
   spewOpEnd();\
 }\
 \
@@ -11894,6 +13027,22 @@ void spewBigIntIncResult(CacheIRReader& reader) {\
 void spewBigIntDecResult(CacheIRReader& reader) {\
   spewOp(CacheOp::BigIntDecResult);\
   spewOperandId("inputId", reader.bigIntOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrInc(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrInc);\
+  spewOperandId("inputId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewBigIntPtrDec(CacheIRReader& reader) {\
+  spewOp(CacheOp::BigIntPtrDec);\
+  spewOperandId("inputId", reader.intPtrOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.intPtrOperandId());\
   spewOpEnd();\
 }\
 \
@@ -11969,11 +13118,23 @@ void spewNewArrayObjectResult(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
-void spewCallStringConcatResult(CacheIRReader& reader) {\
-  spewOp(CacheOp::CallStringConcatResult);\
+void spewNewFunctionCloneResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::NewFunctionCloneResult);\
+  spewField("canonicalOffset", reader.stubOffset());\
+  spewArgSeparator();\
+  spewAllocKindImm("allocKind", reader.allocKind());\
+  spewArgSeparator();\
+  spewField("siteOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
+void spewConcatStringsResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::ConcatStringsResult);\
   spewOperandId("lhsId", reader.stringOperandId());\
   spewArgSeparator();\
   spewOperandId("rhsId", reader.stringOperandId());\
+  spewArgSeparator();\
+  spewField("stubOffset", reader.stubOffset());\
   spewOpEnd();\
 }\
 \
@@ -12177,6 +13338,22 @@ void spewSetHasObjectResult(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewSetDeleteResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::SetDeleteResult);\
+  spewOperandId("setId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("valId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewSetAddResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::SetAddResult);\
+  spewOperandId("setId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("keyId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
 void spewSetSizeResult(CacheIRReader& reader) {\
   spewOp(CacheOp::SetSizeResult);\
   spewOperandId("setId", reader.objOperandId());\
@@ -12279,9 +13456,51 @@ void spewMapGetObjectResult(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewMapDeleteResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapDeleteResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("valId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapSetResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapSetResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("keyId", reader.valOperandId());\
+  spewArgSeparator();\
+  spewOperandId("valId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
 void spewMapSizeResult(CacheIRReader& reader) {\
   spewOp(CacheOp::MapSizeResult);\
   spewOperandId("mapId", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewDateFillLocalTimeSlots(CacheIRReader& reader) {\
+  spewOp(CacheOp::DateFillLocalTimeSlots);\
+  spewOperandId("dateId", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewDateHoursFromSecondsIntoYearResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::DateHoursFromSecondsIntoYearResult);\
+  spewOperandId("secondsIntoYearId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewDateMinutesFromSecondsIntoYearResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::DateMinutesFromSecondsIntoYearResult);\
+  spewOperandId("secondsIntoYearId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewDateSecondsFromSecondsIntoYearResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::DateSecondsFromSecondsIntoYearResult);\
+  spewOperandId("secondsIntoYearId", reader.valOperandId());\
   spewOpEnd();\
 }\
 \
@@ -12323,6 +13542,14 @@ void spewWrapResult(CacheIRReader& reader) {\
 \
 void spewBailout(CacheIRReader& reader) {\
   spewOp(CacheOp::Bailout);\
+  spewOpEnd();\
+}\
+\
+void spewAssertFloat32Result(CacheIRReader& reader) {\
+  spewOp(CacheOp::AssertFloat32Result);\
+  spewOperandId("valId", reader.valOperandId());\
+  spewArgSeparator();\
+  spewBoolImm("mustBeFloat32", reader.readBool());\
   spewOpEnd();\
 }\
 \
@@ -12601,6 +13828,16 @@ void cloneHasClassResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.assertLengthMatches();\
 }}\
 \
+void cloneHasShapeResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::HasShapeResult);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  uint32_t shapeOffset = reader.stubOffset();\
+  Shape* shape = getShapeField(shapeOffset);\
+  writer.writeShapeField(shape);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneCallRegExpMatcherResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::CallRegExpMatcherResult);\
   ObjOperandId regexpId = reader.objOperandId();\
@@ -12704,22 +13941,6 @@ void cloneStringSplitStringResult(CacheIRReader& reader, CacheIRWriter& writer) 
   writer.writeOperandId(strId);\
   StringOperandId separatorId = reader.stringOperandId();\
   writer.writeOperandId(separatorId);\
-  writer.assertLengthMatches();\
-}}\
-\
-void cloneRegExpPrototypeOptimizableResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
-  writer.writeOp(CacheOp::RegExpPrototypeOptimizableResult);\
-  ObjOperandId protoId = reader.objOperandId();\
-  writer.writeOperandId(protoId);\
-  writer.assertLengthMatches();\
-}}\
-\
-void cloneRegExpInstanceOptimizableResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
-  writer.writeOp(CacheOp::RegExpInstanceOptimizableResult);\
-  ObjOperandId regexpId = reader.objOperandId();\
-  writer.writeOperandId(regexpId);\
-  ObjOperandId protoId = reader.objOperandId();\
-  writer.writeOperandId(protoId);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -12887,6 +14108,16 @@ void cloneGuardSpecificInt32(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOperandId(numId);\
   int32_t expected = reader.int32Immediate();\
   writer.writeInt32Imm(expected);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneGuardSpecificValue(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::GuardSpecificValue);\
+  ValOperandId valId = reader.valOperandId();\
+  writer.writeOperandId(valId);\
+  uint32_t expectedOffset = reader.stubOffset();\
+  const Value expected = getValueField(expectedOffset);\
+  writer.writeValueField(expected);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -13161,6 +14392,13 @@ void cloneGuardArgumentsObjectFlags(CacheIRReader& reader, CacheIRWriter& writer
   writer.assertLengthMatches();\
 }}\
 \
+void cloneGuardObjectHasSameRealm(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::GuardObjectHasSameRealm);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneLoadObject(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::LoadObject);\
   ObjOperandId resultId = reader.objOperandId();\
@@ -13281,6 +14519,25 @@ void cloneMegamorphicLoadSlotResult(CacheIRReader& reader, CacheIRWriter& writer
 \
 void cloneMegamorphicLoadSlotByValueResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::MegamorphicLoadSlotByValueResult);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  ValOperandId idId = reader.valOperandId();\
+  writer.writeOperandId(idId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMegamorphicLoadSlotPermissiveResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MegamorphicLoadSlotPermissiveResult);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  uint32_t nameOffset = reader.stubOffset();\
+  jsid name = getIdField(nameOffset);\
+  writer.writeIdField(name);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMegamorphicLoadSlotByValuePermissiveResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MegamorphicLoadSlotByValuePermissiveResult);\
   ObjOperandId objId = reader.objOperandId();\
   writer.writeOperandId(objId);\
   ValOperandId idId = reader.valOperandId();\
@@ -13812,6 +15069,9 @@ void cloneNewArrayFromLengthResult(CacheIRReader& reader, CacheIRWriter& writer)
   writer.writeObjectField(templateObject);\
   Int32OperandId lengthId = reader.int32OperandId();\
   writer.writeOperandId(lengthId);\
+  uint32_t siteOffset = reader.stubOffset();\
+  gc::AllocSite* site = getAllocSiteField(siteOffset);\
+  writer.writeAllocSiteField(site);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -13846,6 +15106,42 @@ void cloneNewTypedArrayFromArrayResult(CacheIRReader& reader, CacheIRWriter& wri
   writer.writeObjectField(templateObject);\
   ObjOperandId arrayId = reader.objOperandId();\
   writer.writeOperandId(arrayId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneNewMapObjectResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::NewMapObjectResult);\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  JSObject* templateObject = getObjectField(templateObjectOffset);\
+  writer.writeObjectField(templateObject);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneNewSetObjectResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::NewSetObjectResult);\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  JSObject* templateObject = getObjectField(templateObjectOffset);\
+  writer.writeObjectField(templateObject);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneNewMapObjectFromIterableResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::NewMapObjectFromIterableResult);\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  JSObject* templateObject = getObjectField(templateObjectOffset);\
+  writer.writeObjectField(templateObject);\
+  ValOperandId iterableId = reader.valOperandId();\
+  writer.writeOperandId(iterableId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneNewSetObjectFromIterableResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::NewSetObjectFromIterableResult);\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  JSObject* templateObject = getObjectField(templateObjectOffset);\
+  writer.writeObjectField(templateObject);\
+  ValOperandId iterableId = reader.valOperandId();\
+  writer.writeOperandId(iterableId);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -14013,6 +15309,13 @@ void cloneMathSqrtNumberResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
 \
 void cloneMathFRoundNumberResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::MathFRoundNumberResult);\
+  NumberOperandId inputId = reader.numberOperandId();\
+  writer.writeOperandId(inputId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMathF16RoundNumberResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MathF16RoundNumberResult);\
   NumberOperandId inputId = reader.numberOperandId();\
   writer.writeOperandId(inputId);\
   writer.assertLengthMatches();\
@@ -14371,6 +15674,11 @@ void cloneAtomicsIsLockFreeResult(CacheIRReader& reader, CacheIRWriter& writer) 
   writer.assertLengthMatches();\
 }}\
 \
+void cloneAtomicsPauseResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::AtomicsPauseResult);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneCallNativeSetter(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::CallNativeSetter);\
   ObjOperandId receiverId = reader.objOperandId();\
@@ -14565,9 +15873,9 @@ void cloneCallWasmFunction(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeCallFlagsImm(flags);\
   uint32_t argcFixed = reader.uint32Immediate();\
   writer.writeUInt32Imm(argcFixed);\
-  uint32_t funcExportOffset = reader.stubOffset();\
-  const void* funcExport = getRawPointerField(funcExportOffset);\
-  writer.writeRawPointerField(funcExport);\
+  uint32_t funcTypeOffset = reader.stubOffset();\
+  const void* funcType = getRawPointerField(funcTypeOffset);\
+  writer.writeRawPointerField(funcType);\
   uint32_t instanceOffset = reader.stubOffset();\
   JSObject* instance = getObjectField(instanceOffset);\
   writer.writeObjectField(instance);\
@@ -14610,6 +15918,24 @@ void cloneCallDOMFunction(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeCallFlagsImm(flags);\
   uint32_t argcFixed = reader.uint32Immediate();\
   writer.writeUInt32Imm(argcFixed);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneCallDOMFunctionWithAllocSite(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::CallDOMFunctionWithAllocSite);\
+  ObjOperandId calleeId = reader.objOperandId();\
+  writer.writeOperandId(calleeId);\
+  Int32OperandId argcId = reader.int32OperandId();\
+  writer.writeOperandId(argcId);\
+  ObjOperandId thisObjId = reader.objOperandId();\
+  writer.writeOperandId(thisObjId);\
+  CallFlags flags = reader.callFlags();\
+  writer.writeCallFlagsImm(flags);\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  writer.writeUInt32Imm(argcFixed);\
+  uint32_t siteOffset = reader.stubOffset();\
+  gc::AllocSite* site = getAllocSiteField(siteOffset);\
+  writer.writeAllocSiteField(site);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -14941,6 +16267,18 @@ void cloneLoadBoundFunctionTarget(CacheIRReader& reader, CacheIRWriter& writer) 
   ObjOperandId objId = reader.objOperandId();\
   writer.writeOperandId(objId);\
   ObjOperandId resultId = reader.objOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneLoadBoundFunctionArgument(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::LoadBoundFunctionArgument);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  uint32_t index = reader.uint32Immediate();\
+  writer.writeUInt32Imm(index);\
+  ValOperandId resultId = reader.valOperandId();\
   writer.newOperandId();\
   writer.writeOperandId(resultId);\
   writer.assertLengthMatches();\
@@ -15501,6 +16839,95 @@ void cloneBigIntPowResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.assertLengthMatches();\
 }}\
 \
+void cloneBigIntToIntPtr(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntToIntPtr);\
+  BigIntOperandId inputId = reader.bigIntOperandId();\
+  writer.writeOperandId(inputId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneIntPtrToBigIntResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::IntPtrToBigIntResult);\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  writer.writeOperandId(inputId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrAdd(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrAdd);\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(lhsId);\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(rhsId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrSub(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrSub);\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(lhsId);\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(rhsId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrMul(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrMul);\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(lhsId);\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(rhsId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrDiv(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrDiv);\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(lhsId);\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(rhsId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrMod(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrMod);\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(lhsId);\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(rhsId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrPow(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrPow);\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(lhsId);\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(rhsId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneInt32BitOrResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::Int32BitOrResult);\
   Int32OperandId lhsId = reader.int32OperandId();\
@@ -15616,6 +17043,76 @@ void cloneBigIntNotResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.assertLengthMatches();\
 }}\
 \
+void cloneBigIntPtrBitOr(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrBitOr);\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(lhsId);\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(rhsId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrBitXor(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrBitXor);\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(lhsId);\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(rhsId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrBitAnd(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrBitAnd);\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(lhsId);\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(rhsId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrLeftShift(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrLeftShift);\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(lhsId);\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(rhsId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrRightShift(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrRightShift);\
+  IntPtrOperandId lhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(lhsId);\
+  IntPtrOperandId rhsId = reader.intPtrOperandId();\
+  writer.writeOperandId(rhsId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrNot(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrNot);\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  writer.writeOperandId(inputId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneInt32NegationResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::Int32NegationResult);\
   Int32OperandId inputId = reader.int32OperandId();\
@@ -15634,6 +17131,16 @@ void cloneBigIntNegationResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::BigIntNegationResult);\
   BigIntOperandId inputId = reader.bigIntOperandId();\
   writer.writeOperandId(inputId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrNegation(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrNegation);\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  writer.writeOperandId(inputId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -15676,6 +17183,26 @@ void cloneBigIntDecResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::BigIntDecResult);\
   BigIntOperandId inputId = reader.bigIntOperandId();\
   writer.writeOperandId(inputId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrInc(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrInc);\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  writer.writeOperandId(inputId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBigIntPtrDec(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BigIntPtrDec);\
+  IntPtrOperandId inputId = reader.intPtrOperandId();\
+  writer.writeOperandId(inputId);\
+  IntPtrOperandId resultId = reader.intPtrOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -15766,12 +17293,28 @@ void cloneNewArrayObjectResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.assertLengthMatches();\
 }}\
 \
-void cloneCallStringConcatResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
-  writer.writeOp(CacheOp::CallStringConcatResult);\
+void cloneNewFunctionCloneResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::NewFunctionCloneResult);\
+  uint32_t canonicalOffset = reader.stubOffset();\
+  JSObject* canonical = getObjectField(canonicalOffset);\
+  writer.writeObjectField(canonical);\
+  gc::AllocKind allocKind = reader.allocKind();\
+  writer.writeAllocKindImm(allocKind);\
+  uint32_t siteOffset = reader.stubOffset();\
+  gc::AllocSite* site = getAllocSiteField(siteOffset);\
+  writer.writeAllocSiteField(site);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneConcatStringsResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::ConcatStringsResult);\
   StringOperandId lhsId = reader.stringOperandId();\
   writer.writeOperandId(lhsId);\
   StringOperandId rhsId = reader.stringOperandId();\
   writer.writeOperandId(rhsId);\
+  uint32_t stubOffset = reader.stubOffset();\
+  JitCode* stub = getJitCodeField(stubOffset);\
+  writer.writeJitCodeField(stub);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -15998,6 +17541,24 @@ void cloneSetHasObjectResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.assertLengthMatches();\
 }}\
 \
+void cloneSetDeleteResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::SetDeleteResult);\
+  ObjOperandId setId = reader.objOperandId();\
+  writer.writeOperandId(setId);\
+  ValOperandId valId = reader.valOperandId();\
+  writer.writeOperandId(valId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneSetAddResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::SetAddResult);\
+  ObjOperandId setId = reader.objOperandId();\
+  writer.writeOperandId(setId);\
+  ValOperandId keyId = reader.valOperandId();\
+  writer.writeOperandId(keyId);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneSetSizeResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::SetSizeResult);\
   ObjOperandId setId = reader.objOperandId();\
@@ -16113,10 +17674,58 @@ void cloneMapGetObjectResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.assertLengthMatches();\
 }}\
 \
+void cloneMapDeleteResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapDeleteResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  ValOperandId valId = reader.valOperandId();\
+  writer.writeOperandId(valId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapSetResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapSetResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  ValOperandId keyId = reader.valOperandId();\
+  writer.writeOperandId(keyId);\
+  ValOperandId valId = reader.valOperandId();\
+  writer.writeOperandId(valId);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneMapSizeResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::MapSizeResult);\
   ObjOperandId mapId = reader.objOperandId();\
   writer.writeOperandId(mapId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneDateFillLocalTimeSlots(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::DateFillLocalTimeSlots);\
+  ObjOperandId dateId = reader.objOperandId();\
+  writer.writeOperandId(dateId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneDateHoursFromSecondsIntoYearResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::DateHoursFromSecondsIntoYearResult);\
+  ValOperandId secondsIntoYearId = reader.valOperandId();\
+  writer.writeOperandId(secondsIntoYearId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneDateMinutesFromSecondsIntoYearResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::DateMinutesFromSecondsIntoYearResult);\
+  ValOperandId secondsIntoYearId = reader.valOperandId();\
+  writer.writeOperandId(secondsIntoYearId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneDateSecondsFromSecondsIntoYearResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::DateSecondsFromSecondsIntoYearResult);\
+  ValOperandId secondsIntoYearId = reader.valOperandId();\
+  writer.writeOperandId(secondsIntoYearId);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -16162,6 +17771,15 @@ void cloneWrapResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
 \
 void cloneBailout(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::Bailout);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneAssertFloat32Result(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::AssertFloat32Result);\
+  ValOperandId valId = reader.valOperandId();\
+  writer.writeOperandId(valId);\
+  bool mustBeFloat32 = reader.readBool();\
+  writer.writeBoolImm(mustBeFloat32);\
   writer.assertLengthMatches();\
 }}\
 \

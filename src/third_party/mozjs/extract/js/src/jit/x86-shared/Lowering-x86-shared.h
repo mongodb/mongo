@@ -17,10 +17,13 @@ class LIRGeneratorX86Shared : public LIRGeneratorShared {
   LIRGeneratorX86Shared(MIRGenerator* gen, MIRGraph& graph, LIRGraph& lirGraph)
       : LIRGeneratorShared(gen, graph, lirGraph) {}
 
+  LUse useShiftRegister(MDefinition* mir);
+  LUse useShiftRegisterAtStart(MDefinition* mir);
+  LDefinition tempShift();
+
   LTableSwitch* newLTableSwitch(const LAllocation& in,
-                                const LDefinition& inputCopy,
-                                MTableSwitch* ins);
-  LTableSwitchV* newLTableSwitchV(MTableSwitch* ins);
+                                const LDefinition& inputCopy);
+  LTableSwitchV* newLTableSwitchV(const LBoxAllocation& in);
 
   void lowerForShift(LInstructionHelper<1, 2, 0>* ins, MDefinition* mir,
                      MDefinition* lhs, MDefinition* rhs);
@@ -29,19 +32,13 @@ class LIRGeneratorX86Shared : public LIRGeneratorShared {
   void lowerForALU(LInstructionHelper<1, 2, 0>* ins, MDefinition* mir,
                    MDefinition* lhs, MDefinition* rhs);
 
-  template <size_t Temps>
-  void lowerForShiftInt64(
-      LInstructionHelper<INT64_PIECES, INT64_PIECES + 1, Temps>* ins,
-      MDefinition* mir, MDefinition* lhs, MDefinition* rhs);
+  template <class LInstr>
+  void lowerForShiftInt64(LInstr* ins, MDefinition* mir, MDefinition* lhs,
+                          MDefinition* rhs);
 
-  void lowerForCompareI64AndBranch(MTest* mir, MCompare* comp, JSOp op,
-                                   MDefinition* left, MDefinition* right,
-                                   MBasicBlock* ifTrue, MBasicBlock* ifFalse);
   template <size_t Temps>
   void lowerForFPU(LInstructionHelper<1, 2, Temps>* ins, MDefinition* mir,
                    MDefinition* lhs, MDefinition* rhs);
-  void lowerForBitAndAndBranch(LBitAndAndBranch* baab, MInstruction* mir,
-                               MDefinition* lhs, MDefinition* rhs);
   void lowerNegI(MInstruction* ins, MDefinition* input);
   void lowerNegI64(MInstruction* ins, MDefinition* input);
   void lowerMulI(MMul* mul, MDefinition* lhs, MDefinition* rhs);
@@ -53,11 +50,8 @@ class LIRGeneratorX86Shared : public LIRGeneratorShared {
   void lowerPowOfTwoI(MPow* mir);
   void lowerWasmSelectI(MWasmSelect* select);
   void lowerWasmSelectI64(MWasmSelect* select);
-  void lowerBigIntLsh(MBigIntLsh* ins);
-  void lowerBigIntRsh(MBigIntRsh* ins);
-  void lowerWasmBuiltinTruncateToInt32(MWasmBuiltinTruncateToInt32* ins);
-  void lowerTruncateDToInt32(MTruncateToInt32* ins);
-  void lowerTruncateFToInt32(MTruncateToInt32* ins);
+  void lowerBigIntPtrLsh(MBigIntPtrLsh* ins);
+  void lowerBigIntPtrRsh(MBigIntPtrRsh* ins);
   void lowerCompareExchangeTypedArrayElement(
       MCompareExchangeTypedArrayElement* ins, bool useI386ByteRegisters);
   void lowerAtomicExchangeTypedArrayElement(

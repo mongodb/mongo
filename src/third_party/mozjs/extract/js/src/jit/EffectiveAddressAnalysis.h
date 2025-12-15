@@ -14,14 +14,14 @@ class MIRGenerator;
 class MIRGraph;
 
 class EffectiveAddressAnalysis {
-  MIRGenerator* mir_;
+  const MIRGenerator* mir_;
   MIRGraph& graph_;
 
   template <typename AsmJSMemoryAccess>
   void analyzeAsmJSHeapAccess(AsmJSMemoryAccess* ins);
 
  public:
-  EffectiveAddressAnalysis(MIRGenerator* mir, MIRGraph& graph)
+  EffectiveAddressAnalysis(const MIRGenerator* mir, MIRGraph& graph)
       : mir_(mir), graph_(graph) {}
 
   [[nodiscard]] bool analyze();

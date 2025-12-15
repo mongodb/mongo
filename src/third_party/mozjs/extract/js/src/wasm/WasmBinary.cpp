@@ -19,7 +19,7 @@
 #include "wasm/WasmBinary.h"
 
 #include "js/Printf.h"
-#include "wasm/WasmValidate.h"
+#include "wasm/WasmMetadata.h"
 
 using namespace js;
 using namespace js::wasm;
@@ -65,7 +65,7 @@ bool Decoder::fail(size_t errorOffset, const char* msg) {
   return false;
 }
 
-bool Decoder::readSectionHeader(uint8_t* id, SectionRange* range) {
+bool Decoder::readSectionHeader(uint8_t* id, BytecodeRange* range) {
   if (!readFixedU8(id)) {
     return false;
   }
@@ -75,20 +75,19 @@ bool Decoder::readSectionHeader(uint8_t* id, SectionRange* range) {
     return false;
   }
 
-  range->start = currentOffset();
-  range->size = size;
-  return true;
+  return BytecodeRange::fromStartAndSize(currentOffset(), size, range);
 }
 
-bool Decoder::startSection(SectionId id, ModuleEnvironment* env,
-                           MaybeSectionRange* range, const char* sectionName) {
+bool Decoder::startSection(SectionId id, CodeMetadata* codeMeta,
+                           MaybeBytecodeRange* range, const char* sectionName) {
   MOZ_ASSERT(!*range);
 
   // Record state at beginning of section to allow rewinding to this point
   // if, after skipping through several custom sections, we don't find the
   // section 'id'.
   const uint8_t* const initialCur = cur_;
-  const size_t initialCustomSectionsLength = env->customSections.length();
+  const size_t initialCustomSectionsLength =
+      codeMeta->customSectionRanges.length();
 
   // Maintain a pointer to the current section that gets updated as custom
   // sections are skipped.
@@ -109,7 +108,7 @@ bool Decoder::startSection(SectionId id, ModuleEnvironment* env,
     // Rewind to the beginning of the current section since this is what
     // skipCustomSection() assumes.
     cur_ = currentSectionStart;
-    if (!skipCustomSection(env)) {
+    if (!skipCustomSection(codeMeta)) {
       return false;
     }
 
@@ -132,81 +131,85 @@ bool Decoder::startSection(SectionId id, ModuleEnvironment* env,
   }
 
   range->emplace();
-  (*range)->start = currentOffset();
-  (*range)->size = size;
+  if (!BytecodeRange::fromStartAndSize(currentOffset(), size, range->ptr())) {
+    goto fail;
+  }
   return true;
 
 rewind:
   cur_ = initialCur;
-  env->customSections.shrinkTo(initialCustomSectionsLength);
+  codeMeta->customSectionRanges.shrinkTo(initialCustomSectionsLength);
   return true;
 
 fail:
   return failf("failed to start %s section", sectionName);
 }
 
-bool Decoder::finishSection(const SectionRange& range,
+bool Decoder::finishSection(const BytecodeRange& range,
                             const char* sectionName) {
-  if (resilientMode_) {
-    return true;
-  }
-  if (range.size != currentOffset() - range.start) {
+  if (range.end != currentOffset()) {
     return failf("byte size mismatch in %s section", sectionName);
   }
   return true;
 }
 
 bool Decoder::startCustomSection(const char* expected, size_t expectedLength,
-                                 ModuleEnvironment* env,
-                                 MaybeSectionRange* range) {
+                                 CodeMetadata* codeMeta,
+                                 MaybeBytecodeRange* range) {
   // Record state at beginning of section to allow rewinding to this point
   // if, after skipping through several custom sections, we don't find the
   // section 'id'.
   const uint8_t* const initialCur = cur_;
-  const size_t initialCustomSectionsLength = env->customSections.length();
+  const size_t initialCustomSectionsLength =
+      codeMeta->customSectionRanges.length();
 
   while (true) {
     // Try to start a custom section. If we can't, rewind to the beginning
     // since we may have skipped several custom sections already looking for
     // 'expected'.
-    if (!startSection(SectionId::Custom, env, range, "custom")) {
+    if (!startSection(SectionId::Custom, codeMeta, range, "custom")) {
       return false;
     }
     if (!*range) {
       goto rewind;
     }
 
-    if (bytesRemain() < (*range)->size) {
+    if (bytesRemain() < (*range)->size()) {
       goto fail;
     }
 
-    CustomSectionEnv sec;
-    if (!readVarU32(&sec.nameLength) || sec.nameLength > bytesRemain()) {
+    uint32_t sectionNameSize;
+    if (!readVarU32(&sectionNameSize) || sectionNameSize > bytesRemain()) {
       goto fail;
     }
 
-    sec.nameOffset = currentOffset();
-    sec.payloadOffset = sec.nameOffset + sec.nameLength;
-
-    uint32_t payloadEnd = (*range)->start + (*range)->size;
-    if (sec.payloadOffset > payloadEnd) {
+    // A custom section name must be valid UTF-8
+    if (!IsUtf8(AsChars(mozilla::Span(cur_, sectionNameSize)))) {
       goto fail;
     }
 
-    sec.payloadLength = payloadEnd - sec.payloadOffset;
+    CustomSectionRange secRange;
+    secRange.name = BytecodeRange(currentOffset(), sectionNameSize);
+    // The payload starts after the name, and goes to the end of the custom
+    // section.
+    if (secRange.name.end > (*range)->end) {
+      goto fail;
+    }
+    secRange.payload.start = secRange.name.end;
+    secRange.payload.end = (*range)->end;
 
     // Now that we have a valid custom section, record its offsets in the
     // metadata which can be queried by the user via Module.customSections.
     // Note: after an entry is appended, it may be popped if this loop or
     // the loop in startSection needs to rewind.
-    if (!env->customSections.append(sec)) {
+    if (!codeMeta->customSectionRanges.append(secRange)) {
       return false;
     }
 
     // If this is the expected custom section, we're done.
-    if (!expected || (expectedLength == sec.nameLength &&
-                      !memcmp(cur_, expected, sec.nameLength))) {
-      cur_ += sec.nameLength;
+    if (!expected || (expectedLength == secRange.name.size() &&
+                      !memcmp(cur_, expected, secRange.name.size()))) {
+      cur_ += secRange.name.size();
       return true;
     }
 
@@ -218,51 +221,53 @@ bool Decoder::startCustomSection(const char* expected, size_t expectedLength,
 
 rewind:
   cur_ = initialCur;
-  env->customSections.shrinkTo(initialCustomSectionsLength);
+  codeMeta->customSectionRanges.shrinkTo(initialCustomSectionsLength);
   return true;
 
 fail:
   return fail("failed to start custom section");
 }
 
-void Decoder::finishCustomSection(const char* name, const SectionRange& range) {
+bool Decoder::finishCustomSection(const char* name,
+                                  const BytecodeRange& range) {
   MOZ_ASSERT(cur_ >= beg_);
   MOZ_ASSERT(cur_ <= end_);
 
   if (error_ && *error_) {
     warnf("in the '%s' custom section: %s", name, error_->get());
     skipAndFinishCustomSection(range);
-    return;
+    return false;
   }
 
   uint32_t actualSize = currentOffset() - range.start;
-  if (range.size != actualSize) {
-    if (actualSize < range.size) {
+  if (range.size() != actualSize) {
+    if (actualSize < range.size()) {
       warnf("in the '%s' custom section: %" PRIu32 " unconsumed bytes", name,
-            uint32_t(range.size - actualSize));
+            uint32_t(range.size() - actualSize));
     } else {
       warnf("in the '%s' custom section: %" PRIu32
             " bytes consumed past the end",
-            name, uint32_t(actualSize - range.size));
+            name, uint32_t(actualSize - range.size()));
     }
     skipAndFinishCustomSection(range);
-    return;
+    return false;
   }
 
   // Nothing to do! (c.f. skipAndFinishCustomSection())
+  return true;
 }
 
-void Decoder::skipAndFinishCustomSection(const SectionRange& range) {
+void Decoder::skipAndFinishCustomSection(const BytecodeRange& range) {
   MOZ_ASSERT(cur_ >= beg_);
   MOZ_ASSERT(cur_ <= end_);
-  cur_ = (beg_ + (range.start - offsetInModule_)) + range.size;
+  cur_ = beg_ + (range.end - offsetInModule_);
   MOZ_ASSERT(cur_ <= end_);
   clearError();
 }
 
-bool Decoder::skipCustomSection(ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!startCustomSection(nullptr, 0, env, &range)) {
+bool Decoder::skipCustomSection(CodeMetadata* codeMeta) {
+  MaybeBytecodeRange range;
+  if (!startCustomSection(nullptr, 0, codeMeta, &range)) {
     return false;
   }
   if (!range) {
@@ -274,7 +279,7 @@ bool Decoder::skipCustomSection(ModuleEnvironment* env) {
 }
 
 bool Decoder::startNameSubsection(NameType nameType,
-                                  Maybe<uint32_t>* endOffset) {
+                                  mozilla::Maybe<uint32_t>* endOffset) {
   MOZ_ASSERT(!*endOffset);
 
   const uint8_t* const initialPosition = cur_;
@@ -293,7 +298,7 @@ bool Decoder::startNameSubsection(NameType nameType,
     return fail("bad name subsection payload length");
   }
 
-  *endOffset = Some(currentOffset() + payloadLength);
+  *endOffset = mozilla::Some(currentOffset() + payloadLength);
   return true;
 
 rewind:

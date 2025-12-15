@@ -18,14 +18,23 @@
 namespace js {
 namespace gc {
 
-/* Capacity for slotsToThingKind */
-const size_t SLOTS_TO_THING_KIND_LIMIT = 17;
-extern const AllocKind slotsToThingKind[];
+inline constexpr AllocKind slotsToThingKind[] = {
+    // clang-format off
+    /*  0 */ AllocKind::OBJECT0,  AllocKind::OBJECT2,  AllocKind::OBJECT2,  AllocKind::OBJECT4,
+    /*  4 */ AllocKind::OBJECT4,  AllocKind::OBJECT8,  AllocKind::OBJECT8,  AllocKind::OBJECT8,
+    /*  8 */ AllocKind::OBJECT8,  AllocKind::OBJECT12, AllocKind::OBJECT12, AllocKind::OBJECT12,
+    /* 12 */ AllocKind::OBJECT12, AllocKind::OBJECT16, AllocKind::OBJECT16, AllocKind::OBJECT16,
+    /* 16 */ AllocKind::OBJECT16
+    // clang-format on
+};
+
 extern const uint32_t slotsToAllocKindBytes[];
 
+static constexpr uint32_t MaxGCObjectFixedSlots = std::size(slotsToThingKind);
+
 /* Get the best kind to use when making an object with the given slot count. */
-static inline AllocKind GetGCObjectKind(size_t numSlots) {
-  if (numSlots >= SLOTS_TO_THING_KIND_LIMIT) {
+static constexpr AllocKind GetGCObjectKind(size_t numSlots) {
+  if (numSlots >= std::size(slotsToThingKind)) {
     return AllocKind::OBJECT16;
   }
   return slotsToThingKind[numSlots];
@@ -45,11 +54,11 @@ static constexpr bool CanUseFixedElementsForArray(size_t numElements) {
     return false;
   }
   size_t numSlots = numElements + ObjectElements::VALUES_PER_HEADER;
-  return numSlots < SLOTS_TO_THING_KIND_LIMIT;
+  return numSlots < std::size(slotsToThingKind);
 }
 
 /* As for GetGCObjectKind, but for dense array allocation. */
-static inline AllocKind GetGCArrayKind(size_t numElements) {
+static constexpr AllocKind GetGCArrayKind(size_t numElements) {
   /*
    * Dense arrays can use their fixed slots to hold their elements array
    * (less two Values worth of ObjectElements header), but if more than the
@@ -64,7 +73,7 @@ static inline AllocKind GetGCArrayKind(size_t numElements) {
 }
 
 static inline AllocKind GetGCObjectFixedSlotsKind(size_t numFixedSlots) {
-  MOZ_ASSERT(numFixedSlots < SLOTS_TO_THING_KIND_LIMIT);
+  MOZ_ASSERT(numFixedSlots < std::size(slotsToThingKind));
   return slotsToThingKind[numFixedSlots];
 }
 
@@ -84,29 +93,35 @@ static inline AllocKind GetGCObjectKindForBytes(size_t nbytes) {
 }
 
 /* Get the number of fixed slots and initial capacity associated with a kind. */
-static constexpr inline size_t GetGCKindSlots(AllocKind thingKind) {
+static constexpr size_t GetGCKindSlots(AllocKind thingKind) {
   // Using a switch in hopes that thingKind will usually be a compile-time
   // constant.
   switch (thingKind) {
     case AllocKind::OBJECT0:
+    case AllocKind::OBJECT0_FOREGROUND:
     case AllocKind::OBJECT0_BACKGROUND:
       return 0;
     case AllocKind::OBJECT2:
+    case AllocKind::OBJECT2_FOREGROUND:
     case AllocKind::OBJECT2_BACKGROUND:
       return 2;
     case AllocKind::FUNCTION:
     case AllocKind::OBJECT4:
+    case AllocKind::OBJECT4_FOREGROUND:
     case AllocKind::OBJECT4_BACKGROUND:
       return 4;
     case AllocKind::FUNCTION_EXTENDED:
       return 7;
     case AllocKind::OBJECT8:
+    case AllocKind::OBJECT8_FOREGROUND:
     case AllocKind::OBJECT8_BACKGROUND:
       return 8;
     case AllocKind::OBJECT12:
+    case AllocKind::OBJECT12_FOREGROUND:
     case AllocKind::OBJECT12_BACKGROUND:
       return 12;
     case AllocKind::OBJECT16:
+    case AllocKind::OBJECT16_FOREGROUND:
     case AllocKind::OBJECT16_BACKGROUND:
       return 16;
     default:
@@ -118,42 +133,44 @@ static inline size_t GetGCKindBytes(AllocKind thingKind) {
   return sizeof(JSObject_Slots0) + GetGCKindSlots(thingKind) * sizeof(Value);
 }
 
-static inline bool CanUseBackgroundAllocKind(const JSClass* clasp) {
-  return !clasp->hasFinalize() || (clasp->flags & JSCLASS_BACKGROUND_FINALIZE);
-}
-
-static inline bool CanChangeToBackgroundAllocKind(AllocKind kind,
-                                                  const JSClass* clasp) {
-  // If a foreground alloc kind is specified but the class has no finalizer or a
-  // finalizer that is safe to call on a different thread, we can change the
-  // alloc kind to one which is finalized on a background thread.
-  //
-  // For example, AllocKind::OBJECT0 calls the finalizer on the main thread, and
-  // AllocKind::OBJECT0_BACKGROUND calls the finalizer on the a helper thread.
-
-  MOZ_ASSERT(IsObjectAllocKind(kind));
-
-  if (IsBackgroundFinalized(kind)) {
-    return false;  // This kind is already a background finalized kind.
+static inline FinalizeKind GetObjectFinalizeKind(const JSClass* clasp) {
+  if (!clasp->hasFinalize()) {
+    MOZ_ASSERT((clasp->flags & JSCLASS_FOREGROUND_FINALIZE) == 0);
+    MOZ_ASSERT((clasp->flags & JSCLASS_BACKGROUND_FINALIZE) == 0);
+    return FinalizeKind::None;
   }
 
-  return CanUseBackgroundAllocKind(clasp);
+  if (clasp->flags & JSCLASS_BACKGROUND_FINALIZE) {
+    MOZ_ASSERT((clasp->flags & JSCLASS_FOREGROUND_FINALIZE) == 0);
+    return FinalizeKind::Background;
+  }
+
+  MOZ_ASSERT(clasp->flags & JSCLASS_FOREGROUND_FINALIZE);
+  return FinalizeKind::Foreground;
 }
 
-static inline AllocKind ForegroundToBackgroundAllocKind(AllocKind fgKind) {
-  MOZ_ASSERT(IsObjectAllocKind(fgKind));
-  MOZ_ASSERT(IsForegroundFinalized(fgKind));
+static inline AllocKind GetFinalizedAllocKind(AllocKind kind,
+                                              FinalizeKind finalizeKind) {
+  MOZ_ASSERT(kind != AllocKind::FUNCTION &&
+             kind != AllocKind::FUNCTION_EXTENDED);
+  MOZ_ASSERT(IsObjectAllocKind(kind));
+  MOZ_ASSERT(!IsFinalizedKind(kind));
 
-  // For objects, each background alloc kind is defined just after the
-  // corresponding foreground alloc kind so we can convert between them by
-  // incrementing or decrementing as appropriate.
-  AllocKind bgKind = AllocKind(size_t(fgKind) + 1);
+  AllocKind newKind = AllocKind(size_t(kind) + size_t(finalizeKind));
+  MOZ_ASSERT(IsObjectAllocKind(newKind));
+  MOZ_ASSERT(GetGCKindSlots(newKind) == GetGCKindSlots(kind));
+  MOZ_ASSERT_IF(finalizeKind == FinalizeKind::None, !IsFinalizedKind(newKind));
+  MOZ_ASSERT_IF(finalizeKind == FinalizeKind::Foreground,
+                IsForegroundFinalized(newKind));
+  MOZ_ASSERT_IF(finalizeKind == FinalizeKind::Background,
+                IsBackgroundFinalized(newKind));
 
-  MOZ_ASSERT(IsObjectAllocKind(bgKind));
-  MOZ_ASSERT(IsBackgroundFinalized(bgKind));
-  MOZ_ASSERT(GetGCKindSlots(bgKind) == GetGCKindSlots(fgKind));
+  return newKind;
+}
 
-  return bgKind;
+static inline AllocKind GetFinalizedAllocKindForClass(AllocKind kind,
+                                                      const JSClass* clasp) {
+  return GetFinalizedAllocKind(kind, GetObjectFinalizeKind(clasp));
 }
 
 }  // namespace gc

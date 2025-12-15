@@ -24,7 +24,6 @@
 #include "vm/StringType.h"
 #include "vm/TypedArrayObject.h"
 
-#include "gc/Heap-inl.h"
 #include "gc/Marking-inl.h"
 #include "gc/ObjectKind-inl.h"
 #include "vm/Compartment-inl.h"
@@ -32,12 +31,6 @@
 #include "vm/JSObject-inl.h"
 #include "vm/Realm-inl.h"
 #include "vm/Shape-inl.h"
-
-#ifdef ENABLE_RECORD_TUPLE
-// Defined in vm/RecordTupleShared.{h,cpp}. We cannot include that file
-// because it causes circular dependencies.
-extern bool js::IsExtendedPrimitive(const JSObject& obj);
-#endif
 
 namespace js {
 
@@ -244,7 +237,7 @@ inline bool NativeObject::initDenseElementsFromRange(JSContext* cx, Iter begin,
   MOZ_ASSERT(slot == count);
 
   getElementsHeader()->initializedLength = count;
-  as<ArrayObject>().setLength(count);
+  as<ArrayObject>().setLengthToInitializedLength();
   return true;
 }
 
@@ -464,17 +457,11 @@ inline DenseElementResult NativeObject::setOrExtendDenseElements(
   }
 
   if (is<ArrayObject>() && start + count >= as<ArrayObject>().length()) {
-    as<ArrayObject>().setLength(start + count);
+    as<ArrayObject>().setLengthToInitializedLength();
   }
 
   copyDenseElements(start, vp, count);
   return DenseElementResult::Success;
-}
-
-inline bool NativeObject::isInWholeCellBuffer() const {
-  const gc::TenuredCell* cell = &asTenured();
-  gc::ArenaCellSet* cells = cell->arena()->bufferedCells();
-  return cells && cells->hasCell(cell);
 }
 
 /* static */
@@ -622,11 +609,8 @@ MOZ_ALWAYS_INLINE bool NativeObject::setShapeAndAddNewSlot(
 inline js::gc::AllocKind NativeObject::allocKindForTenure() const {
   using namespace js::gc;
   AllocKind kind = GetGCObjectFixedSlotsKind(numFixedSlots());
-  MOZ_ASSERT(!IsBackgroundFinalized(kind));
-  if (!CanChangeToBackgroundAllocKind(kind, getClass())) {
-    return kind;
-  }
-  return ForegroundToBackgroundAllocKind(kind);
+  MOZ_ASSERT(!IsFinalizedKind(kind));
+  return GetFinalizedAllocKindForClass(kind, getClass());
 }
 
 inline js::GlobalObject& NativeObject::global() const { return nonCCWGlobal(); }
@@ -728,9 +712,6 @@ static MOZ_ALWAYS_INLINE bool NativeLookupOwnPropertyInline(
   // violate this guidance are the ModuleEnvironmentObject.
   MOZ_ASSERT_IF(obj->getOpsLookupProperty(),
                 obj->template is<ModuleEnvironmentObject>());
-#ifdef ENABLE_RECORD_TUPLE
-  MOZ_ASSERT(!js::IsExtendedPrimitive(*obj));
-#endif
 
   // Check for a native dense element.
   if (id.isInt()) {

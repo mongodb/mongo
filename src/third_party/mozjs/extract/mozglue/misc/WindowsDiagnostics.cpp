@@ -13,19 +13,19 @@
 #include <windows.h>
 #include <winternl.h>
 
-#if defined(MOZ_DIAGNOSTIC_ASSERT_ENABLED) && defined(_M_X64)
+#if defined(_M_AMD64)
 
 namespace mozilla {
 
-static OnSingleStepCallback sOnSingleStepCallback{};
+MOZ_RUNINIT static OnSingleStepCallback sOnSingleStepCallback{};
 static void* sOnSingleStepCallbackState = nullptr;
 static bool sIsSingleStepping = false;
 
 MFBT_API AutoOnSingleStepCallback::AutoOnSingleStepCallback(
     OnSingleStepCallback aOnSingleStepCallback, void* aState) {
-  MOZ_DIAGNOSTIC_ASSERT(!sIsSingleStepping && !sOnSingleStepCallback &&
-                            !sOnSingleStepCallbackState,
-                        "Single-stepping is already active");
+  MOZ_RELEASE_ASSERT(!sIsSingleStepping && !sOnSingleStepCallback &&
+                         !sOnSingleStepCallbackState,
+                     "Single-stepping is already active");
 
   sOnSingleStepCallback = std::move(aOnSingleStepCallback);
   sOnSingleStepCallbackState = aState;
@@ -42,7 +42,7 @@ MFBT_API AutoOnSingleStepCallback::~AutoOnSingleStepCallback() {
 // a first single-step exception. It is then up to the exception handler to
 // keep the trap flag enabled so that a new single step exception gets
 // triggered with the following instruction.
-MFBT_API MOZ_NEVER_INLINE __attribute__((naked)) void EnableTrapFlag() {
+MFBT_API MOZ_NEVER_INLINE MOZ_NAKED void EnableTrapFlag() {
   asm volatile(
       "pushfq;"
       "orw $0x100,(%rsp);"
@@ -53,7 +53,7 @@ MFBT_API MOZ_NEVER_INLINE __attribute__((naked)) void EnableTrapFlag() {
 // This function does not do anything special, but when we reach its address
 // while single-stepping the exception handler will know that it is now time to
 // leave the trap flag turned off.
-MFBT_API MOZ_NEVER_INLINE __attribute__((naked)) void DisableTrapFlag() {
+MFBT_API MOZ_NEVER_INLINE MOZ_NAKED void DisableTrapFlag() {
   asm volatile("retq;");
 }
 
@@ -78,4 +78,4 @@ MFBT_API LONG SingleStepExceptionHandler(_EXCEPTION_POINTERS* aExceptionInfo) {
 
 }  // namespace mozilla
 
-#endif  // MOZ_DIAGNOSTIC_ASSERT_ENABLED && _M_X64
+#endif  // _M_AMD64

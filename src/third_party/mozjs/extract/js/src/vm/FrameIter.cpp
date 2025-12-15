@@ -186,7 +186,7 @@ void JitFrameIter::settle() {
 
   if (isWasm()) {
     const wasm::WasmFrameIter& wasmFrame = asWasm();
-    if (!wasmFrame.hasUnwoundJitFrame()) {
+    if (!wasmFrame.done() || !wasmFrame.unwoundCallerFPIsJSJit()) {
       return;
     }
 
@@ -200,16 +200,14 @@ void JitFrameIter::settle() {
     //
     // The wasm iterator has saved the previous jit frame pointer for us.
 
-    MOZ_ASSERT(wasmFrame.done());
     uint8_t* prevFP = wasmFrame.unwoundCallerFP();
-    jit::FrameType prevFrameType = wasmFrame.unwoundJitFrameType();
 
     if (mustUnwindActivation_) {
       act_->setJSExitFP(prevFP);
     }
 
     iter_.destroy();
-    iter_.construct<jit::JSJitFrameIter>(act_, prevFrameType, prevFP);
+    iter_.construct<jit::JSJitFrameIter>(act_, prevFP, mustUnwindActivation_);
     MOZ_ASSERT(!asJSJit().done());
     return;
   }
@@ -404,6 +402,7 @@ void FrameIter::nextJitFrame() {
   }
 
   MOZ_ASSERT(isWasm());
+  wasmFrame().enableInlinedFrames();
   data_.pc_ = nullptr;
 }
 
@@ -845,7 +844,7 @@ bool FrameIter::matchCallee(JSContext* cx, JS::Handle<JSFunction*> fun) const {
   // group and Ion will not inline them interchangeably.
   //
   // See: js::jit::InlineFrameIterator::findNextFrame()
-  if (currentCallee->hasBaseScript()) {
+  if (currentCallee->hasBaseScript() && fun->hasBaseScript()) {
     if (currentCallee->baseScript() != fun->baseScript()) {
       return false;
     }

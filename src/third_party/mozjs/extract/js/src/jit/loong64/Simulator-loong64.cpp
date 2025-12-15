@@ -804,9 +804,10 @@ bool loong64Debugger::getValue(const char* desc, int64_t* value) {
   }
 
   if (strncmp(desc, "0x", 2) == 0) {
-    return sscanf(desc + 2, "%lx", reinterpret_cast<uint64_t*>(value)) == 1;
+    return sscanf(desc + 2, "%" PRIx64, reinterpret_cast<uint64_t*>(value)) ==
+           1;
   }
-  return sscanf(desc, "%lu", reinterpret_cast<uint64_t*>(value)) == 1;
+  return sscanf(desc, "%" PRIu64, reinterpret_cast<uint64_t*>(value)) == 1;
 }
 
 bool loong64Debugger::setBreakpoint(SimInstruction* breakpc) {
@@ -1093,7 +1094,12 @@ void loong64Debugger::debug() {
         }
       } else if (strcmp(cmd, "gdb") == 0) {
         printf("relinquishing control to gdb\n");
+#if defined(__x86_64__)
         asm("int $3");
+#elif defined(__aarch64__)
+        // see masm.breakpoint for arm64
+        asm("brk #0xf000");
+#endif
         printf("regaining control from gdb\n");
       } else if (strcmp(cmd, "break") == 0) {
         if (argc == 2) {
@@ -1715,7 +1721,10 @@ void Simulator::setCallResultFloat(float result) {
 }
 
 void Simulator::setCallResult(int64_t res) { setRegister(a0, res); }
-
+#ifdef XP_DARWIN
+// add a dedicated setCallResult for intptr_t on Darwin
+void Simulator::setCallResult(intptr_t res) { setRegister(v0, I64(res)); }
+#endif
 void Simulator::setCallResult(__int128_t res) {
   setRegister(a0, I64(res));
   setRegister(a1, I64(res >> 64));
@@ -2041,8 +2050,8 @@ int Simulator::storeConditionalW(uint64_t addr, int value,
   // return 0, but there is no point at allowing that. It is certainly an
   // indicator of a bug.
   if (addr != LLAddr_) {
-    printf("SC to bad address: 0x%016" PRIx64 ", pc=0x%016" PRIx64
-           ", expected: 0x%016" PRIx64 "\n",
+    printf("SC to bad address: 0x%016" PRIx64 ", pc=0x%016" PRIxPTR
+           ", expected: 0x%016" PRIxPTR "\n",
            addr, reinterpret_cast<intptr_t>(instr), LLAddr_);
     MOZ_CRASH();
   }
@@ -2095,8 +2104,8 @@ int Simulator::storeConditionalD(uint64_t addr, int64_t value,
   // return 0, but there is no point at allowing that. It is certainly an
   // indicator of a bug.
   if (addr != LLAddr_) {
-    printf("SC to bad address: 0x%016" PRIx64 ", pc=0x%016" PRIx64
-           ", expected: 0x%016" PRIx64 "\n",
+    printf("SC to bad address: 0x%016" PRIx64 ", pc=0x%016" PRIxPTR
+           ", expected: 0x%016" PRIxPTR "\n",
            addr, reinterpret_cast<intptr_t>(instr), LLAddr_);
     MOZ_CRASH();
   }

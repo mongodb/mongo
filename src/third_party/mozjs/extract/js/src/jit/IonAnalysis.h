@@ -32,53 +32,54 @@ class MIRGenerator;
 class MIRGraph;
 class MTest;
 
-[[nodiscard]] bool PruneUnusedBranches(MIRGenerator* mir, MIRGraph& graph);
+[[nodiscard]] bool PruneUnusedBranches(const MIRGenerator* mir,
+                                       MIRGraph& graph);
 
 [[nodiscard]] bool FoldTests(MIRGraph& graph);
 
-[[nodiscard]] bool FoldEmptyBlocks(MIRGraph& graph);
+[[nodiscard]] bool FoldEmptyBlocks(MIRGraph& graph, bool* changed);
 
 [[nodiscard]] bool SplitCriticalEdges(MIRGraph& graph);
 
-[[nodiscard]] bool OptimizeIteratorIndices(MIRGenerator* mir, MIRGraph& graph);
+[[nodiscard]] bool OptimizeIteratorIndices(const MIRGenerator* mir,
+                                           MIRGraph& graph);
 
 bool IsUint32Type(const MDefinition* def);
 
 enum Observability { ConservativeObservability, AggressiveObservability };
 
-[[nodiscard]] bool EliminatePhis(MIRGenerator* mir, MIRGraph& graph,
+[[nodiscard]] bool EliminatePhis(const MIRGenerator* mir, MIRGraph& graph,
                                  Observability observe);
 
-size_t MarkLoopBlocks(MIRGraph& graph, MBasicBlock* header, bool* canOsr);
+size_t MarkLoopBlocks(MIRGraph& graph, const MBasicBlock* header, bool* canOsr);
 
-void UnmarkLoopBlocks(MIRGraph& graph, MBasicBlock* header);
+void UnmarkLoopBlocks(MIRGraph& graph, const MBasicBlock* header);
 
 [[nodiscard]] bool MakeLoopsContiguous(MIRGraph& graph);
 
-[[nodiscard]] bool EliminateTriviallyDeadResumePointOperands(MIRGenerator* mir,
-                                                             MIRGraph& graph);
+[[nodiscard]] bool EliminateTriviallyDeadResumePointOperands(
+    const MIRGenerator* mir, MIRGraph& graph);
 
-[[nodiscard]] bool EliminateDeadResumePointOperands(MIRGenerator* mir,
+[[nodiscard]] bool EliminateDeadResumePointOperands(const MIRGenerator* mir,
                                                     MIRGraph& graph);
 
-[[nodiscard]] bool EliminateDeadCode(MIRGenerator* mir, MIRGraph& graph);
+[[nodiscard]] bool EliminateDeadCode(const MIRGenerator* mir, MIRGraph& graph);
 
-[[nodiscard]] bool FoldLoadsWithUnbox(MIRGenerator* mir, MIRGraph& graph);
+[[nodiscard]] bool FoldLoadsWithUnbox(const MIRGenerator* mir, MIRGraph& graph);
 
-[[nodiscard]] bool ApplyTypeInformation(MIRGenerator* mir, MIRGraph& graph);
+[[nodiscard]] bool ApplyTypeInformation(const MIRGenerator* mir,
+                                        MIRGraph& graph);
 
 void RenumberBlocks(MIRGraph& graph);
 
-[[nodiscard]] bool AccountForCFGChanges(MIRGenerator* mir, MIRGraph& graph,
+[[nodiscard]] bool AccountForCFGChanges(const MIRGenerator* mir,
+                                        MIRGraph& graph,
                                         bool updateAliasAnalysis,
                                         bool underValueNumberer = false);
 
-[[nodiscard]] bool RemoveUnmarkedBlocks(MIRGenerator* mir, MIRGraph& graph,
+[[nodiscard]] bool RemoveUnmarkedBlocks(const MIRGenerator* mir,
+                                        MIRGraph& graph,
                                         uint32_t numMarkedBlocks);
-
-void ClearDominatorTree(MIRGraph& graph);
-
-[[nodiscard]] bool BuildDominatorTree(MIRGraph& graph);
 
 [[nodiscard]] bool BuildPhiReverseMapping(MIRGraph& graph);
 
@@ -99,6 +100,8 @@ void AssertExtendedGraphCoherency(MIRGraph& graph,
 [[nodiscard]] bool AddKeepAliveInstructions(MIRGraph& graph);
 
 [[nodiscard]] bool MarkLoadsUsedAsPropertyKeys(MIRGraph& graph);
+
+[[nodiscard]] bool TrackWasmRefTypes(MIRGraph& graph);
 
 // Simple linear sum of the form 'n' or 'x + n'.
 struct SimpleLinearSum {
@@ -122,7 +125,7 @@ SimpleLinearSum ExtractLinearSum(MDefinition* ins,
                                  MathSpace space = MathSpace::Unknown,
                                  int32_t recursionDepth = 0);
 
-[[nodiscard]] bool ExtractLinearInequality(MTest* test,
+[[nodiscard]] bool ExtractLinearInequality(const MTest* test,
                                            BranchDirection direction,
                                            SimpleLinearSum* plhs,
                                            MDefinition** prhs,
@@ -185,10 +188,37 @@ bool IsDiscardable(const MDefinition* def);
 bool IsDiscardableAllowEffectful(const MDefinition* def);
 
 class CompileInfo;
-void DumpMIRExpressions(GenericPrinter& out, MIRGraph& graph,
-                        const CompileInfo& info, const char* phase);
-void DumpMIRDefinition(GenericPrinter& out, MDefinition* def);
 
+// Debug printing.  For avoidance of ambiguity resulting from use of integer
+// IDs for MBasicBlocks and MDefinitions, these routines can optionally be
+// asked to dump a base-26 hashed version of pointers too.  Be aware these are
+// not guaranteed to be unique, although collisions are very unlikely.
+
+// Dump `p`, hashed, to `out`.
+void DumpHashedPointer(GenericPrinter& out, const void* p);
+
+// Dump the ID and possibly the pointer hash of `def`, to `out`.
+void DumpMIRDefinitionID(GenericPrinter& out, const MDefinition* def,
+                         bool showHashedPointers = false);
+// Dump an MDefinition to `out`.
+void DumpMIRDefinition(GenericPrinter& out, const MDefinition* def,
+                       bool showHashedPointers = false);
+
+// Dump the ID and possibly the pointer hash of `block`, to `out`.
+void DumpMIRBlockID(GenericPrinter& out, const MBasicBlock* block,
+                    bool showHashedPointers = false);
+// Dump an MBasicBlock to `out`.
+void DumpMIRBlock(GenericPrinter& out, MBasicBlock* block,
+                  bool showHashedPointers = false);
+
+// Dump an entire MIRGraph to `out`.
+void DumpMIRGraph(GenericPrinter& out, MIRGraph& graph,
+                  bool showHashedPointers = false);
+
+// Legacy entry point for DumpMIRGraph.
+void DumpMIRExpressions(GenericPrinter& out, MIRGraph& graph,
+                        const CompileInfo& info, const char* phase,
+                        bool showHashedPointers = false);
 }  // namespace jit
 }  // namespace js
 

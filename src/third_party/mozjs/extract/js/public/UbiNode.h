@@ -1164,6 +1164,26 @@ class JS_PUBLIC_API Concrete<JSString> : TracerConcrete<JSString> {
   static const char16_t concreteTypeName[];
 };
 
+template <>
+class JS_PUBLIC_API Concrete<js::gc::SmallBuffer>
+    : TracerConcrete<js::gc::SmallBuffer> {
+ protected:
+  explicit Concrete(js::gc::SmallBuffer* ptr)
+      : TracerConcrete<js::gc::SmallBuffer>(ptr) {}
+
+ public:
+  static void construct(void* storage, js::gc::SmallBuffer* ptr) {
+    new (storage) Concrete(ptr);
+  }
+
+  Size size(mozilla::MallocSizeOf mallocSizeOf) const override;
+
+  CoarseType coarseType() const final { return CoarseType::Object; }
+
+  const char16_t* typeName() const override { return concreteTypeName; }
+  static const char16_t concreteTypeName[];
+};
+
 // The ubi::Node null pointer. Any attempt to operate on a null ubi::Node
 // asserts.
 template <>

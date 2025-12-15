@@ -123,7 +123,7 @@ static void JSONString(GenericPrinter& out, const CharT* s, size_t length) {
   }
 }
 
-void JSONPrinter::property(const char* name, JSLinearString* str) {
+void JSONPrinter::property(const char* name, const JSLinearString* str) {
   JS::AutoCheckCannotGC nogc;
   beginStringProperty(name);
 

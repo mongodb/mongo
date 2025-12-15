@@ -30,15 +30,20 @@
 #include <cstdlib>
 #include <cstring>
 
-#include <jstypes.h>
-
 #include "jscustomallocator_oom.h"
+#include <jstypes.h>
 
 namespace mongo {
 namespace sm {
+JS_PUBLIC_API void reset(size_t max_bytes, bool track_mmap);
 JS_PUBLIC_API size_t get_total_bytes();
-JS_PUBLIC_API void reset(size_t max_bytes);
 JS_PUBLIC_API size_t get_max_bytes();
+
+JS_PUBLIC_API void check_oom_on_mmap_allocation(size_t bytes);
+
+size_t get_malloc_bytes();
+size_t get_mmap_bytes();
+void signal_oom();
 }  // namespace sm
 }  // namespace mongo
 
@@ -60,6 +65,7 @@ JS_PUBLIC_API void* js_arena_realloc(arena_id_t arena, void* p, size_t bytes);
 namespace js {
 
 extern JS_PUBLIC_DATA arena_id_t MallocArena;
+extern JS_PUBLIC_DATA arena_id_t BackgroundMallocArena;
 extern JS_PUBLIC_DATA arena_id_t ArrayBufferContentsArena;
 extern JS_PUBLIC_DATA arena_id_t StringBufferArena;
 
@@ -89,15 +95,24 @@ struct MOZ_RAII JS_PUBLIC_DATA AutoEnterOOMUnsafeRegion {
         annotateOOMSizeCallback = callback;
     }
 
+    /* Returns true if there's an AutoEnterOOMUnsafeRegion scope on the current callstack */
+    static bool isInOOMUnsafeRegion() {
+        return isInOomUnsafeRegion_ > 0;
+    }
+
 #if defined(DEBUG) || defined(JS_OOM_BREAKPOINT)
     AutoEnterOOMUnsafeRegion() : oomEnabled_(oom::simulator.isThreadSimulatingAny()) {
         if (oomEnabled_) {
             MOZ_ALWAYS_TRUE(owner_.compareExchange(nullptr, this));
             oom::simulator.setInUnsafeRegion(true);
         }
+
+        ++isInOomUnsafeRegion_;
     }
 
     ~AutoEnterOOMUnsafeRegion() {
+        --isInOomUnsafeRegion_;
+
         if (oomEnabled_) {
             oom::simulator.setInUnsafeRegion(false);
             MOZ_ALWAYS_TRUE(owner_.compareExchange(this, nullptr));
@@ -109,9 +124,20 @@ private:
     static mozilla::Atomic<AutoEnterOOMUnsafeRegion*> owner_;
 
     bool oomEnabled_;
+#else
+    AutoEnterOOMUnsafeRegion() {
+        ++isInOomUnsafeRegion_;
+    }
+
+    ~AutoEnterOOMUnsafeRegion() {
+        --isInOomUnsafeRegion_;
+    }
 #endif
 
 private:
+    // Tracks whether the current thread is inside an AutoEnterOOMUnsafeRegion
+    static thread_local size_t isInOomUnsafeRegion_;
+
     static MOZ_NORETURN MOZ_COLD void crash_impl(const char* reason);
     static MOZ_NORETURN MOZ_COLD void crash_impl(size_t size, const char* reason);
 };

@@ -122,12 +122,12 @@ class StackHeight {
 class StackResultsLoc {
   uint32_t bytes_;
   size_t count_;
-  Maybe<uint32_t> height_;
+  mozilla::Maybe<uint32_t> height_;
 
  public:
-  StackResultsLoc() : bytes_(0), count_(0){};
+  StackResultsLoc() : bytes_(0), count_(0) {};
   StackResultsLoc(uint32_t bytes, size_t count, uint32_t height)
-      : bytes_(bytes), count_(count), height_(Some(height)) {
+      : bytes_(bytes), count_(count), height_(mozilla::Some(height)) {
     MOZ_ASSERT(bytes != 0);
     MOZ_ASSERT(count != 0);
     MOZ_ASSERT(height != 0);
@@ -494,7 +494,7 @@ class BaseStackFrame final : public BaseStackFrameAllocator {
   CodeOffset stackAddOffset_;
 
   // Low byte offset of pointer to stack results, if any.
-  Maybe<int32_t> stackResultsPtrOffset_;
+  mozilla::Maybe<int32_t> stackResultsPtrOffset_;
 
   // The offset of instance pointer.
   uint32_t instancePointerOffset_;
@@ -539,13 +539,13 @@ class BaseStackFrame final : public BaseStackFrameAllocator {
   // Note the platform scratch register may be used by branchPtr(), so
   // generally tmp must be something else.
 
-  void checkStack(Register tmp, BytecodeOffset trapOffset) {
+  void checkStack(Register tmp, TrapSiteDesc trapSiteDesc) {
     stackAddOffset_ = masm.sub32FromStackPtrWithPatch(tmp);
     Label ok;
     masm.branchPtr(Assembler::Below,
                    Address(InstanceReg, wasm::Instance::offsetOfStackLimit()),
                    tmp, &ok);
-    masm.wasmTrap(Trap::StackOverflow, trapOffset);
+    masm.wasmTrap(Trap::StackOverflow, trapSiteDesc);
     masm.bind(&ok);
   }
 
@@ -590,7 +590,7 @@ class BaseStackFrame final : public BaseStackFrameAllocator {
       return false;
     }
 
-    DebugOnly<uint32_t> index = 0;
+    mozilla::DebugOnly<uint32_t> index = 0;
     BaseLocalIter i(locals, args, debugEnabled);
     for (; !i.done() && i.index() < args.lengthWithoutStackResults(); i++) {
       MOZ_ASSERT(i.isArg());
@@ -616,7 +616,7 @@ class BaseStackFrame final : public BaseStackFrameAllocator {
     setLocalSize(AlignBytes(localSize, WasmStackAlignment));
 
     if (args.hasSyntheticStackResultPointerArg()) {
-      stackResultsPtrOffset_ = Some(i.stackResultPointerOffset());
+      stackResultsPtrOffset_ = mozilla::Some(i.stackResultPointerOffset());
     }
 
     return true;
@@ -768,7 +768,7 @@ class BaseStackFrame final : public BaseStackFrameAllocator {
   // Pushes the register `r` to the stack. This pushes the full 64-bit width on
   // 64-bit systems, and 32-bits otherwise.
   uint32_t pushGPR(Register r) {
-    DebugOnly<uint32_t> stackBefore = currentStackHeight();
+    mozilla::DebugOnly<uint32_t> stackBefore = currentStackHeight();
 #ifdef RABALDR_CHUNKY_STACK
     pushChunkyBytes(StackSizeOfPtr);
     masm.storePtr(r, Address(sp_, stackOffset(currentStackHeight())));
@@ -781,12 +781,16 @@ class BaseStackFrame final : public BaseStackFrameAllocator {
   }
 
   uint32_t pushFloat32(FloatRegister r) {
-    DebugOnly<uint32_t> stackBefore = currentStackHeight();
+    mozilla::DebugOnly<uint32_t> stackBefore = currentStackHeight();
 #ifdef RABALDR_CHUNKY_STACK
     pushChunkyBytes(StackSizeOfFloat);
     masm.storeFloat32(r, Address(sp_, stackOffset(currentStackHeight())));
 #else
-    masm.Push(r);
+    if (StackSizeOfFloat == 4) {
+      masm.Push(r);
+    } else {
+      masm.Push(r.asDouble());
+    }
 #endif
     maxFramePushed_ = std::max(maxFramePushed_, masm.framePushed());
     MOZ_ASSERT(stackBefore + StackSizeOfFloat == currentStackHeight());
@@ -795,7 +799,7 @@ class BaseStackFrame final : public BaseStackFrameAllocator {
 
 #ifdef ENABLE_WASM_SIMD
   uint32_t pushV128(RegV128 r) {
-    DebugOnly<uint32_t> stackBefore = currentStackHeight();
+    mozilla::DebugOnly<uint32_t> stackBefore = currentStackHeight();
 #  ifdef RABALDR_CHUNKY_STACK
     pushChunkyBytes(StackSizeOfV128);
 #  else
@@ -810,7 +814,7 @@ class BaseStackFrame final : public BaseStackFrameAllocator {
 #endif
 
   uint32_t pushDouble(FloatRegister r) {
-    DebugOnly<uint32_t> stackBefore = currentStackHeight();
+    mozilla::DebugOnly<uint32_t> stackBefore = currentStackHeight();
 #ifdef RABALDR_CHUNKY_STACK
     pushChunkyBytes(StackSizeOfDouble);
     masm.storeDouble(r, Address(sp_, stackOffset(currentStackHeight())));
@@ -825,7 +829,7 @@ class BaseStackFrame final : public BaseStackFrameAllocator {
   // Pops the stack into the register `r`. This pops the full 64-bit width on
   // 64-bit systems, and 32-bits otherwise.
   void popGPR(Register r) {
-    DebugOnly<uint32_t> stackBefore = currentStackHeight();
+    mozilla::DebugOnly<uint32_t> stackBefore = currentStackHeight();
 #ifdef RABALDR_CHUNKY_STACK
     masm.loadPtr(Address(sp_, stackOffset(currentStackHeight())), r);
     popChunkyBytes(StackSizeOfPtr);
@@ -836,18 +840,22 @@ class BaseStackFrame final : public BaseStackFrameAllocator {
   }
 
   void popFloat32(FloatRegister r) {
-    DebugOnly<uint32_t> stackBefore = currentStackHeight();
+    mozilla::DebugOnly<uint32_t> stackBefore = currentStackHeight();
 #ifdef RABALDR_CHUNKY_STACK
     masm.loadFloat32(Address(sp_, stackOffset(currentStackHeight())), r);
     popChunkyBytes(StackSizeOfFloat);
 #else
-    masm.Pop(r);
+    if (StackSizeOfFloat == 4) {
+      masm.Pop(r);
+    } else {
+      masm.Pop(r.asDouble());
+    }
 #endif
     MOZ_ASSERT(stackBefore - StackSizeOfFloat == currentStackHeight());
   }
 
   void popDouble(FloatRegister r) {
-    DebugOnly<uint32_t> stackBefore = currentStackHeight();
+    mozilla::DebugOnly<uint32_t> stackBefore = currentStackHeight();
 #ifdef RABALDR_CHUNKY_STACK
     masm.loadDouble(Address(sp_, stackOffset(currentStackHeight())), r);
     popChunkyBytes(StackSizeOfDouble);
@@ -859,7 +867,7 @@ class BaseStackFrame final : public BaseStackFrameAllocator {
 
 #ifdef ENABLE_WASM_SIMD
   void popV128(RegV128 r) {
-    DebugOnly<uint32_t> stackBefore = currentStackHeight();
+    mozilla::DebugOnly<uint32_t> stackBefore = currentStackHeight();
     masm.loadUnalignedSimd128(Address(sp_, stackOffset(currentStackHeight())),
                               r);
 #  ifdef RABALDR_CHUNKY_STACK
@@ -1327,7 +1335,7 @@ struct StackMapGenerator {
   // Maybe because createStackMap needs to know whether or not we're still
   // in the prologue.  It makes a Nothing-to-Some transition just once per
   // function.
-  Maybe<uint32_t> framePushedAtEntryToBody;
+  mozilla::Maybe<uint32_t> framePushedAtEntryToBody;
 
   // --- These can change at any point ---
 
@@ -1348,7 +1356,7 @@ struct StackMapGenerator {
   // When not inside a function call setup/teardown sequence, it is Nothing.
   // It can make Nothing-to/from-Some transitions arbitrarily as we progress
   // through the function body.
-  Maybe<uint32_t> framePushedExcludingOutboundCallArgs;
+  mozilla::Maybe<uint32_t> framePushedExcludingOutboundCallArgs;
 
   // The number of memory-resident, ref-typed entries on the containing
   // BaseCompiler::stk_.

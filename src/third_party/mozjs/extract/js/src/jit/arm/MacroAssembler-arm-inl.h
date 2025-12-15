@@ -24,6 +24,20 @@ void MacroAssembler::move64(Imm64 imm, Register64 dest) {
   move32(Imm32((imm.value >> 32) & 0xFFFFFFFFL), dest.high);
 }
 
+void MacroAssembler::moveFloat16ToGPR(FloatRegister src, Register dest) {
+  ma_vxfer(src, dest);
+
+  // Ensure the hi-word is zeroed.
+  as_uxth(dest, dest, 0);
+}
+
+void MacroAssembler::moveGPRToFloat16(Register src, FloatRegister dest) {
+  // Ensure the hi-word is zeroed.
+  as_uxth(src, src, 0);
+
+  ma_vxfer(src, dest);
+}
+
 void MacroAssembler::moveFloat32ToGPR(FloatRegister src, Register dest) {
   ma_vxfer(src, dest);
 }
@@ -50,6 +64,10 @@ void MacroAssembler::moveDoubleToGPR64(FloatRegister src, Register64 dest) {
 
 void MacroAssembler::moveGPR64ToDouble(Register64 src, FloatRegister dest) {
   ma_vxfer(src.low, src.high, dest);
+}
+
+void MacroAssembler::moveLowDoubleToGPR(FloatRegister src, Register dest) {
+  ma_vxfer(src, dest, InvalidReg);
 }
 
 void MacroAssembler::move64To32(Register64 src, Register dest) {
@@ -82,6 +100,14 @@ void MacroAssembler::move32To64SignExtend(Register src, Register64 dest) {
   ma_asr(Imm32(31), dest.low, dest.high);
 }
 
+void MacroAssembler::move8SignExtendToPtr(Register src, Register dest) {
+  move8SignExtend(src, dest);
+}
+
+void MacroAssembler::move16SignExtendToPtr(Register src, Register dest) {
+  move16SignExtend(src, dest);
+}
+
 void MacroAssembler::move32SignExtendToPtr(Register src, Register dest) {
   move32(src, dest);
 }
@@ -110,9 +136,11 @@ void MacroAssembler::and32(Register src, Register dest) {
   ma_and(src, dest, SetCC);
 }
 
-void MacroAssembler::and32(Imm32 imm, Register dest) {
+void MacroAssembler::and32(Imm32 imm, Register dest) { and32(imm, dest, dest); }
+
+void MacroAssembler::and32(Imm32 imm, Register src, Register dest) {
   ScratchRegisterScope scratch(*this);
-  ma_and(imm, dest, scratch, SetCC);
+  ma_and(imm, src, dest, scratch, SetCC);
 }
 
 void MacroAssembler::and32(Imm32 imm, const Address& dest) {
@@ -135,8 +163,12 @@ void MacroAssembler::and32(const Address& src, Register dest) {
 void MacroAssembler::andPtr(Register src, Register dest) { ma_and(src, dest); }
 
 void MacroAssembler::andPtr(Imm32 imm, Register dest) {
+  andPtr(imm, dest, dest);
+}
+
+void MacroAssembler::andPtr(Imm32 imm, Register src, Register dest) {
   ScratchRegisterScope scratch(*this);
-  ma_and(imm, dest, scratch);
+  ma_and(imm, src, dest, scratch);
 }
 
 void MacroAssembler::and64(Imm64 imm, Register64 dest) {
@@ -168,9 +200,11 @@ void MacroAssembler::xor64(Imm64 imm, Register64 dest) {
 
 void MacroAssembler::or32(Register src, Register dest) { ma_orr(src, dest); }
 
-void MacroAssembler::or32(Imm32 imm, Register dest) {
+void MacroAssembler::or32(Imm32 imm, Register dest) { or32(imm, dest, dest); }
+
+void MacroAssembler::or32(Imm32 imm, Register src, Register dest) {
   ScratchRegisterScope scratch(*this);
-  ma_orr(imm, dest, scratch);
+  ma_orr(imm, src, dest, scratch);
 }
 
 void MacroAssembler::or32(Imm32 imm, const Address& dest) {
@@ -184,9 +218,11 @@ void MacroAssembler::or32(Imm32 imm, const Address& dest) {
 
 void MacroAssembler::orPtr(Register src, Register dest) { ma_orr(src, dest); }
 
-void MacroAssembler::orPtr(Imm32 imm, Register dest) {
+void MacroAssembler::orPtr(Imm32 imm, Register dest) { orPtr(imm, dest, dest); }
+
+void MacroAssembler::orPtr(Imm32 imm, Register src, Register dest) {
   ScratchRegisterScope scratch(*this);
-  ma_orr(imm, dest, scratch);
+  ma_orr(imm, src, dest, scratch);
 }
 
 void MacroAssembler::and64(Register64 src, Register64 dest) {
@@ -208,9 +244,11 @@ void MacroAssembler::xor32(Register src, Register dest) {
   ma_eor(src, dest, SetCC);
 }
 
-void MacroAssembler::xor32(Imm32 imm, Register dest) {
+void MacroAssembler::xor32(Imm32 imm, Register dest) { xor32(imm, dest, dest); }
+
+void MacroAssembler::xor32(Imm32 imm, Register src, Register dest) {
   ScratchRegisterScope scratch(*this);
-  ma_eor(imm, dest, scratch, SetCC);
+  ma_eor(imm, src, dest, scratch, SetCC);
 }
 
 void MacroAssembler::xor32(Imm32 imm, const Address& dest) {
@@ -233,8 +271,12 @@ void MacroAssembler::xor32(const Address& src, Register dest) {
 void MacroAssembler::xorPtr(Register src, Register dest) { ma_eor(src, dest); }
 
 void MacroAssembler::xorPtr(Imm32 imm, Register dest) {
+  xorPtr(imm, dest, dest);
+}
+
+void MacroAssembler::xorPtr(Imm32 imm, Register src, Register dest) {
   ScratchRegisterScope scratch(*this);
-  ma_eor(imm, dest, scratch);
+  ma_eor(imm, src, dest, scratch);
 }
 
 // ===============================================================
@@ -342,7 +384,8 @@ void MacroAssembler::patchSub32FromStackPtr(CodeOffset offset, Imm32 imm) {
   ScratchRegisterScope scratch(*this);
   BufferInstructionIterator iter(BufferOffset(offset.offset()), &m_buffer);
   iter.maybeSkipAutomaticInstructions();
-  ma_mov_patch(imm, scratch, Always, HasMOVWT() ? L_MOVWT : L_LDR, iter);
+  ma_mov_patch(imm, scratch, Always, ARMFlags::HasMOVWT() ? L_MOVWT : L_LDR,
+               iter);
 }
 
 void MacroAssembler::addDouble(FloatRegister src, FloatRegister dest) {
@@ -523,7 +566,7 @@ void MacroAssembler::mulDoublePtr(ImmPtr imm, Register temp,
 
 void MacroAssembler::quotient32(Register rhs, Register srcDest,
                                 bool isUnsigned) {
-  MOZ_ASSERT(HasIDIV());
+  MOZ_ASSERT(ARMFlags::HasIDIV());
   if (isUnsigned) {
     ma_udiv(srcDest, rhs, srcDest);
   } else {
@@ -533,7 +576,7 @@ void MacroAssembler::quotient32(Register rhs, Register srcDest,
 
 void MacroAssembler::remainder32(Register rhs, Register srcDest,
                                  bool isUnsigned) {
-  MOZ_ASSERT(HasIDIV());
+  MOZ_ASSERT(ARMFlags::HasIDIV());
 
   ScratchRegisterScope scratch(*this);
   if (isUnsigned) {
@@ -627,12 +670,20 @@ void MacroAssembler::maxDouble(FloatRegister other, FloatRegister srcDest,
 // Shift functions
 
 void MacroAssembler::lshiftPtr(Imm32 imm, Register dest) {
+  lshiftPtr(imm, dest, dest);
+}
+
+void MacroAssembler::lshiftPtr(Imm32 imm, Register src, Register dest) {
   MOZ_ASSERT(0 <= imm.value && imm.value < 32);
-  ma_lsl(imm, dest, dest);
+  ma_lsl(imm, src, dest);
 }
 
 void MacroAssembler::lshiftPtr(Register src, Register dest) {
   ma_lsl(src, dest, dest);
+}
+
+void MacroAssembler::flexibleLshiftPtr(Register shift, Register srcDest) {
+  flexibleLshift32(shift, srcDest);
 }
 
 void MacroAssembler::lshift64(Imm32 imm, Register64 dest) {
@@ -678,19 +729,30 @@ void MacroAssembler::flexibleLshift32(Register src, Register dest) {
 }
 
 void MacroAssembler::lshift32(Imm32 imm, Register dest) {
-  MOZ_ASSERT(0 <= imm.value && imm.value < 32);
-  lshiftPtr(imm, dest);
+  lshiftPtr(imm, dest, dest);
+}
+
+void MacroAssembler::lshift32(Imm32 imm, Register src, Register dest) {
+  lshiftPtr(imm, src, dest);
 }
 
 void MacroAssembler::rshiftPtr(Imm32 imm, Register dest) {
+  rshiftPtr(imm, dest, dest);
+}
+
+void MacroAssembler::rshiftPtr(Imm32 imm, Register src, Register dest) {
   MOZ_ASSERT(0 <= imm.value && imm.value < 32);
   if (imm.value) {
-    ma_lsr(imm, dest, dest);
+    ma_lsr(imm, src, dest);
   }
 }
 
 void MacroAssembler::rshiftPtr(Register src, Register dest) {
   ma_lsr(src, dest, dest);
+}
+
+void MacroAssembler::flexibleRshiftPtr(Register shift, Register srcDest) {
+  flexibleRshift32(shift, srcDest);
 }
 
 void MacroAssembler::rshift32(Register src, Register dest) {
@@ -704,15 +766,32 @@ void MacroAssembler::flexibleRshift32(Register src, Register dest) {
 }
 
 void MacroAssembler::rshift32(Imm32 imm, Register dest) {
-  MOZ_ASSERT(0 <= imm.value && imm.value < 32);
-  rshiftPtr(imm, dest);
+  rshiftPtr(imm, dest, dest);
+}
+
+void MacroAssembler::rshift32(Imm32 imm, Register src, Register dest) {
+  rshiftPtr(imm, src, dest);
 }
 
 void MacroAssembler::rshiftPtrArithmetic(Imm32 imm, Register dest) {
+  rshiftPtrArithmetic(imm, dest, dest);
+}
+
+void MacroAssembler::rshiftPtrArithmetic(Imm32 imm, Register src,
+                                         Register dest) {
   MOZ_ASSERT(0 <= imm.value && imm.value < 32);
   if (imm.value) {
-    ma_asr(imm, dest, dest);
+    ma_asr(imm, src, dest);
   }
+}
+
+void MacroAssembler::rshiftPtrArithmetic(Register src, Register dest) {
+  ma_asr(src, dest, dest);
+}
+
+void MacroAssembler::flexibleRshiftPtrArithmetic(Register shift,
+                                                 Register srcDest) {
+  flexibleRshift32Arithmetic(shift, srcDest);
 }
 
 void MacroAssembler::rshift64Arithmetic(Imm32 imm, Register64 dest) {
@@ -765,8 +844,12 @@ void MacroAssembler::rshift32Arithmetic(Register src, Register dest) {
 }
 
 void MacroAssembler::rshift32Arithmetic(Imm32 imm, Register dest) {
-  MOZ_ASSERT(0 <= imm.value && imm.value < 32);
-  rshiftPtrArithmetic(imm, dest);
+  rshiftPtrArithmetic(imm, dest, dest);
+}
+
+void MacroAssembler::rshift32Arithmetic(Imm32 imm, Register src,
+                                        Register dest) {
+  rshiftPtrArithmetic(imm, src, dest);
 }
 
 void MacroAssembler::flexibleRshift32Arithmetic(Register src, Register dest) {
@@ -1072,16 +1155,45 @@ void MacroAssembler::cmp32Set(Condition cond, T1 lhs, T2 rhs, Register dest) {
   emitSet(cond, dest);
 }
 
+void MacroAssembler::cmp64Set(Condition cond, Register64 lhs, Register64 rhs,
+                              Register dest) {
+  if (lhs.high == dest || lhs.low == dest || rhs.high == dest ||
+      rhs.low == dest) {
+    cmp64SetAliased(cond, lhs, rhs, dest);
+  } else {
+    cmp64SetNonAliased(cond, lhs, rhs, dest);
+  }
+}
+
+void MacroAssembler::cmp64Set(Condition cond, Register64 lhs, Imm64 rhs,
+                              Register dest) {
+  if (rhs.value == 0 &&
+      (cond == Assembler::Equal || cond == Assembler::NotEqual)) {
+    ma_orr(lhs.low, lhs.high, dest);
+    cmp32Set(cond, dest, Imm32(0), dest);
+  } else if (lhs.high == dest || lhs.low == dest) {
+    cmp64SetAliased(cond, lhs, rhs, dest);
+  } else {
+    cmp64SetNonAliased(cond, lhs, rhs, dest);
+  }
+}
+
+void MacroAssembler::cmp64Set(Condition cond, Address lhs, Register64 rhs,
+                              Register dest) {
+  if (lhs.base == dest || rhs.high == dest || rhs.low == dest) {
+    cmp64SetAliased(cond, lhs, rhs, dest);
+  } else {
+    cmp64SetNonAliased(cond, lhs, rhs, dest);
+  }
+}
+
 void MacroAssembler::cmp64Set(Condition cond, Address lhs, Imm64 rhs,
                               Register dest) {
-  Label success, done;
-
-  branch64(cond, lhs, rhs, &success);
-  move32(Imm32(0), dest);
-  jump(&done);
-  bind(&success);
-  move32(Imm32(1), dest);
-  bind(&done);
+  if (lhs.base == dest) {
+    cmp64SetAliased(cond, lhs, rhs, dest);
+  } else {
+    cmp64SetNonAliased(cond, lhs, rhs, dest);
+  }
 }
 
 template <typename T1, typename T2>
@@ -1097,14 +1209,15 @@ void MacroAssembler::clz32(Register src, Register dest, bool knownNotZero) {
   ma_clz(src, dest);
 }
 
-void MacroAssembler::clz64(Register64 src, Register dest) {
+void MacroAssembler::clz64(Register64 src, Register64 dest) {
   ScratchRegisterScope scratch(*this);
 
   ma_clz(src.high, scratch);
   as_cmp(scratch, Imm8(32));
-  ma_mov(scratch, dest, LeaveCC, NotEqual);
-  ma_clz(src.low, dest, Equal);
-  as_add(dest, dest, Imm8(32), LeaveCC, Equal);
+  ma_mov(scratch, dest.low, LeaveCC, NotEqual);
+  ma_clz(src.low, dest.low, Equal);
+  as_add(dest.low, dest.low, Imm8(32), LeaveCC, Equal);
+  ma_mov(Imm32(0), dest.high);
 }
 
 void MacroAssembler::ctz32(Register src, Register dest, bool knownNotZero) {
@@ -1112,19 +1225,20 @@ void MacroAssembler::ctz32(Register src, Register dest, bool knownNotZero) {
   ma_ctz(src, dest, scratch);
 }
 
-void MacroAssembler::ctz64(Register64 src, Register dest) {
+void MacroAssembler::ctz64(Register64 src, Register64 dest) {
   Label done, high;
   as_cmp(src.low, Imm8(0));
   ma_b(&high, Equal);
 
-  ctz32(src.low, dest, /* knownNotZero = */ true);
+  ctz32(src.low, dest.low, /* knownNotZero = */ true);
   ma_b(&done);
 
   bind(&high);
-  ctz32(src.high, dest, /* knownNotZero = */ false);
-  as_add(dest, dest, Imm8(32));
+  ctz32(src.high, dest.low, /* knownNotZero = */ false);
+  as_add(dest.low, dest.low, Imm8(32));
 
   bind(&done);
+  ma_mov(Imm32(0), dest.high);
 }
 
 void MacroAssembler::popcnt32(Register input, Register output, Register tmp) {
@@ -1312,16 +1426,14 @@ void MacroAssembler::branch16(Condition cond, const Address& lhs, Imm32 rhs,
   ma_b(label, cond);
 }
 
-template <class L>
 void MacroAssembler::branch32(Condition cond, Register lhs, Register rhs,
-                              L label) {
+                              Label* label, LhsHighBitsAreClean) {
   ma_cmp(lhs, rhs);
   ma_b(label, cond);
 }
 
-template <class L>
 void MacroAssembler::branch32(Condition cond, Register lhs, Imm32 rhs,
-                              L label) {
+                              Label* label, LhsHighBitsAreClean) {
   ScratchRegisterScope scratch(*this);
 
   ma_cmp(lhs, rhs, scratch);
@@ -1425,40 +1537,24 @@ void MacroAssembler::branch32(Condition cond, wasm::SymbolicAddress lhs,
   ma_b(label, cond);
 }
 
+void MacroAssembler::branch64(Condition cond, Register64 lhs, Imm64 val,
+                              Label* success, Label* fail) {
+  branch64Impl(cond, lhs, val, success, fail);
+}
+
+void MacroAssembler::branch64(Condition cond, Register64 lhs, Register64 rhs,
+                              Label* success, Label* fail) {
+  branch64Impl(cond, lhs, rhs, success, fail);
+}
+
 void MacroAssembler::branch64(Condition cond, const Address& lhs, Imm64 val,
-                              Label* label) {
-  MOZ_ASSERT(cond == Assembler::NotEqual || cond == Assembler::Equal,
-             "other condition codes not supported");
-
-  Label done;
-
-  if (cond == Assembler::Equal) {
-    branch32(Assembler::NotEqual, lhs, val.firstHalf(), &done);
-  } else {
-    branch32(Assembler::NotEqual, lhs, val.firstHalf(), label);
-  }
-  branch32(cond, Address(lhs.base, lhs.offset + sizeof(uint32_t)),
-           val.secondHalf(), label);
-
-  bind(&done);
+                              Label* success, Label* fail) {
+  branch64Impl(cond, lhs, val, success, fail);
 }
 
 void MacroAssembler::branch64(Condition cond, const Address& lhs,
-                              Register64 rhs, Label* label) {
-  MOZ_ASSERT(cond == Assembler::NotEqual || cond == Assembler::Equal,
-             "other condition codes not supported");
-
-  Label done;
-
-  if (cond == Assembler::Equal) {
-    branch32(Assembler::NotEqual, lhs, rhs.low, &done);
-  } else {
-    branch32(Assembler::NotEqual, lhs, rhs.low, label);
-  }
-  branch32(cond, Address(lhs.base, lhs.offset + sizeof(uint32_t)), rhs.high,
-           label);
-
-  bind(&done);
+                              Register64 rhs, Label* success, Label* fail) {
+  branch64Impl(cond, lhs, rhs, success, fail);
 }
 
 void MacroAssembler::branch64(Condition cond, const Address& lhs,
@@ -1471,139 +1567,21 @@ void MacroAssembler::branch64(Condition cond, const Address& lhs,
 
   Label done;
 
-  load32(rhs, scratch);
+  load32(LowWord(rhs), scratch);
   if (cond == Assembler::Equal) {
-    branch32(Assembler::NotEqual, lhs, scratch, &done);
+    branch32(Assembler::NotEqual, LowWord(lhs), scratch, &done);
   } else {
-    branch32(Assembler::NotEqual, lhs, scratch, label);
+    branch32(Assembler::NotEqual, LowWord(lhs), scratch, label);
   }
 
-  load32(Address(rhs.base, rhs.offset + sizeof(uint32_t)), scratch);
-  branch32(cond, Address(lhs.base, lhs.offset + sizeof(uint32_t)), scratch,
-           label);
+  load32(HighWord(rhs), scratch);
+  branch32(cond, HighWord(lhs), scratch, label);
 
   bind(&done);
 }
 
-void MacroAssembler::branch64(Condition cond, Register64 lhs, Imm64 val,
-                              Label* success, Label* fail) {
-  bool fallthrough = false;
-  Label fallthroughLabel;
-
-  if (!fail) {
-    fail = &fallthroughLabel;
-    fallthrough = true;
-  }
-
-  switch (cond) {
-    case Assembler::Equal:
-      branch32(Assembler::NotEqual, lhs.low, val.low(), fail);
-      branch32(Assembler::Equal, lhs.high, val.hi(), success);
-      if (!fallthrough) {
-        jump(fail);
-      }
-      break;
-    case Assembler::NotEqual:
-      branch32(Assembler::NotEqual, lhs.low, val.low(), success);
-      branch32(Assembler::NotEqual, lhs.high, val.hi(), success);
-      if (!fallthrough) {
-        jump(fail);
-      }
-      break;
-    case Assembler::LessThan:
-    case Assembler::LessThanOrEqual:
-    case Assembler::GreaterThan:
-    case Assembler::GreaterThanOrEqual:
-    case Assembler::Below:
-    case Assembler::BelowOrEqual:
-    case Assembler::Above:
-    case Assembler::AboveOrEqual: {
-      Assembler::Condition cond1 = Assembler::ConditionWithoutEqual(cond);
-      Assembler::Condition cond2 =
-          Assembler::ConditionWithoutEqual(Assembler::InvertCondition(cond));
-      Assembler::Condition cond3 = Assembler::UnsignedCondition(cond);
-
-      cmp32(lhs.high, val.hi());
-      ma_b(success, cond1);
-      ma_b(fail, cond2);
-      cmp32(lhs.low, val.low());
-      ma_b(success, cond3);
-      if (!fallthrough) {
-        jump(fail);
-      }
-      break;
-    }
-    default:
-      MOZ_CRASH("Condition code not supported");
-      break;
-  }
-
-  if (fallthrough) {
-    bind(fail);
-  }
-}
-
-void MacroAssembler::branch64(Condition cond, Register64 lhs, Register64 rhs,
-                              Label* success, Label* fail) {
-  bool fallthrough = false;
-  Label fallthroughLabel;
-
-  if (!fail) {
-    fail = &fallthroughLabel;
-    fallthrough = true;
-  }
-
-  switch (cond) {
-    case Assembler::Equal:
-      branch32(Assembler::NotEqual, lhs.low, rhs.low, fail);
-      branch32(Assembler::Equal, lhs.high, rhs.high, success);
-      if (!fallthrough) {
-        jump(fail);
-      }
-      break;
-    case Assembler::NotEqual:
-      branch32(Assembler::NotEqual, lhs.low, rhs.low, success);
-      branch32(Assembler::NotEqual, lhs.high, rhs.high, success);
-      if (!fallthrough) {
-        jump(fail);
-      }
-      break;
-    case Assembler::LessThan:
-    case Assembler::LessThanOrEqual:
-    case Assembler::GreaterThan:
-    case Assembler::GreaterThanOrEqual:
-    case Assembler::Below:
-    case Assembler::BelowOrEqual:
-    case Assembler::Above:
-    case Assembler::AboveOrEqual: {
-      Assembler::Condition cond1 = Assembler::ConditionWithoutEqual(cond);
-      Assembler::Condition cond2 =
-          Assembler::ConditionWithoutEqual(Assembler::InvertCondition(cond));
-      Assembler::Condition cond3 = Assembler::UnsignedCondition(cond);
-
-      cmp32(lhs.high, rhs.high);
-      ma_b(success, cond1);
-      ma_b(fail, cond2);
-      cmp32(lhs.low, rhs.low);
-      ma_b(success, cond3);
-      if (!fallthrough) {
-        jump(fail);
-      }
-      break;
-    }
-    default:
-      MOZ_CRASH("Condition code not supported");
-      break;
-  }
-
-  if (fallthrough) {
-    bind(fail);
-  }
-}
-
-template <class L>
 void MacroAssembler::branchPtr(Condition cond, Register lhs, Register rhs,
-                               L label) {
+                               Label* label) {
   branch32(cond, lhs, rhs, label);
 }
 
@@ -1629,9 +1607,8 @@ void MacroAssembler::branchPtr(Condition cond, Register lhs, ImmWord rhs,
   branch32(cond, lhs, Imm32(rhs.value), label);
 }
 
-template <class L>
 void MacroAssembler::branchPtr(Condition cond, const Address& lhs, Register rhs,
-                               L label) {
+                               Label* label) {
   branch32(cond, lhs, rhs, label);
 }
 
@@ -1779,6 +1756,21 @@ void MacroAssembler::branchTruncateDoubleToInt32(FloatRegister src,
   ma_b(fail, Assembler::Equal);
 }
 
+void MacroAssembler::branchInt64NotInPtrRange(Register64 src, Label* label) {
+  // The high-word needs to be either all zero or all one, depending on the MSB
+  // of the low-word.
+  as_cmp(src.high, asr(src.low, 31));
+  ma_b(label, Assembler::NotEqual);
+}
+
+void MacroAssembler::branchUInt64NotInPtrRange(Register64 src, Label* label) {
+  ScratchRegisterScope scratch(*this);
+
+  // The low-word MSB and all bits in the high-word must be zero.
+  as_orr(scratch, src.high, asr(src.low, 31), SetCC);
+  ma_b(label, Assembler::NonZero);
+}
+
 template <typename T>
 void MacroAssembler::branchAdd32(Condition cond, T src, Register dest,
                                  Label* label) {
@@ -1842,6 +1834,10 @@ void MacroAssembler::branchMulPtr(Condition cond, Register src, Register dest,
   branchMul32(cond, src, dest, label);
 }
 
+void MacroAssembler::branchNegPtr(Condition cond, Register reg, Label* label) {
+  branchNeg32(cond, reg, label);
+}
+
 void MacroAssembler::decBranchPtr(Condition cond, Register lhs, Imm32 rhs,
                                   Label* label) {
   ScratchRegisterScope scratch(*this);
@@ -1849,9 +1845,8 @@ void MacroAssembler::decBranchPtr(Condition cond, Register lhs, Imm32 rhs,
   as_b(label, cond);
 }
 
-template <class L>
 void MacroAssembler::branchTest32(Condition cond, Register lhs, Register rhs,
-                                  L label) {
+                                  Label* label) {
   MOZ_ASSERT(cond == Zero || cond == NonZero || cond == Signed ||
              cond == NotSigned);
   // x86 likes test foo, foo rather than cmp foo, #0.
@@ -1864,9 +1859,8 @@ void MacroAssembler::branchTest32(Condition cond, Register lhs, Register rhs,
   ma_b(label, cond);
 }
 
-template <class L>
 void MacroAssembler::branchTest32(Condition cond, Register lhs, Imm32 rhs,
-                                  L label) {
+                                  Label* label) {
   MOZ_ASSERT(cond == Zero || cond == NonZero || cond == Signed ||
              cond == NotSigned);
   ScratchRegisterScope scratch(*this);
@@ -1888,9 +1882,8 @@ void MacroAssembler::branchTest32(Condition cond, const AbsoluteAddress& lhs,
   branchTest32(cond, scratch2, rhs, label);
 }
 
-template <class L>
 void MacroAssembler::branchTestPtr(Condition cond, Register lhs, Register rhs,
-                                   L label) {
+                                   Label* label) {
   branchTest32(cond, lhs, rhs, label);
 }
 
@@ -1899,25 +1892,82 @@ void MacroAssembler::branchTestPtr(Condition cond, Register lhs, Imm32 rhs,
   branchTest32(cond, lhs, rhs, label);
 }
 
+void MacroAssembler::branchTestPtr(Condition cond, Register lhs, ImmWord rhs,
+                                   Label* label) {
+  branchTest32(cond, lhs, Imm32(rhs.value), label);
+}
+
 void MacroAssembler::branchTestPtr(Condition cond, const Address& lhs,
                                    Imm32 rhs, Label* label) {
   branchTest32(cond, lhs, rhs, label);
 }
 
-template <class L>
 void MacroAssembler::branchTest64(Condition cond, Register64 lhs,
-                                  Register64 rhs, Register temp, L label) {
-  if (cond == Assembler::Zero || cond == Assembler::NonZero) {
-    ScratchRegisterScope scratch(*this);
+                                  Register64 rhs, Register temp, Label* success,
+                                  Label* fail) {
+  bool fallthrough = false;
+  Label fallthroughLabel;
 
-    MOZ_ASSERT(lhs.low == rhs.low);
-    MOZ_ASSERT(lhs.high == rhs.high);
-    ma_orr(lhs.low, lhs.high, scratch);
-    branchTestPtr(cond, scratch, scratch, label);
+  if (!fail) {
+    fail = &fallthroughLabel;
+    fallthrough = true;
+  }
+
+  if (cond == Assembler::Zero || cond == Assembler::NonZero) {
+    if (lhs == rhs) {
+      ScratchRegisterScope scratch(*this);
+      ma_orr(lhs.low, lhs.high, scratch);
+      branchTest32(cond, scratch, scratch, success);
+    } else if (cond == Assembler::Zero) {
+      branchTest32(Assembler::NonZero, lhs.low, rhs.low, fail);
+      branchTest32(Assembler::Zero, lhs.high, rhs.high, success);
+    } else {
+      branchTest32(Assembler::NonZero, lhs.low, rhs.low, success);
+      branchTest32(Assembler::NonZero, lhs.high, rhs.high, success);
+    }
   } else if (cond == Assembler::Signed || cond == Assembler::NotSigned) {
-    branchTest32(cond, lhs.high, rhs.high, label);
+    branchTest32(cond, lhs.high, rhs.high, success);
   } else {
     MOZ_CRASH("Unsupported condition");
+  }
+
+  if (fallthrough) {
+    bind(fail);
+  } else {
+    jump(fail);
+  }
+}
+
+void MacroAssembler::branchTest64(Condition cond, Register64 lhs, Imm64 rhs,
+                                  Label* success, Label* fail) {
+  bool fallthrough = false;
+  Label fallthroughLabel;
+
+  if (!fail) {
+    fail = &fallthroughLabel;
+    fallthrough = true;
+  }
+
+  if (cond == Assembler::Zero || cond == Assembler::NonZero) {
+    if (rhs.hi().value == 0) {
+      branchTest32(cond, lhs.low, rhs.low(), success);
+    } else if (rhs.low().value == 0) {
+      branchTest32(cond, lhs.high, rhs.hi(), success);
+    } else if (cond == Assembler::Zero) {
+      branchTest32(Assembler::NonZero, lhs.low, rhs.low(), fail);
+      branchTest32(Assembler::Zero, lhs.high, rhs.hi(), success);
+    } else {
+      branchTest32(Assembler::NonZero, lhs.low, rhs.low(), success);
+      branchTest32(Assembler::NonZero, lhs.high, rhs.hi(), success);
+    }
+  } else {
+    MOZ_CRASH("Unsupported condition");
+  }
+
+  if (fallthrough) {
+    bind(fail);
+  } else {
+    jump(fail);
   }
 }
 
@@ -2274,9 +2324,8 @@ void MacroAssembler::branchTestMagic(Condition cond, const BaseIndex& address,
   branchTestMagicImpl(cond, address, label);
 }
 
-template <class L>
 void MacroAssembler::branchTestMagic(Condition cond, const ValueOperand& value,
-                                     L label) {
+                                     Label* label) {
   branchTestMagicImpl(cond, value, label);
 }
 
@@ -2301,7 +2350,8 @@ void MacroAssembler::branchTestMagic(Condition cond, const Address& valaddr,
   bind(&notMagic);
 }
 
-void MacroAssembler::branchTestValue(Condition cond, const BaseIndex& lhs,
+template <typename T>
+void MacroAssembler::branchTestValue(Condition cond, const T& lhs,
                                      const ValueOperand& rhs, Label* label) {
   MOZ_ASSERT(cond == Assembler::Equal || cond == Assembler::NotEqual);
 
@@ -2395,6 +2445,11 @@ void MacroAssembler::cmp32Move32(Condition cond, Register lhs,
   cmp32Move32(cond, lhs, scratch, src, dest);
 }
 
+void MacroAssembler::cmpPtrMovePtr(Condition cond, Register lhs, Imm32 rhs,
+                                   Register src, Register dest) {
+  cmp32MovePtr(cond, lhs, rhs, src, dest);
+}
+
 void MacroAssembler::cmpPtrMovePtr(Condition cond, Register lhs, Register rhs,
                                    Register src, Register dest) {
   cmp32Move32(cond, lhs, rhs, src, dest);
@@ -2440,6 +2495,13 @@ void MacroAssembler::test32LoadPtr(Condition cond, const Address& addr,
   test32(addr, mask);
   ScratchRegisterScope scratch(*this);
   ma_ldr(src, dest, scratch, Offset, cond);
+}
+
+void MacroAssembler::test32MovePtr(Condition cond, Register operand, Imm32 mask,
+                                   Register src, Register dest) {
+  MOZ_ASSERT(cond == Assembler::Zero || cond == Assembler::NonZero);
+  test32(operand, mask);
+  ma_mov(src, dest, LeaveCC, cond);
 }
 
 void MacroAssembler::test32MovePtr(Condition cond, const Address& addr,
@@ -2501,14 +2563,14 @@ void MacroAssembler::spectreBoundsCheckPtr(Register index,
 
 // ========================================================================
 // Memory access primitives.
-FaultingCodeOffset MacroAssembler::storeUncanonicalizedDouble(
-    FloatRegister src, const Address& addr) {
+FaultingCodeOffset MacroAssembler::storeDouble(FloatRegister src,
+                                               const Address& addr) {
   ScratchRegisterScope scratch(*this);
   BufferOffset offset = ma_vstr(src, addr, scratch);
   return FaultingCodeOffset(offset.getOffset());
 }
-FaultingCodeOffset MacroAssembler::storeUncanonicalizedDouble(
-    FloatRegister src, const BaseIndex& addr) {
+FaultingCodeOffset MacroAssembler::storeDouble(FloatRegister src,
+                                               const BaseIndex& addr) {
   ScratchRegisterScope scratch(*this);
   SecondScratchRegisterScope scratch2(*this);
   uint32_t scale = Imm32::ShiftOf(addr.scale).value;
@@ -2517,14 +2579,14 @@ FaultingCodeOffset MacroAssembler::storeUncanonicalizedDouble(
   return FaultingCodeOffset(offset.getOffset());
 }
 
-FaultingCodeOffset MacroAssembler::storeUncanonicalizedFloat32(
-    FloatRegister src, const Address& addr) {
+FaultingCodeOffset MacroAssembler::storeFloat32(FloatRegister src,
+                                                const Address& addr) {
   ScratchRegisterScope scratch(*this);
   BufferOffset offset = ma_vstr(src.asSingle(), addr, scratch);
   return FaultingCodeOffset(offset.getOffset());
 }
-FaultingCodeOffset MacroAssembler::storeUncanonicalizedFloat32(
-    FloatRegister src, const BaseIndex& addr) {
+FaultingCodeOffset MacroAssembler::storeFloat32(FloatRegister src,
+                                                const BaseIndex& addr) {
   ScratchRegisterScope scratch(*this);
   SecondScratchRegisterScope scratch2(*this);
   uint32_t scale = Imm32::ShiftOf(addr.scale).value;
@@ -2533,15 +2595,32 @@ FaultingCodeOffset MacroAssembler::storeUncanonicalizedFloat32(
   return FaultingCodeOffset(offset.getOffset());
 }
 
-void MacroAssembler::memoryBarrier(MemoryBarrierBits barrier) {
+FaultingCodeOffset MacroAssembler::storeFloat16(FloatRegister src,
+                                                const Address& dest,
+                                                Register scratch) {
+  ma_vxfer(src, scratch);
+
+  // store16 uses |strh|, which supports unaligned access.
+  return store16(scratch, dest);
+}
+FaultingCodeOffset MacroAssembler::storeFloat16(FloatRegister src,
+                                                const BaseIndex& dest,
+                                                Register scratch) {
+  ma_vxfer(src, scratch);
+
+  // store16 uses |strh|, which supports unaligned access.
+  return store16(scratch, dest);
+}
+
+void MacroAssembler::memoryBarrier(MemoryBarrier barrier) {
   // On ARMv6 the optional argument (BarrierST, etc) is ignored.
-  if (barrier == (MembarStoreStore | MembarSynchronizing)) {
+  if (barrier.isSyncStoreStore()) {
     ma_dsb(BarrierST);
-  } else if (barrier & MembarSynchronizing) {
+  } else if (barrier.hasSync()) {
     ma_dsb();
-  } else if (barrier == MembarStoreStore) {
+  } else if (barrier.isStoreStore()) {
     ma_dmb(BarrierST);
-  } else if (barrier) {
+  } else if (!barrier.isNone()) {
     ma_dmb();
   }
 }
@@ -2601,6 +2680,102 @@ void MacroAssembler::fallibleUnboxPtr(const BaseIndex& src, Register dest,
 
 void MacroAssemblerARMCompat::incrementInt32Value(const Address& addr) {
   asMasm().add32(Imm32(1), ToPayload(addr));
+}
+
+template <typename T1, typename T2>
+void MacroAssemblerARMCompat::cmp64SetAliased(Condition cond, T1 lhs, T2 rhs,
+                                              Register dest) {
+  auto& masm = asMasm();
+
+  Label success, done;
+
+  masm.branch64(cond, lhs, rhs, &success);
+  masm.move32(Imm32(0), dest);
+  masm.jump(&done);
+  masm.bind(&success);
+  masm.move32(Imm32(1), dest);
+  masm.bind(&done);
+}
+
+template <typename T1, typename T2>
+void MacroAssemblerARMCompat::cmp64SetNonAliased(Condition cond, T1 lhs, T2 rhs,
+                                                 Register dest) {
+  auto& masm = asMasm();
+
+  Label done;
+
+  masm.move32(Imm32(1), dest);
+  masm.branch64(cond, lhs, rhs, &done);
+  masm.move32(Imm32(0), dest);
+  masm.bind(&done);
+}
+
+template <typename T1, typename T2>
+void MacroAssemblerARMCompat::branch64Impl(Condition cond, T1 lhs, T2 rhs,
+                                           Label* success, Label* fail) {
+  auto& masm = asMasm();
+
+  auto words = [](auto operand) {
+    using Operand = decltype(operand);
+    if constexpr (std::is_same_v<Operand, Imm64>) {
+      return std::pair{operand.hi(), operand.low()};
+    } else if constexpr (std::is_same_v<Operand, Register64>) {
+      return std::pair{operand.high, operand.low};
+    } else {
+      return std::pair{HighWord(operand), LowWord(operand)};
+    }
+  };
+
+  auto [lhsHigh, lhsLow] = words(lhs);
+  auto [rhsHigh, rhsLow] = words(rhs);
+
+  bool fallthrough = false;
+  Label fallthroughLabel;
+
+  if (!fail) {
+    fail = &fallthroughLabel;
+    fallthrough = true;
+  }
+
+  switch (cond) {
+    case Assembler::Equal:
+      masm.branch32(Assembler::NotEqual, lhsLow, rhsLow, fail);
+      masm.branch32(Assembler::Equal, lhsHigh, rhsHigh, success);
+      break;
+    case Assembler::NotEqual:
+      masm.branch32(Assembler::NotEqual, lhsLow, rhsLow, success);
+      masm.branch32(Assembler::NotEqual, lhsHigh, rhsHigh, success);
+      break;
+    case Assembler::LessThan:
+    case Assembler::LessThanOrEqual:
+    case Assembler::GreaterThan:
+    case Assembler::GreaterThanOrEqual:
+    case Assembler::Below:
+    case Assembler::BelowOrEqual:
+    case Assembler::Above:
+    case Assembler::AboveOrEqual: {
+      Assembler::Condition cond1 = Assembler::ConditionWithoutEqual(cond);
+      Assembler::Condition cond2 =
+          Assembler::ConditionWithoutEqual(Assembler::InvertCondition(cond));
+      Assembler::Condition cond3 = Assembler::UnsignedCondition(cond);
+
+      cmp32(lhsHigh, rhsHigh);
+      ma_b(success, cond1);
+      ma_b(fail, cond2);
+      cmp32(lhsLow, rhsLow);
+      ma_b(success, cond3);
+      break;
+    }
+    default:
+      MOZ_CRASH("Condition code not supported");
+      break;
+  }
+
+  if (fallthrough) {
+    bind(fail);
+  } else {
+    jump(fail);
+  }
 }
 
 }  // namespace jit

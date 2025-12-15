@@ -38,7 +38,9 @@ class WasmValueBox : public NativeObject {
 };
 
 const JSClass WasmValueBox::class_ = {
-    "WasmValueBox", JSCLASS_HAS_RESERVED_SLOTS(RESERVED_SLOTS)};
+    "WasmValueBox",
+    JSCLASS_HAS_RESERVED_SLOTS(RESERVED_SLOTS),
+};
 
 WasmValueBox* WasmValueBox::create(JSContext* cx, HandleValue value) {
   WasmValueBox* obj = NewObjectWithGivenProto<WasmValueBox>(cx, nullptr);

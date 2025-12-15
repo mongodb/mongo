@@ -29,3 +29,6 @@ UNIFIED_SOURCES = [
     "Script.cpp",
     "Source.cpp",
 ]
+
+if CONFIG["MOZ_EXECUTION_TRACING"]:
+    UNIFIED_SOURCES += ["ExecutionTracer.cpp"]

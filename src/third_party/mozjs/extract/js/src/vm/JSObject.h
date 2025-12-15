@@ -38,6 +38,7 @@ class RelocationOverlay;
 
 class GlobalObject;
 class NativeObject;
+class WithEnvironmentObject;
 
 enum class IntegrityLevel { Sealed, Frozen };
 
@@ -201,9 +202,6 @@ class JSObject
   bool isGenerationCountedGlobal() const {
     return hasFlag(js::ObjectFlag::GenerationCountedGlobal);
   }
-  static bool setGenerationCountedGlobal(JSContext* cx, JS::HandleObject obj) {
-    return setFlag(cx, obj, js::ObjectFlag::GenerationCountedGlobal);
-  }
 
   bool hasFuseProperty() const {
     return hasFlag(js::ObjectFlag::HasFuseProperty);
@@ -216,7 +214,7 @@ class JSObject
   // declarations (i.e., those defined with "var") are kept.
   //
   // Conceptually, when a var binding is defined, it is defined on the
-  // innermost qualified varobj on the scope chain.
+  // innermost qualified varobj on the environment chain.
   //
   // Function scopes (CallObjects) are qualified varobjs, and there can be
   // no other qualified varobj that is more inner for var bindings in that
@@ -233,13 +231,16 @@ class JSObject
   // (e.g., Gecko and XPConnect), as they often wish to run scripts under a
   // scope that captures var bindings.
   inline bool isQualifiedVarObj() const;
-  static bool setQualifiedVarObj(JSContext* cx, JS::HandleObject obj) {
-    return setFlag(cx, obj, js::ObjectFlag::QualifiedVarObj);
-  }
+
+  // Non-syntactic with-environment objects can be made qualified varobjs after
+  // construction. All other qualified varobjs are directly marked as such when
+  // allocating the object.
+  static inline bool setQualifiedVarObj(
+      JSContext* cx, JS::Handle<js::WithEnvironmentObject*> obj);
 
   // An "unqualified" varobj is the object on which "unqualified"
   // assignments (i.e., bareword assignments for which the LHS does not
-  // exist on the scope chain) are kept.
+  // exist on the environment chain) are kept.
   inline bool isUnqualifiedVarObj() const;
 
   // Once the "invalidated teleporting" flag is set for an object, it is never
@@ -267,6 +268,9 @@ class JSObject
                "(not dynamically-computed) prototypes");
     return setFlag(cx, obj, js::ObjectFlag::InvalidatedTeleporting);
   }
+
+  [[nodiscard]] static bool reshapeForTeleporting(JSContext* cx,
+                                                  JS::HandleObject obj);
 
   /*
    * Whether there may be "interesting symbol" properties on this object. An
@@ -306,6 +310,8 @@ class JSObject
                                                  JSObject* next) {
     js::gc::PostWriteBarrierImpl<JSObject>(cellp, prev, next);
   }
+
+  js::gc::AllocKind allocKind() const;
 
   /* Return the allocKind we would use if we were to tenure this object. */
   js::gc::AllocKind allocKindForTenure(const js::Nursery& nursery) const;
@@ -785,19 +791,6 @@ inline bool ToPrimitive(JSContext* cx, JSType preferredType,
 MOZ_ALWAYS_INLINE const char* GetObjectClassName(JSContext* cx,
                                                  HandleObject obj);
 
-/*
- * Prepare a |this| object to be returned to script. This includes replacing
- * Windows with their corresponding WindowProxy.
- *
- * Helpers are also provided to first extract the |this| from specific
- * types of environment.
- */
-JSObject* GetThisObject(JSObject* obj);
-
-JSObject* GetThisObjectOfLexical(JSObject* env);
-
-JSObject* GetThisObjectOfWith(JSObject* env);
-
 } /* namespace js */
 
 namespace js {
@@ -868,14 +861,14 @@ extern bool ReadPropertyDescriptors(
     JSContext* cx, HandleObject props, bool checkAccessors,
     MutableHandleIdVector ids, MutableHandle<PropertyDescriptorVector> descs);
 
-/* Read the name using a dynamic lookup on the scopeChain. */
+/* Read the name using a dynamic lookup on the envChain. */
 extern bool LookupName(JSContext* cx, Handle<PropertyName*> name,
-                       HandleObject scopeChain, MutableHandleObject objp,
+                       HandleObject envChain, MutableHandleObject objp,
                        MutableHandleObject pobjp, PropertyResult* propp);
 
 extern bool LookupNameNoGC(JSContext* cx, PropertyName* name,
-                           JSObject* scopeChain, JSObject** objp,
-                           NativeObject** pobjp, PropertyResult* propp);
+                           JSObject* envChain, NativeObject** pobjp,
+                           PropertyResult* propp);
 
 /*
  * Like LookupName except returns the global object if 'name' is not found in
@@ -884,22 +877,21 @@ extern bool LookupNameNoGC(JSContext* cx, PropertyName* name,
  * Additionally, pobjp and propp are not needed by callers so they are not
  * returned.
  */
-extern bool LookupNameWithGlobalDefault(JSContext* cx,
-                                        Handle<PropertyName*> name,
-                                        HandleObject scopeChain,
-                                        MutableHandleObject objp);
+extern JSObject* LookupNameWithGlobalDefault(JSContext* cx,
+                                             Handle<PropertyName*> name,
+                                             HandleObject envChain);
 
 /*
  * Like LookupName except returns the unqualified var object if 'name' is not
  * found in any preceding scope. Normally the unqualified var object is the
- * global. If the value for the name in the looked-up scope is an
- * uninitialized lexical, an UninitializedLexicalObject is returned.
+ * global. If the value for the name in the looked-up scope is an uninitialized
+ * lexical, a RuntimeLexicalErrorObject is returned.
  *
  * Additionally, pobjp is not needed by callers so it is not returned.
  */
-extern bool LookupNameUnqualified(JSContext* cx, Handle<PropertyName*> name,
-                                  HandleObject scopeChain,
-                                  MutableHandleObject objp);
+extern JSObject* LookupNameUnqualified(JSContext* cx,
+                                       Handle<PropertyName*> name,
+                                       HandleObject envChain);
 
 }  // namespace js
 
@@ -925,14 +917,6 @@ bool GetOwnPropertyPure(JSContext* cx, JSObject* obj, jsid id, Value* vp,
                         bool* found);
 
 bool GetGetterPure(JSContext* cx, JSObject* obj, jsid id, JSFunction** fp);
-
-bool GetOwnGetterPure(JSContext* cx, JSObject* obj, jsid id, JSFunction** fp);
-
-bool GetOwnNativeGetterPure(JSContext* cx, JSObject* obj, jsid id,
-                            JSNative* native);
-
-bool HasOwnDataPropertyPure(JSContext* cx, JSObject* obj, jsid id,
-                            bool* result);
 
 /*
  * Like JS::FromPropertyDescriptor, but ignore desc.object() and always set vp
@@ -1088,7 +1072,7 @@ extern bool TestIntegrityLevel(JSContext* cx, HandleObject obj,
     JSContext* cx, HandleObject obj, JSProtoKey ctorKey,
     bool (*isDefaultSpecies)(JSContext*, JSFunction*));
 
-extern bool GetObjectFromIncumbentGlobal(JSContext* cx,
+extern bool GetObjectFromHostDefinedData(JSContext* cx,
                                          MutableHandleObject obj);
 
 #ifdef DEBUG

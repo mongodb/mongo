@@ -35,31 +35,48 @@ void MacroAssembler::clampDoubleToUint8(FloatRegister input, Register output) {
 
   bind(&positive);
 
-  // Add 0.5 and truncate.
-  loadConstantDouble(0.5, scratch);
-  addDouble(scratch, input);
+  if (HasRoundInstruction(RoundingMode::NearestTiesToEven)) {
+    // Round input to nearest integer.
+    nearbyIntDouble(RoundingMode::NearestTiesToEven, input, input);
 
-  Label outOfRange;
+    // Truncate to int32 and ensure the result <= 255. This relies on the
+    // processor setting output to a value > 255 for doubles outside the int32
+    // range (for instance 0x80000000).
+    vcvttsd2si(input, output);
+    branch32(Assembler::BelowOrEqual, output, Imm32(255), &done);
+    move32(Imm32(255), output);
+  } else {
+    Label outOfRange;
 
-  // Truncate to int32 and ensure the result <= 255. This relies on the
-  // processor setting output to a value > 255 for doubles outside the int32
-  // range (for instance 0x80000000).
-  vcvttsd2si(input, output);
-  branch32(Assembler::Above, output, Imm32(255), &outOfRange);
-  {
-    // Check if we had a tie.
-    convertInt32ToDouble(output, scratch);
-    branchDouble(DoubleNotEqual, input, scratch, &done);
+    // Truncate to int32 and ensure the result <= 255. This relies on the
+    // processor setting output to a value > 255 for doubles outside the int32
+    // range (for instance 0x80000000).
+    vcvttsd2si(input, output);
+    branch32(Assembler::AboveOrEqual, output, Imm32(255), &outOfRange);
+    {
+      // Check if we had a tie.
+      convertInt32ToDouble(output, scratch);
+      subDouble(scratch, input);
 
-    // It was a tie. Mask out the ones bit to get an even value.
-    // See also js_TypedArray_uint8_clamp_double.
-    and32(Imm32(~1), output);
-    jump(&done);
+      loadConstantDouble(0.5, scratch);
+
+      Label roundUp;
+      vucomisd(scratch, input);
+      j(Above, &roundUp);
+      j(NotEqual, &done);
+
+      // It was a tie. Round up if the output is odd.
+      branchTest32(Zero, output, Imm32(1), &done);
+
+      bind(&roundUp);
+      add32(Imm32(1), output);
+      jump(&done);
+    }
+
+    // > 255 --> 255
+    bind(&outOfRange);
+    move32(Imm32(255), output);
   }
-
-  // > 255 --> 255
-  bind(&outOfRange);
-  { move32(Imm32(255), output); }
 
   bind(&done);
 }
@@ -713,6 +730,10 @@ void MacroAssembler::patchFarJump(CodeOffset farJump, uint32_t targetOffset) {
   Assembler::patchFarJump(farJump, targetOffset);
 }
 
+void MacroAssembler::patchFarJump(uint8_t* farJump, uint8_t* target) {
+  Assembler::patchFarJump(farJump, target);
+}
+
 CodeOffset MacroAssembler::nopPatchableToCall() {
   masm.nop_five();
   return CodeOffset(currentOffset());
@@ -724,6 +745,15 @@ void MacroAssembler::patchNopToCall(uint8_t* callsite, uint8_t* target) {
 
 void MacroAssembler::patchCallToNop(uint8_t* callsite) {
   Assembler::patchCallToFiveByteNop(callsite);
+}
+
+CodeOffset MacroAssembler::move32WithPatch(Register dest) {
+  movl(Imm32(-1), dest);
+  return CodeOffset(currentOffset());
+}
+
+void MacroAssembler::patchMove32(CodeOffset offset, Imm32 n) {
+  X86Encoding::SetInt32(masm.data() + offset.offset(), n.value);
 }
 
 // ===============================================================
@@ -772,20 +802,20 @@ struct MOZ_RAII AutoHandleWasmTruncateToIntErrors {
   MacroAssembler& masm;
   Label inputIsNaN;
   Label intOverflow;
-  wasm::BytecodeOffset off;
+  const wasm::TrapSiteDesc& trapSiteDesc;
 
-  explicit AutoHandleWasmTruncateToIntErrors(MacroAssembler& masm,
-                                             wasm::BytecodeOffset off)
-      : masm(masm), off(off) {}
+  explicit AutoHandleWasmTruncateToIntErrors(
+      MacroAssembler& masm, const wasm::TrapSiteDesc& trapSiteDesc)
+      : masm(masm), trapSiteDesc(trapSiteDesc) {}
 
   ~AutoHandleWasmTruncateToIntErrors() {
     // Handle errors.  These cases are not in arbitrary order: code will
     // fall through to intOverflow.
     masm.bind(&intOverflow);
-    masm.wasmTrap(wasm::Trap::IntegerOverflow, off);
+    masm.wasmTrap(wasm::Trap::IntegerOverflow, trapSiteDesc);
 
     masm.bind(&inputIsNaN);
-    masm.wasmTrap(wasm::Trap::InvalidConversionToInteger, off);
+    masm.wasmTrap(wasm::Trap::InvalidConversionToInteger, trapSiteDesc);
   }
 };
 
@@ -807,11 +837,9 @@ void MacroAssembler::wasmTruncateFloat32ToInt32(FloatRegister input,
   j(Assembler::Overflow, oolEntry);
 }
 
-void MacroAssembler::oolWasmTruncateCheckF64ToI32(FloatRegister input,
-                                                  Register output,
-                                                  TruncFlags flags,
-                                                  wasm::BytecodeOffset off,
-                                                  Label* rejoin) {
+void MacroAssembler::oolWasmTruncateCheckF64ToI32(
+    FloatRegister input, Register output, TruncFlags flags,
+    const wasm::TrapSiteDesc& trapSiteDesc, Label* rejoin) {
   bool isUnsigned = flags & TRUNC_UNSIGNED;
   bool isSaturating = flags & TRUNC_SATURATING;
 
@@ -848,7 +876,7 @@ void MacroAssembler::oolWasmTruncateCheckF64ToI32(FloatRegister input,
     return;
   }
 
-  AutoHandleWasmTruncateToIntErrors traps(*this, off);
+  AutoHandleWasmTruncateToIntErrors traps(*this, trapSiteDesc);
 
   // Eagerly take care of NaNs.
   branchDouble(Assembler::DoubleUnordered, input, input, &traps.inputIsNaN);
@@ -873,11 +901,9 @@ void MacroAssembler::oolWasmTruncateCheckF64ToI32(FloatRegister input,
   jump(rejoin);
 }
 
-void MacroAssembler::oolWasmTruncateCheckF32ToI32(FloatRegister input,
-                                                  Register output,
-                                                  TruncFlags flags,
-                                                  wasm::BytecodeOffset off,
-                                                  Label* rejoin) {
+void MacroAssembler::oolWasmTruncateCheckF32ToI32(
+    FloatRegister input, Register output, TruncFlags flags,
+    const wasm::TrapSiteDesc& trapSiteDesc, Label* rejoin) {
   bool isUnsigned = flags & TRUNC_UNSIGNED;
   bool isSaturating = flags & TRUNC_SATURATING;
 
@@ -914,7 +940,7 @@ void MacroAssembler::oolWasmTruncateCheckF32ToI32(FloatRegister input,
     return;
   }
 
-  AutoHandleWasmTruncateToIntErrors traps(*this, off);
+  AutoHandleWasmTruncateToIntErrors traps(*this, trapSiteDesc);
 
   // Eagerly take care of NaNs.
   branchFloat(Assembler::DoubleUnordered, input, input, &traps.inputIsNaN);
@@ -935,11 +961,9 @@ void MacroAssembler::oolWasmTruncateCheckF32ToI32(FloatRegister input,
   jump(rejoin);
 }
 
-void MacroAssembler::oolWasmTruncateCheckF64ToI64(FloatRegister input,
-                                                  Register64 output,
-                                                  TruncFlags flags,
-                                                  wasm::BytecodeOffset off,
-                                                  Label* rejoin) {
+void MacroAssembler::oolWasmTruncateCheckF64ToI64(
+    FloatRegister input, Register64 output, TruncFlags flags,
+    const wasm::TrapSiteDesc& trapSiteDesc, Label* rejoin) {
   bool isUnsigned = flags & TRUNC_UNSIGNED;
   bool isSaturating = flags & TRUNC_SATURATING;
 
@@ -975,7 +999,7 @@ void MacroAssembler::oolWasmTruncateCheckF64ToI64(FloatRegister input,
     return;
   }
 
-  AutoHandleWasmTruncateToIntErrors traps(*this, off);
+  AutoHandleWasmTruncateToIntErrors traps(*this, trapSiteDesc);
 
   // Eagerly take care of NaNs.
   branchDouble(Assembler::DoubleUnordered, input, input, &traps.inputIsNaN);
@@ -1002,11 +1026,9 @@ void MacroAssembler::oolWasmTruncateCheckF64ToI64(FloatRegister input,
   jump(rejoin);
 }
 
-void MacroAssembler::oolWasmTruncateCheckF32ToI64(FloatRegister input,
-                                                  Register64 output,
-                                                  TruncFlags flags,
-                                                  wasm::BytecodeOffset off,
-                                                  Label* rejoin) {
+void MacroAssembler::oolWasmTruncateCheckF32ToI64(
+    FloatRegister input, Register64 output, TruncFlags flags,
+    const wasm::TrapSiteDesc& trapSiteDesc, Label* rejoin) {
   bool isUnsigned = flags & TRUNC_UNSIGNED;
   bool isSaturating = flags & TRUNC_SATURATING;
 
@@ -1042,7 +1064,7 @@ void MacroAssembler::oolWasmTruncateCheckF32ToI64(FloatRegister input,
     return;
   }
 
-  AutoHandleWasmTruncateToIntErrors traps(*this, off);
+  AutoHandleWasmTruncateToIntErrors traps(*this, trapSiteDesc);
 
   // Eagerly take care of NaNs.
   branchFloat(Assembler::DoubleUnordered, input, input, &traps.inputIsNaN);
@@ -1072,40 +1094,65 @@ void MacroAssembler::enterFakeExitFrameForWasm(Register cxreg, Register scratch,
   enterFakeExitFrame(cxreg, scratch, type);
 }
 
+CodeOffset MacroAssembler::sub32FromMemAndBranchIfNegativeWithPatch(
+    Address address, Label* label) {
+  // -128 is arbitrary, but makes `*address` count upwards, which may help
+  // to identify cases where the subsequent ::patch..() call was forgotten.
+  int numImmBytes = subl(Imm32(-128), Operand(address));
+  // This is vitally important for patching
+  MOZ_RELEASE_ASSERT(numImmBytes == 1);
+  // Points immediately after the location to patch
+  CodeOffset patchPoint = CodeOffset(currentOffset());
+  jSrc(Condition::Signed, label);
+  return patchPoint;
+}
+
+void MacroAssembler::patchSub32FromMemAndBranchIfNegative(CodeOffset offset,
+                                                          Imm32 imm) {
+  int32_t val = imm.value;
+  // Patching it to zero would make the insn pointless
+  MOZ_RELEASE_ASSERT(val >= 1 && val <= 127);
+  uint8_t* ptr = (uint8_t*)masm.data() + offset.offset() - 1;
+  MOZ_RELEASE_ASSERT(*ptr == uint8_t(-128));  // as created above
+  *ptr = uint8_t(val) & 0x7F;
+}
+
 // ========================================================================
 // Primitive atomic operations.
 
 static void ExtendTo32(MacroAssembler& masm, Scalar::Type type, Register r) {
-  switch (Scalar::byteSize(type)) {
-    case 1:
-      if (Scalar::isSignedIntType(type)) {
-        masm.movsbl(r, r);
-      } else {
-        masm.movzbl(r, r);
-      }
+  switch (type) {
+    case Scalar::Int8:
+      masm.movsbl(r, r);
       break;
-    case 2:
-      if (Scalar::isSignedIntType(type)) {
-        masm.movswl(r, r);
-      } else {
-        masm.movzwl(r, r);
-      }
+    case Scalar::Uint8:
+      masm.movzbl(r, r);
+      break;
+    case Scalar::Int16:
+      masm.movswl(r, r);
+      break;
+    case Scalar::Uint16:
+      masm.movzwl(r, r);
+      break;
+    case Scalar::Int32:
+    case Scalar::Uint32:
       break;
     default:
-      break;
+      MOZ_CRASH("unexpected type");
   }
 }
 
-static inline void CheckBytereg(Register r) {
 #ifdef DEBUG
+static inline bool IsByteReg(Register r) {
   AllocatableGeneralRegisterSet byteRegs(Registers::SingleByteRegs);
-  MOZ_ASSERT(byteRegs.has(r));
-#endif
+  return byteRegs.has(r);
 }
 
-static inline void CheckBytereg(Imm32 r) {
+static inline bool IsByteReg(Imm32 r) {
   // Nothing
+  return true;
 }
+#endif
 
 template <typename T>
 static void CompareExchange(MacroAssembler& masm,
@@ -1127,7 +1174,7 @@ static void CompareExchange(MacroAssembler& masm,
   // GenerateAtomicOperations.py
   switch (Scalar::byteSize(type)) {
     case 1:
-      CheckBytereg(newval);
+      MOZ_ASSERT(IsByteReg(newval));
       masm.lock_cmpxchgb(newval, Operand(mem));
       break;
     case 2:
@@ -1186,7 +1233,7 @@ static void AtomicExchange(MacroAssembler& masm,
 
   switch (Scalar::byteSize(type)) {
     case 1:
-      CheckBytereg(output);
+      MOZ_ASSERT(IsByteReg(output));
       masm.xchgb(output, Operand(mem));
       break;
     case 2:
@@ -1244,6 +1291,34 @@ static void SetupValue(MacroAssembler& masm, AtomicOp op, Register src,
   }
 }
 
+static auto WasmTrapMachineInsn(Scalar::Type arrayType, AtomicOp op) {
+  switch (op) {
+    case AtomicOp::Add:
+    case AtomicOp::Sub:
+      return wasm::TrapMachineInsn::Atomic;
+    case AtomicOp::And:
+    case AtomicOp::Or:
+    case AtomicOp::Xor:
+      switch (arrayType) {
+        case Scalar::Int8:
+        case Scalar::Uint8:
+          return wasm::TrapMachineInsn::Load8;
+        case Scalar::Int16:
+        case Scalar::Uint16:
+          return wasm::TrapMachineInsn::Load16;
+        case Scalar::Int32:
+        case Scalar::Uint32:
+          return wasm::TrapMachineInsn::Load32;
+        default:
+          break;
+      }
+      [[fallthrough]];
+    default:
+      break;
+  }
+  MOZ_CRASH();
+}
+
 template <typename T, typename V>
 static void AtomicFetchOp(MacroAssembler& masm,
                           const wasm::MemoryAccessDesc* access,
@@ -1253,117 +1328,150 @@ static void AtomicFetchOp(MacroAssembler& masm,
 
   // NOTE: the generated code must match the assembly code in gen_fetchop in
   // GenerateAtomicOperations.py
-#define ATOMIC_BITOP_BODY(LOAD, LOAD_DESCR, OP, LOCK_CMPXCHG) \
-  do {                                                        \
-    MOZ_ASSERT(output != temp);                               \
-    MOZ_ASSERT(output == eax);                                \
-    if (access)                                               \
-      masm.append(*access, LOAD_DESCR,                        \
-                  FaultingCodeOffset(masm.currentOffset()));  \
-    masm.LOAD(Operand(mem), eax);                             \
-    Label again;                                              \
-    masm.bind(&again);                                        \
-    masm.movl(eax, temp);                                     \
-    masm.OP(value, temp);                                     \
-    masm.LOCK_CMPXCHG(temp, Operand(mem));                    \
-    masm.j(MacroAssembler::NonZero, &again);                  \
-  } while (0)
 
-  MOZ_ASSERT_IF(op == AtomicOp::Add || op == AtomicOp::Sub, temp == InvalidReg);
+  // Setup the output register.
+  switch (op) {
+    case AtomicOp::Add:
+    case AtomicOp::Sub:
+      MOZ_ASSERT(temp == InvalidReg);
+      MOZ_ASSERT_IF(Scalar::byteSize(arrayType) == 1,
+                    IsByteReg(output) && IsByteReg(value));
 
-  switch (Scalar::byteSize(arrayType)) {
-    case 1:
-      CheckBytereg(output);
-      switch (op) {
-        case AtomicOp::Add:
-        case AtomicOp::Sub:
-          CheckBytereg(value);  // But not for the bitwise ops
-          SetupValue(masm, op, value, output);
-          if (access) {
-            masm.append(*access, wasm::TrapMachineInsn::Atomic,
-                        FaultingCodeOffset(masm.currentOffset()));
-          }
-          masm.lock_xaddb(output, Operand(mem));
-          break;
-        case AtomicOp::And:
-          CheckBytereg(temp);
-          ATOMIC_BITOP_BODY(movb, wasm::TrapMachineInsn::Load8, andl,
-                            lock_cmpxchgb);
-          break;
-        case AtomicOp::Or:
-          CheckBytereg(temp);
-          ATOMIC_BITOP_BODY(movb, wasm::TrapMachineInsn::Load8, orl,
-                            lock_cmpxchgb);
-          break;
-        case AtomicOp::Xor:
-          CheckBytereg(temp);
-          ATOMIC_BITOP_BODY(movb, wasm::TrapMachineInsn::Load8, xorl,
-                            lock_cmpxchgb);
-          break;
-        default:
-          MOZ_CRASH();
-      }
+      SetupValue(masm, op, value, output);
       break;
-    case 2:
-      switch (op) {
-        case AtomicOp::Add:
-        case AtomicOp::Sub:
-          SetupValue(masm, op, value, output);
-          if (access) {
-            masm.append(*access, wasm::TrapMachineInsn::Atomic,
-                        FaultingCodeOffset(masm.currentOffset()));
-          }
-          masm.lock_xaddw(output, Operand(mem));
-          break;
-        case AtomicOp::And:
-          ATOMIC_BITOP_BODY(movw, wasm::TrapMachineInsn::Load16, andl,
-                            lock_cmpxchgw);
-          break;
-        case AtomicOp::Or:
-          ATOMIC_BITOP_BODY(movw, wasm::TrapMachineInsn::Load16, orl,
-                            lock_cmpxchgw);
-          break;
-        case AtomicOp::Xor:
-          ATOMIC_BITOP_BODY(movw, wasm::TrapMachineInsn::Load16, xorl,
-                            lock_cmpxchgw);
-          break;
-        default:
-          MOZ_CRASH();
-      }
-      break;
-    case 4:
-      switch (op) {
-        case AtomicOp::Add:
-        case AtomicOp::Sub:
-          SetupValue(masm, op, value, output);
-          if (access) {
-            masm.append(*access, wasm::TrapMachineInsn::Atomic,
-                        FaultingCodeOffset(masm.currentOffset()));
-          }
-          masm.lock_xaddl(output, Operand(mem));
-          break;
-        case AtomicOp::And:
-          ATOMIC_BITOP_BODY(movl, wasm::TrapMachineInsn::Load32, andl,
-                            lock_cmpxchgl);
-          break;
-        case AtomicOp::Or:
-          ATOMIC_BITOP_BODY(movl, wasm::TrapMachineInsn::Load32, orl,
-                            lock_cmpxchgl);
-          break;
-        case AtomicOp::Xor:
-          ATOMIC_BITOP_BODY(movl, wasm::TrapMachineInsn::Load32, xorl,
-                            lock_cmpxchgl);
-          break;
-        default:
-          MOZ_CRASH();
-      }
+    case AtomicOp::And:
+    case AtomicOp::Or:
+    case AtomicOp::Xor:
+      MOZ_ASSERT(output != temp && output == eax);
+      MOZ_ASSERT_IF(Scalar::byteSize(arrayType) == 1,
+                    IsByteReg(output) && IsByteReg(temp));
+
+      // Bitwise operations don't require any additional setup.
       break;
     default:
-      MOZ_CRASH("Invalid size");
+      MOZ_CRASH();
   }
-  ExtendTo32(masm, arrayType, output);
 
-#undef ATOMIC_BITOP_BODY
+  auto lock_xadd = [&]() {
+    switch (arrayType) {
+      case Scalar::Int8:
+      case Scalar::Uint8:
+        masm.lock_xaddb(output, Operand(mem));
+        break;
+      case Scalar::Int16:
+      case Scalar::Uint16:
+        masm.lock_xaddw(output, Operand(mem));
+        break;
+      case Scalar::Int32:
+      case Scalar::Uint32:
+        masm.lock_xaddl(output, Operand(mem));
+        break;
+      default:
+        MOZ_CRASH();
+    }
+  };
+
+  auto load = [&]() {
+    switch (arrayType) {
+      case Scalar::Int8:
+      case Scalar::Uint8:
+        masm.movzbl(Operand(mem), eax);
+        break;
+      case Scalar::Int16:
+      case Scalar::Uint16:
+        masm.movzwl(Operand(mem), eax);
+        break;
+      case Scalar::Int32:
+      case Scalar::Uint32:
+        masm.movl(Operand(mem), eax);
+        break;
+      default:
+        MOZ_CRASH();
+    }
+  };
+
+  auto bitwiseOp = [&]() {
+    switch (op) {
+      case AtomicOp::And:
+        masm.andl(value, temp);
+        break;
+      case AtomicOp::Or:
+        masm.orl(value, temp);
+        break;
+      case AtomicOp::Xor:
+        masm.xorl(value, temp);
+        break;
+      default:
+        MOZ_CRASH();
+    }
+  };
+
+  auto lock_cmpxchg = [&]() {
+    switch (arrayType) {
+      case Scalar::Int8:
+      case Scalar::Uint8:
+        masm.lock_cmpxchgb(temp, Operand(mem));
+        break;
+      case Scalar::Int16:
+      case Scalar::Uint16:
+        masm.lock_cmpxchgw(temp, Operand(mem));
+        break;
+      case Scalar::Int32:
+      case Scalar::Uint32:
+        masm.lock_cmpxchgl(temp, Operand(mem));
+        break;
+      default:
+        MOZ_CRASH();
+    }
+  };
+
+  // Add trap instruction directly before the load.
+  if (access) {
+    masm.append(*access, WasmTrapMachineInsn(arrayType, op),
+                FaultingCodeOffset(masm.currentOffset()));
+  }
+
+  switch (op) {
+    case AtomicOp::Add:
+    case AtomicOp::Sub:
+      // `add` and `sub` operations can be optimized with XADD.
+      lock_xadd();
+
+      ExtendTo32(masm, arrayType, output);
+      break;
+
+    case AtomicOp::And:
+    case AtomicOp::Or:
+    case AtomicOp::Xor: {
+      // Bitwise operations need a CAS loop.
+
+      // Load memory into eax.
+      load();
+
+      // Loop.
+      Label again;
+      masm.bind(&again);
+      masm.movl(eax, temp);
+
+      // temp = temp <op> value.
+      bitwiseOp();
+
+      // Compare and swap `temp` with memory.
+      lock_cmpxchg();
+
+      // Repeat if the comparison failed.
+      masm.j(MacroAssembler::NonZero, &again);
+
+      // Sign-extend the zero-extended load.
+      if (Scalar::isSignedIntType(arrayType)) {
+        ExtendTo32(masm, arrayType, eax);
+      }
+      break;
+    }
+
+    default:
+      MOZ_CRASH();
+  }
 }
 
 void MacroAssembler::atomicFetchOp(Scalar::Type arrayType, Synchronization,
@@ -1672,6 +1780,8 @@ void MacroAssembler::atomicFetchOpJS(Scalar::Type arrayType,
   AtomicFetchOpJS(*this, arrayType, sync, op, value, mem, temp1, temp2, output);
 }
 
+void MacroAssembler::atomicPause() { masm.pause(); }
+
 // ========================================================================
 // Spectre Mitigations.
 
@@ -1718,7 +1828,10 @@ void MacroAssembler::floorFloat32ToInt32(FloatRegister src, Register dest,
     {
       // Truncate and round toward zero.
       // This is off-by-one for everything but integer-valued inputs.
-      truncateFloat32ToInt32(src, dest, fail);
+      //
+      // Directly call vcvttss2si instead of truncateFloat32ToInt32 because we
+      // want to perform failure handling ourselves.
+      vcvttss2si(src, dest);
 
       // Test whether the input double was integer-valued.
       {
@@ -1729,8 +1842,9 @@ void MacroAssembler::floorFloat32ToInt32(FloatRegister src, Register dest,
 
       // Input is not integer-valued, so we rounded off-by-one in the
       // wrong direction. Correct by subtraction.
-      subl(Imm32(1), dest);
-      // Cannot overflow: output was already checked against INT_MIN.
+      //
+      // Overflows if vcvttss2si returned the failure return value INT_MIN.
+      branchSub32(Assembler::Overflow, Imm32(1), dest, fail);
     }
 
     bind(&end);
@@ -1773,7 +1887,10 @@ void MacroAssembler::floorDoubleToInt32(FloatRegister src, Register dest,
     {
       // Truncate and round toward zero.
       // This is off-by-one for everything but integer-valued inputs.
-      truncateDoubleToInt32(src, dest, fail);
+      //
+      // Directly call vcvttsd2si instead of truncateDoubleToInt32 because we
+      // want to perform failure handling ourselves.
+      vcvttsd2si(src, dest);
 
       // Test whether the input double was integer-valued.
       {
@@ -1784,8 +1901,9 @@ void MacroAssembler::floorDoubleToInt32(FloatRegister src, Register dest,
 
       // Input is not integer-valued, so we rounded off-by-one in the
       // wrong direction. Correct by subtraction.
-      subl(Imm32(1), dest);
-      // Cannot overflow: output was already checked against INT_MIN.
+      //
+      // Overflows if vcvttsd2si returned the failure return value INT_MIN.
+      branchSub32(Assembler::Overflow, Imm32(1), dest, fail);
     }
 
     bind(&end);
@@ -1983,7 +2101,10 @@ void MacroAssembler::roundFloat32ToInt32(FloatRegister src, Register dest,
 
       // Truncate and round toward zero.
       // This is off-by-one for everything but integer-valued inputs.
-      truncateFloat32ToInt32(temp, dest, fail);
+      //
+      // Directly call vcvttss2si instead of truncateFloat32ToInt32 because we
+      // want to perform failure handling ourselves.
+      vcvttss2si(temp, dest);
 
       // Test whether the truncated float was integer-valued.
       convertInt32ToFloat32(dest, scratch);
@@ -1991,8 +2112,9 @@ void MacroAssembler::roundFloat32ToInt32(FloatRegister src, Register dest,
 
       // Input is not integer-valued, so we rounded off-by-one in the
       // wrong direction. Correct by subtraction.
-      subl(Imm32(1), dest);
-      // Cannot overflow: output was already checked against INT_MIN.
+      //
+      // Overflows if vcvttss2si returned the failure return value INT_MIN.
+      branchSub32(Assembler::Overflow, Imm32(1), dest, fail);
     }
   }
 
@@ -2058,7 +2180,10 @@ void MacroAssembler::roundDoubleToInt32(FloatRegister src, Register dest,
 
       // Truncate and round toward zero.
       // This is off-by-one for everything but integer-valued inputs.
-      truncateDoubleToInt32(temp, dest, fail);
+      //
+      // Directly call vcvttsd2si instead of truncateDoubleToInt32 because we
+      // want to perform failure handling ourselves.
+      vcvttsd2si(temp, dest);
 
       // Test whether the truncated double was integer-valued.
       convertInt32ToDouble(dest, scratch);
@@ -2066,8 +2191,9 @@ void MacroAssembler::roundDoubleToInt32(FloatRegister src, Register dest,
 
       // Input is not integer-valued, so we rounded off-by-one in the
       // wrong direction. Correct by subtraction.
-      subl(Imm32(1), dest);
-      // Cannot overflow: output was already checked against INT_MIN.
+      //
+      // Overflows if vcvttsd2si returned the failure return value INT_MIN.
+      branchSub32(Assembler::Overflow, Imm32(1), dest, fail);
     }
   }
 
@@ -2151,13 +2277,11 @@ void MacroAssembler::shiftIndex32AndAdd(Register indexTemp32, int shift,
   addPtr(indexTemp32, pointer);
 }
 
-#ifdef ENABLE_WASM_TAIL_CALLS
 CodeOffset MacroAssembler::wasmMarkedSlowCall(const wasm::CallSiteDesc& desc,
                                               const Register reg) {
   CodeOffset offset = call(desc, reg);
   wasmMarkCallAsSlow();
   return offset;
 }
-#endif  // ENABLE_WASM_TAIL_CALLS
 
 //}}} check_macroassembler_style

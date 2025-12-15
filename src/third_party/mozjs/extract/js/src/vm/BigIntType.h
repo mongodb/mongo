@@ -8,6 +8,7 @@
 #define vm_BigIntType_h
 
 #include "mozilla/Assertions.h"
+#include "mozilla/Maybe.h"
 #include "mozilla/OperatorNewExtensions.h"
 #include "mozilla/Range.h"
 #include "mozilla/Span.h"
@@ -129,9 +130,13 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
                                      bool isNegative,
                                      js::gc::Heap heap = js::gc::Heap::Default);
   static BigInt* createFromDouble(JSContext* cx, double d);
-  static BigInt* createFromUint64(JSContext* cx, uint64_t n);
-  static BigInt* createFromInt64(JSContext* cx, int64_t n);
-  static BigInt* createFromDigit(JSContext* cx, Digit d, bool isNegative);
+  static BigInt* createFromUint64(JSContext* cx, uint64_t n,
+                                  js::gc::Heap heap = js::gc::Heap::Default);
+  static BigInt* createFromInt64(JSContext* cx, int64_t n,
+                                 js::gc::Heap heap = js::gc::Heap::Default);
+  static BigInt* createFromIntPtr(JSContext* cx, intptr_t n);
+  static BigInt* createFromDigit(JSContext* cx, Digit d, bool isNegative,
+                                 js::gc::Heap heap = js::gc::Heap::Default);
   static BigInt* createFromNonZeroRawUint64(JSContext* cx, uint64_t n,
                                             bool isNegative);
   // FIXME: Cache these values.
@@ -161,8 +166,15 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
                      MutableHandle<BigInt*> quotient,
                      MutableHandle<BigInt*> remainder);
 
+  static bool powIntPtr(intptr_t x, intptr_t y, intptr_t* result);
+
   static int64_t toInt64(const BigInt* x);
   static uint64_t toUint64(const BigInt* x);
+
+  // Return true if the BigInt is without loss of precision representable as an
+  // int32 and store the int32 value in the output. Otherwise return false and
+  // leave the value of the output parameter unspecified.
+  static bool isInt32(const BigInt* x, int32_t* result);
 
   // Return true if the BigInt is without loss of precision representable as an
   // int64 and store the int64 value in the output. Otherwise return false and
@@ -173,6 +185,11 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
   // uint64 and store the uint64 value in the output. Otherwise return false and
   // leave the value of the output parameter unspecified.
   static bool isUint64(const BigInt* x, uint64_t* result);
+
+  // Return true if the BigInt is without loss of precision representable as an
+  // intptr_t and store the intptr_t value in the output. Otherwise return false
+  // and leave the value of the output parameter unspecified.
+  static bool isIntPtr(const BigInt* x, intptr_t* result);
 
   // Return true if the BigInt is without loss of precision representable as a
   // JS Number (double) and store the double value in the output. Otherwise
@@ -223,19 +240,15 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
   static JSLinearString* toString(JSContext* cx, Handle<BigInt*> x,
                                   uint8_t radix);
   template <typename CharT>
-  static BigInt* parseLiteral(JSContext* cx,
-                              const mozilla::Range<const CharT> chars,
+  static BigInt* parseLiteral(JSContext* cx, mozilla::Range<const CharT> chars,
                               bool* haveParseError,
                               js::gc::Heap heap = js::gc::Heap::Default);
   template <typename CharT>
   static BigInt* parseLiteralDigits(JSContext* cx,
-                                    const mozilla::Range<const CharT> chars,
+                                    mozilla::Range<const CharT> chars,
                                     unsigned radix, bool isNegative,
                                     bool* haveParseError,
                                     js::gc::Heap heap = js::gc::Heap::Default);
-
-  template <typename CharT>
-  static bool literalIsZero(const mozilla::Range<const CharT> chars);
 
   static int8_t compare(const BigInt* lhs, const BigInt* rhs);
   static bool equal(const BigInt* lhs, const BigInt* rhs);
@@ -414,8 +427,8 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
   static JSLinearString* toStringBasePowerOfTwo(JSContext* cx, Handle<BigInt*>,
                                                 unsigned radix);
   template <js::AllowGC allowGC>
-  static JSLinearString* toStringSingleDigitBaseTen(JSContext* cx, Digit digit,
-                                                    bool isNegative);
+  static JSLinearString* toStringSingleDigit(JSContext* cx, Digit digit,
+                                             bool isNegative, unsigned radix);
   static JSLinearString* toStringGeneric(JSContext* cx, Handle<BigInt*>,
                                          unsigned radix);
 
@@ -490,9 +503,10 @@ extern JS::Result<JS::BigInt*> StringToBigInt(JSContext* cx,
 extern JS::BigInt* ParseBigIntLiteral(
     JSContext* cx, const mozilla::Range<const char16_t>& chars);
 
-// Check an already validated numeric literal for a non-zero value. Used by
-// the parsers node folder in deferred mode.
-extern bool BigIntLiteralIsZero(const mozilla::Range<const char16_t>& chars);
+// Parse a BigInt from an already-validated numeric literal. Returns Some if the
+// BigInt literal fits into int64. Otherwise returns Nothing.
+extern mozilla::Maybe<int64_t> ParseBigInt64Literal(
+    mozilla::Range<const char16_t> chars);
 
 extern JS::BigInt* ToBigInt(JSContext* cx, JS::Handle<JS::Value> v);
 extern JS::Result<int64_t> ToBigInt64(JSContext* cx, JS::Handle<JS::Value> v);

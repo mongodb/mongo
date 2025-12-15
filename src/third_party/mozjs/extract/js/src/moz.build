@@ -92,12 +92,6 @@ CONFIGURE_DEFINE_FILES += [
     "js-confdefs.h",
 ]
 
-if not CONFIG["JS_STANDALONE"]:
-    CONFIGURE_SUBST_FILES += [
-        "../../config/autoconf-js.mk",
-        "../../config/emptyvars-js.mk",
-    ]
-
 CONFIGURE_DEFINE_FILES += [
     "js-config.h",
 ]
@@ -141,6 +135,7 @@ EXPORTS.js += [
     "../public/Conversions.h",
     "../public/Date.h",
     "../public/Debug.h",
+    "../public/EnvironmentChain.h",
     "../public/Equality.h",
     "../public/ErrorInterceptor.h",
     "../public/ErrorReport.h",
@@ -161,7 +156,6 @@ EXPORTS.js += [
     "../public/Initialization.h",
     "../public/Interrupt.h",
     "../public/Iterator.h",
-    "../public/JitCodeAPI.h",
     "../public/JSON.h",
     "../public/LocaleSensitive.h",
     "../public/MapAndSet.h",
@@ -169,7 +163,9 @@ EXPORTS.js += [
     "../public/MemoryFunctions.h",
     "../public/MemoryMetrics.h",
     "../public/Modules.h",
+    "../public/NativeStackLimits.h",
     "../public/Object.h",
+    "../public/ObjectWithStashedPointer.h",
     "../public/Prefs.h",
     "../public/Principals.h",
     "../public/Printer.h",
@@ -243,12 +239,14 @@ EXPORTS.js += [
 # change, but they're at least plausible first passes at designing something.
 # We expose them as-is, buyer beware.
 EXPORTS.js.experimental += [
+    "../public/experimental/BindingAllocs.h",
     "../public/experimental/CodeCoverage.h",
     "../public/experimental/CompileScript.h",
     "../public/experimental/CTypes.h",
     "../public/experimental/Intl.h",
     "../public/experimental/JitInfo.h",
     "../public/experimental/JSStencil.h",
+    "../public/experimental/LoggingInterface.h",
     "../public/experimental/PCCountProfiling.h",
     "../public/experimental/SourceHook.h",
     "../public/experimental/TypedData.h",
@@ -393,16 +391,16 @@ UNIFIED_SOURCES += [
     "vm/JSONPrinter.cpp",
     "vm/JSScript.cpp",
     "vm/List.cpp",
+    "vm/Logging.cpp",
     "vm/MemoryMetrics.cpp",
     "vm/Modules.cpp",
     "vm/NativeObject.cpp",
+    "vm/ObjectWithStashedPointer.cpp",
     "vm/OffThreadPromiseRuntimeState.cpp",
-    "vm/PIC.cpp",
     "vm/PlainObject.cpp",
     "vm/Prefs.cpp",
     "vm/Printer.cpp",
     "vm/Probes.cpp",
-    "vm/PromiseLookup.cpp",
     "vm/PropertyAndElement.cpp",
     "vm/PropertyDescriptor.cpp",
     "vm/PropMap.cpp",
@@ -423,7 +421,6 @@ UNIFIED_SOURCES += [
     "vm/SourceHook.cpp",
     "vm/Stack.cpp",
     "vm/StaticStrings.cpp",
-    "vm/StencilCache.cpp",
     "vm/StencilObject.cpp",
     "vm/StringType.cpp",
     "vm/SymbolType.cpp",
@@ -462,13 +459,12 @@ if CONFIG["ENABLE_PORTABLE_BASELINE_INTERP"]:
         "vm/PortableBaselineInterpret.cpp",
     ]
 
-if CONFIG["ENABLE_RECORD_TUPLE"]:
+if CONFIG["ENABLE_EXPLICIT_RESOURCE_MANAGEMENT"]:
     UNIFIED_SOURCES += [
-        "builtin/RecordObject.cpp",
-        "builtin/TupleObject.cpp",
-        "vm/RecordTupleShared.cpp",
-        "vm/RecordType.cpp",
-        "vm/TupleType.cpp",
+        "builtin/AsyncDisposableStackObject.cpp",
+        "builtin/DisposableStackObject.cpp",
+        "builtin/DisposableStackObjectBase.cpp",
+        "vm/DisposableRecord.cpp",
     ]
 
 if CONFIG["JS_HAS_INTL_API"]:
@@ -477,6 +473,7 @@ if CONFIG["JS_HAS_INTL_API"]:
         "builtin/intl/CommonFunctions.cpp",
         "builtin/intl/DateTimeFormat.cpp",
         "builtin/intl/DisplayNames.cpp",
+        "builtin/intl/DurationFormat.cpp",
         "builtin/intl/IntlObject.cpp",
         "builtin/intl/LanguageTag.cpp",
         "builtin/intl/ListFormat.cpp",
@@ -489,6 +486,7 @@ if CONFIG["JS_HAS_INTL_API"]:
     ]
 
 if CONFIG["MOZ_INSTRUMENTS"]:
+    OS_LIBS += ["-framework CoreFoundation"]
     SOURCES += [
         "devtools/Instruments.cpp",
     ]
@@ -513,9 +511,9 @@ else:
         "threading/posix/PosixThread.cpp",
     ]
 
-if CONFIG["JS_HAS_INTL_API"] and CONFIG["MOZ_ICU4X"]:
+if CONFIG["JS_HAS_INTL_API"]:
     LOCAL_INCLUDES += [
-        "/intl/icu_capi/c/include",
+        "/intl/icu_capi/bindings/c",
     ]
 
 if CONFIG["JS_HAS_CTYPES"]:
@@ -545,9 +543,19 @@ if CONFIG["MOZ_VTUNE"]:
         if int(CONFIG["CC_VERSION"].split(".")[0]) >= 8:
             SOURCES["vtune/ittnotify_static.c"].flags += ["-Wno-stringop-truncation"]
 
-DIRS += ["build", "debugger", "frontend", "gc", "irregexp", "jit", "util", "wasm"]
+DIRS += [
+    "build",
+    "debugger",
+    "frontend",
+    "gc",
+    "irregexp",
+    "jit",
+    "util",
+    "wasm",
+    "xsum",
+]
 
-if CONFIG["JS_HAS_TEMPORAL_API"]:
+if CONFIG["JS_HAS_INTL_API"]:
     DIRS += ["builtin/temporal"]
 
 # Bug 1739321 - clang 13+ only emits debuginfo for classes that are actually
@@ -605,6 +613,7 @@ selfhosted_inputs = [
         "builtin/intl/CurrencyDataGenerated.js",
         "builtin/intl/DateTimeFormat.js",
         "builtin/intl/DisplayNames.js",
+        "builtin/intl/DurationFormat.js",
         "builtin/intl/IntlObject.js",
         "builtin/intl/ListFormat.js",
         "builtin/intl/NumberFormat.js",
@@ -617,8 +626,11 @@ selfhosted_inputs = [
     else []
 )
 
-if CONFIG["ENABLE_RECORD_TUPLE"]:
-    selfhosted_inputs += ["builtin/Tuple.js"]
+if CONFIG["ENABLE_EXPLICIT_RESOURCE_MANAGEMENT"]:
+    selfhosted_inputs += [
+        "builtin/AsyncDisposableStack.js",
+        "builtin/DisposableStack.js",
+    ]
 
 # Prepare self-hosted JS code for embedding
 GeneratedFile(
@@ -648,3 +660,6 @@ if CONFIG["JS_HAS_INTL_API"]:
         ]
 
     USE_LIBS += ["intlcomponents"]
+
+if CONFIG["USE_LIBZ_RS"]:
+    DEFINES["USE_LIBZ_RS"] = True

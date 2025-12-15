@@ -7,9 +7,11 @@
 #include "frontend/EmitterScope.h"
 
 #include "frontend/AbstractScopePtr.h"
+#include "frontend/BytecodeControlStructures.h"
 #include "frontend/BytecodeEmitter.h"
 #include "frontend/ModuleSharedContext.h"
 #include "frontend/TDZCheckCache.h"
+#include "frontend/UsingEmitter.h"
 #include "js/friend/ErrorMessages.h"  // JSMSG_*
 #include "vm/EnvironmentObject.h"     // ClassBodyLexicalEnvironmentObject
 
@@ -333,8 +335,50 @@ void EmitterScope::dump(BytecodeEmitter* bce) {
   fprintf(stdout, "\n");
 }
 
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+bool EmitterScope::prepareForDisposableScopeBody(BytecodeEmitter* bce) {
+  if (hasDisposables()) {
+    if (!usingEmitter_->prepareForDisposableScopeBody(blockKind_)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool EmitterScope::prepareForModuleDisposableScopeBody(BytecodeEmitter* bce) {
+  return prepareForDisposableScopeBody(bce);
+}
+
+bool EmitterScope::prepareForDisposableAssignment(UsingHint hint) {
+  MOZ_ASSERT(hasDisposables());
+  return usingEmitter_->prepareForAssignment(hint);
+}
+
+bool EmitterScope::emitDisposableScopeBodyEnd(BytecodeEmitter* bce) {
+  // For-of loops emit the dispose loop in the different place and timing.
+  // (See ForOfEmitter::emitInitialize,
+  // ForOfLoopControl::emitPrepareForNonLocalJumpFromScope and
+  // ForOfLoopControl::emitEndCodeNeedingIteratorClose())
+  if (hasDisposables() && (blockKind_ != BlockKind::ForOf)) {
+    if (!usingEmitter_->emitEnd()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool EmitterScope::emitModuleDisposableScopeBodyEnd(BytecodeEmitter* bce) {
+  return emitDisposableScopeBodyEnd(bce);
+}
+#endif
+
 bool EmitterScope::enterLexical(BytecodeEmitter* bce, ScopeKind kind,
-                                LexicalScope::ParserData* bindings) {
+                                LexicalScope::ParserData* bindings
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+                                ,
+                                BlockKind blockKind
+#endif
+) {
   MOZ_ASSERT(kind != ScopeKind::NamedLambda &&
              kind != ScopeKind::StrictNamedLambda);
   MOZ_ASSERT(this == bce->innermostEmitterScopeNoCheck());
@@ -360,6 +404,11 @@ bool EmitterScope::enterLexical(BytecodeEmitter* bce, ScopeKind kind,
     if (!tdzCache->noteTDZCheck(bce, bi.name(), CheckTDZ)) {
       return false;
     }
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    if (bi.kind() == BindingKind::Using) {
+      setHasDisposables(bce);
+    }
+#endif
   }
 
   updateFrameFixedSlots(bce, bi);
@@ -394,6 +443,17 @@ bool EmitterScope::enterLexical(BytecodeEmitter* bce, ScopeKind kind,
   if (!deadZoneFrameSlotRange(bce, firstFrameSlot, frameSlotEnd())) {
     return false;
   }
+
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+  MOZ_ASSERT_IF(blockKind_ != BlockKind::Other, kind == ScopeKind::Lexical);
+  MOZ_ASSERT_IF(kind != ScopeKind::Lexical, blockKind_ == BlockKind::Other);
+
+  blockKind_ = blockKind;
+
+  if (!prepareForDisposableScopeBody(bce)) {
+    return false;
+  }
+#endif
 
   return checkEnvironmentChainLength(bce);
 }
@@ -846,6 +906,12 @@ bool EmitterScope::enterModule(BytecodeEmitter* bce,
           return false;
         }
       }
+
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+      if (bi.kind() == BindingKind::Using) {
+        setHasDisposables(bce);
+      }
+#endif
     }
 
     updateFrameFixedSlots(bce, bi);
@@ -928,8 +994,8 @@ bool EmitterScope::leave(BytecodeEmitter* bce, bool nonLocal) {
     case ScopeKind::ClassBody:
 
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-      if (hasDisposables()) {
-        if (!bce->emit1(JSOp::DisposeDisposables)) {
+      if (!nonLocal) {
+        if (!emitDisposableScopeBodyEnd(bce)) {
           return false;
         }
       }

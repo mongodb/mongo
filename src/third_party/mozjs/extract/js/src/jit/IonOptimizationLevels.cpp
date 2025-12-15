@@ -9,6 +9,7 @@
 #include "jit/Ion.h"
 #include "jit/JitHints.h"
 #include "jit/JitRuntime.h"
+#include "js/Prefs.h"
 #include "vm/JSScript.h"
 
 #include "vm/JSScript-inl.h"
@@ -19,51 +20,24 @@ using namespace js::jit;
 namespace js {
 namespace jit {
 
-const OptimizationLevelInfo IonOptimizations;
-
-void OptimizationInfo::initNormalOptimizationInfo() {
-  level_ = OptimizationLevel::Normal;
-
-  autoTruncate_ = true;
-  eaa_ = true;
-  edgeCaseAnalysis_ = true;
-  eliminateRedundantChecks_ = true;
-  eliminateRedundantShapeGuards_ = true;
-  eliminateRedundantGCBarriers_ = true;
-  inlineInterpreted_ = true;
-  inlineNative_ = true;
-  licm_ = true;
-  gvn_ = true;
-  rangeAnalysis_ = true;
-  reordering_ = true;
-  scalarReplacement_ = true;
-  sink_ = true;
-
-  registerAllocator_ = RegisterAllocator_Backtracking;
+/*static*/
+uint32_t OptimizationInfo::baseWarmUpThresholdForScript(JSContext* cx,
+                                                        JSScript* script) {
+  // If an Ion counter hint is present, override the threshold.
+  if (cx->runtime()->jitRuntime()->hasJitHintsMap()) {
+    JitHintsMap* jitHints = cx->runtime()->jitRuntime()->getJitHintsMap();
+    uint32_t hintThreshold;
+    if (jitHints->getIonThresholdHint(script, hintThreshold)) {
+      return hintThreshold;
+    }
+  }
+  return JitOptions.normalIonWarmUpThreshold;
 }
 
-void OptimizationInfo::initWasmOptimizationInfo() {
-  // The Wasm optimization level
-  // Disables some passes that don't work well with wasm.
-
-  // Take normal option values for not specified values.
-  initNormalOptimizationInfo();
-
-  level_ = OptimizationLevel::Wasm;
-
-  ama_ = true;
-  autoTruncate_ = false;
-  edgeCaseAnalysis_ = false;
-  eliminateRedundantChecks_ = false;
-  eliminateRedundantShapeGuards_ = false;
-  eliminateRedundantGCBarriers_ = false;
-  scalarReplacement_ = false;  // wasm has no objects.
-  sink_ = false;
-}
-
-uint32_t OptimizationInfo::compilerWarmUpThreshold(JSContext* cx,
-                                                   JSScript* script,
-                                                   jsbytecode* pc) const {
+/*static*/
+uint32_t OptimizationInfo::warmUpThresholdForPC(JSScript* script,
+                                                jsbytecode* pc,
+                                                uint32_t baseThreshold) {
   MOZ_ASSERT(pc == nullptr || pc == script->code() ||
              JSOp(*pc) == JSOp::LoopHead);
 
@@ -71,16 +45,7 @@ uint32_t OptimizationInfo::compilerWarmUpThreshold(JSContext* cx,
   // wrong. See bug 1602681.
   MOZ_ASSERT_IF(pc && JSOp(*pc) == JSOp::LoopHead, pc > script->code());
 
-  uint32_t warmUpThreshold = baseCompilerWarmUpThreshold();
-
-  // If an Ion counter hint is present, override the threshold.
-  if (cx->runtime()->jitRuntime()->hasJitHintsMap()) {
-    JitHintsMap* jitHints = cx->runtime()->jitRuntime()->getJitHintsMap();
-    uint32_t hintThreshold;
-    if (jitHints->getIonThresholdHint(script, hintThreshold)) {
-      warmUpThreshold = hintThreshold;
-    }
-  }
+  uint32_t warmUpThreshold = baseThreshold;
 
   if (pc == script->code()) {
     pc = nullptr;
@@ -111,45 +76,34 @@ uint32_t OptimizationInfo::compilerWarmUpThreshold(JSContext* cx,
   // Note that the loop depth is always > 0 so we will prefer non-OSR over OSR.
   uint32_t loopDepth = LoopHeadDepthHint(pc);
   MOZ_ASSERT(loopDepth > 0);
-  return warmUpThreshold + loopDepth * (baseCompilerWarmUpThreshold() / 10);
-}
-
-uint32_t OptimizationInfo::recompileWarmUpThreshold(JSContext* cx,
-                                                    JSScript* script,
-                                                    jsbytecode* pc) const {
-  MOZ_ASSERT(pc == script->code() || JSOp(*pc) == JSOp::LoopHead);
-
-  uint32_t threshold = compilerWarmUpThreshold(cx, script, pc);
-  if (JSOp(*pc) != JSOp::LoopHead || JitOptions.eagerIonCompilation()) {
-    return threshold;
-  }
-
-  // If we're stuck in a long-running loop at a low optimization level, we have
-  // to invalidate to be able to tier up. This is worse than recompiling at
-  // function entry (because in that case we can use the lazy link mechanism and
-  // avoid invalidation completely). Use a very high recompilation threshold for
-  // loop edges so that this only affects very long-running loops.
-
-  uint32_t loopDepth = LoopHeadDepthHint(pc);
-  MOZ_ASSERT(loopDepth > 0);
-  return threshold + loopDepth * (baseCompilerWarmUpThreshold() / 10);
-}
-
-OptimizationLevelInfo::OptimizationLevelInfo() {
-  infos_[OptimizationLevel::Normal].initNormalOptimizationInfo();
-  infos_[OptimizationLevel::Wasm].initWasmOptimizationInfo();
+  return warmUpThreshold + loopDepth * (baseThreshold / 10);
 }
 
 OptimizationLevel OptimizationLevelInfo::levelForScript(JSContext* cx,
                                                         JSScript* script,
                                                         jsbytecode* pc) const {
-  const OptimizationInfo* info = get(OptimizationLevel::Normal);
+  uint32_t baseThreshold =
+      OptimizationInfo::baseWarmUpThresholdForScript(cx, script);
   if (script->getWarmUpCount() <
-      info->compilerWarmUpThreshold(cx, script, pc)) {
+      OptimizationInfo::warmUpThresholdForPC(script, pc, baseThreshold)) {
     return OptimizationLevel::DontCompile;
   }
 
   return OptimizationLevel::Normal;
+}
+
+IonRegisterAllocator OptimizationInfo::registerAllocator() const {
+  switch (JS::Prefs::ion_regalloc()) {
+    case 0:
+    default:
+      // Use the default register allocator.
+      return registerAllocator_;
+    case 1:
+      return RegisterAllocator_Backtracking;
+    case 2:
+      return RegisterAllocator_Simple;
+  }
+  MOZ_CRASH("Unreachable");
 }
 
 }  // namespace jit

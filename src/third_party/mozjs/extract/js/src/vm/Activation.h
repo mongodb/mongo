@@ -33,10 +33,6 @@ namespace JS {
 class CallArgs;
 class JS_PUBLIC_API Compartment;
 
-namespace dbg {
-class JS_PUBLIC_API AutoEntryMonitor;
-}  // namespace dbg
-
 }  // namespace JS
 
 namespace js {
@@ -46,32 +42,6 @@ class InterpreterActivation;
 namespace jit {
 class JitActivation;
 }  // namespace jit
-
-// This class is separate from Activation, because it calls Compartment::wrap()
-// which can GC and walk the stack. It's not safe to do that within the
-// JitActivation constructor.
-class MOZ_RAII ActivationEntryMonitor {
-  JSContext* cx_;
-
-  // The entry point monitor that was set on cx_->runtime() when this
-  // ActivationEntryMonitor was created.
-  JS::dbg::AutoEntryMonitor* entryMonitor_;
-
-  explicit inline ActivationEntryMonitor(JSContext* cx);
-
-  ActivationEntryMonitor(const ActivationEntryMonitor& other) = delete;
-  void operator=(const ActivationEntryMonitor& other) = delete;
-
-  void init(JSContext* cx, jit::CalleeToken entryToken);
-  void init(JSContext* cx, InterpreterFrame* entryFrame);
-
-  JS::Value asyncStack(JSContext* cx);
-
- public:
-  inline ActivationEntryMonitor(JSContext* cx, InterpreterFrame* entryFrame);
-  inline ActivationEntryMonitor(JSContext* cx, jit::CalleeToken entryToken);
-  inline ~ActivationEntryMonitor();
-};
 
 // [SMDOC] LiveSavedFrameCache: SavedFrame caching to minimize stack walking
 //

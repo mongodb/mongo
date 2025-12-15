@@ -278,7 +278,6 @@ bool jit::CallTrampolineNativeJitCode(JSContext* cx, TrampolineNative native,
   Rooted<Value> result(cx, Int32Value(args.length()));
 
   AssertRealmUnchanged aru(cx);
-  ActivationEntryMonitor entryMonitor(cx, calleeToken);
   JitActivation activation(cx);
 
   EnterJitCode enter = cx->runtime()->jitRuntime()->enterJit();

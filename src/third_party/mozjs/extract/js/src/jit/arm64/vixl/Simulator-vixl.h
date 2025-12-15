@@ -498,6 +498,12 @@ class SimExclusiveGlobalMonitor {
 };
 
 class Redirection;
+class Simulator;
+
+// When the SingleStepCallback is called, the simulator is about to execute
+// sim->get_pc() and the current machine state represents the completed
+// execution of the previous pc.
+typedef void (*SingleStepCallback)(void* arg, Simulator* sim, void* pc);
 
 class Simulator : public DecoderVisitor {
  public:
@@ -535,6 +541,10 @@ class Simulator : public DecoderVisitor {
   JS::ProfilingFrameIterator::RegisterState registerState();
 
   void ResetState();
+
+  // Profiler support.
+  void enable_single_stepping(SingleStepCallback cb, void* arg);
+  void disable_single_stepping();
 
   // Run the simulator.
   virtual void Run();
@@ -2504,6 +2514,11 @@ class Simulator : public DecoderVisitor {
   // Indicates that the simulator ran out of memory at some point.
   // Data structures may not be fully allocated.
   bool oom_;
+
+  // Single-stepping support
+  bool single_stepping_;
+  SingleStepCallback single_step_callback_;
+  void* single_step_callback_arg_;
 
  public:
   // True if the simulator ran out of memory during or after construction.

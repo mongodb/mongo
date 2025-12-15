@@ -167,7 +167,8 @@ class SavedStacks {
 
   [[nodiscard]] bool saveCurrentStack(
       JSContext* cx, MutableHandle<SavedFrame*> frame,
-      JS::StackCapture&& capture = JS::StackCapture(JS::AllFrames()));
+      JS::StackCapture&& capture = JS::StackCapture(JS::AllFrames()),
+      HandleObject startAt = nullptr);
   [[nodiscard]] bool copyAsyncStack(
       JSContext* cx, HandleObject asyncStack, HandleString asyncCause,
       MutableHandle<SavedFrame*> adoptedStack,
@@ -218,7 +219,8 @@ class SavedStacks {
 
   [[nodiscard]] bool insertFrames(JSContext* cx,
                                   MutableHandle<SavedFrame*> frame,
-                                  JS::StackCapture&& capture);
+                                  JS::StackCapture&& capture,
+                                  HandleObject startAt);
   [[nodiscard]] bool adoptAsyncStack(
       JSContext* cx, MutableHandle<SavedFrame*> asyncStack,
       Handle<JSAtom*> asyncCause, const mozilla::Maybe<size_t>& maxFrameCount);
@@ -238,8 +240,7 @@ class SavedStacks {
     WeakHeapPtr<JSScript*> script;
     jsbytecode* pc;
 
-    void trace(JSTracer* trc) { /* PCKey is weak. */
-    }
+    void trace(JSTracer* trc) { /* PCKey is weak. */ }
     bool traceWeak(JSTracer* trc) {
       return TraceWeakEdge(trc, &script, "traceWeak");
     }

@@ -598,7 +598,11 @@ class ParseContext : public Nestable<ParseContext> {
   }
 
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  bool isUsingSyntaxAllowed() { return !atGlobalLevel() || atModuleTopLevel(); }
+  bool isUsingSyntaxAllowed() {
+    bool isInSwitch = innermostStatement() &&
+                      innermostStatement()->kind() == StatementKind::Switch;
+    return (!atGlobalLevel() || atModuleTopLevel()) && !isInSwitch;
+  }
 #endif
 
   void setSuperScopeNeedsHomeObject() {

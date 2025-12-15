@@ -16,7 +16,7 @@ namespace wasm {
 
 #ifdef DEBUG
 void MemoryAccessDesc::assertOffsetInGuardPages() const {
-  MOZ_ASSERT(offset64_ < (uint64_t)GetMaxOffsetGuardLimit(hugeMemory_));
+  MOZ_ASSERT(offset_ < (uint64_t)GetMaxOffsetGuardLimit(hugeMemory_));
 }
 #endif
 

@@ -109,8 +109,7 @@ class NurseryAwareHashMap {
            nurseryEntries.sizeOfExcludingThis(mallocSizeOf);
   }
   size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const {
-    return map.shallowSizeOfIncludingThis(mallocSizeOf) +
-           nurseryEntries.sizeOfIncludingThis(mallocSizeOf);
+    return mallocSizeOf(this) + sizeOfExcludingThis(mallocSizeOf);
   }
 
   [[nodiscard]] bool put(const Key& key, const Value& value) {

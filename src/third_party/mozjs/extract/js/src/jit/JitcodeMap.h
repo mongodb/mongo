@@ -93,13 +93,14 @@ class JitCodeRange {
   }
 };
 
-typedef Vector<BytecodeLocation, 0, SystemAllocPolicy> BytecodeLocationVector;
+using BytecodeLocationVector = Vector<BytecodeLocation, 0, SystemAllocPolicy>;
 
 class IonEntry;
 class IonICEntry;
 class BaselineEntry;
 class BaselineInterpreterEntry;
 class DummyEntry;
+class SelfHostedSharedEntry;
 
 // Base class for all entries.
 class JitcodeGlobalEntry : public JitCodeRange {
@@ -117,7 +118,8 @@ class JitcodeGlobalEntry : public JitCodeRange {
     IonIC,
     Baseline,
     BaselineInterpreter,
-    Dummy
+    Dummy,
+    SelfHostedShared,
   };
 
  protected:
@@ -163,18 +165,21 @@ class JitcodeGlobalEntry : public JitCodeRange {
     return kind() == Kind::BaselineInterpreter;
   }
   bool isDummy() const { return kind() == Kind::Dummy; }
+  bool isSelfHostedShared() const { return kind() == Kind::SelfHostedShared; }
 
   inline const IonEntry& asIon() const;
   inline const IonICEntry& asIonIC() const;
   inline const BaselineEntry& asBaseline() const;
   inline const BaselineInterpreterEntry& asBaselineInterpreter() const;
   inline const DummyEntry& asDummy() const;
+  inline const SelfHostedSharedEntry& asSelfHostedShared() const;
 
   inline IonEntry& asIon();
   inline IonICEntry& asIonIC();
   inline BaselineEntry& asBaseline();
   inline BaselineInterpreterEntry& asBaselineInterpreter();
   inline DummyEntry& asDummy();
+  inline SelfHostedSharedEntry& asSelfHostedShared();
 
   JitCode* jitcode() const { return jitcode_; }
   JitCode** jitcodePtr() { return &jitcode_; }
@@ -337,6 +342,31 @@ class BaselineEntry : public JitcodeGlobalEntry {
   void traceWeak(JSTracer* trc);
 };
 
+class SelfHostedSharedEntry : public JitcodeGlobalEntry {
+  UniqueChars str_;
+
+ public:
+  SelfHostedSharedEntry(JitCode* code, void* nativeStartAddr,
+                        void* nativeEndAddr, UniqueChars str)
+      : JitcodeGlobalEntry(Kind::SelfHostedShared, code, nativeStartAddr,
+                           nativeEndAddr),
+        str_(std::move(str)) {
+    MOZ_ASSERT(str_);
+  }
+
+  const char* str() const { return str_.get(); }
+
+  void* canonicalNativeAddrFor(void* ptr) const;
+
+  [[nodiscard]] bool callStackAtAddr(void* ptr, BytecodeLocationVector& results,
+                                     uint32_t* depth) const;
+
+  uint32_t callStackAtAddr(void* ptr, const char** results,
+                           uint32_t maxResults) const;
+
+  uint64_t lookupRealmID() const;
+};
+
 class BaselineInterpreterEntry : public JitcodeGlobalEntry {
  public:
   BaselineInterpreterEntry(JitCode* code, void* nativeStartAddr,
@@ -407,6 +437,12 @@ inline const DummyEntry& JitcodeGlobalEntry::asDummy() const {
   return *static_cast<const DummyEntry*>(this);
 }
 
+inline const SelfHostedSharedEntry& JitcodeGlobalEntry::asSelfHostedShared()
+    const {
+  MOZ_ASSERT(isSelfHostedShared());
+  return *static_cast<const SelfHostedSharedEntry*>(this);
+}
+
 inline IonEntry& JitcodeGlobalEntry::asIon() {
   MOZ_ASSERT(isIon());
   return *static_cast<IonEntry*>(this);
@@ -432,6 +468,11 @@ inline DummyEntry& JitcodeGlobalEntry::asDummy() {
   return *static_cast<DummyEntry*>(this);
 }
 
+inline SelfHostedSharedEntry& JitcodeGlobalEntry::asSelfHostedShared() {
+  MOZ_ASSERT(isSelfHostedShared());
+  return *static_cast<SelfHostedSharedEntry*>(this);
+}
+
 // Global table of JitcodeGlobalEntry entries.
 class JitcodeGlobalTable {
  private:
@@ -449,7 +490,8 @@ class JitcodeGlobalTable {
   EntryTree tree_;
 
  public:
-  JitcodeGlobalTable() : alloc_(LIFO_CHUNK_SIZE), tree_(&alloc_) {}
+  JitcodeGlobalTable()
+      : alloc_(LIFO_CHUNK_SIZE, js::BackgroundMallocArena), tree_(&alloc_) {}
 
   bool empty() const {
     MOZ_ASSERT(entries_.empty() == tree_.empty());

@@ -160,19 +160,28 @@ const JSClass WeakRefObject::class_ = {
     "WeakRef",
     JSCLASS_HAS_RESERVED_SLOTS(SlotCount) |
         JSCLASS_HAS_CACHED_PROTO(JSProto_WeakRef) | JSCLASS_FOREGROUND_FINALIZE,
-    &classOps_, &classSpec_};
+    &classOps_,
+    &classSpec_,
+};
 
 const JSClass WeakRefObject::protoClass_ = {
     // https://tc39.es/proposal-weakrefs/#sec-weak-ref.prototype
     // https://tc39.es/proposal-weakrefs/#sec-properties-of-the-weak-ref-prototype-object
-    "WeakRef.prototype", JSCLASS_HAS_CACHED_PROTO(JSProto_WeakRef),
-    JS_NULL_CLASS_OPS, &classSpec_};
+    "WeakRef.prototype",
+    JSCLASS_HAS_CACHED_PROTO(JSProto_WeakRef),
+    JS_NULL_CLASS_OPS,
+    &classSpec_,
+};
 
 const JSPropertySpec WeakRefObject::properties[] = {
-    JS_STRING_SYM_PS(toStringTag, "WeakRef", JSPROP_READONLY), JS_PS_END};
+    JS_STRING_SYM_PS(toStringTag, "WeakRef", JSPROP_READONLY),
+    JS_PS_END,
+};
 
-const JSFunctionSpec WeakRefObject::methods[] = {JS_FN("deref", deref, 0, 0),
-                                                 JS_FS_END};
+const JSFunctionSpec WeakRefObject::methods[] = {
+    JS_FN("deref", deref, 0, 0),
+    JS_FS_END,
+};
 
 /* static */
 bool WeakRefObject::deref(JSContext* cx, unsigned argc, Value* vp) {

@@ -31,6 +31,9 @@
 namespace js {
 namespace wasm {
 
+using mozilla::Maybe;
+using mozilla::Some;
+
 //////////////////////////////////////////////////////////////////////////////
 //
 // BaseLocalIter methods.
@@ -420,7 +423,7 @@ bool StackMapGenerator::createStackMap(
   }
 
   // Add the completed map to the running collection thereof.
-  if (!stackMaps_->add((uint8_t*)(uintptr_t)assemblerOffset, stackMap)) {
+  if (!stackMaps_->add(assemblerOffset, stackMap)) {
     stackMap->destroy();
     return false;
   }

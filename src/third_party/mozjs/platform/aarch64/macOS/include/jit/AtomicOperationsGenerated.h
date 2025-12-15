@@ -548,6 +548,9 @@ namespace jit {
                     : "memory", "cc");
                 return res;
             }
+            inline void AtomicPause() {
+                asm volatile ("isb" ::: "memory");
+            }
         inline void AtomicCopyUnalignedBlockDownUnsynchronized(uint8_t* dst, const uint8_t* src) {
             uint8_t* dst_ = reinterpret_cast<uint8_t*>(dst);
             const uint8_t* src_ = reinterpret_cast<const uint8_t*>(src);
@@ -933,7 +936,29 @@ namespace jit {
                 : [dst] "r" (dst_), [src] "r"(src_)
                 : "memory");
         }
-        inline void AtomicCopyByteUnsynchronized(uint8_t* dst, const uint8_t* src) {
+        inline void AtomicCopy32Unsynchronized(uint8_t* dst, const uint8_t* src) {
+            uint32_t* dst_ = reinterpret_cast<uint32_t*>(dst);
+            const uint32_t* src_ = reinterpret_cast<const uint32_t*>(src);
+            uint32_t scratch;
+            asm volatile ("ldr %w[scratch], [%x[src], 0]\n\t"
+"str %w[scratch], [%x[dst], 0]\n\t"
+
+                : [scratch] "=&r" (scratch)
+                : [dst] "r" (dst_), [src] "r"(src_)
+                : "memory");
+        }
+        inline void AtomicCopy16Unsynchronized(uint8_t* dst, const uint8_t* src) {
+            uint16_t* dst_ = reinterpret_cast<uint16_t*>(dst);
+            const uint16_t* src_ = reinterpret_cast<const uint16_t*>(src);
+            uint16_t scratch;
+            asm volatile ("ldrh %w[scratch], [%x[src], 0]\n\t"
+"strh %w[scratch], [%x[dst], 0]\n\t"
+
+                : [scratch] "=&r" (scratch)
+                : [dst] "r" (dst_), [src] "r"(src_)
+                : "memory");
+        }
+        inline void AtomicCopy8Unsynchronized(uint8_t* dst, const uint8_t* src) {
             uint8_t* dst_ = reinterpret_cast<uint8_t*>(dst);
             const uint8_t* src_ = reinterpret_cast<const uint8_t*>(src);
             uint8_t scratch;

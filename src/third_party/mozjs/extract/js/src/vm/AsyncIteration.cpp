@@ -179,7 +179,8 @@ AsyncGeneratorRequest* AsyncGeneratorObject::peekRequest(
 
 const JSClass AsyncGeneratorRequest::class_ = {
     "AsyncGeneratorRequest",
-    JSCLASS_HAS_RESERVED_SLOTS(AsyncGeneratorRequest::Slots)};
+    JSCLASS_HAS_RESERVED_SLOTS(AsyncGeneratorRequest::Slots),
+};
 
 // ES2022 draft rev 193211a3d889a61e74ef7da1475dfa356e029f29
 //
@@ -312,15 +313,15 @@ AsyncGeneratorRequest* AsyncGeneratorRequest::create(
 // Stesp 10-13.
 [[nodiscard]] static bool AsyncGeneratorYield(
     JSContext* cx, Handle<AsyncGeneratorObject*> generator, HandleValue value) {
-  // Step 13.a.
-  generator->setSuspendedYield();
-
   // Step 10. Perform
   //          ! AsyncGeneratorCompleteStep(generator, completion, false,
   //                                       previousRealm).
   if (!AsyncGeneratorCompleteStepNormal(cx, generator, value, false)) {
     return false;
   }
+
+  // Step 13.a.
+  generator->setSuspendedYield();
 
   // Steps 11-13.
   return AsyncGeneratorDrainQueue(cx, generator);
@@ -985,10 +986,77 @@ bool js::AsyncGeneratorThrow(JSContext* cx, unsigned argc, Value* vp) {
   return AsyncGeneratorReturned(cx, generator, thisOrRval);
 }
 
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+/**
+ * Explicit Resource Management Proposal
+ * 27.1.3.1 %AsyncIteratorPrototype% [ @@asyncDispose ] ( )
+ * https://arai-a.github.io/ecma262-compare/?pr=3000&id=sec-%25asynciteratorprototype%25-%40%40asyncdispose
+ */
+static bool AsyncIteratorDispose(JSContext* cx, unsigned argc, Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+
+  // Step 1. Let O be the this value.
+  JS::Rooted<JS::Value> O(cx, args.thisv());
+
+  // Step 2. Let promiseCapability be ! NewPromiseCapability(%Promise%).
+  JS::Rooted<PromiseObject*> promise(cx,
+                                     PromiseObject::createSkippingExecutor(cx));
+  if (!promise) {
+    return false;
+  }
+
+  // Step 3. Let return be Completion(GetMethod(O, "return")).
+  JS::Rooted<JS::Value> returnMethod(cx);
+  if (!GetProperty(cx, O, cx->names().return_, &returnMethod)) {
+    // Step 4. IfAbruptRejectPromise(return, promiseCapability).
+    return AbruptRejectPromise(cx, args, promise, nullptr);
+  }
+
+  // Step 5. If return is undefined, then
+  // As per the spec GetMethod returns undefined if the property is either null
+  // or undefined thus here we check for both.
+  if (returnMethod.isNullOrUndefined()) {
+    // Step 5.a. Perform ! Call(promiseCapability.[[Resolve]], undefined, «
+    // undefined »).
+    if (!PromiseObject::resolve(cx, promise, JS::UndefinedHandleValue)) {
+      return false;
+    }
+    args.rval().setObject(*promise);
+    return true;
+  }
+
+  // GetMethod also throws a TypeError exception if the function is not callable
+  // thus we perform that check here.
+  if (!IsCallable(returnMethod)) {
+    ReportIsNotFunction(cx, returnMethod);
+    return AbruptRejectPromise(cx, args, promise, nullptr);
+  }
+
+  // Step 6. Else,
+  // Step 6.a. Let result be Completion(Call(return, O, « undefined »)).
+  JS::Rooted<JS::Value> rval(cx);
+  if (!Call(cx, returnMethod, O, JS::UndefinedHandleValue, &rval)) {
+    // Step 6.b. IfAbruptRejectPromise(result, promiseCapability).
+    return AbruptRejectPromise(cx, args, promise, nullptr);
+  }
+
+  // Step 6.c-g.
+  if (!InternalAsyncIteratorDisposeAwait(cx, rval, promise)) {
+    return AbruptRejectPromise(cx, args, promise, nullptr);
+  }
+
+  // Step 7. Return promiseCapability.[[Promise]].
+  args.rval().setObject(*promise);
+  return true;
+}
+#endif
+
 static const JSFunctionSpec async_generator_methods[] = {
     JS_FN("next", js::AsyncGeneratorNext, 1, 0),
     JS_FN("throw", js::AsyncGeneratorThrow, 1, 0),
-    JS_FN("return", js::AsyncGeneratorReturn, 1, 0), JS_FS_END};
+    JS_FN("return", js::AsyncGeneratorReturn, 1, 0),
+    JS_FS_END,
+};
 
 static JSObject* CreateAsyncGeneratorFunction(JSContext* cx, JSProtoKey key) {
   RootedObject proto(cx, &cx->global()->getFunctionConstructor());
@@ -1072,11 +1140,15 @@ static const ClassSpec AsyncGeneratorFunctionClassSpec = {
     nullptr,
     nullptr,
     AsyncGeneratorFunctionClassFinish,
-    ClassSpec::DontDefineConstructor};
+    ClassSpec::DontDefineConstructor,
+};
 
 const JSClass js::AsyncGeneratorFunctionClass = {
-    "AsyncGeneratorFunction", 0, JS_NULL_CLASS_OPS,
-    &AsyncGeneratorFunctionClassSpec};
+    "AsyncGeneratorFunction",
+    0,
+    JS_NULL_CLASS_OPS,
+    &AsyncGeneratorFunctionClassSpec,
+};
 
 [[nodiscard]] bool js::AsyncGeneratorPromiseReactionJob(
     JSContext* cx, PromiseHandler handler,
@@ -1113,7 +1185,8 @@ const JSClass js::AsyncGeneratorFunctionClass = {
 
 const JSClass AsyncFromSyncIteratorObject::class_ = {
     "AsyncFromSyncIteratorObject",
-    JSCLASS_HAS_RESERVED_SLOTS(AsyncFromSyncIteratorObject::Slots)};
+    JSCLASS_HAS_RESERVED_SLOTS(AsyncFromSyncIteratorObject::Slots),
+};
 
 /*
  * ES2024 draft rev 53454a9a596d90473d2152ef04656d605162cd4c
@@ -1202,7 +1275,9 @@ static bool AsyncFromSyncIteratorThrow(JSContext* cx, unsigned argc,
 static const JSFunctionSpec async_from_sync_iter_methods[] = {
     JS_FN("next", AsyncFromSyncIteratorNext, 1, 0),
     JS_FN("throw", AsyncFromSyncIteratorThrow, 1, 0),
-    JS_FN("return", AsyncFromSyncIteratorReturn, 1, 0), JS_FS_END};
+    JS_FN("return", AsyncFromSyncIteratorReturn, 1, 0),
+    JS_FS_END,
+};
 
 bool GlobalObject::initAsyncFromSyncIteratorProto(
     JSContext* cx, Handle<GlobalObject*> global) {
@@ -1244,7 +1319,11 @@ bool GlobalObject::initAsyncFromSyncIteratorProto(
 
 static const JSFunctionSpec async_iterator_proto_methods[] = {
     JS_SELF_HOSTED_SYM_FN(asyncIterator, "AsyncIteratorIdentity", 0, 0),
-    JS_FS_END};
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    JS_SYM_FN(asyncDispose, AsyncIteratorDispose, 0, 0),
+#endif
+    JS_FS_END,
+};
 
 static const JSFunctionSpec async_iterator_proto_methods_with_helpers[] = {
     JS_SELF_HOSTED_FN("map", "AsyncIteratorMap", 1, 0),
@@ -1260,7 +1339,11 @@ static const JSFunctionSpec async_iterator_proto_methods_with_helpers[] = {
     JS_SELF_HOSTED_FN("every", "AsyncIteratorEvery", 1, 0),
     JS_SELF_HOSTED_FN("find", "AsyncIteratorFind", 1, 0),
     JS_SELF_HOSTED_SYM_FN(asyncIterator, "AsyncIteratorIdentity", 0, 0),
-    JS_FS_END};
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    JS_SYM_FN(asyncDispose, AsyncIteratorDispose, 0, 0),
+#endif
+    JS_FS_END,
+};
 
 bool GlobalObject::initAsyncIteratorProto(JSContext* cx,
                                           Handle<GlobalObject*> global) {
@@ -1350,7 +1433,9 @@ static const JSFunctionSpec async_iterator_helper_methods[] = {
 };
 
 static const JSClass AsyncIteratorHelperPrototypeClass = {
-    "Async Iterator Helper", 0};
+    "Async Iterator Helper",
+    0,
+};
 
 const JSClass AsyncIteratorHelperObject::class_ = {
     "Async Iterator Helper",

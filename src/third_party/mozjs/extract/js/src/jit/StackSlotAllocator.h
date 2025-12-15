@@ -7,6 +7,7 @@
 #ifndef jit_StackSlotAllocator_h
 #define jit_StackSlotAllocator_h
 
+#include "jit/LIR.h"
 #include "jit/Registers.h"
 
 namespace js {
@@ -15,6 +16,7 @@ namespace jit {
 class StackSlotAllocator {
   js::Vector<uint32_t, 4, SystemAllocPolicy> normalSlots;
   js::Vector<uint32_t, 4, SystemAllocPolicy> doubleSlots;
+  js::Vector<uint32_t, 4, SystemAllocPolicy> quadSlots;
   uint32_t height_;
 
   void addAvailableSlot(uint32_t index) {
@@ -25,10 +27,14 @@ class StackSlotAllocator {
   void addAvailableDoubleSlot(uint32_t index) {
     (void)doubleSlots.append(index);
   }
+  void addAvailableQuadSlot(uint32_t index) { (void)quadSlots.append(index); }
 
   uint32_t allocateQuadSlot() {
     // This relies on the fact that any architecture specific
     // alignment of the stack pointer is done a priori.
+    if (!quadSlots.empty()) {
+      return quadSlots.popCopy();
+    }
     if (height_ % 8 != 0) {
       addAvailableSlot(height_ += 4);
     }
@@ -80,48 +86,31 @@ class StackSlotAllocator {
     alloc->setBase(height_);
   }
 
-  static uint32_t width(LDefinition::Type type) {
-    switch (type) {
-#if JS_BITS_PER_WORD == 32
-      case LDefinition::GENERAL:
-      case LDefinition::OBJECT:
-      case LDefinition::SLOTS:
-      case LDefinition::WASM_ANYREF:
-#endif
-#ifdef JS_NUNBOX32
-      case LDefinition::TYPE:
-      case LDefinition::PAYLOAD:
-#endif
-      case LDefinition::INT32:
-      case LDefinition::FLOAT32:
-        return 4;
-#if JS_BITS_PER_WORD == 64
-      case LDefinition::GENERAL:
-      case LDefinition::OBJECT:
-      case LDefinition::SLOTS:
-      case LDefinition::WASM_ANYREF:
-#endif
-#ifdef JS_PUNBOX64
-      case LDefinition::BOX:
-#endif
-      case LDefinition::DOUBLE:
-        return 8;
-      case LDefinition::SIMD128:
-        return 16;
-      case LDefinition::STACKRESULTS:
-        MOZ_CRASH("Stack results area must be allocated manually");
+  uint32_t allocateSlot(LStackSlot::Width width) {
+    switch (width) {
+      case LStackSlot::Word:
+        return allocateSlot();
+      case LStackSlot::DoubleWord:
+        return allocateDoubleSlot();
+      case LStackSlot::QuadWord:
+        return allocateQuadSlot();
     }
-    MOZ_CRASH("Unknown slot type");
+    MOZ_CRASH("Unknown slot width");
   }
 
-  uint32_t allocateSlot(LDefinition::Type type) {
-    switch (width(type)) {
-      case 4:
-        return allocateSlot();
-      case 8:
-        return allocateDoubleSlot();
-      case 16:
-        return allocateQuadSlot();
+  // This method is used by the Simple allocator to free stack slots so that
+  // they can be reused. The Backtracking allocator doesn't call this.
+  void freeSlot(LStackSlot::Width width, uint32_t slot) {
+    switch (width) {
+      case LStackSlot::Word:
+        addAvailableSlot(slot);
+        return;
+      case LStackSlot::DoubleWord:
+        addAvailableDoubleSlot(slot);
+        return;
+      case LStackSlot::QuadWord:
+        addAvailableQuadSlot(slot);
+        return;
     }
     MOZ_CRASH("Unknown slot width");
   }

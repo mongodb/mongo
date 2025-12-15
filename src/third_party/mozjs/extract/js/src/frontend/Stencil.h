@@ -11,6 +11,7 @@
 #include "mozilla/Maybe.h"            // mozilla::{Maybe, Nothing}
 #include "mozilla/MemoryReporting.h"  // mozilla::MallocSizeOf
 #include "mozilla/Span.h"             // mozilla::Span
+#include "mozilla/Variant.h"          // mozilla::Variant
 
 #include <stddef.h>  // size_t
 #include <stdint.h>  // char16_t, uint8_t, uint16_t, uint32_t
@@ -19,17 +20,18 @@
 #include "frontend/ObjLiteral.h"        // ObjLiteralStencil
 #include "frontend/ParserAtom.h"        // TaggedParserAtomIndex
 #include "frontend/ScriptIndex.h"       // ScriptIndex
-#include "frontend/TypedIndex.h"        // TypedIndex
-#include "js/AllocPolicy.h"             // SystemAllocPolicy
-#include "js/ColumnNumber.h"            // JS::ColumnNumberOneOrigin
-#include "js/RefCounted.h"              // AtomicRefCounted
-#include "js/RegExpFlags.h"             // JS::RegExpFlags
-#include "js/RootingAPI.h"              // Handle
-#include "js/TypeDecls.h"               // JSContext
-#include "js/UniquePtr.h"               // js::UniquePtr
-#include "js/Utility.h"                 // UniqueTwoByteChars
-#include "js/Vector.h"                  // js::Vector
-#include "vm/FunctionFlags.h"           // FunctionFlags
+#include "frontend/TaggedParserAtomIndexHasher.h"  // frontend::TaggedParserAtomIndexHasher
+#include "frontend/TypedIndex.h"                   // TypedIndex
+#include "js/AllocPolicy.h"                        // SystemAllocPolicy
+#include "js/ColumnNumber.h"                       // JS::ColumnNumberOneOrigin
+#include "js/RefCounted.h"                         // AtomicRefCounted
+#include "js/RegExpFlags.h"                        // JS::RegExpFlags
+#include "js/RootingAPI.h"                         // Handle
+#include "js/TypeDecls.h"                          // JSContext
+#include "js/UniquePtr.h"                          // js::UniquePtr
+#include "js/Utility.h"                            // UniqueTwoByteChars
+#include "js/Vector.h"                             // js::Vector
+#include "vm/FunctionFlags.h"                      // FunctionFlags
 #include "vm/Scope.h"  // Scope, BaseScopeData, FunctionScope, LexicalScope, VarScope, GlobalScope, EvalScope, ModuleScope
 #include "vm/ScopeKind.h"      // ScopeKind
 #include "vm/SharedStencil.h"  // ImmutableScriptFlags, GCThingIndex, js::SharedImmutableScriptData, MemberInitializers, SourceExtent
@@ -245,19 +247,39 @@ class BigIntStencil {
 
   // Source of the BigInt literal.
   // It's not null-terminated, and also trailing 'n' suffix is not included.
-  mozilla::Span<char16_t> source_;
+  //
+  // Int64-sized BigInt values are directly stored inline as int64_t.
+  mozilla::Variant<mozilla::Span<char16_t>, int64_t> bigInt_{int64_t{}};
+
+  // Methods used by XDR.
+  mozilla::Span<char16_t>& source() {
+    if (bigInt_.is<int64_t>()) {
+      bigInt_ = mozilla::AsVariant(mozilla::Span<char16_t>{});
+    }
+    return bigInt_.as<mozilla::Span<char16_t>>();
+  }
+  const mozilla::Span<char16_t>& source() const {
+    return bigInt_.as<mozilla::Span<char16_t>>();
+  }
+
+  [[nodiscard]] bool initFromChars(FrontendContext* fc, LifoAlloc& alloc,
+                                   mozilla::Span<const char16_t> buf);
 
  public:
   BigIntStencil() = default;
 
   [[nodiscard]] bool init(FrontendContext* fc, LifoAlloc& alloc,
-                          const mozilla::Span<const char16_t> buf);
+                          mozilla::Span<const char16_t> buf);
+
+  [[nodiscard]] bool init(FrontendContext* fc, LifoAlloc& alloc,
+                          const BigIntStencil& other);
 
   BigInt* createBigInt(JSContext* cx) const;
 
+  // Methods used by constant-folding.
   bool isZero() const;
-
-  mozilla::Span<const char16_t> source() const { return source_; }
+  bool inplaceNegate();
+  bool inplaceBitNot();
 
 #ifdef DEBUG
   bool isContainedIn(const LifoAlloc& alloc) const;
@@ -269,6 +291,8 @@ class BigIntStencil {
   void dumpCharsNoQuote(GenericPrinter& out) const;
 #endif
 };
+
+using BigIntStencilVector = Vector<BigIntStencil, 0, js::SystemAllocPolicy>;
 
 class ScopeStencil {
   friend class StencilXDR;
@@ -511,11 +535,20 @@ class StencilModuleImportAttribute {
   StencilModuleImportAttribute(TaggedParserAtomIndex key,
                                TaggedParserAtomIndex value)
       : key(key), value(value) {}
+
+  bool operator!=(const StencilModuleImportAttribute& rhs) const {
+    return key != rhs.key || value != rhs.value;
+  }
+
+  bool operator==(const StencilModuleImportAttribute& rhs) const {
+    return !(*this != rhs);
+  }
 };
 
 class StencilModuleRequest {
  public:
   TaggedParserAtomIndex specifier;
+  TaggedParserAtomIndex firstUnsupportedAttributeKey;
 
   using ImportAttributeVector =
       Vector<StencilModuleImportAttribute, 0, js::SystemAllocPolicy>;
@@ -530,7 +563,8 @@ class StencilModuleRequest {
   }
 
   StencilModuleRequest(const StencilModuleRequest& other)
-      : specifier(other.specifier) {
+      : specifier(other.specifier),
+        firstUnsupportedAttributeKey(other.firstUnsupportedAttributeKey) {
     AutoEnterOOMUnsafeRegion oomUnsafe;
     if (!attributes.appendAll(other.attributes)) {
       oomUnsafe.crash("StencilModuleRequest::StencilModuleRequest");
@@ -538,19 +572,63 @@ class StencilModuleRequest {
   }
 
   StencilModuleRequest(StencilModuleRequest&& other) noexcept
-      : specifier(other.specifier), attributes(std::move(other.attributes)) {}
+      : specifier(other.specifier),
+        firstUnsupportedAttributeKey(other.firstUnsupportedAttributeKey),
+        attributes(std::move(other.attributes)) {}
 
   StencilModuleRequest& operator=(StencilModuleRequest& other) {
     specifier = other.specifier;
+    firstUnsupportedAttributeKey = other.firstUnsupportedAttributeKey;
     attributes = std::move(other.attributes);
     return *this;
   }
 
   StencilModuleRequest& operator=(StencilModuleRequest&& other) noexcept {
     specifier = other.specifier;
+    firstUnsupportedAttributeKey = other.firstUnsupportedAttributeKey;
     attributes = std::move(other.attributes);
     return *this;
   }
+
+  bool operator==(const StencilModuleRequest& other) const {
+    size_t attrLen = attributes.length();
+    if (specifier != other.specifier ||
+        firstUnsupportedAttributeKey != other.firstUnsupportedAttributeKey ||
+        attrLen != other.attributes.length()) {
+      return false;
+    }
+
+    for (size_t i = 0; i < attrLen; i++) {
+      if (attributes[i] != other.attributes[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  bool operator!=(const StencilModuleRequest& other) const {
+    return !(*this == other);
+  }
+};
+
+struct StencilModuleRequestHasher {
+  using Key = js::frontend::StencilModuleRequest;
+  using Lookup = Key;
+
+  static HashNumber hash(const Lookup& l) {
+    HashNumber hash = 0;
+    size_t attrLen = l.attributes.length();
+    for (size_t i = 0; i < attrLen; i++) {
+      hash = mozilla::AddToHash(
+          hash, TaggedParserAtomIndexHasher::hash(l.attributes[i].key),
+          TaggedParserAtomIndexHasher::hash(l.attributes[i].value));
+    }
+    return mozilla::AddToHash(hash,
+                              TaggedParserAtomIndexHasher::hash(l.specifier));
+  }
+
+  static bool match(const Key& k, const Lookup& l) { return k == l; }
 };
 
 class MaybeModuleRequestIndex {

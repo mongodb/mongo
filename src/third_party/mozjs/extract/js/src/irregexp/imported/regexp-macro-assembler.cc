@@ -124,7 +124,7 @@ int RangeArrayLengthFor(const ZoneList<CharacterRange>* ranges) {
 }
 
 bool Equals(const ZoneList<CharacterRange>* lhs,
-            const Handle<FixedUInt16Array>& rhs) {
+            const DirectHandle<FixedUInt16Array>& rhs) {
   const int rhs_length = rhs->length();
   if (rhs_length != RangeArrayLengthFor(lhs)) return false;
   for (int i = 0; i < lhs->length(); i++) {
@@ -175,15 +175,14 @@ Handle<ByteArray> NativeRegExpMacroAssembler::GetOrAddRangeArray(
 
 // static
 uint32_t RegExpMacroAssembler::IsCharacterInRangeArray(uint32_t current_char,
-                                                       Address raw_byte_array,
-                                                       Isolate* isolate) {
+                                                       Address raw_byte_array) {
   // Use uint32_t to avoid complexity around bool return types (which may be
   // optimized to use only the least significant byte).
   static constexpr uint32_t kTrue = 1;
   static constexpr uint32_t kFalse = 0;
 
   Tagged<FixedUInt16Array> ranges =
-      FixedUInt16Array::cast(Tagged<Object>(raw_byte_array));
+      Cast<FixedUInt16Array>(Tagged<Object>(raw_byte_array));
   DCHECK_GE(ranges->length(), 1);
 
   // Shortcut for fully out of range chars.
@@ -311,10 +310,10 @@ int NativeRegExpMacroAssembler::CheckStackGuardState(
 
   // Prepare for possible GC.
   HandleScope handles(isolate);
-  Handle<InstructionStream> code_handle(re_code, isolate);
-  Handle<String> subject_handle(String::cast(Tagged<Object>(*subject)),
-                                isolate);
-  bool is_one_byte = String::IsOneByteRepresentationUnderneath(*subject_handle);
+  DirectHandle<InstructionStream> code_handle(re_code, isolate);
+  DirectHandle<String> subject_handle(Cast<String>(Tagged<Object>(*subject)),
+                                      isolate);
+  bool is_one_byte = subject_handle->IsOneByteRepresentation();
   int return_value = 0;
 
   {
@@ -344,8 +343,7 @@ int NativeRegExpMacroAssembler::CheckStackGuardState(
   // If we continue, we need to update the subject string addresses.
   if (return_value == 0) {
     // String encoding might have changed.
-    if (String::IsOneByteRepresentationUnderneath(*subject_handle) !=
-        is_one_byte) {
+    if (subject_handle->IsOneByteRepresentation() != is_one_byte) {
       // If we changed between an LATIN1 and an UC16 string, the specialized
       // code cannot be used, and we need to restart regexp matching from
       // scratch (including, potentially, compiling a new version of the code).
@@ -361,8 +359,8 @@ int NativeRegExpMacroAssembler::CheckStackGuardState(
 }
 
 // Returns a {Result} sentinel, or the number of successful matches.
-int NativeRegExpMacroAssembler::Match(Handle<JSRegExp> regexp,
-                                      Handle<String> subject,
+int NativeRegExpMacroAssembler::Match(DirectHandle<IrRegExpData> regexp_data,
+                                      DirectHandle<String> subject,
                                       int* offsets_vector,
                                       int offsets_vector_length,
                                       int previous_index, Isolate* isolate) {
@@ -383,15 +381,15 @@ int NativeRegExpMacroAssembler::Match(Handle<JSRegExp> regexp,
   // The string has been flattened, so if it is a cons string it contains the
   // full string in the first part.
   if (StringShape(subject_ptr).IsCons()) {
-    DCHECK_EQ(0, ConsString::cast(subject_ptr)->second()->length());
-    subject_ptr = ConsString::cast(subject_ptr)->first();
+    DCHECK_EQ(0, Cast<ConsString>(subject_ptr)->second()->length());
+    subject_ptr = Cast<ConsString>(subject_ptr)->first();
   } else if (StringShape(subject_ptr).IsSliced()) {
-    Tagged<SlicedString> slice = SlicedString::cast(subject_ptr);
+    Tagged<SlicedString> slice = Cast<SlicedString>(subject_ptr);
     subject_ptr = slice->parent();
     slice_offset = slice->offset();
   }
   if (StringShape(subject_ptr).IsThin()) {
-    subject_ptr = ThinString::cast(subject_ptr)->actual();
+    subject_ptr = Cast<ThinString>(subject_ptr)->actual();
   }
   // Ensure that an underlying string has the same representation.
   bool is_one_byte = subject_ptr->IsOneByteRepresentation();
@@ -405,7 +403,7 @@ int NativeRegExpMacroAssembler::Match(Handle<JSRegExp> regexp,
   int byte_length = char_length << char_size_shift;
   const uint8_t* input_end = input_start + byte_length;
   return Execute(*subject, start_offset, input_start, input_end, offsets_vector,
-                 offsets_vector_length, isolate, *regexp);
+                 offsets_vector_length, isolate, *regexp_data);
 }
 
 // static
@@ -413,34 +411,33 @@ int NativeRegExpMacroAssembler::ExecuteForTesting(
     Tagged<String> input, int start_offset, const uint8_t* input_start,
     const uint8_t* input_end, int* output, int output_size, Isolate* isolate,
     Tagged<JSRegExp> regexp) {
+  Tagged<RegExpData> data = regexp->data(isolate);
+  SBXCHECK(Is<IrRegExpData>(data));
   return Execute(input, start_offset, input_start, input_end, output,
-                 output_size, isolate, regexp);
+                 output_size, isolate, Cast<IrRegExpData>(data));
 }
 
 // Returns a {Result} sentinel, or the number of successful matches.
-// TODO(pthier): The JSRegExp object is passed to native irregexp code to match
-// the signature of the interpreter. We should get rid of JS objects passed to
-// internal methods.
 int NativeRegExpMacroAssembler::Execute(
     Tagged<String>
         input,  // This needs to be the unpacked (sliced, cons) string.
     int start_offset, const uint8_t* input_start, const uint8_t* input_end,
-    int* output, int output_size, Isolate* isolate, Tagged<JSRegExp> regexp) {
-  RegExpStackScope stack_scope(isolate);
-
-  bool is_one_byte = String::IsOneByteRepresentationUnderneath(input);
-  Tagged<Code> code = Code::cast(regexp->code(isolate, is_one_byte));
+    int* output, int output_size, Isolate* isolate,
+    Tagged<IrRegExpData> regexp_data) {
+  bool is_one_byte = input->IsOneByteRepresentation();
+  Tagged<Code> code = regexp_data->code(isolate, is_one_byte);
   RegExp::CallOrigin call_origin = RegExp::CallOrigin::kFromRuntime;
 
   using RegexpMatcherSig =
       // NOLINTNEXTLINE(readability/casting)
       int(Address input_string, int start_offset, const uint8_t* input_start,
           const uint8_t* input_end, int* output, int output_size,
-          int call_origin, Isolate* isolate, Address regexp);
+          int call_origin, Isolate* isolate, Address regexp_data);
 
   auto fn = GeneratedCode<RegexpMatcherSig>::FromCode(isolate, code);
-  int result = fn.Call(input.ptr(), start_offset, input_start, input_end,
-                       output, output_size, call_origin, isolate, regexp.ptr());
+  int result =
+      fn.Call(input.ptr(), start_offset, input_start, input_end, output,
+              output_size, call_origin, isolate, regexp_data.ptr());
   DCHECK_GE(result, SMALLEST_REGEXP_RESULT);
 
   if (result == EXCEPTION && !isolate->has_exception()) {

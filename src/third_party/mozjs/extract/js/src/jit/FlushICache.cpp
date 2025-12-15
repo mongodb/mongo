@@ -58,40 +58,60 @@ namespace jit {
 
 bool CanFlushExecutionContextForAllThreads() {
 #  if (LINUX_HAS_MEMBARRIER || defined(__android__))
-  // On linux, check the kernel supports membarrier(2), that is, it's a kernel
-  // above Linux 4.16 included.
+  // We only need to decide this once, but we don't know which thread will ask
+  // first.  Hence the atomic.
+  enum class MemBarrierAvailable : uint32_t { Unset, No, Yes };
+
+  // The only allowable transitions are Unset->No and Unset->Yes.
+  static mozilla::Atomic<MemBarrierAvailable> state(MemBarrierAvailable::Unset);
+
+  MemBarrierAvailable localState = state;
+  if (MOZ_LIKELY(localState != MemBarrierAvailable::Unset)) {
+    return localState == MemBarrierAvailable::Yes;
+  }
+
+  // Otherwise we'll have to make enquiries.  This needs to produce the same
+  // result if performed more than once.
+
+  // On linux, check the kernel supports membarrier(2).  A prerequisite is that
+  // the kernel version is 4.16 or later.
   //
   // Note: this code has been extracted (August 2020) from
   // https://android.googlesource.com/platform/art/+/58520dfba31d6eeef75f5babff15e09aa28e5db8/libartbase/base/membarrier.cc#50
   static constexpr int kRequiredMajor = 4;
   static constexpr int kRequiredMinor = 16;
 
-  static bool computed = false;
-  static bool kernelHasMembarrier = false;
-
-  if (computed) {
-    return kernelHasMembarrier;
-  }
-
   struct utsname uts;
   int major, minor;
-  kernelHasMembarrier = uname(&uts) == 0 && strcmp(uts.sysname, "Linux") == 0 &&
-                        sscanf(uts.release, "%d.%d", &major, &minor) == 2 &&
-                        major >= kRequiredMajor &&
-                        (major != kRequiredMajor || minor >= kRequiredMinor);
+  bool memBarrierAvailable =
+      uname(&uts) == 0 && strcmp(uts.sysname, "Linux") == 0 &&
+      sscanf(uts.release, "%d.%d", &major, &minor) == 2 &&
+      major >= kRequiredMajor &&
+      (major != kRequiredMajor || minor >= kRequiredMinor);
 
-  // As a test bed, try to run the syscall with the command registering the
-  // intent to use the actual membarrier we'll want to carry out later.
+  // Try to run the syscall with the command registering the intent to use the
+  // actual membarrier we'll want to carry out later.
   //
-  // IMPORTANT: This is required or else running the membarrier later won't
-  // actually interrupt the threads in this process.
-  if (kernelHasMembarrier &&
+  // IMPORTANT: This is needs to succeed, since otherwise running the
+  // membarrier later won't actually interrupt the threads in this process.
+  // Per `man 2 membarrier`, "RETURN VALUE", we are assured that multiple calls
+  // to `membarrier` with the same commands always produce the same results.
+  if (memBarrierAvailable &&
       membarrier(MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_SYNC_CORE, 0) != 0) {
-    kernelHasMembarrier = false;
+    memBarrierAvailable = false;
   }
 
-  computed = true;
-  return kernelHasMembarrier;
+  bool ok = state.compareExchange(
+      MemBarrierAvailable::Unset,
+      memBarrierAvailable ? MemBarrierAvailable::Yes : MemBarrierAvailable::No);
+  if (ok) {
+    return memBarrierAvailable;
+  }
+
+  // We got out-raced.  Return the info that's already there.
+  MOZ_ASSERT(state != MemBarrierAvailable::Unset);
+  return state == MemBarrierAvailable::Yes;
+
 #  else
   // On other platforms, we assume that the syscall for flushing the icache
   // will flush the execution context for other cores.

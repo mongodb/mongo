@@ -368,6 +368,38 @@ class DoublyLinkedList final {
     }
     return !ElementNotInList(aElm);
   }
+
+  /**
+   * Returns whether an element is linked correctly to its predecessor and/or
+   * successor, if any. Used for internal sanity checks.
+   */
+  bool ElementIsLinkedWell(T* aElm) {
+    MOZ_ASSERT(aElm);
+    if (!ElementProbablyInList(aElm)) {
+      return false;
+    }
+    T* next = ElementAccess::Get(aElm).mNext;
+    if (next) {
+      if (ElementAccess::Get(next).mPrev != aElm) {
+        return false;
+      }
+    } else {
+      if (aElm != mTail) {
+        return false;
+      }
+    }
+    T* prev = ElementAccess::Get(aElm).mPrev;
+    if (prev) {
+      if (ElementAccess::Get(prev).mNext != aElm) {
+        return false;
+      }
+    } else {
+      if (aElm != mHead) {
+        return false;
+      }
+    }
+    return true;
+  }
 };
 
 /**

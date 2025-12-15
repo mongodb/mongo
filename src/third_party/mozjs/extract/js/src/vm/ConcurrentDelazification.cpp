@@ -23,7 +23,6 @@
 #include "js/AllocPolicy.h"    // ReportOutOfMemory
 #include "js/experimental/JSStencil.h"  // RefPtrTraits<JS::Stencil>
 #include "vm/JSContext.h"               // JSContext
-#include "vm/StencilCache.h"            // DelazificationCache
 
 using namespace js;
 
@@ -142,16 +141,14 @@ bool LargeFirstDelazification::insert(ScriptIndex index,
   return true;
 }
 
-bool DelazificationContext::init(const JS::ReadOnlyCompileOptions& options,
-                                 const frontend::CompilationStencil& stencil) {
+bool DelazificationContext::init(
+    const JS::ReadOnlyCompileOptions& options,
+    frontend::InitialStencilAndDelazifications* stencils) {
   using namespace js::frontend;
 
-  RefPtr<ScriptSource> source(stencil.source);
-  DelazificationCache& cache = DelazificationCache::getSingleton();
-  if (!cache.startCaching(std::move(source))) {
-    return false;
-  }
+  stencils_ = stencils;
 
+  const CompilationStencil& stencil = *stencils->getInitial();
   auto initial = fc_.getAllocator()->make_unique<ExtensibleCompilationStencil>(
       options, stencil.source);
   if (!initial || !initial->cloneFrom(&fc_, stencil)) {
@@ -215,28 +212,24 @@ bool DelazificationContext::delazify() {
   // to use it, as it could be purged by a GC in the mean time.
   StencilScopeBindingCache scopeCache(merger_);
 
-  LifoAlloc tempLifoAlloc(JSContext::TEMP_LIFO_ALLOC_PRIMARY_CHUNK_SIZE);
+  LifoAlloc tempLifoAlloc(JSContext::TEMP_LIFO_ALLOC_PRIMARY_CHUNK_SIZE,
+                          js::BackgroundMallocArena);
 
   while (!strategy_->done()) {
     if (isInterrupted_) {
       isInterrupted_ = false;
       break;
     }
-    RefPtr<CompilationStencil> innerStencil;
+    const CompilationStencil* innerStencil;
     ScriptIndex scriptIndex = strategy_->next();
     {
       BorrowingCompilationStencil borrow(merger_.getResult());
-
-      // Take the next inner function to be delazified.
-      ScriptStencilRef scriptRef{borrow, scriptIndex};
-      MOZ_ASSERT(!scriptRef.scriptData().isGhost());
-      MOZ_ASSERT(!scriptRef.scriptData().hasSharedData());
 
       // Parse and generate bytecode for the inner function.
       DelazifyFailureReason failureReason;
       innerStencil = DelazifyCanonicalScriptedFunction(
           &fc_, tempLifoAlloc, initialPrefableOptions_, &scopeCache, borrow,
-          scriptIndex, &failureReason);
+          scriptIndex, stencils_.get(), &failureReason);
       if (!innerStencil) {
         if (failureReason == DelazifyFailureReason::Compressed) {
           // The script source is already compressed, and delazification cannot
@@ -248,23 +241,6 @@ bool DelazificationContext::delazify() {
 
         strategy_->clear();
         return false;
-      }
-
-      // Add the generated stencil to the cache, to be consumed by the main
-      // thread.
-      DelazificationCache& cache = DelazificationCache::getSingleton();
-      StencilContext key(borrow.source, scriptRef.scriptExtra().extent);
-      if (auto guard = cache.isSourceCached(borrow.source)) {
-        if (!cache.putNew(guard, key, innerStencil.get())) {
-          ReportOutOfMemory(&fc_);
-          strategy_->clear();
-          return false;
-        }
-      } else {
-        // Stencils for this source are no longer accepted in the cache, thus
-        // there is no reason to keep our eager delazification going.
-        strategy_->clear();
-        return true;
       }
     }
 

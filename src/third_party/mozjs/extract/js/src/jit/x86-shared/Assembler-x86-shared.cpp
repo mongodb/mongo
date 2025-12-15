@@ -120,9 +120,20 @@ AssemblerX86Shared::Condition AssemblerX86Shared::InvertCondition(
       return AboveOrEqual;
     case BelowOrEqual:
       return Above;
-    default:
-      MOZ_CRASH("unexpected condition");
+    case Overflow:
+      return NoOverflow;
+    case NoOverflow:
+      return Overflow;
+    case Signed:
+      return NotSigned;
+    case NotSigned:
+      return Signed;
+    case Parity:
+      return NoParity;
+    case NoParity:
+      return Parity;
   }
+  MOZ_CRASH("unexpected condition");
 }
 
 AssemblerX86Shared::Condition AssemblerX86Shared::UnsignedCondition(
@@ -214,6 +225,7 @@ bool CPUInfo::bmi2Present = false;
 bool CPUInfo::lzcntPresent = false;
 bool CPUInfo::avx2Present = false;
 bool CPUInfo::fmaPresent = false;
+bool CPUInfo::f16cPresent = false;
 
 namespace js {
 namespace jit {
@@ -334,6 +346,10 @@ void CPUInfo::ComputeFlags() {
   // Use the avxEnabled flag to enable/disable FMA.
   static constexpr int FMABit = 1 << 12;
   fmaPresent = (flagsEcx & FMABit) && avxEnabled;
+
+  // Support for the F16C instruction set. Requires AVX support.
+  static constexpr int F16CBit = 1 << 29;
+  f16cPresent = avxPresent && (flagsEcx & F16CBit);
 
   flagsEax = 0x80000001;
   ReadCPUInfo(&flagsEax, &flagsEbx, &flagsEcx, &flagsEdx);

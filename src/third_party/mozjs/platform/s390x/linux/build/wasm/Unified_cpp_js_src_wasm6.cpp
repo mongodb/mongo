@@ -1,4 +1,13 @@
 #define MOZ_UNIFIED_BUILD
+#include "wasm/WasmSummarizeInsn.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "wasm/WasmSummarizeInsn.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "wasm/WasmSummarizeInsn.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "wasm/WasmTable.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "wasm/WasmTable.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."

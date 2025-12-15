@@ -111,7 +111,7 @@ def print_opcode(opcode):
     stack_uses = maybe_escape(opcode.stack_uses, "<code>{}</code> ")
     stack_defs = maybe_escape(opcode.stack_defs, " <code>{}</code>")
     if stack_uses or stack_defs:
-        stack = "<div>Stack: {}&rArr;{}</div>\n".format(stack_uses, stack_defs)
+        stack = f"<div>Stack: {stack_uses}&rArr;{stack_defs}</div>\n"
     else:
         stack = ""
 
@@ -132,7 +132,7 @@ id_count = dict()
 
 
 def make_element_id(category, type=""):
-    key = "{}:{}".format(category, type)
+    key = f"{category}:{type}"
     if key in id_cache:
         return id_cache[key]
 
@@ -143,7 +143,7 @@ def make_element_id(category, type=""):
 
     if id in id_count:
         id_count[id] += 1
-        id = "{}_{}".format(id, id_count[id])
+        id = f"{id}_{id_count[id]}"
     else:
         id_count[id] = 1
 
@@ -153,30 +153,22 @@ def make_element_id(category, type=""):
 
 def print_doc(index):
     print(
-        """<div>{{{{SpiderMonkeySidebar("Internals")}}}}</div>
+        f"""<div>{{{{SpiderMonkeySidebar("Internals")}}}}</div>
 
 <h2 id="Bytecode_Listing">Bytecode Listing</h2>
 
 <p>This document is automatically generated from
-<a href="{source_base}/js/src/vm/Opcodes.h">Opcodes.h</a> by
-<a href="{source_base}/js/src/vm/make_opcode_doc.py">make_opcode_doc.py</a>.</p>
-""".format(
-            source_base=SOURCE_BASE
-        )
+<a href="{SOURCE_BASE}/js/src/vm/Opcodes.h">Opcodes.h</a> by
+<a href="{SOURCE_BASE}/js/src/vm/make_opcode_doc.py">make_opcode_doc.py</a>.</p>
+"""
     )
 
     for category_name, types in index:
-        print(
-            '<h3 id="{id}">{name}</h3>'.format(
-                name=category_name, id=make_element_id(category_name)
-            )
-        )
+        print(f'<h3 id="{make_element_id(category_name)}">{category_name}</h3>')
         for type_name, opcodes in types:
             if type_name:
                 print(
-                    '<h4 id="{id}">{name}</h4>'.format(
-                        name=type_name, id=make_element_id(category_name, type_name)
-                    )
+                    f'<h4 id="{make_element_id(category_name, type_name)}">{type_name}</h4>'
                 )
             print("<dl>")
             for opcode in opcodes:

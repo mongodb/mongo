@@ -103,7 +103,6 @@ static EnterJitStatus JS_HAZ_JSNATIVE_CALLER EnterJit(JSContext* cx,
   RootedValue result(cx, Int32Value(numActualArgs));
   {
     AssertRealmUnchanged aru(cx);
-    ActivationEntryMonitor entryMonitor(cx, calleeToken);
     JitActivation activation(cx);
 
 #ifndef ENABLE_PORTABLE_BASELINE_INTERP

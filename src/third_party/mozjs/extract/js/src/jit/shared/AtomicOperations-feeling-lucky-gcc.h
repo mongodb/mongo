@@ -138,6 +138,10 @@ inline void js::jit::AtomicOperations::fenceSeqCst() {
 #endif
 }
 
+inline void js::jit::AtomicOperations::pause() {
+  // No default implementation.
+}
+
 template <typename T>
 inline T js::jit::AtomicOperations::loadSeqCst(T* addr) {
   static_assert(sizeof(T) <= 8, "atomics supported up to 8 bytes only");

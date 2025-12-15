@@ -135,7 +135,7 @@ struct Token {
   /** The token's position in the overall script. */
   TokenPos pos;
 
-  union {
+  union U {
    private:
     friend struct Token;
 
@@ -151,6 +151,9 @@ struct Token {
 
     /** Regular expression flags; use charBuffer to access source chars. */
     JS::RegExpFlags reflags;
+
+   public:
+    U() {};
   } u;
 
 #ifdef DEBUG

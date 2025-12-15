@@ -131,7 +131,7 @@ for path in tests:
     os.chdir(outdir)
     for xdb in glob("*.xdb"):
         os.unlink(xdb)
-    print("START TEST {}".format(name), flush=True)
+    print(f"START TEST {name}", flush=True)
     testpath = os.path.join(indir, "test.py")
     testscript = open(testpath).read()
     testcode = compile(testscript, testpath, "exec")

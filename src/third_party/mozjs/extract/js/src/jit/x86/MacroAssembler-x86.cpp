@@ -510,8 +510,9 @@ void MacroAssemblerX86::finish() {
   }
 }
 
-void MacroAssemblerX86::handleFailureWithHandlerTail(Label* profilerExitTail,
-                                                     Label* bailoutTail) {
+void MacroAssemblerX86::handleFailureWithHandlerTail(
+    Label* profilerExitTail, Label* bailoutTail,
+    uint32_t* returnValueCheckOffset) {
   // Reserve space for exception information.
   subl(Imm32(sizeof(ResumeFromException)), esp);
   movl(esp, eax);
@@ -523,13 +524,15 @@ void MacroAssemblerX86::handleFailureWithHandlerTail(Label* profilerExitTail,
   asMasm().callWithABI<Fn, HandleException>(
       ABIType::General, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
 
+  *returnValueCheckOffset = asMasm().currentOffset();
+
   Label entryFrame;
   Label catch_;
   Label finally;
   Label returnBaseline;
   Label returnIon;
   Label bailout;
-  Label wasm;
+  Label wasmInterpEntry;
   Label wasmCatch;
 
   loadPtr(Address(esp, ResumeFromException::offsetOfKind()), eax);
@@ -546,8 +549,9 @@ void MacroAssemblerX86::handleFailureWithHandlerTail(Label* profilerExitTail,
                     Imm32(ExceptionResumeKind::ForcedReturnIon), &returnIon);
   asMasm().branch32(Assembler::Equal, eax, Imm32(ExceptionResumeKind::Bailout),
                     &bailout);
-  asMasm().branch32(Assembler::Equal, eax, Imm32(ExceptionResumeKind::Wasm),
-                    &wasm);
+  asMasm().branch32(Assembler::Equal, eax,
+                    Imm32(ExceptionResumeKind::WasmInterpEntry),
+                    &wasmInterpEntry);
   asMasm().branch32(Assembler::Equal, eax,
                     Imm32(ExceptionResumeKind::WasmCatch), &wasmCatch);
 
@@ -633,13 +637,12 @@ void MacroAssemblerX86::handleFailureWithHandlerTail(Label* profilerExitTail,
   move32(Imm32(1), ReturnReg);
   jump(bailoutTail);
 
-  // If we are throwing and the innermost frame was a wasm frame, reset SP and
-  // FP; SP is pointing to the unwound return address to the wasm entry, so
-  // we can just ret().
-  bind(&wasm);
+  // Reset SP and FP; SP is pointing to the unwound return address to the wasm
+  // interpreter entry, so we can just ret().
+  bind(&wasmInterpEntry);
   loadPtr(Address(esp, ResumeFromException::offsetOfFramePointer()), ebp);
   loadPtr(Address(esp, ResumeFromException::offsetOfStackPointer()), esp);
-  movePtr(ImmPtr((const void*)wasm::FailInstanceReg), InstanceReg);
+  movePtr(ImmPtr((const void*)wasm::InterpFailInstanceReg), InstanceReg);
   masm.ret();
 
   // Found a wasm catch handler, restore state and jump to it.
@@ -821,33 +824,6 @@ void MacroAssembler::callWithABINoProfiler(const Address& fun, ABIType result) {
 // ===============================================================
 // Move instructions
 
-void MacroAssembler::moveValue(const TypedOrValueRegister& src,
-                               const ValueOperand& dest) {
-  if (src.hasValue()) {
-    moveValue(src.valueReg(), dest);
-    return;
-  }
-
-  MIRType type = src.type();
-  AnyRegister reg = src.typedReg();
-
-  if (!IsFloatingPointType(type)) {
-    if (reg.gpr() != dest.payloadReg()) {
-      movl(reg.gpr(), dest.payloadReg());
-    }
-    mov(ImmWord(MIRTypeToTag(type)), dest.typeReg());
-    return;
-  }
-
-  ScratchDoubleScope scratch(*this);
-  FloatRegister freg = reg.fpu();
-  if (type == MIRType::Float32) {
-    convertFloat32ToDouble(freg, scratch);
-    freg = scratch;
-  }
-  boxDouble(freg, dest, scratch);
-}
-
 void MacroAssembler::moveValue(const ValueOperand& src,
                                const ValueOperand& dest) {
   Register s0 = src.typeReg();
@@ -883,6 +859,21 @@ void MacroAssembler::moveValue(const Value& src, const ValueOperand& dest) {
   } else {
     movl(Imm32(src.toNunboxPayload()), dest.payloadReg());
   }
+}
+
+// ===============================================================
+// Arithmetic functions
+
+void MacroAssembler::flexibleQuotientPtr(
+    Register rhs, Register srcDest, bool isUnsigned,
+    const LiveRegisterSet& volatileLiveRegs) {
+  flexibleQuotient32(rhs, srcDest, isUnsigned, volatileLiveRegs);
+}
+
+void MacroAssembler::flexibleRemainderPtr(
+    Register rhs, Register srcDest, bool isUnsigned,
+    const LiveRegisterSet& volatileLiveRegs) {
+  flexibleRemainder32(rhs, srcDest, isUnsigned, volatileLiveRegs);
 }
 
 // ===============================================================
@@ -952,6 +943,7 @@ void MacroAssembler::branchValueIsNurseryCell(Condition cond,
 void MacroAssembler::branchTestValue(Condition cond, const ValueOperand& lhs,
                                      const Value& rhs, Label* label) {
   MOZ_ASSERT(cond == Equal || cond == NotEqual);
+  MOZ_ASSERT(!rhs.isNaN());
   if (rhs.isGCThing()) {
     cmpPtr(lhs.payloadReg(), ImmGCPtr(rhs.toGCThing()));
   } else {
@@ -970,6 +962,36 @@ void MacroAssembler::branchTestValue(Condition cond, const ValueOperand& lhs,
     j(NotEqual, label);
 
     cmp32(lhs.typeReg(), Imm32(rhs.toNunboxTag()));
+    j(NotEqual, label);
+  }
+}
+
+void MacroAssembler::branchTestNaNValue(Condition cond, const ValueOperand& val,
+                                        Register temp, Label* label) {
+  MOZ_ASSERT(cond == Equal || cond == NotEqual);
+
+  // When testing for NaN, we want to ignore the sign bit.
+  const uint32_t SignBit = mozilla::FloatingPoint<double>::kSignBit >> 32;
+  movl(val.typeReg(), temp);
+  andl(Imm32(~SignBit), temp);
+
+  // Compare against a NaN with sign bit 0.
+  static_assert(JS::detail::CanonicalizedNaNSignBit == 0);
+  Value expected = DoubleValue(JS::GenericNaN());
+  cmpPtr(val.payloadReg(), ImmWord(expected.toNunboxPayload()));
+
+  if (cond == Equal) {
+    Label done;
+    j(NotEqual, &done);
+    {
+      cmp32(temp, Imm32(expected.toNunboxTag()));
+      j(Equal, label);
+    }
+    bind(&done);
+  } else {
+    j(NotEqual, label);
+
+    cmp32(temp, Imm32(expected.toNunboxTag()));
     j(NotEqual, label);
   }
 }
@@ -1686,14 +1708,14 @@ void MacroAssembler::atomicFetchOp64(Synchronization, AtomicOp op,
 // ========================================================================
 // Convert floating point.
 
-bool MacroAssembler::convertUInt64ToDoubleNeedsTemp() { return HasSSE3(); }
+bool MacroAssembler::convertUInt64ToDoubleNeedsTemp() { return false; }
 
 void MacroAssembler::convertUInt64ToDouble(Register64 src, FloatRegister dest,
                                            Register temp) {
+  MOZ_ASSERT(temp == Register::Invalid());
+
   // SUBPD needs SSE2, HADDPD needs SSE3.
   if (!HasSSE3()) {
-    MOZ_ASSERT(temp == Register::Invalid());
-
     // Zero the dest register to break dependencies, see convertInt32ToDouble.
     zeroDouble(dest);
 
@@ -1876,7 +1898,6 @@ void MacroAssembler::wasmBoundsCheck64(Condition cond, Register64 index,
   bind(&notOk);
 }
 
-#ifdef ENABLE_WASM_TAIL_CALLS
 void MacroAssembler::wasmMarkCallAsSlow() {
   static_assert(esi == InstanceReg);
   or32(esi, esi);
@@ -1890,6 +1911,5 @@ void MacroAssembler::wasmCheckSlowCallsite(Register ra, Label* notSlow,
   cmp16(Address(ra, 0), Imm32(SlowCallMarker));
   j(Assembler::NotEqual, notSlow);
 }
-#endif  // ENABLE_WASM_TAIL_CALLS
 
 //}}} check_macroassembler_style

@@ -79,7 +79,7 @@ JS_PUBLIC_API const char* JS_UnsafeGetLastProfilingError();
 
 #ifdef __linux__
 
-[[nodiscard]] extern JS_PUBLIC_API bool js_StartPerf();
+[[nodiscard]] extern JS_PUBLIC_API bool js_StartPerf(const char* outfile);
 
 [[nodiscard]] extern JS_PUBLIC_API bool js_StopPerf();
 

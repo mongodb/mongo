@@ -5,7 +5,7 @@
 /* Portions Copyright Norbert Lindenberg 2011-2012. */
 
 /**
- * 11.1.2 CreateDateTimeFormat ( newTarget, locales, options, required, defaults )
+ * 11.1.2 CreateDateTimeFormat ( newTarget, locales, options, required, defaults [ , toLocaleStringTimeZone ] )
  *
  * Compute an internal properties object from |lazyDateTimeFormatData|.
  */
@@ -102,6 +102,8 @@ function resolveDateTimeFormatInternals(lazyDateTimeFormatData) {
     internalProps.dateStyle = lazyDateTimeFormatData.dateStyle;
     internalProps.timeStyle = lazyDateTimeFormatData.timeStyle;
   } else {
+    internalProps.required = lazyDateTimeFormatData.required;
+    internalProps.defaults = lazyDateTimeFormatData.defaults;
     internalProps.hourCycle = formatOptions.hourCycle;
     internalProps.hour12 = formatOptions.hour12;
     internalProps.weekday = formatOptions.weekday;
@@ -195,10 +197,10 @@ function CanonicalizeTimeZoneName(timeZone) {
     "Unsupported canonical time zone"
   );
 
-  // Step 3.
-  if (ianaTimeZone === "Etc/UTC" || ianaTimeZone === "Etc/GMT") {
-    ianaTimeZone = "UTC";
-  }
+  // Step 3. (Not applicable.)
+  assert(ianaTimeZone !== "Etc/UTC", "Invalid link to UTC");
+  assert(ianaTimeZone !== "Etc/GMT", "Invalid link to UTC");
+  assert(ianaTimeZone !== "GMT", "Invalid link to UTC");
 
   // Step 4.
   return ianaTimeZone;
@@ -275,15 +277,9 @@ function TimeZoneOffsetString(offsetString) {
   assert(typeof(offsetString) === "string", "offsetString is a string");
 
   // UTCOffset :::
-  //   TemporalSign Hour
-  //   TemporalSign Hour HourSubcomponents[+Extended]
-  //   TemporalSign Hour HourSubcomponents[~Extended]
-  //
-  // TemporalSign :::
-  //   ASCIISign
-  //   <MINUS>
-  //
-  // With <MINUS> = U+2212
+  //   ASCIISign Hour
+  //   ASCIISign Hour HourSubcomponents[+Extended]
+  //   ASCIISign Hour HourSubcomponents[~Extended]
   //
   // ASCIISign ::: one of
   //   + -
@@ -316,40 +312,19 @@ function TimeZoneOffsetString(offsetString) {
     return null;
   }
 
-  // Self-hosted code only supports Latin-1 permanent atoms, so the Unicode <MINUS>
-  // can't be used in a string literal "\u2212". That means the first character has
-  // to be checked using the character code instead of performing a normal string
-  // comparison. Alternatively <MINUS> could be generated at runtime through
-  // |std_String_fromCharCode(0x2212)|, but that means allocating a string just for
-  // the comparison. And for consistency also check the remaining characters through
-  // their character code.
-
-  #define PLUS_SIGN 0x2b
-  #define HYPHEN_MINUS 0x2d
-  #define MINUS 0x2212
-  #define COLON 0x3a
-  #define DIGIT_ZERO 0x30
-  #define DIGIT_TWO 0x32
-  #define DIGIT_THREE 0x33
-  #define DIGIT_FIVE 0x35
-  #define DIGIT_NINE 0x39
-
-  /* global PLUS_SIGN, HYPHEN_MINUS, MINUS, COLON */
-  /* global DIGIT_ZERO, DIGIT_TWO, DIGIT_THREE, DIGIT_FIVE, DIGIT_NINE */
-
-  // The first character must match |TemporalSign|.
-  var sign = callFunction(std_String_charCodeAt, offsetString, 0);
-  if (sign !== PLUS_SIGN && sign !== HYPHEN_MINUS && sign !== MINUS) {
+  // The first character must match |ASCIISign|.
+  var sign = offsetString[0];
+  if (sign !== "+" && sign !== "-") {
     return null;
   }
 
   // Read the next two characters for the |Hour| grammar production.
-  var hourTens = callFunction(std_String_charCodeAt, offsetString, 1);
-  var hourOnes = callFunction(std_String_charCodeAt, offsetString, 2);
+  var hourTens = offsetString[1];
+  var hourOnes = offsetString[2];
 
   // Read the remaining characters for the optional |MinuteSecond| grammar production.
-  var minutesTens = DIGIT_ZERO;
-  var minutesOnes = DIGIT_ZERO;
+  var minutesTens = "0";
+  var minutesOnes = "0";
   if (offsetString.length > 3) {
     // |TimeSeparator| is optional.
     var separatorLength = offsetString[3] === ":" ? 1 : 0;
@@ -359,70 +334,43 @@ function TimeZoneOffsetString(offsetString) {
       return null;
     }
 
-    minutesTens = callFunction(
-      std_String_charCodeAt,
-      offsetString,
-      3 + separatorLength,
-    );
-    minutesOnes = callFunction(
-      std_String_charCodeAt,
-      offsetString,
-      4 + separatorLength,
-    );
+    minutesTens = offsetString[3 + separatorLength];
+    minutesOnes = offsetString[4 + separatorLength];
   }
 
   // Validate the characters match the |Hour| and |MinuteSecond| productions:
   // - hours must be in the range 0..23
   // - minutes must in the range 0..59
   if (
-    hourTens < DIGIT_ZERO ||
-    hourOnes < DIGIT_ZERO ||
-    minutesTens < DIGIT_ZERO ||
-    minutesOnes < DIGIT_ZERO ||
-    hourTens > DIGIT_TWO ||
-    hourOnes > DIGIT_NINE ||
-    minutesTens > DIGIT_FIVE ||
-    minutesOnes > DIGIT_NINE ||
-    (hourTens === DIGIT_TWO && hourOnes > DIGIT_THREE)
+    hourTens < "0" ||
+    hourOnes < "0" ||
+    minutesTens < "0" ||
+    minutesOnes < "0" ||
+    hourTens > "2" ||
+    hourOnes > "9" ||
+    minutesTens > "5" ||
+    minutesOnes > "9" ||
+    (hourTens === "2" && hourOnes > "3")
   ) {
     return null;
   }
 
   // FormatOffsetTimeZoneIdentifier, steps 1-5.
   if (
-    hourTens === DIGIT_ZERO &&
-    hourOnes === DIGIT_ZERO &&
-    minutesTens === DIGIT_ZERO &&
-    minutesOnes === DIGIT_ZERO
+    hourTens === "0" &&
+    hourOnes === "0" &&
+    minutesTens === "0" &&
+    minutesOnes === "0"
   ) {
-    sign = PLUS_SIGN;
-  } else if (sign === MINUS) {
-    sign = HYPHEN_MINUS;
+    sign = "+";
   }
 
-  return std_String_fromCharCode(
-    sign,
-    hourTens,
-    hourOnes,
-    COLON,
-    minutesTens,
-    minutesOnes,
-  );
-
-  #undef PLUS_SIGN
-  #undef HYPHEN_MINUS
-  #undef MINUS
-  #undef COLON
-  #undef DIGIT_ZERO
-  #undef DIGIT_TWO
-  #undef DIGIT_THREE
-  #undef DIGIT_FIVE
-  #undef DIGIT_NINE
+  return sign + hourTens + hourOnes + ":" + minutesTens + minutesOnes;
 }
 
 /* eslint-disable complexity */
 /**
- * 11.1.2 CreateDateTimeFormat ( newTarget, locales, options, required, defaults )
+ * 11.1.2 CreateDateTimeFormat ( newTarget, locales, options, required, defaults [ , toLocaleStringTimeZone ] )
  *
  * Initializes an object as a DateTimeFormat.
  *
@@ -439,6 +387,7 @@ function InitializeDateTimeFormat(
   options,
   required,
   defaults,
+  toLocaleStringTimeZone,
   mozExtensions
 ) {
   assert(
@@ -456,6 +405,10 @@ function InitializeDateTimeFormat(
   assert(
     defaults === "date" || defaults === "time" || defaults === "all",
     `InitializeDateTimeFormat called with invalid defaults value: ${defaults}`
+  );
+  assert(
+    toLocaleStringTimeZone === undefined || typeof toLocaleStringTimeZone === "string",
+    `InitializeDateTimeFormat called with invalid toLocaleStringTimeZone value: ${toLocaleStringTimeZone}`
   );
 
   // Lazy DateTimeFormat data has the following structure:
@@ -485,6 +438,10 @@ function InitializeDateTimeFormat(
   //       }
   //
   //     formatMatcher: "basic" / "best fit",
+  //
+  //     required: "date" / "time" / "any", // optional
+  //
+  //     defaults: "date" / "time" / "all", // optional
   //   }
   //
   // Note that lazy data is only installed as a final step of initialization,
@@ -585,11 +542,22 @@ function InitializeDateTimeFormat(
   // Steps 30-34.
   if (timeZone === undefined) {
     // Step 30.a.
-    timeZone = DefaultTimeZone();
+    if (toLocaleStringTimeZone !== undefined) {
+      timeZone = toLocaleStringTimeZone;
+    } else {
+      timeZone = DefaultTimeZone();
+    }
 
     // Steps 32-34. (Not applicable in our implementation.)
   } else {
     // Step 31.a.
+    if (toLocaleStringTimeZone !== undefined) {
+      ThrowTypeError(
+        JSMSG_INVALID_DATETIME_OPTION,
+        "timeZone",
+        "Temporal.ZonedDateTime.toLocaleString"
+      );
+    }
     timeZone = ToString(timeZone);
 
     // Steps 32-34.
@@ -793,58 +761,16 @@ function InitializeDateTimeFormat(
 
     // Step 43.b.
     if (required === "date" && timeStyle !== undefined) {
-      ThrowTypeError(
-        JSMSG_INVALID_DATETIME_STYLE,
-        "timeStyle",
-        "toLocaleDateString"
-      );
+      ThrowTypeError(JSMSG_INVALID_DATETIME_STYLE, "timeStyle", "date");
     }
 
     // Step 43.c.
     if (required === "time" && dateStyle !== undefined) {
-      ThrowTypeError(
-        JSMSG_INVALID_DATETIME_STYLE,
-        "dateStyle",
-        "toLocaleTimeString"
-      );
+      ThrowTypeError(JSMSG_INVALID_DATETIME_STYLE, "dateStyle", "time");
     }
   } else {
-    // Step 44.a.
-    var needDefaults = true;
-
-    // Step 44.b.
-    if (required === "date" || required === "any") {
-      needDefaults =
-        formatOptions.weekday === undefined &&
-        formatOptions.year === undefined &&
-        formatOptions.month === undefined &&
-        formatOptions.day === undefined;
-    }
-
-    // Step 44.c.
-    if (required === "time" || required === "any") {
-      needDefaults =
-        needDefaults &&
-        formatOptions.dayPeriod === undefined &&
-        formatOptions.hour === undefined &&
-        formatOptions.minute === undefined &&
-        formatOptions.second === undefined &&
-        formatOptions.fractionalSecondDigits === undefined;
-    }
-
-    // Step 44.d.
-    if (needDefaults && (defaults === "date" || defaults === "all")) {
-      formatOptions.year = "numeric";
-      formatOptions.month = "numeric";
-      formatOptions.day = "numeric";
-    }
-
-    // Step 44.e.
-    if (needDefaults && (defaults === "time" || defaults === "all")) {
-      formatOptions.hour = "numeric";
-      formatOptions.minute = "numeric";
-      formatOptions.second = "numeric";
-    }
+    lazyDateTimeFormatData.required = required;
+    lazyDateTimeFormatData.defaults = defaults;
 
     // Steps 44.f-h provided by ICU, more or less.
   }
@@ -948,11 +874,8 @@ function createDateTimeFormatFormat(dtf) {
       "dateTimeFormatFormatToBind called with non-DateTimeFormat"
     );
 
-    // Steps 3-4.
-    var x = date === undefined ? std_Date_now() : ToNumber(date);
-
-    // Step 5.
-    return intl_FormatDateTime(dtf, x, /* formatToParts = */ false);
+    // Steps 3-5.
+    return intl_FormatDateTime(dtf, date, /* formatToParts = */ false);
   };
 }
 
@@ -1009,14 +932,11 @@ function Intl_DateTimeFormat_formatToParts(date) {
     );
   }
 
-  // Steps 4-5.
-  var x = date === undefined ? std_Date_now() : ToNumber(date);
-
   // Ensure the DateTimeFormat internals are resolved.
   getDateTimeFormatInternals(dtf);
 
-  // Step 6.
-  return intl_FormatDateTime(dtf, x, /* formatToParts = */ true);
+  // Steps 4-6.
+  return intl_FormatDateTime(dtf, date, /* formatToParts = */ true);
 }
 
 /**
@@ -1048,17 +968,11 @@ function Intl_DateTimeFormat_formatRange(startDate, endDate) {
     );
   }
 
-  // Step 4.
-  var x = ToNumber(startDate);
-
-  // Step 5.
-  var y = ToNumber(endDate);
-
   // Ensure the DateTimeFormat internals are resolved.
   getDateTimeFormatInternals(dtf);
 
-  // Step 6.
-  return intl_FormatDateTimeRange(dtf, x, y, /* formatToParts = */ false);
+  // Steps 4-6.
+  return intl_FormatDateTimeRange(dtf, startDate, endDate, /* formatToParts = */ false);
 }
 
 /**
@@ -1090,17 +1004,11 @@ function Intl_DateTimeFormat_formatRangeToParts(startDate, endDate) {
     );
   }
 
-  // Step 4.
-  var x = ToNumber(startDate);
-
-  // Step 5.
-  var y = ToNumber(endDate);
-
   // Ensure the DateTimeFormat internals are resolved.
   getDateTimeFormatInternals(dtf);
 
-  // Step 6.
-  return intl_FormatDateTimeRange(dtf, x, y, /* formatToParts = */ true);
+  // Steps 4-6.
+  return intl_FormatDateTimeRange(dtf, startDate, endDate, /* formatToParts = */ true);
 }
 
 /**

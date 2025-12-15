@@ -46,7 +46,9 @@ const JSClass PluralRulesObject::class_ = {
     JSCLASS_HAS_RESERVED_SLOTS(PluralRulesObject::SLOT_COUNT) |
         JSCLASS_HAS_CACHED_PROTO(JSProto_PluralRules) |
         JSCLASS_FOREGROUND_FINALIZE,
-    &PluralRulesObject::classOps_, &PluralRulesObject::classSpec_};
+    &PluralRulesObject::classOps_,
+    &PluralRulesObject::classSpec_,
+};
 
 const JSClass& PluralRulesObject::protoClass_ = PlainObject::class_;
 
@@ -59,18 +61,22 @@ static bool pluralRules_toSource(JSContext* cx, unsigned argc, Value* vp) {
 static const JSFunctionSpec pluralRules_static_methods[] = {
     JS_SELF_HOSTED_FN("supportedLocalesOf",
                       "Intl_PluralRules_supportedLocalesOf", 1, 0),
-    JS_FS_END};
+    JS_FS_END,
+};
 
 static const JSFunctionSpec pluralRules_methods[] = {
     JS_SELF_HOSTED_FN("resolvedOptions", "Intl_PluralRules_resolvedOptions", 0,
                       0),
     JS_SELF_HOSTED_FN("select", "Intl_PluralRules_select", 1, 0),
     JS_SELF_HOSTED_FN("selectRange", "Intl_PluralRules_selectRange", 2, 0),
-    JS_FN("toSource", pluralRules_toSource, 0, 0), JS_FS_END};
+    JS_FN("toSource", pluralRules_toSource, 0, 0),
+    JS_FS_END,
+};
 
 static const JSPropertySpec pluralRules_properties[] = {
     JS_STRING_SYM_PS(toStringTag, "Intl.PluralRules", JSPROP_READONLY),
-    JS_PS_END};
+    JS_PS_END,
+};
 
 static bool PluralRules(JSContext* cx, unsigned argc, Value* vp);
 
@@ -82,7 +88,8 @@ const ClassSpec PluralRulesObject::classSpec_ = {
     pluralRules_methods,
     pluralRules_properties,
     nullptr,
-    ClassSpec::DontDefineConstructor};
+    ClassSpec::DontDefineConstructor,
+};
 
 /**
  * 16.1.1 Intl.PluralRules ( [ locales [ , options ] ] )
@@ -491,11 +498,20 @@ bool js::intl_GetPluralCategories(JSContext* cx, unsigned argc, Value* vp) {
   res->setDenseInitializedLength(categories.size());
 
   size_t index = 0;
-  for (PluralRules::Keyword keyword : categories) {
-    JSString* str = KeywordToString(keyword, cx);
-    MOZ_ASSERT(str);
+  for (auto keyword : {
+           PluralRules::Keyword::Zero,
+           PluralRules::Keyword::One,
+           PluralRules::Keyword::Two,
+           PluralRules::Keyword::Few,
+           PluralRules::Keyword::Many,
+           PluralRules::Keyword::Other,
+       }) {
+    if (categories.contains(keyword)) {
+      JSString* str = KeywordToString(keyword, cx);
+      MOZ_ASSERT(str);
 
-    res->initDenseElement(index++, StringValue(str));
+      res->initDenseElement(index++, StringValue(str));
+    }
   }
   MOZ_ASSERT(index == categories.size());
 

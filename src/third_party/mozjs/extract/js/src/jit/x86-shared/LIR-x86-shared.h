@@ -10,62 +10,6 @@
 namespace js {
 namespace jit {
 
-class LDivI : public LBinaryMath<1> {
- public:
-  LIR_HEADER(DivI)
-
-  LDivI(const LAllocation& lhs, const LAllocation& rhs, const LDefinition& temp)
-      : LBinaryMath(classOpcode) {
-    setOperand(0, lhs);
-    setOperand(1, rhs);
-    setTemp(0, temp);
-  }
-
-  const char* extraName() const {
-    if (mir()->isTruncated()) {
-      if (mir()->canBeNegativeZero()) {
-        return mir()->canBeNegativeOverflow()
-                   ? "Truncate_NegativeZero_NegativeOverflow"
-                   : "Truncate_NegativeZero";
-      }
-      return mir()->canBeNegativeOverflow() ? "Truncate_NegativeOverflow"
-                                            : "Truncate";
-    }
-    if (mir()->canBeNegativeZero()) {
-      return mir()->canBeNegativeOverflow() ? "NegativeZero_NegativeOverflow"
-                                            : "NegativeZero";
-    }
-    return mir()->canBeNegativeOverflow() ? "NegativeOverflow" : nullptr;
-  }
-
-  const LDefinition* remainder() { return getTemp(0); }
-  MDiv* mir() const { return mir_->toDiv(); }
-};
-
-// Signed division by a power-of-two constant.
-class LDivPowTwoI : public LBinaryMath<0> {
-  const int32_t shift_;
-  const bool negativeDivisor_;
-
- public:
-  LIR_HEADER(DivPowTwoI)
-
-  LDivPowTwoI(const LAllocation& lhs, const LAllocation& lhsCopy, int32_t shift,
-              bool negativeDivisor)
-      : LBinaryMath(classOpcode),
-        shift_(shift),
-        negativeDivisor_(negativeDivisor) {
-    setOperand(0, lhs);
-    setOperand(1, lhsCopy);
-  }
-
-  const LAllocation* numerator() { return getOperand(0); }
-  const LAllocation* numeratorCopy() { return getOperand(1); }
-  int32_t shift() const { return shift_; }
-  bool negativeDivisor() const { return negativeDivisor_; }
-  MDiv* mir() const { return mir_->toDiv(); }
-};
-
 class LDivOrModConstantI : public LInstructionHelper<1, 1, 1> {
   const int32_t denominator_;
 
@@ -91,25 +35,6 @@ class LDivOrModConstantI : public LInstructionHelper<1, 1, 1> {
     }
     return mir_->toDiv()->canBeNegativeDividend();
   }
-};
-
-class LModI : public LBinaryMath<1> {
- public:
-  LIR_HEADER(ModI)
-
-  LModI(const LAllocation& lhs, const LAllocation& rhs, const LDefinition& temp)
-      : LBinaryMath(classOpcode) {
-    setOperand(0, lhs);
-    setOperand(1, rhs);
-    setTemp(0, temp);
-  }
-
-  const char* extraName() const {
-    return mir()->isTruncated() ? "Truncated" : nullptr;
-  }
-
-  const LDefinition* remainder() { return getDef(0); }
-  MMod* mir() const { return mir_->toMod(); }
 };
 
 // This class performs a simple x86 'div', yielding either a quotient or
@@ -152,11 +77,11 @@ class LUDivOrMod : public LBinaryMath<1> {
     return mir_->toDiv()->trapOnError();
   }
 
-  wasm::BytecodeOffset bytecodeOffset() const {
+  wasm::TrapSiteDesc trapSiteDesc() const {
     if (mir_->isMod()) {
-      return mir_->toMod()->bytecodeOffset();
+      return mir_->toMod()->trapSiteDesc();
     }
-    return mir_->toDiv()->bytecodeOffset();
+    return mir_->toDiv()->trapSiteDesc();
   }
 };
 
@@ -191,111 +116,12 @@ class LUDivOrModConstant : public LInstructionHelper<1, 1, 1> {
     }
     return mir_->toDiv()->trapOnError();
   }
-  wasm::BytecodeOffset bytecodeOffset() const {
+  wasm::TrapSiteDesc trapSiteDesc() const {
     if (mir_->isMod()) {
-      return mir_->toMod()->bytecodeOffset();
+      return mir_->toMod()->trapSiteDesc();
     }
-    return mir_->toDiv()->bytecodeOffset();
+    return mir_->toDiv()->trapSiteDesc();
   }
-};
-
-class LModPowTwoI : public LInstructionHelper<1, 1, 0> {
-  const int32_t shift_;
-
- public:
-  LIR_HEADER(ModPowTwoI)
-
-  LModPowTwoI(const LAllocation& lhs, int32_t shift)
-      : LInstructionHelper(classOpcode), shift_(shift) {
-    setOperand(0, lhs);
-  }
-
-  int32_t shift() const { return shift_; }
-  const LDefinition* remainder() { return getDef(0); }
-  MMod* mir() const { return mir_->toMod(); }
-};
-
-// Takes a tableswitch with an integer to decide
-class LTableSwitch : public LInstructionHelper<0, 1, 2> {
- public:
-  LIR_HEADER(TableSwitch)
-
-  LTableSwitch(const LAllocation& in, const LDefinition& inputCopy,
-               const LDefinition& jumpTablePointer, MTableSwitch* ins)
-      : LInstructionHelper(classOpcode) {
-    setOperand(0, in);
-    setTemp(0, inputCopy);
-    setTemp(1, jumpTablePointer);
-    setMir(ins);
-  }
-
-  MTableSwitch* mir() const { return mir_->toTableSwitch(); }
-
-  const LAllocation* index() { return getOperand(0); }
-  const LDefinition* tempInt() { return getTemp(0); }
-  const LDefinition* tempPointer() { return getTemp(1); }
-};
-
-// Takes a tableswitch with a value to decide
-class LTableSwitchV : public LInstructionHelper<0, BOX_PIECES, 3> {
- public:
-  LIR_HEADER(TableSwitchV)
-
-  LTableSwitchV(const LBoxAllocation& input, const LDefinition& inputCopy,
-                const LDefinition& floatCopy,
-                const LDefinition& jumpTablePointer, MTableSwitch* ins)
-      : LInstructionHelper(classOpcode) {
-    setBoxOperand(InputValue, input);
-    setTemp(0, inputCopy);
-    setTemp(1, floatCopy);
-    setTemp(2, jumpTablePointer);
-    setMir(ins);
-  }
-
-  MTableSwitch* mir() const { return mir_->toTableSwitch(); }
-
-  static const size_t InputValue = 0;
-
-  const LDefinition* tempInt() { return getTemp(0); }
-  const LDefinition* tempFloat() { return getTemp(1); }
-  const LDefinition* tempPointer() { return getTemp(2); }
-};
-
-class LMulI : public LBinaryMath<0, 1> {
- public:
-  LIR_HEADER(MulI)
-
-  LMulI(const LAllocation& lhs, const LAllocation& rhs,
-        const LAllocation& lhsCopy)
-      : LBinaryMath(classOpcode) {
-    setOperand(0, lhs);
-    setOperand(1, rhs);
-    setOperand(2, lhsCopy);
-  }
-
-  const char* extraName() const {
-    return (mir()->mode() == MMul::Integer)
-               ? "Integer"
-               : (mir()->canBeNegativeZero() ? "CanBeNegativeZero" : nullptr);
-  }
-
-  MMul* mir() const { return mir_->toMul(); }
-  const LAllocation* lhsCopy() { return this->getOperand(2); }
-};
-
-class LInt64ToFloatingPoint : public LInstructionHelper<1, INT64_PIECES, 1> {
- public:
-  LIR_HEADER(Int64ToFloatingPoint);
-
-  LInt64ToFloatingPoint(const LInt64Allocation& in, const LDefinition& temp)
-      : LInstructionHelper(classOpcode) {
-    setInt64Operand(0, in);
-    setTemp(0, temp);
-  }
-
-  MInt64ToFloatingPoint* mir() const { return mir_->toInt64ToFloatingPoint(); }
-
-  const LDefinition* temp() { return getTemp(0); }
 };
 
 }  // namespace jit

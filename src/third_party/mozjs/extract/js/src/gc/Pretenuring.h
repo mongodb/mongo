@@ -61,15 +61,19 @@ class AllocSite {
     Normal = 0,
     Unknown = 1,
     Optimized = 2,
-    Missing = 3
+    Missing = 3,
+    Tenuring = 4,
   };
-  enum class State : uint32_t { ShortLived = 0, Unknown = 1, LongLived = 2 };
+  enum class State : uint32_t { Unknown = 0, LongLived = 1, ShortLived = 2 };
 
-  // The JIT depends on being able to tell the states apart by checking a single
-  // bit.
-  static constexpr int32_t LONG_LIVED_BIT = int32_t(State::LongLived);
-  static_assert((LONG_LIVED_BIT & int32_t(State::Unknown)) == 0);
-  static_assert((AllocSite::LONG_LIVED_BIT & int32_t(State::ShortLived)) == 0);
+  // We can convert between state and heap by extracting a single bit.
+  static constexpr int32_t LONG_LIVED_BIT = 1;
+  static_assert((uint32_t(State::Unknown) & LONG_LIVED_BIT) ==
+                uint32_t(Heap::Default));
+  static_assert((uint32_t(State::LongLived) & LONG_LIVED_BIT) ==
+                uint32_t(Heap::Tenured));
+  static_assert((uint32_t(State::ShortLived) & LONG_LIVED_BIT) ==
+                uint32_t(Heap::Default));
 
  private:
   JS::Zone* zone_ = nullptr;
@@ -91,16 +95,16 @@ class AllocSite {
   // Note that the offset does not need to correspond with the script stored in
   // this AllocSite, because if we're doing trial-inlining, the script will be
   // the outer script and the pc offset can be in an inlined script.
-  uint32_t pcOffset_ : 30;
-  static constexpr uint32_t InvalidPCOffset = Bit(30) - 1;
+  uint32_t pcOffset_ : 29;
+  static constexpr uint32_t InvalidPCOffset = Bit(29) - 1;
 
-  uint32_t kind_ : 2;
+  uint32_t kind_ : 3;
 
   // Number of nursery allocations at this site since it was last processed by
   // processSite().
   uint32_t nurseryAllocCount = 0;
 
-  // Number of nursery allocations at this site that were tenured since it was
+  // Number of nursery allocations at this site that were promoted since it was
   // last processed by processSite().
   uint32_t nurseryPromotedCount : 24;
 
@@ -122,7 +126,8 @@ class AllocSite {
   uintptr_t rawScript() const { return scriptAndState & ~STATE_MASK; }
 
  public:
-  static constexpr uint32_t MaxValidPCOffset = InvalidPCOffset - 1;
+  static constexpr uint32_t EnvSitePCOffset = InvalidPCOffset - 1;
+  static constexpr uint32_t MaxValidPCOffset = EnvSitePCOffset - 1;
 
   // Default constructor. Clients must call one of the init methods afterwards.
   AllocSite()
@@ -141,7 +146,7 @@ class AllocSite {
         nurseryPromotedCount(0),
         invalidationCount(0),
         traceKind_(uint32_t(traceKind)) {
-    MOZ_ASSERT(pcOffset <= MaxValidPCOffset);
+    MOZ_ASSERT(pcOffset <= MaxValidPCOffset || pcOffset == EnvSitePCOffset);
     MOZ_ASSERT(pcOffset_ == pcOffset);
     setScript(script);
   }
@@ -163,6 +168,13 @@ class AllocSite {
     assertUninitialized();
     zone_ = zone;
     kind_ = uint32_t(Kind::Optimized);
+  }
+
+  void initTenuringSite(JS::Zone* zone) {
+    assertUninitialized();
+    zone_ = zone;
+    scriptAndState = uintptr_t(State::LongLived);
+    kind_ = uint32_t(Kind::Tenuring);
   }
 
   // Initialize a site to be a wasm site.
@@ -212,6 +224,7 @@ class AllocSite {
   bool isUnknown() const { return kind() == Kind::Unknown; }
   bool isOptimized() const { return kind() == Kind::Optimized; }
   bool isMissing() const { return kind() == Kind::Missing; }
+  bool isTenuring() const { return kind() == Kind::Tenuring; }
 
   Kind kind() const {
     MOZ_ASSERT((Kind(kind_) == Kind::Normal || Kind(kind_) == Kind::Missing) ==
@@ -224,10 +237,10 @@ class AllocSite {
   // Whether allocations at this site should be allocated in the nursery or the
   // tenured heap.
   Heap initialHeap() const {
-    if (!isNormal()) {
-      return Heap::Default;
-    }
-    return state() == State::LongLived ? Heap::Tenured : Heap::Default;
+    Heap heap = Heap(uint32_t(state()) & LONG_LIVED_BIT);
+    MOZ_ASSERT_IF(isTenuring(), heap == Heap::Tenured);
+    MOZ_ASSERT_IF(!isTenuring() && !isNormal(), heap == Heap::Default);
+    return heap;
   }
 
   bool hasNurseryAllocations() const {
@@ -315,6 +328,10 @@ class PretenuringZone {
   // not recorded by optimized JIT code.
   AllocSite optimizedAllocSite;
 
+  // Alloc Site which always tenure allocates. Used to avoid type punning
+  // when JIT-compiling for the Realm local allocation site.
+  AllocSite tenuringAllocSite;
+
   // Allocation sites used for nursery cells promoted to the next nursery
   // generation that didn't come from optimized alloc sites.
   AllocSite promotedAllocSites[NurseryTraceKinds];
@@ -334,9 +351,8 @@ class PretenuringZone {
   // get the pretenuring decision wrong.
   uint32_t highNurserySurvivalCount = 0;
 
-  // Total allocation count by trace kind (ignoring optimized
-  // allocations). Calculated during nursery collection.
-  uint32_t nurseryAllocCounts[NurseryTraceKinds] = {0};
+  // Total promotion count by trace kind. Calculated during nursery collection.
+  uint32_t nurseryPromotedCounts[NurseryTraceKinds] = {0};
 
   explicit PretenuringZone(JS::Zone* zone) {
     for (uint32_t i = 0; i < NurseryTraceKinds; i++) {
@@ -344,6 +360,7 @@ class PretenuringZone {
       promotedAllocSites[i].initUnknownSite(zone, JS::TraceKind(i));
     }
     optimizedAllocSite.initOptimizedSite(zone);
+    tenuringAllocSite.initTenuringSite(zone);
   }
 
   AllocSite& unknownAllocSite(JS::TraceKind kind) {
@@ -378,13 +395,10 @@ class PretenuringZone {
   bool shouldResetNurseryAllocSites();
   bool shouldResetPretenuredAllocSites();
 
-  uint32_t& nurseryAllocCount(JS::TraceKind kind) {
+  uint32_t nurseryPromotedCount(JS::TraceKind kind) const {
     size_t i = size_t(kind);
-    MOZ_ASSERT(i < NurseryTraceKinds);
-    return nurseryAllocCounts[i];
-  }
-  uint32_t nurseryAllocCount(JS::TraceKind kind) const {
-    return const_cast<PretenuringZone*>(this)->nurseryAllocCount(kind);
+    MOZ_ASSERT(i < std::size(nurseryPromotedCounts));
+    return nurseryPromotedCounts[i];
   }
 };
 

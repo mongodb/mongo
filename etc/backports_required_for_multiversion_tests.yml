@@ -107,6 +107,8 @@ last-continuous:
       ticket: SERVER-114126
     - test_file: jstests/replsets/rollback_index_build_start_abort.js
       ticket: SERVER-103955
+    - test_file: jstests/sharding/query/javascript_heap_limit.js
+      ticket: SERVER-109200
   suites: null
 last-lts:
   all:
@@ -716,4 +718,6 @@ last-lts:
       ticket: SERVER-114126
     - test_file: jstests/replsets/rollback_index_build_start_abort.js
       ticket: SERVER-103955
+    - test_file: jstests/sharding/query/javascript_heap_limit.js
+      ticket: SERVER-109200
   suites: null

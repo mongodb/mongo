@@ -72,12 +72,12 @@
 #include "vm/ArrayObject-inl.h"
 #include "vm/Compartment-inl.h"
 #include "vm/ErrorObject-inl.h"
-#include "vm/InlineCharBuffer-inl.h"
 #include "vm/JSContext-inl.h"
 #include "vm/JSObject-inl.h"
 #include "vm/NativeObject-inl.h"
 #include "vm/ObjectOperations-inl.h"
 #include "vm/Realm-inl.h"
+#include "vm/StringType-inl.h"
 
 using namespace js;
 
@@ -501,6 +501,10 @@ struct JSStructuredCloneReader {
   // SameProcess is the widest (it can store anything it wants)
   // and DifferentProcess is the narrowest (it cannot contain pointers and must
   // be valid cross-process.)
+  //
+  // Although this can be initially set to other "unresolved" values (eg
+  // Unassigned), by the end of a successful readHeader() this will be resolved
+  // to SameProcess or DifferentProcess.
   JS::StructuredCloneScope allowedScope;
 
   const JS::CloneDataPolicy cloneDataPolicy;
@@ -988,6 +992,7 @@ bool SCOutput::writeArray(const T* p, size_t nelems) {
   for (size_t i = 0; i < nelems; i++) {
     T value = NativeEndian::swapToLittleEndian(p[i]);
     if (!buf.AppendBytes(reinterpret_cast<char*>(&value), sizeof(value))) {
+      ReportOutOfMemory(context());
       return false;
     }
   }
@@ -996,6 +1001,7 @@ bool SCOutput::writeArray(const T* p, size_t nelems) {
   size_t padbytes = ComputePadding(nelems, sizeof(T));
   char zeroes[sizeof(uint64_t)] = {0};
   if (!buf.AppendBytes(zeroes, padbytes)) {
+    ReportOutOfMemory(context());
     return false;
   }
 
@@ -1009,6 +1015,7 @@ bool SCOutput::writeArray<uint8_t>(const uint8_t* p, size_t nelems) {
   }
 
   if (!buf.AppendBytes(reinterpret_cast<const char*>(p), nelems)) {
+    ReportOutOfMemory(context());
     return false;
   }
 
@@ -1016,6 +1023,7 @@ bool SCOutput::writeArray<uint8_t>(const uint8_t* p, size_t nelems) {
   size_t padbytes = ComputePadding(nelems, 1);
   char zeroes[sizeof(uint64_t)] = {0};
   if (!buf.AppendBytes(zeroes, padbytes)) {
+    ReportOutOfMemory(context());
     return false;
   }
 
@@ -1188,6 +1196,11 @@ bool JSStructuredCloneWriter::parseTransferable() {
   RootedValue v(context());
   RootedObject tObj(context());
 
+  Rooted<GCHashSet<js::HeapPtr<JSObject*>,
+                   js::StableCellHasher<js::HeapPtr<JSObject*>>,
+                   SystemAllocPolicy>>
+      seen(context());
+
   for (uint32_t i = 0; i < length; ++i) {
     if (!CheckForInterrupt(cx)) {
       return false;
@@ -1248,10 +1261,36 @@ bool JSStructuredCloneWriter::parseTransferable() {
       }
     }
 
-    // No duplicates allowed
-    if (std::find(transferableObjects.begin(), transferableObjects.end(),
-                  tObj) != transferableObjects.end()) {
-      return reportDataCloneError(JS_SCERR_DUP_TRANSFERABLE);
+    // No duplicates allowed. Normally the transferable list is very short, but
+    // some users are passing >10k. Switch to a hash-based lookup when the
+    // linear list starts getting long.
+    constexpr uint32_t MAX_LINEAR = 10;
+
+    // Switch from a linear scan to a set lookup, initializing the set with all
+    // objects seen so far.
+    if (i == MAX_LINEAR) {
+      for (JSObject* obj : transferableObjects) {
+        if (!seen.putNew(obj)) {
+          seen.clear();  // Fall back to linear scan on OOM.
+          break;
+        }
+      }
+    }
+
+    if (seen.empty()) {
+      if (std::find(transferableObjects.begin(), transferableObjects.end(),
+                    tObj) != transferableObjects.end()) {
+        return reportDataCloneError(JS_SCERR_DUP_TRANSFERABLE);
+      }
+    } else {
+      MOZ_ASSERT(seen.count() == i);  // All objs are distinct up to this point.
+      auto p = seen.lookupForAdd(tObj);
+      if (p) {
+        return reportDataCloneError(JS_SCERR_DUP_TRANSFERABLE);
+      }
+      if (!seen.add(p, tObj)) {
+        seen.clear();  // Fall back to linear scan on OOM.
+      }
     }
 
     if (!transferableObjects.append(tObj)) {
@@ -1283,14 +1322,29 @@ bool JSStructuredCloneWriter::writeString(uint32_t tag, JSString* str) {
   }
 #endif
 
-  static_assert(JSString::MAX_LENGTH <= INT32_MAX,
-                "String length must fit in 31 bits");
+  static_assert(JSString::MAX_LENGTH < (1 << 30),
+                "String length must fit in 30 bits");
+
+  // Try to share the underlying StringBuffer without copying the contents.
+  bool useBuffer = linear->hasStringBuffer() &&
+                   output().scope() == JS::StructuredCloneScope::SameProcess;
 
   uint32_t length = linear->length();
-  uint32_t lengthAndEncoding =
-      length | (uint32_t(linear->hasLatin1Chars()) << 31);
-  if (!out.writePair(tag, lengthAndEncoding)) {
+  bool isLatin1 = linear->hasLatin1Chars();
+  uint32_t lengthAndBits =
+      length | (uint32_t(isLatin1) << 31) | (uint32_t(useBuffer) << 30);
+  if (!out.writePair(tag, lengthAndBits)) {
     return false;
+  }
+
+  if (useBuffer) {
+    mozilla::StringBuffer* buffer = linear->stringBuffer();
+    if (!out.buf.stringBufferRefsHeld_.emplaceBack(buffer)) {
+      ReportOutOfMemory(context());
+      return false;
+    }
+    uintptr_t p = reinterpret_cast<uintptr_t>(buffer);
+    return out.writeBytes(&p, sizeof(p));
   }
 
   JS::AutoCheckCannotGC nogc;
@@ -1717,10 +1771,10 @@ bool JSStructuredCloneWriter::traverseMap(HandleObject obj) {
   Rooted<GCVector<Value>> newEntries(context(), GCVector<Value>(context()));
   {
     // If there is no wrapper, the compartment munging is a no-op.
-    RootedObject unwrapped(context(), obj->maybeUnwrapAs<MapObject>());
+    Rooted<MapObject*> unwrapped(context(), obj->maybeUnwrapAs<MapObject>());
     MOZ_ASSERT(unwrapped);
     JSAutoRealm ar(context(), unwrapped);
-    if (!MapObject::getKeysAndValuesInterleaved(unwrapped, &newEntries)) {
+    if (!unwrapped->getKeysAndValuesInterleaved(&newEntries)) {
       return false;
     }
   }
@@ -1752,10 +1806,10 @@ bool JSStructuredCloneWriter::traverseSet(HandleObject obj) {
   Rooted<GCVector<Value>> keys(context(), GCVector<Value>(context()));
   {
     // If there is no wrapper, the compartment munging is a no-op.
-    RootedObject unwrapped(context(), obj->maybeUnwrapAs<SetObject>());
+    Rooted<SetObject*> unwrapped(context(), obj->maybeUnwrapAs<SetObject>());
     MOZ_ASSERT(unwrapped);
     JSAutoRealm ar(context(), unwrapped);
-    if (!SetObject::keys(context(), unwrapped, &keys)) {
+    if (!unwrapped->keys(&keys)) {
       return false;
     }
   }
@@ -2159,13 +2213,6 @@ bool JSStructuredCloneWriter::startWrite(HandleValue v) {
     case ESClass::Arguments:
     case ESClass::Function:
       break;
-
-#ifdef ENABLE_RECORD_TUPLE
-    case ESClass::Record:
-    case ESClass::Tuple:
-      MOZ_CRASH("Record and Tuple are not supported");
-#endif
-
     case ESClass::Other: {
       if (obj->canUnwrapAs<TypedArrayObject>()) {
         return writeTypedArray(obj);
@@ -2526,28 +2573,68 @@ JSStructuredCloneReader::JSStructuredCloneReader(
 template <typename CharT>
 JSString* JSStructuredCloneReader::readStringImpl(
     uint32_t nchars, ShouldAtomizeStrings atomize) {
-  InlineCharBuffer<CharT> chars;
-  if (!chars.maybeAlloc(context(), nchars) ||
-      !in.readChars(chars.get(), nchars)) {
-    return nullptr;
-  }
-
   if (atomize) {
+    AtomStringChars<CharT> chars;
+    if (!chars.maybeAlloc(context(), nchars) ||
+        !in.readChars(chars.data(), nchars)) {
+      return nullptr;
+    }
     return chars.toAtom(context(), nchars);
   }
 
-  return chars.toStringDontDeflate(context(), nchars, gcHeap);
+  // Uses `StringChars::unsafeData()` because `readChars` can report an error,
+  // which can trigger a GC.
+  StringChars<CharT> chars(context());
+  if (!chars.maybeAlloc(context(), nchars, gcHeap) ||
+      !in.readChars(chars.unsafeData(), nchars)) {
+    return nullptr;
+  }
+  return chars.template toStringDontDeflate<CanGC>(context(), nchars, gcHeap);
 }
 
 JSString* JSStructuredCloneReader::readString(uint32_t data,
                                               ShouldAtomizeStrings atomize) {
-  uint32_t nchars = data & BitMask(31);
+  uint32_t nchars = data & BitMask(30);
   bool latin1 = data & (1 << 31);
+  bool hasBuffer = data & (1 << 30);
 
   if (nchars > JSString::MAX_LENGTH) {
     JS_ReportErrorNumberASCII(context(), GetErrorMessage, nullptr,
                               JSMSG_SC_BAD_SERIALIZED_DATA, "string length");
     return nullptr;
+  }
+
+  if (hasBuffer) {
+    if (allowedScope > JS::StructuredCloneScope::SameProcess) {
+      JS_ReportErrorNumberASCII(context(), GetErrorMessage, nullptr,
+                                JSMSG_SC_BAD_SERIALIZED_DATA,
+                                "invalid scope for string buffer");
+      return nullptr;
+    }
+
+    uintptr_t p;
+    if (!in.readBytes(&p, sizeof(p))) {
+      in.reportTruncated();
+      return nullptr;
+    }
+    RefPtr<mozilla::StringBuffer> buffer(
+        reinterpret_cast<mozilla::StringBuffer*>(p));
+    JSContext* cx = context();
+    if (atomize) {
+      if (latin1) {
+        return AtomizeChars(cx, static_cast<Latin1Char*>(buffer->Data()),
+                            nchars);
+      }
+      return AtomizeChars(cx, static_cast<char16_t*>(buffer->Data()), nchars);
+    }
+    if (latin1) {
+      Rooted<JSString::OwnedChars<Latin1Char>> owned(cx, std::move(buffer),
+                                                     nchars);
+      return JSLinearString::newValidLength<CanGC, Latin1Char>(cx, &owned,
+                                                               gcHeap);
+    }
+    Rooted<JSString::OwnedChars<char16_t>> owned(cx, std::move(buffer), nchars);
+    return JSLinearString::newValidLength<CanGC, char16_t>(cx, &owned, gcHeap);
   }
 
   return latin1 ? readStringImpl<Latin1Char>(nchars, atomize)
@@ -2595,7 +2682,7 @@ bool JSStructuredCloneReader::readTypedArray(uint32_t arrayType,
                                              uint64_t nelems,
                                              MutableHandleValue vp,
                                              bool v1Read) {
-  if (arrayType > (v1Read ? Scalar::Uint8Clamped : Scalar::BigUint64)) {
+  if (arrayType > (v1Read ? Scalar::Uint8Clamped : Scalar::Float16)) {
     JS_ReportErrorNumberASCII(context(), GetErrorMessage, nullptr,
                               JSMSG_SC_BAD_SERIALIZED_DATA,
                               "unhandled typed array element type");
@@ -2828,7 +2915,7 @@ bool JSStructuredCloneReader::readSharedArrayBuffer(StructuredDataType type,
   bool isGrowable = type == SCTAG_GROWABLE_SHARED_ARRAY_BUFFER_OBJECT;
 
   SharedArrayRawBuffer* rawbuf = reinterpret_cast<SharedArrayRawBuffer*>(p);
-  MOZ_RELEASE_ASSERT(isGrowable == rawbuf->isGrowable());
+  MOZ_RELEASE_ASSERT(rawbuf->isWasm() || isGrowable == rawbuf->isGrowableJS());
 
   // There's no guarantee that the receiving agent has enabled shared memory
   // even if the transmitting agent has done so.  Ideally we'd check at the
@@ -3000,6 +3087,11 @@ bool JSStructuredCloneReader::startRead(MutableHandleValue vp,
                                         ShouldAtomizeStrings atomizeStrings) {
   uint32_t tag, data;
   bool alreadAppended = false;
+
+  AutoCheckRecursionLimit recursion(in.context());
+  if (!recursion.check(in.context())) {
+    return false;
+  }
 
   if (!in.readPair(&tag, &data)) {
     return false;
@@ -3420,9 +3512,8 @@ bool JSStructuredCloneReader::readTransferMap() {
     }
 
     if (tag == SCTAG_TRANSFER_MAP_ARRAY_BUFFER) {
-      if (allowedScope == JS::StructuredCloneScope::DifferentProcess ||
-          allowedScope ==
-              JS::StructuredCloneScope::DifferentProcessForIndexedDB) {
+      MOZ_ASSERT(allowedScope <= JS::StructuredCloneScope::LastResolvedScope);
+      if (allowedScope == JS::StructuredCloneScope::DifferentProcess) {
         // Transferred ArrayBuffers in a DifferentProcess clone buffer
         // are treated as if they weren't Transferred at all. We should
         // only see SCTAG_TRANSFER_MAP_STORED_ARRAY_BUFFER.
@@ -3810,7 +3901,7 @@ bool JSStructuredCloneReader::readMapField(Handle<MapObject*> mapObj,
   if (!startRead(&val)) {
     return false;
   }
-  return MapObject::set(context(), mapObj, key, val);
+  return mapObj->set(context(), key, val);
 }
 
 // Read a value and treat as a key,value pair. Interpret as a plain property
@@ -3864,11 +3955,11 @@ bool JSStructuredCloneReader::readObjectField(HandleObject obj,
 
 // Perform the whole recursive reading procedure.
 bool JSStructuredCloneReader::read(MutableHandleValue vp, size_t nbytes) {
-  auto startTime = mozilla::TimeStamp::Now();
-
   if (!readHeader()) {
     return false;
   }
+  MOZ_ASSERT(allowedScope <= JS::StructuredCloneScope::LastResolvedScope,
+             "allowedScope should have been resolved by now");
 
   if (!readTransferMap()) {
     return false;
@@ -3952,7 +4043,7 @@ bool JSStructuredCloneReader::read(MutableHandleValue vp, size_t nbytes) {
     if (obj->is<SetObject>()) {
       // Set object: the values between obj header (from startRead()) and
       // SCTAG_END_OF_KEYS are all interpreted as values to add to the set.
-      if (!SetObject::add(context(), obj, key)) {
+      if (!obj->as<SetObject>().add(context(), key)) {
         return false;
       }
     } else if (obj->is<MapObject>()) {
@@ -4008,13 +4099,6 @@ bool JSStructuredCloneReader::read(MutableHandleValue vp, size_t nbytes) {
     return false;
   }
 #endif
-
-  JSRuntime* rt = context()->runtime();
-  rt->metrics().DESERIALIZE_BYTES(nbytes);
-  rt->metrics().DESERIALIZE_ITEMS(numItemsRead);
-  mozilla::TimeDuration elapsed = mozilla::TimeStamp::Now() - startTime;
-  rt->metrics().DESERIALIZE_US(elapsed);
-
   return true;
 }
 
@@ -4121,6 +4205,7 @@ void JSAutoStructuredCloneBuffer::clear() {
   data_.discardTransferables();
   data_.ownTransferables_ = OwnTransferablePolicy::NoTransferables;
   data_.refsHeld_.releaseAll();
+  data_.stringBufferRefsHeld_.clear();
   data_.Clear();
   version_ = 0;
 }

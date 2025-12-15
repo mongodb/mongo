@@ -42,8 +42,7 @@ class LZ4 {
    * @param aInputSize is the input size. Max supported value is ~1.9GB
    * @return the number of bytes written in buffer |aDest|
    */
-  static MFBT_API size_t compress(const char* aSource, size_t aInputSize,
-                                  char* aDest);
+  static size_t compress(const char* aSource, size_t aInputSize, char* aDest);
 
   /**
    * Compress |aInputSize| bytes from |aSource| into an output buffer
@@ -60,9 +59,8 @@ class LZ4 {
    * @return the number of bytes written in buffer |aDest| or 0 if the
    *   compression fails
    */
-  static MFBT_API size_t compressLimitedOutput(const char* aSource,
-                                               size_t aInputSize, char* aDest,
-                                               size_t aMaxOutputSize);
+  static size_t compressLimitedOutput(const char* aSource, size_t aInputSize,
+                                      char* aDest, size_t aMaxOutputSize);
 
   /**
    * If the source stream is malformed, the function will stop decoding
@@ -81,10 +79,9 @@ class LZ4 {
    *   buffer (necessarily <= aMaxOutputSize)
    * @return true on success, false on failure
    */
-  [[nodiscard]] static MFBT_API bool decompress(const char* aSource,
-                                                size_t aInputSize, char* aDest,
-                                                size_t aMaxOutputSize,
-                                                size_t* aOutputSize);
+  [[nodiscard]] static bool decompress(const char* aSource, size_t aInputSize,
+                                       char* aDest, size_t aMaxOutputSize,
+                                       size_t* aOutputSize);
 
   /**
    * If the source stream is malformed, the function will stop decoding
@@ -105,11 +102,10 @@ class LZ4 {
    *   buffer (necessarily <= aMaxOutputSize)
    * @return true on success, false on failure
    */
-  [[nodiscard]] static MFBT_API bool decompressPartial(const char* aSource,
-                                                       size_t aInputSize,
-                                                       char* aDest,
-                                                       size_t aMaxOutputSize,
-                                                       size_t* aOutputSize);
+  [[nodiscard]] static bool decompressPartial(const char* aSource,
+                                              size_t aInputSize, char* aDest,
+                                              size_t aMaxOutputSize,
+                                              size_t* aOutputSize);
 
   /*
    * Provides the maximum size that LZ4 may output in a "worst case"
@@ -134,10 +130,10 @@ class LZ4 {
  */
 class LZ4FrameCompressionContext final {
  public:
-  MFBT_API LZ4FrameCompressionContext(int aCompressionLevel, size_t aMaxSrcSize,
-                                      bool aChecksum, bool aStableSrc = false);
+  LZ4FrameCompressionContext(int aCompressionLevel, size_t aMaxSrcSize,
+                             bool aChecksum, bool aStableSrc = false);
 
-  MFBT_API ~LZ4FrameCompressionContext();
+  ~LZ4FrameCompressionContext();
 
   size_t GetRequiredWriteBufferLength() { return mWriteBufLen; }
 
@@ -147,8 +143,7 @@ class LZ4FrameCompressionContext final {
    * @return a Result with a Span containing the frame header, or an lz4 error
    * code (size_t).
    */
-  MFBT_API Result<Span<const char>, size_t> BeginCompressing(
-      Span<char> aWriteBuffer);
+  Result<Span<const char>, size_t> BeginCompressing(Span<char> aWriteBuffer);
 
   /**
    * Continue streaming frame-based compression with the provided input.
@@ -157,8 +152,7 @@ class LZ4FrameCompressionContext final {
    * @return a Result with a Span containing compressed output, or an lz4 error
    * code (size_t).
    */
-  MFBT_API Result<Span<const char>, size_t> ContinueCompressing(
-      Span<const char> aInput);
+  Result<Span<const char>, size_t> ContinueCompressing(Span<const char> aInput);
 
   /**
    * Finalize streaming frame-based compression with the provided input.
@@ -166,7 +160,7 @@ class LZ4FrameCompressionContext final {
    * @return a Result with a Span containing compressed output and the frame
    * footer, or an lz4 error code (size_t).
    */
-  MFBT_API Result<Span<const char>, size_t> EndCompressing();
+  Result<Span<const char>, size_t> EndCompressing();
 
  private:
   LZ4F_cctx_s* mContext;
@@ -191,8 +185,8 @@ struct LZ4FrameDecompressionResult {
  */
 class LZ4FrameDecompressionContext final {
  public:
-  explicit MFBT_API LZ4FrameDecompressionContext(bool aStableDest = false);
-  MFBT_API ~LZ4FrameDecompressionContext();
+  explicit LZ4FrameDecompressionContext(bool aStableDest = false);
+  ~LZ4FrameDecompressionContext();
 
   /**
    * Decompress a buffer/part of a buffer compressed with
@@ -204,7 +198,7 @@ class LZ4FrameDecompressionContext final {
    * completely decompressed the input into the output, or an lz4 error code
    * (size_t).
    */
-  MFBT_API Result<LZ4FrameDecompressionResult, size_t> Decompress(
+  Result<LZ4FrameDecompressionResult, size_t> Decompress(
       Span<char> aOutput, Span<const char> aInput);
 
  private:

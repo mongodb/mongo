@@ -31,13 +31,13 @@ class Registers {
     invalid_reg,
     invalid_reg2,  // To avoid silly static_assert failures.
   };
-  typedef uint8_t Code;
-  typedef RegisterID Encoding;
+  using Code = uint8_t;
+  using Encoding = RegisterID;
   union RegisterContent {
     uintptr_t r;
   };
 
-  typedef uint8_t SetType;
+  using SetType = uint8_t;
 
   static uint32_t SetSize(SetType) { MOZ_CRASH(); }
   static uint32_t FirstBit(SetType) { MOZ_CRASH(); }
@@ -60,19 +60,19 @@ class Registers {
   static const SetType CallMask = 0;
 };
 
-typedef uint8_t PackedRegisterMask;
+using PackedRegisterMask = uint8_t;
 
 class FloatRegisters {
  public:
   enum FPRegisterID { f0 = 0, invalid_reg };
-  typedef FPRegisterID Code;
-  typedef FPRegisterID Encoding;
+  using Code = FPRegisterID;
+  using Encoding = FPRegisterID;
   union RegisterContent {
     float s;
     double d;
   };
 
-  typedef uint32_t SetType;
+  using SetType = uint32_t;
 
   static const char* GetName(Code) { MOZ_CRASH(); }
   static Code FromName(const char*) { MOZ_CRASH(); }
@@ -94,10 +94,10 @@ template <typename T>
 class TypedRegisterSet;
 
 struct FloatRegister {
-  typedef FloatRegisters Codes;
-  typedef Codes::Code Code;
-  typedef Codes::Encoding Encoding;
-  typedef Codes::SetType SetType;
+  using Codes = FloatRegisters;
+  using Code = Codes::Code;
+  using Encoding = Codes::Encoding;
+  using SetType = Codes::SetType;
 
   Code _;
 

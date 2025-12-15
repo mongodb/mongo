@@ -47,7 +47,7 @@ namespace mozjs {
 class JSCustomAllocatorTest : public unittest::Test {
 protected:
     void setUp() override {
-        mongo::sm::reset(0);
+        mongo::sm::reset(0, false);
 
         // Note: get_total_bytes() is an estimate and won't exactly count allocated bytes,
         // test should only compare to 0
@@ -55,13 +55,13 @@ protected:
     }
 
     void tearDown() override {
-        mongo::sm::reset(0);
+        mongo::sm::reset(0, false);
     }
 };
 
 
 TEST_F(JSCustomAllocatorTest, MallocUpToLimit) {
-    mongo::sm::reset(100);
+    mongo::sm::reset(100, false);
     ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
 
     void* ptr1 = js_malloc(20);
@@ -85,7 +85,7 @@ TEST_F(JSCustomAllocatorTest, MallocUpToLimit) {
 }
 
 TEST_F(JSCustomAllocatorTest, ReallocUpToLimit) {
-    mongo::sm::reset(100);
+    mongo::sm::reset(100, false);
     ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
 
     void* ptr1 = js_malloc(20);
@@ -104,7 +104,7 @@ TEST_F(JSCustomAllocatorTest, ReallocUpToLimit) {
 
 
 TEST_F(JSCustomAllocatorTest, CallocUpToLimit) {
-    mongo::sm::reset(100);
+    mongo::sm::reset(100, false);
     ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
 
     void* ptr1 = js_calloc(10, 2);

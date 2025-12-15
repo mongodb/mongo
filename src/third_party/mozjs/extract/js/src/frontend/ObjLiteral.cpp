@@ -108,15 +108,62 @@ static void InterpretObjLiteralValue(
   }
 }
 
+static uint32_t CountNonIndexPropertiesUpTo(
+    const mozilla::Span<const uint8_t> literalInsns, uint32_t limit) {
+  ObjLiteralReader reader(literalInsns);
+
+  uint32_t count = 0;
+  while (count < limit) {
+    // Make sure `insn` doesn't live across GC.
+    ObjLiteralInsn insn;
+    if (!reader.readInsn(&insn)) {
+      break;
+    }
+    if (!insn.getKey().isArrayIndex()) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
 enum class PropertySetKind {
   UniqueNames,
   Normal,
 };
 
 template <PropertySetKind kind>
-bool InterpretObjLiteralObj(JSContext* cx, Handle<PlainObject*> obj,
-                            const frontend::CompilationAtomCache& atomCache,
-                            const mozilla::Span<const uint8_t> literalInsns) {
+static gc::AllocKind AllocKindForObjectLiteral(
+    const mozilla::Span<const uint8_t> literalInsns, uint32_t propCount) {
+  // Use NewObjectGCKind for empty object literals to reserve some fixed slots
+  // for new properties. This improves performance for common patterns such as
+  // |Object.assign({}, ...)|.
+  if (propCount == 0) {
+    return NewObjectGCKind();
+  }
+
+  // Don't reserve object slots for index properties that don't use them.
+  if (kind == PropertySetKind::Normal) {
+    propCount =
+        CountNonIndexPropertiesUpTo(literalInsns, gc::MaxGCObjectFixedSlots);
+  }
+
+  return gc::GetGCObjectKind(propCount);
+}
+
+template <PropertySetKind kind>
+JSObject* InterpretObjLiteralObj(
+    JSContext* cx, const frontend::CompilationAtomCache& atomCache,
+    const mozilla::Span<const uint8_t> literalInsns, uint32_t propertyCount) {
+  gc::AllocKind allocKind =
+      AllocKindForObjectLiteral<kind>(literalInsns, propertyCount);
+
+  Rooted<PlainObject*> obj(
+      cx, NewPlainObjectWithAllocKind(cx, allocKind, TenuredObject));
+  if (!obj) {
+    return nullptr;
+  }
+
   ObjLiteralReader reader(literalInsns);
 
   RootedId propId(cx);
@@ -144,49 +191,30 @@ bool InterpretObjLiteralObj(JSContext* cx, Handle<PlainObject*> obj,
 
     if constexpr (kind == PropertySetKind::UniqueNames) {
       if (!AddDataPropertyToPlainObject(cx, obj, propId, propVal)) {
-        return false;
+        return nullptr;
       }
     } else {
       if (!NativeDefineDataProperty(cx, obj, propId, propVal,
                                     JSPROP_ENUMERATE)) {
-        return false;
+        return nullptr;
       }
     }
   }
-  return true;
-}
 
-static gc::AllocKind AllocKindForObjectLiteral(uint32_t propCount) {
-  // Use NewObjectGCKind for empty object literals to reserve some fixed slots
-  // for new properties. This improves performance for common patterns such as
-  // |Object.assign({}, ...)|.
-  return (propCount == 0) ? NewObjectGCKind() : gc::GetGCObjectKind(propCount);
+  return obj;
 }
 
 static JSObject* InterpretObjLiteralObj(
     JSContext* cx, const frontend::CompilationAtomCache& atomCache,
     const mozilla::Span<const uint8_t> literalInsns, ObjLiteralFlags flags,
     uint32_t propertyCount) {
-  gc::AllocKind allocKind = AllocKindForObjectLiteral(propertyCount);
-
-  Rooted<PlainObject*> obj(
-      cx, NewPlainObjectWithAllocKind(cx, allocKind, TenuredObject));
-  if (!obj) {
-    return nullptr;
-  }
-
   if (!flags.hasFlag(ObjLiteralFlag::HasIndexOrDuplicatePropName)) {
-    if (!InterpretObjLiteralObj<PropertySetKind::UniqueNames>(
-            cx, obj, atomCache, literalInsns)) {
-      return nullptr;
-    }
-  } else {
-    if (!InterpretObjLiteralObj<PropertySetKind::Normal>(cx, obj, atomCache,
-                                                         literalInsns)) {
-      return nullptr;
-    }
+    return InterpretObjLiteralObj<PropertySetKind::UniqueNames>(
+        cx, atomCache, literalInsns, propertyCount);
   }
-  return obj;
+
+  return InterpretObjLiteralObj<PropertySetKind::Normal>(
+      cx, atomCache, literalInsns, propertyCount);
 }
 
 static JSObject* InterpretObjLiteralArray(
@@ -286,7 +314,11 @@ template <PropertySetKind kind>
 Shape* InterpretObjLiteralShape(JSContext* cx,
                                 const frontend::CompilationAtomCache& atomCache,
                                 const mozilla::Span<const uint8_t> literalInsns,
-                                uint32_t numFixedSlots) {
+                                uint32_t propertyCount) {
+  gc::AllocKind allocKind =
+      AllocKindForObjectLiteral<kind>(literalInsns, propertyCount);
+  uint32_t numFixedSlots = GetGCKindSlots(allocKind);
+
   ObjLiteralReader reader(literalInsns);
 
   Rooted<SharedPropMap*> map(cx);
@@ -342,15 +374,12 @@ static Shape* InterpretObjLiteralShape(
     JSContext* cx, const frontend::CompilationAtomCache& atomCache,
     const mozilla::Span<const uint8_t> literalInsns, ObjLiteralFlags flags,
     uint32_t propertyCount) {
-  gc::AllocKind allocKind = AllocKindForObjectLiteral(propertyCount);
-  uint32_t numFixedSlots = GetGCKindSlots(allocKind);
-
   if (!flags.hasFlag(ObjLiteralFlag::HasIndexOrDuplicatePropName)) {
     return InterpretObjLiteralShape<PropertySetKind::UniqueNames>(
-        cx, atomCache, literalInsns, numFixedSlots);
+        cx, atomCache, literalInsns, propertyCount);
   }
   return InterpretObjLiteralShape<PropertySetKind::Normal>(
-      cx, atomCache, literalInsns, numFixedSlots);
+      cx, atomCache, literalInsns, propertyCount);
 }
 
 JS::GCCellPtr ObjLiteralStencil::create(

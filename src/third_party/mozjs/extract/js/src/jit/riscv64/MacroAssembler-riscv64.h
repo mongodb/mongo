@@ -53,6 +53,12 @@ class ScratchTagScopeRelease {
   ~ScratchTagScopeRelease() { ts_->reacquire(); }
 };
 
+struct ImmShiftedTag : public ImmWord {
+  explicit ImmShiftedTag(JSValueType type)
+      : ImmWord(uintptr_t(JSValueShiftedTag(JSVAL_TYPE_TO_SHIFTED_TAG(type)))) {
+  }
+};
+
 struct ImmTag : public Imm32 {
   ImmTag(JSValueTag mask) : Imm32(int32_t(mask)) {}
 };
@@ -75,6 +81,9 @@ class MacroAssemblerRiscv64 : public Assembler {
   static bool SupportsFloatingPoint() { return true; }
   static bool SupportsUnalignedAccesses() { return true; }
   static bool SupportsFastUnalignedFPAccesses() { return true; }
+  static bool SupportsFloat64To16() { return false; }
+  static bool SupportsFloat32To16() { return false; }
+
   void haltingAlign(int alignment) {
     // TODO(loong64): Implement a proper halting align.
     nopAlign(alignment);
@@ -292,6 +301,8 @@ class MacroAssemblerRiscv64 : public Assembler {
   Condition ma_cmp(Register rd, Register lhs, Imm32 imm, Condition c);
   void ma_cmp_set(Register dst, Register lhs, ImmWord imm, Condition c);
   void ma_cmp_set(Register dst, Register lhs, ImmPtr imm, Condition c);
+  void ma_cmp_set(Register dst, Register lhs, ImmGCPtr imm, Condition c);
+  void ma_cmp_set(Register dst, Address address, Register rhs, Condition c);
   void ma_cmp_set(Register dst, Address address, Imm32 imm, Condition c);
   void ma_cmp_set(Register dst, Address address, ImmWord imm, Condition c);
 
@@ -547,6 +558,22 @@ class MacroAssemblerRiscv64Compat : public MacroAssemblerRiscv64 {
   void convertInt32ToFloat32(Register src, FloatRegister dest);
   void convertInt32ToFloat32(const Address& src, FloatRegister dest);
 
+  void convertDoubleToFloat16(FloatRegister src, FloatRegister dest) {
+    MOZ_CRASH("Not supported for this target");
+  }
+  void convertFloat16ToDouble(FloatRegister src, FloatRegister dest) {
+    MOZ_CRASH("Not supported for this target");
+  }
+  void convertFloat32ToFloat16(FloatRegister src, FloatRegister dest) {
+    MOZ_CRASH("Not supported for this target");
+  }
+  void convertFloat16ToFloat32(FloatRegister src, FloatRegister dest) {
+    MOZ_CRASH("Not supported for this target");
+  }
+  void convertInt32ToFloat16(Register src, FloatRegister dest) {
+    MOZ_CRASH("Not supported for this target");
+  }
+
   void movq(Register rj, Register rd);
 
   void computeEffectiveAddress(const Address& address, Register dest) {
@@ -623,9 +650,15 @@ class MacroAssemblerRiscv64Compat : public MacroAssemblerRiscv64 {
     ma_push(scratch);
   }
   void push(Register reg) { ma_push(reg); }
-  void push(FloatRegister reg) { ma_push(reg); }
+  void push(FloatRegister reg) {
+    MOZ_ASSERT(reg.isDouble(), "float32 and simd128 not supported");
+    ma_push(reg);
+  }
   void pop(Register reg) { ma_pop(reg); }
-  void pop(FloatRegister reg) { ma_pop(reg); }
+  void pop(FloatRegister reg) {
+    MOZ_ASSERT(reg.isDouble(), "float32 and simd128 not supported");
+    ma_pop(reg);
+  }
 
   // Emit a branch that can be toggled to a non-operation. On LOONG64 we use
   // "andi" instruction to toggle the branch.
@@ -744,7 +777,7 @@ class MacroAssemblerRiscv64Compat : public MacroAssemblerRiscv64 {
     UseScratchRegisterScope temps(this);
     Register scratch = temps.Acquire();
     MOZ_ASSERT(scratch != src);
-    mov(ImmWord(JSVAL_TYPE_TO_SHIFTED_TAG(type)), scratch);
+    mov(ImmShiftedTag(type), scratch);
     xor_(dest, src, scratch);
   }
 
@@ -867,17 +900,9 @@ class MacroAssemblerRiscv64Compat : public MacroAssemblerRiscv64 {
     return scratch;
   }
 
-  void ensureDouble(const ValueOperand& source, FloatRegister dest,
-                    Label* failure);
-
-  void boolValueToDouble(const ValueOperand& operand, FloatRegister dest);
-  void int32ValueToDouble(const ValueOperand& operand, FloatRegister dest);
   void loadInt32OrDouble(const Address& src, FloatRegister dest);
   void loadInt32OrDouble(const BaseIndex& addr, FloatRegister dest);
   void loadConstantDouble(double dp, FloatRegister dest);
-
-  void boolValueToFloat32(const ValueOperand& operand, FloatRegister dest);
-  void int32ValueToFloat32(const ValueOperand& operand, FloatRegister dest);
   void loadConstantFloat32(float f, FloatRegister dest);
 
   void testNullSet(Condition cond, const ValueOperand& value, Register dest);
@@ -1016,8 +1041,8 @@ class MacroAssemblerRiscv64Compat : public MacroAssemblerRiscv64 {
     pushValue(ValueOperand(scratch));
   }
 
-  void handleFailureWithHandlerTail(Label* profilerExitTail,
-                                    Label* bailoutTail);
+  void handleFailureWithHandlerTail(Label* profilerExitTail, Label* bailoutTail,
+                                    uint32_t* returnValueCheckOffset);
 
   /////////////////////////////////////////////////////////////////
   // Common interface.
@@ -1114,6 +1139,15 @@ class MacroAssemblerRiscv64Compat : public MacroAssemblerRiscv64 {
     FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
     flw(dest, scratch, 0);
     return fco;
+  }
+
+  FaultingCodeOffset loadFloat16(const Address& addr, FloatRegister dest,
+                                 Register) {
+    MOZ_CRASH("Not supported for this target");
+  }
+  FaultingCodeOffset loadFloat16(const BaseIndex& src, FloatRegister dest,
+                                 Register) {
+    MOZ_CRASH("Not supported for this target");
   }
 
   template <typename S>

@@ -32,6 +32,10 @@ extern JS_PUBLIC_API void SetHelperThreadTaskCallback(
 // Function to call from external thread pool to run a helper thread task.
 extern JS_PUBLIC_API void RunHelperThreadTask(HelperThreadTask* task);
 
+// Function to get the name of the helper thread task.
+extern JS_PUBLIC_API const char* GetHelperThreadTaskName(
+    HelperThreadTask* task);
+
 }  // namespace JS
 
 #endif  // js_HelperThreadAPI_h

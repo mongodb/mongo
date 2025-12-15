@@ -32,4 +32,25 @@ void FileHandleDeleter::operator()(FileHandleHelper aHelper) {
 }
 
 }  // namespace detail
+
+#ifndef __wasm__
+UniqueFileHandle DuplicateFileHandle(detail::FileHandleType aFile) {
+#  ifdef XP_WIN
+  if (aFile != INVALID_HANDLE_VALUE && aFile != NULL) {
+    HANDLE handle;
+    HANDLE currentProcess = ::GetCurrentProcess();
+    if (::DuplicateHandle(currentProcess, aFile, currentProcess, &handle, 0,
+                          false, DUPLICATE_SAME_ACCESS)) {
+      return UniqueFileHandle{handle};
+    }
+  }
+#  else
+  if (aFile != -1) {
+    return UniqueFileHandle{dup(aFile)};
+  }
+#  endif
+  return nullptr;
+}
+#endif
+
 }  // namespace mozilla

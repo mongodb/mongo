@@ -38,6 +38,7 @@ struct CompilationStencil;
 struct CompilationGCOutput;
 struct CompilationInput;
 struct PreallocatedCompilationGCOutput;
+struct InitialStencilAndDelazifications;
 }  // namespace frontend
 }  // namespace js
 
@@ -47,7 +48,7 @@ struct PreallocatedCompilationGCOutput;
 
 namespace JS {
 
-using Stencil = js::frontend::CompilationStencil;
+using Stencil = js::frontend::InitialStencilAndDelazifications;
 using FrontendContext = js::FrontendContext;
 
 // Temporary storage used during instantiating Stencil.
@@ -193,6 +194,7 @@ extern JS_PUBLIC_API JSObject* InstantiateModuleStencil(
 namespace JS {
 
 // Serialize the Stencil into the transcode buffer.
+// This fails if the stencil contains asm.js.
 extern JS_PUBLIC_API TranscodeResult EncodeStencil(JSContext* cx,
                                                    Stencil* stencil,
                                                    TranscodeBuffer& buffer);
@@ -205,10 +207,59 @@ extern JS_PUBLIC_API TranscodeResult
 DecodeStencil(JS::FrontendContext* fc, const ReadOnlyDecodeOptions& options,
               const TranscodeRange& range, Stencil** stencilOut);
 
-// Register an encoder on its script source, such that all functions can be
-// encoded as they are delazified.
-extern JS_PUBLIC_API bool StartIncrementalEncoding(JSContext* cx,
-                                                   RefPtr<Stencil>&& stencil);
+// ************************************************************************
+//   Collect delazifications
+// ************************************************************************
+
+// Start collecting delazifications for given script or module's source object.
+//
+// If the source object is already collecting delazifications, alreadyStarted is
+// set to true and returns true. alreadyStarted is set to false otherwise.
+extern JS_PUBLIC_API bool StartCollectingDelazifications(
+    JSContext* cx, JS::Handle<JSScript*> script, Stencil* stencil,
+    bool& alreadyStarted);
+
+extern JS_PUBLIC_API bool StartCollectingDelazifications(
+    JSContext* cx, JS::Handle<JSObject*> module, Stencil* stencil,
+    bool& alreadyStarted);
+
+// Finish collecting delazifications and retrieve the result.
+//
+// With |buffer| out-parameter, the result is encoded and appended to the
+// buffer. If failed, the content of |buffer| would be undefined.
+//
+// If the `buffer` isn't empty, the start of the `buffer` should meet
+// JS::IsTranscodingBytecodeAligned, and the length should meet
+// JS::IsTranscodingBytecodeOffsetAligned.
+//
+// NOTE: As long as IsTranscodingBytecodeOffsetAligned is met, that means
+//       there's JS::BytecodeOffsetAlignment+extra bytes in the buffer,
+//       IsTranscodingBytecodeAligned should be guaranteed to meet by
+//       malloc, used by MallocAllocPolicy in mozilla::Vector.
+extern JS_PUBLIC_API bool FinishCollectingDelazifications(
+    JSContext* cx, Handle<JSScript*> script, TranscodeBuffer& buffer);
+
+// Similar to |JS::FinishCollectingDelazifications|, but receives module obect.
+extern JS_PUBLIC_API bool FinishCollectingDelazifications(
+    JSContext* cx, Handle<JSObject*> module, TranscodeBuffer& buffer);
+
+// Instead of transcoding to a buffer, return the JS::Stencil that reflects
+// the delazification from the execution.
+extern JS_PUBLIC_API bool FinishCollectingDelazifications(
+    JSContext* cx, Handle<JSScript*> script, JS::Stencil** stencilOut);
+
+extern JS_PUBLIC_API void AbortCollectingDelazifications(
+    Handle<JSScript*> script);
+extern JS_PUBLIC_API void AbortCollectingDelazifications(
+    Handle<JSObject*> module);
+
+// ************************************************************************
+//   Cache
+// ************************************************************************
+
+// Returns true if the stencil is compatible with caching.
+// This returns false if the stencil contains asm.js.
+extern JS_PUBLIC_API bool IsStencilCacheable(JS::Stencil* stencil);
 
 }  // namespace JS
 

@@ -23,8 +23,7 @@
 #  define JS_CODEGEN_MIPS_HARDFP
 #endif
 
-#if (defined(_MIPS_SIM) && (_MIPS_SIM == _ABIO32)) || \
-    defined(JS_SIMULATOR_MIPS32)
+#if (defined(_MIPS_SIM) && (_MIPS_SIM == _ABIO32))
 #  define USES_O32_ABI
 #elif (defined(_MIPS_SIM) && (_MIPS_SIM == _ABI64)) || \
     defined(JS_SIMULATOR_MIPS64)
@@ -266,11 +265,7 @@ class FloatRegistersMIPSShared {
 
   static const Encoding Invalid = invalid_freg;
 
-#if defined(JS_CODEGEN_MIPS32)
-  typedef uint32_t SetType;
-#elif defined(JS_CODEGEN_MIPS64)
   typedef uint64_t SetType;
-#endif
 };
 
 static const uint32_t SpillSlotSize =
@@ -286,20 +281,6 @@ class FloatRegisterMIPSShared {
 
   typedef FloatRegistersMIPSShared::SetType SetType;
 
-#if defined(JS_CODEGEN_MIPS32)
-  static uint32_t SetSize(SetType x) {
-    static_assert(sizeof(SetType) == 4, "SetType must be 32 bits");
-    return mozilla::CountPopulation32(x);
-  }
-  static uint32_t FirstBit(SetType x) {
-    static_assert(sizeof(SetType) == 4, "SetType must be 32 bits");
-    return mozilla::CountTrailingZeroes32(x);
-  }
-  static uint32_t LastBit(SetType x) {
-    static_assert(sizeof(SetType) == 4, "SetType must be 32 bits");
-    return 31 - mozilla::CountLeadingZeroes32(x);
-  }
-#elif defined(JS_CODEGEN_MIPS64)
   static uint32_t SetSize(SetType x) {
     static_assert(sizeof(SetType) == 8, "SetType must be 64 bits");
     return mozilla::CountPopulation64(x);
@@ -312,7 +293,6 @@ class FloatRegisterMIPSShared {
     static_assert(sizeof(SetType) == 8, "SetType must be 64 bits");
     return 63 - mozilla::CountLeadingZeroes64(x);
   }
-#endif
 };
 
 namespace mips_private {
@@ -330,9 +310,7 @@ inline bool hasR2() { return mips_private::hasR2; }
 // MIPS doesn't have double registers that can NOT be treated as float32.
 inline bool hasUnaliasedDouble() { return false; }
 
-// MIPS64 doesn't support it and on MIPS32 we don't allocate odd single fp
-// registers thus not exposing multi aliasing to the jit.
-// See comments in Arhitecture-mips32.h.
+// MIPS64 doesn't support it.
 inline bool hasMultiAlias() { return false; }
 
 }  // namespace jit

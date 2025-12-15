@@ -10,7 +10,6 @@
 #include <unistd.h>
 
 #include "jit/FlushICache.h"  // js::jit::FlushICache
-#include "jit/mips32/Simulator-mips32.h"
 #include "jit/mips64/Simulator-mips64.h"
 #include "jit/RegisterSets.h"
 
@@ -29,30 +28,29 @@ namespace jit {
 static uint32_t get_mips_flags() {
   uint32_t flags = HWCAP_MIPS;
 
-#if defined(JS_SIMULATOR_MIPS32) || defined(JS_SIMULATOR_MIPS64)
+#if defined(JS_SIMULATOR_MIPS64)
   flags |= HWCAP_FPU;
   flags |= HWCAP_R2;
 #else
 #  ifdef __linux__
   FILE* fp = fopen("/proc/cpuinfo", "r");
-  if (!fp) {
-    return flags;
-  }
-
-  char buf[1024] = {};
-  (void)fread(buf, sizeof(char), sizeof(buf) - 1, fp);
-  fclose(fp);
-  if (strstr(buf, "FPU")) {
-    flags |= HWCAP_FPU;
-  }
-  if (strstr(buf, "Loongson")) {
-    flags |= HWCAP_LOONGSON;
-  }
-  if (strstr(buf, "mips32r2") || strstr(buf, "mips64r2")) {
-    flags |= HWCAP_R2;
+  if (fp) {
+    char buf[1024] = {};
+    size_t len = fread(buf, sizeof(char), sizeof(buf) - 1, fp);
+    fclose(fp);
+    buf[len] = 0;
+    if (strstr(buf, "FPU")) {
+      flags |= HWCAP_FPU;
+    }
+    if (strstr(buf, "Loongson")) {
+      flags |= HWCAP_LOONGSON;
+    }
+    if (strstr(buf, "mips32r2") || strstr(buf, "mips64r2")) {
+      flags |= HWCAP_R2;
+    }
   }
 #  endif
-#endif  // JS_SIMULATOR_MIPS32 || JS_SIMULATOR_MIPS64
+#endif  // JS_SIMULATOR_MIPS64
   return flags;
 }
 

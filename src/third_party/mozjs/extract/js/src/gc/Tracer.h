@@ -7,6 +7,7 @@
 #ifndef js_Tracer_h
 #define js_Tracer_h
 
+#include "gc/Allocator.h"
 #include "gc/Barrier.h"
 #include "gc/TraceKind.h"
 #include "js/HashTable.h"
@@ -254,6 +255,14 @@ inline void TraceManuallyBarrieredEdge(JSTracer* trc, T* thingp,
   gc::TraceEdgeInternal(trc, gc::ConvertToBase(thingp), name);
 }
 
+template <typename T>
+inline void TraceManuallyBarrieredNullableEdge(JSTracer* trc, T* thingp,
+                                               const char* name) {
+  if (InternalBarrierMethods<T>::isMarkable(*thingp)) {
+    gc::TraceEdgeInternal(trc, gc::ConvertToBase(thingp), name);
+  }
+}
+
 // Trace through a weak edge. If *thingp is not marked at the end of marking,
 // it is replaced by nullptr, and this method will return false to indicate that
 // the edge no longer exists.
@@ -318,6 +327,15 @@ template <typename T>
 void TraceRootRange(JSTracer* trc, size_t len, T* vec, const char* name) {
   gc::AssertRootMarkingPhase(trc);
   gc::TraceRangeInternal(trc, len, gc::ConvertToBase(vec), name);
+}
+
+// Note that this doesn't trace the contents of the alloc.
+// TODO: Unify this with other TraceEdge methods.
+template <typename T>
+void TraceBufferEdge(JSTracer* trc, gc::Cell* owner, T** bufferp,
+                     const char* name) {
+  void** ptrp = reinterpret_cast<void**>(bufferp);
+  gc::TraceBufferEdgeInternal(trc, owner, ptrp, name);
 }
 
 // As below but with manual barriers.

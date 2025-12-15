@@ -18,7 +18,7 @@ namespace frontend {
 template <typename Tag>
 struct TypedIndex {
   TypedIndex() = default;
-  constexpr explicit TypedIndex(uint32_t index) : index(index){};
+  constexpr explicit TypedIndex(uint32_t index) : index(index) {};
 
   uint32_t index = 0;
 

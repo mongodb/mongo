@@ -119,6 +119,7 @@ class Decoder {
   void DecodeVCMP(Instruction* instr);
   void DecodeVCVTBetweenDoubleAndSingle(Instruction* instr);
   void DecodeVCVTBetweenFloatingPointAndInteger(Instruction* instr);
+  void DecodeVCVTBetweenFloatingPointAndHalf(Instruction* instr);
 
   const disasm::NameConverter& converter_;
   V8Vector<char> out_buffer_;
@@ -851,6 +852,8 @@ void Decoder::DecodeType01(Instruction* instr) {
     }
   } else if ((type == 1) && instr->IsNopType1()) {
     Format(instr, "nop'cond");
+  } else if ((type == 1) && instr->IsYieldType1()) {
+    Format(instr, "yield'cond");
   } else if ((type == 1) && instr->IsCsdbType1()) {
     Format(instr, "csdb'cond");
   } else {
@@ -1400,6 +1403,9 @@ void Decoder::DecodeTypeVFP(Instruction* instr) {
         } else {
           Format(instr, "vrintz'cond.f32.f32 'Sd, 'Sm");
         }
+      } else if ((instr->Opc2Value() & ~0x1) == 0x2 &&
+                 (instr->Opc3Value() & 0x1)) {
+        DecodeVCVTBetweenFloatingPointAndHalf(instr);
       } else {
         Unknown(instr);  // Not used by V8.
       }
@@ -1574,6 +1580,45 @@ void Decoder::DecodeVCVTBetweenFloatingPointAndInteger(Instruction* instr) {
         Format(instr, "vcvt'cond.f32.u32 'Sd, 'Sm");
       } else {
         Format(instr, "vcvt'cond.f32.s32 'Sd, 'Sm");
+      }
+    }
+  }
+}
+
+void Decoder::DecodeVCVTBetweenFloatingPointAndHalf(Instruction* instr) {
+  VERIFY((instr->Bit(4) == 0) && (instr->Opc1Value() == 0x7));
+  VERIFY((instr->Opc2Value() & ~0x1) == 0x2 && (instr->Opc3Value() & 0x1));
+
+  bool top_half = (instr->Bit(7) == 1);
+  bool to_half = (instr->Bit(16) == 1);
+  bool dp_operation = (instr->SzValue() == 1);
+
+  if (top_half) {
+    if (dp_operation) {
+      if (to_half) {
+        Format(instr, "vcvtt'cond.f16.f64 'Sd, 'Dm");
+      } else {
+        Format(instr, "vcvtt'cond.f64.f16 'Dd, 'Sm");
+      }
+    } else {
+      if (to_half) {
+        Format(instr, "vcvtt'cond.f16.f32 'Sd, 'Sm");
+      } else {
+        Format(instr, "vcvtt'cond.f32.f16 'Sd, 'Sm");
+      }
+    }
+  } else {
+    if (dp_operation) {
+      if (to_half) {
+        Format(instr, "vcvtb'cond.f16.f64 'Sd, 'Dm");
+      } else {
+        Format(instr, "vcvtb'cond.f64.f16 'Dd, 'Sm");
+      }
+    } else {
+      if (to_half) {
+        Format(instr, "vcvtb'cond.f16.f32 'Sd, 'Sm");
+      } else {
+        Format(instr, "vcvtb'cond.f32.f16 'Sd, 'Sm");
       }
     }
   }

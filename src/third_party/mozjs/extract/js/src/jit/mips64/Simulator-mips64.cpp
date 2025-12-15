@@ -944,7 +944,12 @@ void MipsDebugger::debug() {
         }
       } else if (strcmp(cmd, "gdb") == 0) {
         printf("relinquishing control to gdb\n");
+#if defined(__x86_64__)
         asm("int $3");
+#elif defined(__aarch64__)
+        // see masm.breakpoint for arm64
+        asm("brk #0xf000");
+#endif
         printf("regaining control from gdb\n");
       } else if (strcmp(cmd, "break") == 0) {
         if (argc == 2) {
@@ -1437,7 +1442,10 @@ void Simulator::setCallResultFloat(float result) {
 }
 
 void Simulator::setCallResult(int64_t res) { setRegister(v0, res); }
-
+#ifdef XP_DARWIN
+// add a dedicated setCallResult for intptr_t on Darwin
+void Simulator::setCallResult(intptr_t res) { setRegister(v0, I64(res)); }
+#endif
 void Simulator::setCallResult(__int128_t res) {
   setRegister(v0, I64(res));
   setRegister(v1, I64(res >> 64));
@@ -1801,8 +1809,8 @@ int Simulator::storeConditionalW(uint64_t addr, int value,
   // return 0, but there is no point at allowing that. It is certainly an
   // indicator of a bug.
   if (addr != LLAddr_) {
-    printf("SC to bad address: 0x%016" PRIx64 ", pc=0x%016" PRIx64
-           ", expected: 0x%016" PRIx64 "\n",
+    printf("SC to bad address: 0x%016" PRIx64 ", pc=0x%016" PRIxPTR
+           ", expected: 0x%016" PRIxPTR "\n",
            addr, reinterpret_cast<intptr_t>(instr), LLAddr_);
     MOZ_CRASH();
   }
@@ -1855,8 +1863,8 @@ int Simulator::storeConditionalD(uint64_t addr, int64_t value,
   // return 0, but there is no point at allowing that. It is certainly an
   // indicator of a bug.
   if (addr != LLAddr_) {
-    printf("SC to bad address: 0x%016" PRIx64 ", pc=0x%016" PRIx64
-           ", expected: 0x%016" PRIx64 "\n",
+    printf("SC to bad address: 0x%016" PRIx64 ", pc=0x%016" PRIxPTR
+           ", expected: 0x%016" PRIxPTR "\n",
            addr, reinterpret_cast<intptr_t>(instr), LLAddr_);
     MOZ_CRASH();
   }

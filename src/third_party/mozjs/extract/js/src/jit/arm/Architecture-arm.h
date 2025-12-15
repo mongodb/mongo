@@ -7,6 +7,7 @@
 #ifndef jit_arm_Architecture_arm_h
 #define jit_arm_Architecture_arm_h
 
+#include "mozilla/EnumSet.h"
 #include "mozilla/MathAlgorithms.h"
 
 #include <algorithm>
@@ -16,13 +17,6 @@
 #include "jit/shared/Architecture-shared.h"
 
 #include "js/Utility.h"
-
-// GCC versions 4.6 and above define __ARM_PCS_VFP to denote a hard-float
-// ABI target. The iOS toolchain doesn't define anything specific here,
-// but iOS always supports VFP.
-#if defined(__ARM_PCS_VFP) || defined(XP_IOS)
-#  define JS_CODEGEN_ARM_HARDFP
-#endif
 
 namespace js {
 namespace jit {
@@ -63,8 +57,8 @@ class Registers {
     pc = r15,
     invalid_reg
   };
-  typedef uint8_t Code;
-  typedef RegisterID Encoding;
+  using Code = uint8_t;
+  using Encoding = RegisterID;
 
   // Content spilled during bailouts.
   union RegisterContent {
@@ -88,7 +82,7 @@ class Registers {
   static const uint32_t Total = 16;
   static const uint32_t Allocatable = 13;
 
-  typedef uint32_t SetType;
+  using SetType = uint32_t;
 
   static const SetType AllMask = (1 << Total) - 1;
   static const SetType ArgRegMask =
@@ -144,7 +138,7 @@ class Registers {
 };
 
 // Smallest integer type that can hold a register bitmask.
-typedef uint16_t PackedRegisterMask;
+using PackedRegisterMask = uint16_t;
 
 class FloatRegisters {
  public:
@@ -216,8 +210,8 @@ class FloatRegisters {
     invalid_freg
   };
 
-  typedef uint32_t Code;
-  typedef FPRegisterID Encoding;
+  using Code = uint32_t;
+  using Encoding = FPRegisterID;
 
   // Content spilled during bailouts.
   union RegisterContent {
@@ -285,7 +279,7 @@ class FloatRegisters {
     //        | s{2n+1} |  s{2n}  |
     //
   /* clang-format on */
-  typedef uint64_t SetType;
+  using SetType = uint64_t;
   static const SetType AllSingleMask = (1ull << TotalSingle) - 1;
   static const SetType AllDoubleMask = ((1ull << TotalDouble) - 1)
                                        << TotalSingle;
@@ -330,9 +324,9 @@ class VFPRegister {
   // be converted.
   enum RegType : uint8_t { Single = 0x0, Double = 0x1, UInt = 0x2, Int = 0x3 };
 
-  typedef FloatRegisters Codes;
-  typedef Codes::Code Code;
-  typedef Codes::Encoding Encoding;
+  using Codes = FloatRegisters;
+  using Code = Codes::Code;
+  using Encoding = Codes::Encoding;
 
   // Bitfields below are all uint32_t to make sure MSVC packs them correctly.
  public:
@@ -491,7 +485,7 @@ class VFPRegister {
     return doubleOverlay(aliasIdx - 1);
   }
 
-  typedef FloatRegisters::SetType SetType;
+  using SetType = FloatRegisters::SetType;
 
   // This function is used to ensure that Register set can take all Single
   // registers, even if we are taking a mix of either double or single
@@ -630,74 +624,168 @@ VFPRegister::AllocatableAsIndexableSet<RegTypeName::Float64>(SetType set) {
 }
 
 // The only floating point register set that we work with are the VFP Registers.
-typedef VFPRegister FloatRegister;
+using FloatRegister = VFPRegister;
 
-uint32_t GetARMFlags();
-bool HasARMv7();
-bool HasMOVWT();
-bool HasLDSTREXBHD();  // {LD,ST}REX{B,H,D}
-bool HasDMBDSBISB();   // DMB, DSB, and ISB
-bool HasVFPv3();
-bool HasVFP();
-bool Has32DP();
-bool HasIDIV();
-bool HasNEON();
+enum class ARMCapability : uint32_t {
+  // Flag when the capabilities are initialized, so they can be atomically set.
+  Initialized,
 
-extern volatile uint32_t armHwCapFlags;
+  // Flag when HWCAP_VFP is set.
+  VFP,
 
-// Not part of the HWCAP flag, but we need to know these and these bits are not
-// used. Define these here so that their use can be inlined by the simulator.
+  // Flag when HWCAP_VFPD32 is set.
+  VFPD32,
 
-// A bit to flag when signaled alignment faults are to be fixed up.
-#define HWCAP_FIXUP_FAULT (1 << 24)
+  // Flag when HWCAP_VFPv3 is set.
+  VFPv3,
 
-// A bit to flag when the flags are uninitialized, so they can be atomically
-// set.
-#define HWCAP_UNINITIALIZED (1 << 25)
+  // Flag when HWCAP_VFPv3D16 is set.
+  VFPv3D16,
 
-// A bit to flag when alignment faults are enabled and signal.
-#define HWCAP_ALIGNMENT_FAULT (1 << 26)
+  // Flag when HWCAP_VFPv4 is set.
+  VFPv4,
 
-// A bit to flag the use of the hardfp ABI.
-#define HWCAP_USE_HARDFP_ABI (1 << 27)
+  // Flag when HWCAP_NEON is set.
+  Neon,
 
-// A bit to flag the use of the ARMv7 arch, otherwise ARMv6.
-#define HWCAP_ARMv7 (1 << 28)
+  // Flag when HWCAP_IDIVA is set.
+  IDivA,
 
-// Top three bits are reserved, do not use them.
+  // Flag when HWCAP_FPHP is set (floating point half-precision).
+  FPHP,
 
-// Returns true when cpu alignment faults are enabled and signaled, and thus we
-// should ensure loads and stores are aligned.
-inline bool HasAlignmentFault() {
-  MOZ_ASSERT(armHwCapFlags != HWCAP_UNINITIALIZED);
-  return armHwCapFlags & HWCAP_ALIGNMENT_FAULT;
-}
+  // Flag when signaled alignment faults are to be fixed up.
+  FixupFault,
+
+  // Flag when alignment faults are enabled and signal.
+  AlignmentFault,
+
+  // Flag the use of the hardfp ABI.
+  UseHardFpABI,
+
+  // Flag the use of the ARMv7 arch, otherwise ARMv6.
+  ARMv7,
+};
+
+using ARMCapabilities = mozilla::EnumSet<ARMCapability>;
+
+class ARMFlags final {
+  // The override flags parsed from the ARMHWCAP environment variable or from
+  // the --arm-hwcap js shell argument. They are stable after startup: there is
+  // no longer a programmatic way of setting these from JS.
+  static inline ARMCapabilities capabilities{};
+
+ public:
+  ARMFlags() = delete;
+
+  // ARMFlags::Init is called from the JitContext constructor to read the
+  // hardware flags. This method must only be called exactly once.
+  //
+  // If the environment variable ARMHWCAP is set then the flags are read from it
+  // instead; see ParseARMHwCapFlags.
+  static void Init();
+
+  static bool IsInitialized() {
+    return capabilities.contains(ARMCapability::Initialized);
+  }
+
+  static uint32_t GetFlags() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.serialize();
+  }
+  static bool HasARMv7() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::ARMv7);
+  }
+  static bool HasMOVWT() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::ARMv7);
+  }
+  // {LD,ST}REX{B,H,D}
+  static bool HasLDSTREXBHD() {
+    // These are really available from ARMv6K and later, but why bother?
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::ARMv7);
+  }
+  // DMB, DSB, and ISB
+  static bool HasDMBDSBISB() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::ARMv7);
+  }
+  static bool HasVFP() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::VFP);
+  }
+  static bool Has32DP() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::VFPD32);
+  }
+  static bool HasVFPv3() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::VFPv3);
+  }
+  static bool HasVFPv4() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::VFPv4);
+  }
+  static bool HasNEON() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::Neon);
+  }
+  static bool HasIDIV() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::IDivA);
+  }
+  static bool HasFPHalfPrecision() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::FPHP);
+  }
+
+  // Returns true when cpu alignment faults are enabled and signaled, and thus
+  // we should ensure loads and stores are aligned.
+  static bool HasAlignmentFault() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::AlignmentFault);
+  }
 
 #ifdef JS_SIMULATOR_ARM
-// Returns true when cpu alignment faults will be fixed up by the
-// "operating system", which functionality we will emulate.
-inline bool FixupFault() {
-  MOZ_ASSERT(armHwCapFlags != HWCAP_UNINITIALIZED);
-  return armHwCapFlags & HWCAP_FIXUP_FAULT;
-}
+  // Returns true when cpu alignment faults will be fixed up by the
+  // "operating system", which functionality we will emulate.
+  static bool FixupFault() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::FixupFault);
+  }
 #endif
+
+// If the simulator is used then the ABI choice is dynamic. Otherwise the ABI is
+// static and useHardFpABI is constexpr so that unused branches can be optimized
+// away.
+#ifdef JS_SIMULATOR_ARM
+  static bool UseHardFpABI() {
+    MOZ_ASSERT(IsInitialized());
+    return capabilities.contains(ARMCapability::UseHardFpABI);
+  }
+#else
+  static constexpr bool UseHardFpABI() {
+// GCC versions 4.6 and above define __ARM_PCS_VFP to denote a hard-float
+// ABI target. The iOS toolchain doesn't define anything specific here, but
+// iOS always supports VFP.
+#  if defined(__ARM_PCS_VFP) || defined(XP_IOS)
+    return true;
+#  else
+    return false;
+#  endif
+  }
+#endif
+};
 
 // Arm/D32 has double registers that can NOT be treated as float32 and this
 // requires some dances in lowering.
-inline bool hasUnaliasedDouble() { return Has32DP(); }
+inline bool hasUnaliasedDouble() { return ARMFlags::Has32DP(); }
 
 // On ARM, Dn aliases both S2n and S2n+1, so if you need to convert a float32 to
 // a double as a temporary, you need a temporary double register.
 inline bool hasMultiAlias() { return true; }
-
-// InitARMFlags is called from the JitContext constructor to read the hardware
-// flags.  The call is a no-op after the first call, or if the JS shell has
-// already set the flags (it has a command line switch for this, see
-// ParseARMHwCapFlags).
-//
-// If the environment variable ARMHWCAP is set then the flags are read from it
-// instead; see ParseARMHwCapFlags.
-void InitARMFlags();
 
 // Register a string denoting ARM hardware flags. During engine initialization,
 // these flags will then be used instead of the actual hardware capabilities.
@@ -705,23 +793,8 @@ void InitARMFlags();
 // outlive the JS_Init call.
 void SetARMHwCapFlagsString(const char* armHwCap);
 
-// Retrive the ARM hardware flags at a bitmask.  They must have been set.
-uint32_t GetARMFlags();
-
-// If the simulator is used then the ABI choice is dynamic. Otherwise the ABI is
-// static and useHardFpABI is inlined so that unused branches can be optimized
-// away.
-#ifdef JS_SIMULATOR_ARM
-bool UseHardFpABI();
-#else
-static inline bool UseHardFpABI() {
-#  if defined(JS_CODEGEN_ARM_HARDFP)
-  return true;
-#  else
-  return false;
-#  endif
-}
-#endif
+// Retrieve the ARM hardware flags as a bitmask. They must have been set.
+inline uint32_t GetARMFlags() { return ARMFlags::GetFlags(); }
 
 // In order to handle SoftFp ABI calls, we need to be able to express that we
 // have ABIArg which are represented by pair of general purpose registers.

@@ -44,7 +44,9 @@ namespace js {
 const JSClass DebugScriptObject::class_ = {
     "DebugScriptObject",
     JSCLASS_HAS_RESERVED_SLOTS(SlotCount) | JSCLASS_BACKGROUND_FINALIZE,
-    &classOps_, JS_NULL_CLASS_SPEC};
+    &classOps_,
+    JS_NULL_CLASS_SPEC,
+};
 
 const JSClassOps DebugScriptObject::classOps_ = {
     nullptr,                      // addProperty

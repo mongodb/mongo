@@ -91,7 +91,7 @@ class MoveEmitterARM64 {
   void setScratchRegister(Register reg) {}
 };
 
-typedef MoveEmitterARM64 MoveEmitter;
+using MoveEmitter = MoveEmitterARM64;
 
 }  // namespace jit
 }  // namespace js

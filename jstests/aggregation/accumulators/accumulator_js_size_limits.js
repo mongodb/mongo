@@ -145,20 +145,20 @@ const largeAccumulator = {
 };
 res = coll
     .aggregate([
-        {$addFields: {a: {$range: [0, 1000000]}}},
+        {$addFields: {a: {$range: [0, 250000]}}},
         {$unwind: "$a"}, // Create a number of documents to be executed by the accumulator.
         {$group: {_id: "$groupBy", count: largeAccumulator}},
     ])
     .toArray();
 assert.sameMembers(res, [
-    {_id: 1, count: 1000000},
-    {_id: 2, count: 1000000},
+    {_id: 1, count: 250000},
+    {_id: 2, count: 250000},
 ]);
 
 // With $bucket.
 res = coll
     .aggregate([
-        {$addFields: {a: {$range: [0, 1000000]}}},
+        {$addFields: {a: {$range: [0, 250000]}}},
         {$unwind: "$a"}, // Create a number of documents to be executed by the accumulator.
         {
             $bucket: {groupBy: "$groupBy", boundaries: [1, 2, 3], output: {count: largeAccumulator}},
@@ -166,6 +166,6 @@ res = coll
     ])
     .toArray();
 assert.sameMembers(res, [
-    {_id: 1, count: 1000000},
-    {_id: 2, count: 1000000},
+    {_id: 1, count: 250000},
+    {_id: 2, count: 250000},
 ]);

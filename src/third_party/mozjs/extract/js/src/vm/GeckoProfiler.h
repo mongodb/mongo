@@ -8,7 +8,9 @@
 #define vm_GeckoProfiler_h
 
 #include "mozilla/Attributes.h"
+#include "mozilla/BaseProfilerMarkersPrerequisites.h"
 #include "mozilla/DebugOnly.h"
+#include "mozilla/TimeStamp.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -122,25 +124,36 @@ class GeckoProfilerRuntime {
   MainThreadData<ProfileStringMap> strings_;
   bool slowAssertions;
   uint32_t enabled_;
-  void (*eventMarker_)(const char*, const char*);
+  void (*eventMarker_)(mozilla::MarkerCategory, const char*, const char*);
+  void (*intervalMarker_)(mozilla::MarkerCategory, const char*,
+                          mozilla::TimeStamp, const char*);
 
  public:
   explicit GeckoProfilerRuntime(JSRuntime* rt);
 
   /* management of whether instrumentation is on or off */
-  bool enabled() { return enabled_; }
+  bool enabled() const { return enabled_; }
   void enable(bool enabled);
   void enableSlowAssertions(bool enabled) { slowAssertions = enabled; }
   bool slowAssertionsEnabled() { return slowAssertions; }
 
-  void setEventMarker(void (*fn)(const char*, const char*));
+  void setEventMarker(void (*fn)(mozilla::MarkerCategory, const char*,
+                                 const char*));
+  void setIntervalMarker(void (*fn)(mozilla::MarkerCategory, const char*,
+                                    mozilla::TimeStamp, const char*));
 
   static JS::UniqueChars allocProfileString(JSContext* cx, BaseScript* script);
   const char* profileString(JSContext* cx, BaseScript* script);
 
   void onScriptFinalized(BaseScript* script);
 
-  void markEvent(const char* event, const char* details);
+  void markEvent(
+      const char* event, const char* details,
+      JS::ProfilingCategoryPair jsPair = JS::ProfilingCategoryPair::JS);
+
+  void markInterval(
+      const char* event, mozilla::TimeStamp start, const char* details,
+      JS::ProfilingCategoryPair jsPair = JS::ProfilingCategoryPair::JS);
 
   ProfileStringMap& strings() { return strings_.ref(); }
 
@@ -148,7 +161,7 @@ class GeckoProfilerRuntime {
   size_t stringsCount();
   void stringsReset();
 
-  uint32_t* addressOfEnabled() { return &enabled_; }
+  const uint32_t* addressOfEnabled() const { return &enabled_; }
 
   void fixupStringsMapAfterMovingGC();
 #ifdef JSGC_HASH_TABLE_CHECKS

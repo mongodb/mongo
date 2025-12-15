@@ -192,11 +192,19 @@ class ICStub {
     // call JitCode::FromExecutable on the raw pointer.
     return isFallback();
   }
+
+#ifndef ENABLE_PORTABLE_BASELINE_INTERP
   JitCode* jitCode() {
     MOZ_ASSERT(!usesTrampolineCode());
     return JitCode::FromExecutable(stubCode_);
   }
   bool hasJitCode() { return !!stubCode_; }
+#else  // !ENABLE_PORTABLE_BASELINE_INTERP
+  JitCode* jitCode() { return nullptr; }
+  bool hasJitCode() { return false; }
+  uint8_t* rawJitCode() const { return stubCode_; }
+  void updateRawJitCode(uint8_t* ptr) { stubCode_ = ptr; }
+#endif
 
   uint32_t enteredCount() const { return enteredCount_; }
   inline void incrementEnteredCount() { enteredCount_++; }
@@ -378,7 +386,7 @@ extern bool DoBindNameFallback(JSContext* cx, BaselineFrame* frame,
                                ICFallbackStub* stub, HandleObject envChain,
                                MutableHandleValue res);
 
-extern bool DoGetIntrinsicFallback(JSContext* cx, BaselineFrame* frame,
+extern bool DoLazyConstantFallback(JSContext* cx, BaselineFrame* frame,
                                    ICFallbackStub* stub,
                                    MutableHandleValue res);
 
@@ -437,6 +445,9 @@ extern bool DoNewArrayFallback(JSContext* cx, BaselineFrame* frame,
 extern bool DoNewObjectFallback(JSContext* cx, BaselineFrame* frame,
                                 ICFallbackStub* stub, MutableHandleValue res);
 
+extern bool DoLambdaFallback(JSContext* cx, BaselineFrame* frame,
+                             ICFallbackStub* stub, MutableHandleValue res);
+
 extern bool DoCompareFallback(JSContext* cx, BaselineFrame* frame,
                               ICFallbackStub* stub, HandleValue lhs,
                               HandleValue rhs, MutableHandleValue ret);
@@ -448,6 +459,8 @@ extern bool DoOptimizeGetIteratorFallback(JSContext* cx, BaselineFrame* frame,
                                           ICFallbackStub* stub,
                                           HandleValue value,
                                           MutableHandleValue res);
+extern bool DoGetImportFallback(JSContext* cx, BaselineFrame* frame,
+                                ICFallbackStub* stub, MutableHandleValue res);
 
 }  // namespace jit
 }  // namespace js

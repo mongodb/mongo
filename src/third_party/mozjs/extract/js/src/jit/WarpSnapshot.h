@@ -11,9 +11,10 @@
 #include "mozilla/Variant.h"
 
 #include "builtin/ModuleObject.h"
-#include "gc/Policy.h"
 #include "jit/JitAllocPolicy.h"
 #include "jit/JitContext.h"
+#include "jit/JitZone.h"
+#include "jit/OffthreadSnapshot.h"
 #include "jit/TypeData.h"
 #include "vm/EnvironmentObject.h"
 #include "vm/FunctionFlags.h"  // js::FunctionFlags
@@ -40,7 +41,7 @@ class WarpScriptSnapshot;
   _(WarpGetIntrinsic)            \
   _(WarpGetImport)               \
   _(WarpRest)                    \
-  _(WarpBindGName)               \
+  _(WarpBindUnqualifiedGName)    \
   _(WarpVarEnvironment)          \
   _(WarpLexicalEnvironment)      \
   _(WarpClassBodyEnvironment)    \
@@ -48,29 +49,6 @@ class WarpScriptSnapshot;
   _(WarpCacheIR)                 \
   _(WarpInlinedCall)             \
   _(WarpPolymorphicTypes)
-
-// Wrapper for GC things stored in WarpSnapshot. Asserts the GC pointer is not
-// nursery-allocated. These pointers must be traced using TraceWarpGCPtr.
-template <typename T>
-class WarpGCPtr {
-  // Note: no pre-barrier is needed because this is a constant. No post-barrier
-  // is needed because the value is always tenured.
-  const T ptr_;
-
- public:
-  explicit WarpGCPtr(const T& ptr) : ptr_(ptr) {
-    MOZ_ASSERT(JS::GCPolicy<T>::isTenured(ptr),
-               "WarpSnapshot pointers must be tenured");
-  }
-  WarpGCPtr(const WarpGCPtr<T>& other) = default;
-
-  operator T() const { return ptr_; }
-  T operator->() const { return ptr_; }
-
- private:
-  WarpGCPtr() = delete;
-  void operator=(WarpGCPtr<T>& other) = delete;
-};
 
 // WarpOpSnapshot is the base class for data attached to a single bytecode op by
 // WarpOracle. This is typically data that WarpBuilder can't read off-thread
@@ -121,7 +99,7 @@ using WarpOpSnapshotList = mozilla::LinkedList<WarpOpSnapshot>;
 // Template object for JSOp::Arguments.
 class WarpArguments : public WarpOpSnapshot {
   // Note: this can be nullptr if the realm has no template object yet.
-  WarpGCPtr<ArgumentsObject*> templateObj_;
+  OffthreadGCPtr<ArgumentsObject*> templateObj_;
 
  public:
   static constexpr Kind ThisKind = Kind::WarpArguments;
@@ -157,7 +135,7 @@ class WarpRegExp : public WarpOpSnapshot {
 
 // The object for JSOp::BuiltinObject if it exists at compile-time.
 class WarpBuiltinObject : public WarpOpSnapshot {
-  WarpGCPtr<JSObject*> builtin_;
+  OffthreadGCPtr<JSObject*> builtin_;
 
  public:
   static constexpr Kind ThisKind = Kind::WarpBuiltinObject;
@@ -177,7 +155,7 @@ class WarpBuiltinObject : public WarpOpSnapshot {
 
 // The intrinsic for JSOp::GetIntrinsic if it exists at compile-time.
 class WarpGetIntrinsic : public WarpOpSnapshot {
-  WarpGCPtr<Value> intrinsic_;
+  OffthreadGCPtr<Value> intrinsic_;
 
  public:
   static constexpr Kind ThisKind = Kind::WarpGetIntrinsic;
@@ -195,7 +173,7 @@ class WarpGetIntrinsic : public WarpOpSnapshot {
 
 // Target module environment and slot information for JSOp::GetImport.
 class WarpGetImport : public WarpOpSnapshot {
-  WarpGCPtr<ModuleEnvironmentObject*> targetEnv_;
+  OffthreadGCPtr<ModuleEnvironmentObject*> targetEnv_;
   uint32_t numFixedSlots_;
   uint32_t slot_;
   bool needsLexicalCheck_;
@@ -239,7 +217,7 @@ class WarpBailout : public WarpOpSnapshot {
 // Information from a Baseline IC stub.
 class WarpCacheIR : public WarpOpSnapshot {
   // Baseline stub code. Stored here to keep the CacheIRStubInfo alive.
-  WarpGCPtr<JitCode*> stubCode_;
+  OffthreadGCPtr<JitCode*> stubCode_;
   const CacheIRStubInfo* stubInfo_;
 
   // Copied Baseline stub data. Allocated in the same LifoAlloc.
@@ -373,7 +351,7 @@ class WarpPolymorphicTypes : public WarpOpSnapshot {
 
 // Shape for JSOp::Rest.
 class WarpRest : public WarpOpSnapshot {
-  WarpGCPtr<Shape*> shape_;
+  OffthreadGCPtr<Shape*> shape_;
 
  public:
   static constexpr Kind ThisKind = Kind::WarpRest;
@@ -390,14 +368,14 @@ class WarpRest : public WarpOpSnapshot {
 #endif
 };
 
-// Global environment for BindGName
-class WarpBindGName : public WarpOpSnapshot {
-  WarpGCPtr<JSObject*> globalEnv_;
+// Global environment for BindUnqualifiedGName
+class WarpBindUnqualifiedGName : public WarpOpSnapshot {
+  OffthreadGCPtr<JSObject*> globalEnv_;
 
  public:
-  static constexpr Kind ThisKind = Kind::WarpBindGName;
+  static constexpr Kind ThisKind = Kind::WarpBindUnqualifiedGName;
 
-  WarpBindGName(uint32_t offset, JSObject* globalEnv)
+  WarpBindUnqualifiedGName(uint32_t offset, JSObject* globalEnv)
       : WarpOpSnapshot(ThisKind, offset), globalEnv_(globalEnv) {}
 
   JSObject* globalEnv() const { return globalEnv_; }
@@ -411,7 +389,7 @@ class WarpBindGName : public WarpOpSnapshot {
 
 // Block environment for PushVarEnv
 class WarpVarEnvironment : public WarpOpSnapshot {
-  WarpGCPtr<VarEnvironmentObject*> templateObj_;
+  OffthreadGCPtr<VarEnvironmentObject*> templateObj_;
 
  public:
   static constexpr Kind ThisKind = Kind::WarpVarEnvironment;
@@ -430,7 +408,7 @@ class WarpVarEnvironment : public WarpOpSnapshot {
 
 // Block environment for PushLexicalEnv, FreshenLexicalEnv, RecreateLexicalEnv
 class WarpLexicalEnvironment : public WarpOpSnapshot {
-  WarpGCPtr<BlockLexicalEnvironmentObject*> templateObj_;
+  OffthreadGCPtr<BlockLexicalEnvironmentObject*> templateObj_;
 
  public:
   static constexpr Kind ThisKind = Kind::WarpLexicalEnvironment;
@@ -450,7 +428,7 @@ class WarpLexicalEnvironment : public WarpOpSnapshot {
 
 // Class body lexical environment for PushClassBodyEnv
 class WarpClassBodyEnvironment : public WarpOpSnapshot {
-  WarpGCPtr<ClassBodyLexicalEnvironmentObject*> templateObj_;
+  OffthreadGCPtr<ClassBodyLexicalEnvironmentObject*> templateObj_;
 
  public:
   static constexpr Kind ThisKind = Kind::WarpClassBodyEnvironment;
@@ -471,16 +449,19 @@ class WarpClassBodyEnvironment : public WarpOpSnapshot {
 };
 
 struct NoEnvironment {};
-using ConstantObjectEnvironment = WarpGCPtr<JSObject*>;
+using ConstantObjectEnvironment = OffthreadGCPtr<JSObject*>;
 struct FunctionEnvironment {
-  WarpGCPtr<CallObject*> callObjectTemplate;
-  WarpGCPtr<NamedLambdaObject*> namedLambdaTemplate;
+  OffthreadGCPtr<CallObject*> callObjectTemplate;
+  OffthreadGCPtr<NamedLambdaObject*> namedLambdaTemplate;
+  gc::Heap initialHeap;
 
  public:
   FunctionEnvironment(CallObject* callObjectTemplate,
-                      NamedLambdaObject* namedLambdaTemplate)
+                      NamedLambdaObject* namedLambdaTemplate,
+                      gc::Heap initialHeap)
       : callObjectTemplate(callObjectTemplate),
-        namedLambdaTemplate(namedLambdaTemplate) {}
+        namedLambdaTemplate(namedLambdaTemplate),
+        initialHeap(initialHeap) {}
 };
 
 // Snapshot data for the environment object(s) created in the script's prologue.
@@ -503,12 +484,12 @@ using WarpEnvironment =
 class WarpScriptSnapshot
     : public TempObject,
       public mozilla::LinkedListElement<WarpScriptSnapshot> {
-  WarpGCPtr<JSScript*> script_;
+  OffthreadGCPtr<JSScript*> script_;
   WarpEnvironment environment_;
   WarpOpSnapshotList opSnapshots_;
 
   // If the script has a JSOp::ImportMeta op, this is the module to bake in.
-  WarpGCPtr<ModuleObject*> moduleObject_;
+  OffthreadGCPtr<ModuleObject*> moduleObject_;
 
   // Whether this script is for an arrow function.
   bool isArrowFunction_;
@@ -554,16 +535,21 @@ class WarpBailoutInfo {
 
 using WarpScriptSnapshotList = mozilla::LinkedList<WarpScriptSnapshot>;
 
+using WarpZoneStubsSnapshot = JitZone::Stubs<JitCode*>;
+
 // Data allocated by WarpOracle on the main thread that's used off-thread by
 // WarpBuilder to build the MIR graph.
 class WarpSnapshot : public TempObject {
   // The scripts being compiled.
   WarpScriptSnapshotList scriptSnapshots_;
 
+  // JitZone stubs this compilation depends on.
+  const WarpZoneStubsSnapshot zoneStubs_;
+
   // The global lexical environment and its thisObject(). We don't inline
   // cross-realm calls so this can be stored once per snapshot.
-  WarpGCPtr<GlobalLexicalEnvironmentObject*> globalLexicalEnv_;
-  WarpGCPtr<JSObject*> globalLexicalEnvThis_;
+  OffthreadGCPtr<GlobalLexicalEnvironmentObject*> globalLexicalEnv_;
+  OffthreadGCPtr<JSObject*> globalLexicalEnvThis_;
 
   const WarpBailoutInfo bailoutInfo_;
 
@@ -585,11 +571,17 @@ class WarpSnapshot : public TempObject {
  public:
   explicit WarpSnapshot(JSContext* cx, TempAllocator& alloc,
                         WarpScriptSnapshotList&& scriptSnapshots,
+                        const WarpZoneStubsSnapshot& zoneStubs,
                         const WarpBailoutInfo& bailoutInfo,
                         bool recordWarmUpCount);
 
   WarpScriptSnapshot* rootScript() { return scriptSnapshots_.getFirst(); }
   const WarpScriptSnapshotList& scripts() const { return scriptSnapshots_; }
+
+  JitCode* getZoneStub(JitZone::StubKind kind) const {
+    MOZ_ASSERT(zoneStubs_[kind]);
+    return zoneStubs_[kind];
+  }
 
   GlobalLexicalEnvironmentObject* globalLexicalEnv() const {
     return globalLexicalEnv_;

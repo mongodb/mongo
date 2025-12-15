@@ -6,6 +6,7 @@
 
 #include "vm/GeckoProfiler-inl.h"
 
+#include "mozilla/DebugOnly.h"
 #include "mozilla/Sprintf.h"
 
 #include "gc/GC.h"
@@ -29,7 +30,11 @@ GeckoProfilerThread::GeckoProfilerThread()
     : profilingStack_(nullptr), profilingStackIfEnabled_(nullptr) {}
 
 GeckoProfilerRuntime::GeckoProfilerRuntime(JSRuntime* rt)
-    : rt(rt), slowAssertions(false), enabled_(false), eventMarker_(nullptr) {
+    : rt(rt),
+      slowAssertions(false),
+      enabled_(false),
+      eventMarker_(nullptr),
+      intervalMarker_(nullptr) {
   MOZ_ASSERT(rt != nullptr);
 }
 
@@ -39,9 +44,15 @@ void GeckoProfilerThread::setProfilingStack(ProfilingStack* profilingStack,
   profilingStackIfEnabled_ = enabled ? profilingStack : nullptr;
 }
 
-void GeckoProfilerRuntime::setEventMarker(void (*fn)(const char*,
+void GeckoProfilerRuntime::setEventMarker(void (*fn)(mozilla::MarkerCategory,
+                                                     const char*,
                                                      const char*)) {
   eventMarker_ = fn;
+}
+
+void GeckoProfilerRuntime::setIntervalMarker(void (*fn)(
+    mozilla::MarkerCategory, const char*, mozilla::TimeStamp, const char*)) {
+  intervalMarker_ = fn;
 }
 
 // Get a pointer to the top-most profiling frame, given the exit frame pointer.
@@ -179,11 +190,27 @@ void GeckoProfilerRuntime::onScriptFinalized(BaseScript* script) {
   }
 }
 
-void GeckoProfilerRuntime::markEvent(const char* event, const char* details) {
+void GeckoProfilerRuntime::markEvent(const char* event, const char* details,
+                                     JS::ProfilingCategoryPair jsPair) {
   MOZ_ASSERT(enabled());
   if (eventMarker_) {
     JS::AutoSuppressGCAnalysis nogc;
-    eventMarker_(event, details);
+    mozilla::MarkerCategory category(
+        static_cast<mozilla::baseprofiler::ProfilingCategoryPair>(jsPair));
+    eventMarker_(category, event, details);
+  }
+}
+
+void GeckoProfilerRuntime::markInterval(const char* event,
+                                        mozilla::TimeStamp start,
+                                        const char* details,
+                                        JS::ProfilingCategoryPair jsPair) {
+  MOZ_ASSERT(enabled());
+  if (intervalMarker_) {
+    JS::AutoSuppressGCAnalysis nogc;
+    mozilla::MarkerCategory category(
+        static_cast<mozilla::baseprofiler::ProfilingCategoryPair>(jsPair));
+    intervalMarker_(category, event, start, details);
   }
 }
 
@@ -260,21 +287,16 @@ void GeckoProfilerThread::exit(JSContext* cx, JSScript* script) {
 UniqueChars GeckoProfilerRuntime::allocProfileString(JSContext* cx,
                                                      BaseScript* script) {
   // Note: this profiler string is regexp-matched by
-  // devtools/client/profiler/cleopatra/js/parserWorker.js.
+  // profiler code. Most recently at
+  // https://github.com/firefox-devtools/profiler/blob/245b1a400c5c368ccc13641d0335398bafa0e870/src/profile-logic/process-profile.js#L520-L525
 
   // If the script has a function, try calculating its name.
-  bool hasName = false;
+  JSAtom* name = nullptr;
   size_t nameLength = 0;
-  UniqueChars nameStr;
   JSFunction* func = script->function();
   if (func && func->fullDisplayAtom()) {
-    nameStr = StringToNewUTF8CharsZ(cx, *func->fullDisplayAtom());
-    if (!nameStr) {
-      return nullptr;
-    }
-
-    nameLength = strlen(nameStr.get());
-    hasName = true;
+    name = func->fullDisplayAtom();
+    nameLength = JS::GetDeflatedUTF8StringLength(name);
   }
 
   // Calculate filename length. We cap this to a reasonable limit to avoid
@@ -287,7 +309,7 @@ UniqueChars GeckoProfilerRuntime::allocProfileString(JSContext* cx,
   bool hasLineAndColumn = false;
   size_t lineAndColumnLength = 0;
   char lineAndColumnStr[30];
-  if (hasName || script->isFunction() || script->isForEval()) {
+  if (name || script->isFunction() || script->isForEval()) {
     lineAndColumnLength =
         SprintfLiteral(lineAndColumnStr, "%u:%u", script->lineno(),
                        script->column().oneOriginValue());
@@ -303,7 +325,7 @@ UniqueChars GeckoProfilerRuntime::allocProfileString(JSContext* cx,
 
   // Calculate full string length.
   size_t fullLength = 0;
-  if (hasName) {
+  if (name) {
     MOZ_ASSERT(hasLineAndColumn);
     fullLength = nameLength + 2 + filenameLength + 1 + lineAndColumnLength + 1;
   } else if (hasLineAndColumn) {
@@ -321,8 +343,10 @@ UniqueChars GeckoProfilerRuntime::allocProfileString(JSContext* cx,
   size_t cur = 0;
 
   // Fill string with function name if needed.
-  if (hasName) {
-    memcpy(str.get() + cur, nameStr.get(), nameLength);
+  if (name) {
+    mozilla::DebugOnly<size_t> written = JS::DeflateStringToUTF8Buffer(
+        name, mozilla::Span(str.get() + cur, nameLength));
+    MOZ_ASSERT(written == nameLength);
     cur += nameLength;
     str[cur++] = ' ';
     str[cur++] = '(';
@@ -340,7 +364,7 @@ UniqueChars GeckoProfilerRuntime::allocProfileString(JSContext* cx,
   }
 
   // Terminal ')' if necessary.
-  if (hasName) {
+  if (name) {
     str[cur++] = ')';
   }
 
@@ -487,9 +511,13 @@ JS_PUBLIC_API void js::EnableContextProfilingStack(JSContext* cx,
 }
 
 JS_PUBLIC_API void js::RegisterContextProfilingEventMarker(
-    JSContext* cx, void (*fn)(const char*, const char*)) {
+    JSContext* cx,
+    void (*mark)(mozilla::MarkerCategory, const char*, const char*),
+    void (*interval)(mozilla::MarkerCategory, const char*, mozilla::TimeStamp,
+                     const char*)) {
   MOZ_ASSERT(cx->runtime()->geckoProfiler().enabled());
-  cx->runtime()->geckoProfiler().setEventMarker(fn);
+  cx->runtime()->geckoProfiler().setEventMarker(mark);
+  cx->runtime()->geckoProfiler().setIntervalMarker(interval);
 }
 
 AutoSuppressProfilerSampling::AutoSuppressProfilerSampling(JSContext* cx)
@@ -549,7 +577,7 @@ const ProfilingCategoryPairInfo sProfilingCategoryPairInfo[] = {
 JS_PUBLIC_API const ProfilingCategoryPairInfo& GetProfilingCategoryPairInfo(
     ProfilingCategoryPair aCategoryPair) {
   static_assert(
-      MOZ_ARRAY_LENGTH(sProfilingCategoryPairInfo) ==
+      std::size(sProfilingCategoryPairInfo) ==
           uint32_t(ProfilingCategoryPair::COUNT),
       "sProfilingCategoryPairInfo and ProfilingCategory need to have the "
       "same order and the same length");

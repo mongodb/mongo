@@ -24,30 +24,13 @@ using namespace js;
 using namespace js::jit;
 using namespace js::wasm;
 
-#ifdef ENABLE_WASM_GC
-#  ifndef ENABLE_WASM_GC
-#    error "GC types require the function-references feature"
-#  endif
+#ifdef ENABLE_WASM_SIMD
+#  define WASM_SIMD_OP(code) return code
+#else
+#  define WASM_SIMD_OP(code) break
 #endif
 
 #ifdef DEBUG
-
-#  ifdef ENABLE_WASM_GC
-#    define WASM_FUNCTION_REFERENCES_OP(code) return code
-#  else
-#    define WASM_FUNCTION_REFERENCES_OP(code) break
-#  endif
-#  ifdef ENABLE_WASM_GC
-#    define WASM_GC_OP(code) return code
-#  else
-#    define WASM_GC_OP(code) break
-#  endif
-#  ifdef ENABLE_WASM_SIMD
-#    define WASM_SIMD_OP(code) return code
-#  else
-#    define WASM_SIMD_OP(code) break
-#  endif
-
 OpKind wasm::Classify(OpBytes op) {
   switch (Op(op.b0)) {
     case Op::Block:
@@ -59,13 +42,13 @@ OpKind wasm::Classify(OpBytes op) {
     case Op::Drop:
       return OpKind::Drop;
     case Op::I32Const:
-      return OpKind::I32;
+      return OpKind::I32Const;
     case Op::I64Const:
-      return OpKind::I64;
+      return OpKind::I64Const;
     case Op::F32Const:
-      return OpKind::F32;
+      return OpKind::F32Const;
     case Op::F64Const:
-      return OpKind::F64;
+      return OpKind::F64Const;
     case Op::Br:
       return OpKind::Br;
     case Op::BrIf:
@@ -257,9 +240,9 @@ OpKind wasm::Classify(OpBytes op) {
     case Op::ReturnCallIndirect:
       return OpKind::ReturnCallIndirect;
     case Op::CallRef:
-      WASM_FUNCTION_REFERENCES_OP(OpKind::CallRef);
+      return OpKind::CallRef;
     case Op::ReturnCallRef:
-      WASM_FUNCTION_REFERENCES_OP(OpKind::ReturnCallRef);
+      return OpKind::ReturnCallRef;
     case Op::Return:
     case Op::Limit:
       // Accept Limit, for use in decoding the end of a function after the body.
@@ -292,76 +275,76 @@ OpKind wasm::Classify(OpBytes op) {
       return OpKind::MemoryGrow;
     case Op::RefNull:
       return OpKind::RefNull;
-    case Op::RefIsNull:
-      return OpKind::Conversion;
     case Op::RefFunc:
       return OpKind::RefFunc;
+    case Op::RefIsNull:
+      return OpKind::RefIsNull;
     case Op::RefAsNonNull:
-      WASM_FUNCTION_REFERENCES_OP(OpKind::RefAsNonNull);
+      return OpKind::RefAsNonNull;
     case Op::BrOnNull:
-      WASM_FUNCTION_REFERENCES_OP(OpKind::BrOnNull);
+      return OpKind::BrOnNull;
     case Op::BrOnNonNull:
-      WASM_FUNCTION_REFERENCES_OP(OpKind::BrOnNonNull);
+      return OpKind::BrOnNonNull;
     case Op::RefEq:
-      WASM_GC_OP(OpKind::Comparison);
+      return OpKind::Comparison;
     case Op::GcPrefix: {
       switch (GcOp(op.b1)) {
         case GcOp::Limit:
           // Reject Limit for GcPrefix encoding
           break;
         case GcOp::StructNew:
-          WASM_GC_OP(OpKind::StructNew);
+          return OpKind::StructNew;
         case GcOp::StructNewDefault:
-          WASM_GC_OP(OpKind::StructNewDefault);
+          return OpKind::StructNewDefault;
         case GcOp::StructGet:
         case GcOp::StructGetS:
         case GcOp::StructGetU:
-          WASM_GC_OP(OpKind::StructGet);
+          return OpKind::StructGet;
         case GcOp::StructSet:
-          WASM_GC_OP(OpKind::StructSet);
+          return OpKind::StructSet;
         case GcOp::ArrayNew:
-          WASM_GC_OP(OpKind::ArrayNew);
+          return OpKind::ArrayNew;
         case GcOp::ArrayNewFixed:
-          WASM_GC_OP(OpKind::ArrayNewFixed);
+          return OpKind::ArrayNewFixed;
         case GcOp::ArrayNewDefault:
-          WASM_GC_OP(OpKind::ArrayNewDefault);
+          return OpKind::ArrayNewDefault;
         case GcOp::ArrayNewData:
-          WASM_GC_OP(OpKind::ArrayNewData);
+          return OpKind::ArrayNewData;
         case GcOp::ArrayNewElem:
-          WASM_GC_OP(OpKind::ArrayNewElem);
+          return OpKind::ArrayNewElem;
         case GcOp::ArrayInitData:
-          WASM_GC_OP(OpKind::ArrayInitData);
+          return OpKind::ArrayInitData;
         case GcOp::ArrayInitElem:
-          WASM_GC_OP(OpKind::ArrayInitElem);
+          return OpKind::ArrayInitElem;
         case GcOp::ArrayGet:
         case GcOp::ArrayGetS:
         case GcOp::ArrayGetU:
-          WASM_GC_OP(OpKind::ArrayGet);
+          return OpKind::ArrayGet;
         case GcOp::ArraySet:
-          WASM_GC_OP(OpKind::ArraySet);
+          return OpKind::ArraySet;
         case GcOp::ArrayLen:
-          WASM_GC_OP(OpKind::ArrayLen);
+          return OpKind::ArrayLen;
         case GcOp::ArrayCopy:
-          WASM_GC_OP(OpKind::ArrayCopy);
+          return OpKind::ArrayCopy;
         case GcOp::ArrayFill:
-          WASM_GC_OP(OpKind::ArrayFill);
+          return OpKind::ArrayFill;
         case GcOp::RefI31:
         case GcOp::I31GetS:
         case GcOp::I31GetU:
-          WASM_GC_OP(OpKind::Conversion);
+          return OpKind::Conversion;
         case GcOp::RefTest:
         case GcOp::RefTestNull:
-          WASM_GC_OP(OpKind::RefTest);
+          return OpKind::RefTest;
         case GcOp::RefCast:
         case GcOp::RefCastNull:
-          WASM_GC_OP(OpKind::RefCast);
+          return OpKind::RefCast;
         case GcOp::BrOnCast:
         case GcOp::BrOnCastFail:
-          WASM_GC_OP(OpKind::BrOnCast);
+          return OpKind::BrOnCast;
         case GcOp::AnyConvertExtern:
-          WASM_GC_OP(OpKind::RefConversion);
+          return OpKind::RefConversion;
         case GcOp::ExternConvertAny:
-          WASM_GC_OP(OpKind::RefConversion);
+          return OpKind::RefConversion;
       }
       break;
     }
@@ -529,7 +512,7 @@ OpKind wasm::Classify(OpBytes op) {
         case SimdOp::F64x2RelaxedMax:
         case SimdOp::I8x16RelaxedSwizzle:
         case SimdOp::I16x8RelaxedQ15MulrS:
-        case SimdOp::I16x8DotI8x16I7x16S:
+        case SimdOp::I16x8RelaxedDotI8x16I7x16S:
           WASM_SIMD_OP(OpKind::Binary);
         case SimdOp::I8x16Neg:
         case SimdOp::I16x8Neg:
@@ -604,7 +587,7 @@ OpKind wasm::Classify(OpBytes op) {
         case SimdOp::I8x16Shuffle:
           WASM_SIMD_OP(OpKind::VectorShuffle);
         case SimdOp::V128Const:
-          WASM_SIMD_OP(OpKind::V128);
+          WASM_SIMD_OP(OpKind::V128Const);
         case SimdOp::V128Load:
         case SimdOp::V128Load8Splat:
         case SimdOp::V128Load16Splat:
@@ -639,7 +622,7 @@ OpKind wasm::Classify(OpBytes op) {
         case SimdOp::I16x8RelaxedLaneSelect:
         case SimdOp::I32x4RelaxedLaneSelect:
         case SimdOp::I64x2RelaxedLaneSelect:
-        case SimdOp::I32x4DotI8x16I7x16AddS:
+        case SimdOp::I32x4RelaxedDotI8x16I7x16AddS:
           WASM_SIMD_OP(OpKind::Ternary);
       }
       break;
@@ -685,8 +668,8 @@ OpKind wasm::Classify(OpBytes op) {
         case ThreadOp::Limit:
           // Reject Limit for ThreadPrefix encoding
           break;
-        case ThreadOp::Wake:
-          return OpKind::Wake;
+        case ThreadOp::Notify:
+          return OpKind::Notify;
         case ThreadOp::I32Wait:
         case ThreadOp::I64Wait:
           return OpKind::Wait;
@@ -750,7 +733,7 @@ OpKind wasm::Classify(OpBytes op) {
         case ThreadOp::I64AtomicXchg8U:
         case ThreadOp::I64AtomicXchg16U:
         case ThreadOp::I64AtomicXchg32U:
-          return OpKind::AtomicBinOp;
+          return OpKind::AtomicRMW;
         case ThreadOp::I32AtomicCmpXchg:
         case ThreadOp::I64AtomicCmpXchg:
         case ThreadOp::I32AtomicCmpXchg8U:
@@ -758,7 +741,7 @@ OpKind wasm::Classify(OpBytes op) {
         case ThreadOp::I64AtomicCmpXchg8U:
         case ThreadOp::I64AtomicCmpXchg16U:
         case ThreadOp::I64AtomicCmpXchg32U:
-          return OpKind::AtomicCompareExchange;
+          return OpKind::AtomicCmpXchg;
         default:
           break;
       }
@@ -821,11 +804,1182 @@ OpKind wasm::Classify(OpBytes op) {
   }
   MOZ_CRASH("unimplemented opcode");
 }
-
-#  undef WASM_GC_OP
-#  undef WASM_REF_OP
-
 #endif  // DEBUG
+
+const char* OpBytes::toString() const {
+  switch (Op(b0)) {
+    case Op::Unreachable:
+      return "unreachable";
+    case Op::Nop:
+      return "nop";
+    case Op::Block:
+      return "block";
+    case Op::Loop:
+      return "loop";
+    case Op::If:
+      return "if";
+    case Op::Else:
+      return "else";
+    case Op::Try:
+      return "try";
+    case Op::Catch:
+      return "catch";
+    case Op::Throw:
+      return "throw";
+    case Op::Rethrow:
+      return "rethrow";
+    case Op::ThrowRef:
+      return "throw_ref";
+    case Op::End:
+      return "end";
+    case Op::Br:
+      return "br";
+    case Op::BrIf:
+      return "br_if";
+    case Op::BrTable:
+      return "br_table";
+    case Op::Return:
+      return "return";
+    case Op::Call:
+      return "call";
+    case Op::CallIndirect:
+      return "call_indirect";
+    case Op::ReturnCall:
+      return "return_call";
+    case Op::ReturnCallIndirect:
+      return "return_call_indirect";
+    case Op::CallRef:
+      return "call_ref";
+    case Op::ReturnCallRef:
+      return "return_call_ref";
+    case Op::Delegate:
+      return "delegate";
+    case Op::CatchAll:
+      return "catch_all";
+    case Op::Drop:
+      return "drop";
+    case Op::SelectNumeric:
+      return "select";
+    case Op::SelectTyped:
+      return "select";
+    case Op::TryTable:
+      return "try_table";
+    case Op::LocalGet:
+      return "local.get";
+    case Op::LocalSet:
+      return "local.set";
+    case Op::LocalTee:
+      return "local.tee";
+    case Op::GlobalGet:
+      return "global.get";
+    case Op::GlobalSet:
+      return "global.set";
+    case Op::TableGet:
+      return "table.get";
+    case Op::TableSet:
+      return "table.set";
+    case Op::I32Load:
+      return "i32.load";
+    case Op::I64Load:
+      return "i64.load";
+    case Op::F32Load:
+      return "f32.load";
+    case Op::F64Load:
+      return "f64.load";
+    case Op::I32Load8S:
+      return "i32.load8_s";
+    case Op::I32Load8U:
+      return "i32.load8_u";
+    case Op::I32Load16S:
+      return "i32.load16_s";
+    case Op::I32Load16U:
+      return "i32.load16_u";
+    case Op::I64Load8S:
+      return "i64.load8_s";
+    case Op::I64Load8U:
+      return "i64.load8_u";
+    case Op::I64Load16S:
+      return "i64.load16_s";
+    case Op::I64Load16U:
+      return "i64.load16_u";
+    case Op::I64Load32S:
+      return "i64.load32_s";
+    case Op::I64Load32U:
+      return "i64.load32_u";
+    case Op::I32Store:
+      return "i32.store";
+    case Op::I64Store:
+      return "i64.store";
+    case Op::F32Store:
+      return "f32.store";
+    case Op::F64Store:
+      return "f64.store";
+    case Op::I32Store8:
+      return "i32.store8";
+    case Op::I32Store16:
+      return "i32.store16";
+    case Op::I64Store8:
+      return "i64.store8";
+    case Op::I64Store16:
+      return "i64.store16";
+    case Op::I64Store32:
+      return "i64.store32";
+    case Op::MemorySize:
+      return "memory.size";
+    case Op::MemoryGrow:
+      return "memory.grow";
+    case Op::I32Const:
+      return "i32.const";
+    case Op::I64Const:
+      return "i64.const";
+    case Op::F32Const:
+      return "f32.const";
+    case Op::F64Const:
+      return "f64.const";
+    case Op::I32Eqz:
+      return "i32.eqz";
+    case Op::I32Eq:
+      return "i32.eq";
+    case Op::I32Ne:
+      return "i32.ne";
+    case Op::I32LtS:
+      return "i32.lt_s";
+    case Op::I32LtU:
+      return "i32.lt_u";
+    case Op::I32GtS:
+      return "i32.gt_s";
+    case Op::I32GtU:
+      return "i32.gt_u";
+    case Op::I32LeS:
+      return "i32.le_s";
+    case Op::I32LeU:
+      return "i32.le_u";
+    case Op::I32GeS:
+      return "i32.ge_s";
+    case Op::I32GeU:
+      return "i32.ge_u";
+    case Op::I64Eqz:
+      return "i64.eqz";
+    case Op::I64Eq:
+      return "i64.eq";
+    case Op::I64Ne:
+      return "i64.ne";
+    case Op::I64LtS:
+      return "i64.lt_s";
+    case Op::I64LtU:
+      return "i64.lt_u";
+    case Op::I64GtS:
+      return "i64.gt_s";
+    case Op::I64GtU:
+      return "i64.gt_u";
+    case Op::I64LeS:
+      return "i64.le_s";
+    case Op::I64LeU:
+      return "i64.le_u";
+    case Op::I64GeS:
+      return "i64.ge_s";
+    case Op::I64GeU:
+      return "i64.ge_u";
+    case Op::F32Eq:
+      return "f32.eq";
+    case Op::F32Ne:
+      return "f32.ne";
+    case Op::F32Lt:
+      return "f32.lt";
+    case Op::F32Gt:
+      return "f32.gt";
+    case Op::F32Le:
+      return "f32.le";
+    case Op::F32Ge:
+      return "f32.ge";
+    case Op::F64Eq:
+      return "f64.eq";
+    case Op::F64Ne:
+      return "f64.ne";
+    case Op::F64Lt:
+      return "f64.lt";
+    case Op::F64Gt:
+      return "f64.gt";
+    case Op::F64Le:
+      return "f64.le";
+    case Op::F64Ge:
+      return "f64.ge";
+    case Op::I32Clz:
+      return "i32.clz";
+    case Op::I32Ctz:
+      return "i32.ctz";
+    case Op::I32Popcnt:
+      return "i32.popcnt";
+    case Op::I32Add:
+      return "i32.add";
+    case Op::I32Sub:
+      return "i32.sub";
+    case Op::I32Mul:
+      return "i32.mul";
+    case Op::I32DivS:
+      return "i32.div_s";
+    case Op::I32DivU:
+      return "i32.div_u";
+    case Op::I32RemS:
+      return "i32.rem_s";
+    case Op::I32RemU:
+      return "i32.rem_u";
+    case Op::I32And:
+      return "i32.and";
+    case Op::I32Or:
+      return "i32.or";
+    case Op::I32Xor:
+      return "i32.xor";
+    case Op::I32Shl:
+      return "i32.shl";
+    case Op::I32ShrS:
+      return "i32.shr_s";
+    case Op::I32ShrU:
+      return "i32.shr_u";
+    case Op::I32Rotl:
+      return "i32.rotl";
+    case Op::I32Rotr:
+      return "i32.rotr";
+    case Op::I64Clz:
+      return "i64.clz";
+    case Op::I64Ctz:
+      return "i64.ctz";
+    case Op::I64Popcnt:
+      return "i64.popcnt";
+    case Op::I64Add:
+      return "i64.add";
+    case Op::I64Sub:
+      return "i64.sub";
+    case Op::I64Mul:
+      return "i64.mul";
+    case Op::I64DivS:
+      return "i64.div_s";
+    case Op::I64DivU:
+      return "i64.div_u";
+    case Op::I64RemS:
+      return "i64.rem_s";
+    case Op::I64RemU:
+      return "i64.rem_u";
+    case Op::I64And:
+      return "i64.and";
+    case Op::I64Or:
+      return "i64.or";
+    case Op::I64Xor:
+      return "i64.xor";
+    case Op::I64Shl:
+      return "i64.shl";
+    case Op::I64ShrS:
+      return "i64.shr_s";
+    case Op::I64ShrU:
+      return "i64.shr_u";
+    case Op::I64Rotl:
+      return "i64.rotl";
+    case Op::I64Rotr:
+      return "i64.rotr";
+    case Op::F32Abs:
+      return "f32.abs";
+    case Op::F32Neg:
+      return "f32.neg";
+    case Op::F32Ceil:
+      return "f32.ceil";
+    case Op::F32Floor:
+      return "f32.floor";
+    case Op::F32Trunc:
+      return "f32.trunc";
+    case Op::F32Nearest:
+      return "f32.nearest";
+    case Op::F32Sqrt:
+      return "f32.sqrt";
+    case Op::F32Add:
+      return "f32.add";
+    case Op::F32Sub:
+      return "f32.sub";
+    case Op::F32Mul:
+      return "f32.mul";
+    case Op::F32Div:
+      return "f32.div";
+    case Op::F32Min:
+      return "f32.min";
+    case Op::F32Max:
+      return "f32.max";
+    case Op::F32CopySign:
+      return "f32.copysign";
+    case Op::F64Abs:
+      return "f64.abs";
+    case Op::F64Neg:
+      return "f64.neg";
+    case Op::F64Ceil:
+      return "f64.ceil";
+    case Op::F64Floor:
+      return "f64.floor";
+    case Op::F64Trunc:
+      return "f64.trunc";
+    case Op::F64Nearest:
+      return "f64.nearest";
+    case Op::F64Sqrt:
+      return "f64.sqrt";
+    case Op::F64Add:
+      return "f64.add";
+    case Op::F64Sub:
+      return "f64.sub";
+    case Op::F64Mul:
+      return "f64.mul";
+    case Op::F64Div:
+      return "f64.div";
+    case Op::F64Min:
+      return "f64.min";
+    case Op::F64Max:
+      return "f64.max";
+    case Op::F64CopySign:
+      return "f64.copysign";
+    case Op::I32WrapI64:
+      return "i32.wrap_i64";
+    case Op::I32TruncF32S:
+      return "i32.trunc_f32_s";
+    case Op::I32TruncF32U:
+      return "i32.trunc_f32_u";
+    case Op::I32TruncF64S:
+      return "i32.trunc_f64_s";
+    case Op::I32TruncF64U:
+      return "i32.trunc_f64_u";
+    case Op::I64ExtendI32S:
+      return "i64.extend_i32_s";
+    case Op::I64ExtendI32U:
+      return "i64.extend_i32_u";
+    case Op::I64TruncF32S:
+      return "i64.trunc_f32_s";
+    case Op::I64TruncF32U:
+      return "i64.trunc_f32_u";
+    case Op::I64TruncF64S:
+      return "i64.trunc_f64_s";
+    case Op::I64TruncF64U:
+      return "i64.trunc_f64_u";
+    case Op::F32ConvertI32S:
+      return "f32.convert_i32_s";
+    case Op::F32ConvertI32U:
+      return "f32.convert_i32_u";
+    case Op::F32ConvertI64S:
+      return "f32.convert_i64_s";
+    case Op::F32ConvertI64U:
+      return "f32.convert_i64_u";
+    case Op::F32DemoteF64:
+      return "f32.demote_f64";
+    case Op::F64ConvertI32S:
+      return "f64.convert_i32_s";
+    case Op::F64ConvertI32U:
+      return "f64.convert_i32_u";
+    case Op::F64ConvertI64S:
+      return "f64.convert_i64_s";
+    case Op::F64ConvertI64U:
+      return "f64.convert_i64_u";
+    case Op::F64PromoteF32:
+      return "f64.promote_f32";
+    case Op::I32ReinterpretF32:
+      return "i32.reinterpret_f32";
+    case Op::I64ReinterpretF64:
+      return "i64.reinterpret_f64";
+    case Op::F32ReinterpretI32:
+      return "f32.reinterpret_i32";
+    case Op::F64ReinterpretI64:
+      return "f64.reinterpret_i64";
+    case Op::I32Extend8S:
+      return "i32.extend8_s";
+    case Op::I32Extend16S:
+      return "i32.extend16_s";
+    case Op::I64Extend8S:
+      return "i64.extend8_s";
+    case Op::I64Extend16S:
+      return "i64.extend16_s";
+    case Op::I64Extend32S:
+      return "i64.extend32_s";
+    case Op::RefNull:
+      return "ref.null";
+    case Op::RefIsNull:
+      return "ref.is_null";
+    case Op::RefFunc:
+      return "ref.func";
+    case Op::RefAsNonNull:
+      return "ref.as_non_null";
+    case Op::BrOnNull:
+      return "br_on_null";
+    case Op::RefEq:
+      return "ref.eq";
+    case Op::BrOnNonNull:
+      return "br_on_non_null";
+    case Op::GcPrefix: {
+      switch (GcOp(b1)) {
+        case GcOp::StructNew:
+          return "struct.new";
+        case GcOp::StructNewDefault:
+          return "struct.new_default";
+        case GcOp::StructGet:
+          return "struct.get";
+        case GcOp::StructGetS:
+          return "struct.get_s";
+        case GcOp::StructGetU:
+          return "struct.get_u";
+        case GcOp::StructSet:
+          return "struct.set";
+        case GcOp::ArrayNew:
+          return "array.new";
+        case GcOp::ArrayNewDefault:
+          return "array.new_default";
+        case GcOp::ArrayNewFixed:
+          return "array.new_fixed";
+        case GcOp::ArrayNewData:
+          return "array.new_data";
+        case GcOp::ArrayNewElem:
+          return "array.new_elem";
+        case GcOp::ArrayGet:
+          return "array.get";
+        case GcOp::ArrayGetS:
+          return "array.get_s";
+        case GcOp::ArrayGetU:
+          return "array.get_u";
+        case GcOp::ArraySet:
+          return "array.set";
+        case GcOp::ArrayLen:
+          return "array.len";
+        case GcOp::ArrayFill:
+          return "array.fill";
+        case GcOp::ArrayCopy:
+          return "array.copy";
+        case GcOp::ArrayInitData:
+          return "array.init_data";
+        case GcOp::ArrayInitElem:
+          return "array.init_elem";
+        case GcOp::RefTest:
+          return "ref.test";
+        case GcOp::RefTestNull:
+          return "ref.test";
+        case GcOp::RefCast:
+          return "ref.cast";
+        case GcOp::RefCastNull:
+          return "ref.cast";
+        case GcOp::BrOnCast:
+          return "br_on_cast";
+        case GcOp::BrOnCastFail:
+          return "br_on_cast_fail";
+        case GcOp::AnyConvertExtern:
+          return "any.convert_extern";
+        case GcOp::ExternConvertAny:
+          return "extern.convert_any";
+        case GcOp::RefI31:
+          return "ref.i31";
+        case GcOp::I31GetS:
+          return "i31.get_s";
+        case GcOp::I31GetU:
+          return "i31.get_u";
+        default:
+          return "unknown";
+      }
+    }
+    case Op::MiscPrefix: {
+      switch (MiscOp(b1)) {
+        case MiscOp::I32TruncSatF32S:
+          return "i32.trunc_sat_f32_s";
+        case MiscOp::I32TruncSatF32U:
+          return "i32.trunc_sat_f32_u";
+        case MiscOp::I32TruncSatF64S:
+          return "i32.trunc_sat_f64_s";
+        case MiscOp::I32TruncSatF64U:
+          return "i32.trunc_sat_f64_u";
+        case MiscOp::I64TruncSatF32S:
+          return "i64.trunc_sat_f32_s";
+        case MiscOp::I64TruncSatF32U:
+          return "i64.trunc_sat_f32_u";
+        case MiscOp::I64TruncSatF64S:
+          return "i64.trunc_sat_f64_s";
+        case MiscOp::I64TruncSatF64U:
+          return "i64.trunc_sat_f64_u";
+        case MiscOp::MemoryInit:
+          return "memory.init";
+        case MiscOp::DataDrop:
+          return "data.drop";
+        case MiscOp::MemoryCopy:
+          return "memory.copy";
+        case MiscOp::MemoryFill:
+          return "memory.fill";
+        case MiscOp::TableInit:
+          return "table.init";
+        case MiscOp::ElemDrop:
+          return "elem.drop";
+        case MiscOp::TableCopy:
+          return "table.copy";
+        case MiscOp::TableGrow:
+          return "table.grow";
+        case MiscOp::TableSize:
+          return "table.size";
+        case MiscOp::TableFill:
+          return "table.fill";
+        case MiscOp::MemoryDiscard:
+          return "memory.discard";
+        default:
+          return "unknown";
+      }
+    }
+    case Op::SimdPrefix: {
+      switch (SimdOp(b1)) {
+        case SimdOp::V128Load:
+          return "v128.load";
+        case SimdOp::V128Load8x8S:
+          return "v128.load8x8_s";
+        case SimdOp::V128Load8x8U:
+          return "v128.load8x8_u";
+        case SimdOp::V128Load16x4S:
+          return "v128.load16x4_s";
+        case SimdOp::V128Load16x4U:
+          return "v128.load16x4_u";
+        case SimdOp::V128Load32x2S:
+          return "v128.load32x2_s";
+        case SimdOp::V128Load32x2U:
+          return "v128.load32x2_u";
+        case SimdOp::V128Load8Splat:
+          return "v128.load8_splat";
+        case SimdOp::V128Load16Splat:
+          return "v128.load16_splat";
+        case SimdOp::V128Load32Splat:
+          return "v128.load32_splat";
+        case SimdOp::V128Load64Splat:
+          return "v128.load64_splat";
+        case SimdOp::V128Store:
+          return "v128.store";
+        case SimdOp::V128Const:
+          return "v128.const";
+        case SimdOp::I8x16Shuffle:
+          return "i8x16.shuffle";
+        case SimdOp::I8x16Swizzle:
+          return "i8x16.swizzle";
+        case SimdOp::I8x16Splat:
+          return "i8x16.splat";
+        case SimdOp::I16x8Splat:
+          return "i16x8.splat";
+        case SimdOp::I32x4Splat:
+          return "i32x4.splat";
+        case SimdOp::I64x2Splat:
+          return "i64x2.splat";
+        case SimdOp::F32x4Splat:
+          return "f32x4.splat";
+        case SimdOp::F64x2Splat:
+          return "f64x2.splat";
+        case SimdOp::I8x16ExtractLaneS:
+          return "i8x16.extract_lane_s";
+        case SimdOp::I8x16ExtractLaneU:
+          return "i8x16.extract_lane_u";
+        case SimdOp::I8x16ReplaceLane:
+          return "i8x16.replace_lane";
+        case SimdOp::I16x8ExtractLaneS:
+          return "i16x8.extract_lane_s";
+        case SimdOp::I16x8ExtractLaneU:
+          return "i16x8.extract_lane_u";
+        case SimdOp::I16x8ReplaceLane:
+          return "i16x8.replace_lane";
+        case SimdOp::I32x4ExtractLane:
+          return "i32x4.extract_lane";
+        case SimdOp::I32x4ReplaceLane:
+          return "i32x4.replace_lane";
+        case SimdOp::I64x2ExtractLane:
+          return "i64x2.extract_lane";
+        case SimdOp::I64x2ReplaceLane:
+          return "i64x2.replace_lane";
+        case SimdOp::F32x4ExtractLane:
+          return "f32x4.extract_lane";
+        case SimdOp::F32x4ReplaceLane:
+          return "f32x4.replace_lane";
+        case SimdOp::F64x2ExtractLane:
+          return "f64x2.extract_lane";
+        case SimdOp::F64x2ReplaceLane:
+          return "f64x2.replace_lane";
+        case SimdOp::I8x16Eq:
+          return "i8x16.eq";
+        case SimdOp::I8x16Ne:
+          return "i8x16.ne";
+        case SimdOp::I8x16LtS:
+          return "i8x16.lt_s";
+        case SimdOp::I8x16LtU:
+          return "i8x16.lt_u";
+        case SimdOp::I8x16GtS:
+          return "i8x16.gt_s";
+        case SimdOp::I8x16GtU:
+          return "i8x16.gt_u";
+        case SimdOp::I8x16LeS:
+          return "i8x16.le_s";
+        case SimdOp::I8x16LeU:
+          return "i8x16.le_u";
+        case SimdOp::I8x16GeS:
+          return "i8x16.ge_s";
+        case SimdOp::I8x16GeU:
+          return "i8x16.ge_u";
+        case SimdOp::I16x8Eq:
+          return "i16x8.eq";
+        case SimdOp::I16x8Ne:
+          return "i16x8.ne";
+        case SimdOp::I16x8LtS:
+          return "i16x8.lt_s";
+        case SimdOp::I16x8LtU:
+          return "i16x8.lt_u";
+        case SimdOp::I16x8GtS:
+          return "i16x8.gt_s";
+        case SimdOp::I16x8GtU:
+          return "i16x8.gt_u";
+        case SimdOp::I16x8LeS:
+          return "i16x8.le_s";
+        case SimdOp::I16x8LeU:
+          return "i16x8.le_u";
+        case SimdOp::I16x8GeS:
+          return "i16x8.ge_s";
+        case SimdOp::I16x8GeU:
+          return "i16x8.ge_u";
+        case SimdOp::I32x4Eq:
+          return "i32x4.eq";
+        case SimdOp::I32x4Ne:
+          return "i32x4.ne";
+        case SimdOp::I32x4LtS:
+          return "i32x4.lt_s";
+        case SimdOp::I32x4LtU:
+          return "i32x4.lt_u";
+        case SimdOp::I32x4GtS:
+          return "i32x4.gt_s";
+        case SimdOp::I32x4GtU:
+          return "i32x4.gt_u";
+        case SimdOp::I32x4LeS:
+          return "i32x4.le_s";
+        case SimdOp::I32x4LeU:
+          return "i32x4.le_u";
+        case SimdOp::I32x4GeS:
+          return "i32x4.ge_s";
+        case SimdOp::I32x4GeU:
+          return "i32x4.ge_u";
+        case SimdOp::F32x4Eq:
+          return "f32x4.eq";
+        case SimdOp::F32x4Ne:
+          return "f32x4.ne";
+        case SimdOp::F32x4Lt:
+          return "f32x4.lt";
+        case SimdOp::F32x4Gt:
+          return "f32x4.gt";
+        case SimdOp::F32x4Le:
+          return "f32x4.le";
+        case SimdOp::F32x4Ge:
+          return "f32x4.ge";
+        case SimdOp::F64x2Eq:
+          return "f64x2.eq";
+        case SimdOp::F64x2Ne:
+          return "f64x2.ne";
+        case SimdOp::F64x2Lt:
+          return "f64x2.lt";
+        case SimdOp::F64x2Gt:
+          return "f64x2.gt";
+        case SimdOp::F64x2Le:
+          return "f64x2.le";
+        case SimdOp::F64x2Ge:
+          return "f64x2.ge";
+        case SimdOp::V128Not:
+          return "v128.not";
+        case SimdOp::V128And:
+          return "v128.and";
+        case SimdOp::V128AndNot:
+          return "v128.andnot";
+        case SimdOp::V128Or:
+          return "v128.or";
+        case SimdOp::V128Xor:
+          return "v128.xor";
+        case SimdOp::V128Bitselect:
+          return "v128.bit_select";
+        case SimdOp::V128AnyTrue:
+          return "v128.any_true";
+        case SimdOp::V128Load8Lane:
+          return "v128.load8_lane";
+        case SimdOp::V128Load16Lane:
+          return "v128.load16_lane";
+        case SimdOp::V128Load32Lane:
+          return "v128.load32_lane";
+        case SimdOp::V128Load64Lane:
+          return "v128.load64_lane";
+        case SimdOp::V128Store8Lane:
+          return "v128.store8_lane";
+        case SimdOp::V128Store16Lane:
+          return "v128.store16_lane";
+        case SimdOp::V128Store32Lane:
+          return "v128.store32_lane";
+        case SimdOp::V128Store64Lane:
+          return "v128.store64_lane";
+        case SimdOp::V128Load32Zero:
+          return "v128.load32_zero";
+        case SimdOp::V128Load64Zero:
+          return "v128.load64_zero";
+        case SimdOp::F32x4DemoteF64x2Zero:
+          return "f32x4.demote_f64x2_zero";
+        case SimdOp::F64x2PromoteLowF32x4:
+          return "f64x2.promote_low_f32x4";
+        case SimdOp::I8x16Abs:
+          return "i8x16.abs";
+        case SimdOp::I8x16Neg:
+          return "i8x16.neg";
+        case SimdOp::I8x16Popcnt:
+          return "i8x16.popcnt";
+        case SimdOp::I8x16AllTrue:
+          return "i8x16.all_true";
+        case SimdOp::I8x16Bitmask:
+          return "i8x16.bitmask";
+        case SimdOp::I8x16NarrowI16x8S:
+          return "i8x16.narrow_i16x8_s";
+        case SimdOp::I8x16NarrowI16x8U:
+          return "i8x16.narrow_i16x8_u";
+        case SimdOp::F32x4Ceil:
+          return "f32x4.ceil";
+        case SimdOp::F32x4Floor:
+          return "f32x4.floor";
+        case SimdOp::F32x4Trunc:
+          return "f32x4.trunc";
+        case SimdOp::F32x4Nearest:
+          return "f32x4.nearest";
+        case SimdOp::I8x16Shl:
+          return "i8x16.shl";
+        case SimdOp::I8x16ShrS:
+          return "i8x16.shr_s";
+        case SimdOp::I8x16ShrU:
+          return "i8x16.shr_u";
+        case SimdOp::I8x16Add:
+          return "i8x16.add";
+        case SimdOp::I8x16AddSatS:
+          return "i8x16.add_sat_s";
+        case SimdOp::I8x16AddSatU:
+          return "i8x16.add_sat_u";
+        case SimdOp::I8x16Sub:
+          return "i8x16.sub";
+        case SimdOp::I8x16SubSatS:
+          return "i8x16.sub_sat_s";
+        case SimdOp::I8x16SubSatU:
+          return "i8x16.sub_sat_u";
+        case SimdOp::F64x2Ceil:
+          return "f64x2.ceil";
+        case SimdOp::F64x2Floor:
+          return "f64x2.floor";
+        case SimdOp::I8x16MinS:
+          return "i8x16.min_s";
+        case SimdOp::I8x16MinU:
+          return "i8x16.min_u";
+        case SimdOp::I8x16MaxS:
+          return "i8x16.max_s";
+        case SimdOp::I8x16MaxU:
+          return "i8x16.max_u";
+        case SimdOp::F64x2Trunc:
+          return "f64x2.trunc";
+        case SimdOp::I8x16AvgrU:
+          return "i8x16.avgr_u";
+        case SimdOp::I16x8ExtaddPairwiseI8x16S:
+          return "i16x8.extadd_pairwise_i8x16_s";
+        case SimdOp::I16x8ExtaddPairwiseI8x16U:
+          return "i16x8.extadd_pairwise_i8x16_u";
+        case SimdOp::I32x4ExtaddPairwiseI16x8S:
+          return "i32x4.extadd_pairwise_i16x8_s";
+        case SimdOp::I32x4ExtaddPairwiseI16x8U:
+          return "i32x4.extadd_pairwise_i16x8_u";
+        case SimdOp::I16x8Abs:
+          return "i16x8.abs";
+        case SimdOp::I16x8Neg:
+          return "i16x8.neg";
+        case SimdOp::I16x8Q15MulrSatS:
+          return "i16x8.q15mulr_sat_s";
+        case SimdOp::I16x8AllTrue:
+          return "i16x8.all_true";
+        case SimdOp::I16x8Bitmask:
+          return "i16x8.bitmask";
+        case SimdOp::I16x8NarrowI32x4S:
+          return "i16x8.narrow_i32x4_s";
+        case SimdOp::I16x8NarrowI32x4U:
+          return "i16x8.narrow_i32x4_u";
+        case SimdOp::I16x8ExtendLowI8x16S:
+          return "i16x8.extend_low_i8x16_s";
+        case SimdOp::I16x8ExtendHighI8x16S:
+          return "i16x8.extend_high_i8x16_s";
+        case SimdOp::I16x8ExtendLowI8x16U:
+          return "i16x8.extend_low_i8x16_u";
+        case SimdOp::I16x8ExtendHighI8x16U:
+          return "i16x8.extend_high_i8x16_u";
+        case SimdOp::I16x8Shl:
+          return "i16x8.shl";
+        case SimdOp::I16x8ShrS:
+          return "i16x8.shr_s";
+        case SimdOp::I16x8ShrU:
+          return "i16x8.shr_u";
+        case SimdOp::I16x8Add:
+          return "i16x8.add";
+        case SimdOp::I16x8AddSatS:
+          return "i16x8.add_sat_s";
+        case SimdOp::I16x8AddSatU:
+          return "i16x8.add_sat_u";
+        case SimdOp::I16x8Sub:
+          return "i16x8.sub";
+        case SimdOp::I16x8SubSatS:
+          return "i16x8.sub_sat_s";
+        case SimdOp::I16x8SubSatU:
+          return "i16x8.sub_sat_u";
+        case SimdOp::F64x2Nearest:
+          return "f64x2.nearest";
+        case SimdOp::I16x8Mul:
+          return "i16x8.mul";
+        case SimdOp::I16x8MinS:
+          return "i16x8.min_s";
+        case SimdOp::I16x8MinU:
+          return "i16x8.min_u";
+        case SimdOp::I16x8MaxS:
+          return "i16x8.max_s";
+        case SimdOp::I16x8MaxU:
+          return "i16x8.max_u";
+        case SimdOp::I16x8AvgrU:
+          return "i16x8.avgr_u";
+        case SimdOp::I16x8ExtmulLowI8x16S:
+          return "i16x8.extmul_low_i8x16_s";
+        case SimdOp::I16x8ExtmulHighI8x16S:
+          return "i16x8.extmul_high_i8x16_s";
+        case SimdOp::I16x8ExtmulLowI8x16U:
+          return "i16x8.extmul_low_i8x16_u";
+        case SimdOp::I16x8ExtmulHighI8x16U:
+          return "i16x8.extmul_high_i8x16_u";
+        case SimdOp::I32x4Abs:
+          return "i32x4.abs";
+        case SimdOp::I32x4Neg:
+          return "i32x4.neg";
+        case SimdOp::I32x4AllTrue:
+          return "i32x4.all_true";
+        case SimdOp::I32x4Bitmask:
+          return "i32x4.bitmask";
+        case SimdOp::I32x4ExtendLowI16x8S:
+          return "i32x4.extend_low_i16x8_s";
+        case SimdOp::I32x4ExtendHighI16x8S:
+          return "i32x4.extend_high_i16x8_s";
+        case SimdOp::I32x4ExtendLowI16x8U:
+          return "i32x4.extend_low_i16x8_u";
+        case SimdOp::I32x4ExtendHighI16x8U:
+          return "i32x4.extend_high_i16x8_u";
+        case SimdOp::I32x4Shl:
+          return "i32x4.shl";
+        case SimdOp::I32x4ShrS:
+          return "i32x4.shr_s";
+        case SimdOp::I32x4ShrU:
+          return "i32x4.shr_u";
+        case SimdOp::I32x4Add:
+          return "i32x4.add";
+        case SimdOp::I32x4Sub:
+          return "i32x4.sub";
+        case SimdOp::I32x4Mul:
+          return "i32x4.mul";
+        case SimdOp::I32x4MinS:
+          return "i32x4.min_s";
+        case SimdOp::I32x4MinU:
+          return "i32x4.min_u";
+        case SimdOp::I32x4MaxS:
+          return "i32x4.max_s";
+        case SimdOp::I32x4MaxU:
+          return "i32x4.max_u";
+        case SimdOp::I32x4DotI16x8S:
+          return "i32x4.dot_i16x8_s";
+        case SimdOp::I32x4ExtmulLowI16x8S:
+          return "i32x4.extmul_low_i16x8_s";
+        case SimdOp::I32x4ExtmulHighI16x8S:
+          return "i32x4.extmul_high_i16x8_s";
+        case SimdOp::I32x4ExtmulLowI16x8U:
+          return "i32x4.extmul_low_i16x8_u";
+        case SimdOp::I32x4ExtmulHighI16x8U:
+          return "i32x4.extmul_high_i16x8_u";
+        case SimdOp::I64x2Abs:
+          return "i64x2.abs";
+        case SimdOp::I64x2Neg:
+          return "i64x2.neg";
+        case SimdOp::I64x2AllTrue:
+          return "i64x2.all_true";
+        case SimdOp::I64x2Bitmask:
+          return "i64x2.bitmask";
+        case SimdOp::I64x2ExtendLowI32x4S:
+          return "i64x2.extend_low_i32x4_s";
+        case SimdOp::I64x2ExtendHighI32x4S:
+          return "i64x2.extend_high_i32x4_s";
+        case SimdOp::I64x2ExtendLowI32x4U:
+          return "i64x2.extend_low_i32x4_u";
+        case SimdOp::I64x2ExtendHighI32x4U:
+          return "i64x2.extend_high_i32x4_u";
+        case SimdOp::I64x2Shl:
+          return "i64x2.shl";
+        case SimdOp::I64x2ShrS:
+          return "i64x2.shr_s";
+        case SimdOp::I64x2ShrU:
+          return "i64x2.shr_u";
+        case SimdOp::I64x2Add:
+          return "i64x2.add";
+        case SimdOp::I64x2Sub:
+          return "i64x2.sub";
+        case SimdOp::I64x2Mul:
+          return "i64x2.mul";
+        case SimdOp::I64x2Eq:
+          return "i64x2.eq";
+        case SimdOp::I64x2Ne:
+          return "i64x2.ne";
+        case SimdOp::I64x2LtS:
+          return "i64x2.lt_s";
+        case SimdOp::I64x2GtS:
+          return "i64x2.gt_s";
+        case SimdOp::I64x2LeS:
+          return "i64x2.le_s";
+        case SimdOp::I64x2GeS:
+          return "i64x2.ge_s";
+        case SimdOp::I64x2ExtmulLowI32x4S:
+          return "i64x2.extmul_low_i32x4_s";
+        case SimdOp::I64x2ExtmulHighI32x4S:
+          return "i64x2.extmul_high_i32x4_s";
+        case SimdOp::I64x2ExtmulLowI32x4U:
+          return "i64x2.extmul_low_i32x4_u";
+        case SimdOp::I64x2ExtmulHighI32x4U:
+          return "i64x2.extmul_high_i32x4_u";
+        case SimdOp::F32x4Abs:
+          return "f32x4.abs";
+        case SimdOp::F32x4Neg:
+          return "f32x4.neg";
+        case SimdOp::F32x4Sqrt:
+          return "f32x4.sqrt";
+        case SimdOp::F32x4Add:
+          return "f32x4.add";
+        case SimdOp::F32x4Sub:
+          return "f32x4.sub";
+        case SimdOp::F32x4Mul:
+          return "f32x4.mul";
+        case SimdOp::F32x4Div:
+          return "f32x4.div";
+        case SimdOp::F32x4Min:
+          return "f32x4.min";
+        case SimdOp::F32x4Max:
+          return "f32x4.max";
+        case SimdOp::F32x4PMin:
+          return "f32x4.pmin";
+        case SimdOp::F32x4PMax:
+          return "f32x4.pmax";
+        case SimdOp::F64x2Abs:
+          return "f64x2.abs";
+        case SimdOp::F64x2Neg:
+          return "f64x2.neg";
+        case SimdOp::F64x2Sqrt:
+          return "f64x2.sqrt";
+        case SimdOp::F64x2Add:
+          return "f64x2.add";
+        case SimdOp::F64x2Sub:
+          return "f64x2.sub";
+        case SimdOp::F64x2Mul:
+          return "f64x2.mul";
+        case SimdOp::F64x2Div:
+          return "f64x2.div";
+        case SimdOp::F64x2Min:
+          return "f64x2.min";
+        case SimdOp::F64x2Max:
+          return "f64x2.max";
+        case SimdOp::F64x2PMin:
+          return "f64x2.pmin";
+        case SimdOp::F64x2PMax:
+          return "f64x2.pmax";
+        case SimdOp::I32x4TruncSatF32x4S:
+          return "i32x4.trunc_sat_f32x4_s";
+        case SimdOp::I32x4TruncSatF32x4U:
+          return "i32x4.trunc_sat_f32x4_u";
+        case SimdOp::F32x4ConvertI32x4S:
+          return "f32x4.convert_i32x4_s";
+        case SimdOp::F32x4ConvertI32x4U:
+          return "f32x4.convert_i32x4_u";
+        case SimdOp::I32x4TruncSatF64x2SZero:
+          return "i32x4.trunc_sat_f64x2_s_zero";
+        case SimdOp::I32x4TruncSatF64x2UZero:
+          return "i32x4.trunc_sat_f64x2_u_zero";
+        case SimdOp::F64x2ConvertLowI32x4S:
+          return "f64x2.convert_low_i32x4_s";
+        case SimdOp::F64x2ConvertLowI32x4U:
+          return "f64x2.convert_low_i32x4_u";
+        case SimdOp::I8x16RelaxedSwizzle:
+          return "i8x16.relaxed_swizzle";
+        case SimdOp::I32x4RelaxedTruncF32x4S:
+          return "i32x4.relaxed_trunc_f32x4_s";
+        case SimdOp::I32x4RelaxedTruncF32x4U:
+          return "i32x4.relaxed_trunc_f32x4_u";
+        case SimdOp::I32x4RelaxedTruncF64x2SZero:
+          return "i32x4.relaxed_trunc_f64x2_s_zero";
+        case SimdOp::I32x4RelaxedTruncF64x2UZero:
+          return "i32x4.relaxed_trunc_f64x2_u_zero";
+        case SimdOp::F32x4RelaxedMadd:
+          return "f32x4.relaxed_madd";
+        case SimdOp::F32x4RelaxedNmadd:
+          return "f32x4.relaxed_nmadd";
+        case SimdOp::F64x2RelaxedMadd:
+          return "f64x2.relaxed_madd";
+        case SimdOp::F64x2RelaxedNmadd:
+          return "f64x2.relaxed_nmadd";
+        case SimdOp::I8x16RelaxedLaneSelect:
+          return "i8x16.relaxed_laneselect";
+        case SimdOp::I16x8RelaxedLaneSelect:
+          return "i16x8.relaxed_laneselect";
+        case SimdOp::I32x4RelaxedLaneSelect:
+          return "i32x4.relaxed_laneselect";
+        case SimdOp::I64x2RelaxedLaneSelect:
+          return "i64x2.relaxed_laneselect";
+        case SimdOp::F32x4RelaxedMin:
+          return "f32x4.relaxed_min";
+        case SimdOp::F32x4RelaxedMax:
+          return "f32x4.relaxed_max";
+        case SimdOp::F64x2RelaxedMin:
+          return "f64x2.relaxed_min";
+        case SimdOp::F64x2RelaxedMax:
+          return "f64x2.relaxed_max";
+        case SimdOp::I16x8RelaxedQ15MulrS:
+          return "i16x8.relaxed_q15mulr_s";
+        case SimdOp::I16x8RelaxedDotI8x16I7x16S:
+          return "i16x8.relaxed_dot_i8x16_i7x16_s";
+        case SimdOp::I32x4RelaxedDotI8x16I7x16AddS:
+          return "i32x4.relaxed_dot_i8x16_i7x16_add_s";
+        default:
+          return "unknown";
+      }
+    }
+    case Op::ThreadPrefix: {
+      switch (ThreadOp(b1)) {
+        case ThreadOp::Notify:
+          return "memory.atomic.notify";
+        case ThreadOp::I32Wait:
+          return "memory.atomic.wait32";
+        case ThreadOp::I64Wait:
+          return "memory.atomic.wait64";
+        case ThreadOp::Fence:
+          return "atomic.fence";
+        case ThreadOp::I32AtomicLoad:
+          return "i32.atomic.load";
+        case ThreadOp::I64AtomicLoad:
+          return "i64.atomic.load";
+        case ThreadOp::I32AtomicLoad8U:
+          return "i32.atomic.load8u";
+        case ThreadOp::I32AtomicLoad16U:
+          return "i32.atomic.load16_u";
+        case ThreadOp::I64AtomicLoad8U:
+          return "i64.atomic.load8u";
+        case ThreadOp::I64AtomicLoad16U:
+          return "i64.atomic.load16_u";
+        case ThreadOp::I64AtomicLoad32U:
+          return "i64.atomic.load32_u";
+        case ThreadOp::I32AtomicStore:
+          return "i32.atomic.store";
+        case ThreadOp::I64AtomicStore:
+          return "i64.atomic.store";
+        case ThreadOp::I32AtomicStore8U:
+          return "i32.atomic.store8_u";
+        case ThreadOp::I32AtomicStore16U:
+          return "i32.atomic.store16_u";
+        case ThreadOp::I64AtomicStore8U:
+          return "i64.atomic.store8_u";
+        case ThreadOp::I64AtomicStore16U:
+          return "i64.atomic.store16_u";
+        case ThreadOp::I64AtomicStore32U:
+          return "i64.atomic.store32_u";
+        case ThreadOp::I32AtomicAdd:
+          return "i32.atomic.rmw.add";
+        case ThreadOp::I64AtomicAdd:
+          return "i64.atomic.rmw.add";
+        case ThreadOp::I32AtomicAdd8U:
+          return "i32.atomic.rmw8.add_u";
+        case ThreadOp::I32AtomicAdd16U:
+          return "i32.atomic.rmw16.add_u";
+        case ThreadOp::I64AtomicAdd8U:
+          return "i64.atomic.rmw8.add_u";
+        case ThreadOp::I64AtomicAdd16U:
+          return "i64.atomic.rmw16.add_u";
+        case ThreadOp::I64AtomicAdd32U:
+          return "i64.atomic.rmw32.add_u";
+        case ThreadOp::I32AtomicSub:
+          return "i32.atomic.rmw.sub";
+        case ThreadOp::I64AtomicSub:
+          return "i64.atomic.rmw.sub";
+        case ThreadOp::I32AtomicSub8U:
+          return "i32.atomic.rmw8.sub_u";
+        case ThreadOp::I32AtomicSub16U:
+          return "i32.atomic.rmw16.sub_u";
+        case ThreadOp::I64AtomicSub8U:
+          return "i64.atomic.rmw8.sub_u";
+        case ThreadOp::I64AtomicSub16U:
+          return "i64.atomic.rmw16.sub_u";
+        case ThreadOp::I64AtomicSub32U:
+          return "i64.atomic.rmw32.sub_u";
+        case ThreadOp::I32AtomicAnd:
+          return "i32.atomic.rmw.and";
+        case ThreadOp::I64AtomicAnd:
+          return "i64.atomic.rmw.and";
+        case ThreadOp::I32AtomicAnd8U:
+          return "i32.atomic.rmw.and8_u";
+        case ThreadOp::I32AtomicAnd16U:
+          return "i32.atomic.rmw16.and_u";
+        case ThreadOp::I64AtomicAnd8U:
+          return "i64.atomic.rmw8.and_u";
+        case ThreadOp::I64AtomicAnd16U:
+          return "i64.atomic.rmw16.and_u";
+        case ThreadOp::I64AtomicAnd32U:
+          return "i64.atomic.rmw32.and_u";
+        case ThreadOp::I32AtomicOr:
+          return "i32.atomic.rmw.or";
+        case ThreadOp::I64AtomicOr:
+          return "i64.atomic.rmw.or";
+        case ThreadOp::I32AtomicOr8U:
+          return "i32.atomic.rmw8.or_u";
+        case ThreadOp::I32AtomicOr16U:
+          return "i32.atomic.rmw16.or_u";
+        case ThreadOp::I64AtomicOr8U:
+          return "i64.atomic.rmw8.or_u";
+        case ThreadOp::I64AtomicOr16U:
+          return "i64.atomic.rmw16.or_u";
+        case ThreadOp::I64AtomicOr32U:
+          return "i64.atomic.rmw32.or_u";
+        case ThreadOp::I32AtomicXor:
+          return "i32.atomic.rmw.xor";
+        case ThreadOp::I64AtomicXor:
+          return "i64.atomic.rmw.xor";
+        case ThreadOp::I32AtomicXor8U:
+          return "i32.atomic.rmw8.xor_u";
+        case ThreadOp::I32AtomicXor16U:
+          return "i32.atomic.rmw16.xor_u";
+        case ThreadOp::I64AtomicXor8U:
+          return "i64.atomic.rmw8.xor_u";
+        case ThreadOp::I64AtomicXor16U:
+          return "i64.atomic.rmw16.xor_u";
+        case ThreadOp::I64AtomicXor32U:
+          return "i64.atomic.rmw32.xor_u";
+        case ThreadOp::I32AtomicXchg:
+          return "i32.atomic.rmw.xchg";
+        case ThreadOp::I64AtomicXchg:
+          return "i64.atomic.rmw.xchg";
+        case ThreadOp::I32AtomicXchg8U:
+          return "i32.atomic.rmw8.xchg_u";
+        case ThreadOp::I32AtomicXchg16U:
+          return "i32.atomic.rmw16.xchg_u";
+        case ThreadOp::I64AtomicXchg8U:
+          return "i64.atomic.rmw8.xchg_u";
+        case ThreadOp::I64AtomicXchg16U:
+          return "i64.atomic.rmw16.xchg_u";
+        case ThreadOp::I64AtomicXchg32U:
+          return "i64.atomic.rmw32.xchg_u";
+        case ThreadOp::I32AtomicCmpXchg:
+          return "i32.atomic.rmw.cmpxchg";
+        case ThreadOp::I64AtomicCmpXchg:
+          return "i64.atomic.rmw.cmpxchg";
+        case ThreadOp::I32AtomicCmpXchg8U:
+          return "i32.atomic.rmw8.cmpxchg_u";
+        case ThreadOp::I32AtomicCmpXchg16U:
+          return "i32.atomic.rmw16.cmpxchg_u";
+        case ThreadOp::I64AtomicCmpXchg8U:
+          return "i64.atomic.rmw8.cmpxchg_u";
+        case ThreadOp::I64AtomicCmpXchg16U:
+          return "i64.atomic.rmw16.cmpxchg_u";
+        case ThreadOp::I64AtomicCmpXchg32U:
+          return "i64.atomic.rmw32.cmpxchg_u";
+        default:
+          return "unknown";
+      }
+    }
+    default:
+      return "unknown";
+  }
+}
 
 bool UnsetLocalsState::init(const ValTypeVector& locals, size_t numParams) {
   MOZ_ASSERT(setLocalsStack_.empty());

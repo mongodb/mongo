@@ -7,6 +7,8 @@
 
 #include "SSE.h"
 
+#include "mozilla/Attributes.h"
+
 #ifdef HAVE_CPUID_H
 // cpuid.h is available on gcc 4.3 and higher on i386 and x86_64
 #  include <cpuid.h>
@@ -169,39 +171,39 @@ namespace sse_private {
 #if defined(MOZILLA_SSE_HAVE_CPUID_DETECTION)
 
 #  if !defined(MOZILLA_PRESUME_MMX)
-bool mmx_enabled = has_cpuid_bits(1u, edx, (1u << 23));
+MOZ_RUNINIT bool mmx_enabled = has_cpuid_bits(1u, edx, (1u << 23));
 #  endif
 
 #  if !defined(MOZILLA_PRESUME_SSE)
-bool sse_enabled = has_cpuid_bits(1u, edx, (1u << 25));
+MOZ_RUNINIT bool sse_enabled = has_cpuid_bits(1u, edx, (1u << 25));
 #  endif
 
 #  if !defined(MOZILLA_PRESUME_SSE2)
-bool sse2_enabled = has_cpuid_bits(1u, edx, (1u << 26));
+MOZ_RUNINIT bool sse2_enabled = has_cpuid_bits(1u, edx, (1u << 26));
 #  endif
 
 #  if !defined(MOZILLA_PRESUME_SSE3)
-bool sse3_enabled = has_cpuid_bits(1u, ecx, (1u << 0));
+MOZ_RUNINIT bool sse3_enabled = has_cpuid_bits(1u, ecx, (1u << 0));
 #  endif
 
 #  if !defined(MOZILLA_PRESUME_SSSE3)
-bool ssse3_enabled = has_cpuid_bits(1u, ecx, (1u << 9));
+MOZ_RUNINIT bool ssse3_enabled = has_cpuid_bits(1u, ecx, (1u << 9));
 #  endif
 
 #  if !defined(MOZILLA_PRESUME_SSE4A)
-bool sse4a_enabled = has_cpuid_bits(0x80000001u, ecx, (1u << 6));
+MOZ_RUNINIT bool sse4a_enabled = has_cpuid_bits(0x80000001u, ecx, (1u << 6));
 #  endif
 
 #  if !defined(MOZILLA_PRESUME_SSE4_1)
-bool sse4_1_enabled = has_cpuid_bits(1u, ecx, (1u << 19));
+MOZ_RUNINIT bool sse4_1_enabled = has_cpuid_bits(1u, ecx, (1u << 19));
 #  endif
 
 #  if !defined(MOZILLA_PRESUME_SSE4_2)
-bool sse4_2_enabled = has_cpuid_bits(1u, ecx, (1u << 20));
+MOZ_RUNINIT bool sse4_2_enabled = has_cpuid_bits(1u, ecx, (1u << 20));
 #  endif
 
 #  if !defined(MOZILLA_PRESUME_FMA3)
-bool fma3_enabled = has_cpuid_bits(1u, ecx, (1u << 12));
+MOZ_RUNINIT bool fma3_enabled = has_cpuid_bits(1u, ecx, (1u << 12));
 #  endif
 
 #  if !defined(MOZILLA_PRESUME_AVX) || !defined(MOZILLA_PRESUME_AVX2)
@@ -225,22 +227,22 @@ static bool has_avx() {
 #  endif  // !MOZILLA_PRESUME_AVX || !MOZILLA_PRESUME_AVX2
 
 #  if !defined(MOZILLA_PRESUME_AVX)
-bool avx_enabled = has_avx();
+MOZ_RUNINIT bool avx_enabled = has_avx();
 #  endif
 
 #  if !defined(MOZILLA_PRESUME_AVX2)
-bool avx2_enabled = has_avx() && has_cpuid_bits(7u, ebx, (1u << 5));
+MOZ_RUNINIT bool avx2_enabled = has_avx() && has_cpuid_bits(7u, ebx, (1u << 5));
 #  endif
 
 #  if !defined(MOZILLA_PRESUME_AVXVNNI)
-bool avxvnni_enabled = has_cpuid_bits_ex(7u, eax, (1u << 4));
+MOZ_RUNINIT bool avxvnni_enabled = has_cpuid_bits_ex(7u, eax, (1u << 4));
 #  endif
 
 #  if !defined(MOZILLA_PRESUME_AES)
-bool aes_enabled = has_cpuid_bits(1u, ecx, (1u << 25));
+MOZ_RUNINIT bool aes_enabled = has_cpuid_bits(1u, ecx, (1u << 25));
 #  endif
 
-bool has_constant_tsc = has_cpuid_bits(0x80000007u, edx, (1u << 8));
+MOZ_RUNINIT bool has_constant_tsc = has_cpuid_bits(0x80000007u, edx, (1u << 8));
 
 #endif
 

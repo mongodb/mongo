@@ -9,6 +9,8 @@
 
 #include "mozilla/Attributes.h"
 
+#include <stddef.h>
+
 namespace js {
 namespace frontend {
 
@@ -142,38 +144,36 @@ class MOZ_STACK_CLASS ElemOpEmitter {
 #ifdef DEBUG
   // The state of this emitter.
   //
-  //             skipObjAndKeyAndRhs
-  //           +------------------------------------------------+
-  //           |                                                |
-  // +-------+ | prepareForObj +-----+ prepareForKey +-----+    |
-  // | Start |-+-------------->| Obj |-------------->| Key |-+  |
-  // +-------+                 +-----+               +-----+ |  |
-  //                                                         |  |
-  // +-------------------------------------------------------+  |
-  // |                                                          |
-  // | [Get]                                                    |
-  // | [Call]                                                   |
-  // |   emitGet +-----+                                        |
-  // +---------->| Get |                                        |
-  // |           +-----+                                        |
-  // |                                                          |
-  // | [Delete]                                                 |
-  // |   emitDelete +--------+                                  |
-  // +------------->| Delete |                                  |
-  // |              +--------+                                  |
-  // |                                                          |
-  // | [PostIncrement]                                          |
-  // | [PreIncrement]                                           |
-  // | [PostDecrement]                                          |
-  // | [PreDecrement]                                           |
-  // |   emitIncDec +--------+                                  |
-  // +------------->| IncDec |                                  |
-  // |              +--------+                                  |
-  // |                                      +-------------------+
-  // | [SimpleAssignment]                   |
-  // | [PropInit]                           |
-  // |                        prepareForRhs v  +-----+
-  // +--------------------->+-------------->+->| Rhs |-+
+  //
+  // +-------+   prepareForObj +-----+ prepareForKey +-----+
+  // | Start |---------------->| Obj |-------------->| Key |-+
+  // +-------+                 +-----+               +-----+ |
+  //                                                         |
+  // +-------------------------------------------------------+
+  // |
+  // | [Get]
+  // | [Call]
+  // |   emitGet +-----+
+  // +---------->| Get |
+  // |           +-----+
+  // |
+  // | [Delete]
+  // |   emitDelete +--------+
+  // +------------->| Delete |
+  // |              +--------+
+  // |
+  // | [PostIncrement]
+  // | [PreIncrement]
+  // | [PostDecrement]
+  // | [PreDecrement]
+  // |   emitIncDec +--------+
+  // +------------->| IncDec |
+  // |              +--------+
+  // |
+  // | [SimpleAssignment]
+  // | [PropInit]
+  // |                        prepareForRhs    +-----+
+  // +--------------------->+----------------->| Rhs |-+
   // |                      ^                  +-----+ |
   // |                      |                          |
   // |                      |            +-------------+
@@ -200,7 +200,7 @@ class MOZ_STACK_CLASS ElemOpEmitter {
     // After calling emitIncDec.
     IncDec,
 
-    // After calling prepareForRhs or skipObjAndKeyAndRhs.
+    // After calling prepareForRhs.
     Rhs,
 
     // After calling emitAssignment.
@@ -252,13 +252,14 @@ class MOZ_STACK_CLASS ElemOpEmitter {
   [[nodiscard]] bool emitGet();
 
   [[nodiscard]] bool prepareForRhs();
-  [[nodiscard]] bool skipObjAndKeyAndRhs();
 
   [[nodiscard]] bool emitDelete();
 
   [[nodiscard]] bool emitAssignment();
 
   [[nodiscard]] bool emitIncDec(ValueUsage valueUsage);
+
+  size_t numReferenceSlots() const { return 2 + isSuper(); }
 };
 
 } /* namespace frontend */

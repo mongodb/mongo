@@ -2975,17 +2975,6 @@ template <typename Unit, class AnyCharsAccess>
         break;
 
       case '#': {
-#ifdef ENABLE_RECORD_TUPLE
-        if (matchCodeUnit('{')) {
-          simpleKind = TokenKind::HashCurly;
-          break;
-        }
-        if (matchCodeUnit('[')) {
-          simpleKind = TokenKind::HashBracket;
-          break;
-        }
-#endif
-
         TokenStart start(this->sourceUnits, -1);
         const Unit* identStart = this->sourceUnits.addressOfNextCodeUnit() - 1;
         IdentifierEscapes sawEscape;
@@ -3604,7 +3593,7 @@ bool TokenStreamSpecific<Unit, AnyCharsAccess>::getStringOrTemplateToken(
           unit = char16_t(val);
           break;
         }  // default
-      }    // switch (AssertedCast<uint8_t>(CodeUnitValue(toUnit(unit))))
+      }  // switch (AssertedCast<uint8_t>(CodeUnitValue(toUnit(unit))))
 
       if (!this->charBuffer.append(unit)) {
         return false;

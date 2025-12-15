@@ -15,7 +15,6 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/MemoryReporting.h"
-#include "mozilla/PodOperations.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/Span.h"  // mozilla::{Span,Span}
 #include "mozilla/Sprintf.h"
@@ -31,8 +30,8 @@
 #include "jstypes.h"
 
 #include "frontend/BytecodeSection.h"
-#include "frontend/CompilationStencil.h"  // frontend::CompilationStencil
-#include "frontend/FrontendContext.h"     // AutoReportFrontendContext
+#include "frontend/CompilationStencil.h"  // frontend::CompilationStencil, frontend::InitialStencilAndDelazifications
+#include "frontend/FrontendContext.h"  // AutoReportFrontendContext
 #include "frontend/ParseContext.h"
 #include "frontend/SourceNotes.h"  // SrcNote, SrcNoteType, SrcNoteIterator
 #include "frontend/Stencil.h"  // DumpFunctionFlagsItems, DumpImmutableScriptFlags
@@ -58,7 +57,7 @@
 #include "js/Utility.h"  // JS::UniqueChars
 #include "js/Value.h"    // JS::Value
 #include "util/Poison.h"
-#include "util/StringBuffer.h"
+#include "util/StringBuilder.h"
 #include "util/Text.h"
 #include "vm/BigIntType.h"  // JS::BigInt
 #include "vm/BytecodeIterator.h"
@@ -94,12 +93,9 @@ using namespace js;
 
 using mozilla::CheckedInt;
 using mozilla::Maybe;
-using mozilla::PodCopy;
 using mozilla::PointerRangeSize;
-using mozilla::Utf8AsUnsignedChars;
 using mozilla::Utf8Unit;
 
-using JS::CompileOptions;
 using JS::ReadOnlyCompileOptions;
 using JS::SourceText;
 
@@ -698,6 +694,8 @@ void ScriptSourceObject::finalize(JS::GCContext* gcx, JSObject* obj) {
 
   // Clear the private value, calling the release hook if necessary.
   sso->setPrivate(gcx->runtime(), UndefinedValue());
+
+  sso->clearStencils();
 }
 
 static const JSClassOps ScriptSourceObjectClassOps = {
@@ -716,7 +714,8 @@ static const JSClassOps ScriptSourceObjectClassOps = {
 const JSClass ScriptSourceObject::class_ = {
     "ScriptSource",
     JSCLASS_HAS_RESERVED_SLOTS(RESERVED_SLOTS) | JSCLASS_FOREGROUND_FINALIZE,
-    &ScriptSourceObjectClassOps};
+    &ScriptSourceObjectClassOps,
+};
 
 ScriptSourceObject* ScriptSourceObject::create(JSContext* cx,
                                                ScriptSource* source) {
@@ -733,6 +732,8 @@ ScriptSourceObject* ScriptSourceObject::create(JSContext* cx,
   // them.
   obj->initReservedSlot(ELEMENT_PROPERTY_SLOT, MagicValue(JS_GENERIC_MAGIC));
   obj->initReservedSlot(INTRODUCTION_SCRIPT_SLOT, MagicValue(JS_GENERIC_MAGIC));
+
+  obj->initReservedSlot(STENCILS_SLOT, UndefinedValue());
 
   return obj;
 }
@@ -933,7 +934,8 @@ JSLinearString* JSScript::sourceData(JSContext* cx, HandleScript script) {
                                            script->sourceEnd());
 }
 
-bool BaseScript::appendSourceDataForToString(JSContext* cx, StringBuffer& buf) {
+bool BaseScript::appendSourceDataForToString(JSContext* cx,
+                                             StringBuilder& buf) {
   MOZ_ASSERT(scriptSource()->hasSourceText());
   return scriptSource()->appendSubstring(cx, buf, toStringStart(),
                                          toStringEnd());
@@ -1095,11 +1097,17 @@ void ScriptSource::PinnedUnitsBase::addReader() {
 
 template <typename Unit>
 void ScriptSource::PinnedUnitsBase::removeReader() {
-  // Note: We use a Mutex with Exclusive access, such that no PinnedUnits
-  // instance is live while we are compressing the source.
+  // If the off-thread compression task couldn't perform
+  // convertToCompressedSource, the conversion is pending on
+  // the pendingCompressed field.
+  //
+  // If there's no other reader at this point, perform the pending conversion
+  // here.
+  //
+  // See also ScriptSource::triggerConvertToCompressedSource.
   auto guard = source_->readers_.lock();
   MOZ_ASSERT(guard->count > 0);
-  if (--guard->count) {
+  if (--guard->count == 0) {
     source_->performDelayedConvertToCompressedSource<Unit>(guard);
   }
 }
@@ -1339,7 +1347,7 @@ JSLinearString* ScriptSource::substringDontDeflate(JSContext* cx, size_t start,
   return NewStringCopyNDontDeflate<CanGC>(cx, units.asChars(), len);
 }
 
-bool ScriptSource::appendSubstring(JSContext* cx, StringBuffer& buf,
+bool ScriptSource::appendSubstring(JSContext* cx, StringBuilder& buf,
                                    size_t start, size_t stop) {
   MOZ_ASSERT(start <= stop);
 
@@ -1789,75 +1797,87 @@ void ScriptSource::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
   info->numScripts++;
 }
 
-bool ScriptSource::startIncrementalEncoding(
-    JSContext* cx,
-    UniquePtr<frontend::ExtensibleCompilationStencil>&& initial) {
-  // We don't support asm.js in XDR.
-  // Encoding failures are reported by the xdrFinalizeEncoder function.
-  if (initial->asmJS) {
-    return true;
+frontend::InitialStencilAndDelazifications*
+ScriptSourceObject::maybeGetStencils() {
+  Value stencilsVal = getReservedSlot(STENCILS_SLOT);
+  if (stencilsVal.isUndefined()) {
+    return nullptr;
   }
 
-  // Remove the reference to the source, to avoid the circular reference.
-  initial->source = nullptr;
-
-  AutoIncrementalTimer timer(cx->realm()->timers.xdrEncodingTime);
-  auto failureCase = mozilla::MakeScopeExit([&] { xdrEncoder_.reset(); });
-
-  if (!xdrEncoder_.setInitial(
-          cx, std::forward<UniquePtr<frontend::ExtensibleCompilationStencil>>(
-                  initial))) {
-    // On encoding failure, let failureCase destroy encoder and return true
-    // to avoid failing any currently executing script.
-    return false;
-  }
-
-  failureCase.release();
-  return true;
+  return reinterpret_cast<frontend::InitialStencilAndDelazifications*>(
+      uintptr_t(stencilsVal.toPrivate()) & ~STENCILS_MASK);
 }
 
-bool ScriptSource::addDelazificationToIncrementalEncoding(
-    JSContext* cx, const frontend::CompilationStencil& stencil) {
-  MOZ_ASSERT(hasEncoder());
-  AutoIncrementalTimer timer(cx->realm()->timers.xdrEncodingTime);
-  auto failureCase = mozilla::MakeScopeExit([&] { xdrEncoder_.reset(); });
-
-  if (!xdrEncoder_.addDelazification(cx, stencil)) {
-    // On encoding failure, let failureCase destroy encoder and return true
-    // to avoid failing any currently executing script.
-    return false;
+void ScriptSourceObject::clearStencils() {
+  auto* stencils = maybeGetStencils();
+  if (!stencils) {
+    return;
   }
 
-  failureCase.release();
-  return true;
+  stencils->Release();
+  setReservedSlot(STENCILS_SLOT, UndefinedValue());
 }
 
-bool ScriptSource::xdrFinalizeEncoder(JSContext* cx,
-                                      JS::TranscodeBuffer& buffer) {
-  if (!hasEncoder()) {
-    JS_ReportErrorASCII(cx, "XDR encoding failure");
-    return false;
-  }
-
-  auto cleanup = mozilla::MakeScopeExit([&] { xdrEncoder_.reset(); });
-
-  AutoReportFrontendContext fc(cx);
-  XDRStencilEncoder encoder(&fc, buffer);
-
-  frontend::BorrowingCompilationStencil borrowingStencil(
-      xdrEncoder_.merger_->getResult());
-  XDRResult res = encoder.codeStencil(this, borrowingStencil);
-  if (res.isErr()) {
-    if (JS::IsTranscodeFailureResult(res.unwrapErr())) {
-      fc.clearAutoReport();
-      JS_ReportErrorASCII(cx, "XDR encoding failure");
-    }
-    return false;
-  }
-  return true;
+template <uintptr_t flag>
+void ScriptSourceObject::setStencilsFlag() {
+  JS::Value stencilsVal = getReservedSlot(STENCILS_SLOT);
+  MOZ_ASSERT(!stencilsVal.isUndefined(),
+             "This should be called after setStencils");
+  uintptr_t raw = uintptr_t(stencilsVal.toPrivate());
+  MOZ_ASSERT((raw & flag) == 0);
+  raw |= flag;
+  setReservedSlot(STENCILS_SLOT, PrivateValue(raw));
 }
 
-void ScriptSource::xdrAbortEncoder() { xdrEncoder_.reset(); }
+template <uintptr_t flag>
+void ScriptSourceObject::unsetStencilsFlag() {
+  JS::Value stencilsVal = getReservedSlot(STENCILS_SLOT);
+  MOZ_ASSERT(!stencilsVal.isUndefined(),
+             "This should be called after setStencils");
+  uintptr_t raw = uintptr_t(stencilsVal.toPrivate());
+  raw &= ~flag;
+  if (raw & STENCILS_MASK) {
+    setReservedSlot(STENCILS_SLOT, PrivateValue(raw));
+  } else {
+    clearStencils();
+  }
+}
+
+template <uintptr_t flag>
+bool ScriptSourceObject::isStencilsFlagSet() const {
+  JS::Value stencilsVal = getReservedSlot(STENCILS_SLOT);
+  if (stencilsVal.isUndefined()) {
+    return false;
+  }
+  uintptr_t raw = uintptr_t(stencilsVal.toPrivate());
+  return bool(raw & flag);
+}
+
+void ScriptSourceObject::setStencils(
+    already_AddRefed<frontend::InitialStencilAndDelazifications> stencils) {
+  MOZ_ASSERT(!maybeGetStencils());
+  setReservedSlot(STENCILS_SLOT, PrivateValue(stencils.take()));
+}
+
+void ScriptSourceObject::setCollectingDelazifications() {
+  setStencilsFlag<STENCILS_COLLECTING_DELAZIFICATIONS_FLAG>();
+}
+
+void ScriptSourceObject::unsetCollectingDelazifications() {
+  unsetStencilsFlag<STENCILS_COLLECTING_DELAZIFICATIONS_FLAG>();
+}
+
+bool ScriptSourceObject::isCollectingDelazifications() const {
+  return isStencilsFlagSet<STENCILS_COLLECTING_DELAZIFICATIONS_FLAG>();
+}
+
+void ScriptSourceObject::setSharingDelazifications() {
+  setStencilsFlag<STENCILS_SHARING_DELAZIFICATIONS_FLAG>();
+}
+
+bool ScriptSourceObject::isSharingDelazifications() const {
+  return isStencilsFlagSet<STENCILS_SHARING_DELAZIFICATIONS_FLAG>();
+}
 
 template <typename Unit>
 [[nodiscard]] bool ScriptSource::initializeUnretrievableUncompressedSource(
@@ -2172,6 +2192,8 @@ void JSScript::relazify(JSRuntime* rt) {
   // Any JIT compiles should have been released, so we already point to the
   // interpreter trampoline which supports lazy scripts.
   MOZ_ASSERT_IF(jit::HasJitBackend(), isUsingInterpreterTrampoline(rt));
+
+  realm()->removeFromCompileQueue(this);
 
   // Without bytecode, the script counts are invalid so destroy them if they
   // still exist.
@@ -2722,8 +2744,10 @@ out:
   return script->offsetToPC(offset);
 }
 
-JS_PUBLIC_API unsigned js::GetScriptLineExtent(JSScript* script) {
+JS_PUBLIC_API unsigned js::GetScriptLineExtent(
+    JSScript* script, JS::LimitedColumnNumberOneOrigin* columnp) {
   unsigned lineno = script->lineno();
+  JS::LimitedColumnNumberOneOrigin column = script->column();
   unsigned maxLineNo = lineno;
   for (SrcNoteIterator iter(script->notes(), script->notesEnd()); !iter.atEnd();
        ++iter) {
@@ -2731,16 +2755,27 @@ JS_PUBLIC_API unsigned js::GetScriptLineExtent(JSScript* script) {
     SrcNoteType type = sn->type();
     if (type == SrcNoteType::SetLine) {
       lineno = SrcNote::SetLine::getLine(sn, script->lineno());
+      column = JS::LimitedColumnNumberOneOrigin();
     } else if (type == SrcNoteType::SetLineColumn) {
       lineno = SrcNote::SetLineColumn::getLine(sn, script->lineno());
-    } else if (type == SrcNoteType::NewLine ||
-               type == SrcNoteType::NewLineColumn) {
+      column = SrcNote::SetLineColumn::getColumn(sn);
+    } else if (type == SrcNoteType::NewLine) {
       lineno++;
+      column = JS::LimitedColumnNumberOneOrigin();
+    } else if (type == SrcNoteType::NewLineColumn) {
+      lineno++;
+      column = SrcNote::NewLineColumn::getColumn(sn);
+    } else if (type == SrcNoteType::ColSpan) {
+      column += SrcNote::ColSpan::getSpan(sn);
     }
 
     if (maxLineNo < lineno) {
       maxLineNo = lineno;
     }
+  }
+
+  if (columnp) {
+    *columnp = column;
   }
 
   return 1 + maxLineNo - script->lineno();
@@ -3642,15 +3677,11 @@ bool JSScript::dumpGCThings(JSContext* cx, JS::Handle<JSScript*> script,
         }
 
         JS::Rooted<JS::Value> objValue(cx, ObjectValue(*obj));
-        JS::Rooted<JSString*> str(cx, ValueToSource(cx, objValue));
-        if (!str) {
+        JS::UniqueChars source = ToDisassemblySource(cx, objValue);
+        if (!source) {
           return false;
         }
-        JS::UniqueChars utf8chars = JS_EncodeStringToUTF8(cx, str);
-        if (!utf8chars) {
-          return false;
-        }
-        sp->put(utf8chars.get());
+        sp->put(source.get());
         sp->put("\n");
       }
     } else if (gcThing.is<JSString>()) {

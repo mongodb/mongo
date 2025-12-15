@@ -697,6 +697,15 @@ class RegExpStringIteratorObject : public NativeObject {
 RegExpStringIteratorObject* NewRegExpStringIteratorTemplate(JSContext* cx);
 RegExpStringIteratorObject* NewRegExpStringIterator(JSContext* cx);
 
+#ifdef NIGHTLY_BUILD
+class IteratorRangeObject : public NativeObject {
+ public:
+  static const JSClass class_;
+};
+
+IteratorRangeObject* NewIteratorRange(JSContext* cx);
+#endif
+
 [[nodiscard]] bool EnumerateProperties(JSContext* cx, HandleObject obj,
                                        MutableHandleIdVector props);
 
@@ -801,6 +810,16 @@ IteratorHelperObject* NewIteratorHelper(JSContext* cx);
 
 bool IterableToArray(JSContext* cx, HandleValue iterable,
                      MutableHandle<ArrayObject*> array);
+
+bool HasOptimizableArrayIteratorPrototype(JSContext* cx);
+
+enum class MustBePacked { No, Yes };
+
+template <MustBePacked Packed>
+bool IsArrayWithDefaultIterator(JSObject* obj, JSContext* cx);
+
+bool IsMapObjectWithDefaultIterator(JSObject* obj, JSContext* cx);
+bool IsSetObjectWithDefaultIterator(JSObject* obj, JSContext* cx);
 
 // Typed arrays and classes with an enumerate hook can have extra properties not
 // included in the shape's property map or the object's dense elements.

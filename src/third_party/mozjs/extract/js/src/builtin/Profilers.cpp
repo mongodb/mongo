@@ -80,7 +80,7 @@ JS_PUBLIC_API bool JS_StartProfiling(const char* profileName, pid_t pid) {
   ok = StartOSXProfiling(profileName, pid);
 #endif
 #ifdef __linux__
-  if (!js_StartPerf()) {
+  if (!js_StartPerf(profileName)) {
     ok = false;
   }
 #endif
@@ -363,7 +363,8 @@ static const JSFunctionSpec profiling_functions[] = {
     JS_FN("stopCallgrind", StopCallgrind, 0, 0),
     JS_FN("dumpCallgrind", DumpCallgrind, 1, 0),
 #  endif
-    JS_FS_END};
+    JS_FS_END,
+};
 
 #endif
 
@@ -442,9 +443,8 @@ JS_PUBLIC_API bool js_DumpCallgrind(const char* outfile) {
  *
  * To pass additional parameters to |perf record|, provide them in the
  * MOZ_PROFILE_PERF_FLAGS environment variable.  If this variable does not
- * exist, we default it to "--call-graph".  (If you don't want --call-graph but
- * don't want to pass any other args, define MOZ_PROFILE_PERF_FLAGS to the empty
- * string.)
+ * exist, we default it to "-g".  (If you don't want -g but don't want to
+ * pass any other args, define MOZ_PROFILE_PERF_FLAGS to the empty string.)
  *
  * If you include --pid or --output in MOZ_PROFILE_PERF_FLAGS, you're just
  * asking for trouble.
@@ -461,8 +461,9 @@ JS_PUBLIC_API bool js_DumpCallgrind(const char* outfile) {
 static bool perfInitialized = false;
 static pid_t perfPid = 0;
 
-bool js_StartPerf() {
-  const char* outfile = "mozperf.data";
+bool js_StartPerf(const char* profileName) {
+  const char* outfile =
+      (profileName && profileName[0]) ? profileName : "mozperf.data";
 
   if (perfPid != 0) {
     UnsafeError("js_StartPerf: called while perf was already running!\n");
@@ -505,7 +506,7 @@ bool js_StartPerf() {
 
     const char* flags = getenv("MOZ_PROFILE_PERF_FLAGS");
     if (!flags) {
-      flags = "--call-graph";
+      flags = "-g";
     }
 
     UniqueChars flags2 = DuplicateString(flags);

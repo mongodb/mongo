@@ -148,7 +148,7 @@ def preprocess(cxx, preprocessorOption, source, args=[]):
     result = subprocess.Popen(cxx + outputArg + args + [tmpIn]).wait()
     if result != 0:
         sys.exit(result)
-    with open(tmpOut, "r") as output:
+    with open(tmpOut) as output:
         processed = output.read()
     os.remove(tmpIn)
     os.remove(tmpOut)

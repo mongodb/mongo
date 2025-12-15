@@ -150,7 +150,7 @@ def sourcelink(symbol=None, loc=None, range=None):
 
 
 def quoted_dict(d):
-    return {k: escape(v) for k, v in d.items() if type(v) == str}
+    return {k: escape(v) for k, v in d.items() if type(v) is str}
 
 
 num_hazards = 0
@@ -330,7 +330,7 @@ try:
 
         print_footer(html)
 
-except IOError as e:
+except OSError as e:
     print("Failed: %s" % str(e))
 
 if args.verbose:

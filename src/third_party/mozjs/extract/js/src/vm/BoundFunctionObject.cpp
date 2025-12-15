@@ -8,7 +8,7 @@
 
 #include <string_view>
 
-#include "util/StringBuffer.h"
+#include "util/StringBuilder.h"
 #include "vm/Interpreter.h"
 #include "vm/Shape.h"
 #include "vm/Stack.h"
@@ -214,7 +214,7 @@ static MOZ_ALWAYS_INLINE JSAtom* AppendBoundFunctionPrefix(JSContext* cx,
     }
   }
 
-  StringBuffer sb(cx);
+  StringBuilder sb(cx);
   if (!sb.append("bound ") || !sb.append(str)) {
     return nullptr;
   }
@@ -321,6 +321,7 @@ BoundFunctionObject* BoundFunctionObject::functionBindImpl(
   // If this assertion fails, make sure we use the correct AllocKind and that we
   // use all of its slots (consider increasing MaxInlineBoundArgs).
   static_assert(gc::GetGCKindSlots(allocKind) == SlotCount);
+  static_assert(gc::GetFinalizeKind(allocKind) == gc::FinalizeKind::None);
 
   // ES2023 10.4.1.3 BoundFunctionCreate
   // Steps 1-5.

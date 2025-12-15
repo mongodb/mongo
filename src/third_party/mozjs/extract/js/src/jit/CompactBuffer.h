@@ -216,6 +216,11 @@ class CompactBufferWriter {
       writeByte((ptrWord >> (i * 8)) & 0xFF);
     }
   }
+  void writeBytes(const uint8_t* data, size_t len) {
+    if (!buffer_.append(data, len)) {
+      enoughMemory_ = false;
+    }
+  }
   size_t length() const { return buffer_.length(); }
   uint8_t* buffer() {
     MOZ_ASSERT(!oom());

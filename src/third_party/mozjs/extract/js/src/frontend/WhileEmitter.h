@@ -35,7 +35,7 @@ struct BytecodeEmitter;
 //     wh.emitEnd();
 //
 class MOZ_STACK_CLASS WhileEmitter {
-#ifdef ENABLE_DECORATORS
+#if defined(ENABLE_DECORATORS) || defined(ENABLE_EXPLICIT_RESOURCE_MANAGEMENT)
  protected:
 #endif
   BytecodeEmitter* bce_;
@@ -87,7 +87,7 @@ class MOZ_STACK_CLASS WhileEmitter {
   [[nodiscard]] bool emitEnd();
 };
 
-#ifdef ENABLE_DECORATORS
+#if defined(ENABLE_DECORATORS) || defined(ENABLE_EXPLICIT_RESOURCE_MANAGEMENT)
 // This version is for emitting the condition in synthesized code that
 // does not have a corresponding location in the source code.
 class MOZ_STACK_CLASS InternalWhileEmitter : public WhileEmitter {

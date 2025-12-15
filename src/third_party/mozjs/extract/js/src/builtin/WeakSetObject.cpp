@@ -13,6 +13,7 @@
 #include "vm/JSContext.h"
 #include "vm/SelfHosting.h"
 
+#include "builtin/MapObject-inl.h"
 #include "builtin/WeakMapObject-inl.h"
 #include "vm/JSObject-inl.h"
 #include "vm/NativeObject-inl.h"
@@ -23,23 +24,27 @@ using namespace js;
   return v.isObject() && v.toObject().is<WeakSetObject>();
 }
 
+static bool AddWeakSetEntryImpl(JSContext* cx, Handle<WeakSetObject*> setObj,
+                                Handle<Value> keyVal) {
+  if (MOZ_UNLIKELY(!CanBeHeldWeakly(cx, keyVal))) {
+    unsigned errorNum = GetErrorNumber(false);
+    ReportValueError(cx, errorNum, JSDVG_IGNORE_STACK, keyVal, nullptr);
+    return false;
+  }
+
+  return WeakCollectionPutEntryInternal(cx, setObj, keyVal, TrueHandleValue);
+}
+
 // ES2018 draft rev 7a2d3f053ecc2336fc19f377c55d52d78b11b296
 // 23.4.3.1 WeakSet.prototype.add ( value )
 /* static */ MOZ_ALWAYS_INLINE bool WeakSetObject::add_impl(
     JSContext* cx, const CallArgs& args) {
   MOZ_ASSERT(is(args.thisv()));
 
-  // Step 4.
-  if (!CanBeHeldWeakly(cx, args.get(0))) {
-    unsigned errorNum = GetErrorNumber(false);
-    ReportValueError(cx, errorNum, JSDVG_IGNORE_STACK, args.get(0), nullptr);
-    return false;
-  }
-
-  // Steps 5-7.
-  RootedValue value(cx, args[0]);
-  Rooted<WeakSetObject*> map(cx, &args.thisv().toObject().as<WeakSetObject>());
-  if (!WeakCollectionPutEntryInternal(cx, map, value, TrueHandleValue)) {
+  // Steps 4-7.
+  Rooted<WeakSetObject*> setObj(cx,
+                                &args.thisv().toObject().as<WeakSetObject>());
+  if (!AddWeakSetEntryImpl(cx, setObj, args.get(0))) {
     return false;
   }
 
@@ -135,32 +140,79 @@ const ClassSpec WeakSetObject::classSpec_ = {
     nullptr,
     WeakSetObject::methods,
     WeakSetObject::properties,
+    GenericFinishInit<WhichHasFuseProperty::Proto>,
 };
 
 const JSClass WeakSetObject::class_ = {
     "WeakSet",
     JSCLASS_HAS_RESERVED_SLOTS(SlotCount) |
         JSCLASS_HAS_CACHED_PROTO(JSProto_WeakSet) | JSCLASS_BACKGROUND_FINALIZE,
-    &WeakCollectionObject::classOps_, &WeakSetObject::classSpec_};
+    &WeakCollectionObject::classOps_,
+    &WeakSetObject::classSpec_,
+};
 
 const JSClass WeakSetObject::protoClass_ = {
-    "WeakSet.prototype", JSCLASS_HAS_CACHED_PROTO(JSProto_WeakSet),
-    JS_NULL_CLASS_OPS, &WeakSetObject::classSpec_};
+    "WeakSet.prototype",
+    JSCLASS_HAS_CACHED_PROTO(JSProto_WeakSet),
+    JS_NULL_CLASS_OPS,
+    &WeakSetObject::classSpec_,
+};
 
 const JSPropertySpec WeakSetObject::properties[] = {
-    JS_STRING_SYM_PS(toStringTag, "WeakSet", JSPROP_READONLY), JS_PS_END};
+    JS_STRING_SYM_PS(toStringTag, "WeakSet", JSPROP_READONLY),
+    JS_PS_END,
+};
 
 const JSFunctionSpec WeakSetObject::methods[] = {
-    JS_FN("add", add, 1, 0), JS_FN("delete", delete_, 1, 0),
-    JS_FN("has", has, 1, 0), JS_FS_END};
+    JS_FN("add", add, 1, 0),
+    JS_FN("delete", delete_, 1, 0),
+    JS_FN("has", has, 1, 0),
+    JS_FS_END,
+};
 
 WeakSetObject* WeakSetObject::create(JSContext* cx,
                                      HandleObject proto /* = nullptr */) {
   return NewObjectWithClassProto<WeakSetObject>(cx, proto);
 }
 
-bool WeakSetObject::isBuiltinAdd(HandleValue add) {
-  return IsNativeFunction(add, WeakSetObject::add);
+// static
+bool WeakSetObject::tryOptimizeCtorWithIterable(JSContext* cx,
+                                                Handle<WeakSetObject*> obj,
+                                                Handle<Value> iterableVal,
+                                                bool* optimized) {
+  MOZ_ASSERT(!iterableVal.isNullOrUndefined());
+  MOZ_ASSERT(!*optimized);
+
+  if (!CanOptimizeMapOrSetCtorWithIterable<JSProto_WeakSet>(WeakSetObject::add,
+                                                            obj, cx)) {
+    return true;
+  }
+
+  if (!iterableVal.isObject()) {
+    return true;
+  }
+  JSObject* iterable = &iterableVal.toObject();
+
+  // Fast path for `new WeakSet(array)`.
+  if (IsOptimizableArrayForMapOrSetCtor<MapOrSet::Set>(iterable, cx)) {
+    RootedValue keyVal(cx);
+    Rooted<ArrayObject*> array(cx, &iterable->as<ArrayObject>());
+    uint32_t len = array->getDenseInitializedLength();
+
+    for (uint32_t index = 0; index < len; index++) {
+      keyVal.set(array->getDenseElement(index));
+      MOZ_ASSERT(!keyVal.isMagic(JS_ELEMENTS_HOLE));
+
+      if (!AddWeakSetEntryImpl(cx, obj, keyVal)) {
+        return false;
+      }
+    }
+
+    *optimized = true;
+    return true;
+  }
+
+  return true;
 }
 
 bool WeakSetObject::construct(JSContext* cx, unsigned argc, Value* vp) {
@@ -182,35 +234,14 @@ bool WeakSetObject::construct(JSContext* cx, unsigned argc, Value* vp) {
   }
 
   if (!args.get(0).isNullOrUndefined()) {
-    RootedValue iterable(cx, args[0]);
+    Handle<Value> iterable = args[0];
     bool optimized = false;
-    if (!IsOptimizableInitForSet<GlobalObject::getOrCreateWeakSetPrototype,
-                                 isBuiltinAdd>(cx, obj, iterable, &optimized)) {
+    if (!tryOptimizeCtorWithIterable(cx, obj, iterable, &optimized)) {
       return false;
     }
-
-    if (optimized) {
-      RootedValue keyVal(cx);
-      Rooted<ArrayObject*> array(cx, &iterable.toObject().as<ArrayObject>());
-      for (uint32_t index = 0; index < array->getDenseInitializedLength();
-           ++index) {
-        keyVal.set(array->getDenseElement(index));
-        MOZ_ASSERT(!keyVal.isMagic(JS_ELEMENTS_HOLE));
-
-        if (!CanBeHeldWeakly(cx, keyVal)) {
-          unsigned errorNum = GetErrorNumber(false);
-          ReportValueError(cx, errorNum, JSDVG_IGNORE_STACK, args.get(0),
-                           nullptr);
-          return false;
-        }
-
-        if (!WeakCollectionPutEntryInternal(cx, obj, keyVal, TrueHandleValue)) {
-          return false;
-        }
-      }
-    } else {
+    if (!optimized) {
       FixedInvokeArgs<1> args2(cx);
-      args2[0].set(args[0]);
+      args2[0].set(iterable);
 
       RootedValue thisv(cx, ObjectValue(*obj));
       if (!CallSelfHostedFunction(cx, cx->names().WeakSetConstructorInit, thisv,

@@ -832,17 +832,28 @@ bool BaselineStackBuilder::buildExpressionStack() {
 
   for (uint32_t i = 0; i < exprStackSlots(); i++) {
     Value v;
-    // If we are in the middle of propagating an exception from Ion by
-    // bailing to baseline due to debug mode, we might not have all
-    // the stack if we are at the newest frame.
+    // If we're at the newest frame and in the middle of throwing an exception,
+    // some expression stack slots might not be available.
     //
-    // For instance, if calling |f()| pushed an Ion frame which threw,
-    // the snapshot expects the return value to be pushed, but it's
-    // possible nothing was pushed before we threw.
+    // For example, if we call a function that throws, and then catch the
+    // exception, the return value won't be available. This isn't usually a
+    // problem, because the expression stack is generally empty when we enter a
+    // catch block.  However, if a catch is inside a for-of, there are
+    // iterator-related values on the stack. If one of those values is defined
+    // by the function that threw, then its value will be unavailable. This is
+    // not possible for a user-written catch, but can happen for synthetic
+    // catches generated via desugaring. See bug 1934425 for a case involving
+    // `for (await using ...)`.
+    //
+    // Similar issues of trying to recover the result of a throwing function can
+    // also occur when bailing out while propagating an exception due to debug
+    // mode.
     //
     // We therefore use a fallible read here.
     if (!iter_.tryRead(&v)) {
-      MOZ_ASSERT(propagatingIonExceptionForDebugMode() && !iter_.moreFrames());
+      MOZ_ASSERT(
+          !iter_.moreFrames() &&
+          (catchingException() || propagatingIonExceptionForDebugMode()));
       v = MagicValue(JS_OPTIMIZED_OUT);
     }
     if (!writeValue(v, "StackValue")) {

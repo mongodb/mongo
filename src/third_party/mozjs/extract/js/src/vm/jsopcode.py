@@ -149,16 +149,12 @@ def find_by_name(list, name):
 def add_to_index(index, opcode):
     types = find_by_name(index, opcode.category_name)
     if types is None:
-        raise Exception(
-            "Category is not listed in index: "
-            "{name}".format(name=opcode.category_name)
-        )
+        raise Exception("Category is not listed in index: " f"{opcode.category_name}")
     opcodes = find_by_name(types, opcode.type_name)
     if opcodes is None:
         if opcode.type_name:
             raise Exception(
-                "Type is not listed in {category}: "
-                "{name}".format(category=opcode.category_name, name=opcode.type_name)
+                f"Type is not listed in {opcode.category_name}: " f"{opcode.type_name}"
             )
         types.append((opcode.type_name, [opcode]))
         return
@@ -213,7 +209,7 @@ def get_opcodes(dir):
     opcodes = dict()
     index = []
 
-    with open("{dir}/js/src/vm/Opcodes.h".format(dir=dir), "r", encoding="utf-8") as f:
+    with open(f"{dir}/js/src/vm/Opcodes.h", encoding="utf-8") as f:
         data = f.read()
 
     comment_info = None
@@ -267,9 +263,7 @@ def get_opcodes(dir):
                         stack += " " + line.strip()
                 else:
                     raise ValueError(
-                        "unrecognized line in comment: {!r}\n\nfull comment was:\n{}".format(
-                            line, comment
-                        )
+                        f"unrecognized line in comment: {line!r}\n\nfull comment was:\n{comment}"
                     )
 
             comment_info.desc = desc
@@ -300,9 +294,7 @@ def get_opcodes(dir):
                 expected_snake += "_"
             if opcode.op_snake != expected_snake:
                 raise ValueError(
-                    "Unexpected snake-case name for {}: expected {!r}, got {!r}".format(
-                        opcode.op, expected_snake, opcode.op_snake
-                    )
+                    f"Unexpected snake-case name for {opcode.op}: expected {expected_snake!r}, got {opcode.op_snake!r}"
                 )
 
             if not group_head:
@@ -310,46 +302,29 @@ def get_opcodes(dir):
 
                 opcode.sort_key = opcode.op
                 if opcode.category_name == "":
-                    raise Exception(
-                        "Category is not specified for " "{op}".format(op=opcode.op)
-                    )
+                    raise Exception("Category is not specified for " f"{opcode.op}")
                 add_to_index(index, opcode)
             else:
                 if group_head.length != opcode.length:
                     raise Exception(
                         "length should be same for opcodes of the"
                         " same group: "
-                        "{value1}({op1}) != "
-                        "{value2}({op2})".format(
-                            op1=group_head.op,
-                            value1=group_head.length,
-                            op2=opcode.op,
-                            value2=opcode.length,
-                        )
+                        f"{group_head.length}({group_head.op}) != "
+                        f"{opcode.length}({opcode.op})"
                     )
                 if group_head.nuses != opcode.nuses:
                     raise Exception(
                         "nuses should be same for opcodes of the"
                         " same group: "
-                        "{value1}({op1}) != "
-                        "{value2}({op2})".format(
-                            op1=group_head.op,
-                            value1=group_head.nuses,
-                            op2=opcode.op,
-                            value2=opcode.nuses,
-                        )
+                        f"{group_head.nuses}({group_head.op}) != "
+                        f"{opcode.nuses}({opcode.op})"
                     )
                 if group_head.ndefs != opcode.ndefs:
                     raise Exception(
                         "ndefs should be same for opcodes of the"
                         " same group: "
-                        "{value1}({op1}) != "
-                        "{value2}({op2})".format(
-                            op1=group_head.op,
-                            value1=group_head.ndefs,
-                            op2=opcode.op,
-                            value2=opcode.ndefs,
-                        )
+                        f"{group_head.ndefs}({group_head.op}) != "
+                        f"{opcode.ndefs}({opcode.op})"
                     )
 
                 group_head.group.append(opcode)
@@ -368,15 +343,15 @@ def get_opcodes(dir):
 
             if nuses != -1 and stack_nuses != -1 and nuses != stack_nuses:
                 raise Exception(
-                    "nuses should match stack notation: {op}: "
-                    "{nuses} != {stack_nuses} "
-                    "(stack_nuses)".format(op=op, nuses=nuses, stack_nuses=stack_nuses)
+                    f"nuses should match stack notation: {op}: "
+                    f"{nuses} != {stack_nuses} "
+                    "(stack_nuses)"
                 )
             if ndefs != -1 and stack_ndefs != -1 and ndefs != stack_ndefs:
                 raise Exception(
-                    "ndefs should match stack notation: {op}: "
-                    "{ndefs} != {stack_ndefs} "
-                    "(stack_ndefs)".format(op=op, ndefs=ndefs, stack_ndefs=stack_ndefs)
+                    f"ndefs should match stack notation: {op}: "
+                    f"{ndefs} != {stack_ndefs} "
+                    "(stack_ndefs)"
                 )
 
     return index, opcodes

@@ -17,15 +17,6 @@
 #error "vm/StaticStrings.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/StencilCache.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/StencilCache.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "vm/StencilCache.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
 #include "vm/StencilObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "vm/StencilObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -51,5 +42,14 @@
 #endif
 #ifdef INITGUID
 #error "vm/StructuredClone.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "vm/SymbolType.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "vm/SymbolType.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "vm/SymbolType.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

@@ -5,6 +5,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "jit/InstructionReordering.h"
+
+#include "jit/MIRGenerator.h"
 #include "jit/MIRGraph.h"
 
 using namespace js;
@@ -72,7 +74,7 @@ static void MoveConstantsToStart(MBasicBlock* block,
   }
 }
 
-bool jit::ReorderInstructions(MIRGraph& graph) {
+bool jit::ReorderInstructions(MIRGenerator* mir, MIRGraph& graph) {
   // Renumber all instructions in the graph as we go.
   size_t nextId = 0;
 
@@ -81,6 +83,10 @@ bool jit::ReorderInstructions(MIRGraph& graph) {
 
   for (ReversePostorderIterator block(graph.rpoBegin());
        block != graph.rpoEnd(); block++) {
+    if (mir->shouldCancel("ReorderInstructions (block loop)")) {
+      return false;
+    }
+
     // Don't reorder instructions within entry blocks, which have special
     // requirements.
     bool isEntryBlock =
@@ -120,6 +126,10 @@ bool jit::ReorderInstructions(MIRGraph& graph) {
     MInstructionReverseIterator rtop = ++block->rbegin(insertionPoint);
     for (MInstructionIterator iter(block->begin(insertionPoint));
          iter != block->end();) {
+      if (mir->shouldCancel("ReorderInstructions (instruction loop)")) {
+        return false;
+      }
+
       MInstruction* ins = *iter;
 
       // Filter out some instructions which are never reordered.

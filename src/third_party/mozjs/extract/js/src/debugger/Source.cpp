@@ -68,7 +68,10 @@ const JSClassOps DebuggerSource::classOps_ = {
 };
 
 const JSClass DebuggerSource::class_ = {
-    "Source", JSCLASS_HAS_RESERVED_SLOTS(RESERVED_SLOTS), &classOps_};
+    "Source",
+    JSCLASS_HAS_RESERVED_SLOTS(RESERVED_SLOTS),
+    &classOps_,
+};
 
 /* static */
 NativeObject* DebuggerSource::initClass(JSContext* cx,
@@ -278,14 +281,13 @@ bool DebuggerSource::CallData::getBinary() {
     return false;
   }
 
-  const wasm::Bytes& bytecode = instance.debug().bytecode();
+  const wasm::BytecodeSource& bytecode = instance.debug().bytecode();
   RootedObject arr(cx, JS_NewUint8Array(cx, bytecode.length()));
   if (!arr) {
     return false;
   }
 
-  memcpy(arr->as<TypedArrayObject>().dataPointerUnshared(), bytecode.begin(),
-         bytecode.length());
+  bytecode.copyTo((uint8_t*)arr->as<TypedArrayObject>().dataPointerUnshared());
 
   args.rval().setObject(*arr);
   return true;
@@ -393,7 +395,11 @@ struct DebuggerSourceGetDisplayURLMatcher {
     return ss->hasDisplayURL() ? ss->displayURL() : nullptr;
   }
   ReturnType match(Handle<WasmInstanceObject*> wasmInstance) {
-    return wasmInstance->instance().metadata().displayURL();
+    return wasmInstance->instance().codeMetaForAsmJS()
+               ? wasmInstance->instance()
+                     .codeMetaForAsmJS()
+                     ->displayURL()  // asm.js
+               : nullptr;            // wasm
   }
 };
 
@@ -687,7 +693,10 @@ const JSPropertySpec DebuggerSource::properties_[] = {
     JS_DEBUG_PSG("introductionType", getIntroductionType),
     JS_DEBUG_PSG("elementAttributeName", getElementProperty),
     JS_DEBUG_PSGS("sourceMapURL", getSourceMapURL, setSourceMapURL),
-    JS_PS_END};
+    JS_PS_END,
+};
 
 const JSFunctionSpec DebuggerSource::methods_[] = {
-    JS_DEBUG_FN("reparse", reparse, 0), JS_FS_END};
+    JS_DEBUG_FN("reparse", reparse, 0),
+    JS_FS_END,
+};

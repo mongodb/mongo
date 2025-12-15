@@ -140,6 +140,7 @@ static constexpr Register WasmTableCallIndexReg = ABINonArgReg3;
 // Registers used for ref calls.
 static constexpr Register WasmCallRefCallScratchReg0 = ABINonArgReg0;
 static constexpr Register WasmCallRefCallScratchReg1 = ABINonArgReg1;
+static constexpr Register WasmCallRefCallScratchReg2 = ABINonArgReg2;
 static constexpr Register WasmCallRefReg = ABINonArgReg3;
 
 // Registers used for wasm tail calls operations.
@@ -305,6 +306,7 @@ class Assembler : public AssemblerX86Shared {
   void push(const ImmWord imm) { push(Imm32(imm.value)); }
   void push(const ImmPtr imm) { push(ImmWord(uintptr_t(imm.value))); }
   void push(FloatRegister src) {
+    MOZ_ASSERT(src.isDouble(), "float32 and simd128 not supported");
     subl(Imm32(sizeof(double)), StackPointer);
     vmovsd(src, Address(StackPointer, 0));
   }
@@ -315,6 +317,7 @@ class Assembler : public AssemblerX86Shared {
   }
 
   void pop(FloatRegister src) {
+    MOZ_ASSERT(src.isDouble(), "float32 and simd128 not supported");
     vmovsd(Address(StackPointer, 0), src);
     addl(Imm32(sizeof(double)), StackPointer);
   }

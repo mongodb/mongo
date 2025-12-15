@@ -16,6 +16,9 @@
 #include "frontend/NameAnalysisTypes.h"
 #include "frontend/NameCollections.h"
 #include "frontend/Stencil.h"
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+#  include "frontend/UsingEmitter.h"
+#endif
 #include "vm/Opcodes.h"        // JSOp
 #include "vm/SharedStencil.h"  // GCThingIndex
 
@@ -46,7 +49,10 @@ class EmitterScope : public Nestable<EmitterScope> {
   bool hasEnvironment_;
 
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  bool hasDisposables_ = false;
+  mozilla::Maybe<UsingEmitter> usingEmitter_;
+
+ private:
+  BlockKind blockKind_ = BlockKind::Other;
 #endif
 
   // The number of enclosing environments. Used for error checking.
@@ -109,13 +115,26 @@ class EmitterScope : public Nestable<EmitterScope> {
     return clearFrameSlotRange(bce, JSOp::Uninitialized, slotStart, slotEnd);
   }
 
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+  void setHasDisposables(BytecodeEmitter* bce) {
+    if (!usingEmitter_.isSome()) {
+      usingEmitter_.emplace(bce);
+    }
+  }
+#endif
+
  public:
   explicit EmitterScope(BytecodeEmitter* bce);
 
   void dump(BytecodeEmitter* bce);
 
   [[nodiscard]] bool enterLexical(BytecodeEmitter* bce, ScopeKind kind,
-                                  LexicalScope::ParserData* bindings);
+                                  LexicalScope::ParserData* bindings
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+                                  ,
+                                  BlockKind blockKind = BlockKind::Other
+#endif
+  );
   [[nodiscard]] bool enterClassBody(BytecodeEmitter* bce, ScopeKind kind,
                                     ClassBodyScope::ParserData* bindings);
   [[nodiscard]] bool enterNamedLambda(BytecodeEmitter* bce,
@@ -147,11 +166,25 @@ class EmitterScope : public Nestable<EmitterScope> {
   bool hasEnvironment() const { return hasEnvironment_; }
 
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  bool hasDisposables() const { return hasDisposables_; }
+ private:
+  // Disposable Scope here refers to any scope
+  // with using bindings in it for now that is
+  // a lexical scope and a module scope.
+  [[nodiscard]] bool prepareForDisposableScopeBody(BytecodeEmitter* bce);
 
-  bool setHasDisposables() {
-    hasDisposables_ = true;
-    return true;
+  [[nodiscard]] bool emitDisposableScopeBodyEnd(BytecodeEmitter* bce);
+
+ public:
+  [[nodiscard]] bool prepareForModuleDisposableScopeBody(BytecodeEmitter* bce);
+
+  [[nodiscard]] bool emitModuleDisposableScopeBodyEnd(BytecodeEmitter* bce);
+
+  [[nodiscard]] bool prepareForDisposableAssignment(UsingHint hint);
+
+  bool hasDisposables() const { return usingEmitter_.isSome(); }
+
+  bool hasAsyncDisposables() const {
+    return hasDisposables() && usingEmitter_->hasAwaitUsing();
   }
 #endif
 

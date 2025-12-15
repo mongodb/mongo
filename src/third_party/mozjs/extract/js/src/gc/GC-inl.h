@@ -23,34 +23,15 @@ namespace js::gc {
 
 class AutoAssertEmptyNursery;
 
-class ArenaListIter {
-  Arena* arena;
-
- public:
-  explicit ArenaListIter(Arena* head) : arena(head) {}
-  bool done() const { return !arena; }
-  Arena* get() const {
-    MOZ_ASSERT(!done());
-    return arena;
-  }
-  void next() {
-    MOZ_ASSERT(!done());
-    arena = arena->next;
-  }
-
-  operator Arena*() const { return get(); }
-  Arena* operator->() const { return get(); }
-};
-
 // Iterate all arenas in a zone of the specified kind, for use by the GC.
 //
 // Since the GC never iterates arenas during foreground sweeping we can skip
 // traversing foreground swept arenas.
-class ArenaIterInGC : public ChainedIterator<ArenaListIter, 2> {
+class ArenaIterInGC : public ChainedIterator<ArenaList::Iterator, 2> {
  public:
   ArenaIterInGC(JS::Zone* zone, AllocKind kind)
-      : ChainedIterator(zone->arenas.getFirstArena(kind),
-                        zone->arenas.getFirstCollectingArena(kind)) {
+      : ChainedIterator(zone->arenas.arenaList(kind),
+                        zone->arenas.collectingArenaList(kind)) {
 #ifdef DEBUG
     MOZ_ASSERT(JS::RuntimeHeapIsMajorCollecting());
     GCRuntime& gc = zone->runtimeFromMainThread()->gc;
@@ -65,13 +46,13 @@ class ArenaIterInGC : public ChainedIterator<ArenaListIter, 2> {
 // Most uses of this happen when we are not in incremental GC but the debugger
 // can iterate scripts at any time.
 class ArenaIter : public AutoGatherSweptArenas,
-                  public ChainedIterator<ArenaListIter, 3> {
+                  public ChainedIterator<ArenaList::Iterator, 3> {
  public:
   ArenaIter(JS::Zone* zone, AllocKind kind)
       : AutoGatherSweptArenas(zone, kind),
-        ChainedIterator(zone->arenas.getFirstArena(kind),
-                        zone->arenas.getFirstCollectingArena(kind),
-                        sweptArenas()) {}
+        ChainedIterator(zone->arenas.arenaList(kind),
+                        zone->arenas.collectingArenaList(kind), sweptArenas()) {
+  }
 };
 
 class ArenaCellIter {
@@ -172,9 +153,11 @@ class ZoneAllCellIter<TenuredCell> {
     // against other threads iterating or allocating. However, we do have
     // background finalization; we may have to wait for this to finish if
     // it's currently active.
-    if (IsBackgroundFinalized(kind) &&
-        zone->arenas.needBackgroundFinalizeWait(kind)) {
-      rt->gc.waitBackgroundSweepEnd();
+    if (IsBackgroundFinalized(kind)) {
+      ArenaLists& arenas = zone->arenas;
+      if (zone->isGCFinished() && !arenas.doneBackgroundFinalize(kind)) {
+        rt->gc.waitBackgroundSweepEnd();
+      }
     }
     iter.emplace(zone, kind);
   }

@@ -124,10 +124,6 @@ void MoveEmitterMIPSShared::emitInt32Move(const MoveOperand& from,
 
 void MoveEmitterMIPSShared::emitFloat32Move(const MoveOperand& from,
                                             const MoveOperand& to) {
-  // Ensure that we can use ScratchFloat32Reg in memory move.
-  MOZ_ASSERT_IF(from.isFloatReg(), from.floatReg() != ScratchFloat32Reg);
-  MOZ_ASSERT_IF(to.isFloatReg(), to.floatReg() != ScratchFloat32Reg);
-
   if (from.isFloatReg()) {
     if (to.isFloatReg()) {
       masm.moveFloat32(from.floatReg(), to.floatReg());

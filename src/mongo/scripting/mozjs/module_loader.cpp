@@ -98,14 +98,21 @@ JSObject* ModuleLoader::loadRootModule(JSContext* cx,
                                        const std::string& path,
                                        boost::optional<StringData> source) {
     JS::RootedString baseUrl(cx, JS_NewStringCopyN(cx, _baseUrl.c_str(), _baseUrl.size()));
+    if (!baseUrl) {
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to create baseUrl");
+    }
     JS::RootedObject info(cx, createScriptPrivateInfo(cx, baseUrl, source));
     if (!info) {
-        return nullptr;
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to create info");
     }
 
     JS::RootedValue referencingPrivate(cx, JS::ObjectValue(*info));
     JS::RootedString specifier(cx, JS_NewStringCopyN(cx, path.c_str(), path.size()));
-    JS::RootedObject moduleRequest(cx, JS::CreateModuleRequest(cx, specifier));
+    if (!specifier) {
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to create specifier");
+    }
+    JS::RootedObject moduleRequest(
+        cx, JS::CreateModuleRequest(cx, specifier, JS::ModuleType::JavaScript));
     if (!moduleRequest) {
         return nullptr;
     }
@@ -148,7 +155,13 @@ bool ModuleLoader::importModuleDynamically(JSContext* cx,
                                            JS::HandleObject moduleRequest,
                                            JS::HandleObject promise) {
     JS::RootedString baseUrl(cx, JS_NewStringCopyN(cx, _baseUrl.c_str(), _baseUrl.size()));
+    if (!baseUrl) {
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to create baseUrl");
+    }
     JS::RootedObject info(cx, createScriptPrivateInfo(cx, baseUrl));
+    if (!info) {
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to create info");
+    }
     JS::RootedValue newReferencingPrivate(cx, JS::ObjectValue(*info));
 
     // The dynamic `import` method returns a Promise, and thus allows us to perform module loading
@@ -160,15 +173,18 @@ bool ModuleLoader::importModuleDynamically(JSContext* cx,
         JS::Rooted<JSString*> path(cx,
                                    resolveAndNormalize(cx, moduleRequest, newReferencingPrivate));
         if (!path) {
+            LOGV2_ERROR(716284, "Failed to resolve and normalize path");
             return false;
         }
 
         JS::RootedObject module(cx, loadAndParse(cx, path, newReferencingPrivate));
         if (!module) {
+            LOGV2_ERROR(716285, "Failed to load and parse module");
             return false;
         }
 
         if (!JS::ModuleLink(cx, module)) {
+            LOGV2_ERROR(716286, "Failed to link module");
             return false;
         }
 
@@ -177,6 +193,10 @@ bool ModuleLoader::importModuleDynamically(JSContext* cx,
 
     JSObject* evaluationObject = ok ? &rval.toObject() : nullptr;
     JS::RootedObject evaluationPromise(cx, evaluationObject);
+    if (!evaluationPromise) {
+        LOGV2_ERROR(716287, "Failed to create evaluation promise");
+        return false;
+    }
     return JS::FinishDynamicModuleImport(
         cx, evaluationPromise, newReferencingPrivate, moduleRequest, promise);
 }
@@ -239,8 +259,18 @@ JSString* ModuleLoader::resolveAndNormalize(JSContext* cx,
         return nullptr;
     }
 
-    boost::filesystem::path specifierPath(JS_EncodeStringToUTF8(cx, specifierString).get());
-    auto refAbsPath = boost::filesystem::path(JS_EncodeStringToUTF8(cx, refPath).get());
+    JS::UniqueChars specifierChars = JS_EncodeStringToUTF8(cx, specifierString);
+    uassert(ErrorCodes::JSInterpreterFailure,
+            "Failed to UTF-8 encode module specifier",
+            specifierChars);
+    boost::filesystem::path specifierPath(specifierChars.get());
+
+    JS::UniqueChars refPathChars = JS_EncodeStringToUTF8(cx, refPath);
+    uassert(ErrorCodes::JSInterpreterFailure,
+            "Failed to UTF-8 encode referencing module path",
+            refPathChars);
+    boost::filesystem::path refAbsPath(refPathChars.get());
+
     if (is_directory(specifierPath)) {
         JS_ReportErrorUTF8(cx,
                            "Directory import '%s' is not supported, imported from %s",
@@ -513,10 +543,19 @@ JSObject* ModuleLoader::createScriptPrivateInfo(JSContext* cx,
             JS::LossyUTF8CharsToNewTwoByteCharsZ(
                 cx, JS::UTF8Chars(source->data(), len), &len, js::MallocArena)
                 .get());
+        if (!ucbuf) {
+            uasserted(ErrorCodes::JSInterpreterFailure, "Failed to create ucbuf");
+        }
 
         JS::RootedString sourceValue(cx, JS_NewUCStringCopyN(cx, ucbuf.get(), len));
+
+        if (!sourceValue) {
+            uasserted(ErrorCodes::JSInterpreterFailure, "Failed to create sourceValue");
+        }
+
+
         if (!JS_DefineProperty(cx, info, "source", sourceValue, JSPROP_ENUMERATE)) {
-            return nullptr;
+            uasserted(ErrorCodes::JSInterpreterFailure, "Failed to create source property");
         }
     }
 
@@ -575,7 +614,11 @@ std::string ModuleLoader::resolveBaseUrl(JSContext* cx, const std::string& loadP
             }
 
             JS::RootedString baseUrlString(cx, baseUrlValue.toString());
-            auto baseUrl = std::string{JS_EncodeStringToUTF8(cx, baseUrlString).get()};
+            JS::UniqueChars baseUrlChars = JS_EncodeStringToUTF8(cx, baseUrlString);
+            uassert(ErrorCodes::JSInterpreterFailure,
+                    "Failed to UTF-8 encode baseUrl from jsconfig.json",
+                    baseUrlChars);  // returns nullptr on OOM/encoding errors
+            std::string baseUrl{baseUrlChars.get()};
 
             boost::system::error_code ec;
             auto resolvedPath =

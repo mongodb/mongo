@@ -21,7 +21,11 @@
     Args_Double_None = detail::MakeABIFunctionType(ABIType::Float64, {}),\
     Args_Int_Double = detail::MakeABIFunctionType(ABIType::General, {ABIType::Float64}),\
     Args_Int_Float32 = detail::MakeABIFunctionType(ABIType::General, {ABIType::Float32}),\
+    Args_Int32_Float32 = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::Float32}),\
     Args_Float32_Float32 = detail::MakeABIFunctionType(ABIType::Float32, {ABIType::Float32}),\
+    Args_Float32_Float64 = detail::MakeABIFunctionType(ABIType::Float32, {ABIType::Float64}),\
+    Args_Float32_General = detail::MakeABIFunctionType(ABIType::Float32, {ABIType::General}),\
+    Args_Float32_Int32 = detail::MakeABIFunctionType(ABIType::Float32, {ABIType::Int32}),\
     Args_Float32_IntInt = detail::MakeABIFunctionType(ABIType::Float32, {ABIType::General, ABIType::General}),\
     Args_Double_Double = detail::MakeABIFunctionType(ABIType::Float64, {ABIType::Float64}),\
     Args_Double_Int = detail::MakeABIFunctionType(ABIType::Float64, {ABIType::General}),\
@@ -41,16 +45,21 @@
     Args_General_GeneralInt32 = detail::MakeABIFunctionType(ABIType::General, {ABIType::General, ABIType::Int32}),\
     Args_General_GeneralInt32General = detail::MakeABIFunctionType(ABIType::General, {ABIType::General, ABIType::Int32, ABIType::General}),\
     Args_General_GeneralInt32Int32 = detail::MakeABIFunctionType(ABIType::General, {ABIType::General, ABIType::Int32, ABIType::Int32}),\
+    Args_General_GeneralInt32Int32General = detail::MakeABIFunctionType(ABIType::General, {ABIType::General, ABIType::Int32, ABIType::Int32, ABIType::General}),\
     Args_General_GeneralInt32Int32GeneralInt32 = detail::MakeABIFunctionType(ABIType::General, {ABIType::General, ABIType::Int32, ABIType::Int32, ABIType::General, ABIType::Int32}),\
+    Args_General_GeneralInt32Int32Int32GeneralInt32 = detail::MakeABIFunctionType(ABIType::General, {ABIType::General, ABIType::Int32, ABIType::Int32, ABIType::Int32, ABIType::General, ABIType::Int32}),\
     Args_General_GeneralGeneralInt32Int32 = detail::MakeABIFunctionType(ABIType::General, {ABIType::General, ABIType::General, ABIType::Int32, ABIType::Int32}),\
     Args_Int32_General = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General}),\
     Args_Int32_GeneralGeneral = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General, ABIType::General}),\
     Args_Int32_GeneralGeneralGeneral = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General, ABIType::General, ABIType::General}),\
+    Args_Int32_GeneralGeneralGeneralGeneral = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General, ABIType::General, ABIType::General, ABIType::General}),\
     Args_Int32_GeneralGeneralGeneralInt32 = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General, ABIType::General, ABIType::General, ABIType::Int32}),\
     Args_Int32_GeneralGeneralInt32 = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General, ABIType::General, ABIType::Int32}),\
     Args_Int32_GeneralGeneralInt32General = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General, ABIType::General, ABIType::Int32, ABIType::General}),\
     Args_Int32_GeneralGeneralInt32GeneralInt32Int32Int32 = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General, ABIType::General, ABIType::Int32, ABIType::General, ABIType::Int32, ABIType::Int32, ABIType::Int32}),\
     Args_Int32_GeneralGeneralInt32Int32 = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General, ABIType::General, ABIType::Int32, ABIType::Int32}),\
+    Args_Int32_GeneralGeneralInt32Int32Int32Int32 = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General, ABIType::General, ABIType::Int32, ABIType::Int32, ABIType::Int32, ABIType::Int32}),\
+    Args_Int32_GeneralGeneralInt32Int32Int32Int32Int32 = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General, ABIType::General, ABIType::Int32, ABIType::Int32, ABIType::Int32, ABIType::Int32, ABIType::Int32}),\
     Args_Int32_GeneralGeneralInt32Int32Int32GeneralInt32 = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General, ABIType::General, ABIType::Int32, ABIType::Int32, ABIType::Int32, ABIType::General, ABIType::Int32}),\
     Args_Int32_GeneralInt32 = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General, ABIType::Int32}),\
     Args_Int32_GeneralInt32Float32Float32Float32Float32Int32Int32Int32Int32General = detail::MakeABIFunctionType(ABIType::Int32, {ABIType::General, ABIType::Int32, ABIType::Float32, ABIType::Float32, ABIType::Float32, ABIType::Float32, ABIType::Int32, ABIType::Int32, ABIType::Int32, ABIType::Int32, ABIType::General}),\
@@ -84,6 +93,8 @@
     Args_Int64_GeneralInt32 = detail::MakeABIFunctionType(ABIType::Int64, {ABIType::General, ABIType::Int32}),\
     Args_Int64_GeneralInt64 = detail::MakeABIFunctionType(ABIType::Int64, {ABIType::General, ABIType::Int64}),\
     Args_Int64_GeneralInt64Int32 = detail::MakeABIFunctionType(ABIType::Int64, {ABIType::General, ABIType::Int64, ABIType::Int32}),\
+    Args_Void_GeneralInt32GeneralInt32Int32 = detail::MakeABIFunctionType(ABIType::Void, {ABIType::General, ABIType::Int32, ABIType::General, ABIType::Int32, ABIType::Int32}),\
+    Args_Void_GeneralInt32GeneralInt32Int32Int32 = detail::MakeABIFunctionType(ABIType::Void, {ABIType::General, ABIType::Int32, ABIType::General, ABIType::Int32, ABIType::Int32, ABIType::Int32}),\
 
 #define ABI_FUNCTION_TYPE_SIM_PROTOTYPES \
     typedef intptr_t (*Prototype_General0)();\
@@ -99,7 +110,11 @@
     typedef double (*Prototype_Double_None)();\
     typedef intptr_t (*Prototype_Int_Double)(double);\
     typedef intptr_t (*Prototype_Int_Float32)(float);\
+    typedef int32_t (*Prototype_Int32_Float32)(float);\
     typedef float (*Prototype_Float32_Float32)(float);\
+    typedef float (*Prototype_Float32_Float64)(double);\
+    typedef float (*Prototype_Float32_General)(intptr_t);\
+    typedef float (*Prototype_Float32_Int32)(int32_t);\
     typedef float (*Prototype_Float32_IntInt)(intptr_t, intptr_t);\
     typedef double (*Prototype_Double_Double)(double);\
     typedef double (*Prototype_Double_Int)(intptr_t);\
@@ -119,16 +134,21 @@
     typedef intptr_t (*Prototype_General_GeneralInt32)(intptr_t, int32_t);\
     typedef intptr_t (*Prototype_General_GeneralInt32General)(intptr_t, int32_t, intptr_t);\
     typedef intptr_t (*Prototype_General_GeneralInt32Int32)(intptr_t, int32_t, int32_t);\
+    typedef intptr_t (*Prototype_General_GeneralInt32Int32General)(intptr_t, int32_t, int32_t, intptr_t);\
     typedef intptr_t (*Prototype_General_GeneralInt32Int32GeneralInt32)(intptr_t, int32_t, int32_t, intptr_t, int32_t);\
+    typedef intptr_t (*Prototype_General_GeneralInt32Int32Int32GeneralInt32)(intptr_t, int32_t, int32_t, int32_t, intptr_t, int32_t);\
     typedef intptr_t (*Prototype_General_GeneralGeneralInt32Int32)(intptr_t, intptr_t, int32_t, int32_t);\
     typedef int32_t (*Prototype_Int32_General)(intptr_t);\
     typedef int32_t (*Prototype_Int32_GeneralGeneral)(intptr_t, intptr_t);\
     typedef int32_t (*Prototype_Int32_GeneralGeneralGeneral)(intptr_t, intptr_t, intptr_t);\
+    typedef int32_t (*Prototype_Int32_GeneralGeneralGeneralGeneral)(intptr_t, intptr_t, intptr_t, intptr_t);\
     typedef int32_t (*Prototype_Int32_GeneralGeneralGeneralInt32)(intptr_t, intptr_t, intptr_t, int32_t);\
     typedef int32_t (*Prototype_Int32_GeneralGeneralInt32)(intptr_t, intptr_t, int32_t);\
     typedef int32_t (*Prototype_Int32_GeneralGeneralInt32General)(intptr_t, intptr_t, int32_t, intptr_t);\
     typedef int32_t (*Prototype_Int32_GeneralGeneralInt32GeneralInt32Int32Int32)(intptr_t, intptr_t, int32_t, intptr_t, int32_t, int32_t, int32_t);\
     typedef int32_t (*Prototype_Int32_GeneralGeneralInt32Int32)(intptr_t, intptr_t, int32_t, int32_t);\
+    typedef int32_t (*Prototype_Int32_GeneralGeneralInt32Int32Int32Int32)(intptr_t, intptr_t, int32_t, int32_t, int32_t, int32_t);\
+    typedef int32_t (*Prototype_Int32_GeneralGeneralInt32Int32Int32Int32Int32)(intptr_t, intptr_t, int32_t, int32_t, int32_t, int32_t, int32_t);\
     typedef int32_t (*Prototype_Int32_GeneralGeneralInt32Int32Int32GeneralInt32)(intptr_t, intptr_t, int32_t, int32_t, int32_t, intptr_t, int32_t);\
     typedef int32_t (*Prototype_Int32_GeneralInt32)(intptr_t, int32_t);\
     typedef int32_t (*Prototype_Int32_GeneralInt32Float32Float32Float32Float32Int32Int32Int32Int32General)(intptr_t, int32_t, float, float, float, float, int32_t, int32_t, int32_t, int32_t, intptr_t);\
@@ -162,6 +182,8 @@
     typedef int64_t (*Prototype_Int64_GeneralInt32)(intptr_t, int32_t);\
     typedef int64_t (*Prototype_Int64_GeneralInt64)(intptr_t, int64_t);\
     typedef int64_t (*Prototype_Int64_GeneralInt64Int32)(intptr_t, int64_t, int32_t);\
+    typedef void (*Prototype_Void_GeneralInt32GeneralInt32Int32)(intptr_t, int32_t, intptr_t, int32_t, int32_t);\
+    typedef void (*Prototype_Void_GeneralInt32GeneralInt32Int32Int32)(intptr_t, int32_t, intptr_t, int32_t, int32_t, int32_t);\
 
 #define ABI_FUNCTION_TYPE_ARM64_SIM_DISPATCH \
 case js::jit::Args_General0: {\
@@ -242,9 +264,33 @@ case js::jit::Args_Int_Float32: {\
   setGPR64Result(ret);\
   break;\
 }\
+case js::jit::Args_Int32_Float32: {\
+  auto target = reinterpret_cast<Prototype_Int32_Float32>(nativeFn);\
+  auto ret = target(s0);\
+  setGPR32Result(ret);\
+  break;\
+}\
 case js::jit::Args_Float32_Float32: {\
   auto target = reinterpret_cast<Prototype_Float32_Float32>(nativeFn);\
   auto ret = target(s0);\
+  setFP32Result(ret);\
+  break;\
+}\
+case js::jit::Args_Float32_Float64: {\
+  auto target = reinterpret_cast<Prototype_Float32_Float64>(nativeFn);\
+  auto ret = target(d0);\
+  setFP32Result(ret);\
+  break;\
+}\
+case js::jit::Args_Float32_General: {\
+  auto target = reinterpret_cast<Prototype_Float32_General>(nativeFn);\
+  auto ret = target(x0);\
+  setFP32Result(ret);\
+  break;\
+}\
+case js::jit::Args_Float32_Int32: {\
+  auto target = reinterpret_cast<Prototype_Float32_Int32>(nativeFn);\
+  auto ret = target(x0);\
   setFP32Result(ret);\
   break;\
 }\
@@ -362,9 +408,21 @@ case js::jit::Args_General_GeneralInt32Int32: {\
   setGPR64Result(ret);\
   break;\
 }\
+case js::jit::Args_General_GeneralInt32Int32General: {\
+  auto target = reinterpret_cast<Prototype_General_GeneralInt32Int32General>(nativeFn);\
+  auto ret = target(x0, x1, x2, x3);\
+  setGPR64Result(ret);\
+  break;\
+}\
 case js::jit::Args_General_GeneralInt32Int32GeneralInt32: {\
   auto target = reinterpret_cast<Prototype_General_GeneralInt32Int32GeneralInt32>(nativeFn);\
   auto ret = target(x0, x1, x2, x3, x4);\
+  setGPR64Result(ret);\
+  break;\
+}\
+case js::jit::Args_General_GeneralInt32Int32Int32GeneralInt32: {\
+  auto target = reinterpret_cast<Prototype_General_GeneralInt32Int32Int32GeneralInt32>(nativeFn);\
+  auto ret = target(x0, x1, x2, x3, x4, x5);\
   setGPR64Result(ret);\
   break;\
 }\
@@ -389,6 +447,12 @@ case js::jit::Args_Int32_GeneralGeneral: {\
 case js::jit::Args_Int32_GeneralGeneralGeneral: {\
   auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralGeneral>(nativeFn);\
   auto ret = target(x0, x1, x2);\
+  setGPR32Result(ret);\
+  break;\
+}\
+case js::jit::Args_Int32_GeneralGeneralGeneralGeneral: {\
+  auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralGeneralGeneral>(nativeFn);\
+  auto ret = target(x0, x1, x2, x3);\
   setGPR32Result(ret);\
   break;\
 }\
@@ -419,6 +483,18 @@ case js::jit::Args_Int32_GeneralGeneralInt32GeneralInt32Int32Int32: {\
 case js::jit::Args_Int32_GeneralGeneralInt32Int32: {\
   auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralInt32Int32>(nativeFn);\
   auto ret = target(x0, x1, x2, x3);\
+  setGPR32Result(ret);\
+  break;\
+}\
+case js::jit::Args_Int32_GeneralGeneralInt32Int32Int32Int32: {\
+  auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralInt32Int32Int32Int32>(nativeFn);\
+  auto ret = target(x0, x1, x2, x3, x4, x5);\
+  setGPR32Result(ret);\
+  break;\
+}\
+case js::jit::Args_Int32_GeneralGeneralInt32Int32Int32Int32Int32: {\
+  auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralInt32Int32Int32Int32Int32>(nativeFn);\
+  auto ret = target(x0, x1, x2, x3, x4, x5, x6);\
   setGPR32Result(ret);\
   break;\
 }\
@@ -620,6 +696,16 @@ case js::jit::Args_Int64_GeneralInt64Int32: {\
   setGPR64Result(ret);\
   break;\
 }\
+case js::jit::Args_Void_GeneralInt32GeneralInt32Int32: {\
+  auto target = reinterpret_cast<Prototype_Void_GeneralInt32GeneralInt32Int32>(nativeFn);\
+  target(x0, x1, x2, x3, x4);\
+  break;\
+}\
+case js::jit::Args_Void_GeneralInt32GeneralInt32Int32Int32: {\
+  auto target = reinterpret_cast<Prototype_Void_GeneralInt32GeneralInt32Int32Int32>(nativeFn);\
+  target(x0, x1, x2, x3, x4, x5);\
+  break;\
+}\
 
 #define ABI_FUNCTION_TYPE_ARM32_SIM_DISPATCH \
 case js::jit::Args_General0: {\
@@ -697,7 +783,7 @@ case js::jit::Args_General8: {\
 case js::jit::Args_Int64_Double: {\
   auto target = reinterpret_cast<Prototype_Int64_Double>(external);\
   int64_t ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(d0);\
   } else {\
     ret = target(mozilla::BitwiseCast<double>(MakeInt64(a0, a1)));\
@@ -717,7 +803,7 @@ case js::jit::Args_Double_None: {\
 case js::jit::Args_Int_Double: {\
   auto target = reinterpret_cast<Prototype_Int_Double>(external);\
   intptr_t ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(d0);\
   } else {\
     ret = target(mozilla::BitwiseCast<double>(MakeInt64(a0, a1)));\
@@ -729,7 +815,19 @@ case js::jit::Args_Int_Double: {\
 case js::jit::Args_Int_Float32: {\
   auto target = reinterpret_cast<Prototype_Int_Float32>(external);\
   intptr_t ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
+    ret = target(s0);\
+  } else {\
+    ret = target(mozilla::BitwiseCast<float>(a0));\
+  }\
+  scratchVolatileRegisters((void*)target);\
+  setCallResult(ret);\
+  break;\
+}\
+case js::jit::Args_Int32_Float32: {\
+  auto target = reinterpret_cast<Prototype_Int32_Float32>(external);\
+  int32_t ret;\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(s0);\
   } else {\
     ret = target(mozilla::BitwiseCast<float>(a0));\
@@ -741,11 +839,39 @@ case js::jit::Args_Int_Float32: {\
 case js::jit::Args_Float32_Float32: {\
   auto target = reinterpret_cast<Prototype_Float32_Float32>(external);\
   float ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(s0);\
   } else {\
     ret = target(mozilla::BitwiseCast<float>(a0));\
   }\
+  scratchVolatileRegisters((void*)target);\
+  setCallResultFloat(ret);\
+  break;\
+}\
+case js::jit::Args_Float32_Float64: {\
+  auto target = reinterpret_cast<Prototype_Float32_Float64>(external);\
+  float ret;\
+  if (ARMFlags::UseHardFpABI()) {\
+    ret = target(d0);\
+  } else {\
+    ret = target(mozilla::BitwiseCast<double>(MakeInt64(a0, a1)));\
+  }\
+  scratchVolatileRegisters((void*)target);\
+  setCallResultFloat(ret);\
+  break;\
+}\
+case js::jit::Args_Float32_General: {\
+  auto target = reinterpret_cast<Prototype_Float32_General>(external);\
+  float ret;\
+  ret = target(a0);\
+  scratchVolatileRegisters((void*)target);\
+  setCallResultFloat(ret);\
+  break;\
+}\
+case js::jit::Args_Float32_Int32: {\
+  auto target = reinterpret_cast<Prototype_Float32_Int32>(external);\
+  float ret;\
+  ret = target(a0);\
   scratchVolatileRegisters((void*)target);\
   setCallResultFloat(ret);\
   break;\
@@ -761,7 +887,7 @@ case js::jit::Args_Float32_IntInt: {\
 case js::jit::Args_Double_Double: {\
   auto target = reinterpret_cast<Prototype_Double_Double>(external);\
   double ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(d0);\
   } else {\
     ret = target(mozilla::BitwiseCast<double>(MakeInt64(a0, a1)));\
@@ -789,7 +915,7 @@ case js::jit::Args_Double_IntInt: {\
 case js::jit::Args_Double_DoubleInt: {\
   auto target = reinterpret_cast<Prototype_Double_DoubleInt>(external);\
   double ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(d0, a0);\
   } else {\
     ret = target(mozilla::BitwiseCast<double>(MakeInt64(a0, a1)), a2);\
@@ -801,7 +927,7 @@ case js::jit::Args_Double_DoubleInt: {\
 case js::jit::Args_Double_DoubleDouble: {\
   auto target = reinterpret_cast<Prototype_Double_DoubleDouble>(external);\
   double ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(d0, d1);\
   } else {\
     ret = target(mozilla::BitwiseCast<double>(MakeInt64(a0, a1)), mozilla::BitwiseCast<double>(MakeInt64(a2, a3)));\
@@ -813,7 +939,7 @@ case js::jit::Args_Double_DoubleDouble: {\
 case js::jit::Args_Float32_Float32Float32: {\
   auto target = reinterpret_cast<Prototype_Float32_Float32Float32>(external);\
   float ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(s0, s1);\
   } else {\
     ret = target(mozilla::BitwiseCast<float>(a0), mozilla::BitwiseCast<float>(a1));\
@@ -825,7 +951,7 @@ case js::jit::Args_Float32_Float32Float32: {\
 case js::jit::Args_Double_IntDouble: {\
   auto target = reinterpret_cast<Prototype_Double_IntDouble>(external);\
   double ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(a0, d0);\
   } else {\
     ret = target(a0, mozilla::BitwiseCast<double>(MakeInt64(a2, a3)));\
@@ -837,7 +963,7 @@ case js::jit::Args_Double_IntDouble: {\
 case js::jit::Args_Int_IntDouble: {\
   auto target = reinterpret_cast<Prototype_Int_IntDouble>(external);\
   intptr_t ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(a0, d0);\
   } else {\
     ret = target(a0, mozilla::BitwiseCast<double>(MakeInt64(a2, a3)));\
@@ -849,7 +975,7 @@ case js::jit::Args_Int_IntDouble: {\
 case js::jit::Args_Int_DoubleInt: {\
   auto target = reinterpret_cast<Prototype_Int_DoubleInt>(external);\
   intptr_t ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(d0, a0);\
   } else {\
     ret = target(mozilla::BitwiseCast<double>(MakeInt64(a0, a1)), a2);\
@@ -861,7 +987,7 @@ case js::jit::Args_Int_DoubleInt: {\
 case js::jit::Args_Double_DoubleDoubleDouble: {\
   auto target = reinterpret_cast<Prototype_Double_DoubleDoubleDouble>(external);\
   double ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(d0, d1, d2);\
   } else {\
     ret = target(mozilla::BitwiseCast<double>(MakeInt64(a0, a1)), mozilla::BitwiseCast<double>(MakeInt64(a2, a3)), mozilla::BitwiseCast<double>(MakeInt64(stack_pointer[0], stack_pointer[1])));\
@@ -873,7 +999,7 @@ case js::jit::Args_Double_DoubleDoubleDouble: {\
 case js::jit::Args_Double_DoubleDoubleDoubleDouble: {\
   auto target = reinterpret_cast<Prototype_Double_DoubleDoubleDoubleDouble>(external);\
   double ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(d0, d1, d2, d3);\
   } else {\
     ret = target(mozilla::BitwiseCast<double>(MakeInt64(a0, a1)), mozilla::BitwiseCast<double>(MakeInt64(a2, a3)), mozilla::BitwiseCast<double>(MakeInt64(stack_pointer[0], stack_pointer[1])), mozilla::BitwiseCast<double>(MakeInt64(stack_pointer[2], stack_pointer[3])));\
@@ -885,7 +1011,7 @@ case js::jit::Args_Double_DoubleDoubleDoubleDouble: {\
 case js::jit::Args_Int_DoubleIntInt: {\
   auto target = reinterpret_cast<Prototype_Int_DoubleIntInt>(external);\
   intptr_t ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(d0, a0, a1);\
   } else {\
     ret = target(mozilla::BitwiseCast<double>(MakeInt64(a0, a1)), a2, a3);\
@@ -897,7 +1023,7 @@ case js::jit::Args_Int_DoubleIntInt: {\
 case js::jit::Args_Int_IntDoubleIntInt: {\
   auto target = reinterpret_cast<Prototype_Int_IntDoubleIntInt>(external);\
   intptr_t ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(a0, d0, a1, a2);\
   } else {\
     ret = target(a0, mozilla::BitwiseCast<double>(MakeInt64(a2, a3)), stack_pointer[0], stack_pointer[1]);\
@@ -946,10 +1072,26 @@ case js::jit::Args_General_GeneralInt32Int32: {\
   setCallResult(ret);\
   break;\
 }\
+case js::jit::Args_General_GeneralInt32Int32General: {\
+  auto target = reinterpret_cast<Prototype_General_GeneralInt32Int32General>(external);\
+  intptr_t ret;\
+  ret = target(a0, a1, a2, a3);\
+  scratchVolatileRegisters((void*)target);\
+  setCallResult(ret);\
+  break;\
+}\
 case js::jit::Args_General_GeneralInt32Int32GeneralInt32: {\
   auto target = reinterpret_cast<Prototype_General_GeneralInt32Int32GeneralInt32>(external);\
   intptr_t ret;\
   ret = target(a0, a1, a2, a3, stack_pointer[0]);\
+  scratchVolatileRegisters((void*)target);\
+  setCallResult(ret);\
+  break;\
+}\
+case js::jit::Args_General_GeneralInt32Int32Int32GeneralInt32: {\
+  auto target = reinterpret_cast<Prototype_General_GeneralInt32Int32Int32GeneralInt32>(external);\
+  intptr_t ret;\
+  ret = target(a0, a1, a2, a3, stack_pointer[0], stack_pointer[1]);\
   scratchVolatileRegisters((void*)target);\
   setCallResult(ret);\
   break;\
@@ -982,6 +1124,14 @@ case js::jit::Args_Int32_GeneralGeneralGeneral: {\
   auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralGeneral>(external);\
   int32_t ret;\
   ret = target(a0, a1, a2);\
+  scratchVolatileRegisters((void*)target);\
+  setCallResult(ret);\
+  break;\
+}\
+case js::jit::Args_Int32_GeneralGeneralGeneralGeneral: {\
+  auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralGeneralGeneral>(external);\
+  int32_t ret;\
+  ret = target(a0, a1, a2, a3);\
   scratchVolatileRegisters((void*)target);\
   setCallResult(ret);\
   break;\
@@ -1026,6 +1176,22 @@ case js::jit::Args_Int32_GeneralGeneralInt32Int32: {\
   setCallResult(ret);\
   break;\
 }\
+case js::jit::Args_Int32_GeneralGeneralInt32Int32Int32Int32: {\
+  auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralInt32Int32Int32Int32>(external);\
+  int32_t ret;\
+  ret = target(a0, a1, a2, a3, stack_pointer[0], stack_pointer[1]);\
+  scratchVolatileRegisters((void*)target);\
+  setCallResult(ret);\
+  break;\
+}\
+case js::jit::Args_Int32_GeneralGeneralInt32Int32Int32Int32Int32: {\
+  auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralInt32Int32Int32Int32Int32>(external);\
+  int32_t ret;\
+  ret = target(a0, a1, a2, a3, stack_pointer[0], stack_pointer[1], stack_pointer[2]);\
+  scratchVolatileRegisters((void*)target);\
+  setCallResult(ret);\
+  break;\
+}\
 case js::jit::Args_Int32_GeneralGeneralInt32Int32Int32GeneralInt32: {\
   auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralInt32Int32Int32GeneralInt32>(external);\
   int32_t ret;\
@@ -1045,7 +1211,7 @@ case js::jit::Args_Int32_GeneralInt32: {\
 case js::jit::Args_Int32_GeneralInt32Float32Float32Float32Float32Int32Int32Int32Int32General: {\
   auto target = reinterpret_cast<Prototype_Int32_GeneralInt32Float32Float32Float32Float32Int32Int32Int32Int32General>(external);\
   int32_t ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(a0, a1, s0, s1, s2, s3, a2, a3, stack_pointer[0], stack_pointer[1], stack_pointer[2]);\
   } else {\
     ret = target(a0, a1, mozilla::BitwiseCast<float>(a2), mozilla::BitwiseCast<float>(a3), mozilla::BitwiseCast<float>(stack_pointer[0]), mozilla::BitwiseCast<float>(stack_pointer[1]), stack_pointer[2], stack_pointer[3], stack_pointer[4], stack_pointer[5], stack_pointer[6]);\
@@ -1057,7 +1223,7 @@ case js::jit::Args_Int32_GeneralInt32Float32Float32Float32Float32Int32Int32Int32
 case js::jit::Args_Int32_GeneralInt32Float32Float32Int32Float32Float32Int32Float32Int32Int32Int32Int32General: {\
   auto target = reinterpret_cast<Prototype_Int32_GeneralInt32Float32Float32Int32Float32Float32Int32Float32Int32Int32Int32Int32General>(external);\
   int32_t ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(a0, a1, s0, s1, a2, s2, s3, a3, s4, stack_pointer[0], stack_pointer[1], stack_pointer[2], stack_pointer[3], stack_pointer[4]);\
   } else {\
     ret = target(a0, a1, mozilla::BitwiseCast<float>(a2), mozilla::BitwiseCast<float>(a3), stack_pointer[0], mozilla::BitwiseCast<float>(stack_pointer[1]), mozilla::BitwiseCast<float>(stack_pointer[2]), stack_pointer[3], mozilla::BitwiseCast<float>(stack_pointer[4]), stack_pointer[5], stack_pointer[6], stack_pointer[7], stack_pointer[8], stack_pointer[9]);\
@@ -1069,7 +1235,7 @@ case js::jit::Args_Int32_GeneralInt32Float32Float32Int32Float32Float32Int32Float
 case js::jit::Args_Int32_GeneralInt32Float32Float32Int32Int32Int32General: {\
   auto target = reinterpret_cast<Prototype_Int32_GeneralInt32Float32Float32Int32Int32Int32General>(external);\
   int32_t ret;\
-  if (UseHardFpABI()) {\
+  if (ARMFlags::UseHardFpABI()) {\
     ret = target(a0, a1, s0, s1, a2, a3, stack_pointer[0], stack_pointer[1]);\
   } else {\
     ret = target(a0, a1, mozilla::BitwiseCast<float>(a2), mozilla::BitwiseCast<float>(a3), stack_pointer[0], stack_pointer[1], stack_pointer[2], stack_pointer[3]);\
@@ -1302,6 +1468,18 @@ case js::jit::Args_Int64_GeneralInt64Int32: {\
   setCallResult(ret);\
   break;\
 }\
+case js::jit::Args_Void_GeneralInt32GeneralInt32Int32: {\
+  auto target = reinterpret_cast<Prototype_Void_GeneralInt32GeneralInt32Int32>(external);\
+  target(a0, a1, a2, a3, stack_pointer[0]);\
+  scratchVolatileRegisters((void*)target);\
+  break;\
+}\
+case js::jit::Args_Void_GeneralInt32GeneralInt32Int32Int32: {\
+  auto target = reinterpret_cast<Prototype_Void_GeneralInt32GeneralInt32Int32Int32>(external);\
+  target(a0, a1, a2, a3, stack_pointer[0], stack_pointer[1]);\
+  scratchVolatileRegisters((void*)target);\
+  break;\
+}\
 
 #define ABI_FUNCTION_TYPE_LOONGARCH64_SIM_DISPATCH \
 case js::jit::Args_General0: {\
@@ -1382,9 +1560,33 @@ case js::jit::Args_Int_Float32: {\
   setCallResult(ret);\
   break;\
 }\
+case js::jit::Args_Int32_Float32: {\
+  auto target = reinterpret_cast<Prototype_Int32_Float32>(nativeFn);\
+  auto ret = target(f0_s);\
+  setCallResult(I64(ret));\
+  break;\
+}\
 case js::jit::Args_Float32_Float32: {\
   auto target = reinterpret_cast<Prototype_Float32_Float32>(nativeFn);\
   auto ret = target(f0_s);\
+  setCallResultFloat(ret);\
+  break;\
+}\
+case js::jit::Args_Float32_Float64: {\
+  auto target = reinterpret_cast<Prototype_Float32_Float64>(nativeFn);\
+  auto ret = target(f0_d);\
+  setCallResultFloat(ret);\
+  break;\
+}\
+case js::jit::Args_Float32_General: {\
+  auto target = reinterpret_cast<Prototype_Float32_General>(nativeFn);\
+  auto ret = target(a0_);\
+  setCallResultFloat(ret);\
+  break;\
+}\
+case js::jit::Args_Float32_Int32: {\
+  auto target = reinterpret_cast<Prototype_Float32_Int32>(nativeFn);\
+  auto ret = target(I32(a0_));\
   setCallResultFloat(ret);\
   break;\
 }\
@@ -1502,9 +1704,21 @@ case js::jit::Args_General_GeneralInt32Int32: {\
   setCallResult(ret);\
   break;\
 }\
+case js::jit::Args_General_GeneralInt32Int32General: {\
+  auto target = reinterpret_cast<Prototype_General_GeneralInt32Int32General>(nativeFn);\
+  auto ret = target(a0_, I32(a1_), I32(a2_), a3_);\
+  setCallResult(ret);\
+  break;\
+}\
 case js::jit::Args_General_GeneralInt32Int32GeneralInt32: {\
   auto target = reinterpret_cast<Prototype_General_GeneralInt32Int32GeneralInt32>(nativeFn);\
   auto ret = target(a0_, I32(a1_), I32(a2_), a3_, I32(a4_));\
+  setCallResult(ret);\
+  break;\
+}\
+case js::jit::Args_General_GeneralInt32Int32Int32GeneralInt32: {\
+  auto target = reinterpret_cast<Prototype_General_GeneralInt32Int32Int32GeneralInt32>(nativeFn);\
+  auto ret = target(a0_, I32(a1_), I32(a2_), I32(a3_), a4_, I32(a5_));\
   setCallResult(ret);\
   break;\
 }\
@@ -1529,6 +1743,12 @@ case js::jit::Args_Int32_GeneralGeneral: {\
 case js::jit::Args_Int32_GeneralGeneralGeneral: {\
   auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralGeneral>(nativeFn);\
   auto ret = target(a0_, a1_, a2_);\
+  setCallResult(I64(ret));\
+  break;\
+}\
+case js::jit::Args_Int32_GeneralGeneralGeneralGeneral: {\
+  auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralGeneralGeneral>(nativeFn);\
+  auto ret = target(a0_, a1_, a2_, a3_);\
   setCallResult(I64(ret));\
   break;\
 }\
@@ -1559,6 +1779,18 @@ case js::jit::Args_Int32_GeneralGeneralInt32GeneralInt32Int32Int32: {\
 case js::jit::Args_Int32_GeneralGeneralInt32Int32: {\
   auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralInt32Int32>(nativeFn);\
   auto ret = target(a0_, a1_, I32(a2_), I32(a3_));\
+  setCallResult(I64(ret));\
+  break;\
+}\
+case js::jit::Args_Int32_GeneralGeneralInt32Int32Int32Int32: {\
+  auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralInt32Int32Int32Int32>(nativeFn);\
+  auto ret = target(a0_, a1_, I32(a2_), I32(a3_), I32(a4_), I32(a5_));\
+  setCallResult(I64(ret));\
+  break;\
+}\
+case js::jit::Args_Int32_GeneralGeneralInt32Int32Int32Int32Int32: {\
+  auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralInt32Int32Int32Int32Int32>(nativeFn);\
+  auto ret = target(a0_, a1_, I32(a2_), I32(a3_), I32(a4_), I32(a5_), I32(a6_));\
   setCallResult(I64(ret));\
   break;\
 }\
@@ -1760,6 +1992,16 @@ case js::jit::Args_Int64_GeneralInt64Int32: {\
   setCallResult(ret);\
   break;\
 }\
+case js::jit::Args_Void_GeneralInt32GeneralInt32Int32: {\
+  auto target = reinterpret_cast<Prototype_Void_GeneralInt32GeneralInt32Int32>(nativeFn);\
+  target(a0_, I32(a1_), a2_, I32(a3_), I32(a4_));\
+  break;\
+}\
+case js::jit::Args_Void_GeneralInt32GeneralInt32Int32Int32: {\
+  auto target = reinterpret_cast<Prototype_Void_GeneralInt32GeneralInt32Int32Int32>(nativeFn);\
+  target(a0_, I32(a1_), a2_, I32(a3_), I32(a4_), I32(a5_));\
+  break;\
+}\
 
 #define ABI_FUNCTION_TYPE_MIPS64_SIM_DISPATCH \
 case js::jit::Args_General0: {\
@@ -1840,9 +2082,33 @@ case js::jit::Args_Int_Float32: {\
   setCallResult(ret);\
   break;\
 }\
+case js::jit::Args_Int32_Float32: {\
+  auto target = reinterpret_cast<Prototype_Int32_Float32>(nativeFn);\
+  auto ret = target(f12_s);\
+  setCallResult(I64(ret));\
+  break;\
+}\
 case js::jit::Args_Float32_Float32: {\
   auto target = reinterpret_cast<Prototype_Float32_Float32>(nativeFn);\
   auto ret = target(f12_s);\
+  setCallResultFloat(ret);\
+  break;\
+}\
+case js::jit::Args_Float32_Float64: {\
+  auto target = reinterpret_cast<Prototype_Float32_Float64>(nativeFn);\
+  auto ret = target(f12_d);\
+  setCallResultFloat(ret);\
+  break;\
+}\
+case js::jit::Args_Float32_General: {\
+  auto target = reinterpret_cast<Prototype_Float32_General>(nativeFn);\
+  auto ret = target(a0_);\
+  setCallResultFloat(ret);\
+  break;\
+}\
+case js::jit::Args_Float32_Int32: {\
+  auto target = reinterpret_cast<Prototype_Float32_Int32>(nativeFn);\
+  auto ret = target(I32(a0_));\
   setCallResultFloat(ret);\
   break;\
 }\
@@ -1960,9 +2226,21 @@ case js::jit::Args_General_GeneralInt32Int32: {\
   setCallResult(ret);\
   break;\
 }\
+case js::jit::Args_General_GeneralInt32Int32General: {\
+  auto target = reinterpret_cast<Prototype_General_GeneralInt32Int32General>(nativeFn);\
+  auto ret = target(a0_, I32(a1_), I32(a2_), a3_);\
+  setCallResult(ret);\
+  break;\
+}\
 case js::jit::Args_General_GeneralInt32Int32GeneralInt32: {\
   auto target = reinterpret_cast<Prototype_General_GeneralInt32Int32GeneralInt32>(nativeFn);\
   auto ret = target(a0_, I32(a1_), I32(a2_), a3_, I32(a4_));\
+  setCallResult(ret);\
+  break;\
+}\
+case js::jit::Args_General_GeneralInt32Int32Int32GeneralInt32: {\
+  auto target = reinterpret_cast<Prototype_General_GeneralInt32Int32Int32GeneralInt32>(nativeFn);\
+  auto ret = target(a0_, I32(a1_), I32(a2_), I32(a3_), a4_, I32(a5_));\
   setCallResult(ret);\
   break;\
 }\
@@ -1987,6 +2265,12 @@ case js::jit::Args_Int32_GeneralGeneral: {\
 case js::jit::Args_Int32_GeneralGeneralGeneral: {\
   auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralGeneral>(nativeFn);\
   auto ret = target(a0_, a1_, a2_);\
+  setCallResult(I64(ret));\
+  break;\
+}\
+case js::jit::Args_Int32_GeneralGeneralGeneralGeneral: {\
+  auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralGeneralGeneral>(nativeFn);\
+  auto ret = target(a0_, a1_, a2_, a3_);\
   setCallResult(I64(ret));\
   break;\
 }\
@@ -2017,6 +2301,18 @@ case js::jit::Args_Int32_GeneralGeneralInt32GeneralInt32Int32Int32: {\
 case js::jit::Args_Int32_GeneralGeneralInt32Int32: {\
   auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralInt32Int32>(nativeFn);\
   auto ret = target(a0_, a1_, I32(a2_), I32(a3_));\
+  setCallResult(I64(ret));\
+  break;\
+}\
+case js::jit::Args_Int32_GeneralGeneralInt32Int32Int32Int32: {\
+  auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralInt32Int32Int32Int32>(nativeFn);\
+  auto ret = target(a0_, a1_, I32(a2_), I32(a3_), I32(a4_), I32(a5_));\
+  setCallResult(I64(ret));\
+  break;\
+}\
+case js::jit::Args_Int32_GeneralGeneralInt32Int32Int32Int32Int32: {\
+  auto target = reinterpret_cast<Prototype_Int32_GeneralGeneralInt32Int32Int32Int32Int32>(nativeFn);\
+  auto ret = target(a0_, a1_, I32(a2_), I32(a3_), I32(a4_), I32(a5_), I32(a6_));\
   setCallResult(I64(ret));\
   break;\
 }\
@@ -2216,6 +2512,16 @@ case js::jit::Args_Int64_GeneralInt64Int32: {\
   auto target = reinterpret_cast<Prototype_Int64_GeneralInt64Int32>(nativeFn);\
   auto ret = target(a0_, a1_, I32(a2_));\
   setCallResult(ret);\
+  break;\
+}\
+case js::jit::Args_Void_GeneralInt32GeneralInt32Int32: {\
+  auto target = reinterpret_cast<Prototype_Void_GeneralInt32GeneralInt32Int32>(nativeFn);\
+  target(a0_, I32(a1_), a2_, I32(a3_), I32(a4_));\
+  break;\
+}\
+case js::jit::Args_Void_GeneralInt32GeneralInt32Int32Int32: {\
+  auto target = reinterpret_cast<Prototype_Void_GeneralInt32GeneralInt32Int32Int32>(nativeFn);\
+  target(a0_, I32(a1_), a2_, I32(a3_), I32(a4_), I32(a5_));\
   break;\
 }\
 

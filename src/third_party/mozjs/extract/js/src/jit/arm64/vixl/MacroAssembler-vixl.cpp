@@ -29,6 +29,8 @@
 #include <ctype.h>
 #include <limits>
 
+#include "jit/RegisterSets.h"
+
 namespace vixl {
 
 MacroAssembler::MacroAssembler()
@@ -1217,15 +1219,37 @@ js::wasm::FaultingCodeOffset MacroAssembler::LoadStoreMacro(
       !IsImmLSUnscaled(offset)) {
     // Immediate offset that can't be encoded using unsigned or unscaled
     // addressing modes.
+    VIXL_ASSERT(addr.regoffset().Is(NoReg));
     UseScratchRegisterScope temps(this);
+    int64_t offset = addr.offset();
+    Register recycle0 = NoReg;
+    Register recycle1 = NoReg;
+    if (!temps.HasAvailableRegister()) {
+      // Recycle the first pair of registers which are not aliasing the operands.
+      js::jit::AllocatableGeneralRegisterSet
+          freeRegs(js::jit::GeneralRegisterSet::Volatile());
+      freeRegs.takeUnchecked(addr.base().asUnsized());
+      freeRegs.takeUnchecked(rt.X().asUnsized());
+      recycle0 = Register(freeRegs.takeFirst(), kXRegSize);
+      recycle1 = Register(freeRegs.takeFirst(), kXRegSize);
+      Push(recycle0, recycle1);
+      temps.Include(recycle0, recycle1);
+      if (addr.base().Is(GetStackPointer64())) {
+        offset += 2 * sizeof(uintptr_t);
+      }
+    }
     Register temp = temps.AcquireSameSizeAs(addr.base());
     VIXL_ASSERT(!temp.Is(rt));
-    VIXL_ASSERT(!temp.Is(addr.base()) && !temp.Is(addr.regoffset()));
-    Mov(temp, addr.offset());
+    VIXL_ASSERT(!temp.Is(addr.base()));
+    Mov(temp, offset);
     {
       js::jit::AutoForbidPoolsAndNops afp(this, 1);
       fco = js::wasm::FaultingCodeOffset(currentOffset());
       LoadStore(rt, MemOperand(addr.base(), temp), op);
+    }
+    if (!recycle0.Is(NoReg)) {
+      temps.Exclude(recycle0, recycle1);
+      Pop(recycle1, recycle0);
     }
   } else if (addr.IsPostIndex() && !IsImmLSUnscaled(offset)) {
     // Post-index beyond unscaled addressing range.
@@ -1908,6 +1932,9 @@ bool UseScratchRegisterScope::IsAvailable(const CPURegister& reg) const {
   return available_->IncludesAliasOf(reg) || availablefp_->IncludesAliasOf(reg);
 }
 
+bool UseScratchRegisterScope::HasAvailableRegister() const {
+  return !available_->IsEmpty();
+}
 
 Register UseScratchRegisterScope::AcquireSameSizeAs(const Register& reg) {
   int code = AcquireNextAvailable(available_).code();

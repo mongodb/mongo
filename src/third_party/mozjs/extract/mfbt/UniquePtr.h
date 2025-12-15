@@ -187,7 +187,7 @@ struct PointerType {
  * |UniquePtr&&| argument.
  */
 template <typename T, class D>
-class UniquePtr {
+class MOZ_GSL_OWNER UniquePtr {
  public:
   typedef T ElementType;
   typedef D DeleterType;
@@ -214,12 +214,13 @@ class UniquePtr {
   /**
    * Construct a UniquePtr containing |aPtr|.
    */
-  explicit UniquePtr(Pointer aPtr) : mTuple(aPtr, DeleterType()) {
+  explicit UniquePtr(Pointer aPtr MOZ_LIFETIME_BOUND)
+      : mTuple(aPtr, DeleterType()) {
     static_assert(!std::is_pointer_v<D>, "must provide a deleter instance");
     static_assert(!std::is_reference_v<D>, "must provide a deleter instance");
   }
 
-  UniquePtr(Pointer aPtr,
+  UniquePtr(Pointer aPtr MOZ_LIFETIME_BOUND,
             std::conditional_t<std::is_reference_v<D>, D, const D&> aD1)
       : mTuple(aPtr, aD1) {}
 
@@ -273,21 +274,21 @@ class UniquePtr {
     return *this;
   }
 
-  std::add_lvalue_reference_t<T> operator*() const {
+  std::add_lvalue_reference_t<T> operator*() const MOZ_LIFETIME_BOUND {
     MOZ_ASSERT(get(), "dereferencing a UniquePtr containing nullptr with *");
     return *get();
   }
-  Pointer operator->() const {
+  Pointer operator->() const MOZ_LIFETIME_BOUND {
     MOZ_ASSERT(get(), "dereferencing a UniquePtr containing nullptr with ->");
     return get();
   }
 
   explicit operator bool() const { return get() != nullptr; }
 
-  Pointer get() const { return ptr(); }
+  Pointer get() const MOZ_LIFETIME_BOUND { return ptr(); }
 
-  DeleterType& get_deleter() { return del(); }
-  const DeleterType& get_deleter() const { return del(); }
+  DeleterType& get_deleter() MOZ_LIFETIME_BOUND { return del(); }
+  const DeleterType& get_deleter() const MOZ_LIFETIME_BOUND { return del(); }
 
   [[nodiscard]] Pointer release() {
     Pointer p = ptr();

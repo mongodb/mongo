@@ -249,7 +249,7 @@ uint32_t js::OneUcs4ToUtf8Char(uint8_t* utf8Buffer, char32_t ucs4Char) {
 }
 
 size_t js::PutEscapedStringImpl(char* buffer, size_t bufferSize,
-                                GenericPrinter* out, JSLinearString* str,
+                                GenericPrinter* out, const JSLinearString* str,
                                 uint32_t quote) {
   size_t len = str->length();
   AutoCheckCannotGC nogc;

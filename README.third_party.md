@@ -50,7 +50,7 @@ a notice will be included in
 | [libunwind]                                          | MIT                                            | 1.8.1                                    |                      | ✗                               |
 | [linenoise]                                          | BSD-2-Clause                                   | 6cdc775807e57b2c3fd64bd207814f8ee1fe35f3 |                      | ✗                               |
 | [MongoDB C Driver]                                   | Apache-2.0                                     | 1.28.1                                   | ✗                    | ✗                               |
-| [Mozilla Firefox ESR]                                | MPL-2.0                                        | 128.11.0esr                              |                      | ✗                               |
+| [Mozilla Firefox ESR]                                | MPL-2.0                                        | 140.3.0esr                               |                      | ✗                               |
 | [MurmurHash3]                                        | Public Domain                                  | a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb |                      | ✗                               |
 | [nlohmann/json]                                      | MIT                                            | 3.11.3                                   | ✗                    |                                 |
 | [node]                                               | ISC                                            | 22.1.0                                   |                      |                                 |

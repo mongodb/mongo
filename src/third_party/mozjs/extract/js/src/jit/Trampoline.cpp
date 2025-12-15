@@ -24,8 +24,12 @@ void JitRuntime::generateExceptionTailStub(MacroAssembler& masm,
 
   exceptionTailOffset_ = startTrampolineCode(masm);
 
+  uint32_t returnValueCheckOffset = 0;
   masm.bind(masm.failureLabel());
-  masm.handleFailureWithHandlerTail(profilerExitTail, bailoutTail);
+  masm.handleFailureWithHandlerTail(profilerExitTail, bailoutTail,
+                                    &returnValueCheckOffset);
+
+  exceptionTailReturnValueCheckOffset_ = returnValueCheckOffset;
 }
 
 void JitRuntime::generateProfilerExitFrameTailStub(MacroAssembler& masm,

@@ -10,6 +10,7 @@
 
 #include "jit/arm64/Assembler-arm64.h"
 #include "jit/Lowering.h"
+#include "jit/MIR-wasm.h"
 #include "jit/MIR.h"
 #include "wasm/WasmFeatures.h"  // for wasm::ReportSimdAnalysis
 
@@ -67,10 +68,10 @@ void LIRGenerator::visitUnbox(MUnbox* unbox) {
   MDefinition* box = unbox->getOperand(0);
   MOZ_ASSERT(box->type() == MIRType::Value);
 
-  LUnboxBase* lir;
+  LInstructionHelper<1, BOX_PIECES, 0>* lir;
   if (IsFloatingPointType(unbox->type())) {
-    lir = new (alloc())
-        LUnboxFloatingPoint(useRegisterAtStart(box), unbox->type());
+    MOZ_ASSERT(unbox->type() == MIRType::Double);
+    lir = new (alloc()) LUnboxFloatingPoint(useBoxAtStart(box));
   } else if (unbox->fallible()) {
     // If the unbox is fallible, load the Value in a register first to
     // avoid multiple loads.
@@ -170,52 +171,32 @@ void LIRGeneratorARM64::lowerForALUInt64(
 
 void LIRGeneratorARM64::lowerForMulInt64(LMulI64* ins, MMul* mir,
                                          MDefinition* lhs, MDefinition* rhs) {
-  ins->setInt64Operand(LMulI64::Lhs, useInt64RegisterAtStart(lhs));
-  ins->setInt64Operand(LMulI64::Rhs, useInt64RegisterOrConstantAtStart(rhs));
+  ins->setLhs(useInt64RegisterAtStart(lhs));
+  ins->setRhs(useInt64RegisterOrConstantAtStart(rhs));
   defineInt64(ins, mir);
 }
 
-template <size_t Temps>
-void LIRGeneratorARM64::lowerForShiftInt64(
-    LInstructionHelper<INT64_PIECES, INT64_PIECES + 1, Temps>* ins,
-    MDefinition* mir, MDefinition* lhs, MDefinition* rhs) {
-  ins->setInt64Operand(0, useInt64RegisterAtStart(lhs));
-
-  static_assert(LShiftI64::Rhs == INT64_PIECES,
-                "Assume Rhs is located at INT64_PIECES.");
-  static_assert(LRotateI64::Count == INT64_PIECES,
-                "Assume Count is located at INT64_PIECES.");
-
-  ins->setOperand(INT64_PIECES, useRegisterOrConstantAtStart(rhs));
+template <class LInstr>
+void LIRGeneratorARM64::lowerForShiftInt64(LInstr* ins, MDefinition* mir,
+                                           MDefinition* lhs, MDefinition* rhs) {
+  if constexpr (std::is_same_v<LInstr, LShiftI64>) {
+    ins->setLhs(useInt64RegisterAtStart(lhs));
+    ins->setRhs(useRegisterOrConstantAtStart(rhs));
+  } else {
+    ins->setInput(useInt64RegisterAtStart(lhs));
+    ins->setCount(useRegisterOrConstantAtStart(rhs));
+  }
   defineInt64(ins, mir);
 }
 
-template void LIRGeneratorARM64::lowerForShiftInt64(
-    LInstructionHelper<INT64_PIECES, INT64_PIECES + 1, 0>* ins,
-    MDefinition* mir, MDefinition* lhs, MDefinition* rhs);
-template void LIRGeneratorARM64::lowerForShiftInt64(
-    LInstructionHelper<INT64_PIECES, INT64_PIECES + 1, 1>* ins,
-    MDefinition* mir, MDefinition* lhs, MDefinition* rhs);
-
-void LIRGeneratorARM64::lowerForCompareI64AndBranch(MTest* mir, MCompare* comp,
-                                                    JSOp op, MDefinition* left,
-                                                    MDefinition* right,
-                                                    MBasicBlock* ifTrue,
-                                                    MBasicBlock* ifFalse) {
-  auto* lir = new (alloc())
-      LCompareI64AndBranch(comp, op, useInt64Register(left),
-                           useInt64RegisterOrConstant(right), ifTrue, ifFalse);
-  add(lir, mir);
-}
-
-void LIRGeneratorARM64::lowerForBitAndAndBranch(LBitAndAndBranch* baab,
-                                                MInstruction* mir,
-                                                MDefinition* lhs,
-                                                MDefinition* rhs) {
-  baab->setOperand(0, useRegisterAtStart(lhs));
-  baab->setOperand(1, useRegisterOrConstantAtStart(rhs));
-  add(baab, mir);
-}
+template void LIRGeneratorARM64::lowerForShiftInt64(LShiftI64* ins,
+                                                    MDefinition* mir,
+                                                    MDefinition* lhs,
+                                                    MDefinition* rhs);
+template void LIRGeneratorARM64::lowerForShiftInt64(LRotateI64* ins,
+                                                    MDefinition* mir,
+                                                    MDefinition* lhs,
+                                                    MDefinition* rhs);
 
 void LIRGeneratorARM64::lowerWasmBuiltinTruncateToInt32(
     MWasmBuiltinTruncateToInt32* ins) {
@@ -231,8 +212,7 @@ void LIRGeneratorARM64::lowerWasmBuiltinTruncateToInt32(
   }
 
   define(new (alloc()) LWasmBuiltinTruncateFToInt32(
-             useRegister(opd), useFixed(ins->instance(), InstanceReg),
-             LDefinition::BogusTemp()),
+             useRegister(opd), LAllocation(), LDefinition::BogusTemp()),
          ins);
 }
 
@@ -269,7 +249,7 @@ void LIRGeneratorARM64::lowerDivI(MDiv* div) {
       return;
     }
     if (rhs != 0) {
-      LDivConstantI* lir = new (alloc()) LDivConstantI(lhs, rhs, temp());
+      LDivConstantI* lir = new (alloc()) LDivConstantI(lhs, temp(), rhs);
       if (div->fallible()) {
         assignSnapshot(lir, div->bailoutKind());
       }
@@ -442,10 +422,9 @@ void LIRGeneratorARM64::lowerWasmCompareAndSelect(MWasmSelect* ins,
   } else {
     MOZ_CRASH("Unexpected type");
   }
-  auto* lir = new (alloc())
-      LWasmCompareAndSelect(useRegisterAtStart(lhs), rhsAlloc, compTy, jsop,
-                            useRegisterAtStart(ins->trueExpr()),
-                            useRegisterAtStart(ins->falseExpr()));
+  auto* lir = new (alloc()) LWasmCompareAndSelect(
+      useRegisterAtStart(lhs), rhsAlloc, useRegisterAtStart(ins->trueExpr()),
+      useRegisterAtStart(ins->falseExpr()), compTy, jsop);
   define(lir, ins);
 }
 
@@ -454,14 +433,12 @@ void LIRGenerator::visitAbs(MAbs* ins) {
 }
 
 LTableSwitch* LIRGeneratorARM64::newLTableSwitch(const LAllocation& in,
-                                                 const LDefinition& inputCopy,
-                                                 MTableSwitch* tableswitch) {
-  return new (alloc()) LTableSwitch(in, inputCopy, temp(), tableswitch);
+                                                 const LDefinition& inputCopy) {
+  return new (alloc()) LTableSwitch(in, inputCopy, temp());
 }
 
-LTableSwitchV* LIRGeneratorARM64::newLTableSwitchV(MTableSwitch* tableswitch) {
-  return new (alloc()) LTableSwitchV(useBox(tableswitch->getOperand(0)), temp(),
-                                     tempDouble(), temp(), tableswitch);
+LTableSwitchV* LIRGeneratorARM64::newLTableSwitchV(const LBoxAllocation& in) {
+  return new (alloc()) LTableSwitchV(in, temp(), tempDouble(), temp());
 }
 
 void LIRGeneratorARM64::lowerUrshD(MUrsh* mir) {
@@ -485,32 +462,36 @@ void LIRGeneratorARM64::lowerPowOfTwoI(MPow* mir) {
   define(lir, mir);
 }
 
-void LIRGeneratorARM64::lowerBigIntLsh(MBigIntLsh* ins) {
-  auto* lir = new (alloc()) LBigIntLsh(
-      useRegister(ins->lhs()), useRegister(ins->rhs()), temp(), temp(), temp());
+void LIRGeneratorARM64::lowerBigIntPtrLsh(MBigIntPtrLsh* ins) {
+  auto* lir = new (alloc()) LBigIntPtrLsh(
+      useRegister(ins->lhs()), useRegister(ins->rhs()), temp(), temp());
+  assignSnapshot(lir, ins->bailoutKind());
   define(lir, ins);
-  assignSafepoint(lir, ins);
 }
 
-void LIRGeneratorARM64::lowerBigIntRsh(MBigIntRsh* ins) {
-  auto* lir = new (alloc()) LBigIntRsh(
-      useRegister(ins->lhs()), useRegister(ins->rhs()), temp(), temp(), temp());
+void LIRGeneratorARM64::lowerBigIntPtrRsh(MBigIntPtrRsh* ins) {
+  auto* lir = new (alloc()) LBigIntPtrRsh(
+      useRegister(ins->lhs()), useRegister(ins->rhs()), temp(), temp());
+  assignSnapshot(lir, ins->bailoutKind());
   define(lir, ins);
-  assignSafepoint(lir, ins);
 }
 
-void LIRGeneratorARM64::lowerBigIntDiv(MBigIntDiv* ins) {
-  auto* lir = new (alloc()) LBigIntDiv(useRegister(ins->lhs()),
-                                       useRegister(ins->rhs()), temp(), temp());
+void LIRGeneratorARM64::lowerBigIntPtrDiv(MBigIntPtrDiv* ins) {
+  auto* lir = new (alloc())
+      LBigIntPtrDiv(useRegister(ins->lhs()), useRegister(ins->rhs()),
+                    LDefinition::BogusTemp(), LDefinition::BogusTemp());
+  assignSnapshot(lir, ins->bailoutKind());
   define(lir, ins);
-  assignSafepoint(lir, ins);
 }
 
-void LIRGeneratorARM64::lowerBigIntMod(MBigIntMod* ins) {
-  auto* lir = new (alloc()) LBigIntMod(useRegister(ins->lhs()),
-                                       useRegister(ins->rhs()), temp(), temp());
+void LIRGeneratorARM64::lowerBigIntPtrMod(MBigIntPtrMod* ins) {
+  auto* lir = new (alloc())
+      LBigIntPtrMod(useRegister(ins->lhs()), useRegister(ins->rhs()), temp(),
+                    LDefinition::BogusTemp());
+  if (ins->canBeDivideByZero()) {
+    assignSnapshot(lir, ins->bailoutKind());
+  }
   define(lir, ins);
-  assignSafepoint(lir, ins);
 }
 
 #ifdef ENABLE_WASM_SIMD
@@ -589,7 +570,7 @@ void LIRGeneratorARM64::lowerUDiv(MDiv* div) {
       return;
     }
 
-    LUDivConstantI* lir = new (alloc()) LUDivConstantI(lhs, rhs, temp());
+    LUDivConstantI* lir = new (alloc()) LUDivConstantI(lhs, temp(), rhs);
     if (div->fallible()) {
       assignSnapshot(lir, div->bailoutKind());
     }
@@ -724,18 +705,14 @@ void LIRGenerator::visitWasmAtomicBinopHeap(MWasmAtomicBinopHeap* ins) {
   // Note, the access type may be Int64 here.
 
   if (!ins->hasUses()) {
-    LWasmAtomicBinopHeapForEffect* lir = new (alloc())
-        LWasmAtomicBinopHeapForEffect(useRegister(base),
-                                      useRegister(ins->value()),
-                                      /* flagTemp= */ temp(), memoryBase);
+    auto* lir = new (alloc()) LWasmAtomicBinopHeapForEffect(
+        useRegister(base), useRegister(ins->value()), memoryBase, temp());
     add(lir, ins);
     return;
   }
 
-  LWasmAtomicBinopHeap* lir = new (alloc())
-      LWasmAtomicBinopHeap(useRegister(base), useRegister(ins->value()),
-                           /* temp= */ LDefinition::BogusTemp(),
-                           /* flagTemp= */ temp(), memoryBase);
+  auto* lir = new (alloc()) LWasmAtomicBinopHeap(
+      useRegister(base), useRegister(ins->value()), memoryBase, temp());
   define(lir, ins);
 }
 
@@ -758,9 +735,7 @@ void LIRGeneratorARM64::lowerTruncateFToInt32(MTruncateToInt32* ins) {
 void LIRGenerator::visitAtomicTypedArrayElementBinop(
     MAtomicTypedArrayElementBinop* ins) {
   MOZ_ASSERT(ins->arrayType() != Scalar::Uint8Clamped);
-  MOZ_ASSERT(ins->arrayType() != Scalar::Float32);
-  MOZ_ASSERT(ins->arrayType() != Scalar::Float64);
-
+  MOZ_ASSERT(!Scalar::isFloatingType(ins->arrayType()));
   MOZ_ASSERT(ins->elements()->type() == MIRType::Elements);
   MOZ_ASSERT(ins->index()->type() == MIRType::IntPtr);
 
@@ -768,19 +743,15 @@ void LIRGenerator::visitAtomicTypedArrayElementBinop(
   const LAllocation index =
       useRegisterOrIndexConstant(ins->index(), ins->arrayType());
 
-  LAllocation value = useRegister(ins->value());
-
   if (Scalar::isBigIntType(ins->arrayType())) {
-    LInt64Definition temp1 = tempInt64();
-    LInt64Definition temp2 = tempInt64();
+    LInt64Allocation value = useInt64Register(ins->value());
+    LInt64Definition temp = tempInt64();
 
     // Case 1: the result of the operation is not used.
-    //
-    // We can omit allocating the result BigInt.
 
     if (ins->isForEffect()) {
       auto* lir = new (alloc()) LAtomicTypedArrayElementBinopForEffect64(
-          elements, index, value, temp1, temp2);
+          elements, index, value, temp);
       add(lir, ins);
       return;
     }
@@ -788,11 +759,12 @@ void LIRGenerator::visitAtomicTypedArrayElementBinop(
     // Case 2: the result of the operation is used.
 
     auto* lir = new (alloc())
-        LAtomicTypedArrayElementBinop64(elements, index, value, temp1, temp2);
-    define(lir, ins);
-    assignSafepoint(lir, ins);
+        LAtomicTypedArrayElementBinop64(elements, index, value, temp);
+    defineInt64(lir, ins);
     return;
   }
+
+  LAllocation value = useRegister(ins->value());
 
   if (ins->isForEffect()) {
     auto* lir = new (alloc())
@@ -815,9 +787,7 @@ void LIRGenerator::visitAtomicTypedArrayElementBinop(
 
 void LIRGenerator::visitCompareExchangeTypedArrayElement(
     MCompareExchangeTypedArrayElement* ins) {
-  MOZ_ASSERT(ins->arrayType() != Scalar::Float32);
-  MOZ_ASSERT(ins->arrayType() != Scalar::Float64);
-
+  MOZ_ASSERT(!Scalar::isFloatingType(ins->arrayType()));
   MOZ_ASSERT(ins->elements()->type() == MIRType::Elements);
   MOZ_ASSERT(ins->index()->type() == MIRType::IntPtr);
 
@@ -825,19 +795,18 @@ void LIRGenerator::visitCompareExchangeTypedArrayElement(
   const LAllocation index =
       useRegisterOrIndexConstant(ins->index(), ins->arrayType());
 
-  const LAllocation newval = useRegister(ins->newval());
-  const LAllocation oldval = useRegister(ins->oldval());
-
   if (Scalar::isBigIntType(ins->arrayType())) {
-    LInt64Definition temp1 = tempInt64();
-    LInt64Definition temp2 = tempInt64();
+    LInt64Allocation oldval = useInt64Register(ins->oldval());
+    LInt64Allocation newval = useInt64Register(ins->newval());
 
-    auto* lir = new (alloc()) LCompareExchangeTypedArrayElement64(
-        elements, index, oldval, newval, temp1, temp2);
-    define(lir, ins);
-    assignSafepoint(lir, ins);
+    auto* lir = new (alloc())
+        LCompareExchangeTypedArrayElement64(elements, index, oldval, newval);
+    defineInt64(lir, ins);
     return;
   }
+
+  const LAllocation oldval = useRegister(ins->oldval());
+  const LAllocation newval = useRegister(ins->newval());
 
   // If the target is an FPReg then we need a temporary at the CodeGenerator
   // level for creating the result.
@@ -863,20 +832,18 @@ void LIRGenerator::visitAtomicExchangeTypedArrayElement(
   const LAllocation index =
       useRegisterOrIndexConstant(ins->index(), ins->arrayType());
 
-  const LAllocation value = useRegister(ins->value());
-
   if (Scalar::isBigIntType(ins->arrayType())) {
-    LInt64Definition temp1 = tempInt64();
-    LDefinition temp2 = temp();
+    LInt64Allocation value = useInt64Register(ins->value());
 
-    auto* lir = new (alloc()) LAtomicExchangeTypedArrayElement64(
-        elements, index, value, temp1, temp2);
-    define(lir, ins);
-    assignSafepoint(lir, ins);
+    auto* lir = new (alloc())
+        LAtomicExchangeTypedArrayElement64(elements, index, value);
+    defineInt64(lir, ins);
     return;
   }
 
   MOZ_ASSERT(ins->arrayType() <= Scalar::Uint32);
+
+  const LAllocation value = useRegister(ins->value());
 
   LDefinition tempDef = LDefinition::BogusTemp();
   if (ins->arrayType() == Scalar::Uint32) {
@@ -894,18 +861,17 @@ void LIRGeneratorARM64::lowerAtomicLoad64(MLoadUnboxedScalar* ins) {
   const LAllocation index =
       useRegisterOrIndexConstant(ins->index(), ins->storageType());
 
-  auto* lir = new (alloc()) LAtomicLoad64(elements, index, temp(), tempInt64());
-  define(lir, ins);
-  assignSafepoint(lir, ins);
+  auto* lir = new (alloc()) LAtomicLoad64(elements, index);
+  defineInt64(lir, ins);
 }
 
 void LIRGeneratorARM64::lowerAtomicStore64(MStoreUnboxedScalar* ins) {
   LUse elements = useRegister(ins->elements());
   LAllocation index =
       useRegisterOrIndexConstant(ins->index(), ins->writeType());
-  LAllocation value = useRegister(ins->value());
+  LInt64Allocation value = useInt64Register(ins->value());
 
-  add(new (alloc()) LAtomicStore64(elements, index, value, tempInt64()), ins);
+  add(new (alloc()) LAtomicStore64(elements, index, value), ins);
 }
 
 void LIRGenerator::visitSubstr(MSubstr* ins) {
@@ -963,16 +929,15 @@ void LIRGenerator::visitWasmStore(MWasmStore* ins) {
   LAllocation memoryBase =
       ins->hasMemoryBase() ? LAllocation(useRegisterAtStart(ins->memoryBase()))
                            : LGeneralReg(HeapReg);
+  LAllocation baseAlloc = useRegisterOrConstantAtStart(base);
 
   if (ins->access().type() == Scalar::Int64) {
-    LAllocation baseAlloc = useRegisterOrConstantAtStart(base);
     LInt64Allocation valueAlloc = useInt64RegisterAtStart(value);
     auto* lir = new (alloc()) LWasmStoreI64(baseAlloc, valueAlloc, memoryBase);
     add(lir, ins);
     return;
   }
 
-  LAllocation baseAlloc = useRegisterOrConstantAtStart(base);
   LAllocation valueAlloc = useRegisterAtStart(value);
   auto* lir = new (alloc()) LWasmStore(baseAlloc, valueAlloc, memoryBase);
   add(lir, ins);
@@ -1030,38 +995,41 @@ void LIRGenerator::visitWasmTernarySimd128(MWasmTernarySimd128* ins) {
 
   switch (ins->simdOp()) {
     case wasm::SimdOp::V128Bitselect: {
-      auto* lir = new (alloc()) LWasmTernarySimd128(
-          ins->simdOp(), useRegister(ins->v0()), useRegister(ins->v1()),
-          useRegisterAtStart(ins->v2()));
+      auto* lir = new (alloc())
+          LWasmTernarySimd128(useRegister(ins->v0()), useRegister(ins->v1()),
+                              useRegisterAtStart(ins->v2()),
+                              LDefinition::BogusTemp(), ins->simdOp());
       // On ARM64, control register is used as output at machine instruction.
-      defineReuseInput(lir, ins, LWasmTernarySimd128::V2);
+      defineReuseInput(lir, ins, LWasmTernarySimd128::V2Index);
       break;
     }
     case wasm::SimdOp::F32x4RelaxedMadd:
     case wasm::SimdOp::F32x4RelaxedNmadd:
     case wasm::SimdOp::F64x2RelaxedMadd:
     case wasm::SimdOp::F64x2RelaxedNmadd: {
-      auto* lir = new (alloc()) LWasmTernarySimd128(
-          ins->simdOp(), useRegister(ins->v0()), useRegister(ins->v1()),
-          useRegisterAtStart(ins->v2()));
-      defineReuseInput(lir, ins, LWasmTernarySimd128::V2);
+      auto* lir = new (alloc())
+          LWasmTernarySimd128(useRegister(ins->v0()), useRegister(ins->v1()),
+                              useRegisterAtStart(ins->v2()),
+                              LDefinition::BogusTemp(), ins->simdOp());
+      defineReuseInput(lir, ins, LWasmTernarySimd128::V2Index);
       break;
     }
-    case wasm::SimdOp::I32x4DotI8x16I7x16AddS: {
+    case wasm::SimdOp::I32x4RelaxedDotI8x16I7x16AddS: {
       auto* lir = new (alloc()) LWasmTernarySimd128(
-          ins->simdOp(), useRegister(ins->v0()), useRegister(ins->v1()),
-          useRegisterAtStart(ins->v2()), tempSimd128());
-      defineReuseInput(lir, ins, LWasmTernarySimd128::V2);
+          useRegister(ins->v0()), useRegister(ins->v1()),
+          useRegisterAtStart(ins->v2()), tempSimd128(), ins->simdOp());
+      defineReuseInput(lir, ins, LWasmTernarySimd128::V2Index);
       break;
     }
     case wasm::SimdOp::I8x16RelaxedLaneSelect:
     case wasm::SimdOp::I16x8RelaxedLaneSelect:
     case wasm::SimdOp::I32x4RelaxedLaneSelect:
     case wasm::SimdOp::I64x2RelaxedLaneSelect: {
-      auto* lir = new (alloc()) LWasmTernarySimd128(
-          ins->simdOp(), useRegister(ins->v0()), useRegister(ins->v1()),
-          useRegisterAtStart(ins->v2()));
-      defineReuseInput(lir, ins, LWasmTernarySimd128::V2);
+      auto* lir = new (alloc())
+          LWasmTernarySimd128(useRegister(ins->v0()), useRegister(ins->v1()),
+                              useRegisterAtStart(ins->v2()),
+                              LDefinition::BogusTemp(), ins->simdOp());
+      defineReuseInput(lir, ins, LWasmTernarySimd128::V2Index);
       break;
     }
     default:
@@ -1091,7 +1059,7 @@ void LIRGenerator::visitWasmBinarySimd128(MWasmBinarySimd128* ins) {
     tempReg1 = tempSimd128();
   }
   auto* lir = new (alloc())
-      LWasmBinarySimd128(op, lhsAlloc, rhsAlloc, tempReg0, tempReg1);
+      LWasmBinarySimd128(lhsAlloc, rhsAlloc, tempReg0, tempReg1, op);
   define(lir, ins);
 #else
   MOZ_CRASH("No SIMD");
@@ -1168,8 +1136,7 @@ void LIRGenerator::visitWasmShiftSimd128(MWasmShiftSimd128* ins) {
 
   LAllocation lhsDestAlloc = useRegisterAtStart(lhs);
   LAllocation rhsAlloc = useRegisterAtStart(rhs);
-  auto* lir = new (alloc()) LWasmVariableShiftSimd128(lhsDestAlloc, rhsAlloc,
-                                                      LDefinition::BogusTemp());
+  auto* lir = new (alloc()) LWasmVariableShiftSimd128(lhsDestAlloc, rhsAlloc);
   define(lir, ins);
 #else
   MOZ_CRASH("No SIMD");
@@ -1222,7 +1189,6 @@ void LIRGenerator::visitWasmShuffleSimd128(MWasmShuffleSimd128* ins) {
     }
     case SimdShuffle::Operand::BOTH:
     case SimdShuffle::Operand::BOTH_SWAPPED: {
-      LDefinition temp = LDefinition::BogusTemp();
       LAllocation lhs;
       LAllocation rhs;
       if (s.opd == SimdShuffle::Operand::BOTH) {
@@ -1232,8 +1198,8 @@ void LIRGenerator::visitWasmShuffleSimd128(MWasmShuffleSimd128* ins) {
         lhs = useRegisterAtStart(ins->rhs());
         rhs = useRegisterAtStart(ins->lhs());
       }
-      auto* lir = new (alloc())
-          LWasmShuffleSimd128(lhs, rhs, temp, *s.shuffleOp, s.control);
+      auto* lir =
+          new (alloc()) LWasmShuffleSimd128(lhs, rhs, *s.shuffleOp, s.control);
       define(lir, ins);
       break;
     }
@@ -1438,8 +1404,8 @@ void LIRGenerator::visitWasmLoadLaneSimd128(MWasmLoadLaneSimd128* ins) {
   LAllocation memoryBase =
       ins->hasMemoryBase() ? LAllocation(useRegisterAtStart(ins->memoryBase()))
                            : LGeneralReg(HeapReg);
-  LWasmLoadLaneSimd128* lir =
-      new (alloc()) LWasmLoadLaneSimd128(base, inputUse, temp(), memoryBase);
+  auto* lir =
+      new (alloc()) LWasmLoadLaneSimd128(base, inputUse, memoryBase, temp());
   define(lir, ins);
 #else
   MOZ_CRASH("No SIMD");
@@ -1455,8 +1421,8 @@ void LIRGenerator::visitWasmStoreLaneSimd128(MWasmStoreLaneSimd128* ins) {
   LAllocation memoryBase =
       ins->hasMemoryBase() ? LAllocation(useRegisterAtStart(ins->memoryBase()))
                            : LGeneralReg(HeapReg);
-  LWasmStoreLaneSimd128* lir =
-      new (alloc()) LWasmStoreLaneSimd128(base, input, temp(), memoryBase);
+  auto* lir =
+      new (alloc()) LWasmStoreLaneSimd128(base, input, memoryBase, temp());
   add(lir, ins);
 #else
   MOZ_CRASH("No SIMD");

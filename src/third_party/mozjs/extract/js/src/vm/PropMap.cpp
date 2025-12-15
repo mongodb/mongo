@@ -546,6 +546,11 @@ void DictionaryPropMap::handOffLastMapStateTo(DictionaryPropMap* newLast) {
 }
 
 // static
+DictionaryPropMap* DictionaryPropMap::createEmpty(JSContext* cx) {
+  return cx->newCell<DictionaryPropMap>(nullptr);
+}
+
+// static
 bool DictionaryPropMap::addProperty(JSContext* cx, const JSClass* clasp,
                                     MutableHandle<DictionaryPropMap*> map,
                                     uint32_t* mapLength, HandleId id,

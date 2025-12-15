@@ -105,7 +105,7 @@ struct MOZ_STACK_CLASS GCThingList {
 
   uint32_t length() const { return vector.length(); }
 
-  const ScriptThingsStackVector& objects() { return vector; }
+  const ScriptThingsStackVector& objects() const { return vector; }
 
   AbstractScopePtr getScope(size_t index) const;
 
@@ -172,8 +172,8 @@ static constexpr size_t MaxSrcNotesLength = INT32_MAX;
 
 // Have a few inline elements, so as to avoid heap allocation for tiny
 // sequences.  See bug 1390526.
-typedef Vector<jsbytecode, 64> BytecodeVector;
-typedef Vector<js::SrcNote, 64> SrcNotesVector;
+using BytecodeVector = Vector<jsbytecode, 64>;
+using SrcNotesVector = Vector<js::SrcNote, 64>;
 
 // Bytecode and all data directly associated with specific opcode/index inside
 // bytecode is stored in this class.

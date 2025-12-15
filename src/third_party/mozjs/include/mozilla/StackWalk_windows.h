@@ -7,12 +7,30 @@
 #ifndef mozilla_StackWalk_windows_h
 #define mozilla_StackWalk_windows_h
 
+#include "mozilla/Array.h"
 #include "mozilla/Types.h"
 
 #if defined(_M_AMD64) || defined(_M_ARM64)
 /**
- * Allow stack walkers to work around the egregious win64 dynamic lookup table
- * list API by locking around SuspendThread to avoid deadlock.
+ * This function enables strategy (1) for avoiding deadlocks between the stack
+ * walking thread and the suspended thread. In aStackWalkLocks the caller must
+ * provide pointers to the two ntdll-internal SRW locks acquired by
+ * RtlLookupFunctionEntry. These locks are LdrpInvertedFunctionTableSRWLock and
+ * RtlpDynamicFunctionTableLock -- we don't need to know which one is which.
+ * Until InitializeStackWalkLocks function is called, strategy (2) is used.
+ *
+ * See comment in StackWalk.cpp
+ */
+MFBT_API
+void InitializeStackWalkLocks(const mozilla::Array<void*, 2>& aStackWalkLocks);
+
+/**
+ * As part of strategy (2) for avoiding deadlocks between the stack walking
+ * thread and the suspended thread, we mark stack walk suppression paths by
+ * putting them under the scope of a AutoSuppressStackWalking object. Any code
+ * path that may do an exclusive acquire of LdrpInvertedFunctionTableSRWLock or
+ * RtlpDynamicFunctionTableLock should be marked this way, to ensure that
+ * strategy (2) can properly mitigate all deadlock scenarios.
  *
  * See comment in StackWalk.cpp
  */

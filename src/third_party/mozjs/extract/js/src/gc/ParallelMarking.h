@@ -38,7 +38,7 @@ class MOZ_STACK_CLASS ParallelMarker {
  public:
   explicit ParallelMarker(GCRuntime* gc);
 
-  bool mark(SliceBudget& sliceBudget);
+  bool mark(const JS::SliceBudget& sliceBudget);
 
   using AtomicCount = mozilla::Atomic<uint32_t, mozilla::Relaxed>;
   AtomicCount& waitingTaskCountRef() { return waitingTaskCount; }
@@ -46,7 +46,7 @@ class MOZ_STACK_CLASS ParallelMarker {
   void donateWorkFrom(GCMarker* src);
 
  private:
-  bool markOneColor(MarkColor color, SliceBudget& sliceBudget);
+  bool markOneColor(MarkColor color, const JS::SliceBudget& sliceBudget);
 
   bool hasWork(MarkColor color) const;
 
@@ -88,7 +88,7 @@ class alignas(TypicalCacheLineSize) ParallelMarkTask
   friend class ParallelMarker;
 
   ParallelMarkTask(ParallelMarker* pm, GCMarker* marker, MarkColor color,
-                   const SliceBudget& budget);
+                   const JS::SliceBudget& budget);
   ~ParallelMarkTask();
 
   void run(AutoLockHelperThreadState& lock) override;
@@ -109,7 +109,7 @@ class alignas(TypicalCacheLineSize) ParallelMarkTask
   ParallelMarker* const pm;
   GCMarker* const marker;
   AutoSetMarkColor color;
-  SliceBudget budget;
+  JS::SliceBudget budget;
   ConditionVariable resumed;
 
   HelperThreadLockData<bool> isWaiting;

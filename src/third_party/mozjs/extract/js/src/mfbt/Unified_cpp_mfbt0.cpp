@@ -17,15 +17,6 @@
 #error "ChaosMode.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "Compression.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "Compression.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "Compression.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
 #include "FloatingPoint.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "FloatingPoint.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -69,6 +60,15 @@
 #endif
 #ifdef INITGUID
 #error "RandomNum.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "RefCounted.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "RefCounted.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "RefCounted.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
 #include "SHA1.cpp"

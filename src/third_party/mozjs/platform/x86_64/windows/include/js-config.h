@@ -41,9 +41,6 @@
 /* Define to 1 if SpiderMonkey should include support for the Intl API. */
 /* #undef JS_HAS_INTL_API */
 
-/* Define to 1 if SpiderMonkey should include support for the Temporal API. */
-/* #undef JS_HAS_TEMPORAL_API */
-
 /* Define to 1 if SpiderMonkey should include a breakpoint function for
  * artificial OOMs. */
 /* #undef JS_OOM_BREAKPOINT */
@@ -61,17 +58,20 @@
 /* Define to 1 if SpiderMonkey is in PUNBOX64 mode. */
 #define JS_PUNBOX64 1
 
-/* Define to 1 if SpiderMonkey should support SmooshMonkey parser. */
-/* #undef JS_ENABLE_SMOOSH */
-
 /* Experimental WASM features */
 /* #undef ENABLE_WASM_EXCEPTIONS */
 /* #undef ENABLE_WASM_FUNCTION_REFERENCES */
-#define ENABLE_WASM_GC 1
+/* #undef ENABLE_WASM_GC */
 /* #undef ENABLE_WASM_SIMD */
 
 /* MOZILLA JSAPI version number components */
-#define MOZJS_MAJOR_VERSION 128
-#define MOZJS_MINOR_VERSION 12
+#define MOZJS_MAJOR_VERSION 140
+#define MOZJS_MINOR_VERSION 3
+
+/* MONGODB MODIFICATION: Define based on platform */
+#define XP_WIN 1
+/* #undef XP_UNIX */
+/* #undef XP_DARWIN */
+
 
 #endif /* js_config_h */

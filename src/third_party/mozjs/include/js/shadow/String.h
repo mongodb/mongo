@@ -35,6 +35,7 @@ struct String {
   static constexpr uint32_t LINEAR_BIT = js::Bit(4);
   static constexpr uint32_t INLINE_CHARS_BIT = js::Bit(6);
   static constexpr uint32_t LATIN1_CHARS_BIT = js::Bit(10);
+  static constexpr uint32_t HAS_STRING_BUFFER_BIT = js::Bit(12);
   static constexpr uint32_t EXTERNAL_FLAGS = LINEAR_BIT | js::Bit(8);
   static constexpr uint32_t TYPE_FLAGS_MASK = js::BitMask(10) - js::BitMask(3);
   static constexpr uint32_t PERMANENT_ATOM_MASK = ATOM_BIT | js::Bit(8);
@@ -68,6 +69,7 @@ struct String {
 
   bool isLinear() const { return flags() & LINEAR_BIT; }
   bool hasLatin1Chars() const { return flags() & LATIN1_CHARS_BIT; }
+  bool hasStringBuffer() const { return flags() & HAS_STRING_BUFFER_BIT; }
 
   // For hot code, prefer other type queries.
   bool isExternal() const {

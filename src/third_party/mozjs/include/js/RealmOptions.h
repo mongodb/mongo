@@ -113,6 +113,12 @@ class JS_PUBLIC_API RealmCreationOptions {
 
   // Determines whether this realm should preserve JIT code on non-shrinking
   // GCs.
+  //
+  // Useful for embedders who know their code is relatively stable. See
+  // Bug 1068697 for motivation.
+  //
+  // This is a hint not a guarantee and can be overriden by other heuristics in
+  // the engine.
   bool preserveJitCode() const { return preserveJitCode_; }
   RealmCreationOptions& setPreserveJitCode(bool flag) {
     preserveJitCode_ = flag;

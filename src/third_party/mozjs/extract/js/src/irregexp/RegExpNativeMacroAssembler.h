@@ -41,7 +41,7 @@ class SMRegExpMacroAssembler final : public NativeRegExpMacroAssembler {
                          Zone* zone, Mode mode, uint32_t num_capture_registers);
   virtual ~SMRegExpMacroAssembler() = default;
 
-  virtual int stack_limit_slack();
+  virtual int stack_limit_slack_slot_count();
   virtual IrregexpImplementation Implementation();
 
   virtual bool Succeed();
@@ -81,6 +81,10 @@ class SMRegExpMacroAssembler final : public NativeRegExpMacroAssembler {
   virtual void CheckNotAtStart(int cp_offset, Label* on_not_at_start);
   virtual void CheckPosition(int cp_offset, Label* on_outside_input);
   virtual void CheckBitInTable(Handle<ByteArray> table, Label* on_bit_set);
+  virtual void SkipUntilBitInTable(int cp_offset, Handle<ByteArray> table,
+                                   Handle<ByteArray> nibble_table,
+                                   int advance_by);
+  virtual bool SkipUntilBitInTableUseSimd(int advance_by);
   virtual bool CheckSpecialCharacterClass(StandardCharacterSet type,
                                           Label* on_no_match);
   virtual void CheckNotBackReference(int start_reg, bool read_backward,
@@ -107,7 +111,7 @@ class SMRegExpMacroAssembler final : public NativeRegExpMacroAssembler {
   virtual void SetRegister(int register_index, int to);
   virtual void ClearRegisters(int reg_from, int reg_to);
 
-  virtual Handle<HeapObject> GetCode(Handle<String> source);
+  virtual Handle<HeapObject> GetCode(Handle<String> source, RegExpFlags flags);
 
   virtual bool CanReadUnaligned() const;
 
@@ -265,6 +269,9 @@ class SMRegExpMacroAssembler final : public NativeRegExpMacroAssembler {
   //
   // 3. While linking the code, we walk the list of label patches
   //    and patch the code accordingly.
+  //
+  // 4. Finally, we patch in the code base address that is added to the
+  //    label offset to calculate the actual address to jump to.
   class LabelPatch {
    public:
     LabelPatch(js::jit::CodeOffset patchOffset, size_t labelOffset)
@@ -279,6 +286,15 @@ class SMRegExpMacroAssembler final : public NativeRegExpMacroAssembler {
     js::AutoEnterOOMUnsafeRegion oomUnsafe;
     if (!labelPatches_.emplaceBack(patchOffset, labelOffset)) {
       oomUnsafe.crash("Irregexp label patch");
+    }
+  }
+
+  js::Vector<js::jit::CodeOffset, 4, js::SystemAllocPolicy>
+      backtrackCodeOffsetPatches_;
+  void PushBacktrackCodeOffsetPatch(js::jit::CodeOffset offset) {
+    js::AutoEnterOOMUnsafeRegion oomUnsafe;
+    if (!backtrackCodeOffsetPatches_.append(offset)) {
+      oomUnsafe.crash("Irregexp backtrack code offset patch");
     }
   }
 

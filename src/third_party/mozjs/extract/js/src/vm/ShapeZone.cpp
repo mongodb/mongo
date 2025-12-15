@@ -105,6 +105,19 @@ void ShapeZone::purgeShapeCaches(JS::GCContext* gcx) {
   shapesWithCache.clearAndFree();
 }
 
+bool ShapeZone::useDictionaryModeTeleportation() {
+  if (!JS::Prefs::experimental_dictionary_teleporting()) {
+    return false;
+  }
+
+  if (reshapeCounter > RESHAPE_MAX) {
+    return false;
+  }
+
+  reshapeCounter++;
+  return true;
+}
+
 void ShapeZone::addSizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf,
                                        size_t* initialPropMapTable,
                                        size_t* shapeTables) {

@@ -16,7 +16,7 @@
 
 #include "jstypes.h"
 
-namespace js {
+namespace JS {
 
 struct JS_PUBLIC_API TimeBudget {
   const mozilla::TimeDuration budget;
@@ -140,6 +140,6 @@ class JS_PUBLIC_API SliceBudget {
   int describe(char* buffer, size_t maxlen) const;
 };
 
-}  // namespace js
+}  // namespace JS
 
 #endif /* js_SliceBudget_h */

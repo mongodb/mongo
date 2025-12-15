@@ -9,6 +9,7 @@
 #include "frontend/BytecodeEmitter.h"
 #include "frontend/EmitterScope.h"
 #include "frontend/ParserAtom.h"  // TaggedParserAtomIndex
+#include "frontend/UsingEmitter.h"
 #include "vm/Opcodes.h"
 #include "vm/StencilEnums.h"  // TryNoteKind
 
@@ -22,24 +23,30 @@ ForOfEmitter::ForOfEmitter(BytecodeEmitter* bce,
                            SelfHostedIter selfHostedIter, IteratorKind iterKind
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
                            ,
-                           HasUsingDeclarationInHead hasUsingDeclarationInHead
+                           HeadUsingDeclarationKind usingDeclarationInHead
 #endif
                            )
     : bce_(bce),
       selfHostedIter_(selfHostedIter),
       iterKind_(iterKind),
-      headLexicalEmitterScope_(headLexicalEmitterScope) {
+      headLexicalEmitterScope_(headLexicalEmitterScope)
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  MOZ_ASSERT_IF(hasUsingDeclarationInHead == HasUsingDeclarationInHead::Yes,
-                headLexicalEmitterScope->hasEnvironment());
-  if (hasUsingDeclarationInHead == HasUsingDeclarationInHead::Yes) {
-    // The using bindings are closed over and stored in the lexical environment
-    // object for headLexicalEmitterScope.
-    // Mark that the environment has disposables for them to be disposed on
-    // every iteration.
-    MOZ_ASSERT(headLexicalEmitterScope == bce_->innermostEmitterScope());
-    bce_->innermostEmitterScope()->setHasDisposables();
-  }
+      ,
+      usingDeclarationInHead_(usingDeclarationInHead)
+#endif
+{
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+  // The using bindings are closed over and stored in the lexical environment
+  // object for headLexicalEmitterScope.
+  // Mark that the environment has disposables for them to be disposed on
+  // every iteration.
+  MOZ_ASSERT_IF(usingDeclarationInHead != HeadUsingDeclarationKind::None,
+                headLexicalEmitterScope->hasEnvironment() &&
+                    headLexicalEmitterScope == bce_->innermostEmitterScope() &&
+                    headLexicalEmitterScope->hasDisposables());
+  MOZ_ASSERT_IF(
+      headLexicalEmitterScope && headLexicalEmitterScope->hasDisposables(),
+      usingDeclarationInHead != HeadUsingDeclarationKind::None);
 #endif
 }
 
@@ -106,23 +113,20 @@ bool ForOfEmitter::emitInitialize(uint32_t forPos) {
 
     if (headLexicalEmitterScope_->hasEnvironment()) {
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-      if (headLexicalEmitterScope_->hasDisposables()) {
-        // Before recreation of the lexical environment, we must dispose
-        // the disposables of the previous iteration.
-        //
-        // Emitting the bytecode to dispose over here means
-        // that we will have one extra disposal at the start of the loop which
-        // is a no op because there arent any disposables added yet.
-        //
-        // There also wouldn't be a dispose operation for the environment
-        // object recreated for the last iteration, where it leaves the loop
-        // before evaluating the body statement.
-        //
-        // TODO: Move the handling of emitting this bytecode to UsingEmitter
-        // (bug 1900756)
-        if (!bce_->emit1(JSOp::DisposeDisposables)) {
-          return false;
-        }
+      // Before recreation of the lexical environment, we must dispose
+      // the disposables of the previous iteration.
+      //
+      // Emitting the bytecode to dispose over here means
+      // that we will have one extra disposal at the start of the loop which
+      // is a no op because there arent any disposables added yet.
+      //
+      // There also wouldn't be a dispose operation for the environment
+      // object recreated for the last iteration, where it leaves the loop
+      // before evaluating the body statement.
+      if (!loopInfo_->prepareForForOfLoopIteration(
+              bce_, headLexicalEmitterScope_,
+              usingDeclarationInHead_ == HeadUsingDeclarationKind::Async)) {
+        return false;
       }
 #endif
       if (!bce_->emitInternedScopeOp(headLexicalEmitterScope_->index(),

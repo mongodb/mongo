@@ -1,4 +1,13 @@
 #define MOZ_UNIFIED_BUILD
+#include "jit/BaselineJIT.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "jit/BaselineJIT.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "jit/BaselineJIT.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "jit/BitSet.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "jit/BitSet.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -35,21 +44,12 @@
 #error "jit/CacheIR.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/CacheIRCompiler.cpp"
+#include "jit/CacheIRAOT.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/CacheIRCompiler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jit/CacheIRAOT.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/CacheIRCompiler.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "jit/CacheIRHealth.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/CacheIRHealth.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "jit/CacheIRHealth.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jit/CacheIRAOT.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

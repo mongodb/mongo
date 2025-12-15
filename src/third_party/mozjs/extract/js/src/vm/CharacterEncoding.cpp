@@ -31,7 +31,7 @@
 
 #include "frontend/FrontendContext.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
-#include "util/StringBuffer.h"
+#include "util/StringBuilder.h"
 #include "util/Unicode.h"  // unicode::REPLACEMENT_CHARACTER
 #include "vm/JSContext.h"
 
@@ -462,29 +462,12 @@ TwoByteCharsZ JS::UTF8CharsToNewTwoByteCharsZ(JSContext* cx,
       cx, utf8, outlen, destArenaId);
 }
 
-TwoByteCharsZ JS::UTF8CharsToNewTwoByteCharsZ(JSContext* cx,
-                                              const ConstUTF8CharsZ& utf8,
-                                              size_t* outlen,
-                                              arena_id_t destArenaId) {
-  UTF8Chars chars(utf8.c_str(), strlen(utf8.c_str()));
-  return InflateUTF8StringHelper<OnUTF8Error::Throw, TwoByteCharsZ>(
-      cx, chars, outlen, destArenaId);
-}
-
 TwoByteCharsZ JS::LossyUTF8CharsToNewTwoByteCharsZ(JSContext* cx,
                                                    const JS::UTF8Chars& utf8,
                                                    size_t* outlen,
                                                    arena_id_t destArenaId) {
   return InflateUTF8StringHelper<OnUTF8Error::InsertReplacementCharacter,
                                  TwoByteCharsZ>(cx, utf8, outlen, destArenaId);
-}
-
-TwoByteCharsZ JS::LossyUTF8CharsToNewTwoByteCharsZ(
-    JSContext* cx, const JS::ConstUTF8CharsZ& utf8, size_t* outlen,
-    arena_id_t destArenaId) {
-  UTF8Chars chars(utf8.c_str(), strlen(utf8.c_str()));
-  return InflateUTF8StringHelper<OnUTF8Error::InsertReplacementCharacter,
-                                 TwoByteCharsZ>(cx, chars, outlen, destArenaId);
 }
 
 static void UpdateSmallestEncodingForChar(char16_t c,
@@ -520,14 +503,6 @@ Latin1CharsZ JS::UTF8CharsToNewLatin1CharsZ(JSContext* cx,
                                             size_t* outlen,
                                             arena_id_t destArenaId) {
   return InflateUTF8StringHelper<OnUTF8Error::Throw, Latin1CharsZ>(
-      cx, utf8, outlen, destArenaId);
-}
-
-Latin1CharsZ JS::LossyUTF8CharsToNewLatin1CharsZ(JSContext* cx,
-                                                 const UTF8Chars& utf8,
-                                                 size_t* outlen,
-                                                 arena_id_t destArenaId) {
-  return InflateUTF8StringHelper<OnUTF8Error::InsertQuestionMark, Latin1CharsZ>(
       cx, utf8, outlen, destArenaId);
 }
 
@@ -870,7 +845,7 @@ JS_PUBLIC_API JS::UniqueWideChars JS::EncodeUtf8ToWide(JSContext* cx,
 #endif
 }
 
-bool StringBuffer::append(const Utf8Unit* units, size_t len) {
+bool StringBuilder::append(const Utf8Unit* units, size_t len) {
   MOZ_ASSERT(maybeCx_);
 
   if (isLatin1()) {

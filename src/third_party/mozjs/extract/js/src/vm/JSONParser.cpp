@@ -33,18 +33,19 @@
 #include "js/GCVector.h"                // JS::GCVector
 #include "js/Id.h"                      // jsid
 #include "js/JSON.h"                    // JS::IsValidJSON
+#include "js/PropertyAndElement.h"      // JS_SetPropertyById
 #include "js/RootingAPI.h"  // JS::Handle, JS::MutableHandle, MutableWrappedPtrOperations
 #include "js/TypeDecls.h"  // Latin1Char
 #include "js/Utility.h"    // js_delete
 #include "js/Value.h"  // JS::Value, JS::BooleanValue, JS::NullValue, JS::NumberValue, JS::StringValue
-#include "js/Vector.h"          // Vector
-#include "util/StringBuffer.h"  // JSStringBuilder
-#include "vm/ArrayObject.h"     // ArrayObject
-#include "vm/ErrorReporting.h"  // ReportCompileErrorLatin1, ErrorMetadata
-#include "vm/JSAtomUtils.h"     // AtomizeChars
-#include "vm/JSContext.h"       // JSContext
-#include "vm/PlainObject.h"     // NewPlainObjectWithMaybeDuplicateKeys
-#include "vm/Realm.h"           // JS::Realm
+#include "js/Vector.h"           // Vector
+#include "util/StringBuilder.h"  // JSStringBuilder
+#include "vm/ArrayObject.h"      // ArrayObject
+#include "vm/ErrorReporting.h"   // ReportCompileErrorLatin1, ErrorMetadata
+#include "vm/JSAtomUtils.h"      // AtomizeChars
+#include "vm/JSContext.h"        // JSContext
+#include "vm/PlainObject.h"  // NewPlainObjectWithMaybeDuplicateKeys, NewPlainObjectWithProto
+#include "vm/Realm.h"  // JS::Realm
 #include "vm/StringType.h"  // JSString, JSAtom, JSLinearString, NewStringCopyN, NameToId
 
 #include "vm/JSAtomUtils-inl.h"  // AtomToId
@@ -56,9 +57,9 @@ using mozilla::IsAsciiDigit;
 using mozilla::IsAsciiHexDigit;
 using mozilla::RangedPtr;
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
-void JSONTokenizer<CharT, ParserT, StringBuilderT>::getTextPosition(
-    uint32_t* column, uint32_t* line) {
+template <typename CharT, typename ParserT>
+void JSONTokenizer<CharT, ParserT>::getTextPosition(uint32_t* column,
+                                                    uint32_t* line) {
   CharPtr ptr = begin;
   uint32_t col = 1;
   uint32_t row = 1;
@@ -82,9 +83,8 @@ static inline bool IsJSONWhitespace(char16_t c) {
   return c == '\t' || c == '\r' || c == '\n' || c == ' ';
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
-bool JSONTokenizer<CharT, ParserT,
-                   StringBuilderT>::consumeTrailingWhitespaces() {
+template <typename CharT, typename ParserT>
+bool JSONTokenizer<CharT, ParserT>::consumeTrailingWhitespaces() {
   for (; current < end; current++) {
     if (!IsJSONWhitespace(*current)) {
       return false;
@@ -93,8 +93,8 @@ bool JSONTokenizer<CharT, ParserT,
   return true;
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::advance() {
+template <typename CharT, typename ParserT>
+JSONToken JSONTokenizer<CharT, ParserT>::advance() {
   while (current < end && IsJSONWhitespace(*current)) {
     current++;
   }
@@ -185,8 +185,8 @@ JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::advance() {
   }
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::advancePropertyName() {
+template <typename CharT, typename ParserT>
+JSONToken JSONTokenizer<CharT, ParserT>::advancePropertyName() {
   MOZ_ASSERT(current[-1] == ',');
 
   while (current < end && IsJSONWhitespace(*current)) {
@@ -205,9 +205,8 @@ JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::advancePropertyName() {
   return token(JSONToken::Error);
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken
-JSONTokenizer<CharT, ParserT, StringBuilderT>::advancePropertyColon() {
+template <typename CharT, typename ParserT>
+JSONToken JSONTokenizer<CharT, ParserT>::advancePropertyColon() {
   MOZ_ASSERT(current[-1] == '"');
 
   while (current < end && IsJSONWhitespace(*current)) {
@@ -244,9 +243,8 @@ static inline void AssertPastValue(const RangedPtr<const CharT> current) {
              IsAsciiDigit(current[-1]));
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken
-JSONTokenizer<CharT, ParserT, StringBuilderT>::advanceAfterProperty() {
+template <typename CharT, typename ParserT>
+JSONToken JSONTokenizer<CharT, ParserT>::advanceAfterProperty() {
   AssertPastValue(current);
 
   while (current < end && IsJSONWhitespace(*current)) {
@@ -271,9 +269,8 @@ JSONTokenizer<CharT, ParserT, StringBuilderT>::advanceAfterProperty() {
   return token(JSONToken::Error);
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken
-JSONTokenizer<CharT, ParserT, StringBuilderT>::advanceAfterObjectOpen() {
+template <typename CharT, typename ParserT>
+JSONToken JSONTokenizer<CharT, ParserT>::advanceAfterObjectOpen() {
   MOZ_ASSERT(current[-1] == '{');
 
   while (current < end && IsJSONWhitespace(*current)) {
@@ -297,9 +294,8 @@ JSONTokenizer<CharT, ParserT, StringBuilderT>::advanceAfterObjectOpen() {
   return token(JSONToken::Error);
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken
-JSONTokenizer<CharT, ParserT, StringBuilderT>::advanceAfterArrayElement() {
+template <typename CharT, typename ParserT>
+JSONToken JSONTokenizer<CharT, ParserT>::advanceAfterArrayElement() {
   AssertPastValue(current);
 
   while (current < end && IsJSONWhitespace(*current)) {
@@ -324,10 +320,10 @@ JSONTokenizer<CharT, ParserT, StringBuilderT>::advanceAfterArrayElement() {
   return token(JSONToken::Error);
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
+template <typename CharT, typename ParserT>
 template <JSONStringType ST>
-JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::stringToken(
-    const CharPtr start, size_t length) {
+JSONToken JSONTokenizer<CharT, ParserT>::stringToken(const CharPtr start,
+                                                     size_t length) {
   if (!parser->handler.template setStringValue<ST>(start, length,
                                                    getSource())) {
     return JSONToken::OOM;
@@ -335,27 +331,27 @@ JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::stringToken(
   return JSONToken::String;
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
+template <typename CharT, typename ParserT>
 template <JSONStringType ST>
-JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::stringToken(
-    StringBuilderT& builder) {
+JSONToken JSONTokenizer<CharT, ParserT>::stringToken(
+    JSONStringBuilder& builder) {
   if (!parser->handler.template setStringValue<ST>(builder, getSource())) {
     return JSONToken::OOM;
   }
   return JSONToken::String;
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::numberToken(double d) {
+template <typename CharT, typename ParserT>
+JSONToken JSONTokenizer<CharT, ParserT>::numberToken(double d) {
   if (!parser->handler.setNumberValue(d, getSource())) {
     return JSONToken::OOM;
   }
   return JSONToken::Number;
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
+template <typename CharT, typename ParserT>
 template <JSONStringType ST>
-JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::readString() {
+JSONToken JSONTokenizer<CharT, ParserT>::readString() {
   MOZ_ASSERT(current < end);
   MOZ_ASSERT(*current == '"');
 
@@ -396,7 +392,7 @@ JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::readString() {
    * of unescaped characters into a temporary buffer, then an escaped
    * character, and repeat until the entire string is consumed.
    */
-  StringBuilderT builder(parser->handler.context());
+  JSONStringBuilder builder(parser->handler.context());
   do {
     if (start < current && !builder.append(start.get(), current.get())) {
       return token(JSONToken::OOM);
@@ -496,8 +492,8 @@ JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::readString() {
   return token(JSONToken::Error);
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::readNumber() {
+template <typename CharT, typename ParserT>
+JSONToken JSONTokenizer<CharT, ParserT>::readNumber() {
   MOZ_ASSERT(current < end);
   MOZ_ASSERT(IsAsciiDigit(*current) || *current == '-');
 
@@ -595,9 +591,20 @@ JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::readNumber() {
   return numberToken(negative ? -d : d);
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
-void JSONTokenizer<CharT, ParserT, StringBuilderT>::error(const char* msg) {
+template <typename CharT, typename ParserT>
+void JSONTokenizer<CharT, ParserT>::error(const char* msg) {
   parser->error(msg);
+}
+
+static void ReportJSONSyntaxError(FrontendContext* fc, ErrorMetadata&& metadata,
+                                  unsigned errorNumber, ...) {
+  va_list args;
+  va_start(args, errorNumber);
+
+  js::ReportCompileErrorLatin1VA(fc, std::move(metadata), nullptr, errorNumber,
+                                 &args);
+
+  va_end(args);
 }
 
 // JSONFullParseHandlerAnyChar uses an AutoSelectGCHeap to switch to allocating
@@ -770,13 +777,13 @@ void JSONFullParseHandlerAnyChar::trace(JSTracer* trc) {
 }
 
 template <typename CharT>
-bool JSONFullParseHandler<CharT>::StringBuilder::append(char16_t c) {
+bool JSONFullParseHandler<CharT>::JSONStringBuilder::append(char16_t c) {
   return buffer.append(c);
 }
 
 template <typename CharT>
-bool JSONFullParseHandler<CharT>::StringBuilder::append(const CharT* begin,
-                                                        const CharT* end) {
+bool JSONFullParseHandler<CharT>::JSONStringBuilder::append(const CharT* begin,
+                                                            const CharT* end) {
   return buffer.append(begin, end);
 }
 
@@ -801,7 +808,7 @@ inline bool JSONFullParseHandler<CharT>::setStringValue(
 template <typename CharT>
 template <JSONStringType ST>
 inline bool JSONFullParseHandler<CharT>::setStringValue(
-    StringBuilder& builder, mozilla::Span<const CharT>&& source) {
+    JSONStringBuilder& builder, mozilla::Span<const CharT>&& source) {
   JSString* str;
   if constexpr (ST == JSONStringType::PropertyName) {
     str = builder.buffer.finishAtom();
@@ -844,8 +851,22 @@ void JSONFullParseHandler<CharT>::reportError(const char* msg, uint32_t line,
   char lineString[MaxWidth];
   SprintfLiteral(lineString, "%" PRIu32, line);
 
-  JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_JSON_BAD_PARSE,
-                            msg, lineString, columnString);
+  if (reportLineNumbersFromParsedData) {
+    AutoReportFrontendContext fc(cx);
+
+    ErrorMetadata metadata;
+    metadata.isMuted = false;
+    metadata.filename = filename.valueOr(JS::ConstUTF8CharsZ(""));
+    metadata.lineNumber = line;
+    metadata.columnNumber = JS::ColumnNumberOneOrigin(column);
+
+    ReportJSONSyntaxError(&fc, std::move(metadata), JSMSG_JSON_BAD_PARSE, msg,
+                          lineString, columnString);
+  } else {
+    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                              JSMSG_JSON_BAD_PARSE, msg, lineString,
+                              columnString);
+  }
 }
 
 template <typename CharT, typename HandlerT>
@@ -1049,12 +1070,10 @@ template class js::JSONPerHandlerParser<Latin1Char,
 template class js::JSONPerHandlerParser<char16_t,
                                         js::JSONFullParseHandler<char16_t>>;
 
-#ifdef ENABLE_JSON_PARSE_WITH_SOURCE
 template class js::JSONPerHandlerParser<Latin1Char,
                                         js::JSONReviveHandler<Latin1Char>>;
 template class js::JSONPerHandlerParser<char16_t,
                                         js::JSONReviveHandler<char16_t>>;
-#endif
 
 template class js::JSONPerHandlerParser<Latin1Char,
                                         js::JSONSyntaxParseHandler<Latin1Char>>;
@@ -1087,11 +1106,15 @@ void JSONParser<CharT>::trace(JSTracer* trc) {
 template class js::JSONParser<Latin1Char>;
 template class js::JSONParser<char16_t>;
 
-#ifdef ENABLE_JSON_PARSE_WITH_SOURCE
 template <typename CharT>
 inline bool JSONReviveHandler<CharT>::objectOpen(Vector<StackEntry, 10>& stack,
                                                  PropertyVector** properties) {
-  if (!parseRecordStack.append(ParseRecordEntry{context()})) {
+  ParseRecordObject::EntryMap* newParseEntry =
+      NewPlainObjectWithProto(context(), nullptr);
+  if (!newParseEntry) {
+    return false;
+  }
+  if (!parseRecordStack.append(newParseEntry)) {
     return false;
   }
 
@@ -1105,9 +1128,11 @@ inline bool JSONReviveHandler<CharT>::finishObjectMember(
   if (!Base::finishObjectMember(stack, value, properties)) {
     return false;
   }
-  parseRecord.value = value;
-  return finishMemberParseRecord((*properties)->back().id,
-                                 parseRecordStack.back());
+  parseRecord->setValue(value);
+  Rooted<JS::PropertyKey> key(context(), (*properties)->back().id);
+  Rooted<ParseRecordObject::EntryMap*> parseRecordBack(context(),
+                                                       parseRecordStack.back());
+  return finishMemberParseRecord(key, parseRecordBack);
 }
 
 template <typename CharT>
@@ -1117,7 +1142,9 @@ inline bool JSONReviveHandler<CharT>::finishObject(
   if (!Base::finishObject(stack, vp, properties)) {
     return false;
   }
-  if (!finishCompoundParseRecord(vp, parseRecordStack.back())) {
+  Rooted<ParseRecordObject::EntryMap*> parseRecordBack(context(),
+                                                       parseRecordStack.back());
+  if (!finishCompoundParseRecord(vp, parseRecordBack)) {
     return false;
   }
   parseRecordStack.popBack();
@@ -1128,7 +1155,12 @@ inline bool JSONReviveHandler<CharT>::finishObject(
 template <typename CharT>
 inline bool JSONReviveHandler<CharT>::arrayOpen(Vector<StackEntry, 10>& stack,
                                                 ElementVector** elements) {
-  if (!parseRecordStack.append(ParseRecordEntry{context()})) {
+  ParseRecordObject::EntryMap* newParseEntry =
+      NewPlainObjectWithProto(context(), nullptr);
+  if (!newParseEntry) {
+    return false;
+  }
+  if (!parseRecordStack.append(newParseEntry)) {
     return false;
   }
 
@@ -1143,8 +1175,13 @@ inline bool JSONReviveHandler<CharT>::arrayElement(
     return false;
   }
   size_t index = (*elements)->length() - 1;
-  JS::PropertyKey key = js::PropertyKey::Int(index);
-  return finishMemberParseRecord(key, parseRecordStack.back());
+  // The JSON string is limited to JS::MaxStringLength, so there should be no
+  // way to get more than IntMax elements
+  MOZ_ASSERT(index <= js::PropertyKey::IntMax);
+  Rooted<JS::PropertyKey> key(context(), js::PropertyKey::Int(int32_t(index)));
+  Rooted<ParseRecordObject::EntryMap*> parseRecordBack(context(),
+                                                       parseRecordStack.back());
+  return finishMemberParseRecord(key, parseRecordBack);
 }
 
 template <typename CharT>
@@ -1154,7 +1191,9 @@ inline bool JSONReviveHandler<CharT>::finishArray(
   if (!Base::finishArray(stack, vp, elements)) {
     return false;
   }
-  if (!finishCompoundParseRecord(vp, parseRecordStack.back())) {
+  Rooted<ParseRecordObject::EntryMap*> parseRecordBack(context(),
+                                                       parseRecordStack.back());
+  if (!finishCompoundParseRecord(vp, parseRecordBack)) {
     return false;
   }
   parseRecordStack.popBack();
@@ -1164,17 +1203,23 @@ inline bool JSONReviveHandler<CharT>::finishArray(
 
 template <typename CharT>
 inline bool JSONReviveHandler<CharT>::finishMemberParseRecord(
-    JS::PropertyKey& key, ParseRecordEntry& objectEntry) {
-  parseRecord.key = key;
-  return objectEntry.put(key, std::move(parseRecord));
+    Handle<JS::PropertyKey> key,
+    Handle<ParseRecordObject::EntryMap*> parseEntry) {
+  parseRecord->setKey(context(), key.get());
+  Rooted<Value> pro(context(), ObjectValue(*parseRecord));
+  parseRecord = nullptr;
+  return JS_SetPropertyById(context(), parseEntry, key, pro);
 }
 
 template <typename CharT>
 inline bool JSONReviveHandler<CharT>::finishCompoundParseRecord(
-    const Value& value, ParseRecordEntry& objectEntry) {
-  Rooted<JSONParseNode*> parseNode(context());
-  parseRecord = ParseRecordObject(parseNode, value);
-  return parseRecord.addEntries(context(), std::move(objectEntry));
+    const Value& value, Handle<ParseRecordObject::EntryMap*> parseEntry) {
+  parseRecord = ParseRecordObject::create(context(), value);
+  if (!parseRecord) {
+    return false;
+  }
+  parseRecord->setEntries(context(), parseEntry);
+  return true;
 }
 
 template <typename CharT>
@@ -1186,30 +1231,33 @@ inline bool JSONReviveHandler<CharT>::finishPrimitiveParseRecord(
   if (!parseNode) {
     return false;
   }
-  parseRecord = ParseRecordObject(parseNode, value);
-  return true;
+  parseRecord = ParseRecordObject::create(context(), parseNode, value);
+  return !!parseRecord;
 }
 
 template <typename CharT>
 void JSONReviveHandler<CharT>::trace(JSTracer* trc) {
   Base::trace(trc);
-  parseRecord.trace(trc);
-  for (auto& entry : this->parseRecordStack) {
-    entry.trace(trc);
+  if (parseRecord) {
+    TraceRoot(trc, &parseRecord, "parse record");
   }
+  this->parseRecordStack.trace(trc);
 }
 
 template <typename CharT>
 bool JSONReviveParser<CharT>::parse(JS::MutableHandle<JS::Value> vp,
-                                    JS::MutableHandle<ParseRecordObject> pro) {
+                                    JS::MutableHandle<ParseRecordObject*> pro) {
   JS::Rooted<JS::Value> tempValue(this->handler.cx);
 
   vp.setUndefined();
 
-  bool result = this->parseImpl(
-      tempValue, [&](JS::Handle<JS::Value> value) { vp.set(value); });
-  pro.set(std::move(this->handler.parseRecord));
-  return result;
+  if (!this->parseImpl(tempValue,
+                       [&](JS::Handle<JS::Value> value) { vp.set(value); })) {
+    return false;
+  }
+  MOZ_ASSERT(this->handler.parseRecord);
+  pro.set(this->handler.parseRecord);
+  return true;
 }
 
 template <typename CharT>
@@ -1227,7 +1275,6 @@ void JSONReviveParser<CharT>::trace(JSTracer* trc) {
 
 template class js::JSONReviveParser<Latin1Char>;
 template class js::JSONReviveParser<char16_t>;
-#endif  // ENABLE_JSON_PARSE_WITH_SOURCE
 
 template <typename CharT>
 inline bool JSONSyntaxParseHandler<CharT>::objectOpen(
@@ -1261,17 +1308,6 @@ inline bool JSONSyntaxParseHandler<CharT>::finishArray(
     Vector<StackEntry, 10>& stack, DummyValue* vp, ElementVector* elements) {
   stack.popBack();
   return true;
-}
-
-static void ReportJSONSyntaxError(FrontendContext* fc, ErrorMetadata&& metadata,
-                                  unsigned errorNumber, ...) {
-  va_list args;
-  va_start(args, errorNumber);
-
-  js::ReportCompileErrorLatin1VA(fc, std::move(metadata), nullptr, errorNumber,
-                                 &args);
-
-  va_end(args);
 }
 
 template <typename CharT>
@@ -1347,11 +1383,11 @@ class MOZ_STACK_CLASS DelegateHandler {
   struct ElementVector {};
   struct PropertyVector {};
 
-  class StringBuilder {
+  class JSONStringBuilder {
    public:
-    StringBuffer buffer;
+    StringBuilder buffer;
 
-    explicit StringBuilder(FrontendContext* fc) : buffer(fc) {}
+    explicit JSONStringBuilder(FrontendContext* fc) : buffer(fc) {}
 
     bool append(char16_t c) { return buffer.append(c); }
     bool append(const CharT* begin, const CharT* end) {
@@ -1391,7 +1427,7 @@ class MOZ_STACK_CLASS DelegateHandler {
   }
 
   template <JSONStringType ST>
-  inline bool setStringValue(StringBuilder& builder,
+  inline bool setStringValue(JSONStringBuilder& builder,
                              mozilla::Span<const CharT>&& source) {
     if (hadHandlerError_) {
       return false;

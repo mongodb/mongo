@@ -104,6 +104,7 @@ static constexpr Register InstanceReg{Registers::invalid_reg};
 static constexpr Register WasmJitEntryReturnScratch{Registers::invalid_reg};
 static constexpr Register WasmCallRefCallScratchReg0{Registers::invalid_reg};
 static constexpr Register WasmCallRefCallScratchReg1{Registers::invalid_reg};
+static constexpr Register WasmCallRefCallScratchReg2{Registers::invalid_reg};
 static constexpr Register WasmCallRefReg{Registers::invalid_reg};
 static constexpr Register WasmTailCallInstanceScratchReg{
     Registers::invalid_reg};

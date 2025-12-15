@@ -42,7 +42,7 @@
 #include "gc/Marking.h"
 #include "js/CharacterEncoding.h"
 #include "js/Wrapper.h"
-#include "util/StringBuffer.h"
+#include "mozilla/StringBuffer.h"
 #include "vm/ErrorObject.h"
 #include "vm/GlobalObject.h"
 #include "vm/JSContext.h"

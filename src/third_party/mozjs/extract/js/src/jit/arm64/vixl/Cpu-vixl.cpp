@@ -203,12 +203,7 @@ CPUFeatures CPU::InferCPUFeaturesFromOS(
   static const size_t kFeatureBitCount =
       sizeof(kFeatureBits) / sizeof(kFeatureBits[0]);
 
-  // Mozilla change: Set the default for the simulator.
-#ifdef JS_SIMULATOR_ARM64
-  unsigned long auxv = ~(0UL);  // Enable all features for the Simulator.
-#else
   unsigned long auxv = getauxval(AT_HWCAP);  // NOLINT(runtime/int)
-#endif
 
   VIXL_STATIC_ASSERT(kFeatureBitCount < (sizeof(auxv) * kBitsPerByte));
   for (size_t i = 0; i < kFeatureBitCount; i++) {

@@ -23,9 +23,9 @@ namespace js {
 namespace detail {
 
 /* static */
-UniquePtr<BumpChunk> BumpChunk::newWithCapacity(size_t size) {
+UniquePtr<BumpChunk> BumpChunk::newWithCapacity(size_t size, arena_id_t arena) {
   MOZ_DIAGNOSTIC_ASSERT(size >= sizeof(BumpChunk));
-  void* mem = js_malloc(size);
+  void* mem = js_arena_malloc(arena, size);
   if (!mem) {
     return nullptr;
   }
@@ -185,7 +185,8 @@ LifoAlloc::UniqueBumpChunk LifoAlloc::newChunkWithCapacity(size_t n,
                                : NextSize(defaultChunkSize_, smallAllocsSize_);
 
   // Create a new BumpChunk, and allocate space for it.
-  UniqueBumpChunk result = detail::BumpChunk::newWithCapacity(chunkSize);
+  UniqueBumpChunk result =
+      detail::BumpChunk::newWithCapacity(chunkSize, arena_);
   if (!result) {
     return nullptr;
   }
@@ -369,6 +370,13 @@ void LifoAlloc::steal(LifoAlloc* other) {
 void LifoAlloc::transferFrom(LifoAlloc* other) {
   MOZ_ASSERT(!markCount);
   MOZ_ASSERT(!other->markCount);
+
+  // This assertion is not really necessary, and if it is getting in your way
+  // please feel free to just delete it, but it should generally point you in
+  // a decent direction. LifoAllocs are entirely capable of having a mix of
+  // allocations from different arenas, this is just a heuristic that we
+  // expect will yield better performance.
+  MOZ_ASSERT(arena_ == other->arena_);
 
   // Transferred chunks are not counted as part of |smallAllocsSize| as this
   // could introduce bias in the |NextSize| heuristics, leading to

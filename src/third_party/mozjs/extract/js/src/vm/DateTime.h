@@ -7,6 +7,7 @@
 #ifndef vm_DateTime_h
 #define vm_DateTime_h
 
+#include "mozilla/Atomics.h"
 #include "mozilla/UniquePtr.h"
 
 #include <stdint.h>
@@ -25,25 +26,24 @@ class Realm;
 
 namespace js {
 
-/* Constants defined by ES5 15.9.1.10. */
-constexpr double HoursPerDay = 24;
-constexpr double MinutesPerHour = 60;
-constexpr double SecondsPerMinute = 60;
-constexpr double msPerSecond = 1000;
-constexpr double msPerMinute = msPerSecond * SecondsPerMinute;
-constexpr double msPerHour = msPerMinute * MinutesPerHour;
-
-/* ES5 15.9.1.2. */
-constexpr double msPerDay = msPerHour * HoursPerDay;
+/**
+ * 21.4.1.2 Time-related Constants
+ *
+ * ES2025 draft rev 76814cbd5d7842c2a99d28e6e8c7833f1de5bee0
+ */
+constexpr int32_t HoursPerDay = 24;
+constexpr int32_t MinutesPerHour = 60;
+constexpr int32_t SecondsPerMinute = 60;
+constexpr int32_t msPerSecond = 1000;
+constexpr int32_t msPerMinute = msPerSecond * SecondsPerMinute;
+constexpr int32_t msPerHour = msPerMinute * MinutesPerHour;
+constexpr int32_t msPerDay = msPerHour * HoursPerDay;
 
 /*
- * Additional quantities not mentioned in the spec.  Be careful using these!
- * They aren't doubles and aren't defined in terms of all the other constants.
- * If you need constants that trigger floating point semantics, you'll have to
- * manually cast to get it.
+ * Additional quantities not mentioned in the spec.
  */
-constexpr unsigned SecondsPerHour = 60 * 60;
-constexpr unsigned SecondsPerDay = SecondsPerHour * 24;
+constexpr int32_t SecondsPerHour = 60 * 60;
+constexpr int32_t SecondsPerDay = SecondsPerHour * 24;
 
 constexpr double StartOfTime = -8.64e15;
 constexpr double EndOfTime = 8.64e15;
@@ -121,6 +121,14 @@ class DateTimeInfo {
   static ExclusiveData<DateTimeInfo>* instance;
   static ExclusiveData<DateTimeInfo>* instanceUTC;
 
+  static constexpr int32_t InvalidOffset = INT32_MIN;
+
+  // Additional cache to avoid the mutex overhead. Uses "relaxed" semantics
+  // because it's acceptable if time zone offset changes aren't propagated right
+  // away to all other threads.
+  static inline mozilla::Atomic<int32_t, mozilla::Relaxed>
+      utcToLocalOffsetSeconds{InvalidOffset};
+
   friend class ExclusiveData<DateTimeInfo>;
 
   friend bool InitDateTimeState();
@@ -163,13 +171,27 @@ class DateTimeInfo {
    * operating system.
    */
   static int32_t utcToLocalStandardOffsetSeconds(ForceUTC forceUTC) {
+    // UTC offset is always zero.
+    if (forceUTC == ForceUTC::Yes) {
+      return 0;
+    }
+
+    // First try the cached offset to avoid any mutex overhead.
+    int32_t offset = utcToLocalOffsetSeconds;
+    if (offset != InvalidOffset) {
+      return offset;
+    }
+
+    // If that fails, use the mutex-synchronized code path.
     auto guard = acquireLockWithValidTimeZone(forceUTC);
-    return guard->utcToLocalStandardOffsetSeconds_;
+    offset = guard->utcToLocalStandardOffsetSeconds_;
+    utcToLocalOffsetSeconds = offset;
+    return offset;
   }
 
-#if JS_HAS_INTL_API
   enum class TimeZoneOffset { UTC, Local };
 
+#if JS_HAS_INTL_API
   /**
    * Return the time zone offset, including DST, in milliseconds at the
    * given time. The input time can be either at UTC or at local time.
@@ -222,6 +244,12 @@ class DateTimeInfo {
   }
 #endif /* JS_HAS_INTL_API */
 
+  // JIT access.
+  static const void* addressOfUTCToLocalOffsetSeconds() {
+    static_assert(sizeof(decltype(utcToLocalOffsetSeconds)) == sizeof(int32_t));
+    return &DateTimeInfo::utcToLocalOffsetSeconds;
+  }
+
  private:
   // The method below should only be called via js::ResetTimeZoneInternal().
   friend void js::ResetTimeZoneInternal(ResetTimeZoneMode);
@@ -230,6 +258,9 @@ class DateTimeInfo {
     {
       auto guard = instance->lock();
       guard->internalResetTimeZone(mode);
+
+      // Mark the cached value as invalid.
+      utcToLocalOffsetSeconds = InvalidOffset;
     }
     {
       // Only needed to initialize the default state and any later call will

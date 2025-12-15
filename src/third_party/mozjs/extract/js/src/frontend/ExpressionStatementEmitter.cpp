@@ -12,8 +12,6 @@
 using namespace js;
 using namespace js::frontend;
 
-using mozilla::Maybe;
-
 ExpressionStatementEmitter::ExpressionStatementEmitter(BytecodeEmitter* bce,
                                                        ValueUsage valueUsage)
     : bce_(bce), valueUsage_(valueUsage) {}

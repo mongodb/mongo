@@ -13,6 +13,7 @@
 #include "mozilla/LinkedList.h"
 #include "mozilla/Maybe.h"
 
+#include <tuple>
 #include <type_traits>
 #include <utility>
 
@@ -23,10 +24,10 @@
 #include "js/GCPolicyAPI.h"
 #include "js/GCTypeMacros.h"  // JS_FOR_EACH_PUBLIC_{,TAGGED_}GC_POINTER_TYPE
 #include "js/HashTable.h"
-#include "js/HeapAPI.h"  // StackKindCount
+#include "js/HeapAPI.h"            // StackKindCount
+#include "js/NativeStackLimits.h"  // JS::NativeStackLimit
 #include "js/ProfilingStack.h"
 #include "js/Realm.h"
-#include "js/Stack.h"  // JS::NativeStackLimit
 #include "js/TypeDecls.h"
 #include "js/UniquePtr.h"
 
@@ -172,18 +173,18 @@ struct Cell;
 // Assignment operators on a base class are hidden by the implicitly defined
 // operator= on the derived class. Thus, define the operator= directly on the
 // class as we would need to manually pass it through anyway.
-#define DECLARE_POINTER_ASSIGN_OPS(Wrapper, T)     \
-  Wrapper<T>& operator=(const T& p) {              \
-    set(p);                                        \
-    return *this;                                  \
-  }                                                \
-  Wrapper<T>& operator=(T&& p) {                   \
-    set(std::move(p));                             \
-    return *this;                                  \
-  }                                                \
-  Wrapper<T>& operator=(const Wrapper<T>& other) { \
-    set(other.get());                              \
-    return *this;                                  \
+#define DECLARE_POINTER_ASSIGN_OPS(Wrapper, T) \
+  Wrapper& operator=(const T& p) {             \
+    set(p);                                    \
+    return *this;                              \
+  }                                            \
+  Wrapper& operator=(T&& p) {                  \
+    set(std::move(p));                         \
+    return *this;                              \
+  }                                            \
+  Wrapper& operator=(const Wrapper& other) {   \
+    set(other.get());                          \
+    return *this;                              \
   }
 
 #define DELETE_ASSIGNMENT_OPS(Wrapper, T) \
@@ -205,11 +206,6 @@ namespace JS {
 
 JS_PUBLIC_API void HeapObjectPostWriteBarrier(JSObject** objp, JSObject* prev,
                                               JSObject* next);
-JS_PUBLIC_API void HeapStringPostWriteBarrier(JSString** objp, JSString* prev,
-                                              JSString* next);
-JS_PUBLIC_API void HeapBigIntPostWriteBarrier(JS::BigInt** bip,
-                                              JS::BigInt* prev,
-                                              JS::BigInt* next);
 JS_PUBLIC_API void HeapObjectWriteBarriers(JSObject** objp, JSObject* prev,
                                            JSObject* next);
 JS_PUBLIC_API void HeapStringWriteBarriers(JSString** objp, JSString* prev,
@@ -244,8 +240,8 @@ struct SafelyInitialized {
     // doesn't offer a type trait indicating whether a class's constructor is
     // user-defined, which better approximates our desired semantics.)
     constexpr bool IsNonTriviallyDefaultConstructibleClassOrUnion =
-        (std::is_class_v<T> ||
-         std::is_union_v<T>)&&!std::is_trivially_default_constructible_v<T>;
+        (std::is_class_v<T> || std::is_union_v<T>) &&
+        !std::is_trivially_default_constructible_v<T>;
 
     static_assert(IsPointer || IsNonTriviallyDefaultConstructibleClassOrUnion,
                   "T() must evaluate to a safely-initialized T");
@@ -281,13 +277,9 @@ inline void AssertGCThingIsNotNurseryAllocable(js::gc::Cell* cell) {}
  *
  * Heap<T> implements the following barriers:
  *
+ *  - Pre-write barrier (necessary for incremental GC).
  *  - Post-write barrier (necessary for generational GC).
- *  - Read barrier (necessary for incremental GC and cycle collector
- *    integration).
- *
- * Note Heap<T> does not have a pre-write barrier as used internally in the
- * engine. The read barrier is used to mark anything read from a Heap<T> during
- * an incremental GC.
+ *  - Read barrier (necessary for cycle collector integration).
  *
  * Heap<T> may be moved or destroyed outside of GC finalization and hence may be
  * used in dynamic storage such as a Vector.
@@ -302,8 +294,6 @@ inline void AssertGCThingIsNotNurseryAllocable(js::gc::Cell* cell) {}
  */
 template <typename T>
 class MOZ_NON_MEMMOVABLE Heap : public js::HeapOperations<T, Heap<T>> {
-  // Please note: this can actually also be used by nsXBLMaybeCompiled<T>, for
-  // legacy reasons.
   static_assert(js::IsHeapConstructibleType<T>::value,
                 "Type T must be a public GC pointer type");
 
@@ -316,7 +306,7 @@ class MOZ_NON_MEMMOVABLE Heap : public js::HeapOperations<T, Heap<T>> {
                   "Heap<T> must be binary compatible with T.");
   }
   explicit Heap(const T& p) : ptr(p) {
-    postWriteBarrier(SafelyInitialized<T>::create(), ptr);
+    writeBarriers(SafelyInitialized<T>::create(), ptr);
   }
 
   /*
@@ -325,25 +315,24 @@ class MOZ_NON_MEMMOVABLE Heap : public js::HeapOperations<T, Heap<T>> {
    * breaks common usage of move semantics, so we need to define both, even
    * though they are equivalent.
    */
-  explicit Heap(const Heap<T>& other) : ptr(other.getWithoutExpose()) {
-    postWriteBarrier(SafelyInitialized<T>::create(), ptr);
+  explicit Heap(const Heap<T>& other) : ptr(other.unbarrieredGet()) {
+    writeBarriers(SafelyInitialized<T>::create(), ptr);
   }
-  Heap(Heap<T>&& other) : ptr(other.getWithoutExpose()) {
-    postWriteBarrier(SafelyInitialized<T>::create(), ptr);
+  Heap(Heap<T>&& other) : ptr(other.unbarrieredGet()) {
+    writeBarriers(SafelyInitialized<T>::create(), ptr);
   }
 
   Heap& operator=(Heap<T>&& other) {
-    set(other.getWithoutExpose());
+    set(other.unbarrieredGet());
     other.set(SafelyInitialized<T>::create());
     return *this;
   }
+  // Copy constructor defined by DECLARE_POINTER_ASSIGN_OPS.
 
-  ~Heap() { postWriteBarrier(ptr, SafelyInitialized<T>::create()); }
+  ~Heap() { writeBarriers(ptr, SafelyInitialized<T>::create()); }
 
   DECLARE_POINTER_CONSTREF_OPS(T);
-  DECLARE_POINTER_ASSIGN_OPS(Heap, T);
-
-  const T* address() const { return &ptr; }
+  DECLARE_POINTER_ASSIGN_OPS(Heap<T>, T);
 
   void exposeToActiveJS() const { js::BarrierMethods<T>::exposeToJS(ptr); }
 
@@ -351,32 +340,25 @@ class MOZ_NON_MEMMOVABLE Heap : public js::HeapOperations<T, Heap<T>> {
     exposeToActiveJS();
     return ptr;
   }
-  const T& getWithoutExpose() const {
-    js::BarrierMethods<T>::readBarrier(ptr);
-    return ptr;
-  }
   const T& unbarrieredGet() const { return ptr; }
 
   void set(const T& newPtr) {
     T tmp = ptr;
     ptr = newPtr;
-    postWriteBarrier(tmp, ptr);
+    writeBarriers(tmp, ptr);
   }
-
-  T* unsafeGet() { return &ptr; }
-
   void unbarrieredSet(const T& newPtr) { ptr = newPtr; }
+
+  T* unsafeAddress() { return &ptr; }
+  const T* unsafeAddress() const { return &ptr; }
 
   explicit operator bool() const {
     return bool(js::BarrierMethods<T>::asGCThingOrNull(ptr));
   }
-  explicit operator bool() {
-    return bool(js::BarrierMethods<T>::asGCThingOrNull(ptr));
-  }
 
  private:
-  void postWriteBarrier(const T& prev, const T& next) {
-    js::BarrierMethods<T>::postWriteBarrier(&ptr, prev, next);
+  void writeBarriers(const T& prev, const T& next) {
+    js::BarrierMethods<T>::writeBarriers(&ptr, prev, next);
   }
 
   T ptr;
@@ -448,7 +430,7 @@ inline void AssertObjectIsNotGray(const JS::Heap<JSObject*>& obj) {}
  * it has two important differences:
  *
  *  1) Pointers which are statically known to only reference "tenured" objects
- *     can avoid the extra overhead of SpiderMonkey's write barriers.
+ *     can avoid the extra overhead of SpiderMonkey's post write barriers.
  *
  *  2) Objects in the "tenured" heap have stronger alignment restrictions than
  *     those in the "nursery", so it is possible to store flags in the lower
@@ -473,6 +455,9 @@ inline void AssertObjectIsNotGray(const JS::Heap<JSObject*>& obj) {}
  */
 template <typename T>
 class TenuredHeap : public js::HeapOperations<T, TenuredHeap<T>> {
+  static_assert(js::IsHeapConstructibleType<T>::value,
+                "Type T must be a public GC pointer type");
+
  public:
   using ElementType = T;
 
@@ -480,12 +465,29 @@ class TenuredHeap : public js::HeapOperations<T, TenuredHeap<T>> {
     static_assert(sizeof(T) == sizeof(TenuredHeap<T>),
                   "TenuredHeap<T> must be binary compatible with T.");
   }
-  explicit TenuredHeap(T p) : bits(0) { setPtr(p); }
+
+  explicit TenuredHeap(T p) : bits(0) { unbarrieredSetPtr(p); }
   explicit TenuredHeap(const TenuredHeap<T>& p) : bits(0) {
-    setPtr(p.getPtr());
+    unbarrieredSetPtr(p.getPtr());
   }
 
+  TenuredHeap<T>& operator=(T p) {
+    setPtr(p);
+    return *this;
+  }
+  TenuredHeap<T>& operator=(const TenuredHeap<T>& other) {
+    preWriteBarrier();
+    bits = other.bits;
+    return *this;
+  }
+
+  ~TenuredHeap() { preWriteBarrier(); }
+
   void setPtr(T newPtr) {
+    preWriteBarrier();
+    unbarrieredSetPtr(newPtr);
+  }
+  void unbarrieredSetPtr(T newPtr) {
     MOZ_ASSERT((reinterpret_cast<uintptr_t>(newPtr) & flagsMask) == 0);
     MOZ_ASSERT(js::gc::IsCellPointerValidOrNull(newPtr));
     if (newPtr) {
@@ -526,25 +528,18 @@ class TenuredHeap : public js::HeapOperations<T, TenuredHeap<T>> {
   explicit operator bool() const {
     return bool(js::BarrierMethods<T>::asGCThingOrNull(unbarrieredGetPtr()));
   }
-  explicit operator bool() {
-    return bool(js::BarrierMethods<T>::asGCThingOrNull(unbarrieredGetPtr()));
-  }
-
-  TenuredHeap<T>& operator=(T p) {
-    setPtr(p);
-    return *this;
-  }
-
-  TenuredHeap<T>& operator=(const TenuredHeap<T>& other) {
-    bits = other.bits;
-    return *this;
-  }
 
  private:
   enum {
     maskBits = 3,
     flagsMask = (1 << maskBits) - 1,
   };
+
+  void preWriteBarrier() {
+    if (T prev = unbarrieredGetPtr()) {
+      JS::IncrementalPreWriteBarrier(JS::GCCellPtr(prev));
+    }
+  }
 
   uintptr_t bits;
 };
@@ -583,6 +578,8 @@ template <typename T>
 class MutableHandle;
 template <typename T>
 class Rooted;
+template <typename T, size_t N = SIZE_MAX>
+class RootedField;
 template <typename T>
 class PersistentRooted;
 
@@ -662,6 +659,11 @@ class MOZ_NONHEAP_CLASS Handle : public js::HandleOperations<T, Handle<T>> {
       MutableHandle<S>& root,
       std::enable_if_t<std::is_convertible_v<S, T>, int> dummy = 0);
 
+  template <size_t N, typename S>
+  inline MOZ_IMPLICIT Handle(
+      const RootedField<S, N>& rootedField,
+      std::enable_if_t<std::is_convertible_v<S, T>, int> dummy = 0);
+
   DECLARE_POINTER_CONSTREF_OPS(T);
   DECLARE_NONPOINTER_ACCESSOR_METHODS(*ptr);
 
@@ -700,6 +702,8 @@ class MOZ_STACK_CLASS MutableHandle
   using ElementType = T;
 
   inline MOZ_IMPLICIT MutableHandle(Rooted<T>* root);
+  template <size_t N>
+  inline MOZ_IMPLICIT MutableHandle(RootedField<T, N>* root);
   inline MOZ_IMPLICIT MutableHandle(PersistentRooted<T>* root);
 
  private:
@@ -783,7 +787,10 @@ struct PtrBarrierMethodsBase {
 
 template <typename T>
 struct BarrierMethods<T*> : public detail::PtrBarrierMethodsBase<T> {
-  static void postWriteBarrier(T** vp, T* prev, T* next) {
+  static void writeBarriers(T** vp, T* prev, T* next) {
+    if (prev) {
+      JS::IncrementalPreWriteBarrier(JS::GCCellPtr(prev));
+    }
     if (next) {
       JS::AssertGCThingIsNotNurseryAllocable(
           reinterpret_cast<js::gc::Cell*>(next));
@@ -794,6 +801,9 @@ struct BarrierMethods<T*> : public detail::PtrBarrierMethodsBase<T> {
 template <>
 struct BarrierMethods<JSObject*>
     : public detail::PtrBarrierMethodsBase<JSObject> {
+  static void writeBarriers(JSObject** vp, JSObject* prev, JSObject* next) {
+    JS::HeapObjectWriteBarriers(vp, prev, next);
+  }
   static void postWriteBarrier(JSObject** vp, JSObject* prev, JSObject* next) {
     JS::HeapObjectPostWriteBarrier(vp, prev, next);
   }
@@ -807,11 +817,11 @@ struct BarrierMethods<JSObject*>
 template <>
 struct BarrierMethods<JSFunction*>
     : public detail::PtrBarrierMethodsBase<JSFunction> {
-  static void postWriteBarrier(JSFunction** vp, JSFunction* prev,
-                               JSFunction* next) {
-    JS::HeapObjectPostWriteBarrier(reinterpret_cast<JSObject**>(vp),
-                                   reinterpret_cast<JSObject*>(prev),
-                                   reinterpret_cast<JSObject*>(next));
+  static void writeBarriers(JSFunction** vp, JSFunction* prev,
+                            JSFunction* next) {
+    JS::HeapObjectWriteBarriers(reinterpret_cast<JSObject**>(vp),
+                                reinterpret_cast<JSObject*>(prev),
+                                reinterpret_cast<JSObject*>(next));
   }
   static void exposeToJS(JSFunction* fun) {
     if (fun) {
@@ -823,17 +833,25 @@ struct BarrierMethods<JSFunction*>
 template <>
 struct BarrierMethods<JSString*>
     : public detail::PtrBarrierMethodsBase<JSString> {
-  static void postWriteBarrier(JSString** vp, JSString* prev, JSString* next) {
-    JS::HeapStringPostWriteBarrier(vp, prev, next);
+  static void writeBarriers(JSString** vp, JSString* prev, JSString* next) {
+    JS::HeapStringWriteBarriers(vp, prev, next);
+  }
+};
+
+template <>
+struct BarrierMethods<JSScript*>
+    : public detail::PtrBarrierMethodsBase<JSScript> {
+  static void writeBarriers(JSScript** vp, JSScript* prev, JSScript* next) {
+    JS::HeapScriptWriteBarriers(vp, prev, next);
   }
 };
 
 template <>
 struct BarrierMethods<JS::BigInt*>
     : public detail::PtrBarrierMethodsBase<JS::BigInt> {
-  static void postWriteBarrier(JS::BigInt** vp, JS::BigInt* prev,
-                               JS::BigInt* next) {
-    JS::HeapBigIntPostWriteBarrier(vp, prev, next);
+  static void writeBarriers(JS::BigInt** vp, JS::BigInt* prev,
+                            JS::BigInt* next) {
+    JS::HeapBigIntWriteBarriers(vp, prev, next);
   }
 };
 
@@ -1145,11 +1163,19 @@ using RootedTraits =
 template <typename T>
 class MOZ_RAII Rooted : public detail::RootedTraits<T>::StackBase,
                         public js::RootedOperations<T, Rooted<T>> {
+  // Intentionally store a pointer into the stack.
+#if defined(__clang__) || (defined(__GNUC__) && __GNUC__ >= 12)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wdangling-pointer"
+#endif
   inline void registerWithRootLists(RootedListHeads& roots) {
     this->stack = &roots[JS::MapTypeToRootKind<T>::kind];
     this->prev = *this->stack;
     *this->stack = this;
   }
+#if defined(__clang__) || (defined(__GNUC__) && __GNUC__ >= 12)
+#  pragma GCC diagnostic pop
+#endif
 
   inline RootedListHeads& rootLists(RootingContext* cx) {
     return cx->stackRoots_;
@@ -1220,7 +1246,7 @@ class MOZ_RAII Rooted : public detail::RootedTraits<T>::StackBase,
   }
 
   DECLARE_POINTER_CONSTREF_OPS(T);
-  DECLARE_POINTER_ASSIGN_OPS(Rooted, T);
+  DECLARE_POINTER_ASSIGN_OPS(Rooted<T>, T);
 
   T& get() { return ptr; }
   const T& get() const { return ptr; }
@@ -1241,6 +1267,86 @@ struct DefineComparisonOps<Rooted<T>> : std::true_type {
   static const T& get(const Rooted<T>& v) { return v.get(); }
 };
 
+}  // namespace detail
+
+template <typename... Fs>
+using RootedTuple = Rooted<std::tuple<Fs...>>;
+
+// Reference to a field in a RootedTuple. This is a drop-in replacement for an
+// individual Rooted.
+//
+// This is very similar to a MutableHandle but with two differences: it has an
+// assignment operator so doesn't require set() to be called and its address
+// converts to a MutableHandle in the same way as a Rooted.
+//
+// The field is specified by the type parameter, optionally disambiguated by
+// supplying the field index too.
+//
+// Used like this:
+//
+//   RootedTuple<JSObject*, JSString*> roots(cx);
+//   RootedField<JSObject*> obj(roots);
+//   RootedField<JSString*> str(roots);
+//
+// or:
+//
+//   RootedTuple<JString*, JSObject*, JSObject*> roots(cx);
+//   RootedField<JString*, 0> str(roots);
+//   RootedField<JSObject*, 1> obj1(roots);
+//   RootedField<JSObject*, 2> obj2(roots);
+template <typename T, size_t N /* = SIZE_MAX */>
+class MOZ_RAII RootedField : public js::RootedOperations<T, RootedField<T, N>> {
+  T* ptr;
+  friend class Handle<T>;
+  friend class MutableHandle<T>;
+
+ public:
+  using ElementType = T;
+
+  template <typename... Fs>
+  explicit RootedField(RootedTuple<Fs...>& rootedTuple) {
+    using Tuple = std::tuple<Fs...>;
+    if constexpr (N == SIZE_MAX) {
+      ptr = &std::get<T>(rootedTuple.get());
+    } else {
+      static_assert(N < std::tuple_size_v<Tuple>);
+      static_assert(std::is_same_v<T, std::tuple_element_t<N, Tuple>>);
+      ptr = &std::get<N>(rootedTuple.get());
+    }
+  }
+  template <typename... Fs, typename S>
+  explicit RootedField(RootedTuple<Fs...>& rootedTuple, S&& value)
+      : RootedField(rootedTuple) {
+    *ptr = std::forward<S>(value);
+  }
+
+  T& get() { return *ptr; }
+  const T& get() const { return *ptr; }
+  void set(const T& value) {
+    *ptr = value;
+    MOZ_ASSERT(GCPolicy<T>::isValid(*ptr));
+  }
+  void set(T&& value) {
+    *ptr = std::move(value);
+    MOZ_ASSERT(GCPolicy<T>::isValid(*ptr));
+  }
+
+  using WrapperT = RootedField<T, N>;
+  DECLARE_POINTER_CONSTREF_OPS(T);
+  DECLARE_POINTER_ASSIGN_OPS(WrapperT, T);
+  // DECLARE_NONPOINTER_ACCESSOR_METHODS(*ptr);
+  // DECLARE_NONPOINTER_MUTABLE_ACCESSOR_METHODS(*ptr);
+
+ private:
+  RootedField() = delete;
+  RootedField(const RootedField& other) = delete;
+};
+
+namespace detail {
+template <size_t N, typename T>
+struct DefineComparisonOps<JS::RootedField<T, N>> : std::true_type {
+  static const T& get(const JS::RootedField<T, N>& v) { return v.get(); }
+};
 }  // namespace detail
 
 } /* namespace JS */
@@ -1343,10 +1449,24 @@ inline Handle<T>::Handle(
 }
 
 template <typename T>
+template <size_t N, typename S>
+inline Handle<T>::Handle(
+    const RootedField<S, N>& rootedField,
+    std::enable_if_t<std::is_convertible_v<S, T>, int> dummy) {
+  ptr = reinterpret_cast<const T*>(rootedField.ptr);
+}
+
+template <typename T>
 inline MutableHandle<T>::MutableHandle(Rooted<T>* root) {
   static_assert(sizeof(MutableHandle<T>) == sizeof(T*),
                 "MutableHandle must be binary compatible with T*.");
   ptr = root->address();
+}
+
+template <typename T>
+template <size_t N>
+inline MutableHandle<T>::MutableHandle(RootedField<T, N>* rootedField) {
+  ptr = rootedField->ptr;
 }
 
 template <typename T>
@@ -1480,7 +1600,7 @@ class PersistentRooted : public detail::RootedTraits<T>::PersistentBase,
   }
 
   DECLARE_POINTER_CONSTREF_OPS(T);
-  DECLARE_POINTER_ASSIGN_OPS(PersistentRooted, T);
+  DECLARE_POINTER_ASSIGN_OPS(PersistentRooted<T>, T);
 
   T& get() { return ptr; }
   const T& get() const { return ptr; }

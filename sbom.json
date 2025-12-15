@@ -71,7 +71,7 @@
   "components": [
     {
       "type": "library",
-      "bom-ref": "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
+      "bom-ref": "pkg:deb/debian/firefox-esr@140.3.0esr-1?arch=source",
       "supplier": {
         "name": "Mozilla Corporation",
         "url": [
@@ -81,7 +81,7 @@
       "author": "Mozilla Corporation",
       "group": "mozilla",
       "name": "Mozilla Firefox ESR",
-      "version": "128.11.0esr",
+      "version": "140.3.0esr",
       "description": "The C++-only SpiderMonkey component of FireFox ESR used by MongoDB.",
       "licenses": [
         {
@@ -91,8 +91,8 @@
         }
       ],
       "copyright": "Mozilla Corporation",
-      "cpe": "cpe:2.3:a:mozilla:firefox:128.11.0:*:*:*:esr:*:*:*",
-      "purl": "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
+      "cpe": "cpe:2.3:a:mozilla:firefox:140.3.0:*:*:*:esr:*:*:*",
+      "purl": "pkg:deb/debian/firefox-esr@140.3.0esr-1?arch=source",
       "externalReferences": [
         {
           "url": "https://github.com/mozilla-firefox/firefox.git",
@@ -2628,7 +2628,7 @@
         "pkg:github/libunwind/libunwind@v1.8.1",
         "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
         "pkg:github/mongodb/mongo-c-driver@1.28.1",
-        "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
+        "pkg:deb/debian/firefox-esr@140.3.0esr-1?arch=source",
         "pkg:github/nodejs/node@22.1.0?download_url=https%3A%2F%2Fgithub.com%2Fnodejs%2Fnode%2Fblob%2F8b45c5d26a829bcd3280401dbc1874bcd1302289%2Fsrc%2Fnode_i18n.cc%23L825%23src%2Fnode_i18n.cc%3AGetStringWidth#src/node_i18n.cc",
         "pkg:pypi/ocspbuilder@0.10.2",
         "pkg:pypi/ocspresponder@0.5.0",
@@ -2768,7 +2768,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
+      "ref": "pkg:deb/debian/firefox-esr@140.3.0esr-1?arch=source",
       "dependsOn": []
     },
     {

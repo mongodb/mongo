@@ -452,6 +452,6 @@ struct JSFunctionSpec {
 #define JS_SYM_FNSPEC(symbol, call, info, nargs, flags, selfHostedName) \
   JS_FNSPEC(::JS::SymbolCode::symbol, call, info, nargs, flags, selfHostedName)
 #define JS_FNSPEC(name, call, info, nargs, flags, selfHostedName) \
-  { JSFunctionSpec::Name(name), {call, info}, nargs, flags, selfHostedName }
+  {JSFunctionSpec::Name(name), {call, info}, nargs, flags, selfHostedName}
 
 #endif  // js_PropertySpec_h

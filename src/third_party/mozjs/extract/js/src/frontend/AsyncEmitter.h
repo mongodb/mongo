@@ -157,7 +157,7 @@ class MOZ_STACK_CLASS AsyncEmitter {
   [[nodiscard]] bool emitFinalYield();
 
  public:
-  explicit AsyncEmitter(BytecodeEmitter* bce) : bce_(bce){};
+  explicit AsyncEmitter(BytecodeEmitter* bce) : bce_(bce) {};
 
   [[nodiscard]] bool prepareForParamsWithoutExpressionOrDestructuring();
   [[nodiscard]] bool prepareForParamsWithExpressionOrDestructuring();

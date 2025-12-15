@@ -453,7 +453,8 @@ JS_PUBLIC_API bool AppendUnique(JSContext* cx, JS::MutableHandleIdVector base,
  *
  * If it is, returns true and outputs the index in *indexp.
  */
-JS_PUBLIC_API bool StringIsArrayIndex(JSLinearString* str, uint32_t* indexp);
+JS_PUBLIC_API bool StringIsArrayIndex(const JSLinearString* str,
+                                      uint32_t* indexp);
 
 /**
  * Overload of StringIsArrayIndex taking a (char16_t*,length) pair. Behaves
@@ -483,8 +484,11 @@ JS_PUBLIC_API bool IsObjectInContextCompartment(JSObject* obj,
 
 using DOMInstanceClassHasProtoAtDepth = bool (*)(const JSClass*, uint32_t,
                                                  uint32_t);
+using DOMInstanceClassIsError = bool (*)(const JSClass*);
+
 struct JSDOMCallbacks {
   DOMInstanceClassHasProtoAtDepth instanceClassMatchesProto;
+  DOMInstanceClassIsError instanceClassIsError;
 };
 using DOMCallbacks = struct JSDOMCallbacks;
 
@@ -505,15 +509,12 @@ extern JS_PUBLIC_API JSLinearString* GetErrorTypeName(JSContext* cx,
                                                       int16_t exnType);
 
 /* Implemented in CrossCompartmentWrapper.cpp. */
-typedef enum NukeReferencesToWindow {
-  NukeWindowReferences,
-  DontNukeWindowReferences
-} NukeReferencesToWindow;
+enum NukeReferencesToWindow { NukeWindowReferences, DontNukeWindowReferences };
 
-typedef enum NukeReferencesFromTarget {
+enum NukeReferencesFromTarget {
   NukeAllReferences,
   NukeIncomingReferences,
-} NukeReferencesFromTarget;
+};
 
 /*
  * These filters are designed to be ephemeral stack classes, and thus don't
@@ -708,8 +709,8 @@ extern JS_PUBLIC_API bool IsSavedFrame(JSObject* obj);
 #if defined(XP_WIN)
 // Parameters use void* types to avoid #including windows.h. The return value of
 // this function is returned from the exception handler.
-typedef long (*JitExceptionHandler)(void* exceptionRecord,  // PEXECTION_RECORD
-                                    void* context);         // PCONTEXT
+using JitExceptionHandler = long (*)(void* exceptionRecord,  // PEXECTION_RECORD
+                                     void* context);         // PCONTEXT
 
 /**
  * Windows uses "structured exception handling" to handle faults. When a fault

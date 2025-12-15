@@ -12,6 +12,7 @@
 #include "mozilla/ScopeExit.h"
 
 #include "gc/Marking.h"
+#include "gc/Zone.h"
 #include "jit/BaselineJIT.h"
 #include "jit/InlineScriptTree.h"
 #include "jit/JitRuntime.h"
@@ -208,6 +209,31 @@ uint64_t BaselineInterpreterEntry::lookupRealmID() const {
   MOZ_CRASH("shouldn't be called for BaselineInterpreter entries");
 }
 
+void* SelfHostedSharedEntry::canonicalNativeAddrFor(void* ptr) const {
+  // TODO: We can't yet normalize Baseline addresses until we unify
+  // BaselineScript's PCMappingEntries with JitcodeGlobalTable.
+  return ptr;
+}
+
+bool SelfHostedSharedEntry::callStackAtAddr(void* ptr,
+                                            BytecodeLocationVector& results,
+                                            uint32_t* depth) const {
+  JitSpew(JitSpew_Profiling,
+          "Unexpected call - without a script, what can we do here?");
+  return true;
+}
+
+uint32_t SelfHostedSharedEntry::callStackAtAddr(void* ptr, const char** results,
+                                                uint32_t maxResults) const {
+  MOZ_ASSERT(containsPointer(ptr));
+  MOZ_ASSERT(maxResults >= 1);
+
+  results[0] = str();
+  return 1;
+}
+
+uint64_t SelfHostedSharedEntry::lookupRealmID() const { return 0; }
+
 const JitcodeGlobalEntry* JitcodeGlobalTable::lookupForSampler(
     void* ptr, JSRuntime* rt, uint64_t samplePosInBuffer) {
   JitcodeGlobalEntry* entry = lookupInternal(ptr);
@@ -246,7 +272,8 @@ JitcodeGlobalEntry* JitcodeGlobalTable::lookupInternal(void* ptr) {
 
 bool JitcodeGlobalTable::addEntry(UniqueJitcodeGlobalEntry entry) {
   MOZ_ASSERT(entry->isIon() || entry->isIonIC() || entry->isBaseline() ||
-             entry->isBaselineInterpreter() || entry->isDummy());
+             entry->isBaselineInterpreter() || entry->isDummy() ||
+             entry->isSelfHostedShared());
 
   // Assert the new entry does not have a code range that's equal to (or
   // contained in) one of the existing entries, because that would confuse the
@@ -438,6 +465,8 @@ void IonICEntry::traceWeak(JSTracer* trc) {
       return asBaselineInterpreter().callStackAtAddr(ptr, results, depth);
     case Kind::Dummy:
       return asDummy().callStackAtAddr(rt, ptr, results, depth);
+    case Kind::SelfHostedShared:
+      return asSelfHostedShared().callStackAtAddr(ptr, results, depth);
   }
   MOZ_CRASH("Invalid kind");
 }
@@ -456,6 +485,8 @@ uint32_t JitcodeGlobalEntry::callStackAtAddr(JSRuntime* rt, void* ptr,
       return asBaselineInterpreter().callStackAtAddr(ptr, results, maxResults);
     case Kind::Dummy:
       return asDummy().callStackAtAddr(rt, ptr, results, maxResults);
+    case Kind::SelfHostedShared:
+      return asSelfHostedShared().callStackAtAddr(ptr, results, maxResults);
   }
   MOZ_CRASH("Invalid kind");
 }
@@ -470,6 +501,8 @@ uint64_t JitcodeGlobalEntry::lookupRealmID(JSRuntime* rt, void* ptr) const {
       return asBaseline().lookupRealmID();
     case Kind::Dummy:
       return asDummy().lookupRealmID();
+    case Kind::SelfHostedShared:
+      return asSelfHostedShared().lookupRealmID();
     case Kind::BaselineInterpreter:
       break;
   }
@@ -490,6 +523,7 @@ bool JitcodeGlobalEntry::trace(JSTracer* trc) {
       break;
     case Kind::BaselineInterpreter:
     case Kind::Dummy:
+    case Kind::SelfHostedShared:
       break;
   }
   return tracedAny;
@@ -508,6 +542,7 @@ void JitcodeGlobalEntry::traceWeak(JSTracer* trc) {
       break;
     case Kind::BaselineInterpreter:
     case Kind::Dummy:
+    case Kind::SelfHostedShared:
       break;
   }
 }
@@ -523,6 +558,8 @@ void* JitcodeGlobalEntry::canonicalNativeAddrFor(JSRuntime* rt,
       return asBaseline().canonicalNativeAddrFor(ptr);
     case Kind::Dummy:
       return asDummy().canonicalNativeAddrFor(rt, ptr);
+    case Kind::SelfHostedShared:
+      return asSelfHostedShared().canonicalNativeAddrFor(ptr);
     case Kind::BaselineInterpreter:
       break;
   }
@@ -546,6 +583,9 @@ void JitcodeGlobalEntry::DestroyPolicy::operator()(JitcodeGlobalEntry* entry) {
       break;
     case JitcodeGlobalEntry::Kind::Dummy:
       js_delete(&entry->asDummy());
+      break;
+    case JitcodeGlobalEntry::Kind::SelfHostedShared:
+      js_delete(&entry->asSelfHostedShared());
       break;
   }
 }
@@ -1113,6 +1153,9 @@ JS::ProfiledFrameHandle::frameKind() const {
   if (entry_.isBaseline()) {
     return JS::ProfilingFrameIterator::Frame_Baseline;
   }
+  if (entry_.isSelfHostedShared()) {
+    return JS::ProfilingFrameIterator::Frame_Baseline;
+  }
   return JS::ProfilingFrameIterator::Frame_Ion;
 }
 
@@ -1131,7 +1174,7 @@ JS_PUBLIC_API JS::ProfiledFrameRange JS::GetProfiledFrames(JSContext* cx,
 
   if (entry) {
     result.depth_ = entry->callStackAtAddr(rt, addr, result.labels_,
-                                           MOZ_ARRAY_LENGTH(result.labels_));
+                                           std::size(result.labels_));
   }
   return result;
 }

@@ -107,7 +107,7 @@
 #  The final prepared A can be used as an input to matrix multiply intrinsic
 #  (`int8_multiply_and_add_bias`).
 #
-# int8_prepare_a(const float* inputMatrixA, float scale, float zeroPoint, uint32_t rowsA, uint32_t colsA, int8_t* outputMatrixA)
+# int8_prepare_a(const float* inputMatrixA, float scale, float zeroPoint, uint32_t rowsA, uint32_t colsA, uint8_t* outputMatrixA)
 # int8_prepare_a(inputMatrixA: i32, scale: f32, zeroPoint: f32, rowsA: i32, colsA: i32, outputMatrixA: i32)
 - op: I8PrepareA
   symbolic_address:
@@ -162,7 +162,7 @@
 #  The inputs of this intrinsic must be obtained by using `int8_prepare_A`,
 #  one of the `int8_prepare_b*` and `int8_prepare_bias` intrinsics respectively.
 #
-# int8_multiply_and_add_bias(const int8_t* inputMatrixAPrepared, float scaleA, float zeroPointA,
+# int8_multiply_and_add_bias(const uint8_t* inputMatrixAPrepared, float scaleA, float zeroPointA,
 #                      const int8_t* inputMatrixBPrepared, float scaleB, float zeroPointB,
 #                      const float* inputBiasPrepared, float unquantMultiplier,
 #                      uint32_t rowsA, uint32_t width, uint32_t colsB, float* output)
@@ -224,6 +224,7 @@
     name: StringTest
     type: Args_Int32_GeneralGeneral
   entry: Instance::stringTest
+  inline_op: StringTest
   export: test
   params:
     - 'externref'
@@ -236,6 +237,7 @@
     name: StringCast
     type: Args_General2
   entry: Instance::stringCast
+  inline_op: StringCast
   export: cast
   params:
     - 'externref'
@@ -336,6 +338,7 @@
     name: StringLength
     type: Args_Int32_GeneralGeneral
   entry: Instance::stringLength
+  inline_op: StringLength
   export: length
   params:
     - 'externref'
@@ -404,12 +407,24 @@
 
 #if defined(ENABLE_WASM_JSPI)
 
-- op: CheckSuspender
+- op: CreateSuspender
   symbolic_address:
-    name: CheckSuspender
+    name: CreateSuspender
+    type: Args_General_GeneralInt32
+  entry: CreateSuspender
+  export: createSuspender
+  params:
+    - 'i32'
+  result: 'externref'
+  fail_mode: FailOnNullPtr
+  uses_memory: false
+
+- op: CreatePromisingPromise
+  symbolic_address:
+    name: CreatePromisingPromise
     type: Args_General2
-  entry: CheckSuspender
-  export: suspenderCheck
+  entry: CreatePromisingPromise
+  export: createPromisingPromise
   params:
     - 'externref'
   result: 'externref'
@@ -431,13 +446,41 @@
 - op: GetSuspendingPromiseResult
   symbolic_address:
     name: GetSuspendingPromiseResult
-    type: Args_General2
+    type: Args_General3
   entry: GetSuspendingPromiseResult
   export: getSuspendingPromiseResult
   params:
     - 'externref'
+    - 'externref'
   result: 'anyref'
   fail_mode: FailOnNullPtr
+  uses_memory: false
+
+- op: AddPromiseReactions
+  symbolic_address:
+    name: AddPromiseReactions
+    type: Args_General4
+  entry: AddPromiseReactions
+  export: addPromiseReactions
+  params:
+    - 'externref'
+    - 'externref'
+    - 'funcref'
+  result: 'anyref'
+  fail_mode: FailOnInvalidRef
+  uses_memory: false
+
+- op: ForwardExceptionToSuspended
+  symbolic_address:
+    name: ForwardExceptionToSuspended
+    type: Args_General3
+  entry: ForwardExceptionToSuspended
+  export: forwardExceptionToSuspended
+  params:
+    - 'externref'
+    - 'exnref'
+  result: 'anyref'
+  fail_mode: Infallible
   uses_memory: false
 
 - op: SetPromisingPromiseResults

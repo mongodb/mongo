@@ -15,17 +15,12 @@
 
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "util/CheckedArithmetic.h"
-#include "vm/ArgumentsObject.h"
 #include "vm/BigIntType.h"
 #include "vm/BytecodeUtil.h"  // JSDVG_SEARCH_STACK
 #include "vm/JSAtomUtils.h"   // AtomizeString
 #include "vm/Realm.h"
-#include "vm/SharedStencil.h"  // GCThingIndex
 #include "vm/StaticStrings.h"
 #include "vm/ThrowMsgKind.h"
-#ifdef ENABLE_RECORD_TUPLE
-#  include "vm/RecordTupleShared.h"
-#endif
 
 #include "vm/GlobalObject-inl.h"
 #include "vm/JSAtomUtils-inl.h"  // PrimitiveValueToId, TypeName
@@ -70,41 +65,14 @@ static inline bool IsUninitializedLexicalSlot(HandleObject obj,
       obj->as<NativeObject>().getSlot(propInfo.slot()));
 }
 
-static inline bool CheckUninitializedLexical(JSContext* cx, PropertyName* name_,
+static inline bool CheckUninitializedLexical(JSContext* cx,
+                                             Handle<PropertyName*> name,
                                              HandleValue val) {
   if (IsUninitializedLexical(val)) {
-    Rooted<PropertyName*> name(cx, name_);
     ReportRuntimeLexicalError(cx, JSMSG_UNINITIALIZED_LEXICAL, name);
     return false;
   }
   return true;
-}
-
-inline bool GetLengthProperty(const Value& lval, MutableHandleValue vp) {
-  /* Optimize length accesses on strings, arrays, and arguments. */
-  if (lval.isString()) {
-    vp.setInt32(lval.toString()->length());
-    return true;
-  }
-  if (lval.isObject()) {
-    JSObject* obj = &lval.toObject();
-    if (obj->is<ArrayObject>()) {
-      vp.setNumber(obj->as<ArrayObject>().length());
-      return true;
-    }
-
-    if (obj->is<ArgumentsObject>()) {
-      ArgumentsObject* argsobj = &obj->as<ArgumentsObject>();
-      if (!argsobj->hasOverriddenLength()) {
-        uint32_t length = argsobj->initialLength();
-        MOZ_ASSERT(length < INT32_MAX);
-        vp.setInt32(int32_t(length));
-        return true;
-      }
-    }
-  }
-
-  return false;
 }
 
 enum class GetNameMode { Normal, TypeOf };
@@ -126,7 +94,8 @@ inline bool FetchName(JSContext* cx, HandleObject receiver, HandleObject holder,
 
   /* Take the slow path if shape was not found in a native object. */
   if (!receiver->is<NativeObject>() || !holder->is<NativeObject>() ||
-      receiver->is<WithEnvironmentObject>()) {
+      (receiver->is<WithEnvironmentObject>() &&
+       receiver->as<WithEnvironmentObject>().supportUnscopables())) {
     Rooted<jsid> id(cx, NameToId(name));
     if (!GetProperty(cx, receiver, receiver, id, vp)) {
       return false;
@@ -137,8 +106,11 @@ inline bool FetchName(JSContext* cx, HandleObject receiver, HandleObject holder,
       /* Fast path for Object instance properties. */
       vp.set(holder->as<NativeObject>().getSlot(propInfo.slot()));
     } else {
+      // Unwrap 'with' environments for reasons given in
+      // GetNameBoundInEnvironment.
+      RootedObject normalized(cx, MaybeUnwrapWithEnvironment(receiver));
       RootedId id(cx, NameToId(name));
-      if (!NativeGetExistingProperty(cx, receiver, holder.as<NativeObject>(),
+      if (!NativeGetExistingProperty(cx, normalized, holder.as<NativeObject>(),
                                      id, propInfo, vp)) {
         return false;
       }
@@ -175,9 +147,8 @@ inline bool GetEnvironmentName(JSContext* cx, HandleObject envChain,
                                MutableHandleValue vp) {
   {
     PropertyResult prop;
-    JSObject* obj = nullptr;
     NativeObject* pobj = nullptr;
-    if (LookupNameNoGC(cx, name, envChain, &obj, &pobj, &prop)) {
+    if (LookupNameNoGC(cx, name, envChain, &pobj, &prop)) {
       if (FetchNameNoGC(pobj, prop, vp.address())) {
         return true;
       }
@@ -396,8 +367,7 @@ static MOZ_ALWAYS_INLINE bool GetObjectElementOperation(
     }
 
     if (key.isString()) {
-      JSString* str = key.toString();
-      JSAtom* name = str->isAtom() ? &str->asAtom() : AtomizeString(cx, str);
+      JSAtom* name = AtomizeString(cx, key.toString());
       if (!name) {
         return false;
       }
@@ -429,19 +399,6 @@ static MOZ_ALWAYS_INLINE bool GetObjectElementOperation(
 static MOZ_ALWAYS_INLINE bool GetPrimitiveElementOperation(
     JSContext* cx, JS::HandleValue receiver, int receiverIndex, HandleValue key,
     MutableHandleValue res) {
-#ifdef ENABLE_RECORD_TUPLE
-  if (receiver.isExtendedPrimitive()) {
-    RootedId id(cx);
-    if (!ToPropertyKey(cx, key, &id)) {
-      return false;
-    }
-    RootedObject obj(cx, &receiver.toExtendedPrimitive());
-    if (!ExtendedPrimitiveGetProperty(cx, obj, receiver, id, res)) {
-      return false;
-    }
-  }
-#endif
-
   // FIXME: Bug 1234324 We shouldn't be boxing here.
   RootedObject boxed(
       cx, ToObjectFromStackForPropertyAccess(cx, receiver, receiverIndex, key));
@@ -463,8 +420,7 @@ static MOZ_ALWAYS_INLINE bool GetPrimitiveElementOperation(
     }
 
     if (key.isString()) {
-      JSString* str = key.toString();
-      JSAtom* name = str->isAtom() ? &str->asAtom() : AtomizeString(cx, str);
+      JSAtom* name = AtomizeString(cx, key.toString());
       if (!name) {
         return false;
       }
@@ -544,10 +500,6 @@ static MOZ_ALWAYS_INLINE bool InitElemOperation(JSContext* cx, jsbytecode* pc,
   }
 
   unsigned flags = GetInitDataPropAttrs(JSOp(*pc));
-  if (id.isPrivateName()) {
-    // Clear enumerate flag off of private names.
-    flags &= ~JSPROP_ENUMERATE;
-  }
   return DefineDataProperty(cx, obj, id, val, flags);
 }
 
@@ -956,7 +908,7 @@ static MOZ_ALWAYS_INLINE void InitElemArrayOperation(JSContext* cx,
 }
 
 /*
- * As an optimization, the interpreter creates a handful of reserved Rooted<T>
+ * As an optimization, the interpreter creates a handful of reserved rooted
  * variables at the beginning, thus inserting them into the Rooted list once
  * upon entry. ReservedRooted "borrows" a reserved Rooted variable and uses it
  * within a local scope, resetting the value to nullptr (or the appropriate
@@ -964,29 +916,26 @@ static MOZ_ALWAYS_INLINE void InitElemArrayOperation(JSContext* cx,
  * from the rooter list, while preventing stale values from being kept alive
  * unnecessarily.
  */
-
 template <typename T>
 class ReservedRooted : public RootedOperations<T, ReservedRooted<T>> {
-  Rooted<T>* savedRoot;
+  MutableHandle<T> savedRoot;
 
  public:
-  ReservedRooted(Rooted<T>* root, const T& ptr) : savedRoot(root) {
-    *root = ptr;
+  ReservedRooted(MutableHandle<T> root, const T& ptr) : savedRoot(root) {
+    root.set(ptr);
   }
 
-  explicit ReservedRooted(Rooted<T>* root) : savedRoot(root) {
-    *root = JS::SafelyInitialized<T>::create();
-  }
+  explicit ReservedRooted(MutableHandle<T> root) : savedRoot(root) { clear(); }
 
-  ~ReservedRooted() { *savedRoot = JS::SafelyInitialized<T>::create(); }
+  ~ReservedRooted() { clear(); }
 
-  void set(const T& p) const { *savedRoot = p; }
-  operator Handle<T>() { return *savedRoot; }
-  operator Rooted<T>&() { return *savedRoot; }
-  MutableHandle<T> operator&() { return &*savedRoot; }
+  void clear() { savedRoot.set(JS::SafelyInitialized<T>::create()); }
+  void set(const T& p) { savedRoot.set(p); }
+  operator Handle<T>() { return savedRoot; }
+  MutableHandle<T> operator&() { return savedRoot; }
 
-  DECLARE_NONPOINTER_ACCESSOR_METHODS(savedRoot->get())
-  DECLARE_NONPOINTER_MUTABLE_ACCESSOR_METHODS(savedRoot->get())
+  DECLARE_NONPOINTER_ACCESSOR_METHODS(savedRoot.get())
+  DECLARE_NONPOINTER_MUTABLE_ACCESSOR_METHODS(savedRoot.get())
   DECLARE_POINTER_CONSTREF_OPS(T)
   DECLARE_POINTER_ASSIGN_OPS(ReservedRooted, T)
 };

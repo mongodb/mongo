@@ -43,7 +43,7 @@
 #include "js/Warnings.h"  // JS::{,Set}WarningReporter
 #include "js/Wrapper.h"
 #include "util/Memory.h"
-#include "util/StringBuffer.h"
+#include "util/StringBuilder.h"
 #include "vm/Compartment.h"
 #include "vm/ErrorObject.h"
 #include "vm/FrameIter.h"    // js::NonBuiltinFrameIter
@@ -220,10 +220,6 @@ struct SuppressErrorsGuard {
 
   ~SuppressErrorsGuard() { JS::SetWarningReporter(cx, prevReporter); }
 };
-
-// Cut off the stack if it gets too deep (most commonly for infinite recursion
-// errors).
-static const size_t MAX_REPORTED_STACK_DEPTH = 1u << 7;
 
 bool js::CaptureStack(JSContext* cx, MutableHandleObject stack) {
   return CaptureCurrentStack(
@@ -795,14 +791,19 @@ const char* js::ValueToSourceForError(JSContext* cx, HandleValue val,
 
   AutoClearPendingException acpe(cx);
 
+  // This function must always return a non-null string. If the conversion to
+  // string fails due to OOM, we return this string instead.
+  static constexpr char ErrorConvertingToStringMsg[] =
+      "<<error converting value to string>>";
+
   RootedString str(cx, JS_ValueToSource(cx, val));
   if (!str) {
-    return "<<error converting value to string>>";
+    return ErrorConvertingToStringMsg;
   }
 
   JSStringBuilder sb(cx);
-  if (val.hasObjectPayload()) {
-    RootedObject valObj(cx, &val.getObjectPayload());
+  if (val.isObject()) {
+    RootedObject valObj(cx, &val.toObject());
     ESClass cls;
     if (!JS::GetBuiltinClass(cx, valObj, &cls)) {
       return "<<error determining class of value>>";
@@ -814,43 +815,43 @@ const char* js::ValueToSourceForError(JSContext* cx, HandleValue val,
       s = "the array buffer ";
     } else if (JS_IsArrayBufferViewObject(valObj)) {
       s = "the typed array ";
-#ifdef ENABLE_RECORD_TUPLE
-    } else if (cls == ESClass::Record) {
-      s = "the record ";
-    } else if (cls == ESClass::Tuple) {
-      s = "the tuple ";
-#endif
     } else {
       s = "the object ";
     }
     if (!sb.append(s, strlen(s))) {
-      return "<<error converting value to string>>";
+      return ErrorConvertingToStringMsg;
     }
   } else if (val.isNumber()) {
     if (!sb.append("the number ")) {
-      return "<<error converting value to string>>";
+      return ErrorConvertingToStringMsg;
     }
   } else if (val.isString()) {
     if (!sb.append("the string ")) {
-      return "<<error converting value to string>>";
+      return ErrorConvertingToStringMsg;
     }
   } else if (val.isBigInt()) {
     if (!sb.append("the BigInt ")) {
-      return "<<error converting value to string>>";
+      return ErrorConvertingToStringMsg;
     }
   } else {
     MOZ_ASSERT(val.isBoolean() || val.isSymbol());
     bytes = StringToNewUTF8CharsZ(cx, *str);
+    if (!bytes) {
+      return ErrorConvertingToStringMsg;
+    }
     return bytes.get();
   }
   if (!sb.append(str)) {
-    return "<<error converting value to string>>";
+    return ErrorConvertingToStringMsg;
   }
   str = sb.finishString();
   if (!str) {
-    return "<<error converting value to string>>";
+    return ErrorConvertingToStringMsg;
   }
   bytes = StringToNewUTF8CharsZ(cx, *str);
+  if (!bytes) {
+    return ErrorConvertingToStringMsg;
+  }
   return bytes.get();
 }
 

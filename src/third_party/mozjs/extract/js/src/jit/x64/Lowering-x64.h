@@ -46,7 +46,10 @@ class LIRGeneratorX64 : public LIRGeneratorX86Shared {
 
   bool needTempForPostBarrier() { return true; }
 
+  void lowerTruncateDToInt32(MTruncateToInt32* ins);
+  void lowerTruncateFToInt32(MTruncateToInt32* ins);
   void lowerBuiltinInt64ToFloatingPoint(MBuiltinInt64ToFloatingPoint* ins);
+  void lowerWasmBuiltinTruncateToInt32(MWasmBuiltinTruncateToInt32* ins);
   void lowerWasmBuiltinTruncateToInt64(MWasmBuiltinTruncateToInt64* ins);
   void lowerDivI64(MDiv* div);
   void lowerWasmBuiltinDivI64(MWasmBuiltinDivI64* div);
@@ -55,8 +58,8 @@ class LIRGeneratorX64 : public LIRGeneratorX86Shared {
   void lowerUDivI64(MDiv* div);
   void lowerUModI64(MMod* mod);
 
-  void lowerBigIntDiv(MBigIntDiv* ins);
-  void lowerBigIntMod(MBigIntMod* ins);
+  void lowerBigIntPtrDiv(MBigIntPtrDiv* ins);
+  void lowerBigIntPtrMod(MBigIntPtrMod* ins);
 
   void lowerAtomicLoad64(MLoadUnboxedScalar* ins);
   void lowerAtomicStore64(MStoreUnboxedScalar* ins);

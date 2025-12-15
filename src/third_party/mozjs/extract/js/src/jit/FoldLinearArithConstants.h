@@ -13,7 +13,8 @@ namespace jit {
 class MIRGenerator;
 class MIRGraph;
 
-[[nodiscard]] bool FoldLinearArithConstants(MIRGenerator* mir, MIRGraph& graph);
+[[nodiscard]] bool FoldLinearArithConstants(const MIRGenerator* mir,
+                                            MIRGraph& graph);
 
 } /* namespace jit */
 } /* namespace js */

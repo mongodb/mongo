@@ -180,6 +180,9 @@ class HashMap {
   HashMap(HashMap&& aRhs) = default;
   HashMap& operator=(HashMap&& aRhs) = default;
 
+  // Swap the contents of this hash map with another.
+  void swap(HashMap& aOther) { mImpl.swap(aOther.mImpl); }
+
   // -- Status and sizing ----------------------------------------------------
 
   // The map's current generation.
@@ -476,6 +479,9 @@ class HashSet {
   // HashSet is movable.
   HashSet(HashSet&& aRhs) = default;
   HashSet& operator=(HashSet&& aRhs) = default;
+
+  // Swap the contents of this hash set with another.
+  void swap(HashSet& aOther) { mImpl.swap(aOther.mImpl); }
 
   // -- Status and sizing ----------------------------------------------------
 
@@ -1556,6 +1562,29 @@ class HashTable : private AllocPolicy {
     AllocPolicy::operator=(std::move(aRhs));
     moveFrom(aRhs);
     return *this;
+  }
+
+  void swap(HashTable& aOther) {
+    ReentrancyGuard g1(*this);
+    ReentrancyGuard g2(aOther);
+
+    // Manual swap of generation because it's a bitfield
+    uint64_t generation = mGen;
+    mGen = aOther.mGen;
+    aOther.mGen = generation;
+
+    // Manual swap of hashShift because it's a bitfield
+    uint64_t hashShift = mHashShift;
+    mHashShift = aOther.mHashShift;
+    aOther.mHashShift = hashShift;
+
+    std::swap(mTable, aOther.mTable);
+    std::swap(mEntryCount, aOther.mEntryCount);
+    std::swap(mRemovedCount, aOther.mRemovedCount);
+#ifdef DEBUG
+    std::swap(mMutationCount, aOther.mMutationCount);
+    std::swap(mEntered, aOther.mEntered);
+#endif
   }
 
  private:

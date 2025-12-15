@@ -26,3 +26,53 @@ function WeakMapConstructorInit(iterable) {
     callContentFunction(adder, map, nextItem[0], nextItem[1]);
   }
 }
+
+#ifdef NIGHTLY_BUILD
+/**
+ * Upsert proposal
+ * 
+ * WeakMap.prototype.getOrInsertComputed ( key, callbackfn )
+ *
+ * https://tc39.es/proposal-upsert/
+ */
+function WeakMapGetOrInsertComputed(key, callbackfn) {
+  // Step 1.  Let M be the this value.
+  var M = this;
+
+  // Step 2.  Perform ? RequireInternalSlot(M, [[WeakMapData]]).
+  if (!IsObject(M) || (M = GuardToWeakMapObject(M)) === null) {
+    return callFunction(
+      CallWeakMapMethodIfWrapped,
+      this,
+      key,
+      callbackfn,
+      "WeakMapGetOrInsertComputed"
+    );
+  }
+
+  // Step 3.  If IsCallable(callbackfn) is false, throw a TypeError exception.
+  if (!IsCallable(callbackfn)) {
+    ThrowTypeError(JSMSG_NOT_FUNCTION, DecompileArg(1, callbackfn));
+  }
+
+  // Step 4.  If CanBeHeldWeakly(key) is false, throw a TypeError exception.
+  // Step 5.  For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
+  // Step 5.a.  If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return p.[[Value]].
+  if (callFunction(std_WeakMap_has, M, key)) {
+    return callFunction(std_WeakMap_get, M, key);
+  }
+
+  // Step 6.  Let value be ? Call(callbackfn, undefined, « key »).
+  var value = callContentFunction(callbackfn, undefined, key);
+
+  // Step 7.  For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
+  // Step 7.a.  If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, then
+  // Step 7.a.i.  Set p.[[Value]] to value.
+  // Step 8.  Let p be the Record { [[Key]]: key, [[Value]]: value }.
+  // Step 9.  Append p to M.[[WeakMapData]].
+  callFunction(std_WeakMap_set, M, key, value);
+
+  // Step 7.a.ii, 10. Return value.
+  return value;
+}
+#endif  // #ifdef NIGHTLY_BUILD

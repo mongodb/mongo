@@ -49,7 +49,8 @@ const JSClass RelativeTimeFormatObject::class_ = {
         JSCLASS_HAS_CACHED_PROTO(JSProto_RelativeTimeFormat) |
         JSCLASS_FOREGROUND_FINALIZE,
     &RelativeTimeFormatObject::classOps_,
-    &RelativeTimeFormatObject::classSpec_};
+    &RelativeTimeFormatObject::classSpec_,
+};
 
 const JSClass& RelativeTimeFormatObject::protoClass_ = PlainObject::class_;
 
@@ -63,7 +64,8 @@ static bool relativeTimeFormat_toSource(JSContext* cx, unsigned argc,
 static const JSFunctionSpec relativeTimeFormat_static_methods[] = {
     JS_SELF_HOSTED_FN("supportedLocalesOf",
                       "Intl_RelativeTimeFormat_supportedLocalesOf", 1, 0),
-    JS_FS_END};
+    JS_FS_END,
+};
 
 static const JSFunctionSpec relativeTimeFormat_methods[] = {
     JS_SELF_HOSTED_FN("resolvedOptions",
@@ -71,11 +73,14 @@ static const JSFunctionSpec relativeTimeFormat_methods[] = {
     JS_SELF_HOSTED_FN("format", "Intl_RelativeTimeFormat_format", 2, 0),
     JS_SELF_HOSTED_FN("formatToParts", "Intl_RelativeTimeFormat_formatToParts",
                       2, 0),
-    JS_FN("toSource", relativeTimeFormat_toSource, 0, 0), JS_FS_END};
+    JS_FN("toSource", relativeTimeFormat_toSource, 0, 0),
+    JS_FS_END,
+};
 
 static const JSPropertySpec relativeTimeFormat_properties[] = {
     JS_STRING_SYM_PS(toStringTag, "Intl.RelativeTimeFormat", JSPROP_READONLY),
-    JS_PS_END};
+    JS_PS_END,
+};
 
 static bool RelativeTimeFormat(JSContext* cx, unsigned argc, Value* vp);
 
@@ -87,7 +92,8 @@ const ClassSpec RelativeTimeFormatObject::classSpec_ = {
     relativeTimeFormat_methods,
     relativeTimeFormat_properties,
     nullptr,
-    ClassSpec::DontDefineConstructor};
+    ClassSpec::DontDefineConstructor,
+};
 
 /**
  * RelativeTimeFormat constructor.

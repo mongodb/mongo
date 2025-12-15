@@ -24,7 +24,7 @@ assert callgraph.calleeGraph[f][h]
 assert callgraph.calleeGraph[g][f]
 assert callgraph.calleeGraph[g][h]
 
-node = ["void n{}(int32)".format(i) for i in range(10)]
+node = [f"void n{i}(int32)" for i in range(10)]
 mnode = [callgraph.unmangledToMangled.get(f) for f in node]
 for src, dst in [
     (1, 2),
@@ -51,4 +51,4 @@ rroots = set(
 )
 assert len(set([node[1], node[2]]) & rroots) == 1
 assert len(set([node[4], node[5]]) & rroots) == 1
-assert len(rroots) == 4, "rroots = {}".format(rroots)  # n1, n4, f, self_recursive
+assert len(rroots) == 4, f"rroots = {rroots}"  # n1, n4, f, self_recursive

@@ -12,6 +12,7 @@
 #include "vm/TypedArrayObject.h"
 
 #include "mozilla/Assertions.h"
+#include "mozilla/Compiler.h"
 #include "mozilla/FloatingPoint.h"
 
 #include <algorithm>
@@ -38,180 +39,75 @@
 
 namespace js {
 
-template <typename To, typename From>
-inline To ConvertNumber(From src);
+// Use static_assert in compilers which support CWG2518. In all other cases
+// fall back to MOZ_CRASH.
+//
+// https://cplusplus.github.io/CWG/issues/2518.html
+#if defined(__clang__)
+#  if (__clang_major__ >= 17)
+#    define STATIC_ASSERT_IN_UNEVALUATED_CONTEXT 1
+#  else
+#    define STATIC_ASSERT_IN_UNEVALUATED_CONTEXT 0
+#  endif
+#elif MOZ_IS_GCC
+#  if MOZ_GCC_VERSION_AT_LEAST(13, 1, 0)
+#    define STATIC_ASSERT_IN_UNEVALUATED_CONTEXT 1
+#  else
+#    define STATIC_ASSERT_IN_UNEVALUATED_CONTEXT 0
+#  endif
+#else
+#  define STATIC_ASSERT_IN_UNEVALUATED_CONTEXT 0
+#endif
 
-template <>
-inline int8_t ConvertNumber<int8_t, float16>(float16 src) {
-  return JS::ToInt8(src.toDouble());
-}
+template <typename T>
+inline auto ToFloatingPoint(T value) {
+  static_assert(!std::numeric_limits<T>::is_integer);
 
-template <>
-inline uint8_t ConvertNumber<uint8_t, float16>(float16 src) {
-  return JS::ToUint8(src.toDouble());
-}
-
-template <>
-inline uint8_clamped ConvertNumber<uint8_clamped, float16>(float16 src) {
-  return uint8_clamped(src.toDouble());
-}
-
-template <>
-inline float16 ConvertNumber<float16, float16>(float16 src) {
-  return src;
-}
-
-template <>
-inline int16_t ConvertNumber<int16_t, float16>(float16 src) {
-  return JS::ToInt16(src.toDouble());
-}
-
-template <>
-inline uint16_t ConvertNumber<uint16_t, float16>(float16 src) {
-  return JS::ToUint16(src.toDouble());
-}
-
-template <>
-inline int32_t ConvertNumber<int32_t, float16>(float16 src) {
-  return JS::ToInt32(src.toDouble());
-}
-
-template <>
-inline uint32_t ConvertNumber<uint32_t, float16>(float16 src) {
-  return JS::ToUint32(src.toDouble());
-}
-
-template <>
-inline int64_t ConvertNumber<int64_t, float16>(float16 src) {
-  return JS::ToInt64(src.toDouble());
-}
-
-template <>
-inline uint64_t ConvertNumber<uint64_t, float16>(float16 src) {
-  return JS::ToUint64(src.toDouble());
-}
-
-// Float16 is a bit of a special case in that it's floating point,
-// but std::is_floating_point_v doesn't know about it.
-template <>
-inline float ConvertNumber<float, float16>(float16 src) {
-  return static_cast<float>(src.toDouble());
-}
-
-template <>
-inline double ConvertNumber<double, float16>(float16 src) {
-  return src.toDouble();
-}
-
-template <>
-inline int8_t ConvertNumber<int8_t, float>(float src) {
-  return JS::ToInt8(src);
-}
-
-template <>
-inline uint8_t ConvertNumber<uint8_t, float>(float src) {
-  return JS::ToUint8(src);
-}
-
-template <>
-inline uint8_clamped ConvertNumber<uint8_clamped, float>(float src) {
-  return uint8_clamped(src);
-}
-
-template <>
-inline float16 ConvertNumber<float16, float>(float src) {
-  return float16(src);
-}
-
-template <>
-inline int16_t ConvertNumber<int16_t, float>(float src) {
-  return JS::ToInt16(src);
-}
-
-template <>
-inline uint16_t ConvertNumber<uint16_t, float>(float src) {
-  return JS::ToUint16(src);
-}
-
-template <>
-inline int32_t ConvertNumber<int32_t, float>(float src) {
-  return JS::ToInt32(src);
-}
-
-template <>
-inline uint32_t ConvertNumber<uint32_t, float>(float src) {
-  return JS::ToUint32(src);
-}
-
-template <>
-inline int64_t ConvertNumber<int64_t, float>(float src) {
-  return JS::ToInt64(src);
-}
-
-template <>
-inline uint64_t ConvertNumber<uint64_t, float>(float src) {
-  return JS::ToUint64(src);
-}
-
-template <>
-inline int8_t ConvertNumber<int8_t, double>(double src) {
-  return JS::ToInt8(src);
-}
-
-template <>
-inline uint8_t ConvertNumber<uint8_t, double>(double src) {
-  return JS::ToUint8(src);
-}
-
-template <>
-inline uint8_clamped ConvertNumber<uint8_clamped, double>(double src) {
-  return uint8_clamped(src);
-}
-
-template <>
-inline float16 ConvertNumber<float16, double>(double src) {
-  return float16(src);
-}
-
-template <>
-inline int16_t ConvertNumber<int16_t, double>(double src) {
-  return JS::ToInt16(src);
-}
-
-template <>
-inline uint16_t ConvertNumber<uint16_t, double>(double src) {
-  return JS::ToUint16(src);
-}
-
-template <>
-inline int32_t ConvertNumber<int32_t, double>(double src) {
-  return JS::ToInt32(src);
-}
-
-template <>
-inline uint32_t ConvertNumber<uint32_t, double>(double src) {
-  return JS::ToUint32(src);
-}
-
-template <>
-inline int64_t ConvertNumber<int64_t, double>(double src) {
-  return JS::ToInt64(src);
-}
-
-template <>
-inline uint64_t ConvertNumber<uint64_t, double>(double src) {
-  return JS::ToUint64(src);
+  if constexpr (std::is_floating_point_v<T>) {
+    return value;
+  } else {
+    return static_cast<double>(value);
+  }
 }
 
 template <typename To, typename From>
 inline To ConvertNumber(From src) {
-  static_assert(
-      !std::is_floating_point_v<From> ||
-          (std::is_floating_point_v<From> && std::is_floating_point_v<To>),
-      "conversion from floating point to int should have been handled by "
-      "specializations above");
-  return To(src);
+  if constexpr (!std::numeric_limits<From>::is_integer) {
+    if constexpr (std::is_same_v<From, To>) {
+      return src;
+    } else if constexpr (!std::numeric_limits<To>::is_integer) {
+      return static_cast<To>(ToFloatingPoint(src));
+    } else if constexpr (std::is_same_v<int8_t, To>) {
+      return JS::ToInt8(ToFloatingPoint(src));
+    } else if constexpr (std::is_same_v<uint8_t, To>) {
+      return JS::ToUint8(ToFloatingPoint(src));
+    } else if constexpr (std::is_same_v<uint8_clamped, To>) {
+      return uint8_clamped(ToFloatingPoint(src));
+    } else if constexpr (std::is_same_v<int16_t, To>) {
+      return JS::ToInt16(ToFloatingPoint(src));
+    } else if constexpr (std::is_same_v<uint16_t, To>) {
+      return JS::ToUint16(ToFloatingPoint(src));
+    } else if constexpr (std::is_same_v<int32_t, To>) {
+      return JS::ToInt32(ToFloatingPoint(src));
+    } else if constexpr (std::is_same_v<uint32_t, To>) {
+      return JS::ToUint32(ToFloatingPoint(src));
+    } else {
+#if STATIC_ASSERT_IN_UNEVALUATED_CONTEXT
+      static_assert(false,
+                    "conversion from floating point to int should have been "
+                    "handled by specializations above");
+#else
+      MOZ_CRASH(
+          "conversion from floating point to int should have been "
+          "handled by specializations above");
+#endif
+    }
+  } else {
+    return static_cast<To>(src);
+  }
 }
+
+#undef STATIC_ASSERT_IN_UNEVALUATED_CONTEXT
 
 template <typename NativeType>
 struct TypeIDOfType;
@@ -362,8 +258,140 @@ class UnsharedOps {
   }
 };
 
+/**
+ * Check if |targetType| and |sourceType| have compatible bit-level
+ * representations to allow bitwise copying.
+ */
+constexpr bool CanUseBitwiseCopy(Scalar::Type targetType,
+                                 Scalar::Type sourceType) {
+  switch (targetType) {
+    case Scalar::Int8:
+    case Scalar::Uint8:
+      return sourceType == Scalar::Int8 || sourceType == Scalar::Uint8 ||
+             sourceType == Scalar::Uint8Clamped;
+
+    case Scalar::Uint8Clamped:
+      return sourceType == Scalar::Uint8 || sourceType == Scalar::Uint8Clamped;
+
+    case Scalar::Int16:
+    case Scalar::Uint16:
+      return sourceType == Scalar::Int16 || sourceType == Scalar::Uint16;
+
+    case Scalar::Int32:
+    case Scalar::Uint32:
+      return sourceType == Scalar::Int32 || sourceType == Scalar::Uint32;
+
+    case Scalar::Float16:
+      return sourceType == Scalar::Float16;
+
+    case Scalar::Float32:
+      return sourceType == Scalar::Float32;
+
+    case Scalar::Float64:
+      return sourceType == Scalar::Float64;
+
+    case Scalar::BigInt64:
+    case Scalar::BigUint64:
+      return sourceType == Scalar::BigInt64 || sourceType == Scalar::BigUint64;
+
+    case Scalar::MaxTypedArrayViewType:
+    case Scalar::Int64:
+    case Scalar::Simd128:
+      // GCC8 doesn't like MOZ_CRASH in constexpr functions, so we can't use it
+      // here to catch invalid typed array types.
+      break;
+  }
+  return false;
+}
+
 template <typename T, typename Ops>
 class ElementSpecific {
+  static constexpr bool canUseBitwiseCopy(Scalar::Type sourceType) {
+    return CanUseBitwiseCopy(TypeIDOfType<T>::id, sourceType);
+  }
+
+  template <typename From>
+  static inline constexpr bool canCopyBitwise =
+      canUseBitwiseCopy(TypeIDOfType<From>::id);
+
+  template <typename From, typename LoadOps = Ops>
+  static typename std::enable_if_t<!canCopyBitwise<From>> store(
+      SharedMem<T*> dest, SharedMem<void*> data, size_t count) {
+    SharedMem<From*> src = data.cast<From*>();
+    for (size_t i = 0; i < count; ++i) {
+      Ops::store(dest++, ConvertNumber<T>(LoadOps::load(src++)));
+    }
+  }
+
+  template <typename From, typename LoadOps = Ops>
+  static typename std::enable_if_t<canCopyBitwise<From>> store(
+      SharedMem<T*> dest, SharedMem<void*> data, size_t count) {
+    MOZ_ASSERT_UNREACHABLE("caller handles bitwise copies");
+  }
+
+  template <typename LoadOps = Ops, typename U = T>
+  static typename std::enable_if_t<!std::is_same_v<U, int64_t> &&
+                                   !std::is_same_v<U, uint64_t>>
+  storeTo(SharedMem<T*> dest, Scalar::Type type, SharedMem<void*> data,
+          size_t count) {
+    static_assert(std::is_same_v<T, U>,
+                  "template parameter U only used to disable this declaration");
+    switch (type) {
+      case Scalar::Int8: {
+        store<int8_t, LoadOps>(dest, data, count);
+        break;
+      }
+      case Scalar::Uint8:
+      case Scalar::Uint8Clamped: {
+        store<uint8_t, LoadOps>(dest, data, count);
+        break;
+      }
+      case Scalar::Int16: {
+        store<int16_t, LoadOps>(dest, data, count);
+        break;
+      }
+      case Scalar::Uint16: {
+        store<uint16_t, LoadOps>(dest, data, count);
+        break;
+      }
+      case Scalar::Int32: {
+        store<int32_t, LoadOps>(dest, data, count);
+        break;
+      }
+      case Scalar::Uint32: {
+        store<uint32_t, LoadOps>(dest, data, count);
+        break;
+      }
+      case Scalar::Float16: {
+        store<float16, LoadOps>(dest, data, count);
+        break;
+      }
+      case Scalar::Float32: {
+        store<float, LoadOps>(dest, data, count);
+        break;
+      }
+      case Scalar::Float64: {
+        store<double, LoadOps>(dest, data, count);
+        break;
+      }
+      case Scalar::BigInt64:
+      case Scalar::BigUint64:
+        MOZ_FALLTHROUGH_ASSERT("unexpected int64/uint64 typed array");
+      default:
+        MOZ_CRASH("setFromTypedArray with a typed array with bogus type");
+    }
+  }
+
+  template <typename LoadOps = Ops, typename U = T>
+  static typename std::enable_if_t<std::is_same_v<U, int64_t> ||
+                                   std::is_same_v<U, uint64_t>>
+  storeTo(SharedMem<T*> dest, Scalar::Type type, SharedMem<void*> data,
+          size_t count) {
+    static_assert(std::is_same_v<T, U>,
+                  "template parameter U only used to disable this declaration");
+    MOZ_ASSERT_UNREACHABLE("caller handles int64<>uint64 bitwise copies");
+  }
+
  public:
   /*
    * Copy |source|'s elements into |target|, starting at |target[offset]|.
@@ -379,6 +407,9 @@ class ElementSpecific {
 
     MOZ_ASSERT(TypeIDOfType<T>::id == target->type(),
                "calling wrong setFromTypedArray specialization");
+    MOZ_ASSERT(Scalar::isBigIntType(target->type()) ==
+                   Scalar::isBigIntType(source->type()),
+               "can't convert between BigInt and Number");
     MOZ_ASSERT(!target->hasDetachedBuffer(), "target isn't detached");
     MOZ_ASSERT(!source->hasDetachedBuffer(), "source isn't detached");
     MOZ_ASSERT(*target->length() >= targetLength, "target isn't shrunk");
@@ -406,98 +437,13 @@ class ElementSpecific {
     // so `SharedMem::cast` will be called with properly aligned memory.
     static_assert(alignof(std::max_align_t) % sizeof(T) == 0);
 
-    SharedMem<T*> dest =
-        target->dataPointerEither().template cast<T*>() + offset;
-    size_t count = sourceLength;
-
-    if (source->type() == target->type()) {
-      Ops::podCopy(dest, source->dataPointerEither().template cast<T*>(),
-                   count);
-      return true;
-    }
-
+    SharedMem<T*> dest = Ops::extract(target).template cast<T*>() + offset;
     SharedMem<void*> data = Ops::extract(source);
-    switch (source->type()) {
-      case Scalar::Int8: {
-        SharedMem<int8_t*> src = data.cast<int8_t*>();
-        for (size_t i = 0; i < count; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(Ops::load(src++)));
-        }
-        break;
-      }
-      case Scalar::Uint8:
-      case Scalar::Uint8Clamped: {
-        SharedMem<uint8_t*> src = data.cast<uint8_t*>();
-        for (size_t i = 0; i < count; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(Ops::load(src++)));
-        }
-        break;
-      }
-      case Scalar::Int16: {
-        SharedMem<int16_t*> src = data.cast<int16_t*>();
-        for (size_t i = 0; i < count; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(Ops::load(src++)));
-        }
-        break;
-      }
-      case Scalar::Uint16: {
-        SharedMem<uint16_t*> src = data.cast<uint16_t*>();
-        for (size_t i = 0; i < count; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(Ops::load(src++)));
-        }
-        break;
-      }
-      case Scalar::Int32: {
-        SharedMem<int32_t*> src = data.cast<int32_t*>();
-        for (size_t i = 0; i < count; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(Ops::load(src++)));
-        }
-        break;
-      }
-      case Scalar::Uint32: {
-        SharedMem<uint32_t*> src = data.cast<uint32_t*>();
-        for (size_t i = 0; i < count; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(Ops::load(src++)));
-        }
-        break;
-      }
-      case Scalar::BigInt64: {
-        SharedMem<int64_t*> src = data.cast<int64_t*>();
-        for (size_t i = 0; i < count; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(Ops::load(src++)));
-        }
-        break;
-      }
-      case Scalar::BigUint64: {
-        SharedMem<uint64_t*> src = data.cast<uint64_t*>();
-        for (size_t i = 0; i < count; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(Ops::load(src++)));
-        }
-        break;
-      }
-      case Scalar::Float16: {
-        SharedMem<float16*> src = data.cast<float16*>();
-        for (size_t i = 0; i < count; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(Ops::load(src++)));
-        }
-        break;
-      }
-      case Scalar::Float32: {
-        SharedMem<float*> src = data.cast<float*>();
-        for (size_t i = 0; i < count; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(Ops::load(src++)));
-        }
-        break;
-      }
-      case Scalar::Float64: {
-        SharedMem<double*> src = data.cast<double*>();
-        for (size_t i = 0; i < count; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(Ops::load(src++)));
-        }
-        break;
-      }
-      default:
-        MOZ_CRASH("setFromTypedArray with a typed array with bogus type");
+
+    if (canUseBitwiseCopy(source->type())) {
+      Ops::podCopy(dest, data.template cast<T*>(), sourceLength);
+    } else {
+      storeTo(dest, source->type(), data, sourceLength);
     }
 
     return true;
@@ -527,8 +473,7 @@ class ElementSpecific {
         size_t bound = std::min<size_t>(
             source->as<NativeObject>().getDenseInitializedLength(), len);
 
-        SharedMem<T*> dest =
-            target->dataPointerEither().template cast<T*>() + offset;
+        SharedMem<T*> dest = Ops::extract(target).template cast<T*>() + offset;
 
         MOZ_ASSERT(!canConvertInfallibly(MagicValue(JS_ELEMENTS_HOLE)),
                    "the following loop must abort on holes");
@@ -575,7 +520,7 @@ class ElementSpecific {
       // Compute every iteration in case getElement/valueToNative
       // detaches the underlying array buffer or GC moves the data.
       SharedMem<T*> dest =
-          target->dataPointerEither().template cast<T*>() + offset + i;
+          Ops::extract(target).template cast<T*>() + offset + i;
       Ops::store(dest, n);
     }
 
@@ -600,7 +545,7 @@ class ElementSpecific {
     // Attempt fast-path infallible conversion of dense elements up to the
     // first potentially side-effectful conversion.
 
-    SharedMem<T*> dest = target->dataPointerEither().template cast<T*>();
+    SharedMem<T*> dest = Ops::extract(target).template cast<T*>();
 
     const Value* srcValues = source->getDenseElements();
     for (; i < len; i++) {
@@ -635,7 +580,7 @@ class ElementSpecific {
       MOZ_ASSERT(i < target->length());
 
       // Compute every iteration in case GC moves the data.
-      SharedMem<T*> newDest = target->dataPointerEither().template cast<T*>();
+      SharedMem<T*> newDest = Ops::extract(target).template cast<T*>();
       Ops::store(newDest + i, n);
     }
 
@@ -652,6 +597,9 @@ class ElementSpecific {
 
     MOZ_ASSERT(TypeIDOfType<T>::id == target->type(),
                "calling wrong setFromTypedArray specialization");
+    MOZ_ASSERT(Scalar::isBigIntType(target->type()) ==
+                   Scalar::isBigIntType(source->type()),
+               "can't convert between BigInt and Number");
     MOZ_ASSERT(!target->hasDetachedBuffer(), "target isn't detached");
     MOZ_ASSERT(!source->hasDetachedBuffer(), "source isn't detached");
     MOZ_ASSERT(*target->length() >= targetLength, "target isn't shrunk");
@@ -663,109 +611,32 @@ class ElementSpecific {
     MOZ_ASSERT(offset <= targetLength);
     MOZ_ASSERT(sourceLength <= targetLength - offset);
 
-    SharedMem<T*> dest =
-        target->dataPointerEither().template cast<T*>() + offset;
+    SharedMem<T*> dest = Ops::extract(target).template cast<T*>() + offset;
     size_t len = sourceLength;
 
-    if (source->type() == target->type()) {
-      SharedMem<T*> src = source->dataPointerEither().template cast<T*>();
+    if (canUseBitwiseCopy(source->type())) {
+      SharedMem<T*> src = Ops::extract(source).template cast<T*>();
       Ops::podMove(dest, src, len);
       return true;
     }
 
-    // Copy |source| in case it overlaps the target elements being set.
+    // Copy |source| because it overlaps the target elements being set.
     size_t sourceByteLen = len * source->bytesPerElement();
-    void* data = target->zone()->template pod_malloc<uint8_t>(sourceByteLen);
-    if (!data) {
+    auto temp = target->zone()->template make_pod_array<uint8_t>(sourceByteLen);
+    if (!temp) {
       return false;
     }
-    Ops::memcpy(SharedMem<void*>::unshared(data), source->dataPointerEither(),
-                sourceByteLen);
 
-    switch (source->type()) {
-      case Scalar::Int8: {
-        int8_t* src = static_cast<int8_t*>(data);
-        for (size_t i = 0; i < len; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(*src++));
-        }
-        break;
-      }
-      case Scalar::Uint8:
-      case Scalar::Uint8Clamped: {
-        uint8_t* src = static_cast<uint8_t*>(data);
-        for (size_t i = 0; i < len; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(*src++));
-        }
-        break;
-      }
-      case Scalar::Int16: {
-        int16_t* src = static_cast<int16_t*>(data);
-        for (size_t i = 0; i < len; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(*src++));
-        }
-        break;
-      }
-      case Scalar::Uint16: {
-        uint16_t* src = static_cast<uint16_t*>(data);
-        for (size_t i = 0; i < len; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(*src++));
-        }
-        break;
-      }
-      case Scalar::Int32: {
-        int32_t* src = static_cast<int32_t*>(data);
-        for (size_t i = 0; i < len; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(*src++));
-        }
-        break;
-      }
-      case Scalar::Uint32: {
-        uint32_t* src = static_cast<uint32_t*>(data);
-        for (size_t i = 0; i < len; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(*src++));
-        }
-        break;
-      }
-      case Scalar::BigInt64: {
-        int64_t* src = static_cast<int64_t*>(data);
-        for (size_t i = 0; i < len; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(*src++));
-        }
-        break;
-      }
-      case Scalar::BigUint64: {
-        uint64_t* src = static_cast<uint64_t*>(data);
-        for (size_t i = 0; i < len; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(*src++));
-        }
-        break;
-      }
-      case Scalar::Float32: {
-        float* src = static_cast<float*>(data);
-        for (size_t i = 0; i < len; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(*src++));
-        }
-        break;
-      }
-      case Scalar::Float64: {
-        double* src = static_cast<double*>(data);
-        for (size_t i = 0; i < len; ++i) {
-          Ops::store(dest++, ConvertNumber<T>(*src++));
-        }
-        break;
-      }
-      default:
-        MOZ_CRASH(
-            "setFromOverlappingTypedArray with a typed array with bogus type");
-    }
+    auto data = SharedMem<void*>::unshared(temp.get());
+    Ops::memcpy(data, Ops::extract(source), sourceByteLen);
 
-    js_free(data);
+    storeTo<UnsharedOps>(dest, source->type(), data, len);
+
     return true;
   }
 
   static bool canConvertInfallibly(const Value& v) {
-    if (TypeIDOfType<T>::id == Scalar::BigInt64 ||
-        TypeIDOfType<T>::id == Scalar::BigUint64) {
+    if (std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t>) {
       // Numbers, Null, Undefined, and Symbols throw a TypeError. Strings may
       // OOM and Objects may have side-effects.
       return v.isBigInt() || v.isBoolean();
@@ -776,33 +647,33 @@ class ElementSpecific {
   }
 
   static T infallibleValueToNative(const Value& v) {
-    if (TypeIDOfType<T>::id == Scalar::BigInt64) {
+    if constexpr (std::is_same_v<T, int64_t>) {
       if (v.isBigInt()) {
         return T(BigInt::toInt64(v.toBigInt()));
       }
       return T(v.toBoolean());
-    }
-    if (TypeIDOfType<T>::id == Scalar::BigUint64) {
+    } else if constexpr (std::is_same_v<T, uint64_t>) {
       if (v.isBigInt()) {
         return T(BigInt::toUint64(v.toBigInt()));
       }
       return T(v.toBoolean());
-    }
-    if (v.isInt32()) {
-      return T(v.toInt32());
-    }
-    if (v.isDouble()) {
-      return doubleToNative(v.toDouble());
-    }
-    if (v.isBoolean()) {
-      return T(v.toBoolean());
-    }
-    if (v.isNull()) {
-      return T(0);
-    }
+    } else {
+      if (v.isInt32()) {
+        return T(v.toInt32());
+      }
+      if (v.isDouble()) {
+        return doubleToNative(v.toDouble());
+      }
+      if (v.isBoolean()) {
+        return T(v.toBoolean());
+      }
+      if (v.isNull()) {
+        return T(0);
+      }
 
-    MOZ_ASSERT(v.isUndefined());
-    return TypeIsFloatingPoint<T>() ? T(JS::GenericNaN()) : T(0);
+      MOZ_ASSERT(v.isUndefined());
+      return !std::numeric_limits<T>::is_integer ? T(JS::GenericNaN()) : T(0);
+    }
   }
 
   static bool valueToNative(JSContext* cx, HandleValue v, T* result) {
@@ -813,29 +684,25 @@ class ElementSpecific {
       return true;
     }
 
-    if (std::is_same_v<T, int64_t>) {
+    if constexpr (std::is_same_v<T, int64_t>) {
       JS_TRY_VAR_OR_RETURN_FALSE(cx, *result, ToBigInt64(cx, v));
-      return true;
-    }
-
-    if (std::is_same_v<T, uint64_t>) {
+    } else if constexpr (std::is_same_v<T, uint64_t>) {
       JS_TRY_VAR_OR_RETURN_FALSE(cx, *result, ToBigUint64(cx, v));
-      return true;
-    }
+    } else {
+      MOZ_ASSERT(v.isString() || v.isObject() || v.isSymbol() || v.isBigInt());
 
-    double d;
-    MOZ_ASSERT(v.isString() || v.isObject() || v.isSymbol() || v.isBigInt());
-    if (!(v.isString() ? StringToNumber(cx, v.toString(), &d)
-                       : ToNumber(cx, v, &d))) {
-      return false;
+      double d;
+      if (!(v.isString() ? StringToNumber(cx, v.toString(), &d)
+                         : ToNumber(cx, v, &d))) {
+        return false;
+      }
+      *result = doubleToNative(d);
     }
-
-    *result = doubleToNative(d);
     return true;
   }
 
   static T doubleToNative(double d) {
-    if (TypeIsFloatingPoint<T>()) {
+    if constexpr (!std::numeric_limits<T>::is_integer) {
       // The JS spec doesn't distinguish among different NaN values, and
       // it deliberately doesn't specify the bit pattern written to a
       // typed array when NaN is written into it.  This bit-pattern
@@ -844,18 +711,8 @@ class ElementSpecific {
       if (js::SupportDifferentialTesting()) {
         d = JS::CanonicalizeNaN(d);
       }
-      return T(d);
     }
-    if (MOZ_UNLIKELY(std::isnan(d))) {
-      return T(0);
-    }
-    if (TypeIDOfType<T>::id == Scalar::Uint8Clamped) {
-      return T(d);
-    }
-    if (TypeIsUnsigned<T>()) {
-      return T(JS::ToUint32(d));
-    }
-    return T(JS::ToInt32(d));
+    return ConvertNumber<T>(d);
   }
 };
 
@@ -865,18 +722,21 @@ inline gc::AllocKind js::FixedLengthTypedArrayObject::allocKindForTenure()
   // buffer. Make sure there is room for the array's fixed data when moving the
   // array.
 
+  using namespace js::gc;
+
   if (hasBuffer()) {
     return NativeObject::allocKindForTenure();
   }
 
-  gc::AllocKind allocKind;
+  AllocKind allocKind;
   if (hasInlineElements()) {
     allocKind = AllocKindForLazyBuffer(byteLength());
   } else {
-    allocKind = gc::GetGCObjectKind(getClass());
+    allocKind = GetGCObjectKind(getClass());
   }
 
-  return gc::ForegroundToBackgroundAllocKind(allocKind);
+  MOZ_ASSERT(GetObjectFinalizeKind(getClass()) == gc::FinalizeKind::Background);
+  return GetFinalizedAllocKind(allocKind, gc::FinalizeKind::Background);
 }
 
 /* static */ gc::AllocKind

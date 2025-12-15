@@ -67,20 +67,32 @@ using ImportAttributeVector = GCVector<ImportAttribute, 0, SystemAllocPolicy>;
 
 class ModuleRequestObject : public NativeObject {
  public:
-  enum { SpecifierSlot = 0, AttributesSlot, SlotCount };
+  enum {
+    SpecifierSlot = 0,
+    FirstUnsupportedAttributeKeySlot,
+    ModuleTypeSlot,
+    SlotCount
+  };
 
   static const JSClass class_;
   static bool isInstance(HandleValue value);
   [[nodiscard]] static ModuleRequestObject* create(
       JSContext* cx, Handle<JSAtom*> specifier,
-      MutableHandle<UniquePtr<ImportAttributeVector>> maybeAttributes);
+      Handle<ImportAttributeVector> maybeAttributes);
+  [[nodiscard]] static ModuleRequestObject* create(JSContext* cx,
+                                                   Handle<JSAtom*> specifier,
+                                                   JS::ModuleType moduleType);
 
   JSAtom* specifier() const;
-  mozilla::Span<const ImportAttribute> attributes() const;
-  bool hasAttributes() const;
-  static bool getModuleType(JSContext* cx,
-                            const Handle<ModuleRequestObject*> moduleRequest,
-                            JS::ModuleType& moduleType);
+  JS::ModuleType moduleType() const;
+
+  // We process import attributes earlier in the process, but according to the
+  // spec, we should error during module evaluation if we encounter an
+  // unsupported attribute. We want to generate a nice error message, so we need
+  // to keep track of the first unsupported key we encounter.
+  void setFirstUnsupportedAttributeKey(Handle<JSAtom*> key);
+  bool hasFirstUnsupportedAttributeKey() const;
+  JSAtom* getFirstUnsupportedAttributeKey() const;
 };
 
 using ModuleRequestVector =
@@ -244,7 +256,7 @@ class ModuleNamespaceObject : public ProxyObject {
 
  private:
   struct ProxyHandler : public BaseProxyHandler {
-    ProxyHandler();
+    constexpr ProxyHandler() : BaseProxyHandler(&family, false) {}
 
     bool getOwnPropertyDescriptor(
         JSContext* cx, HandleObject proxy, HandleId id,
@@ -449,7 +461,7 @@ class ModuleObject : public NativeObject {
   static bool createEnvironment(JSContext* cx, Handle<ModuleObject*> self);
   static bool createSyntheticEnvironment(JSContext* cx,
                                          Handle<ModuleObject*> self,
-                                         Handle<GCVector<Value>> values);
+                                         JS::HandleVector<Value> values);
 
   void initAsyncSlots(JSContext* cx, bool hasTopLevelAwait,
                       Handle<ListObject*> asyncParentModules);

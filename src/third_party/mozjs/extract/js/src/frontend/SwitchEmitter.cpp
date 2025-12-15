@@ -396,10 +396,13 @@ bool SwitchEmitter::emitEnd() {
     return false;
   }
 
-  emitterScope_.reset();
   tdzCacheLexical_.reset();
 
   controlInfo_.reset();
+
+  // LIFO construction order is enforced hence we should reset the
+  // emitterScope_ after controlInfo_ has been reset.
+  emitterScope_.reset();
 
   state_ = State::End;
   return true;

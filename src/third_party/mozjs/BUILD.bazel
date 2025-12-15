@@ -59,6 +59,7 @@ mongo_cc_library(
     srcs = [
         "extract/js/src/builtin/RegExp.cpp",
         "extract/js/src/frontend/Parser.cpp",
+        "extract/js/src/gc/Memory.cpp",
         "extract/js/src/gc/StoreBuffer.cpp",
         "extract/js/src/irregexp/RegExpNativeMacroAssembler.cpp",
         "extract/js/src/irregexp/imported/regexp-ast.cc",
@@ -70,19 +71,21 @@ mongo_cc_library(
         "extract/js/src/vm/Interpreter.cpp",
         "extract/js/src/vm/ProfilingStack.cpp",
         "extract/js/src/wasm/WasmCode-platform.cpp",
-        "extract/mfbt/lz4/lz4.c",
-        "extract/mfbt/lz4/lz4frame.c",
-        "extract/mfbt/lz4/lz4hc.c",
-        "extract/mfbt/lz4/xxhash.c",
+        "extract/js/src/xsum/xsum.cpp",
         "extract/mozglue/misc/AutoProfilerLabel.cpp",
         "extract/mozglue/misc/AwakeTimeStamp.cpp",
         "extract/mozglue/misc/Debug.cpp",
         "extract/mozglue/misc/MmapFaultHandler.cpp",
+        "extract/mozglue/misc/Now.cpp",
         "extract/mozglue/misc/Printf.cpp",
         "extract/mozglue/misc/SIMD.cpp",
         "extract/mozglue/misc/StackWalk.cpp",
         "extract/mozglue/misc/TimeStamp.cpp",
         "extract/mozglue/misc/Uptime.cpp",
+        "extract/mozglue/static/lz4/lz4.c",
+        "extract/mozglue/static/lz4/lz4frame.c",
+        "extract/mozglue/static/lz4/lz4hc.c",
+        "extract/mozglue/static/lz4/xxhash.c",
         "mongo_sources/freeOpToJSContext.cpp",
         "mongo_sources/mongoErrorReportToString.cpp",
     ] + select({
@@ -161,6 +164,7 @@ mongo_cc_library(
         "extract/mfbt/**/*.h",
         "extract/modules/fdlibm/**/*.h",
         "mongo_sources/**/*.h",
+        "extract/mozglue/static/lz4/*.h",
     ]) + PLATFORM_SRCS,
     hdrs = glob(["include/**/*.h"]),
     copts = PLATFORM_COPTS + [
@@ -241,11 +245,15 @@ mongo_cc_library(
             # C5101: use of preprocessor directive in function-like macro
             # argument list is undefined behavior
             "/wd5101",
+
+            # Enable extern constexpr variables
+            "/Zc:externConstexpr",
         ],
         "//conditions:default": [
             "-Wno-sign-compare",
             # Disable warnings for third party libraries as no action will be taken to fix them
             # and they just clutter the output logs
+            "-Wno-unused-value",
             "-Wno-unused-variable",
             "-Wno-implicit-fallthrough",
             # Bazel doesn't differentiate between compile flags for C and C++.
@@ -310,6 +318,7 @@ mongo_cc_library(
         "@platforms//os:macos": ["-Wl,-undefined,dynamic_lookup"],
         "@platforms//os:windows": [
             "ntdll.lib",
+            "mincore.lib",
         ],
         "//conditions:default": [""],
     }),
@@ -345,6 +354,7 @@ mongo_cc_library(
         "**/*.tbl",
     ]),
     deps = [
+        "//src/third_party/fmt",
         "//src/third_party/icu4c-57.1/source:icu_i18n",
         "//src/third_party/zlib",
     ],

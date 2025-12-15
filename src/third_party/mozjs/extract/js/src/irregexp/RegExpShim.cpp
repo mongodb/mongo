@@ -81,8 +81,9 @@ Handle<T>::Handle(T object, Isolate* isolate)
     : location_(isolate->getHandleLocation(object.value())) {}
 
 template Handle<ByteArray>::Handle(ByteArray b, Isolate* isolate);
+template Handle<TrustedByteArray>::Handle(TrustedByteArray b, Isolate* isolate);
 template Handle<HeapObject>::Handle(const JS::Value& v, Isolate* isolate);
-template Handle<JSRegExp>::Handle(JSRegExp re, Isolate* isolate);
+template Handle<IrRegExpData>::Handle(IrRegExpData re, Isolate* isolate);
 template Handle<String>::Handle(String s, Isolate* isolate);
 
 template <typename T>
@@ -238,6 +239,23 @@ Handle<ByteArray> Isolate::NewByteArray(int length, AllocationType alloc) {
   return Handle<ByteArray>(JS::PrivateValue(data), this);
 }
 
+Handle<TrustedByteArray> Isolate::NewTrustedByteArray(int length,
+                                                      AllocationType alloc) {
+  MOZ_RELEASE_ASSERT(length >= 0);
+
+  js::AutoEnterOOMUnsafeRegion oomUnsafe;
+
+  size_t alloc_size = sizeof(ByteArrayData) + length;
+  ByteArrayData* data =
+      static_cast<ByteArrayData*>(allocatePseudoHandle(alloc_size));
+  if (!data) {
+    oomUnsafe.crash("Irregexp NewTrustedByteArray");
+  }
+  new (data) ByteArrayData(length);
+
+  return Handle<TrustedByteArray>(JS::PrivateValue(data), this);
+}
+
 Handle<FixedArray> Isolate::NewFixedArray(int length) {
   MOZ_RELEASE_ASSERT(length >= 0);
   js::AutoEnterOOMUnsafeRegion oomUnsafe;
@@ -292,6 +310,38 @@ template Handle<String> Isolate::InternalizeString(
 
 static_assert(JSRegExp::RegistersForCaptureCount(JSRegExp::kMaxCaptures) <=
               RegExpMacroAssembler::kMaxRegisterCount);
+
+// This function implements AdvanceStringIndex and CodePointAt:
+//  - https://tc39.es/ecma262/#sec-advancestringindex
+//  - https://tc39.es/ecma262/#sec-codepointat
+// The semantics are to advance 2 code units for properly paired
+// surrogates in unicode mode, and 1 code unit otherwise
+// (non-surrogates, unpaired surrogates, or non-unicode mode).
+uint64_t RegExpUtils::AdvanceStringIndex(Tagged<String> wrappedString,
+                                         uint64_t index, bool unicode) {
+  MOZ_ASSERT(index < kMaxSafeIntegerUint64);
+  MOZ_ASSERT(wrappedString->IsFlat());
+  JSLinearString* string = &wrappedString->str()->asLinear();
+
+  if (unicode && index < string->length()) {
+    char16_t first = string->latin1OrTwoByteChar(index);
+    if (first >= 0xD800 && first <= 0xDBFF && index + 1 < string->length()) {
+      char16_t second = string->latin1OrTwoByteChar(index + 1);
+      if (second >= 0xDC00 && second <= 0xDFFF) {
+        return index + 2;
+      }
+    }
+  }
+
+  return index + 1;
+}
+
+// RegexpMacroAssemblerTracer::GetCode dumps the flags by first converting to
+// a String, then into a C string. To avoid allocating while assembling,
+// we just return a handle to the well-known atom "flags".
+Handle<String> JSRegExp::StringFromFlags(Isolate* isolate, RegExpFlags flags) {
+  return Handle<String>(String(isolate->cx()->names().flags), isolate);
+}
 
 }  // namespace internal
 }  // namespace v8

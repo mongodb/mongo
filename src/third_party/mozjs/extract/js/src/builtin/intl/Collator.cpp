@@ -56,7 +56,9 @@ const JSClass CollatorObject::class_ = {
     JSCLASS_HAS_RESERVED_SLOTS(CollatorObject::SLOT_COUNT) |
         JSCLASS_HAS_CACHED_PROTO(JSProto_Collator) |
         JSCLASS_FOREGROUND_FINALIZE,
-    &CollatorObject::classOps_, &CollatorObject::classSpec_};
+    &CollatorObject::classOps_,
+    &CollatorObject::classSpec_,
+};
 
 const JSClass& CollatorObject::protoClass_ = PlainObject::class_;
 
@@ -69,15 +71,20 @@ static bool collator_toSource(JSContext* cx, unsigned argc, Value* vp) {
 static const JSFunctionSpec collator_static_methods[] = {
     JS_SELF_HOSTED_FN("supportedLocalesOf", "Intl_Collator_supportedLocalesOf",
                       1, 0),
-    JS_FS_END};
+    JS_FS_END,
+};
 
 static const JSFunctionSpec collator_methods[] = {
     JS_SELF_HOSTED_FN("resolvedOptions", "Intl_Collator_resolvedOptions", 0, 0),
-    JS_FN("toSource", collator_toSource, 0, 0), JS_FS_END};
+    JS_FN("toSource", collator_toSource, 0, 0),
+    JS_FS_END,
+};
 
 static const JSPropertySpec collator_properties[] = {
     JS_SELF_HOSTED_GET("compare", "$Intl_Collator_compare_get", 0),
-    JS_STRING_SYM_PS(toStringTag, "Intl.Collator", JSPROP_READONLY), JS_PS_END};
+    JS_STRING_SYM_PS(toStringTag, "Intl.Collator", JSPROP_READONLY),
+    JS_PS_END,
+};
 
 static bool Collator(JSContext* cx, unsigned argc, Value* vp);
 
@@ -89,7 +96,8 @@ const ClassSpec CollatorObject::classSpec_ = {
     collator_methods,
     collator_properties,
     nullptr,
-    ClassSpec::DontDefineConstructor};
+    ClassSpec::DontDefineConstructor,
+};
 
 /**
  * 10.1.2 Intl.Collator([ locales [, options]])

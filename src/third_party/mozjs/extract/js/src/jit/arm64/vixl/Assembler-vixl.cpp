@@ -472,21 +472,17 @@ void MemOperand::AddOffset(int64_t offset) {
 }
 
 static CPUFeatures InitCachedCPUFeatures() {
+#ifdef JS_SIMULATOR_ARM64
+  // Enable all features for the Simulator.
+  return CPUFeatures::All();
+#else
   CPUFeatures cpu_features = CPUFeatures::AArch64LegacyBaseline();
 
   // Mozilla change: always use maximally-present features.
   cpu_features.Combine(CPUFeatures::InferFromOS());
 
-  // Mozilla change: Compile time hard-coded value from js-config.mozbuild.
-#ifndef MOZ_AARCH64_JSCVT
-#  error "MOZ_AARCH64_JSCVT must be defined."
-#elif MOZ_AARCH64_JSCVT >= 1
-  // Note, vixl backend implements the JSCVT flag as a boolean despite having 3
-  // extra bits reserved for forward compatibility in the ARMv8 documentation.
-  cpu_features.Combine(CPUFeatures::kJSCVT);
-#endif
-
   return cpu_features;
+#endif
 }
 
 // Assembler

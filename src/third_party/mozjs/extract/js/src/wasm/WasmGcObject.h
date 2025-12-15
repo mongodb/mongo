@@ -22,9 +22,6 @@
 #include "wasm/WasmTypeDef.h"
 #include "wasm/WasmValType.h"
 
-using js::wasm::StorageType;
-using mozilla::CheckedUint32;
-
 namespace js::wasm {
 
 // For trailer blocks whose owning Wasm{Struct,Array}Objects make it into the
@@ -110,7 +107,7 @@ class WasmGcObject : public JSObject {
   [[nodiscard]] static bool lookUpProperty(JSContext* cx,
                                            Handle<WasmGcObject*> obj, jsid id,
                                            PropOffset* offset,
-                                           StorageType* type);
+                                           wasm::StorageType* type);
 
  public:
   [[nodiscard]] static bool loadValue(JSContext* cx, Handle<WasmGcObject*> obj,
@@ -209,10 +206,10 @@ class WasmArrayObject : public WasmGcObject,
   //
   // This logic is mirrored in WasmArrayObject::maxInlineElementsForElemSize and
   // MacroAssembler::wasmNewArrayObject.
-  static CheckedUint32 calcStorageBytesChecked(uint32_t elemSize,
-                                               uint32_t numElements) {
+  static constexpr mozilla::CheckedUint32 calcStorageBytesChecked(
+      uint32_t elemSize, uint32_t numElements) {
     static_assert(sizeof(WasmArrayObject) % gc::CellAlignBytes == 0);
-    CheckedUint32 storageBytes = elemSize;
+    mozilla::CheckedUint32 storageBytes = elemSize;
     storageBytes *= numElements;
     storageBytes += sizeof(WasmArrayObject::DataHeader);
     // Round total allocation up to gc::CellAlignBytes
@@ -220,14 +217,20 @@ class WasmArrayObject : public WasmGcObject,
     storageBytes += gc::CellAlignBytes - (storageBytes % gc::CellAlignBytes);
     return storageBytes;
   }
-  static uint32_t calcStorageBytes(uint32_t elemSize, uint32_t numElements) {
-    CheckedUint32 storageBytes = calcStorageBytesChecked(elemSize, numElements);
+  // Calculate the byte length of the array's data storage, without checking for
+  // overflow. This includes the data header, data, and any extra space for
+  // alignment with GC sizes.
+  static uint32_t calcStorageBytesUnchecked(uint32_t elemSize,
+                                            uint32_t numElements) {
+    mozilla::CheckedUint32 storageBytes =
+        calcStorageBytesChecked(elemSize, numElements);
     MOZ_ASSERT(storageBytes.isValid());
     return storageBytes.value();
   }
   // Compute the maximum number of elements that can be stored inline for the
   // given element size.
-  static inline uint32_t maxInlineElementsForElemSize(uint32_t elemSize);
+  static inline constexpr uint32_t maxInlineElementsForElemSize(
+      uint32_t elemSize);
 
   using DataHeader = uintptr_t;
   static const DataHeader DataIsIL = 0;
@@ -242,7 +245,8 @@ class WasmArrayObject : public WasmGcObject,
   template <bool ZeroFields>
   static MOZ_ALWAYS_INLINE WasmArrayObject* createArrayOOL(
       JSContext* cx, wasm::TypeDefInstanceData* typeDefData,
-      js::gc::Heap initialHeap, uint32_t numElements, uint32_t storageBytes);
+      js::gc::AllocSite* allocSite, js::gc::Heap initialHeap,
+      uint32_t numElements, uint32_t storageBytes);
 
   // Creates a new array object with inline storage. Reports an error on OOM.
   // The element type, shape, class pointer, alloc site and alloc kind are taken
@@ -252,14 +256,16 @@ class WasmArrayObject : public WasmGcObject,
   template <bool ZeroFields>
   static MOZ_ALWAYS_INLINE WasmArrayObject* createArrayIL(
       JSContext* cx, wasm::TypeDefInstanceData* typeDefData,
-      js::gc::Heap initialHeap, uint32_t numElements, uint32_t storageBytes);
+      js::gc::AllocSite* allocSite, js::gc::Heap initialHeap,
+      uint32_t numElements, uint32_t storageBytes);
 
   // This selects one of the above two routines, depending on how much storage
   // is required for the given type and number of elements.
   template <bool ZeroFields>
   static MOZ_ALWAYS_INLINE WasmArrayObject* createArray(
       JSContext* cx, wasm::TypeDefInstanceData* typeDefData,
-      js::gc::Heap initialHeap, uint32_t numElements);
+      js::gc::AllocSite* allocSite, js::gc::Heap initialHeap,
+      uint32_t numElements);
 
   // JIT accessors
   static constexpr size_t offsetOfNumElements() {
@@ -376,14 +382,14 @@ class WasmStructObject : public WasmGcObject,
   template <bool ZeroFields>
   static MOZ_ALWAYS_INLINE WasmStructObject* createStructIL(
       JSContext* cx, wasm::TypeDefInstanceData* typeDefData,
-      js::gc::Heap initialHeap);
+      gc::AllocSite* allocSite, js::gc::Heap initialHeap);
 
   // Same as ::createStructIL, except it is assumed and debug-asserted that
   // `typeDefData` refers to a type that does need OOL storage.
   template <bool ZeroFields>
   static MOZ_ALWAYS_INLINE WasmStructObject* createStructOOL(
       JSContext* cx, wasm::TypeDefInstanceData* typeDefData,
-      js::gc::Heap initialHeap);
+      gc::AllocSite* allocSite, js::gc::Heap initialHeap);
 
   // Given the total number of data bytes required (including alignment
   // holes), return the number of inline and outline bytes required.
@@ -398,14 +404,14 @@ class WasmStructObject : public WasmGcObject,
   // Given the offset of a field, produce the offset in `inlineData` or
   // `*outlineData_` to use, plus a bool indicating which area it is.
   // `fieldType` is for assertional purposes only.
-  static inline void fieldOffsetToAreaAndOffset(StorageType fieldType,
+  static inline void fieldOffsetToAreaAndOffset(wasm::StorageType fieldType,
                                                 uint32_t fieldOffset,
                                                 bool* areaIsOutline,
                                                 uint32_t* areaOffset);
 
   // Given the offset of a field, return its actual address.  `fieldType` is
   // for assertional purposes only.
-  inline uint8_t* fieldOffsetToAddress(StorageType fieldType,
+  inline uint8_t* fieldOffsetToAddress(wasm::StorageType fieldType,
                                        uint32_t fieldOffset);
 
   // Gets JS Value of the structure field.
@@ -443,7 +449,7 @@ static_assert((WasmStructObject_MaxInlineBytes % 16) == 0);
 static_assert((WasmArrayObject_MaxInlineBytes % 16) == 0);
 
 /* static */
-inline uint32_t WasmArrayObject::maxInlineElementsForElemSize(
+inline constexpr uint32_t WasmArrayObject::maxInlineElementsForElemSize(
     uint32_t elemSize) {
   // This implementation inverts the logic of WasmArrayObject::calcStorageBytes
   // to compute numElements.
@@ -478,10 +484,9 @@ inline bool WasmStructObject::requiresOutlineBytes(uint32_t totalBytes) {
 }
 
 /*static*/
-inline void WasmStructObject::fieldOffsetToAreaAndOffset(StorageType fieldType,
-                                                         uint32_t fieldOffset,
-                                                         bool* areaIsOutline,
-                                                         uint32_t* areaOffset) {
+inline void WasmStructObject::fieldOffsetToAreaAndOffset(
+    wasm::StorageType fieldType, uint32_t fieldOffset, bool* areaIsOutline,
+    uint32_t* areaOffset) {
   if (fieldOffset < WasmStructObject_MaxInlineBytes) {
     *areaIsOutline = false;
     *areaOffset = fieldOffset;
@@ -496,8 +501,8 @@ inline void WasmStructObject::fieldOffsetToAreaAndOffset(StorageType fieldType,
       ((fieldOffset + fieldType.size() - 1) < WasmStructObject_MaxInlineBytes));
 }
 
-inline uint8_t* WasmStructObject::fieldOffsetToAddress(StorageType fieldType,
-                                                       uint32_t fieldOffset) {
+inline uint8_t* WasmStructObject::fieldOffsetToAddress(
+    wasm::StorageType fieldType, uint32_t fieldOffset) {
   bool areaIsOutline;
   uint32_t areaOffset;
   fieldOffsetToAreaAndOffset(fieldType, fieldOffset, &areaIsOutline,
@@ -509,6 +514,41 @@ inline uint8_t* WasmStructObject::fieldOffsetToAddress(StorageType fieldType,
 // are in the NULL pointer guard page.
 static_assert(WasmStructObject_MaxInlineBytes <= wasm::NullPtrGuardSize);
 static_assert(sizeof(WasmArrayObject) <= wasm::NullPtrGuardSize);
+
+// Template to acquire a stable pointer to the elements of a WasmArrayObject
+// that will not move even if there is a GC. This will create a copy of the
+// array onto the stack when the array has inline data, and can be expensive.
+template <typename T>
+class MOZ_RAII StableWasmArrayObjectElements {
+  static constexpr size_t MaxInlineElements =
+      WasmArrayObject::maxInlineElementsForElemSize(sizeof(T));
+  Rooted<WasmArrayObject*> array_;
+  T* elements_;
+  mozilla::Maybe<mozilla::Vector<T, MaxInlineElements, SystemAllocPolicy>>
+      ownElements_;
+
+ public:
+  StableWasmArrayObjectElements(JSContext* cx, Handle<WasmArrayObject*> array)
+      : array_(cx, array), elements_(nullptr) {
+    if (array->isDataInline()) {
+      ownElements_.emplace();
+      if (!ownElements_->resize(array->numElements_)) {
+        // Should not happen as we have inline storage for the maximum needed
+        // elements.
+        MOZ_CRASH();
+      }
+      std::copy(array->inlineStorage(),
+                array->inlineStorage() + array->numElements_ * sizeof(T),
+                ownElements_->begin());
+      elements_ = ownElements_->begin();
+    } else {
+      elements_ = reinterpret_cast<T*>(array->data_);
+    }
+  }
+
+  T* elements() { return elements_; }
+  size_t length() const { return array_->numElements_; }
+};
 
 }  // namespace js
 

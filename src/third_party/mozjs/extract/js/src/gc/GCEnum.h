@@ -56,6 +56,7 @@ enum class State {
   D(RootsChange, 1)                      \
   D(Alloc, 2)                            \
   D(VerifierPre, 4)                      \
+  D(VerifierPost, 5)                     \
   D(YieldBeforeRootMarking, 6)           \
   D(GenerationalGC, 7)                   \
   D(YieldBeforeMarking, 8)               \
@@ -73,7 +74,8 @@ enum class State {
   D(YieldBeforeSweepingNonObjects, 22)   \
   D(YieldBeforeSweepingPropMapTrees, 23) \
   D(CheckWeakMapMarking, 24)             \
-  D(YieldWhileGrayMarking, 25)
+  D(YieldWhileGrayMarking, 25)           \
+  D(CheckHeapBeforeMinorGC, 26)
 
 enum class ZealMode {
 #define ZEAL_MODE(name, value) name = value,
@@ -108,10 +110,8 @@ enum class GCAbortReason {
 #define JS_FOR_EACH_INTERNAL_MEMORY_USE(_) \
   _(ArrayBufferContents)                   \
   _(StringContents)                        \
-  _(ObjectElements)                        \
-  _(ObjectSlots)                           \
   _(ScriptPrivateData)                     \
-  _(MapObjectTable)                        \
+  _(MapObjectData)                         \
   _(BigIntDigits)                          \
   _(ScopeData)                             \
   _(WeakMapObject)                         \

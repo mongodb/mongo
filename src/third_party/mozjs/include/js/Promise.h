@@ -36,18 +36,35 @@ class JS_PUBLIC_API JobQueue {
   virtual ~JobQueue() = default;
 
   /**
-   * Ask the embedding for the incumbent global.
+   * Ask the embedding for the host defined data.
    *
-   * SpiderMonkey doesn't itself have a notion of incumbent globals as defined
+   * This is the step 5 in
+   * https://html.spec.whatwg.org/multipage/webappapis.html#hostmakejobcallback
+   *
+   * SpiderMonkey doesn't itself have a notion of host defined data as defined
    * by the HTML spec, so we need the embedding to provide this. See
    * dom/script/ScriptSettings.h for details.
+   *
+   * If the embedding has the host defined data, this method should return the
+   * host defined data via the `data` out parameter and return `true`.
+   * The object in the `data` out parameter can belong to any compartment.
+   * If the embedding doesn't need the host defined data, this method should
+   * set the `data` out parameter to `nullptr` and return `true`.
+   * If any error happens while generating the host defined data, this method
+   * should set a pending exception to `cx` and return `false`.
    */
-  virtual JSObject* getIncumbentGlobal(JSContext* cx) = 0;
+  virtual bool getHostDefinedData(JSContext* cx,
+                                  JS::MutableHandle<JSObject*> data) const = 0;
 
   /**
    * Enqueue a reaction job `job` for `promise`, which was allocated at
-   * `allocationSite`. Provide `incumbentGlobal` as the incumbent global for
+   * `allocationSite`. Provide `hostDefineData` as the host defined data for
    * the reaction job's execution.
+   *
+   * The `hostDefinedData` value comes from `getHostDefinedData` method.
+   * The object is unwrapped, and it can belong to a different compartment
+   * than the current compartment. It can be `nullptr` if `getHostDefinedData`
+   * returns `nullptr`.
    *
    * `promise` can be null if the promise is optimized out.
    * `promise` is guaranteed not to be optimized out if the promise has
@@ -56,7 +73,7 @@ class JS_PUBLIC_API JobQueue {
   virtual bool enqueuePromiseJob(JSContext* cx, JS::HandleObject promise,
                                  JS::HandleObject job,
                                  JS::HandleObject allocationSite,
-                                 JS::HandleObject incumbentGlobal) = 0;
+                                 JS::HandleObject hostDefinedData) = 0;
 
   /**
    * Run all jobs in the queue. Running one job may enqueue others; continue to
@@ -546,27 +563,65 @@ extern JS_PUBLIC_API JSObject* GetWaitForAllPromise(
  * on a JSContext thread when requested via DispatchToEventLoopCallback.
  */
 class JS_PUBLIC_API Dispatchable {
- protected:
-  // Dispatchables are created and destroyed by SpiderMonkey.
-  Dispatchable() = default;
+ public:
+  // Destruction of Dispatchables is public in order to be used with
+  // UniquePtrs. Their destruction by SpiderMonkey is enforced by
+  // ReleaseFailedTask.
   virtual ~Dispatchable() = default;
 
- public:
   // ShuttingDown indicates that SpiderMonkey should abort async tasks to
   // expedite shutdown.
   enum MaybeShuttingDown { NotShuttingDown, ShuttingDown };
 
   // Called by the embedding after DispatchToEventLoopCallback succeeds.
+  // Used to correctly release the unique ptr and call the run task.
+  static void Run(JSContext* cx, js::UniquePtr<Dispatchable>&& task,
+                  MaybeShuttingDown maybeShuttingDown);
+
+  // Used to correctly release the unique ptr. Relies on the
+  // OffThreadRuntimePromiseState to handle cleanup via iteration over the
+  // live() set.
+  static void ReleaseFailedTask(js::UniquePtr<Dispatchable>&& task);
+
+ protected:
+  // Dispatchables are created exclusively by SpiderMonkey.
+  Dispatchable() = default;
+
+  // These two methods must be implemented in order to correctly handle
+  // success and failure cases for the task.
+
+  // Used to execute the task, run on the owning thread.
+  // A subclass should override this method to
+  //   1) execute the task as necessary and
+  //   2) delete the task.
   virtual void run(JSContext* cx, MaybeShuttingDown maybeShuttingDown) = 0;
+
+  // Used to transfer the task back to the runtime if the embedding, upon
+  // taking ownership of the task, fails to dispatch and run it. This allows
+  // the runtime to delete the task during shutdown. This method can be called
+  // from any thread.
+  // Typically, this will be used with a UniquePtr like so:
+  //   auto task = myTask.release();
+  //   task->transferToRuntime();
+  virtual void transferToRuntime() = 0;
 };
 
 /**
- * Callback to dispatch a JS::Dispatchable to a JSContext's thread's event loop.
+ * Callbacks to dispatch a JS::Dispatchable to a JSContext's thread's event
+ * loop.
  *
  * The DispatchToEventLoopCallback set on a particular JSContext must accept
  * JS::Dispatchable instances and arrange for their `run` methods to be called
  * eventually on the JSContext's thread. This is used for cross-thread dispatch,
- * so the callback itself must be safe to call from any thread.
+ * so the callback itself must be safe to call from any thread. It cannot
+ * trigger a GC.
+ *
+ * The DelayedDispatchToEventLoopCallback in addition takes a delay, and it
+ * must accept JS::Dispatchable instances and arrange for their `run` methods
+ * to be called after the delay on the JSContext's thread.
+ * The embeddings must have its own timeout manager to handle the delay.
+ * If a timeout manager is not available for given context, it should return
+ * false, optionally with a warning message printed.
  *
  * If the callback returns `true`, it must eventually run the given
  * Dispatchable; otherwise, SpiderMonkey may leak memory or hang.
@@ -577,17 +632,21 @@ class JS_PUBLIC_API Dispatchable {
  * all subsequently submitted runnables as well.
  *
  * To establish a DispatchToEventLoopCallback, the embedding may either call
- * InitDispatchToEventLoop to provide its own, or call js::UseInternalJobQueues
+ * InitDispatchsToEventLoop to provide its own, or call js::UseInternalJobQueues
  * to select a default implementation built into SpiderMonkey. This latter
  * depends on the embedding to call js::RunJobs on the JavaScript thread to
  * process queued Dispatchables at appropriate times.
  */
 
-typedef bool (*DispatchToEventLoopCallback)(void* closure,
-                                            Dispatchable* dispatchable);
+typedef bool (*DispatchToEventLoopCallback)(
+    void* closure, js::UniquePtr<Dispatchable>&& dispatchable);
 
-extern JS_PUBLIC_API void InitDispatchToEventLoop(
-    JSContext* cx, DispatchToEventLoopCallback callback, void* closure);
+typedef bool (*DelayedDispatchToEventLoopCallback)(
+    void* closure, js::UniquePtr<Dispatchable>&& dispatchable, uint32_t delay);
+
+extern JS_PUBLIC_API void InitDispatchsToEventLoop(
+    JSContext* cx, DispatchToEventLoopCallback callback,
+    DelayedDispatchToEventLoopCallback delayedCallback, void* closure);
 
 /**
  * When a JSRuntime is destroyed it implicitly cancels all async tasks in

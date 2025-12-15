@@ -989,11 +989,16 @@ const ObjectOps js::ProxyObjectOps = {
 };
 
 static const JSFunctionSpec proxy_static_methods[] = {
-    JS_FN("revocable", proxy_revocable, 2, 0), JS_FS_END};
+    JS_FN("revocable", proxy_revocable, 2, 0),
+    JS_FS_END,
+};
 
 static const ClassSpec ProxyClassSpec = {
-    GenericCreateConstructor<js::proxy, 2, gc::AllocKind::FUNCTION>, nullptr,
-    proxy_static_methods, nullptr};
+    GenericCreateConstructor<js::proxy, 2, gc::AllocKind::FUNCTION>,
+    nullptr,
+    proxy_static_methods,
+    nullptr,
+};
 
 const JSClass js::ProxyClass = PROXY_CLASS_DEF_WITH_CLASS_SPEC(
     "Proxy",

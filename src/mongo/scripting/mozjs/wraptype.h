@@ -279,9 +279,12 @@ public:
             JS::RootedObject proto(_context);
 
             JS::RealmOptions options;
-            _proto.init(_context,
-                        _assertPtr(JS_NewGlobalObject(
-                            _context, &_jsclass, nullptr, JS::DontFireOnNewGlobalHook, options)));
+            JSObject* global = JS_NewGlobalObject(
+                _context, &_jsclass, nullptr, JS::DontFireOnNewGlobalHook, options);
+            if (!global) {
+                uasserted(ErrorCodes::JSInterpreterFailure, "Failed to create global object");
+            }
+            _proto.init(_context, global);
 
             JSAutoRealm ac(_context, _proto);
             _installFunctions(_proto, T::freeFunctions);
@@ -579,6 +582,15 @@ private:
     }
 
     JSObject* _assertPtr(JSObject* ptr) {
+
+        // If we don’t even have a realm/global yet, calling throwCurrentJSException()
+        // would recurse into JSContext::getPendingException(), which expects a
+        // compartment and will crash. Instead, translate to a plain uassert with context.
+        if (!JS::CurrentGlobalOrNull(_context)) {
+            uasserted(ErrorCodes::JSInterpreterFailure,
+                      "Failed to create JS object: no global realm initialized");
+        }
+
         if (!ptr)
             throwCurrentJSException(
                 _context, ErrorCodes::JSInterpreterFailure, "Failed to JS_NewX");

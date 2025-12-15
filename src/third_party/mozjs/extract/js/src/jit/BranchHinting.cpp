@@ -25,7 +25,7 @@ using namespace js::jit;
 // Because of Ion's structure, we don't do that for blocks inside a loop.
 // - TODO: do something for likely blocks.
 // - TODO: register allocator can be tuned depending on the hints.
-bool jit::BranchHinting(MIRGenerator* mir, MIRGraph& graph) {
+bool jit::BranchHinting(const MIRGenerator* mir, MIRGraph& graph) {
   JitSpew(JitSpew_BranchHint, "Beginning BranchHinting pass");
 
   // Move towards the end all blocks marked as unlikely

@@ -103,24 +103,11 @@ struct ImportValues;
 // WebAssembly.Module object.
 
 [[nodiscard]] bool CompileAndSerialize(JSContext* cx,
-                                       const ShareableBytes& bytecode,
+                                       const BytecodeSource& source,
                                        Bytes* serialized);
 
 [[nodiscard]] bool DeserializeModule(JSContext* cx, const Bytes& serialized,
                                      MutableHandleObject module);
-
-// A WebAssembly "Exported Function" is the spec name for the JS function
-// objects created to wrap wasm functions. This predicate returns false
-// for asm.js functions which are semantically just normal JS functions
-// (even if they are implemented via wasm under the hood). The accessor
-// functions for extracting the instance and func-index of a wasm function
-// can be used for both wasm and asm.js, however.
-
-bool IsWasmExportedFunction(JSFunction* fun);
-
-Instance& ExportedFunctionToInstance(JSFunction* fun);
-WasmInstanceObject* ExportedFunctionToInstanceObject(JSFunction* fun);
-uint32_t ExportedFunctionToFuncIndex(JSFunction* fun);
 
 bool IsSharedWasmMemoryObject(JSObject* obj);
 
@@ -206,10 +193,9 @@ class WasmGlobalObject : public NativeObject {
 class WasmInstanceObject : public NativeObject {
   static const unsigned INSTANCE_SLOT = 0;
   static const unsigned EXPORTS_OBJ_SLOT = 1;
-  static const unsigned EXPORTS_SLOT = 2;
-  static const unsigned SCOPES_SLOT = 3;
-  static const unsigned INSTANCE_SCOPE_SLOT = 4;
-  static const unsigned GLOBALS_SLOT = 5;
+  static const unsigned SCOPES_SLOT = 2;
+  static const unsigned INSTANCE_SCOPE_SLOT = 3;
+  static const unsigned GLOBALS_SLOT = 4;
 
   static const JSClassOps classOps_;
   static const ClassSpec classSpec_;
@@ -219,20 +205,12 @@ class WasmInstanceObject : public NativeObject {
   static void finalize(JS::GCContext* gcx, JSObject* obj);
   static void trace(JSTracer* trc, JSObject* obj);
 
-  // ExportMap maps from function index to exported function object.
-  // This allows the instance to lazily create exported function
-  // objects on demand (instead up-front for all table elements) while
-  // correctly preserving observable function object identity.
-  using ExportMap = GCHashMap<uint32_t, HeapPtr<JSFunction*>,
-                              DefaultHasher<uint32_t>, CellAllocPolicy>;
-  ExportMap& exports() const;
-
   // See the definition inside WasmJS.cpp.
   class UnspecifiedScopeMap;
   UnspecifiedScopeMap& scopes() const;
 
  public:
-  static const unsigned RESERVED_SLOTS = 6;
+  static const unsigned RESERVED_SLOTS = 5;
   static const JSClass class_;
   static const JSClass& protoClass_;
   static const JSPropertySpec properties[];
@@ -259,9 +237,6 @@ class WasmInstanceObject : public NativeObject {
   [[nodiscard]] static bool getExportedFunction(
       JSContext* cx, Handle<WasmInstanceObject*> instanceObj,
       uint32_t funcIndex, MutableHandleFunction fun);
-
-  const wasm::CodeRange& getExportedFunctionCodeRange(JSFunction* fun,
-                                                      wasm::Tier tier);
 
   static WasmInstanceScope* getScope(JSContext* cx,
                                      Handle<WasmInstanceObject*> instanceObj);
@@ -293,6 +268,10 @@ class WasmMemoryObject : public NativeObject {
   static bool discardImpl(JSContext* cx, const CallArgs& args);
   static bool discard(JSContext* cx, unsigned argc, Value* vp);
   static uint64_t growShared(Handle<WasmMemoryObject*> memory, uint64_t delta);
+  static bool toFixedLengthBufferImpl(JSContext* cx, const CallArgs& args);
+  static bool toFixedLengthBuffer(JSContext* cx, unsigned argc, Value* vp);
+  static bool toResizableBufferImpl(JSContext* cx, const CallArgs& args);
+  static bool toResizableBuffer(JSContext* cx, unsigned argc, Value* vp);
 
   using InstanceSet = JS::WeakCache<GCHashSet<
       WeakHeapPtr<WasmInstanceObject*>,
@@ -300,6 +279,13 @@ class WasmMemoryObject : public NativeObject {
   bool hasObservers() const;
   InstanceSet& observers() const;
   InstanceSet* getOrCreateObservers(JSContext* cx);
+
+  // The spec requires that the buffer property will create a new fixed length
+  // SAB if the underlying raw buffer's length has changed. The method creates
+  // new objects and updates the BUFFER_SLOT slot.
+  static ArrayBufferObjectMaybeShared* refreshBuffer(
+      JSContext* cx, Handle<WasmMemoryObject*> memoryObj,
+      Handle<ArrayBufferObjectMaybeShared*> buffer);
 
  public:
   static const unsigned RESERVED_SLOTS = 3;
@@ -338,7 +324,7 @@ class WasmMemoryObject : public NativeObject {
   wasm::Pages clampedMaxPages() const;
   mozilla::Maybe<wasm::Pages> sourceMaxPages() const;
 
-  wasm::IndexType indexType() const;
+  wasm::AddressType addressType() const;
   bool isShared() const;
   bool isHuge() const;
   bool movingGrowable() const;
@@ -388,8 +374,7 @@ class WasmTableObject : public NativeObject {
   // Note that, after creation, a WasmTableObject's table() is not initialized
   // and must be initialized before use.
 
-  static WasmTableObject* create(JSContext* cx, uint32_t initialLength,
-                                 mozilla::Maybe<uint32_t> maximumLength,
+  static WasmTableObject* create(JSContext* cx, wasm::Limits limits,
                                  wasm::RefType tableType, HandleObject proto);
   wasm::Table& table() const;
 
@@ -427,7 +412,6 @@ class WasmTagObject : public NativeObject {
 
   const wasm::TagType* tagType() const;
   const wasm::ValTypeVector& valueTypes() const;
-  wasm::ResultType resultType() const;
 };
 
 // The class of WebAssembly.Exception. This class is used for

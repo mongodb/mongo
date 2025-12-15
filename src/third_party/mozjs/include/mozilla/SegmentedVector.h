@@ -224,10 +224,8 @@ class SegmentedVector : private AllocPolicy {
   }
 
   // Equivalent to calling |PopLast| |aNumElements| times, but potentially
-  // more efficient.
+  // more efficient. It is safe to call this even when aNumElements > Length().
   void PopLastN(uint32_t aNumElements) {
-    MOZ_ASSERT(aNumElements <= Length());
-
     Segment* last;
 
     // Pop full segments for as long as we can.  Note that this loop

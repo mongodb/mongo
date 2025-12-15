@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -327,7 +325,7 @@ def gather_hazard_data(command_context, **kwargs):
 
     work_dir = get_work_dir(command_context, project, kwargs["work_dir"])
     ensure_dir_exists(work_dir)
-    with open(os.path.join(work_dir, "defaults.py"), "wt") as fh:
+    with open(os.path.join(work_dir, "defaults.py"), "w") as fh:
         data = textwrap.dedent(
             """\
             analysis_scriptdir = "{script_dir}"
@@ -547,7 +545,7 @@ def annotated_source(filename, query):
     line0 = int(line0)
     line1 = int(line1)
 
-    fh = open(filename, "rt")
+    fh = open(filename)
 
     out = "<pre>"
     for lineno, line in enumerate(fh, 1):
@@ -633,7 +631,7 @@ def view_hazards(command_context, project, haz_objdir, work_dir, port, serve_onl
                     if len(tops) > 0:
                         break  # Found a file underneath a root.
             else:
-                raise IOError("not found")
+                raise OSError("not found")
 
             html = annotated_source(fullpath, request.query)
             log("serve '{req}' -> 200 {path}")
@@ -642,7 +640,7 @@ def view_hazards(command_context, project, haz_objdir, work_dir, port, serve_onl
                 {"Content-type": "text/html", "Content-length": len(html)},
                 html,
             )
-        except (IOError, ValueError):
+        except (OSError, ValueError):
             log("serve '{req}' -> 404 {path}", logging.ERROR)
             return (
                 404,

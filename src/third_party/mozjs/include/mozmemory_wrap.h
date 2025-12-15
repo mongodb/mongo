@@ -106,6 +106,7 @@
 
 #ifdef MOZ_MEMORY_IMPL
 #  define MOZ_JEMALLOC_API MOZ_EXTERN_C MFBT_API
+#  define MOZ_JEMALLOC_API_NODISCARD MOZ_EXTERN_C [[nodiscard]] MFBT_API
 #  if defined(XP_WIN)
 #    define mozmem_malloc_impl(a) je_##a
 #  else
@@ -119,6 +120,7 @@
 #if !defined(MOZ_MEMORY_IMPL)
 #  define MOZ_MEMORY_API MOZ_EXTERN_C MFBT_API
 #  define MOZ_JEMALLOC_API MOZ_EXTERN_C MFBT_API
+#  define MOZ_JEMALLOC_API_NODISCARD MOZ_EXTERN_C [[nodiscard]] MFBT_API
 #endif
 
 #ifndef MOZ_MEMORY_API
@@ -126,6 +128,7 @@
 #endif
 #ifndef MOZ_JEMALLOC_API
 #  define MOZ_JEMALLOC_API MOZ_EXTERN_C
+#  define MOZ_JEMALLOC_API_NODISCARD MOZ_EXTERN_C [[nodiscard]]
 #endif
 
 #ifndef mozmem_malloc_impl

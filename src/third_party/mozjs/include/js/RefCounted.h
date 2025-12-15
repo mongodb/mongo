@@ -14,11 +14,7 @@
 
 // These types implement the same interface as mozilla::(Atomic)RefCounted and
 // must be used instead of mozilla::(Atomic)RefCounted for everything in
-// SpiderMonkey. There are two reasons:
-//  - Release() needs to call js_delete, not delete
-//  - SpiderMonkey does not have MOZILLA_INTERNAL_API defined which can lead
-//    to ODR violations that show up as spurious leak reports when ref-counted
-//    types are allocated by SpiderMonkey and released by Gecko (or vice versa).
+// SpiderMonkey. This is because Release() needs to call js_delete, not delete.
 
 namespace js {
 

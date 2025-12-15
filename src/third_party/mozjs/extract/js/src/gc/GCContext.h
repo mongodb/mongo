@@ -26,6 +26,7 @@ namespace gc {
 
 class AutoSetThreadGCUse;
 class AutoSetThreadIsSweeping;
+class AutoDisallowPreWriteBarrier;
 
 enum class GCUse {
   // This thread is not running in the garbage collector.
@@ -76,6 +77,7 @@ class GCContext {
   js::gc::GCUse gcUse_ = js::gc::GCUse::None;
   friend class js::gc::AutoSetThreadGCUse;
   friend class js::gc::AutoSetThreadIsSweeping;
+  friend class js::gc::AutoDisallowPreWriteBarrier;
 
 #ifdef DEBUG
   // The specific zone currently being swept, if any.
@@ -84,6 +86,9 @@ class GCContext {
   // Whether this thread is currently manipulating possibly-gray GC things.
   size_t isTouchingGrayThings_ = false;
   friend class js::AutoTouchingGrayThings;
+
+  // Whether it's safe to perform pre-write barriers.
+  bool preWriteBarrierAllowed_ = true;
 #endif
 
  public:
@@ -110,6 +115,7 @@ class GCContext {
 
   Zone* gcSweepZone() const { return gcSweepZone_; }
   bool isTouchingGrayThings() const { return isTouchingGrayThings_; }
+  bool isPreWriteBarrierAllowed() const { return preWriteBarrierAllowed_; }
 #endif
 
   // Deprecated. Where possible, memory should be tracked against the owning GC

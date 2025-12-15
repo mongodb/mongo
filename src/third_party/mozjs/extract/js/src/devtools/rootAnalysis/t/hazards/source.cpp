@@ -69,6 +69,8 @@ void GC() {
   invisible();
 }
 
+extern Cell* makecell();
+
 extern void usecell(Cell*);
 
 extern bool flipcoin();
@@ -563,4 +565,12 @@ void aggr_init_safe() {
   // throughout the function.)
   GC();
   auto [ok, nogc] = pair_returning_function();
+}
+
+void stack_array() {
+  Cell* array[] = {makecell(), makecell()};
+  Cell* array2[] = {makecell(), makecell()};
+  GC();
+  usecell(array[1]);
+  // Never use array2.
 }

@@ -22,16 +22,8 @@ WeakMapBase::WeakMapBase(JSObject* memOf, Zone* zone)
   MOZ_ASSERT(!IsMarked(mapColor()));
 }
 
-WeakMapBase::~WeakMapBase() {
-  MOZ_ASSERT(CurrentThreadIsGCFinalizing() ||
-             CurrentThreadCanAccessZone(zone_));
-}
-
 void WeakMapBase::unmarkZone(JS::Zone* zone) {
-  AutoEnterOOMUnsafeRegion oomUnsafe;
-  if (!zone->gcEphemeronEdges().clear()) {
-    oomUnsafe.crash("clearing ephemeron edges table");
-  }
+  zone->gcEphemeronEdges().clearAndCompact();
   MOZ_ASSERT(zone->gcNurseryEphemeronEdges().count() == 0);
 
   for (WeakMapBase* m : zone->gcWeakMapList()) {
@@ -91,8 +83,13 @@ bool WeakMapBase::addEphemeronEdge(MarkColor color, gc::Cell* src,
   // Add an implicit edge from |src| to |dst|.
 
   auto& edgeTable = src->zone()->gcEphemeronEdges(src);
-  auto* ptr = edgeTable.getOrAdd(src);
-  return ptr && ptr->value.emplaceBack(color, dst);
+  auto p = edgeTable.lookupForAdd(src);
+  if (!p) {
+    if (!edgeTable.add(p, src, EphemeronEdgeVector())) {
+      return false;
+    }
+  }
+  return p->value().emplaceBack(color, dst);
 }
 
 #if defined(JS_GC_ZEAL) || defined(DEBUG)
@@ -130,9 +127,10 @@ bool WeakMapBase::markZoneIteratively(JS::Zone* zone, GCMarker* marker) {
   return markedAny;
 }
 
-bool WeakMapBase::findSweepGroupEdgesForZone(JS::Zone* zone) {
-  for (WeakMapBase* m : zone->gcWeakMapList()) {
-    if (!m->findSweepGroupEdges()) {
+bool WeakMapBase::findSweepGroupEdgesForZone(JS::Zone* atomsZone,
+                                             JS::Zone* mapZone) {
+  for (WeakMapBase* m : mapZone->gcWeakMapList()) {
+    if (!m->findSweepGroupEdges(atomsZone)) {
       return false;
     }
   }
@@ -189,36 +187,6 @@ void WeakMapBase::restoreMarkedWeakMaps(WeakMapColors& markedWeakMaps) {
   }
 }
 
-ObjectWeakMap::ObjectWeakMap(JSContext* cx) : map(cx, nullptr) {}
-
-JSObject* ObjectWeakMap::lookup(const JSObject* obj) {
-  if (ObjectValueWeakMap::Ptr p = map.lookup(const_cast<JSObject*>(obj))) {
-    return &p->value().toObject();
-  }
-  return nullptr;
-}
-
-bool ObjectWeakMap::add(JSContext* cx, JSObject* obj, JSObject* target) {
-  MOZ_ASSERT(obj && target);
-
-  Value targetVal(ObjectValue(*target));
-  if (!map.putNew(obj, targetVal)) {
-    ReportOutOfMemory(cx);
-    return false;
-  }
-
-  return true;
-}
-
-void ObjectWeakMap::remove(JSObject* key) {
-  MOZ_ASSERT(key);
-  map.remove(key);
-}
-
-void ObjectWeakMap::clear() { map.clear(); }
-
-void ObjectWeakMap::trace(JSTracer* trc) { map.trace(trc); }
-
-size_t ObjectWeakMap::sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) {
-  return map.shallowSizeOfExcludingThis(mallocSizeOf);
-}
+namespace js {
+template class WeakMap<JSObject*, JSObject*>;
+}  // namespace js

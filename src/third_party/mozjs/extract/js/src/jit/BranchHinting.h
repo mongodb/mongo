@@ -14,7 +14,7 @@ namespace js::jit {
 class MIRGenerator;
 class MIRGraph;
 
-[[nodiscard]] bool BranchHinting(MIRGenerator* mir, MIRGraph& graph);
+[[nodiscard]] bool BranchHinting(const MIRGenerator* mir, MIRGraph& graph);
 
 }  // namespace js::jit
 

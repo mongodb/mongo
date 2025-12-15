@@ -56,6 +56,17 @@ static Value StringOrNullValue(JSString* maybeString) {
   return maybeString ? StringValue(maybeString) : NullValue();
 }
 
+static Value ModuleTypeToValue(JS::ModuleType moduleType) {
+  static_assert(size_t(JS::ModuleType::Limit) <= INT32_MAX);
+  return Int32Value(int32_t(moduleType));
+}
+
+static JS::ModuleType ValueToModuleType(const Value& value) {
+  int32_t i = value.toInt32();
+  MOZ_ASSERT(i >= 0 && i <= int32_t(JS::ModuleType::Limit));
+  return static_cast<JS::ModuleType>(i);
+}
+
 #define DEFINE_ATOM_ACCESSOR_METHOD(cls, name, slot) \
   JSAtom* cls::name() const {                        \
     Value value = getReservedSlot(slot);             \
@@ -145,7 +156,8 @@ void RequestedModule::trace(JSTracer* trc) {
 
 /* static */ const JSClass ResolvedBindingObject::class_ = {
     "ResolvedBinding",
-    JSCLASS_HAS_RESERVED_SLOTS(ResolvedBindingObject::SlotCount)};
+    JSCLASS_HAS_RESERVED_SLOTS(ResolvedBindingObject::SlotCount),
+};
 
 ModuleObject* ResolvedBindingObject::module() const {
   Value value = getReservedSlot(ModuleSlot);
@@ -191,37 +203,20 @@ void ImportAttribute::trace(JSTracer* trc) {
 // ModuleRequestObject
 /* static */ const JSClass ModuleRequestObject::class_ = {
     "ModuleRequest",
-    JSCLASS_HAS_RESERVED_SLOTS(ModuleRequestObject::SlotCount)};
+    JSCLASS_HAS_RESERVED_SLOTS(ModuleRequestObject::SlotCount),
+};
 
 DEFINE_ATOM_OR_NULL_ACCESSOR_METHOD(ModuleRequestObject, specifier,
                                     SpecifierSlot)
 
-Span<const ImportAttribute> ModuleRequestObject::attributes() const {
-  Value value = getReservedSlot(AttributesSlot);
-  if (value.isNullOrUndefined()) {
-    return Span<const ImportAttribute>();
-  }
-  void* ptr = value.toPrivate();
-  MOZ_ASSERT(ptr);
-  auto* vector = static_cast<ImportAttributeVector*>(ptr);
-  return *vector;
+JS::ModuleType ModuleRequestObject::moduleType() const {
+  return ValueToModuleType(getReservedSlot(ModuleTypeSlot));
 }
 
-bool ModuleRequestObject::hasAttributes() const {
-  return !getReservedSlot(ModuleRequestObject::AttributesSlot)
-              .isNullOrUndefined();
-}
-
-/* static */
-bool ModuleRequestObject::getModuleType(
-    JSContext* cx, const Handle<ModuleRequestObject*> moduleRequest,
-    JS::ModuleType& moduleType) {
-  if (!moduleRequest->hasAttributes()) {
-    moduleType = JS::ModuleType::JavaScript;
-    return true;
-  }
-
-  for (const ImportAttribute& importAttribute : moduleRequest->attributes()) {
+static bool GetModuleType(JSContext* cx,
+                          Handle<ImportAttributeVector> maybeAttributes,
+                          JS::ModuleType& moduleType) {
+  for (const ImportAttribute& importAttribute : maybeAttributes) {
     if (importAttribute.key() == cx->names().type) {
       int32_t isJsonString;
       if (!js::CompareStrings(cx, cx->names().json, importAttribute.value(),
@@ -251,7 +246,19 @@ bool ModuleRequestObject::isInstance(HandleValue value) {
 /* static */
 ModuleRequestObject* ModuleRequestObject::create(
     JSContext* cx, Handle<JSAtom*> specifier,
-    MutableHandle<UniquePtr<ImportAttributeVector>> maybeAttributes) {
+    Handle<ImportAttributeVector> maybeAttributes) {
+  JS::ModuleType moduleType = JS::ModuleType::JavaScript;
+  if (!GetModuleType(cx, maybeAttributes, moduleType)) {
+    return nullptr;
+  }
+
+  return create(cx, specifier, moduleType);
+}
+
+/* static */
+ModuleRequestObject* ModuleRequestObject::create(JSContext* cx,
+                                                 Handle<JSAtom*> specifier,
+                                                 JS::ModuleType moduleType) {
   ModuleRequestObject* self =
       NewObjectWithGivenProto<ModuleRequestObject>(cx, nullptr);
   if (!self) {
@@ -259,13 +266,26 @@ ModuleRequestObject* ModuleRequestObject::create(
   }
 
   self->initReservedSlot(SpecifierSlot, StringOrNullValue(specifier));
-
-  if (maybeAttributes) {
-    InitReservedSlot(self, AttributesSlot, maybeAttributes.get().release(),
-                     MemoryUse::ModuleImportAttributes);
-  }
+  self->initReservedSlot(ModuleTypeSlot, ModuleTypeToValue(moduleType));
 
   return self;
+}
+
+void ModuleRequestObject::setFirstUnsupportedAttributeKey(Handle<JSAtom*> key) {
+  initReservedSlot(FirstUnsupportedAttributeKeySlot, StringOrNullValue(key));
+}
+
+bool ModuleRequestObject::hasFirstUnsupportedAttributeKey() const {
+  return !getReservedSlot(FirstUnsupportedAttributeKeySlot).isNullOrUndefined();
+}
+
+JSAtom* ModuleRequestObject::getFirstUnsupportedAttributeKey() const {
+  if (!hasFirstUnsupportedAttributeKey()) {
+    return nullptr;
+  }
+  return &getReservedSlot(FirstUnsupportedAttributeKeySlot)
+              .toString()
+              ->asAtom();
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -338,7 +358,8 @@ bool IndirectBindingMap::lookup(jsid name, ModuleEnvironmentObject** envOut,
 // ModuleNamespaceObject
 
 /* static */
-const ModuleNamespaceObject::ProxyHandler ModuleNamespaceObject::proxyHandler;
+constexpr ModuleNamespaceObject::ProxyHandler
+    ModuleNamespaceObject::proxyHandler;
 
 /* static */
 bool ModuleNamespaceObject::isInstance(HandleValue value) {
@@ -417,10 +438,7 @@ bool ModuleNamespaceObject::addBinding(JSContext* cx,
   return bindings().put(cx, exportedNameId, environment, targetNameId);
 }
 
-const char ModuleNamespaceObject::ProxyHandler::family = 0;
-
-ModuleNamespaceObject::ProxyHandler::ProxyHandler()
-    : BaseProxyHandler(&family, false) {}
+constexpr char ModuleNamespaceObject::ProxyHandler::family = 0;
 
 bool ModuleNamespaceObject::ProxyHandler::getPrototype(
     JSContext* cx, HandleObject proxy, MutableHandleObject protop) const {
@@ -886,7 +904,8 @@ Maybe<uint32_t> CyclicModuleFields::maybePendingAsyncDependencies() const {
     "Module",
     JSCLASS_HAS_RESERVED_SLOTS(ModuleObject::SlotCount) |
         JSCLASS_BACKGROUND_FINALIZE,
-    &ModuleObject::classOps_};
+    &ModuleObject::classOps_,
+};
 
 /* static */
 bool ModuleObject::isInstance(HandleValue value) {
@@ -899,6 +918,7 @@ bool ModuleObject::hasCyclicModuleFields() const {
 }
 
 CyclicModuleFields* ModuleObject::cyclicModuleFields() {
+  MOZ_ASSERT(hasCyclicModuleFields());
   void* ptr = getReservedSlot(CyclicModuleFieldsSlot).toPrivate();
   MOZ_ASSERT(ptr);
   return static_cast<CyclicModuleFields*>(ptr);
@@ -1297,6 +1317,10 @@ bool ModuleObject::hasTopLevelCapability() const {
 }
 
 bool ModuleObject::hadEvaluationError() const {
+  if (hasSyntheticModuleFields()) {
+    return false;
+  }
+
   ModuleStatus fullStatus = cyclicModuleFields()->status;
   return fullStatus == ModuleStatus::Evaluated_Error;
 }
@@ -1465,7 +1489,7 @@ bool ModuleObject::createEnvironment(JSContext* cx,
 /*static*/
 bool ModuleObject::createSyntheticEnvironment(JSContext* cx,
                                               Handle<ModuleObject*> self,
-                                              Handle<GCVector<Value>> values) {
+                                              JS::HandleVector<Value> values) {
   Rooted<ModuleEnvironmentObject*> env(
       cx, ModuleEnvironmentObject::createSynthetic(cx, self));
   if (!env) {
@@ -1490,7 +1514,7 @@ ModuleBuilder::ModuleBuilder(FrontendContext* fc,
                              const frontend::EitherParser& eitherParser)
     : fc_(fc),
       eitherParser_(eitherParser),
-      requestedModuleSpecifiers_(fc),
+      requestedModuleIndexes_(fc),
       importEntries_(fc),
       exportEntries_(fc),
       exportNames_(fc) {}
@@ -1599,15 +1623,9 @@ ModuleRequestObject* frontend::StencilModuleMetadata::createModuleRequestObject(
     const StencilModuleRequest& request) const {
   uint32_t numberOfAttributes = request.attributes.length();
 
-  Rooted<UniquePtr<ImportAttributeVector>> attributes(cx);
+  Rooted<ImportAttributeVector> attributes(cx);
   if (numberOfAttributes > 0) {
-    attributes = cx->make_unique<ImportAttributeVector>();
-    if (!attributes) {
-      ReportOutOfMemory(cx);
-      return nullptr;
-    }
-
-    if (!attributes->reserve(numberOfAttributes)) {
+    if (!attributes.reserve(numberOfAttributes)) {
       ReportOutOfMemory(cx);
       return nullptr;
     }
@@ -1618,7 +1636,8 @@ ModuleRequestObject* frontend::StencilModuleMetadata::createModuleRequestObject(
       attributeKey = atomCache.getExistingAtomAt(cx, request.attributes[j].key);
       attributeValue =
           atomCache.getExistingAtomAt(cx, request.attributes[j].value);
-      attributes->infallibleEmplaceBack(attributeKey, attributeValue);
+
+      attributes.infallibleEmplaceBack(attributeKey, attributeValue);
     }
   }
 
@@ -1626,7 +1645,21 @@ ModuleRequestObject* frontend::StencilModuleMetadata::createModuleRequestObject(
                             atomCache.getExistingAtomAt(cx, request.specifier));
   MOZ_ASSERT(specifier);
 
-  return ModuleRequestObject::create(cx, specifier, &attributes);
+  Rooted<ModuleRequestObject*> moduleRequestObject(
+      cx, ModuleRequestObject::create(cx, specifier, attributes));
+  if (!moduleRequestObject) {
+    return nullptr;
+  }
+
+  if (request.firstUnsupportedAttributeKey) {
+    Rooted<JSAtom*> unsupportedAttributeKey(
+        cx,
+        atomCache.getExistingAtomAt(cx, request.firstUnsupportedAttributeKey));
+    moduleRequestObject->setFirstUnsupportedAttributeKey(
+        unsupportedAttributeKey);
+  }
+
+  return moduleRequestObject;
 }
 
 bool frontend::StencilModuleMetadata::createImportEntries(
@@ -1802,15 +1835,26 @@ bool ModuleBuilder::processAttributes(frontend::StencilModuleRequest& request,
     MOZ_ASSERT(attribute->isKind(ParseNodeKind::ImportAttribute));
 
     auto key = attribute->left()->as<NameNode>().atom();
-    auto value = attribute->right()->as<NameNode>().atom();
-
     markUsedByStencil(key);
-    markUsedByStencil(value);
 
-    StencilModuleImportAttribute attributeStencil(key, value);
-    if (!request.attributes.append(attributeStencil)) {
-      js::ReportOutOfMemory(fc_);
-      return false;
+    // Note: This should be driven by a host hook
+    // (HostGetSupportedImportAttributes), however the infrastructure of said
+    // host hook is deeply unclear, and so right now embedders will not have
+    // the ability to alter or extend the set of supported attributes.
+    // See https://bugzilla.mozilla.org/show_bug.cgi?id=1840723.
+    if (key == TaggedParserAtomIndex::WellKnown::type()) {
+      auto value = attribute->right()->as<NameNode>().atom();
+      markUsedByStencil(value);
+
+      StencilModuleImportAttribute attributeStencil(key, value);
+      if (!request.attributes.append(attributeStencil)) {
+        js::ReportOutOfMemory(fc_);
+        return false;
+      }
+    } else {
+      if (!request.firstUnsupportedAttributeKey) {
+        request.firstUnsupportedAttributeKey = key;
+      }
     }
   }
 
@@ -2096,13 +2140,13 @@ bool ModuleBuilder::processExportFrom(frontend::BinaryNode* exportNode) {
     eitherParser_.computeLineAndColumn(spec->pn_pos.begin, &line, &column);
 
     StencilModuleEntry entry;
-    TaggedParserAtomIndex exportName;
     if (spec->isKind(ParseNodeKind::ExportSpec)) {
       auto* importNameNode = &spec->as<BinaryNode>().left()->as<NameNode>();
       auto* exportNameNode = &spec->as<BinaryNode>().right()->as<NameNode>();
 
       auto importName = importNameNode->atom();
-      exportName = exportNameNode->atom();
+      auto exportName = exportNameNode->atom();
+      MOZ_ASSERT(exportNames_.has(exportName));
 
       markUsedByStencil(importName);
       markUsedByStencil(exportName);
@@ -2112,7 +2156,8 @@ bool ModuleBuilder::processExportFrom(frontend::BinaryNode* exportNode) {
     } else if (spec->isKind(ParseNodeKind::ExportNamespaceSpec)) {
       auto* exportNameNode = &spec->as<UnaryNode>().kid()->as<NameNode>();
 
-      exportName = exportNameNode->atom();
+      auto exportName = exportNameNode->atom();
+      MOZ_ASSERT(exportNames_.has(exportName));
 
       markUsedByStencil(exportName);
       entry = StencilModuleEntry::exportNamespaceFromEntry(
@@ -2126,9 +2171,6 @@ bool ModuleBuilder::processExportFrom(frontend::BinaryNode* exportNode) {
     }
 
     if (!exportEntries_.append(entry)) {
-      return false;
-    }
-    if (exportName && !exportNames_.put(exportName)) {
       return false;
     }
   }
@@ -2147,15 +2189,24 @@ frontend::StencilModuleEntry* ModuleBuilder::importEntryFor(
   return &ptr->value();
 }
 
-bool ModuleBuilder::hasExportedName(
-    frontend::TaggedParserAtomIndex name) const {
+ModuleBuilder::NoteExportedNameResult ModuleBuilder::noteExportedName(
+    frontend::TaggedParserAtomIndex name) {
   MOZ_ASSERT(name);
-  return exportNames_.has(name);
+  auto addPtr = exportNames_.lookupForAdd(name);
+  if (addPtr) {
+    return NoteExportedNameResult::AlreadyDeclared;
+  }
+  if (!exportNames_.add(addPtr, name)) {
+    return NoteExportedNameResult::OutOfMemory;
+  }
+  return NoteExportedNameResult::Success;
 }
 
 bool ModuleBuilder::appendExportEntry(
     frontend::TaggedParserAtomIndex exportName,
     frontend::TaggedParserAtomIndex localName, frontend::ParseNode* node) {
+  MOZ_ASSERT(exportNames_.has(exportName));
+
   uint32_t line = 0;
   JS::LimitedColumnNumberOneOrigin column;
   if (node) {
@@ -2166,15 +2217,7 @@ bool ModuleBuilder::appendExportEntry(
   markUsedByStencil(exportName);
   auto entry = frontend::StencilModuleEntry::exportAsEntry(
       localName, exportName, line, JS::ColumnNumberOneOrigin(column));
-  if (!exportEntries_.append(entry)) {
-    return false;
-  }
-
-  if (!exportNames_.put(exportName)) {
-    return false;
-  }
-
-  return true;
+  return exportEntries_.append(entry);
 }
 
 frontend::MaybeModuleRequestIndex ModuleBuilder::appendModuleRequest(
@@ -2187,8 +2230,13 @@ frontend::MaybeModuleRequestIndex ModuleBuilder::appendModuleRequest(
     return MaybeModuleRequestIndex();
   }
 
+  if (auto ptr = moduleRequestIndexes_.lookup(request)) {
+    return MaybeModuleRequestIndex(ptr->value());
+  }
+
   uint32_t index = moduleRequests_.length();
-  if (!moduleRequests_.append(request)) {
+  if (!moduleRequests_.append(request) ||
+      !moduleRequestIndexes_.put(request, index)) {
     js::ReportOutOfMemory(fc_);
     return MaybeModuleRequestIndex();
   }
@@ -2198,8 +2246,8 @@ frontend::MaybeModuleRequestIndex ModuleBuilder::appendModuleRequest(
 
 bool ModuleBuilder::maybeAppendRequestedModule(
     MaybeModuleRequestIndex moduleRequest, frontend::ParseNode* node) {
-  auto specifier = moduleRequests_[moduleRequest.value()].specifier;
-  if (requestedModuleSpecifiers_.has(specifier)) {
+  uint32_t index = moduleRequest.value();
+  if (requestedModuleIndexes_.has(index)) {
     return true;
   }
 
@@ -2215,7 +2263,7 @@ bool ModuleBuilder::maybeAppendRequestedModule(
     return false;
   }
 
-  return requestedModuleSpecifiers_.put(specifier);
+  return requestedModuleIndexes_.put(index);
 }
 
 void ModuleBuilder::markUsedByStencil(frontend::TaggedParserAtomIndex name) {
@@ -2317,18 +2365,6 @@ static bool EvaluateDynamicImportOptions(
   if (!GetProperty(cx, attributesWrapperObject, attributesWrapperObject, withId,
                    &attributesValue)) {
     return false;
-  }
-
-  // Step 11.d. If the host supports the deprecated assert keyword for import
-  // attributes and attributesObj is undefined, then
-  if (attributesValue.isUndefined() &&
-      cx->options().importAttributesAssertSyntax()) {
-    // Step 11.d.i. Set attributesObj to Completion(Get(options, "assert")).
-    RootedId assertId(cx, NameToId(cx->names().assert_));
-    if (!GetProperty(cx, attributesWrapperObject, attributesWrapperObject,
-                     assertId, &attributesValue)) {
-      return false;
-    }
   }
 
   // Step 11.e. If attributesObj is not undefined, then
@@ -2475,32 +2511,16 @@ JSObject* js::StartDynamicModuleImport(JSContext* cx, HandleScript script,
     return promise;
   }
 
-  Rooted<ImportAttributeVector> tempAttributes(cx);
-  if (!EvaluateDynamicImportOptions(cx, optionsArg, &tempAttributes)) {
+  Rooted<ImportAttributeVector> attributes(cx);
+  if (!EvaluateDynamicImportOptions(cx, optionsArg, &attributes)) {
     if (!RejectPromiseWithPendingError(cx, promise)) {
       return nullptr;
     }
     return promise;
   }
 
-  Rooted<UniquePtr<ImportAttributeVector>> attributes(cx);
-  if (!tempAttributes.empty()) {
-    attributes = cx->make_unique<ImportAttributeVector>();
-    if (!attributes) {
-      return nullptr;
-    }
-    if (!attributes->reserve(tempAttributes.length())) {
-      ReportOutOfMemory(cx);
-      return nullptr;
-    }
-    if (!attributes->appendAll(tempAttributes)) {
-      ReportOutOfMemory(cx);
-      return nullptr;
-    }
-  }
-
   RootedObject moduleRequest(
-      cx, ModuleRequestObject::create(cx, specifierAtom, &attributes));
+      cx, ModuleRequestObject::create(cx, specifierAtom, attributes));
   if (!moduleRequest) {
     if (!RejectPromiseWithPendingError(cx, promise)) {
       return nullptr;
@@ -2572,17 +2592,18 @@ bool js::OnModuleEvaluationFailure(JSContext* cx,
 // reference to the referencing private to keep it alive until it is needed.
 class DynamicImportContextObject : public NativeObject {
  public:
-  enum { ReferencingPrivateSlot = 0, SpecifierSlot, SlotCount };
+  enum { ReferencingPrivateSlot = 0, SpecifierSlot, ModuleTypeSlot, SlotCount };
 
   static const JSClass class_;
   static const JSClassOps classOps_;
 
   [[nodiscard]] static DynamicImportContextObject* create(
       JSContext* cx, Handle<Value> referencingPrivate,
-      Handle<JSString*> specifier);
+      Handle<JSString*> specifier, JS::ModuleType moduleType);
 
   Value referencingPrivate() const;
   JSString* specifier() const;
+  JS::ModuleType moduleType() const;
 
   static void clearReferencingPrivate(JSRuntime* runtime,
                                       DynamicImportContextObject* ic);
@@ -2595,7 +2616,8 @@ const JSClass DynamicImportContextObject::class_ = {
     "DynamicImportContextObject",
     JSCLASS_HAS_RESERVED_SLOTS(DynamicImportContextObject::SlotCount) |
         JSCLASS_SLOT0_IS_NSISUPPORTS | JSCLASS_FOREGROUND_FINALIZE,
-    &DynamicImportContextObject::classOps_};
+    &DynamicImportContextObject::classOps_,
+};
 static_assert(DynamicImportContextObject::ReferencingPrivateSlot == 0);
 
 /* static */
@@ -2615,7 +2637,7 @@ const JSClassOps DynamicImportContextObject::classOps_ = {
 /* static */
 DynamicImportContextObject* DynamicImportContextObject::create(
     JSContext* cx, Handle<Value> referencingPrivate,
-    Handle<JSString*> specifier) {
+    Handle<JSString*> specifier, JS::ModuleType moduleType) {
   Rooted<DynamicImportContextObject*> self(
       cx, NewObjectWithGivenProto<DynamicImportContextObject>(cx, nullptr));
   if (!self) {
@@ -2626,6 +2648,8 @@ DynamicImportContextObject* DynamicImportContextObject::create(
 
   self->initReservedSlot(ReferencingPrivateSlot, referencingPrivate);
   self->initReservedSlot(SpecifierSlot, StringValue(specifier));
+  self->initReservedSlot(ModuleTypeSlot, ModuleTypeToValue(moduleType));
+
   return self;
 }
 
@@ -2640,6 +2664,10 @@ JSString* DynamicImportContextObject::specifier() const {
   }
 
   return value.toString();
+}
+
+JS::ModuleType DynamicImportContextObject::moduleType() const {
+  return ValueToModuleType(getReservedSlot(ModuleTypeSlot));
 }
 
 /* static */
@@ -2678,9 +2706,8 @@ static bool OnResolvedDynamicModule(JSContext* cx, unsigned argc, Value* vp) {
   }
 
   Rooted<PromiseObject*> promise(cx, TargetFromHandler<PromiseObject>(args));
-  Rooted<UniquePtr<ImportAttributeVector>> attributes(cx);
   RootedObject moduleRequest(
-      cx, ModuleRequestObject::create(cx, specifier, &attributes));
+      cx, ModuleRequestObject::create(cx, specifier, context->moduleType()));
   if (!moduleRequest) {
     return RejectPromiseWithPendingError(cx, promise);
   }
@@ -2748,8 +2775,9 @@ bool js::FinishDynamicModuleImport(JSContext* cx,
   Rooted<JSString*> specifier(
       cx, moduleRequest->as<ModuleRequestObject>().specifier());
   Rooted<DynamicImportContextObject*> context(
-      cx,
-      DynamicImportContextObject::create(cx, referencingPrivate, specifier));
+      cx, DynamicImportContextObject::create(
+              cx, referencingPrivate, specifier,
+              moduleRequest->as<ModuleRequestObject>().moduleType()));
   if (!context) {
     return false;
   }

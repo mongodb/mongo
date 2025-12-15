@@ -11,6 +11,7 @@
 #include <type_traits>
 
 #include "jit/JitSpewer.h"
+#include "jit/MIR-wasm.h"
 #include "jit/MIR.h"
 #include "jit/MIRGenerator.h"
 #include "js/Printf.h"
@@ -28,12 +29,11 @@ const char* const js::jit::LIROpNames[] = {
 LIRGraph::LIRGraph(MIRGraph* mir)
     : constantPool_(mir->alloc()),
       constantPoolMap_(mir->alloc()),
-      safepoints_(mir->alloc()),
-      nonCallSafepoints_(mir->alloc()),
       numVirtualRegisters_(0),
       numInstructions_(1),  // First id is 1.
       localSlotsSize_(0),
       argumentSlotCount_(0),
+      extraSafepointUses_(0),
       mir_(*mir) {}
 
 bool LIRGraph::addConstantToPool(const Value& v, uint32_t* index) {
@@ -44,15 +44,6 @@ bool LIRGraph::addConstantToPool(const Value& v, uint32_t* index) {
   }
   *index = constantPool_.length();
   return constantPool_.append(v) && constantPoolMap_.add(p, v, *index);
-}
-
-bool LIRGraph::noteNeedsSafepoint(LInstruction* ins) {
-  // Instructions with safepoints must be in linear order.
-  MOZ_ASSERT_IF(!safepoints_.empty(), safepoints_.back()->id() < ins->id());
-  if (!ins->isCall() && !nonCallSafepoints_.append(ins)) {
-    return false;
-  }
-  return safepoints_.append(ins);
 }
 
 #ifdef JS_JITSPEW
@@ -492,7 +483,8 @@ UniqueChars LAllocation::toString() const {
         buf = JS_smprintf("%s", toFloatReg()->reg().name());
         break;
       case LAllocation::STACK_SLOT:
-        buf = JS_smprintf("stack:%u", toStackSlot()->slot());
+        buf = JS_smprintf("stack:%u(%u)", toStackSlot()->slot(),
+                          LStackSlot::ByteWidth(toStackSlot()->width()));
         break;
       case LAllocation::ARGUMENT_SLOT:
         buf = JS_smprintf("arg:%u", toArgument()->index());
@@ -653,7 +645,7 @@ void LNode::dump(GenericPrinter& out) {
       out.printf(" s=(");
       for (size_t i = 0; i < numSuccessors; i++) {
         MBasicBlock* succ = GetSuccessor(ins, i);
-        out.printf("block%u", succ->id());
+        out.printf("block %u", succ->id());
         if (i != numSuccessors - 1) {
           out.printf(", ");
         }
@@ -687,6 +679,51 @@ void LInstruction::initSafepoint(TempAllocator& alloc) {
   MOZ_ASSERT(!safepoint_);
   safepoint_ = new (alloc) LSafepoint(alloc);
   MOZ_ASSERT(safepoint_);
+}
+
+bool LSafepoint::addGCAllocation(uint32_t vregId, LDefinition* def,
+                                 LAllocation a) {
+  switch (def->type()) {
+    case LDefinition::OBJECT:
+      return addGcPointer(a);
+
+    case LDefinition::SLOTS:
+      return addSlotsOrElementsPointer(a);
+
+    case LDefinition::WASM_ANYREF:
+      return addWasmAnyRef(a);
+
+#ifdef JS_NUNBOX32
+    case LDefinition::TYPE:
+      return addNunboxPart(/* isType = */ true, vregId, a);
+
+    case LDefinition::PAYLOAD:
+      return addNunboxPart(/* isType = */ false, vregId, a);
+#else
+    case LDefinition::BOX:
+      return addBoxedValue(a);
+#endif
+
+    case LDefinition::STACKRESULTS: {
+      MOZ_ASSERT(a.isStackArea());
+      for (auto iter = a.toStackArea()->results(); iter; iter.next()) {
+        if (iter.isWasmAnyRef()) {
+          if (!addWasmAnyRef(iter.alloc())) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+
+    case LDefinition::GENERAL:
+    case LDefinition::INT32:
+    case LDefinition::FLOAT32:
+    case LDefinition::DOUBLE:
+    case LDefinition::SIMD128:
+      break;
+  }
+  MOZ_CRASH("Bad register type");
 }
 
 bool LMoveGroup::add(LAllocation from, LAllocation to, LDefinition::Type type) {

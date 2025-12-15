@@ -43,7 +43,7 @@ static inline uint32_t JOF_TYPE(uint32_t fmt) { return fmt & JOF_TYPEMASK; }
  * Immediate operand getters, setters, and bounds.
  */
 
-static MOZ_ALWAYS_INLINE uint8_t GET_UINT8(jsbytecode* pc) {
+static MOZ_ALWAYS_INLINE uint8_t GET_UINT8(const jsbytecode* pc) {
   return uint8_t(pc[1]);
 }
 
@@ -653,6 +653,8 @@ enum class DisassembleSkeptically { No, Yes };
 unsigned Disassemble1(JSContext* cx, JS::Handle<JSScript*> script,
                       jsbytecode* pc, unsigned loc, bool lines,
                       StringPrinter* sp);
+
+extern UniqueChars ToDisassemblySource(JSContext* cx, HandleValue v);
 
 #endif
 

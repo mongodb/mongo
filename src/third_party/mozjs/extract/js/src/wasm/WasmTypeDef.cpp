@@ -36,8 +36,10 @@ using namespace js;
 using namespace js::jit;
 using namespace js::wasm;
 
+using mozilla::CheckedInt32;
 using mozilla::CheckedUint32;
 using mozilla::IsPowerOfTwo;
+using mozilla::MallocSizeOf;
 
 // [SMDOC] Immediate type signature encoding
 //
@@ -218,8 +220,7 @@ static ImmediateType EncodeImmediateFuncType(const FuncType& funcType) {
 //=========================================================================
 // FuncType
 
-void FuncType::initImmediateTypeId(bool gcEnabled, bool isFinal,
-                                   const TypeDef* superTypeDef,
+void FuncType::initImmediateTypeId(bool isFinal, const TypeDef* superTypeDef,
                                    uint32_t recGroupLength) {
   // To improve the performance of the structural type check in
   // the call_indirect function prologue, we attempt to encode the
@@ -235,7 +236,7 @@ void FuncType::initImmediateTypeId(bool gcEnabled, bool isFinal,
   // same reason applies. And finally, types in recursion groups of
   // size > 1 may not be considered equivalent even if they are
   // structurally equivalent in every respect.
-  if (gcEnabled && (!isFinal || superTypeDef || recGroupLength != 1)) {
+  if (!isFinal || superTypeDef || recGroupLength != 1) {
     immediateTypeId_ = NO_IMMEDIATE_TYPE_ID;
     return;
   }
@@ -329,15 +330,26 @@ CheckedInt32 StructLayout::close() {
 }
 
 bool StructType::init() {
+  bool isDefaultable = true;
+
   StructLayout layout;
   for (FieldType& field : fields_) {
     CheckedInt32 offset = layout.addField(field.type);
     if (!offset.isValid()) {
       return false;
     }
+
+    // Add the offset to the list
     if (!fieldOffsets_.append(offset.value())) {
       return false;
     }
+
+    // If any field is not defaultable, this whole struct is not defaultable
+    if (!field.type.isDefaultable()) {
+      isDefaultable = false;
+    }
+
+    // If this field is not a ref, then don't add it to the trace lists
     if (!field.type.isRefRepr()) {
       continue;
     }
@@ -361,8 +373,9 @@ bool StructType::init() {
   if (!size.isValid()) {
     return false;
   }
-  size_ = size.value();
 
+  size_ = size.value();
+  isDefaultable_ = isDefaultable;
   return true;
 }
 
@@ -510,7 +523,7 @@ struct RecGroupHashPolicy {
   static HashNumber hash(Lookup lookup) { return lookup->hash(); }
 
   static bool match(const SharedRecGroup& lhs, Lookup rhs) {
-    return RecGroup::matches(*rhs, *lhs);
+    return RecGroup::isoEquals(*rhs, *lhs);
   }
 };
 
@@ -568,7 +581,7 @@ class TypeIdSet {
   }
 };
 
-ExclusiveData<TypeIdSet> typeIdSet(mutexid::WasmTypeIdSet);
+MOZ_RUNINIT ExclusiveData<TypeIdSet> typeIdSet(mutexid::WasmTypeIdSet);
 
 void wasm::PurgeCanonicalTypes() {
   ExclusiveData<TypeIdSet>::Guard locked = typeIdSet.lock();

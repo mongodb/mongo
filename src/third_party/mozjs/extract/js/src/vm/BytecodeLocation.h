@@ -11,11 +11,15 @@
 #include "js/TypeDecls.h"
 #include "vm/BuiltinObjectKind.h"
 #include "vm/BytecodeUtil.h"
-#include "vm/CheckIsObjectKind.h"   // CheckIsObjectKind
-#include "vm/CompletionKind.h"      // CompletionKind
-#include "vm/FunctionPrefixKind.h"  // FunctionPrefixKind
+#include "vm/CheckIsObjectKind.h"       // CheckIsObjectKind
+#include "vm/CompletionKind.h"          // CompletionKind
+#include "vm/ConstantCompareOperand.h"  // ConstantCompareOperand
+#include "vm/FunctionPrefixKind.h"      // FunctionPrefixKind
 #include "vm/GeneratorResumeKind.h"
 #include "vm/TypeofEqOperand.h"  // TypeofEqOperand
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+#  include "vm/UsingHint.h"
+#endif
 
 namespace js {
 
@@ -284,6 +288,11 @@ class BytecodeLocation {
     return TypeofEqOperand::fromRawValue(GET_UINT8(rawBytecode_));
   }
 
+  ConstantCompareOperand getConstantCompareOperand() const {
+    MOZ_ASSERT(is(JSOp::StrictConstantEq) || is(JSOp::StrictConstantNe));
+    return ConstantCompareOperand::fromRawValue(GET_UINT16(rawBytecode_));
+  }
+
   FunctionPrefixKind getFunctionPrefixKind() const {
     MOZ_ASSERT(is(JSOp::SetFunName));
     return FunctionPrefixKind(GET_UINT8(rawBytecode_));
@@ -303,6 +312,13 @@ class BytecodeLocation {
     MOZ_ASSERT(is(JSOp::CloseIter));
     return CompletionKind(GET_UINT8(rawBytecode_));
   }
+
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+  UsingHint getUsingHint() const {
+    MOZ_ASSERT(is(JSOp::AddDisposable));
+    return UsingHint(GET_UINT8(rawBytecode_));
+  }
+#endif
 
   uint32_t getNewArrayLength() const {
     MOZ_ASSERT(is(JSOp::NewArray));

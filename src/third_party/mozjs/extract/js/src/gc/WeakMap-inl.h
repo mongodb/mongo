@@ -45,6 +45,14 @@ static CellColor GetEffectiveColor(GCMarker* marker, const T& item) {
   return t.color();
 }
 
+// If a wrapper is used as a key in a weakmap, the garbage collector should
+// keep that object around longer than it otherwise would. We want to avoid
+// collecting the wrapper (and removing the weakmap entry) as long as the
+// wrapped object is alive (because the object can be rewrapped and looked up
+// again). As long as the wrapper is used as a weakmap key, it will not be
+// collected (and remain in the weakmap) until the wrapped object is
+// collected.
+
 // Only objects have delegates, so default to returning nullptr. Note that some
 // compilation units will only ever use the object version.
 static MOZ_MAYBE_UNUSED JSObject* GetDelegateInternal(gc::Cell* key) {
@@ -91,7 +99,7 @@ inline bool IsSymbol(const HeapPtr<JS::Value>& key) {
 // collecting but the value zone is, and incorrectly free a value that is
 // reachable solely through weakmaps.
 template <class K, class V>
-void WeakMap<K, V>::assertMapIsSameZoneWithValue(const V& v) {
+void WeakMap<K, V>::assertMapIsSameZoneWithValue(const BarrieredValue& v) {
 #ifdef DEBUG
   gc::Cell* cell = gc::ToMarkable(v);
   if (cell) {
@@ -107,15 +115,16 @@ WeakMap<K, V>::WeakMap(JSContext* cx, JSObject* memOf)
 
 template <class K, class V>
 WeakMap<K, V>::WeakMap(JS::Zone* zone, JSObject* memOf)
-    : Base(zone), WeakMapBase(memOf, zone) {
-  using ElemType = typename K::ElementType;
+    : WeakMapBase(memOf, zone), map_(zone) {
+  static_assert(std::is_same_v<typename RemoveBarrier<K>::Type, K>);
+  static_assert(std::is_same_v<typename RemoveBarrier<V>::Type, V>);
 
   // The object's TraceKind needs to be added to CC graph if this object is
   // used as a WeakMap key, otherwise the key is considered to be pointed from
   // somewhere unknown, and results in leaking the subgraph which contains the
   // key. See the comments in NoteWeakMapsTracer::trace for more details.
-  if constexpr (std::is_pointer_v<ElemType>) {
-    using NonPtrType = std::remove_pointer_t<ElemType>;
+  if constexpr (std::is_pointer_v<K>) {
+    using NonPtrType = std::remove_pointer_t<K>;
     static_assert(JS::IsCCTraceKind(NonPtrType::TraceKind),
                   "Object's TraceKind should be added to CC graph.");
   }
@@ -126,6 +135,32 @@ WeakMap<K, V>::WeakMap(JS::Zone* zone, JSObject* memOf)
   }
 }
 
+template <class K, class V>
+WeakMap<K, V>::~WeakMap() {
+#ifdef DEBUG
+  // Weak maps store their data in an unbarriered map (|map_|) meaning that no
+  // barriers are run on destruction. This is safe because:
+
+  // 1. Weak maps have GC lifetime except on construction failure, therefore no
+  // prebarrier is required.
+  MOZ_ASSERT_IF(!empty(),
+                CurrentThreadIsGCSweeping() || CurrentThreadIsGCFinalizing());
+
+  // 2. If we're finalizing a weak map due to GC then it cannot contain nursery
+  // things, because we evicted the nursery at the start of collection and
+  // writing a nursery thing into the table would require the map to be
+  // live. Therefore no postbarrier is required.
+  size_t i = 0;
+  for (auto r = all(); !r.empty() && i < 1000; r.popFront(), i++) {
+    K key = r.front().key();
+    MOZ_ASSERT_IF(gc::ToMarkable(key), !IsInsideNursery(gc::ToMarkable(key)));
+    V value = r.front().value();
+    MOZ_ASSERT_IF(gc::ToMarkable(value),
+                  !IsInsideNursery(gc::ToMarkable(value)));
+  }
+#endif
+}
+
 // If the entry is live, ensure its key and value are marked. Also make sure the
 // key is at least as marked as min(map, delegate), so it cannot get discarded
 // and then recreated by rewrapping the delegate.
@@ -134,8 +169,9 @@ WeakMap<K, V>::WeakMap(JS::Zone* zone, JSObject* memOf)
 // delegates) where future changes to their mark color would require marking the
 // value (or the key).
 template <class K, class V>
-bool WeakMap<K, V>::markEntry(GCMarker* marker, gc::CellColor mapColor, K& key,
-                              V& value, bool populateWeakKeysTable) {
+bool WeakMap<K, V>::markEntry(GCMarker* marker, gc::CellColor mapColor,
+                              BarrieredKey& key, BarrieredValue& value,
+                              bool populateWeakKeysTable) {
 #ifdef DEBUG
   MOZ_ASSERT(IsMarked(mapColor));
   if (marker->isParallelMarking()) {
@@ -239,7 +275,7 @@ void WeakMap<K, V>::trace(JSTracer* trc) {
   }
 
   // Always trace all values (unless weakMapAction() is Skip).
-  for (Range r = Base::all(); !r.empty(); r.popFront()) {
+  for (Range r = all(); !r.empty(); r.popFront()) {
     TraceEdge(trc, &r.front().value(), "WeakMap entry value");
   }
 }
@@ -281,9 +317,14 @@ bool WeakMap<K, V>::markEntries(GCMarker* marker) {
 
 template <class K, class V>
 void WeakMap<K, V>::traceWeakEdges(JSTracer* trc) {
-  // Remove all entries whose keys remain unmarked.
+  // Scan the map, removing all entries whose keys remain unmarked. Rebuild
+  // cached key state at the same time.
+  mayHaveSymbolKeys = false;
+  mayHaveKeyDelegates = false;
   for (Enum e(*this); !e.empty(); e.popFront()) {
-    if (!TraceWeakEdge(trc, &e.front().mutableKey(), "WeakMap key")) {
+    if (TraceWeakEdge(trc, &e.front().mutableKey(), "WeakMap key")) {
+      keyWriteBarrier(e.front().key());
+    } else {
       e.removeFront();
     }
   }
@@ -298,7 +339,7 @@ void WeakMap<K, V>::traceWeakEdges(JSTracer* trc) {
 // memberOf can be nullptr, which means that the map is not part of a JSObject.
 template <class K, class V>
 void WeakMap<K, V>::traceMappings(WeakMapTracer* tracer) {
-  for (Range r = Base::all(); !r.empty(); r.popFront()) {
+  for (Range r = all(); !r.empty(); r.popFront()) {
     gc::Cell* key = gc::ToMarkable(r.front().key());
     gc::Cell* value = gc::ToMarkable(r.front().value());
     if (key && value) {
@@ -309,50 +350,53 @@ void WeakMap<K, V>::traceMappings(WeakMapTracer* tracer) {
 }
 
 template <class K, class V>
-bool WeakMap<K, V>::findSweepGroupEdges() {
+bool WeakMap<K, V>::findSweepGroupEdges(Zone* atomsZone) {
   // For weakmap keys with delegates in a different zone, add a zone edge to
   // ensure that the delegate zone finishes marking before the key zone.
-  JS::AutoSuppressGCAnalysis nogc;
-  for (Range r = all(); !r.empty(); r.popFront()) {
-    const K& key = r.front().key();
 
-    JSObject* delegate = gc::detail::GetDelegate(key);
-    if (delegate) {
-      // Marking a WeakMap key's delegate will mark the key, so process the
-      // delegate zone no later than the key zone.
-      Zone* delegateZone = delegate->zone();
-      gc::Cell* keyCell = gc::ToMarkable(key);
-      MOZ_ASSERT(keyCell);
-      Zone* keyZone = keyCell->zone();
-      if (delegateZone != keyZone && delegateZone->isGCMarking() &&
-          keyZone->isGCMarking()) {
-        if (!delegateZone->addSweepGroupEdgeTo(keyZone)) {
-          return false;
-        }
-      }
+#ifdef DEBUG
+  if (!mayHaveSymbolKeys || !mayHaveKeyDelegates) {
+    for (Range r = all(); !r.empty(); r.popFront()) {
+      const K& key = r.front().key();
+      MOZ_ASSERT_IF(!mayHaveKeyDelegates, !gc::detail::GetDelegate(key));
+      MOZ_ASSERT_IF(!mayHaveSymbolKeys, !gc::detail::IsSymbol(key));
     }
+  }
+#endif
 
 #ifdef NIGHTLY_BUILD
-    bool symbolsAsWeakMapKeysEnabled =
-        JS::Prefs::experimental_symbols_as_weakmap_keys();
-    if (!symbolsAsWeakMapKeysEnabled) {
-      continue;
+  if (mayHaveSymbolKeys) {
+    MOZ_ASSERT(JS::Prefs::experimental_symbols_as_weakmap_keys());
+    if (atomsZone->isGCMarking()) {
+      if (!atomsZone->addSweepGroupEdgeTo(zone())) {
+        return false;
+      }
     }
+  }
+#endif
 
-    bool isSym = gc::detail::IsSymbol(key);
-    if (isSym) {
-      gc::Cell* keyCell = gc::ToMarkable(key);
-      Zone* keyZone = keyCell->zone();
-      MOZ_ASSERT(keyZone->isAtomsZone());
+  if (mayHaveKeyDelegates) {
+    for (Range r = all(); !r.empty(); r.popFront()) {
+      const K& key = r.front().key();
 
-      if (zone()->isGCMarking() && keyZone->isGCMarking()) {
-        if (!keyZone->addSweepGroupEdgeTo(zone())) {
-          return false;
+      JSObject* delegate = gc::detail::GetDelegate(key);
+      if (delegate) {
+        // Marking a WeakMap key's delegate will mark the key, so process the
+        // delegate zone no later than the key zone.
+        Zone* delegateZone = delegate->zone();
+        gc::Cell* keyCell = gc::ToMarkable(key);
+        MOZ_ASSERT(keyCell);
+        Zone* keyZone = keyCell->zone();
+        if (delegateZone != keyZone && delegateZone->isGCMarking() &&
+            keyZone->isGCMarking()) {
+          if (!delegateZone->addSweepGroupEdgeTo(keyZone)) {
+            return false;
+          }
         }
       }
     }
-#endif
   }
+
   return true;
 }
 
@@ -364,8 +408,8 @@ size_t WeakMap<K, V>::sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) {
 #if DEBUG
 template <class K, class V>
 void WeakMap<K, V>::assertEntriesNotAboutToBeFinalized() {
-  for (Range r = Base::all(); !r.empty(); r.popFront()) {
-    UnbarrieredKey k = r.front().key();
+  for (Range r = all(); !r.empty(); r.popFront()) {
+    K k = r.front().key();
     MOZ_ASSERT(!gc::IsAboutToBeFinalizedUnbarriered(k));
     JSObject* delegate = gc::detail::GetDelegate(k);
     if (delegate) {
@@ -381,7 +425,7 @@ void WeakMap<K, V>::assertEntriesNotAboutToBeFinalized() {
 template <class K, class V>
 bool WeakMap<K, V>::checkMarking() const {
   bool ok = true;
-  for (Range r = Base::all(); !r.empty(); r.popFront()) {
+  for (Range r = all(); !r.empty(); r.popFront()) {
     gc::Cell* key = gc::ToMarkable(r.front().key());
     gc::Cell* value = gc::ToMarkable(r.front().value());
     if (key && value) {
@@ -412,11 +456,7 @@ void WeakMap<K, V>::checkAfterMovingGC() const {
 }
 #endif  // JSGC_HASH_TABLE_CHECKS
 
-inline HashNumber GetHash(JS::Symbol* sym) { return sym->hash(); }
-
-inline bool HashMatch(JS::Symbol* key, JS::Symbol* lookup) {
-  return key->hash() == lookup->hash();
-}
+inline HashNumber GetSymbolHash(JS::Symbol* sym) { return sym->hash(); }
 
 }  // namespace js
 

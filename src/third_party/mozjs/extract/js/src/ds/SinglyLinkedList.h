@@ -18,21 +18,33 @@ namespace js {
  * the list itself.
  *
  * Requires T has field |T::next| for the link pointer.
+ *
+ * The list only stores a pointer to the last element. Since the list is
+ * circular, that provides access to the first element and allows insertion at
+ * the start and end of the list.
  */
 template <typename T>
 class SinglyLinkedList {
   T* last_ = nullptr;
 
  public:
+  // Create an empty list.
   SinglyLinkedList() {
     static_assert(std::is_same_v<decltype(T::next), T*>,
                   "SinglyLinkedList requires T has a next field of type T*");
     MOZ_ASSERT(isEmpty());
   }
 
-  SinglyLinkedList(T* first, T* last) : last_(last) {
-    MOZ_ASSERT(!last_->next);
-    last_->next = first;
+  // Create a list from an existing non-circular linked list from |first| to
+  // |last|.
+  SinglyLinkedList(T* first, T* last) {
+    MOZ_ASSERT(first);
+    MOZ_ASSERT(last);
+    MOZ_ASSERT(!last->next);
+    last->next = first;
+    last_ = last;
+    checkContains(first);
+    checkContains(last);
   }
 
   // It's not possible for elements to be present in more than one list, so copy
@@ -41,12 +53,15 @@ class SinglyLinkedList {
   SinglyLinkedList& operator=(const SinglyLinkedList& other) = delete;
 
   SinglyLinkedList(SinglyLinkedList&& other) {
+    MOZ_ASSERT(&other != this);
     std::swap(last_, other.last_);
     MOZ_ASSERT(other.isEmpty());
   }
   SinglyLinkedList& operator=(SinglyLinkedList&& other) {
+    MOZ_ASSERT(&other != this);
     MOZ_ASSERT(isEmpty());
-    return *new (this) SinglyLinkedList(std::move(other));
+    std::swap(last_, other.last_);
+    return *this;
   }
 
   ~SinglyLinkedList() { MOZ_ASSERT(isEmpty()); }
@@ -98,15 +113,18 @@ class SinglyLinkedList {
   void moveFrontToBack() {
     MOZ_ASSERT(!isEmpty());
     last_ = last_->next;
+    MOZ_ASSERT(!isEmpty());
   }
 
   void append(SinglyLinkedList&& other) {
+    MOZ_ASSERT(&other != this);
+
     if (other.isEmpty()) {
       return;
     }
 
     if (isEmpty()) {
-      new (this) SinglyLinkedList(std::move(other));
+      *this = std::move(other);
       return;
     }
 
@@ -117,14 +135,80 @@ class SinglyLinkedList {
     other.last_ = nullptr;
   }
 
+  void prepend(SinglyLinkedList&& other) {
+    MOZ_ASSERT(&other != this);
+
+    if (other.isEmpty()) {
+      return;
+    }
+
+    if (isEmpty()) {
+      *this = std::move(other);
+      return;
+    }
+
+    T* firstElement = first();
+    last()->next = other.first();
+    other.last()->next = firstElement;
+    other.last_ = nullptr;
+  }
+
+  // Remove all elements between |fromExclusive| and |toInclusive|. Return the
+  // removed list segment as a non-circular linked list.
+  //
+  // The fact that the first parameter is exclusive is a requirement for
+  // implementing this in constant time for a singly linked list.
+  T* removeRange(T* fromExclusive, T* toInclusive) {
+    MOZ_ASSERT(fromExclusive);
+    MOZ_ASSERT(toInclusive);
+    MOZ_ASSERT(fromExclusive != toInclusive);
+    MOZ_ASSERT(!isEmpty());
+
+#ifdef DEBUG
+    size_t index = 0;
+    size_t fromIndex = SIZE_MAX;
+    size_t toIndex = SIZE_MAX;
+    for (T* element = first(); element; element = element->next) {
+      if (element == fromExclusive) {
+        fromIndex = index;
+      }
+      if (element == toInclusive) {
+        toIndex = index;
+      }
+      index++;
+      if (index == 100) {
+        break;
+      }
+    }
+    if (index < 100) {
+      MOZ_ASSERT(fromIndex != SIZE_MAX);
+      MOZ_ASSERT(toIndex != SIZE_MAX);
+      MOZ_ASSERT(fromIndex < toIndex);
+    }
+#endif
+
+    T* result = fromExclusive->next;
+    fromExclusive->next = toInclusive->next;
+    toInclusive->next = nullptr;
+
+    if (last_ == toInclusive) {
+      last_ = fromExclusive;
+    }
+
+    return result;
+  }
+
   // template <typename T>
   class Iterator {
     T* i = nullptr;
     T* last = nullptr;
 
    public:
+    Iterator() = default;
     explicit Iterator(const SinglyLinkedList& list)
         : i(list.first()), last(list.last()) {}
+    Iterator(const SinglyLinkedList& list, T* first)
+        : i(first), last(list.last()) {}
     bool done() const { return !i; }
     void next() {
       MOZ_ASSERT(!done());
@@ -140,6 +224,27 @@ class SinglyLinkedList {
   };
 
   Iterator iter() const { return Iterator(*this); }
+
+  Iterator iterFrom(T* fromInclusive) {
+    checkContains(fromInclusive);
+    return Iterator(*this, fromInclusive);
+  }
+
+  void checkContains(T* element) {
+#ifdef DEBUG
+    size_t i = 0;
+    for (Iterator iter(*this); !iter.done(); iter.next()) {
+      if (iter.get() == element) {
+        return;  // Found.
+      }
+      i++;
+      if (i == 100) {
+        return;  // Limit time spent checking.
+      }
+    }
+    MOZ_CRASH("Element not found");
+#endif
+  }
 
   // Extracts a non-circular linked list and clears this object.
   T* release() {

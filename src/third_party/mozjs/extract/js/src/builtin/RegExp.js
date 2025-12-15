@@ -120,14 +120,14 @@ function RegExpMatch(string) {
   var S = ToString(string);
 
   // Optimized paths for simple cases.
-  if (IsRegExpMethodOptimizable(rx)) {
+  if (IsOptimizableRegExpObject(rx)) {
     // Step 4.
     var flags = UnsafeGetInt32FromReservedSlot(rx, REGEXP_FLAGS_SLOT);
     var global = !!(flags & REGEXP_GLOBAL_FLAG);
 
     if (global) {
       // Step 6.a.
-      var fullUnicode = !!(flags & REGEXP_UNICODE_FLAG);
+      var fullUnicode = !!(flags & REGEXP_UNICODE_FLAG) || !!(flags & REGEXP_UNICODESETS_FLAG);
 
       // Steps 6.b-e.
       return RegExpGlobalMatchOpt(rx, S, fullUnicode);
@@ -154,7 +154,7 @@ function RegExpMatchSlowPath(rx, S) {
   }
 
   // Step 6.a.
-  var fullUnicode = callFunction(std_String_includes, flags, "u");
+  var fullUnicode = callFunction(std_String_includes, flags, "u") || callFunction(std_String_includes, flags, "v");
 
   // Step 6.b.
   rx.lastIndex = 0;
@@ -243,34 +243,6 @@ function RegExpGlobalMatchOpt(rx, S, fullUnicode) {
   }
 }
 
-// Checks if following properties and getters are not modified, and accessing
-// them not observed by content script:
-//   * flags
-//   * hasIndices
-//   * global
-//   * ignoreCase
-//   * multiline
-//   * dotAll
-//   * sticky
-//   * unicode
-//   * unicodeSets
-//   * exec
-//   * lastIndex
-function IsRegExpMethodOptimizable(rx) {
-  if (!IsRegExpObject(rx)) {
-    return false;
-  }
-
-  var RegExpProto = GetBuiltinPrototype("RegExp");
-  // If RegExpPrototypeOptimizable and RegExpInstanceOptimizable succeed,
-  // `RegExpProto.exec` is guaranteed to be data properties.
-  return (
-    RegExpPrototypeOptimizable(RegExpProto) &&
-    RegExpInstanceOptimizable(rx, RegExpProto) &&
-    RegExpProto.exec === RegExp_prototype_Exec
-  );
-}
-
 // ES2023 draft rev 2c78e6f6b5bc6bfbf79dd8a12a9593e5b57afcd2
 // 22.2.5.11 RegExp.prototype [ @@replace ] ( string, replaceValue )
 function RegExpReplace(string, replaceValue) {
@@ -306,7 +278,7 @@ function RegExpReplace(string, replaceValue) {
   }
 
   // Optimized paths.
-  if (IsRegExpMethodOptimizable(rx)) {
+  if (IsOptimizableRegExpObject(rx)) {
     // Step 7.
     var flags = UnsafeGetInt32FromReservedSlot(rx, REGEXP_FLAGS_SLOT);
 
@@ -394,7 +366,7 @@ function RegExpReplaceSlowPath(
   var fullUnicode = false;
   if (global) {
     // Step 9.a.
-    fullUnicode = callFunction(std_String_includes, flags, "u");
+    fullUnicode = callFunction(std_String_includes, flags, "u") || callFunction(std_String_includes, flags, "v");
 
     // Step 9.b.
     rx.lastIndex = 0;
@@ -751,7 +723,7 @@ function RegExpGetFunctionalReplacement(result, S, position, replaceValue) {
 //   * replaceValue is a string without "$"
 function RegExpGlobalReplaceOptSimple(rx, S, lengthS, replaceValue, flags) {
   // Step 9.a.
-  var fullUnicode = !!(flags & REGEXP_UNICODE_FLAG);
+  var fullUnicode = !!(flags & REGEXP_UNICODE_FLAG) || !!(flags &  REGEXP_UNICODESETS_FLAG);
 
   // Step 9.b.
   var lastIndex = 0;
@@ -894,7 +866,7 @@ function RegExpSearch(string) {
     rx.lastIndex = 0;
   }
 
-  if (IsRegExpMethodOptimizable(rx) && S.length < 0x7fff) {
+  if (IsOptimizableRegExpObject(rx) && S.length < 0x7fff) {
     // Step 6.
     var result = RegExpSearcher(rx, S, 0);
 
@@ -951,26 +923,6 @@ function RegExpSearchSlowPath(rx, S, previousLastIndex) {
   return result.index;
 }
 
-function IsRegExpSplitOptimizable(rx, C) {
-  if (!IsRegExpObject(rx)) {
-    return false;
-  }
-
-  var RegExpCtor = GetBuiltinConstructor("RegExp");
-  if (C !== RegExpCtor) {
-    return false;
-  }
-
-  var RegExpProto = RegExpCtor.prototype;
-  // If RegExpPrototypeOptimizable succeeds, `RegExpProto.exec` is guaranteed
-  // to be a data property.
-  return (
-    RegExpPrototypeOptimizable(RegExpProto) &&
-    RegExpInstanceOptimizable(rx, RegExpProto) &&
-    RegExpProto.exec === RegExp_prototype_Exec
-  );
-}
-
 // ES 2017 draft 6859bb9ccaea9c6ede81d71e5320e3833b92cb3e 21.2.5.11.
 function RegExpSplit(string, limit) {
   // Step 1.
@@ -985,10 +937,12 @@ function RegExpSplit(string, limit) {
   var S = ToString(string);
 
   // Step 4.
-  var C = SpeciesConstructor(rx, GetBuiltinConstructor("RegExp"));
+  var builtinCtor = GetBuiltinConstructor("RegExp");
+  var C = SpeciesConstructor(rx, builtinCtor);
 
   var optimizable =
-    IsRegExpSplitOptimizable(rx, C) &&
+    IsOptimizableRegExpObject(rx) &&
+    C === builtinCtor &&
     (limit === undefined || typeof limit === "number");
 
   var flags, unicodeMatching, splitter;
@@ -1236,23 +1190,6 @@ function $RegExpSpecies() {
 }
 SetCanonicalName($RegExpSpecies, "get [Symbol.species]");
 
-function IsRegExpMatchAllOptimizable(rx, C) {
-  if (!IsRegExpObject(rx)) {
-    return false;
-  }
-
-  var RegExpCtor = GetBuiltinConstructor("RegExp");
-  if (C !== RegExpCtor) {
-    return false;
-  }
-
-  var RegExpProto = RegExpCtor.prototype;
-  return (
-    RegExpPrototypeOptimizable(RegExpProto) &&
-    RegExpInstanceOptimizable(rx, RegExpProto)
-  );
-}
-
 // String.prototype.matchAll proposal.
 //
 // RegExp.prototype [ @@matchAll ] ( string )
@@ -1269,10 +1206,11 @@ function RegExpMatchAll(string) {
   var str = ToString(string);
 
   // Step 4.
-  var C = SpeciesConstructor(rx, GetBuiltinConstructor("RegExp"));
+  var builtinCtor = GetBuiltinConstructor("RegExp");
+  var C = SpeciesConstructor(rx, builtinCtor);
 
   var source, flags, matcher, lastIndex;
-  if (IsRegExpMatchAllOptimizable(rx, C)) {
+  if (IsOptimizableRegExpObject(rx) && C === builtinCtor) {
     // Step 5, 9-12.
     source = UnsafeGetStringFromReservedSlot(rx, REGEXP_SOURCE_SLOT);
     flags = UnsafeGetInt32FromReservedSlot(rx, REGEXP_FLAGS_SLOT);
@@ -1337,16 +1275,6 @@ function CreateRegExpStringIterator(regexp, string, source, flags, lastIndex) {
   return iterator;
 }
 
-function IsRegExpStringIteratorNextOptimizable() {
-  var RegExpProto = GetBuiltinPrototype("RegExp");
-  // If RegExpPrototypeOptimizable succeeds, `RegExpProto.exec` is
-  // guaranteed to be a data property.
-  return (
-    RegExpPrototypeOptimizable(RegExpProto) &&
-    RegExpProto.exec === RegExp_prototype_Exec
-  );
-}
-
 // String.prototype.matchAll proposal.
 //
 // %RegExpStringIteratorPrototype%.next ( )
@@ -1391,7 +1319,7 @@ function RegExpStringIteratorNext() {
     REGEXP_STRING_ITERATOR_FLAGS_SLOT
   );
   var global = !!(flags & REGEXP_GLOBAL_FLAG);
-  var fullUnicode = !!(flags & REGEXP_UNICODE_FLAG);
+  var fullUnicode = !!(flags & REGEXP_UNICODE_FLAG) || !!(flags & REGEXP_UNICODESETS_FLAG);
 
   if (lastIndex >= 0) {
     assert(IsRegExpObject(regexp), "|regexp| is a RegExp object");
@@ -1401,7 +1329,7 @@ function RegExpStringIteratorNext() {
       REGEXP_STRING_ITERATOR_SOURCE_SLOT
     );
     if (
-      IsRegExpStringIteratorNextOptimizable() &&
+      IsRegExpPrototypeOptimizable() &&
       UnsafeGetStringFromReservedSlot(regexp, REGEXP_SOURCE_SLOT) === source &&
       UnsafeGetInt32FromReservedSlot(regexp, REGEXP_FLAGS_SLOT) === flags
     ) {

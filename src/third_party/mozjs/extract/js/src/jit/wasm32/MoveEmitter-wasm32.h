@@ -23,7 +23,7 @@ class MoveEmitterWasm32 {
   void setScratchRegister(Register) { MOZ_CRASH(); }
 };
 
-typedef MoveEmitterWasm32 MoveEmitter;
+using MoveEmitter = MoveEmitterWasm32;
 
 }  // namespace js::jit
 

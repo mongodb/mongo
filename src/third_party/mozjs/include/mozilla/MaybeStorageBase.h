@@ -46,7 +46,7 @@ struct MaybeStorageBase<T, false> {
   } mStorage;
 
  public:
-  MaybeStorageBase() = default;
+  constexpr MaybeStorageBase() = default;
   explicit MaybeStorageBase(const T& aVal) : mStorage{aVal} {}
   explicit MaybeStorageBase(T&& aVal) : mStorage{std::move(aVal)} {}
   template <typename... Args>
@@ -63,7 +63,7 @@ struct MaybeStorageBase<T, true> {
   using NonConstT = std::remove_const_t<T>;
 
   union Union {
-    constexpr Union() : dummy() {}
+    constexpr Union() : empty() {}
     constexpr explicit Union(const T& aVal) : val{aVal} {}
     constexpr explicit Union(T&& aVal) : val{std::move(aVal)} {}
     template <typename... Args>
@@ -71,7 +71,7 @@ struct MaybeStorageBase<T, true> {
         : val{std::forward<Args>(aArgs)...} {}
 
     NonConstT val;
-    char dummy;
+    char empty;
   } mStorage;
 
  public:

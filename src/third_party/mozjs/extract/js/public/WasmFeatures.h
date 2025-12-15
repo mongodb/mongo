@@ -42,11 +42,6 @@
 #else
 #  define WASM_RELAXED_SIMD_ENABLED 0
 #endif
-#ifdef ENABLE_WASM_GC
-#  define WASM_GC_ENABLED 1
-#else
-#  define WASM_GC_ENABLED 0
-#endif
 #ifdef ENABLE_WASM_MEMORY64
 #  define WASM_MEMORY64_ENABLED 1
 #else
@@ -56,11 +51,6 @@
 #  define WASM_MEMORY_CONTROL_ENABLED 1
 #else
 #  define WASM_MEMORY_CONTROL_ENABLED 0
-#endif
-#ifdef ENABLE_WASM_TAIL_CALLS
-#  define WASM_TAIL_CALLS_ENABLED 1
-#else
-#  define WASM_TAIL_CALLS_ENABLED 0
 #endif
 #ifdef ENABLE_WASM_JSPI
 #  define WASM_JSPI_ENABLED 1
@@ -99,15 +89,6 @@
     /* flag force enable  */ false,                                     \
     /* flag fuzz enable   */ true,                                      \
     /* preference name    */ exnref)                                    \
-  FEATURE(                                                              \
-    /* capitalized name   */ Gc,                                        \
-    /* lower case name    */ gc,                                        \
-    /* compile predicate  */ WASM_GC_ENABLED,                           \
-    /* compiler predicate */ AnyCompilerAvailable(cx),                  \
-    /* flag predicate     */ true,                                      \
-    /* flag force enable  */ false,                                     \
-    /* flag fuzz enable   */ false,                                     \
-    /* preference name    */ gc)                                        \
   FEATURE(                                                              \
     /* capitalized name   */ JSStringBuiltins,                          \
     /* lower case name    */ jsStringBuiltins,                          \
@@ -154,29 +135,20 @@
     /* flag fuzz enable   */ true,                                      \
     /* preference name    */ multi_memory)                              \
   FEATURE(                                                              \
-    /* capitalized name   */ TailCalls,                                 \
-    /* lower case name    */ tailCalls,                                 \
-    /* compile predicate  */ WASM_TAIL_CALLS_ENABLED,                   \
-    /* compiler predicate */ AnyCompilerAvailable(cx),                  \
-    /* flag predicate     */ true,                                      \
-    /* flag force enable  */ false,                                     \
-    /* flag fuzz enable   */ true,                                      \
-    /* preference name    */ tail_calls)                                \
-  FEATURE(                                                              \
     /* capitalized name   */ JSPromiseIntegration,                      \
     /* lower case name    */ jsPromiseIntegration,                      \
     /* compile predicate  */ WASM_JSPI_ENABLED,                         \
-    /* compiler predicate */ IonAvailable(cx),                          \
+    /* compiler predicate */ IonPlatformSupport(),                      \
     /* flag predicate     */ true,                                      \
     /* flag force enable  */ false,                                     \
-    /* flag fuzz enable   */ false,                                     \
+    /* flag fuzz enable   */ true,                                      \
     /* preference name    */ js_promise_integration)                    \
   FEATURE(                                                              \
     /* capitalized name   */ MozIntGemm,                                \
     /* lower case name    */ mozIntGemm,                                \
     /* compile predicate  */ WASM_MOZ_INTGEMM_ENABLED,                  \
     /* compiler predicate */ AnyCompilerAvailable(cx),                  \
-    /* flag predicate     */ IsSimdPrivilegedContext(cx),               \
+    /* flag predicate     */ IsPrivilegedContext(cx),                   \
     /* flag force enable  */ false,                                     \
     /* flag fuzz enable   */ false,                                     \
     /* preference name    */ moz_intgemm)                               \
@@ -196,7 +168,7 @@
     /* compiler predicate */ IonAvailable(cx),                          \
     /* flag predicate     */ true,                                      \
     /* flag force enable  */ false,                                     \
-    /* flag fuzz enable   */ false,                                     \
+    /* flag fuzz enable   */ true,                                      \
     /* preference name    */ branch_hinting)
 
 // clang-format on

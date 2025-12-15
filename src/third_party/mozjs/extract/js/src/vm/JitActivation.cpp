@@ -228,7 +228,7 @@ void js::jit::JitActivation::traceIonRecovery(JSTracer* trc) {
 }
 
 void js::jit::JitActivation::startWasmTrap(wasm::Trap trap,
-                                           uint32_t bytecodeOffset,
+                                           const wasm::TrapSite& trapSite,
                                            const wasm::RegisterState& state) {
   MOZ_ASSERT(!isWasmTrapping());
 
@@ -246,19 +246,23 @@ void js::jit::JitActivation::startWasmTrap(wasm::Trap trap,
   const wasm::Code& code = wasm::GetNearestEffectiveInstance(fp)->code();
   MOZ_RELEASE_ASSERT(&code == wasm::LookupCode(pc));
 
-  // If the frame was unwound, the bytecodeOffset must be recovered from the
-  // callsite so that it is accurate.
-  if (unwound) {
-    bytecodeOffset = code.lookupCallSite(pc)->lineOrBytecode();
-  }
-
   setWasmExitFP(fp);
   wasmTrapData_.emplace();
   wasmTrapData_->resumePC =
       ((uint8_t*)state.pc) + jit::WasmTrapInstructionLength;
   wasmTrapData_->unwoundPC = pc;
   wasmTrapData_->trap = trap;
-  wasmTrapData_->bytecodeOffset = bytecodeOffset;
+  // If the frame was unwound, the source location must be recovered from the
+  // callsite so that it is accurate.
+  if (unwound) {
+    wasm::CallSite site;
+    MOZ_ALWAYS_TRUE(code.lookupCallSite(pc, &site));
+    wasmTrapData_->trapSite.bytecodeOffset =
+        wasm::BytecodeOffset(site.lineOrBytecode());
+    wasmTrapData_->trapSite.inlinedCallerOffsets = site.inlinedCallerOffsets();
+  } else {
+    wasmTrapData_->trapSite = trapSite;
+  }
   wasmTrapData_->failedUnwindSignatureMismatch =
       !unwound && trap == wasm::Trap::IndirectCallBadSig;
 
