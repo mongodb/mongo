@@ -203,6 +203,36 @@ def download_multiversion_artifact(
         return False
 
 
+def get_dwarf_version(dwarf_dump):
+    """
+    Find the dwarf version of a compile unit that was produced by a MongoDB compiler or
+    has mongodb sources in its name.
+
+    See a segment of a dwarf dump in buildscripts/tests/resmokelib/hang_analyzer/test_extractor.py
+    """
+
+    # Checks if a compile unit contains "mongo" or "src/third_party".
+    # The DW_AT_producer tag will contain the compiler used, which may be stamped with 'MongoDB' for our
+    # toolchain compilers.
+    # The DW_AT_name can contain the source file, for which we hope to find 'src/mongo' or 'src/third_party'
+    mongo_pattern = r"mongo|src/third_party"
+    version_pattern = r"version = 0x([0-9]{4}),"
+
+    for unit in dwarf_dump.split("Compile Unit"):
+        if re.search(mongo_pattern, unit, re.IGNORECASE):
+            matches = re.search(version_pattern, unit)
+            if matches:
+                return int(matches.group(1))
+
+    # If we didn't find any compile unit that looks like the patterns, fallback to ANY dwarf version
+    # listed in the output.
+    matches = re.search(version_pattern, dwarf_dump)
+    if matches:
+        return int(matches.group(1))
+
+    return None
+
+
 @TRACER.start_as_current_span("core_analyzer.post_install_gdb_optimization")
 def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
     @TRACER.start_as_current_span("core_analyzer.post_install_gdb_optimization.add_index")
@@ -228,9 +258,10 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
             current_span.set_attribute("add_index_status", "skipped")
             return
 
-        # find dwarf version from output, it should always be present
-        regex = re.search("version = 0x([0-9]{4}),", process.stdout)
-        if not regex:
+        version = get_dwarf_version(process.stdout)
+        if version:
+            current_span.set_attribute("dwarf_version", version)
+        else:
             current_span.set_status(StatusCode.ERROR, "Could not find dwarf version in file.")
             current_span.set_attributes(
                 {
@@ -243,9 +274,7 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
                 return
             raise RuntimeError(f"Could not find dwarf version in file {file_path}")
 
-        version = int(regex.group(1))
         target_dir = os.path.dirname(file_path)
-        current_span.set_attribute("dwarf_version", version)
 
         try:
             # logic copied from https://sourceware.org/gdb/onlinedocs/gdb/Index-Files.html
