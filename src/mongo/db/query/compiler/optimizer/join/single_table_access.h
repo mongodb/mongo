@@ -34,6 +34,8 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/util/modules.h"
 
+#pragma once
+
 namespace mongo::join_ordering {
 
 using SamplingEstimatorMap =

@@ -72,26 +72,6 @@ private:
 uint64_t combinations(int n, int k);
 
 /**
- * Container for all objects necessary to estimate the selectivity of join predicates.
- */
-class JoinPredicateEstimator {
-public:
-    JoinPredicateEstimator(const JoinGraph& graph,
-                           const std::vector<ResolvedPath>& resolvedPaths,
-                           const SamplingEstimatorMap& samplingEstimators);
-
-    /**
-     * Returns an estimate of the selectivity of the given 'JoinEdge' using sampling.
-     */
-    cost_based_ranker::SelectivityEstimate joinPredicateSel(const JoinEdge& edge);
-
-private:
-    const JoinGraph& _graph;
-    const std::vector<ResolvedPath>& _resolvedPaths;
-    const SamplingEstimatorMap& _samplingEstimators;
-};
-
-/**
  * Represent sargable predicate that can be the RHS of an indexed nested loop join.
  */
 struct IndexedJoinPredicate {
