@@ -66,7 +66,7 @@ render_template(
     output = "feature_flag_test.idl",
     python_libs = [
         dependency(
-            "cheetah3",
+            "ct3",
             group = "compile",
         ),
         dependency(

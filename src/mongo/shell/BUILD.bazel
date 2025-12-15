@@ -228,7 +228,7 @@ render_template(
     output = "error_codes.js",
     python_libs = [
         dependency(
-            "cheetah3",
+            "ct3",
             group = "compile",
         ),
         dependency(

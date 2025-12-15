@@ -30,7 +30,7 @@ render_template(
     output = "error_codes.cpp",
     python_libs = [
         dependency(
-            "cheetah3",
+            "ct3",
             group = "compile",
         ),
         dependency(
@@ -56,7 +56,7 @@ render_template(
     output = "error_codes.h",
     python_libs = [
         dependency(
-            "cheetah3",
+            "ct3",
             group = "compile",
         ),
         dependency(

@@ -361,7 +361,7 @@ render_template(
     output = "builtin_roles.cpp",
     python_libs = [
         dependency(
-            "cheetah3",
+            "ct3",
             group = "compile",
         ),
         dependency(

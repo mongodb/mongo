@@ -21,7 +21,7 @@ render_template(
     output = "releases.h",
     python_libs = [
         dependency(
-            "cheetah3",
+            "ct3",
             group = "compile",
         ),
         dependency(
