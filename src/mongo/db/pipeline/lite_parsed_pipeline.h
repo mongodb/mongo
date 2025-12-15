@@ -52,6 +52,8 @@
 
 namespace mongo {
 
+using StageSpecs = std::vector<std::unique_ptr<LiteParsedDocumentSource>>;
+
 /**
  * A semi-parsed version of a Pipeline, parsed just enough to determine information like what
  * foreign collections are involved.
@@ -295,14 +297,14 @@ public:
         return _isRunningAgainstView_ForHybridSearch;
     }
 
-    const std::vector<std::unique_ptr<LiteParsedDocumentSource>>& getStages() const {
+    const StageSpecs& getStages() const {
         return _stageSpecs;
     }
 
 private:
     // This is logically const - any changes to _stageSpecs will invalidate cached copies of
     // "_hasChangeStream" and "_involvedNamespaces" below.
-    std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
+    StageSpecs _stageSpecs;
 
     // This variable specifies whether the pipeline is running on a view's namespace. This is
     // currently needed for $rankFusion/$scoreFusion positional validation.

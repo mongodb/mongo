@@ -83,11 +83,13 @@ public:
               _nss(nss),
               _options(options),
               _expanded([&] {
-                  auto expanded = expand();
+                  auto expandedList = expand();
                   tassert(10905600,
                           "LiteParsedExpandable must not have an empty expanded pipeline",
-                          !expanded.empty());
-                  return expanded;
+                          !expandedList.empty());
+
+                  return StageSpecs(std::make_move_iterator(expandedList.begin()),
+                                    std::make_move_iterator(expandedList.end()));
               }()) {}
 
         std::unique_ptr<StageParams> getStageParams() const override {
@@ -97,7 +99,7 @@ public:
         /**
          * Return the pre-computed expanded pipeline.
          */
-        const LiteParsedList& getExpandedPipeline() const {
+        const StageSpecs& getExpandedPipeline() const {
             return _expanded;
         }
 
@@ -161,7 +163,7 @@ public:
         const AggStageParseNodeHandle _parseNode;
         const NamespaceString _nss;
         const LiteParserOptions _options;
-        const LiteParsedList _expanded;
+        const StageSpecs _expanded;
     };
 
     /**

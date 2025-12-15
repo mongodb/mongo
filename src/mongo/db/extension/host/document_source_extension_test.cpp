@@ -145,7 +145,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandToExtAst) {
 
     // Expanded pipeline contains LiteParsedExpanded.
     auto* first =
-        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded.front().get());
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded[0].get());
     ASSERT_TRUE(first != nullptr);
     ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kTransformName));
 }
@@ -164,7 +164,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandToExtParse) {
 
     // Expanded pipeline contains LiteParsedExpanded.
     auto* first =
-        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded.front().get());
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded[0].get());
     ASSERT_TRUE(first != nullptr);
     ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kTransformName));
 }
@@ -183,13 +183,13 @@ TEST_F(DocumentSourceExtensionTest, ExpandToHostParse) {
     ASSERT_EQUALS(expanded.size(), 1);
 
     // Expanded pipeline contains LiteParsedDocumentSource.
-    auto* lpds = dynamic_cast<LiteParsedDocumentSource*>(expanded.front().get());
+    auto* lpds = dynamic_cast<LiteParsedDocumentSource*>(expanded[0].get());
     ASSERT_TRUE(lpds != nullptr);
     ASSERT_EQ(lpds->getParseTimeName(), std::string(DocumentSourceMatch::kStageName));
 
     // It is not an instance of LiteParsedExpanded.
     auto* notExpanded =
-        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded.front().get());
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded[0].get());
     ASSERT_TRUE(notExpanded == nullptr);
 }
 
@@ -204,24 +204,20 @@ TEST_F(DocumentSourceExtensionTest, ExpandToMixed) {
     const auto& expanded = lp.getExpandedPipeline();
     ASSERT_EQUALS(expanded.size(), 4);
 
-    const auto it0 = expanded.begin();
-    const auto it1 = std::next(expanded.begin(), 1);
-    const auto it2 = std::next(expanded.begin(), 2);
-    const auto it3 = std::next(expanded.begin(), 3);
-
-    auto* first = dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it0->get());
+    auto* first =
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded[0].get());
     ASSERT_TRUE(first != nullptr);
 
-    auto* second = dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it1->get());
+    auto* second =
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded[1].get());
     ASSERT_TRUE(second != nullptr);
 
-    auto* third = dynamic_cast<LiteParsedDocumentSource*>(it2->get());
+    // This one is NOT LiteParsedExpanded.
+    auto* third = expanded[2].get();
     ASSERT_TRUE(third != nullptr);
-    auto* notExpanded =
-        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it2->get());
-    ASSERT_TRUE(notExpanded == nullptr);
+    ASSERT_TRUE(dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(third) == nullptr);
 
-    auto* fourth = dynamic_cast<LiteParsedDocumentSource*>(it3->get());
+    auto* fourth = expanded[3].get();
     ASSERT_TRUE(fourth != nullptr);
 
     ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kTransformName));
@@ -296,7 +292,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandToHostAst) {
     ASSERT_EQUALS(expanded.size(), 1);
 
     // Expanded pipeline contains LiteParsedDocumentSource.
-    auto* lpds = dynamic_cast<LiteParsedDocumentSource*>(expanded.front().get());
+    auto* lpds = dynamic_cast<LiteParsedDocumentSource*>(expanded[0].get());
     ASSERT_TRUE(lpds != nullptr);
     ASSERT_EQ(lpds->getParseTimeName(),
               std::string(DocumentSourceInternalSearchIdLookUp::kStageName));
@@ -328,24 +324,23 @@ TEST_F(DocumentSourceExtensionTest, ExpandRecursesMultipleLevels) {
     const auto& expanded = lp.getExpandedPipeline();
     ASSERT_EQUALS(expanded.size(), 4);
 
-    const auto it0 = expanded.begin();
-    const auto it1 = std::next(expanded.begin(), 1);
-    const auto it2 = std::next(expanded.begin(), 2);
-    const auto it3 = std::next(expanded.begin(), 3);
-
-    auto* first = dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it0->get());
+    auto* first =
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded[0].get());
     ASSERT_TRUE(first != nullptr);
     ASSERT_EQ(first->getParseTimeName(), std::string(sdk::shared_test_stages::kLeafAName));
 
-    auto* second = dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it1->get());
+    auto* second =
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded[1].get());
     ASSERT_TRUE(second != nullptr);
     ASSERT_EQ(second->getParseTimeName(), std::string(sdk::shared_test_stages::kLeafBName));
 
-    auto* third = dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it2->get());
+    auto* third =
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded[2].get());
     ASSERT_TRUE(third != nullptr);
     ASSERT_EQ(third->getParseTimeName(), std::string(sdk::shared_test_stages::kLeafCName));
 
-    auto* fourth = dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it3->get());
+    auto* fourth =
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded[3].get());
     ASSERT_TRUE(fourth != nullptr);
     ASSERT_EQ(fourth->getParseTimeName(), std::string(sdk::shared_test_stages::kLeafDName));
 }
@@ -514,7 +509,7 @@ TEST_F(DocumentSourceExtensionTest, ExpandToMaxDepthSucceeds) {
     // Final expansion produces exactly one AST leaf.
     ASSERT_EQUALS(expanded.size(), 1);
     auto* leaf =
-        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded.front().get());
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded[0].get());
     ASSERT_TRUE(leaf != nullptr);
     ASSERT_EQ(leaf->getParseTimeName(), std::string(kDepthLeafName));
 }
@@ -588,11 +583,10 @@ TEST_F(DocumentSourceExtensionTest, ExpandSameStageOnDifferentBranchesSucceeds) 
     const auto& expanded = lp.getExpandedPipeline();
     ASSERT_EQUALS(expanded.size(), 2);
 
-    auto it0 = expanded.begin();
-    auto it1 = std::next(expanded.begin(), 1);
-
-    auto* first = dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it0->get());
-    auto* second = dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(it1->get());
+    auto* first =
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded[0].get());
+    auto* second =
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpanded*>(expanded[1].get());
     ASSERT_TRUE(first != nullptr);
     ASSERT_TRUE(second != nullptr);
 

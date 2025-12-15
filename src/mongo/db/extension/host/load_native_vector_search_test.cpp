@@ -130,12 +130,12 @@ protected:
         const auto& expanded = lpExpanded->getExpandedPipeline();
         ASSERT_EQ(expanded.size(), names.size());
 
-        auto it = expanded.begin();
+        size_t i = 0;
         for (const auto& expected : names) {
-            auto* lp = dynamic_cast<LiteParsedDocumentSource*>(it->get());
+            auto* lp = expanded[i].get();
             ASSERT_TRUE(lp);
             ASSERT_EQ(lp->getParseTimeName(), expected);
-            ++it;
+            ++i;
         }
     }
 
