@@ -34,6 +34,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
 #include "mongo/db/s/migration_destination_manager.h"
@@ -46,6 +47,8 @@
 #include "mongo/util/str.h"
 
 #include <system_error>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
@@ -240,6 +243,47 @@ TEST_F(MigrationDestinationManagerNetworkTest,
     MigrationDestinationManager::getCollectionIndexes(
         operationContext(), nss, ShardId("0"), boost::none, boost::none);
     future.default_timed_get();
+}
+
+// Tests that error message includes missing index names when collection is not empty.
+TEST_F(MigrationDestinationManagerTest, ErrorMessageIncludesMissingIndexNames) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
+    boost::optional<UUID> collectionUUID;
+
+    auto opCtx = operationContext();
+    DBDirectClient client(opCtx);
+
+    // Create a collection with some data (so it's not empty).
+    // Note that index on '_id' is built by default.
+    client.insert(nss, BSON("_id" << 1 << "x" << 1));
+
+    // Get the UUID of the created collection directly from the catalog.
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto uuid = catalog->lookupUUIDByNSS(opCtx, nss);
+    ASSERT_TRUE(uuid);
+    collectionUUID.emplace(*uuid);
+
+    // Prepare index specs that include indexes not on the local collection.
+    // Use the actual UUID of the created collection.
+    ASSERT(collectionUUID.has_value());
+
+    CollectionOptionsAndIndexes collectionOptionsAndIndexes{
+        *collectionUUID,
+        {
+            BSON("v" << 2 << "key" << BSON("y" << 1) << "name" << "y_1"),  // Missing index
+            BSON("v" << 2 << "key" << BSON("z" << 1) << "name" << "z_1")   // Missing index
+        },
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
+        BSONObj()};
+
+    LOGV2(11294300, "The error message should list the missing index names: y_1 and z_1.");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        MigrationDestinationManager::cloneCollectionIndexesAndOptions(
+            operationContext(), nss, collectionOptionsAndIndexes),
+        DBException,
+        ErrorCodes::CannotCreateCollection,
+        "aborting, shard is missing 2 indexes and collection is not empty. Non-trivial index "
+        "creation should be scheduled manually. Missing indexes: y_1, z_1");
 }
 
 }  // namespace

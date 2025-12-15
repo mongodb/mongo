@@ -1205,12 +1205,17 @@ void _cloneCollectionIndexesAndOptions(
             opCtx, collection, collectionOptionsAndIndexes.indexSpecs, opts);
         if (!indexSpecs.empty()) {
             // Only allow indexes to be copied if the collection does not have any documents.
-            uassert(ErrorCodes::CannotCreateCollection,
-                    str::stream() << "aborting, shard is missing " << indexSpecs.size()
-                                  << " indexes and "
-                                  << "collection is not empty. Non-trivial "
-                                  << "index creation should be scheduled manually",
-                    collection->isEmpty(opCtx));
+            std::string errMsg = "aborting, shard is missing " + std::to_string(indexSpecs.size()) +
+                " indexes and collection is not empty. Non-trivial " +
+                "index creation should be scheduled manually. Missing indexes:";
+            std::string separator = " ";
+            for (const auto& spec : indexSpecs) {
+                if (spec.hasField("name")) {
+                    errMsg += separator + std::string{spec.getStringField("name")};
+                    separator = ", ";
+                }
+            }
+            uassert(ErrorCodes::CannotCreateCollection, errMsg, collection->isEmpty(opCtx));
 
             // If synchronizing indexes strictly, mark waitForInProgressIndexBuildCompletion as
             // true to wait for index builds to be finished after releasing the locks.
