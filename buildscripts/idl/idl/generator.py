@@ -1132,11 +1132,13 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         """Generate a template declaration for a command's base class."""
         self._writer.write_line("template <typename Derived>")
 
-    def gen_derived_class_declaration_block(self, class_name):
+    def gen_derived_class_declaration_block(self, class_name, mod_visibility):
         # type: (str) -> writer.IndentedScopedBlock
         """Generate a command's base class declaration block."""
         return writer.IndentedScopedBlock(
-            self._writer, "class %s : public TypedCommand<Derived> {" % class_name, "};"
+            self._writer,
+            f"class {make_mod_tag(mod_visibility)}{class_name} : public TypedCommand<Derived> {{",
+            "};",
         )
 
     def gen_type_alias_declaration(self, new_type_name, old_type_name):
@@ -1196,7 +1198,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         self.write_empty_line()
 
         self.gen_template_declaration()
-        with self.gen_derived_class_declaration_block(class_name):
+        with self.gen_derived_class_declaration_block(class_name, command.mod_visibility):
             # Write type alias for InvocationBase.
             self.gen_type_alias_declaration(
                 "_TypedCommandInvocationBase", "typename TypedCommand<Derived>::InvocationBase"
