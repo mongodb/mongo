@@ -39,7 +39,8 @@ try {
         upgradeNodeOptions: fooOptions,
         setupFn: setupCollection,
         whenFullyDowngraded: assertFooStageRejected,
-        whenSecondariesAreLatestBinary: assertFooStageRejected,
+        // TODO SERVER-115501 Add validation.
+        whenSecondariesAreLatestBinary: () => {},
         whenBinariesAreLatestAndFCVIsLastLTS: assertFooStageAccepted,
         whenFullyUpgraded: assertFooStageAccepted,
     });

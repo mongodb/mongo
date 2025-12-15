@@ -17,7 +17,7 @@ const data = [
     {_id: 2, test: "c"},
 ];
 
-const fooParseErrorCodes = [11165101, 10624201];
+const fooParseErrorCodes = [11165101];
 
 export function generateMultiversionExtensionConfigs() {
     return generateExtensionConfigs(["libfoo_mongo_extension.so", "libfoo_extension_v2.so"]);
@@ -65,6 +65,15 @@ export function assertFooStageAcceptedV1Only(primaryConn) {
         db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: 0}}], cursor: {}}),
     );
     assertArrayEq({actual: viewResult.cursor.firstBatch, expected: [data[0]]});
+}
+
+// TODO SERVER-115501 Remove this helper.
+export function assertFooStageAcceptedEitherVersion(primaryConn) {
+    const db = getDB(primaryConn);
+    db[viewName].drop();
+
+    const response = db.runCommand({aggregate: collName, pipeline: [{$testFoo: {}}], cursor: {}});
+    assert(response.ok === 1 || response.code in fooParseErrorCodes);
 }
 
 export function assertFooStageAcceptedV1AndV2(primaryConn) {

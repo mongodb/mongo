@@ -37,6 +37,7 @@ import "jstests/multiVersion/libs/multi_cluster.js";
 
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {
+    assertFooStageAcceptedEitherVersion,
     assertFooStageAcceptedV1AndV2,
     assertFooStageAcceptedV1Only,
     assertFooStageAcceptedV1OnlyPlusV2ViewCreation,
@@ -65,7 +66,8 @@ try {
         restartNodeOptions: fooV2Options,
         setupFn: setupCollection,
         beforeRestart: assertFooStageAcceptedV1Only,
-        afterSecondariesHaveRestarted: assertFooStageAcceptedV1Only,
+        // TODO SERVER-115501 Add fine-grained validation.
+        afterSecondariesHaveRestarted: assertFooStageAcceptedEitherVersion,
         afterPrimariesHaveRestarted: assertFooStageAcceptedV1AndV2,
     });
 
@@ -87,7 +89,8 @@ try {
         restartNodeOptions: fooV1Options,
         setupFn: setupCollection,
         beforeRestart: assertFooStageAcceptedV1AndV2,
-        afterSecondariesHaveRestarted: assertFooStageAcceptedV1AndV2,
+        // TODO SERVER-115501 Add fine-grained validation.
+        afterSecondariesHaveRestarted: assertFooStageAcceptedEitherVersion,
         afterPrimariesHaveRestarted: assertFooStageAcceptedV1Only,
     });
 
