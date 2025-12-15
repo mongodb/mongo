@@ -46,9 +46,29 @@ namespace mongo::query_shape {
 namespace {
 
 BSONObj shapifyQuery(const ParsedUpdate& parsedUpdate, const SerializationOptions& opts) {
-    tassert(11034203, "query is required to be parsed", parsedUpdate.hasParsedFindCommand());
-    auto matchExpr = parsedUpdate.parsedFind->filter.get();
-    return matchExpr ? matchExpr->serialize(opts) : BSONObj{};
+    // Use the already-parsed query ('q' field) if we have it to avoid re-parsing. We won't have the
+    // parsed query in the case where the 'q' field is a simple match on _id (e.g. {_id: 1}) - in
+    // this case, we'll parse the query on-the-fly so we can shapify it.
+    if (parsedUpdate.hasParsedFindCommand()) {
+        auto matchExpr = parsedUpdate.parsedFind->filter.get();
+        return matchExpr ? matchExpr->serialize(opts) : BSONObj{};
+    }
+
+    auto expCtx = ExpressionContextBuilder{}
+                      .ns(parsedUpdate.getRequest()->getNsString())
+                      .blankExpressionContext(true)
+                      .build();
+    auto swParseResult =
+        MatchExpressionParser::parse(parsedUpdate.getRequest()->getQuery(),
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    tassert(11193001,
+            str::stream() << "Failed to parse simple _id query during shapification: "
+                          << swParseResult.getStatus(),
+            swParseResult.isOK());
+
+    return swParseResult.getValue()->serialize(opts);
 }
 
 Value shapifyUpdateOp(const ParsedUpdate& parsedUpdate,

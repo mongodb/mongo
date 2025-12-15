@@ -2,9 +2,8 @@
  * Test that $queryStats properly tokenizes update (where the update modification is specified
  * as replacement document or pipeline) commands on mongod.
  *
- * @tags: [requires_fcv_83]
+ * @tags: [featureFlagQueryStatsUpdateCommand]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     getQueryStatsUpdateCmd,
     withQueryStatsEnabled,
@@ -31,14 +30,32 @@ function testReplacementUpdateTokenization(testDB, collName) {
 
     let queryStats = getQueryStatsUpdateCmd(testDB, {transformIdentifiers: true});
 
-    if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "QueryStatsUpdateCommand")) {
-        assert.eq(queryStats, [], "expect no query stats for update when feature flag is off");
-        return;
-    }
-
     assert.eq(1, queryStats.length);
     assert.eq("update", queryStats[0].key.queryShape.command);
     assert.eq({[kHashedFieldName]: {$eq: "?number"}}, queryStats[0].key.queryShape.q);
+    assert.eq("?object", queryStats[0].key.queryShape.u);
+}
+
+/**
+ * Test that an update filtered on _id is properly tokenized. These _id queries skip parsing during
+ * normal update processing (IDHACK optimization), but should still be recorded in query stats.
+ */
+function testSimpleIdUpdateTokenization(testDB, collName) {
+    const coll = testDB.getCollection(collName);
+    assert.commandWorked(coll.insert({_id: 123, v: 1}));
+
+    const cmdObj = {
+        update: collName,
+        updates: [{q: {_id: 123}, u: {_id: 123, v: 100}}],
+        comment: "update filtered on _id!",
+    };
+    assert.commandWorked(testDB.runCommand(cmdObj));
+
+    let queryStats = getQueryStatsUpdateCmd(testDB, {transformIdentifiers: true});
+
+    assert.eq(1, queryStats.length);
+    assert.eq("update", queryStats[0].key.queryShape.command);
+    assert.eq({[kHashedIdField]: {$eq: "?number"}}, queryStats[0].key.queryShape.q);
     assert.eq("?object", queryStats[0].key.queryShape.u);
 }
 
@@ -111,11 +128,6 @@ function testModifierUpdateTokenizationForSetOfOperators(testDB, collName, coll,
         assert.commandWorked(testDB.runCommand(cmdObj));
 
         let queryStats = getQueryStatsUpdateCmd(testDB, {transformIdentifiers: true});
-
-        if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "QueryStatsUpdateCommand")) {
-            assert.eq(queryStats, [], "expect no query stats for update when feature flag is off");
-            return;
-        }
 
         assert.eq(1, queryStats.length);
         assert.eq("update", queryStats[0].key.queryShape.command);
@@ -235,11 +247,6 @@ function testPipelineUpdateTokenization(testDB, collName) {
 
     let queryStats = getQueryStatsUpdateCmd(testDB, {transformIdentifiers: true});
 
-    if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "QueryStatsUpdateCommand")) {
-        assert.eq(queryStats, [], "expect no query stats for update when feature flag is off");
-        return;
-    }
-
     assert.eq(1, queryStats.length);
 
     assert.eq("update", queryStats[0].key.queryShape.command);
@@ -274,11 +281,6 @@ function testPipelineUpdateWithAliasesTokenization(testDB, collName) {
 
     let queryStats = getQueryStatsUpdateCmd(testDB, {transformIdentifiers: true});
 
-    if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "QueryStatsUpdateCommand")) {
-        assert.eq(queryStats, [], "expect no query stats for update when feature flag is off");
-        return;
-    }
-
     assert.eq(1, queryStats.length);
     assert.eq("update", queryStats[0].key.queryShape.command);
     assert.eq({[kHashedFieldName]: {$eq: "?number"}}, queryStats[0].key.queryShape.q);
@@ -311,11 +313,6 @@ function testPipelineUpdateWithConstantTokenization(testDB, collName) {
 
     let queryStats = getQueryStatsUpdateCmd(testDB, {transformIdentifiers: true});
 
-    if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "QueryStatsUpdateCommand")) {
-        assert.eq(queryStats, [], "expect no query stats for update when feature flag is off");
-        return;
-    }
-
     assert.eq(1, queryStats.length);
     assert.eq("update", queryStats[0].key.queryShape.command);
     assert.eq({[kHashedFieldName]: {$eq: "?number"}}, queryStats[0].key.queryShape.q);
@@ -337,6 +334,10 @@ withQueryStatsEnabled(collName, (coll) => {
 
     jsTest.log.info("Testing replacement update");
     testReplacementUpdateTokenization(testDB, collName);
+
+    jsTest.log.info("Testing update filtered on _id");
+    resetQueryStatsStore(testDB.getMongo(), "1MB");
+    testSimpleIdUpdateTokenization(testDB, collName);
 
     jsTest.log.info("Testing modifier update for simple operators");
     resetQueryStatsStore(testDB.getMongo(), "1MB");

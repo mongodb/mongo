@@ -1439,13 +1439,6 @@ void registerRequestForQueryStats(OperationContext* opCtx,
         return;
     }
 
-    // TODO(SERVER-111930): Support recording query stats for updates with simple ID query
-    // Skip if the parse query is unavailable. This could happen if the query is a simple Id query:
-    // an exact-match query on _id.
-    if (!parsedUpdate.hasParsedFindCommand()) {
-        return;
-    }
-
     // Skip registering the request with encrypted fields as indicated by the inclusion of
     // encryptionInformation. It is important to do this before canonicalizing and optimizing the
     // query, each of which would alter the query shape.

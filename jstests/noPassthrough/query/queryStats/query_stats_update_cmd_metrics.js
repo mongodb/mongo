@@ -54,6 +54,51 @@ function testReplacementUpdateMetrics(coll) {
 }
 
 /**
+ * Test that a simple _id query update generates the expected query stats.
+ * Simple _id queries skip parsing during normal update processing (IDHACK optimization),
+ * but should still record metrics correctly.
+ */
+function testSimpleIdUpdateMetrics(coll) {
+    const testDB = coll.getDB();
+
+    // Insert a document with a specific _id to update.
+    assert.commandWorked(coll.insert({_id: 999, v: 1}));
+
+    const simpleIdUpdateCommandObj = {
+        update: collName,
+        updates: [{q: {_id: 999}, u: {_id: 999, v: 2000}, multi: false}],
+        comment: "running update filtered on _id!!",
+    };
+
+    assert.commandWorked(testDB.runCommand(simpleIdUpdateCommandObj));
+
+    const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: coll.getName()});
+    assert.eq(entry.key.queryShape.command, "update");
+
+    assertAggregatedMetricsSingleExec(entry, {
+        keysExamined: 1, // Should use _id index.
+        docsExamined: 1,
+        hasSortStage: false,
+        usedDisk: false,
+        fromMultiPlanner: false,
+        fromPlanCache: false,
+        writes: {nMatched: 1, nUpserted: 0, nModified: 1, nDeleted: 0, nInserted: 0},
+    });
+
+    assertExpectedResults({
+        results: entry,
+        expectedQueryStatsKey: entry.key,
+        expectedExecCount: 1,
+        expectedDocsReturnedSum: 0,
+        expectedDocsReturnedMax: 0,
+        expectedDocsReturnedMin: 0,
+        expectedDocsReturnedSumOfSq: 0,
+    });
+
+    assert.commandWorked(coll.remove({_id: 999}));
+}
+
+/**
  * Test that a modifier update generates the expected query stats.
  */
 function testModifierUpdateMetrics(coll) {
@@ -193,6 +238,10 @@ withQueryStatsEnabled(collName, (coll) => {
 
     jsTest.log.info("Testing replacement update metrics");
     testReplacementUpdateMetrics(coll);
+    resetCollection(coll);
+
+    jsTest.log.info("Testing update filtered on _id metrics");
+    testSimpleIdUpdateMetrics(coll);
     resetCollection(coll);
 
     jsTest.log.info("Testing modifier update metrics");

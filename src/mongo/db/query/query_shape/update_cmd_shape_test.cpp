@@ -1907,5 +1907,132 @@ TEST_F(UpdateCmdShapeTest, EquivalentUpdateCmdShapeSizes) {
     })"_sd);
     ASSERT_EQ(shape.size(), shapeOptionalValues.size());
 }
+
+/**
+ * Test that we shapify the unoptimized version of the match expression, not the optimized one.
+ */
+TEST_F(UpdateCmdShapeTest, ShapifiesUnoptimizedMatchExpression) {
+    // This redundant $or would normally be optimized to just {_id: 2}.
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { q: { $or: [{_id: 2}, {_id: 2}] }, u: { foo: "bar" }, multi: false, upsert: false } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "$or": [
+                    {
+                        "_id": {
+                            "$eq": "?number"
+                        }
+                    },
+                    {
+                        "_id": {
+                            "$eq": "?number"
+                        }
+                    }
+                ]
+            },
+            "u": "?object",
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "$or": [
+                    {
+                        "_id": {
+                            "$eq": 1
+                        }
+                    },
+                    {
+                        "_id": {
+                            "$eq": 1
+                        }
+                    }
+                ]
+            },
+            "u": {
+                "?": "?"
+            },
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+}
+
+/**
+ * Updates filtered on _id skip parsing in ParsedUpdate for IDHACK
+ * optimization. We should still be able to shapify these updates for query stats.
+ */
+TEST_F(UpdateCmdShapeTest, CanShapifyUpdateWithSimpleIdQuery) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { q: { _id: 2 }, u: { foo: "bar" }, multi: false, upsert: false } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "_id": {
+                    "$eq": "?number"
+                }
+            },
+            "u": "?object",
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "update",
+            "q": {
+                "_id": {
+                    "$eq": 1
+                }
+            },
+            "u": {
+                "?": "?"
+            },
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+}
+
 }  // namespace
 }  // namespace mongo::query_shape

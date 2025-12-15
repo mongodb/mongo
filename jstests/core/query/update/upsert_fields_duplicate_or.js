@@ -1,7 +1,5 @@
 // @tags: [
 //   requires_fcv_73,
-//   # TODO SERVER-111930 Support recording query stats for updates with simple ID query
-//   known_query_shape_computation_problem,
 //   # Time-series collections have different _id properties.
 //   exclude_from_timeseries_crud_passthrough,
 // ]
