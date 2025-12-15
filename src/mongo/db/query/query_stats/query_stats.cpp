@@ -269,6 +269,11 @@ void updateQueryExecStatistics(QueryExecEntry& queryExecEntryToUpdate,
     queryExecEntryToUpdate.maxAcquisitionDelinquencyMillis.aggregate(
         snapshot.maxAcquisitionDelinquencyMillis);
 
+    queryExecEntryToUpdate.totalTimeQueuedMicros.aggregate(snapshot.totalTimeQueuedMicros);
+    queryExecEntryToUpdate.totalAdmissions.aggregate(snapshot.totalAdmissions);
+    queryExecEntryToUpdate.wasLoadShed.aggregate(snapshot.wasLoadShed);
+    queryExecEntryToUpdate.wasDeprioritized.aggregate(snapshot.wasDeprioritized);
+
     // Store the number of interrupt checks per second as a rate, this can give us a better sense of
     // how often interrupts are being checked relative to the total execution time across multiple
     // query runs.
@@ -503,7 +508,10 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
         static_cast<uint64_t>(metrics.nModified.value_or(0)),
         static_cast<uint64_t>(metrics.ndeleted.value_or(0)),
         static_cast<uint64_t>(metrics.ninserted.value_or(0)),
-    };
+        metrics.totalTimeQueuedMicros.value_or(Microseconds(0)).count(),
+        static_cast<uint64_t>(metrics.totalAdmissions.value_or(0)),
+        metrics.wasLoadShed.value_or(false),
+        metrics.wasDeprioritized.value_or(false)};
 
     return snapshot;
 }

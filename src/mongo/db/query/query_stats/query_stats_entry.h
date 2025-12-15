@@ -86,6 +86,14 @@ struct QueryExecEntry {
     AggregatedMetric<int64_t> maxAcquisitionDelinquencyMillis;
 
     /**
+     * Aggregates the execution control stats.
+     */
+    AggregatedMetric<int64_t> totalTimeQueuedMicros;
+    AggregatedMetric<uint64_t> totalAdmissions;
+    AggregatedBool wasLoadShed;
+    AggregatedBool wasDeprioritized;
+
+    /**
      * Aggregates the checkForInterrupt stats including getMore requests.
      */
     AggregatedMetric<uint64_t> numInterruptChecksPerSec;

@@ -253,6 +253,11 @@ struct QueryStatsSnapshot {
     uint64_t nModified;
     uint64_t nDeleted;
     uint64_t nInserted;
+
+    int64_t totalTimeQueuedMicros;
+    uint64_t totalAdmissions;
+    bool wasLoadShed;
+    bool wasDeprioritized;
 };
 
 /**

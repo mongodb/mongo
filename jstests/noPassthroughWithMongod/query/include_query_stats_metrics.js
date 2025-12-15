@@ -50,6 +50,11 @@ function assertMetricsEqual(
     assertMetricEqual(metrics, "totalAcquisitionDelinquencyMillis", 0);
     assertMetricEqual(metrics, "maxAcquisitionDelinquencyMillis", 0);
     assertMetricEqual(metrics, "overdueInterruptApproxMaxMillis", 0);
+    // The exact value of the following metrics cannot be determined beforehand, but we can assert their existence.
+    assertMetricEqual(metrics, "totalTimeQueuedMicros", undefined);
+    assertMetricEqual(metrics, "totalAdmissions", undefined);
+    assertMetricEqual(metrics, "wasLoadShed", undefined);
+    assertMetricEqual(metrics, "wasDeprioritized", undefined);
 }
 
 function assertWriteMetricsEqual(

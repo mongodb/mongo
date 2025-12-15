@@ -1335,6 +1335,12 @@ CursorMetrics OpDebug::getCursorMetrics() const {
     metrics.setMaxAcquisitionDelinquencyMillis(
         additiveMetrics.maxAcquisitionDelinquency.value_or(Milliseconds(0)).count());
 
+    metrics.setTotalTimeQueuedMicros(
+        additiveMetrics.totalTimeQueuedMicros.value_or(Microseconds(0)).count());
+    metrics.setTotalAdmissions(additiveMetrics.totalAdmissions.value_or(0));
+    metrics.setWasLoadShed(additiveMetrics.wasLoadShed.value_or(false));
+    metrics.setWasDeprioritized(additiveMetrics.wasDeprioritized.value_or(false));
+
     metrics.setNumInterruptChecks(additiveMetrics.numInterruptChecks.value_or(0));
     metrics.setOverdueInterruptApproxMaxMillis(
         additiveMetrics.overdueInterruptApproxMax.value_or(Milliseconds(0)).count());
@@ -1481,6 +1487,10 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
         maxAcquisitionDelinquency = std::max(maxAcquisitionDelinquency.value_or(Milliseconds(0)),
                                              *otherMetrics.maxAcquisitionDelinquency);
     }
+    totalTimeQueuedMicros = addOptionals(totalTimeQueuedMicros, otherMetrics.totalTimeQueuedMicros);
+    totalAdmissions = addOptionals(totalAdmissions, otherMetrics.totalAdmissions);
+    wasLoadShed = addOptionals(wasLoadShed, otherMetrics.wasLoadShed);
+    wasDeprioritized = addOptionals(wasDeprioritized, otherMetrics.wasDeprioritized);
 
     hasSortStage = hasSortStage || otherMetrics.hasSortStage;
     usedDisk = usedDisk || otherMetrics.usedDisk;
@@ -1513,6 +1523,12 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
         totalAcquisitionDelinquency.value_or(Milliseconds(0)) + metrics.totalAcquisitionDelinquency;
     maxAcquisitionDelinquency = std::max(maxAcquisitionDelinquency.value_or(Milliseconds(0)),
                                          metrics.maxAcquisitionDelinquency);
+
+    totalTimeQueuedMicros =
+        totalTimeQueuedMicros.value_or(Microseconds(0)) + metrics.totalTimeQueuedMicros;
+    totalAdmissions = totalAdmissions.value_or(0) + metrics.totalAdmissions;
+    wasLoadShed = wasLoadShed.value_or(false) || metrics.wasLoadShed;
+    wasDeprioritized = wasDeprioritized.value_or(false) || metrics.wasDeprioritized;
 
     numInterruptChecks = numInterruptChecks.value_or(0) + metrics.numInterruptChecks;
     overdueInterruptApproxMax = std::max(overdueInterruptApproxMax.value_or(Milliseconds(0)),
@@ -1558,7 +1574,11 @@ void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metri
         static_cast<uint64_t>(metrics.getNUpserted()),
         static_cast<uint64_t>(metrics.getNModified()),
         static_cast<uint64_t>(metrics.getNDeleted()),
-        static_cast<uint64_t>(metrics.getNInserted())});
+        static_cast<uint64_t>(metrics.getNInserted()),
+        Microseconds(metrics.getTotalTimeQueuedMicros()),
+        static_cast<uint64_t>(metrics.getTotalAdmissions()),
+        metrics.getWasLoadShed(),
+        metrics.getWasDeprioritized()});
 }
 
 void OpDebug::AdditiveMetrics::aggregateStorageStats(const StorageStats& stats) {

@@ -63,6 +63,10 @@ static const BSONObj basicMetricsObj = fromjson(R"({
     delinquentAcquisitions: {"$numberLong": "0"},
     totalAcquisitionDelinquencyMillis: {"$numberLong": "0"},
     maxAcquisitionDelinquencyMillis: {"$numberLong": "0"},
+    totalTimeQueuedMicros: {"$numberLong": "0"},
+    totalAdmissions: {"$numberLong": "0"},
+    wasLoadShed: false,
+    wasDeprioritized: false,
     numInterruptChecks: {"$numberLong": "0"},
     overdueInterruptApproxMaxMillis: {"$numberLong": "0"},
     nMatched: {"$numberLong": "0"},
@@ -323,6 +327,10 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     ASSERT_EQ(metrics.getDelinquentAcquisitions(), 0);
     ASSERT_EQ(metrics.getTotalAcquisitionDelinquencyMillis(), 0);
     ASSERT_EQ(metrics.getMaxAcquisitionDelinquencyMillis(), 0);
+    ASSERT_EQ(metrics.getTotalTimeQueuedMicros(), 0);
+    ASSERT_EQ(metrics.getTotalAdmissions(), 0);
+    ASSERT_FALSE(metrics.getWasLoadShed());
+    ASSERT_FALSE(metrics.getWasDeprioritized());
     ASSERT_EQ(metrics.getNumInterruptChecks(), 0);
     ASSERT_EQ(metrics.getOverdueInterruptApproxMaxMillis(), 0);
     ASSERT_EQ(metrics.getNMatched(), 0);
@@ -991,6 +999,10 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     ASSERT_EQ(parsedMetrics->getDelinquentAcquisitions(), 0);
     ASSERT_EQ(parsedMetrics->getTotalAcquisitionDelinquencyMillis(), 0);
     ASSERT_EQ(parsedMetrics->getMaxAcquisitionDelinquencyMillis(), 0);
+    ASSERT_EQ(parsedMetrics->getTotalTimeQueuedMicros(), 0);
+    ASSERT_EQ(parsedMetrics->getTotalAdmissions(), 0);
+    ASSERT_FALSE(parsedMetrics->getWasLoadShed());
+    ASSERT_FALSE(parsedMetrics->getWasDeprioritized());
     ASSERT_EQ(parsedMetrics->getNumInterruptChecks(), 15);
     ASSERT_EQ(parsedMetrics->getOverdueInterruptApproxMaxMillis(), 0);
     ASSERT_EQ(parsedMetrics->getNMatched(), 1);

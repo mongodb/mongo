@@ -135,6 +135,26 @@ structs:
                 description: "The number of documents inserted (excluding upserts)."
                 type: long
                 stability: unstable
+            totalTimeQueuedMicros:
+                description: "Total time spent waiting for a ticket."
+                type: long
+                stability: unstable
+                default: 0
+            totalAdmissions:
+                description: "Total number of admissions during the operation."
+                type: long
+                stability: unstable
+                default: 0
+            wasLoadShed:
+                description: "If true, the operation was load shed."
+                type: bool
+                stability: unstable
+                default: false
+            wasDeprioritized:
+                description: "If true, the operation was deprioritized at some point."
+                type: bool
+                stability: unstable
+                default: false
 
     ResponseCursorBase:
         description: "Common fields of initial and subsequent cursor responses."

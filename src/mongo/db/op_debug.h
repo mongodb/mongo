@@ -230,6 +230,13 @@ public:
 
         boost::optional<uint64_t> numInterruptChecks;
         boost::optional<Milliseconds> overdueInterruptApproxMax;
+
+        // If query stats are being collected for this operation, stores the execution control
+        // statistics.
+        boost::optional<Microseconds> totalTimeQueuedMicros;
+        boost::optional<uint64_t> totalAdmissions;
+        boost::optional<bool> wasLoadShed;
+        boost::optional<bool> wasDeprioritized;
     };
 
     MONGO_MOD_PRIVATE OpDebug() = default;

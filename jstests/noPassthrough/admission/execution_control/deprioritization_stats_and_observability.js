@@ -13,9 +13,10 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
-import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {getQueryExecMetrics, getQueryStats} from "jstests/libs/query/query_stats_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     getExecutionControlStats,
     getTotalDeprioritizationCount,
@@ -402,6 +403,58 @@ describe("Execution control statistics and observability", function () {
                 stats.heuristicDeprioritizationThreshold,
                 "Heuristic deprioritization threshold not reported correctly in serverStatus",
             );
+        });
+    });
+    describe("deprioritization reporting in query execution metrics", function () {
+        let replTest, mongod, db, coll;
+        const findComment = "deprioritized_find_test";
+
+        before(function () {
+            replTest = new ReplSetTest({
+                nodes: 1,
+                nodeOptions: {
+                    setParameter: {
+                        // Force the query to yield frequently to better expose the low-priority
+                        // behavior.
+                        internalQueryExecYieldIterations: 1,
+                        executionControlDeprioritizationGate: true,
+                        executionControlHeuristicNumAdmissionsDeprioritizeThreshold: 1,
+                        logComponentVerbosity: {command: 2},
+                        internalQueryStatsRateLimit: -1,
+                    },
+                    slowms: 0,
+                },
+            });
+            replTest.startSet();
+            replTest.initiate();
+            mongod = replTest.getPrimary();
+            db = mongod.getDB(jsTestName());
+            coll = db.coll;
+
+            insertTestDocuments(coll, 100);
+        });
+
+        after(function () {
+            replTest.stopSet();
+        });
+
+        // TODO SERVER-112150: Once all versions support QueryStatsMetricsSubsections feature flag, simply check metrics["queryExec"].
+        function verifyQueryStatsMetrics(metrics) {
+            let statsObj = metrics.hasOwnProperty("queryExec") ? metrics["queryExec"] : metrics;
+            assert.gte(statsObj.totalTimeQueuedMicros.sum, 0);
+            assert.gte(statsObj.totalAdmissions.sum, 0);
+            assert.gte(statsObj.wasLoadShed.false, 0);
+            assert.gte(statsObj.wasDeprioritized.false, 0);
+        }
+
+        it("should report deprioritization in query execution metrics", function () {
+            runDeprioritizedFind(coll, findComment + "_totalization");
+            const queryStats = getQueryStats(mongod, {collName: coll.getName()});
+            assert(
+                queryStats.length === 1,
+                "Expected to find exactly one query stats entry for '" + coll.getName() + "' " + tojson(queryStats),
+            );
+            verifyQueryStatsMetrics(queryStats[0].metrics);
         });
     });
 

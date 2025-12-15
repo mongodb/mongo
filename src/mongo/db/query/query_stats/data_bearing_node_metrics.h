@@ -69,6 +69,11 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
     uint64_t nDeleted = 0;
     uint64_t nInserted = 0;
 
+    Microseconds totalTimeQueuedMicros{0};
+    uint64_t totalAdmissions = 0;
+    bool wasLoadShed = false;
+    bool wasDeprioritized = false;
+
     /**
      * Adds the fields from the given object into the fields of this object using addition (in the
      * case of numeric metrics) or conjunction/disjunction (in the case of boolean metrics).
@@ -96,6 +101,10 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         nModified += other.nModified;
         nDeleted += other.nDeleted;
         nInserted += other.nInserted;
+        totalTimeQueuedMicros += other.totalTimeQueuedMicros;
+        totalAdmissions += other.totalAdmissions;
+        wasLoadShed = wasLoadShed || other.wasLoadShed;
+        wasDeprioritized = wasDeprioritized || other.wasDeprioritized;
     }
 
     void add(const boost::optional<DataBearingNodeMetrics>& other) {
@@ -131,6 +140,10 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         nModified += metrics.getNModified();
         nDeleted += metrics.getNDeleted();
         nInserted += metrics.getNInserted();
+        totalTimeQueuedMicros += Microseconds(metrics.getTotalTimeQueuedMicros());
+        totalAdmissions += metrics.getTotalAdmissions();
+        wasLoadShed = wasLoadShed || metrics.getWasLoadShed();
+        wasDeprioritized = wasDeprioritized || metrics.getWasDeprioritized();
     }
 };
 

@@ -488,21 +488,36 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
         metrics.cpuNanos = metrics.cpuNanos.value_or(Nanoseconds(0)) + _debug.cpuTime;
 
         if (const auto& admCtx = ExecutionAdmissionContext::get(opCtx());
-            admCtx.getDelinquentAcquisitions() > 0 && !opCtx()->inMultiDocumentTransaction() &&
-            !parent()) {
-            // Note that we don't record delinquency stats around ticketing when in a
-            // multi-document transaction, since operations within multi-document transactions hold
-            // tickets for a long time by design and reporting them as delinquent will just create
-            // noise in the data.
+            !opCtx()->inMultiDocumentTransaction() && !parent()) {
+            if (admCtx.getDelinquentAcquisitions() > 0) {
 
-            metrics.delinquentAcquisitions = metrics.delinquentAcquisitions.value_or(0) +
-                static_cast<uint64_t>(admCtx.getDelinquentAcquisitions());
-            metrics.totalAcquisitionDelinquency =
-                metrics.totalAcquisitionDelinquency.value_or(Milliseconds(0)) +
-                Milliseconds(admCtx.getTotalAcquisitionDelinquencyMillis());
-            metrics.maxAcquisitionDelinquency = Milliseconds{
-                std::max(metrics.maxAcquisitionDelinquency.value_or(Milliseconds(0)).count(),
-                         admCtx.getMaxAcquisitionDelinquencyMillis())};
+                // Note that we don't record delinquency stats around ticketing when in a
+                // multi-document transaction, since operations within multi-document
+                // transactions hold tickets for a long time by design and reporting them as
+                // delinquent will just create noise in the data.
+
+                metrics.delinquentAcquisitions = metrics.delinquentAcquisitions.value_or(0) +
+                    static_cast<uint64_t>(admCtx.getDelinquentAcquisitions());
+                metrics.totalAcquisitionDelinquency =
+                    metrics.totalAcquisitionDelinquency.value_or(Milliseconds(0)) +
+                    Milliseconds(admCtx.getTotalAcquisitionDelinquencyMillis());
+                metrics.maxAcquisitionDelinquency = Milliseconds{
+                    std::max(metrics.maxAcquisitionDelinquency.value_or(Milliseconds(0)).count(),
+                             admCtx.getMaxAcquisitionDelinquencyMillis())};
+            }
+            // Only record execution control metrics for non exempted operations, that is, user
+            // operations, this is done to prevent having extra noise on the statistics comming from
+            // internal operations.
+            if (admCtx.getAdmissions() > 0 && admCtx.getExemptedAdmissions() == 0) {
+                metrics.totalTimeQueuedMicros =
+                    metrics.totalTimeQueuedMicros.value_or(Microseconds(0)) +
+                    admCtx.totalTimeQueuedMicros();
+                metrics.totalAdmissions = metrics.totalAdmissions.value_or(0) +
+                    (admCtx.getAdmissions() - admCtx.getExemptedAdmissions());
+                metrics.wasLoadShed = metrics.wasLoadShed.value_or(false) || admCtx.getLoadShed();
+                metrics.wasDeprioritized =
+                    metrics.wasDeprioritized.value_or(false) || admCtx.getLoadShed();
+            }
         }
 
         if (!parent()) {
@@ -1165,6 +1180,12 @@ void CurOp::reportState(BSONObjBuilder* builder,
             (stats && stats->overdueInterruptChecks.loadRelaxed() > 0)) {
             BSONObjBuilder sub(builder->subobjStart("delinquencyInfo"));
             OpDebug::appendDelinquentInfo(opCtx, sub);
+        }
+        if (admCtx.getAdmissions() > 0) {
+            builder->append("totalTimeQueuedMicros", admCtx.totalTimeQueuedMicros().count());
+            builder->append("totalAdmissions", admCtx.getAdmissions());
+            builder->append("wasLoadShed", admCtx.getLoadShed());
+            builder->append("wasDeprioritized", admCtx.getPriorityLowered());
         }
     }
 

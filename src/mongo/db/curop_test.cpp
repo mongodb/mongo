@@ -105,6 +105,14 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.totalAcquisitionDelinquency = Milliseconds{200};
     currentAdditiveMetrics.maxAcquisitionDelinquency = Milliseconds{300};
     additiveMetricsToAdd.maxAcquisitionDelinquency = Milliseconds{100};
+    currentAdditiveMetrics.totalTimeQueuedMicros = Microseconds{300};
+    additiveMetricsToAdd.totalTimeQueuedMicros = Microseconds{200};
+    currentAdditiveMetrics.totalAdmissions = 1;
+    additiveMetricsToAdd.totalAdmissions = 2;
+    currentAdditiveMetrics.wasLoadShed = false;
+    additiveMetricsToAdd.wasLoadShed = true;
+    currentAdditiveMetrics.wasDeprioritized = false;
+    additiveMetricsToAdd.wasDeprioritized = true;
     currentAdditiveMetrics.numInterruptChecks = 1;
     additiveMetricsToAdd.numInterruptChecks = 2;
     currentAdditiveMetrics.overdueInterruptApproxMax = Milliseconds{100};
@@ -154,6 +162,15 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     ASSERT_EQ(*currentAdditiveMetrics.maxAcquisitionDelinquency,
               std::max(*additiveMetricsBeforeAdd.maxAcquisitionDelinquency,
                        *additiveMetricsToAdd.maxAcquisitionDelinquency));
+    ASSERT_EQ(*currentAdditiveMetrics.totalTimeQueuedMicros,
+              *additiveMetricsBeforeAdd.totalTimeQueuedMicros +
+                  *additiveMetricsToAdd.totalTimeQueuedMicros);
+    ASSERT_EQ(*currentAdditiveMetrics.totalAdmissions,
+              *additiveMetricsBeforeAdd.totalAdmissions + *additiveMetricsToAdd.totalAdmissions);
+    ASSERT_EQ(*currentAdditiveMetrics.wasLoadShed,
+              *additiveMetricsBeforeAdd.wasLoadShed || *additiveMetricsToAdd.wasLoadShed);
+    ASSERT_EQ(*currentAdditiveMetrics.wasDeprioritized,
+              *additiveMetricsBeforeAdd.wasDeprioritized || *additiveMetricsToAdd.wasDeprioritized);
     ASSERT_EQ(*currentAdditiveMetrics.numInterruptChecks,
               *additiveMetricsBeforeAdd.numInterruptChecks +
                   *additiveMetricsToAdd.numInterruptChecks);
@@ -180,6 +197,11 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     additiveMetricsToAdd.cpuNanos = Nanoseconds(1);
     additiveMetricsToAdd.delinquentAcquisitions = 1;
     additiveMetricsToAdd.totalAcquisitionDelinquency = Milliseconds(100);
+    additiveMetricsToAdd.maxAcquisitionDelinquency = Milliseconds(100);
+    additiveMetricsToAdd.totalTimeQueuedMicros = Microseconds(100);
+    additiveMetricsToAdd.totalAdmissions = 1;
+    additiveMetricsToAdd.wasLoadShed = true;
+    additiveMetricsToAdd.wasDeprioritized = true;
     additiveMetricsToAdd.maxAcquisitionDelinquency = Milliseconds(100);
     additiveMetricsToAdd.numInterruptChecks = 1;
     additiveMetricsToAdd.overdueInterruptApproxMax = Milliseconds(100);
@@ -239,6 +261,14 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     ASSERT_EQ(*currentAdditiveMetrics.numInterruptChecks, *additiveMetricsToAdd.numInterruptChecks);
     ASSERT_EQ(*currentAdditiveMetrics.overdueInterruptApproxMax,
               *additiveMetricsToAdd.overdueInterruptApproxMax);
+
+    // The execution control fields for the current AdditiveMetrics object were not initialized, so
+    // they should be treated as zero.
+    ASSERT_EQ(*currentAdditiveMetrics.totalTimeQueuedMicros,
+              *additiveMetricsToAdd.totalTimeQueuedMicros);
+    ASSERT_EQ(*currentAdditiveMetrics.totalAdmissions, *additiveMetricsToAdd.totalAdmissions);
+    ASSERT_EQ(*currentAdditiveMetrics.wasLoadShed, *additiveMetricsToAdd.wasLoadShed);
+    ASSERT_EQ(*currentAdditiveMetrics.wasDeprioritized, *additiveMetricsToAdd.wasDeprioritized);
 }
 
 TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
@@ -278,6 +308,10 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.delinquentAcquisitions = 2;
     additiveMetrics.totalAcquisitionDelinquency = Milliseconds(400);
     additiveMetrics.maxAcquisitionDelinquency = Milliseconds(300);
+    additiveMetrics.totalTimeQueuedMicros = Microseconds(400);
+    additiveMetrics.totalAdmissions = 2;
+    additiveMetrics.wasLoadShed = false;
+    additiveMetrics.wasDeprioritized = false;
     additiveMetrics.numInterruptChecks = 2;
     additiveMetrics.overdueInterruptApproxMax = Milliseconds(100);
     additiveMetrics.nMatched = 1;
@@ -285,7 +319,6 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.nModified = 1;
     additiveMetrics.ndeleted = 0;
     additiveMetrics.ninserted = 0;
-
 
     CursorMetrics cursorMetrics(3 /* keysExamined */,
                                 4 /* docsExamined */,
@@ -307,6 +340,10 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     cursorMetrics.setTotalAcquisitionDelinquencyMillis(400);
     cursorMetrics.setMaxAcquisitionDelinquencyMillis(200);
     cursorMetrics.setOverdueInterruptApproxMaxMillis(200);
+    cursorMetrics.setTotalTimeQueuedMicros(400);
+    cursorMetrics.setTotalAdmissions(5);
+    cursorMetrics.setWasLoadShed(true);
+    cursorMetrics.setWasDeprioritized(true);
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 
@@ -328,6 +365,10 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(*additiveMetrics.nModified, 2);
     ASSERT_EQ(*additiveMetrics.ndeleted, 0);
     ASSERT_EQ(*additiveMetrics.ninserted, 0);
+    ASSERT_EQ(*additiveMetrics.totalTimeQueuedMicros, Microseconds(800));
+    ASSERT_EQ(*additiveMetrics.totalAdmissions, 7);
+    ASSERT_EQ(*additiveMetrics.wasLoadShed, true);
+    ASSERT_EQ(*additiveMetrics.wasDeprioritized, true);
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {
@@ -400,6 +441,10 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     additiveMetrics.delinquentAcquisitions = 2;
     additiveMetrics.totalAcquisitionDelinquency = Milliseconds(400);
     additiveMetrics.maxAcquisitionDelinquency = Milliseconds(200);
+    additiveMetrics.totalTimeQueuedMicros = Microseconds(400);
+    additiveMetrics.totalAdmissions = 3;
+    additiveMetrics.wasLoadShed = true;
+    additiveMetrics.wasDeprioritized = true;
     additiveMetrics.numInterruptChecks = 2;
     additiveMetrics.overdueInterruptApproxMax = Milliseconds(100);
 
@@ -413,6 +458,10 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     remoteMetrics.delinquentAcquisitions = 1;
     remoteMetrics.totalAcquisitionDelinquency = Milliseconds(300);
     remoteMetrics.maxAcquisitionDelinquency = Milliseconds(300);
+    remoteMetrics.totalTimeQueuedMicros = Microseconds(300);
+    remoteMetrics.totalAdmissions = 2;
+    remoteMetrics.wasLoadShed = false;
+    remoteMetrics.wasDeprioritized = false;
     remoteMetrics.numInterruptChecks = 1;
     remoteMetrics.overdueInterruptApproxMax = Milliseconds(300);
 
@@ -427,6 +476,10 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     ASSERT_EQ(*additiveMetrics.delinquentAcquisitions, 3);
     ASSERT_EQ(*additiveMetrics.totalAcquisitionDelinquency, Milliseconds(700));
     ASSERT_EQ(*additiveMetrics.maxAcquisitionDelinquency, Milliseconds(300));
+    ASSERT_EQ(*additiveMetrics.totalTimeQueuedMicros, Microseconds(700));
+    ASSERT_EQ(*additiveMetrics.totalAdmissions, 5);
+    ASSERT_EQ(*additiveMetrics.wasLoadShed, true);
+    ASSERT_EQ(*additiveMetrics.wasDeprioritized, true);
     ASSERT_EQ(*additiveMetrics.numInterruptChecks, 3);
     ASSERT_EQ(*additiveMetrics.overdueInterruptApproxMax, Milliseconds(300));
 }
@@ -693,6 +746,41 @@ TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
                   200 - interval.count());
         ASSERT_EQ(state["delinquencyInfo"]["overdueInterruptApproxMaxMillis"].Number(),
                   200 - interval.count());
+    }
+}
+
+TEST(CurOpTest, ReportDeprioritizationStats) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curOp = CurOp::get(*opCtx);
+    curOp->ensureStarted();
+
+    // 1. Check the default state. If they're zero, they're not reported.
+    {
+        BSONObjBuilder bob;
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+        ASSERT_FALSE(state.hasField("totalTimeQueuedMicros"));
+        ASSERT_FALSE(state.hasField("totalAdmissions"));
+        ASSERT_FALSE(state.hasField("wasLoadShed"));
+        ASSERT_FALSE(state.hasField("wasDeprioritized"));
+    }
+
+    // 2. If there are admissions then report the stats.
+    {
+        ExecutionAdmissionContext::get(opCtx.get()).setAdmission_forTest(1);
+        ExecutionAdmissionContext::get(opCtx.get()).setTotalTimeQueuedMicros_forTest(100);
+        BSONObjBuilder bob;
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+        ASSERT_TRUE(state.hasField("totalAdmissions"));
+        ASSERT_EQ(state["totalAdmissions"].Number(), 1);
+        ASSERT_TRUE(state.hasField("totalTimeQueuedMicros"));
+        ASSERT_EQ(state["totalTimeQueuedMicros"].Number(), 100);
+        ASSERT_TRUE(state.hasField("wasLoadShed"));
+        ASSERT_FALSE(state["wasLoadShed"].Bool());
+        ASSERT_TRUE(state.hasField("wasDeprioritized"));
+        ASSERT_FALSE(state["wasDeprioritized"].Bool());
     }
 }
 
