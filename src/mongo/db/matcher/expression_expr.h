@@ -136,7 +136,11 @@ public:
      */
     void applyRename(const StringMap<std::string>& renameList) {
         SubstituteFieldPathWalker substituteWalker(renameList);
-        expression_walker::walk<Expression>(_expression.get(), &substituteWalker);
+        if (auto newExpr =
+                expression_walker::walk<Expression>(_expression.get(), &substituteWalker);
+            newExpr) {
+            _expression = newExpr.release();
+        }
     }
 
     bool hasRenameablePath(const StringMap<std::string>& renameList) const {
