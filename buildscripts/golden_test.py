@@ -445,10 +445,10 @@ class GoldenTestApp(object):
                 "Only query_golden_classic passthrough found, will run with various settings for internalQueryFrameworkControl"
             )
             for framework_control in [
-                ["--runAllFeatureFlagTests", "--excludeWithAnyTags=featureFlagSbeFull"],
                 ["--mongodSetParameters={internalQueryFrameworkControl: forceClassicEngine}"],
                 ["--mongodSetParameters={internalQueryFrameworkControl: trySbeEngine}"],
                 ["--mongodSetParameters={internalQueryFrameworkControl: trySbeRestricted}"],
+                ["--additionalFeatureFlags=featureFlagSbeFull"],
             ]:
                 resmoke_invocations.append(["--suite", suites[0], *framework_control])
 
