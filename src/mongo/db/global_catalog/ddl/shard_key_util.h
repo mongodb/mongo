@@ -251,6 +251,14 @@ MONGO_MOD_NEEDS_REPLACEMENT void validateTimeseriesShardKey(
     const BSONObj& shardKeyPattern);
 
 /**
+ * Validates that 'tsShardKey' uses the user-facing time-series field names (timeField and
+ * metaField), then translates it to the internal buckets collection format.
+ * Throws if the shard key contains fields other than the defined timeField or metaField.
+ */
+MONGO_MOD_NEEDS_REPLACEMENT BSONObj validateAndTranslateTimeseriesShardKey(
+    const TimeseriesOptions& tsOptions, const BSONObj& tsShardKey);
+
+/**
  * Returns a chunk range with extended or truncated boundaries to match the number of fields in the
  * given metadata's shard key pattern.
  */

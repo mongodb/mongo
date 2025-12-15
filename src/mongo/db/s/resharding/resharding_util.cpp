@@ -568,11 +568,8 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
         (!setProvenance ||
          (*request.getProvenance() == ReshardingProvenanceEnum::kReshardCollection))) {
         auto tsOptions = collEntry.getTimeseriesFields().get().getTimeseriesOptions();
-        shardkeyutil::validateTimeseriesShardKey(
-            tsOptions.getTimeField(), tsOptions.getMetaField(), request.getKey());
         shardKeySpec =
-            uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
-                tsOptions, request.getKey()));
+            shardkeyutil::validateAndTranslateTimeseriesShardKey(tsOptions, request.getKey());
     }
 
     auto tempReshardingNss = resharding::constructTemporaryReshardingNss(nss, collEntry.getUuid());

@@ -212,6 +212,12 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                     _doc.setOldKey(
                         metadata->getChunkManager()->getShardKeyPattern().getKeyPattern());
 
+                    if (auto ts = metadata->getTimeseriesFields()) {
+                        auto bucketsKey = shardkeyutil::validateAndTranslateTimeseriesShardKey(
+                            ts->getTimeseriesOptions(), _doc.getNewShardKey().toBSON());
+                        _doc.setNewShardKey(KeyPattern(bucketsKey));
+                    }
+
                     // No need to keep going if the shard key is already refined.
                     if (SimpleBSONObjComparator::kInstance.evaluate(
                             _doc.getOldKey()->toBSON() == _doc.getNewShardKey().toBSON())) {

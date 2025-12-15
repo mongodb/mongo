@@ -12,13 +12,15 @@ import {
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 
 // Connections.
 const mongo = new ShardingTest({shards: 2, rs: {nodes: 3}});
 const dbName = "testDB";
 const collName = "testColl";
 const timeField = "time";
-const metaField = "meta";
+const metaField = "myMeta";
+const bucketMetaField = "meta";
 const collNss = `${dbName}.${collName}`;
 const controlTimeField = `control.min.${timeField}`;
 const numDocsInserted = 20;
@@ -66,40 +68,40 @@ const zoneShardingTestCases = [
     {
         shardKey: {[metaField]: 1, [timeField]: 1},
         index: {[metaField]: 1, [timeField]: 1},
-        min: {[metaField]: 1, [controlTimeField]: 1},
-        max: {[metaField]: 10, [controlTimeField]: 10},
+        min: {[bucketMetaField]: 1, [controlTimeField]: 1},
+        max: {[bucketMetaField]: 10, [controlTimeField]: 10},
         worksWhenUpdatingZoneKeyRangeBeforeSharding: false,
         worksWhenUpdatingZoneKeyRangeAfterSharding: false,
     },
     {
         shardKey: {[metaField]: 1, [timeField]: 1},
         index: {[metaField]: 1, [timeField]: 1},
-        min: {[metaField]: 1, [controlTimeField]: 1},
-        max: {[metaField]: 10, [controlTimeField]: MaxKey},
+        min: {[bucketMetaField]: 1, [controlTimeField]: 1},
+        max: {[bucketMetaField]: 10, [controlTimeField]: MaxKey},
         worksWhenUpdatingZoneKeyRangeBeforeSharding: false,
         worksWhenUpdatingZoneKeyRangeAfterSharding: false,
     },
     {
         shardKey: {[metaField]: 1, [timeField]: 1},
         index: {[metaField]: 1, [timeField]: 1},
-        min: {[metaField]: 1, [controlTimeField]: MinKey},
-        max: {[metaField]: 10, [controlTimeField]: 10},
+        min: {[bucketMetaField]: 1, [controlTimeField]: MinKey},
+        max: {[bucketMetaField]: 10, [controlTimeField]: 10},
         worksWhenUpdatingZoneKeyRangeBeforeSharding: false,
         worksWhenUpdatingZoneKeyRangeAfterSharding: false,
     },
     {
         shardKey: {[metaField]: 1, [timeField]: 1},
         index: {[metaField]: 1, [timeField]: 1},
-        min: {[metaField]: 1, [controlTimeField]: MinKey},
-        max: {[metaField]: 10, [controlTimeField]: MaxKey},
+        min: {[bucketMetaField]: 1, [controlTimeField]: MinKey},
+        max: {[bucketMetaField]: 10, [controlTimeField]: MaxKey},
         worksWhenUpdatingZoneKeyRangeBeforeSharding: false,
         worksWhenUpdatingZoneKeyRangeAfterSharding: false,
     },
     {
         shardKey: {[metaField]: 1, [timeField]: 1},
         index: {[metaField]: 1, [timeField]: 1},
-        min: {[metaField]: 1, [controlTimeField]: MinKey},
-        max: {[metaField]: 10, [controlTimeField]: MinKey},
+        min: {[bucketMetaField]: 1, [controlTimeField]: MinKey},
+        max: {[bucketMetaField]: 10, [controlTimeField]: MinKey},
         worksWhenUpdatingZoneKeyRangeBeforeSharding: true,
         worksWhenUpdatingZoneKeyRangeAfterSharding: true,
     },
@@ -115,8 +117,8 @@ const zoneShardingTestCases = [
     {
         shardKey: {[metaField]: 1, [timeField]: 1},
         index: {[metaField]: 1, [timeField]: 1},
-        min: {[metaField]: 1},
-        max: {[metaField]: 10},
+        min: {[bucketMetaField]: 1},
+        max: {[bucketMetaField]: 10},
         // Sharding a collection fails if the predefined zones don't exactly match the shard key,
         // but not vice versa. Note this behavior applies to all collections, not just time-series.
         worksWhenUpdatingZoneKeyRangeBeforeSharding: false,
@@ -125,16 +127,16 @@ const zoneShardingTestCases = [
     {
         shardKey: {[metaField]: 1},
         index: {[metaField]: 1},
-        min: {[metaField]: 1},
-        max: {[metaField]: 10},
+        min: {[bucketMetaField]: 1},
+        max: {[bucketMetaField]: 10},
         worksWhenUpdatingZoneKeyRangeBeforeSharding: true,
         worksWhenUpdatingZoneKeyRangeAfterSharding: true,
     },
     {
         shardKey: {[metaField + ".xyz"]: 1},
         index: {[metaField + ".xyz"]: 1},
-        min: {[metaField + ".xyz"]: 1},
-        max: {[metaField + ".xyz"]: 10},
+        min: {[bucketMetaField + ".xyz"]: 1},
+        max: {[bucketMetaField + ".xyz"]: 10},
         worksWhenUpdatingZoneKeyRangeBeforeSharding: true,
         worksWhenUpdatingZoneKeyRangeAfterSharding: true,
     },
@@ -285,7 +287,7 @@ const zoneShardingTestCases = [
     assert.commandWorked(
         primaryShard.getDB(dbName).runCommand({
             checkShardingIndex: getTimeseriesCollForDDLOps(db, coll).getFullName(),
-            keyPattern: {[metaField]: 1, [controlTimeField]: 1},
+            keyPattern: {[bucketMetaField]: 1, [controlTimeField]: 1},
         }),
     );
     assert.commandFailed(
@@ -310,9 +312,9 @@ const zoneShardingTestCases = [
     createTimeSeriesColl({index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1, [timeField]: 1}});
     const primaryShard = mongo.getPrimaryShard(dbName);
     const otherShard = mongo.getOther(primaryShard);
-    const minChunk = {[metaField]: MinKey, [controlTimeField]: MinKey};
-    const splitChunk = {[metaField]: numDocsInserted / 2, [controlTimeField]: MinKey};
-    const maxChunk = {[metaField]: MaxKey, [controlTimeField]: MaxKey};
+    const minChunk = {[bucketMetaField]: MinKey, [controlTimeField]: MinKey};
+    const splitChunk = {[bucketMetaField]: numDocsInserted / 2, [controlTimeField]: MinKey};
+    const maxChunk = {[bucketMetaField]: MaxKey, [controlTimeField]: MaxKey};
     function checkChunkCount(expectedCounts) {
         const counts = mongo.chunkCounts(collName, dbName);
         assert.docEq(expectedCounts, counts);
@@ -368,23 +370,29 @@ const zoneShardingTestCases = [
 
 // Can add control.min.time as the last shard key component on the timeseries collection.
 (function checkRefineCollectionShardKeyCommand() {
-    createTimeSeriesColl({index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1}});
-    assert.commandWorked(
-        mongo.s0.adminCommand({refineCollectionShardKey: collNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
-    );
-    if (!areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
+    if (isFCVgte(db, "8.3")) {
+        createTimeSeriesColl({index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1}});
         assert.commandWorked(
-            mongo.s0.adminCommand({
-                refineCollectionShardKey: getTimeseriesCollForDDLOps(db, coll).getFullName(),
-                key: {[metaField]: 1, [controlTimeField]: 1},
-            }),
+            mongo.s0.adminCommand({refineCollectionShardKey: collNss, key: {[metaField]: 1, [timeField]: 1}}),
         );
+
+        assert(coll.drop());
+        createTimeSeriesColl({index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1}});
+
+        if (!areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
+            assert.commandWorked(
+                mongo.s0.adminCommand({
+                    refineCollectionShardKey: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+                    key: {[metaField]: 1, [timeField]: 1},
+                }),
+            );
+        }
+        for (let i = 0; i < numDocsInserted; i++) {
+            assert.commandWorked(coll.insert({[metaField]: i, [timeField]: ISODate()}));
+        }
+        assert.eq(numDocsInserted * 2, coll.find({}).count());
+        assert(coll.drop());
     }
-    for (let i = 0; i < numDocsInserted; i++) {
-        assert.commandWorked(coll.insert({[metaField]: i, [timeField]: ISODate()}));
-    }
-    assert.eq(numDocsInserted * 2, coll.find({}).count());
-    assert(coll.drop());
 })();
 
 // Check clearJumboFlag command can clear chunk jumbo flag.

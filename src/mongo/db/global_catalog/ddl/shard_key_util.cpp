@@ -366,6 +366,15 @@ void validateTimeseriesShardKey(StringData timeFieldName,
     }
 }
 
+BSONObj validateAndTranslateTimeseriesShardKey(const TimeseriesOptions& tsOptions,
+                                               const BSONObj& tsShardKey) {
+    shardkeyutil::validateTimeseriesShardKey(
+        tsOptions.getTimeField(), tsOptions.getMetaField(), tsShardKey);
+
+    return uassertStatusOK(
+        timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(tsOptions, tsShardKey));
+}
+
 // TODO: SERVER-64187 move calls to validateShardKeyIsNotEncrypted into
 // validateShardKeyIndexExistsOrCreateIfPossible
 void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
