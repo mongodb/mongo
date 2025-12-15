@@ -5,10 +5,10 @@
  *   requires_fcv_83
  * ]
  */
-import {codeOneLine, linebreak, section, subSection} from "jstests/libs/pretty_md.js";
+import {linebreak, section, subSection} from "jstests/libs/pretty_md.js";
 import {outputAggregationPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
-import {normalizePlan, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
+import {prettyPrintWinningPlan, getWinningJoinOrderOneLine} from "jstests/query_golden/libs/pretty_plan.js";
 
 const coll = db[jsTestName() + "_base"];
 coll.drop();
@@ -55,49 +55,11 @@ const origParams = assert.commandWorked(
 );
 delete origParams.ok;
 
-function getStageAbbreviation(stageName) {
-    switch (stageName) {
-        case "HASH_JOIN_EMBEDDING":
-            return "HJ";
-        case "NESTED_LOOP_JOIN":
-            return "NLJ";
-        case "MERGE_JOIN":
-            return "MJ";
-        default:
-            return stageName;
-    }
-}
-
-function formatEmbeddingField(field) {
-    if (field && field !== "none") {
-        return field;
-    }
-
-    return "_";
-}
-
-function abbreviate(node) {
-    const abbrev = getStageAbbreviation(node.stage);
-    if (abbrev == node.stage) {
-        return abbrev;
-    }
-    const l = formatEmbeddingField(node.leftEmbeddingField);
-    const r = formatEmbeddingField(node.rightEmbeddingField);
-    const children = node.inputStages.map(abbreviate);
-    assert.eq(children.length, 2);
-    return `(${abbrev} ${l} = ${children[0]}, ${r} = ${children[1]})`;
-}
-
-function getJoinOrder(explain) {
-    const winningPlan = normalizePlan(getWinningPlanFromExplain(explain), false /*shouldPlatten*/);
-    const x = abbreviate(winningPlan);
-    return x;
-}
-
 function runSingleTest(subtitle, pipeline, seen = undefined) {
     let joinOrder = undefined;
+    const explain = coll.explain().aggregate(pipeline);
     if (seen) {
-        joinOrder = getJoinOrder(coll.explain().aggregate(pipeline));
+        joinOrder = getWinningJoinOrderOneLine(explain);
         if (seen.has(joinOrder)) {
             return undefined;
         }
@@ -105,7 +67,7 @@ function runSingleTest(subtitle, pipeline, seen = undefined) {
     }
     subSection(subtitle);
     if (joinOrder) {
-        codeOneLine(joinOrder, true);
+        prettyPrintWinningPlan(explain);
     } else {
         outputAggregationPlanAndResults(coll, pipeline, {}, true, false);
     }

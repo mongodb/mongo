@@ -171,7 +171,7 @@ function isPlainObject(value) {
     return value && typeof value == "object" && value.constructor === Object;
 }
 
-const kExplainChildFieldNames = [
+export const kExplainChildFieldNames = [
     "inputStage",
     "inputStages",
     "thenStage",
