@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/query/compiler/optimizer/join/adjacency_matrix.h"
+#include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/util/dynamic_bitset.h"
 #include "mongo/util/modules.h"
@@ -75,8 +75,29 @@ JoinGraphCycles findCycles(AdjacencyList adjList);
  * subgraph to break its cycles.
  */
 class GraphCycleBreaker {
+    struct CycleInfo {
+        /**
+         * Cycle stored as a bitset of edges forming the cycle.
+         */
+        Bitset edges;
+
+        /**
+         * Edge to delete to break the cycle .
+         */
+        EdgeId edge;
+
+        friend auto operator<=>(const CycleInfo&, const CycleInfo&) = default;
+    };
+
 public:
-    explicit GraphCycleBreaker(const JoinGraph& graph) : _graph(graph) {}
+    /**
+     * Initializes new instance of GraphCycleBreaker for the given 'graph'.
+     * 'edgeSelectivities' is expected to have selectivities for all edges of the graph,
+     *  'numPaths' is expected to be the number of resolved paths.
+     */
+    explicit GraphCycleBreaker(const JoinGraph& graph,
+                               const EdgeSelectivities& edgeSelectivities,
+                               size_t numPaths = 0);
 
     /**
      * Break cycles for the subgraph specified by the list of edges. It returns new subgraph without
@@ -84,26 +105,18 @@ public:
      */
     std::vector<EdgeId> breakCycles(std::vector<EdgeId> subgraph);
 
+    size_t numCycles_forTest() const {
+        return _cycles.size();
+    }
+
 private:
-    /**
-     * Implements DFS algorithm to detect graph cycles.
-     */
-    void visit(NodeId nodeId, const AdjacencyMatrix& matrix, const std::vector<EdgeId>& edges);
+    EdgeId breakCycle(const Bitset& cycleBitset,
+                      const EdgeSelectivities& edgeSelectivities,
+                      const Bitset& edgesWithSimplePredicates) const;
+    Bitset getEdgeBitset(const Bitset& predicateBitset,
+                         const std::vector<std::pair<EdgeId, uint16_t>>& predicates) const;
 
-    /**
-     * Breaks a cycle which is defined by the currentNode and its parent previousNode.
-     */
-    void breakCycle(NodeId currentNode, NodeId previousNode, const std::vector<EdgeId>& edges);
-
-    /**
-     * Find EdgeId that connects two specified nodes u and v.
-     */
-    boost::optional<EdgeId> findEdgeId(NodeId u, NodeId v, const std::vector<EdgeId>& edges) const;
-
-    const JoinGraph& _graph;
-    const NodeId _sentinel{kMaxNodesInJoin};
-    NodeSet _seen;
-    std::array<NodeId, kMaxNodesInJoin> _parents;
-    absl::btree_set<EdgeId> _edgesToRemove;
+    size_t _numEdges;
+    std::vector<CycleInfo> _cycles;
 };
 }  // namespace mongo::join_ordering

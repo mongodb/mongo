@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/query/compiler/optimizer/join/graph_cycle_breaker.h"
 
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
@@ -66,13 +65,25 @@ constexpr size_t cyclesInClique(size_t numNodes) {
 
 class GraphCycleBreakerTest : public unittest::Test {
 public:
-    GraphCycleBreakerTest() : graph{}, breaker(graph) {
+    static constexpr EdgeId kMaxEdgeId = 63;
+
+    using PathMap = absl::flat_hash_map<NodeId, PathId>;
+    GraphCycleBreakerTest() : graph{} {
         a = addNode("a");
         b = addNode("b");
         c = addNode("c");
         d = addNode("d");
         e = addNode("e");
         f = addNode("f");
+
+        defaultPaths = {{a, pa}, {b, pb}, {c, pc}, {d, pd}, {e, pe}, {f, pf}};
+        alternativePaths = {{a, pa1}, {b, pb1}, {c, pc1}, {d, pd1}, {e, pe1}, {f, pf1}};
+
+        for (size_t i = 0; i <= kMaxEdgeId; ++i) {
+            edgeSelectivities.emplace_back(
+                cost_based_ranker::SelectivityType{static_cast<double>(i + 1) / (2.0 * kMaxEdgeId)},
+                cost_based_ranker::EstimationSource::Code);
+        }
     }
 
     NodeId addNode(StringData collName) {
@@ -80,29 +91,144 @@ public:
     }
 
     EdgeId addEdge(NodeId u, NodeId v) {
-        return *graph.addEdge(u, v, {});
+        return addEdge(u, v, defaultPaths);
+    }
+
+    EdgeId addEdge(NodeId u, NodeId v, PathMap pathMap) {
+        return *graph.addSimpleEqualityEdge(u, v, pathMap[u], pathMap[v]);
+    }
+
+    EdgeId addEdge(NodeId u, NodeId v, PathId uPath, PathId vPath) {
+        return *graph.addSimpleEqualityEdge(u, v, uPath, vPath);
+    }
+
+    EdgeId addCompoundEdge(NodeId u, NodeId v) {
+        addEdge(u, v, defaultPaths);
+        return addEdge(u, v, alternativePaths);
+    }
+
+    void validateCycles(size_t expectedNumberOfCycles) {
+        ASSERT_LTE(graph.numEdges(), kMaxEdgeId + 1);
+
+        GraphCycleBreaker breaker{graph, edgeSelectivities};
+        ASSERT_EQ(breaker.numCycles_forTest(), expectedNumberOfCycles);
     }
 
     template <typename... EdgeIds>
     std::vector<EdgeId> breakCycles(EdgeIds... edges) {
-        return breaker.breakCycles({edges...});
+        ASSERT_LTE(graph.numEdges(), kMaxEdgeId + 1);
+
+        GraphCycleBreaker breaker{graph, edgeSelectivities};
+        auto newEdges = breaker.breakCycles({edges...});
+        return newEdges;
     }
 
+    void setSelectivity(EdgeId edgeId, double newSelectivity) {
+        edgeSelectivities[edgeId] = cost_based_ranker::SelectivityEstimate(
+            cost_based_ranker::SelectivityType(newSelectivity),
+            cost_based_ranker::EstimationSource::Code);
+    }
+
+    static constexpr PathId p1{1}, p2{2}, pa{11}, pb{12}, pc{13}, pd{14}, pe{15}, pf{16}, pa1{21},
+        pb1{22}, pc1{23}, pd1{24}, pe1{25}, pf1{26}, pEnd{27};
+
     JoinGraph graph;
-    GraphCycleBreaker breaker;
     NodeId a, b, c, d, e, f;
+    absl::flat_hash_map<NodeId, PathId> defaultPaths;
+    absl::flat_hash_map<NodeId, PathId> alternativePaths;
+    EdgeSelectivities edgeSelectivities;
 };
 
-TEST_F(GraphCycleBreakerTest, GraphWithCycle) {
+/**
+ * Tests that a middle by selectivity edge is always selected to break cycles.
+ */
+TEST_F(GraphCycleBreakerTest, MiddleEdge) {
+    auto edge_ab = addCompoundEdge(a, b);
+    auto edge_bc = addEdge(b, c);
+    auto edge_ca = addEdge(c, a);
+
+    // B-C is a middle by selectivity.
+    setSelectivity(edge_ab, 0.003);
+    setSelectivity(edge_bc, 0.005);
+    setSelectivity(edge_ca, 0.007);
+
+    // Case1: B-C is the middle. Selectivities: 0.003, 0.005, 0.007.
+    std::vector<EdgeId> expectedEdges{edge_ab, edge_ca};
+
+    auto newEdges = breakCycles(edge_ab, edge_bc, edge_ca);
+    std::sort(newEdges.begin(), newEdges.end());
+    ASSERT_EQ(newEdges, expectedEdges);
+
+    // Case 2: C-A is the middle. Selectivities: 0.003, 0.009, 0.007.
+    // Increase B-C selectivity which makes C-A a new middle.
+    setSelectivity(edge_bc, 0.009);
+    expectedEdges = {edge_ab, edge_bc};
+
+    newEdges = breakCycles(edge_ab, edge_bc, edge_ca);
+    std::sort(newEdges.begin(), newEdges.end());
+    ASSERT_EQ(newEdges, expectedEdges);
+
+    // Case 3: Compound edge A-B removal. Selectivities: 0.008, 0.009, 0.007.
+    // Increase A-B selectivity which makes A-B a new middle.
+    setSelectivity(edge_ab, 0.008);
+    expectedEdges = {edge_bc, edge_ca};
+
+    newEdges = breakCycles(edge_ab, edge_bc, edge_ca);
+    std::sort(newEdges.begin(), newEdges.end());
+    ASSERT_EQ(newEdges, expectedEdges);
+}
+
+/**
+ * Tests that a non-compund edge is selected if available to break a cycle of size > 3.
+ */
+TEST_F(GraphCycleBreakerTest, NoCompoundEdgeSelection) {
+    auto edge_ab = addCompoundEdge(a, b);
+    auto edge_bc = addCompoundEdge(b, c);
+    auto edge_cd = addEdge(c, d);
+    auto edge_da = addCompoundEdge(d, a);
+
+    // We expected that the only non-compound edge C-D will be removed to break the 4-cycle.
+    std::vector<EdgeId> expectedEdges{edge_ab, edge_bc, edge_da};
+
+    auto newEdges = breakCycles(edge_ab, edge_bc, edge_cd, edge_da);
+    std::sort(newEdges.begin(), newEdges.end());
+    ASSERT_EQ(newEdges, expectedEdges);
+}
+
+/**
+ * The cycles still breaks even if all edges are compound.
+ */
+TEST_F(GraphCycleBreakerTest, AllEdgesAreCompound) {
+    auto edge_ab = addCompoundEdge(a, b);
+    auto edge_bc = addCompoundEdge(b, c);
+    auto edge_cd = addCompoundEdge(c, d);
+    auto edge_da = addCompoundEdge(d, a);
+
+    auto newEdges = breakCycles(edge_ab, edge_bc, edge_cd, edge_da);
+
+    // One edge was removed to break the cycle.
+    ASSERT_EQ(newEdges.size(), 3);
+}
+
+TEST_F(GraphCycleBreakerTest, GraphWithComplexCycles) {
+    // A.a = B.a and B.a = C.a and C.a = D.a and D.a = A.a and C.a = A.a
+    // Three cycles:
+    // * A.a - B.a - C.a - D.a - A.a
+    // * A.a - B.a - C.a - A.a
+    // * A.a - C.a - D.a - A.a
     auto edge_ab = addEdge(a, b);
     auto edge_bc = addEdge(b, c);
     auto edge_cd = addEdge(c, d);
     auto edge_da = addEdge(d, a);
     auto edge_ca = addEdge(c, a);
+    // This edge is ignored due to its incompatible predicates.
+    auto edge_db = addEdge(d, b, alternativePaths);
 
-    auto newEdges = breakCycles(edge_ab, edge_bc, edge_cd, edge_da, edge_ca);
+    validateCycles(/*expectedNumberOfCycles*/ 3);
+
+    auto newEdges = breakCycles(edge_ab, edge_bc, edge_cd, edge_da, edge_ca, edge_db);
     //  Two edges are expected to be removed.
-    ASSERT_EQ(newEdges.size(), 3);
+    ASSERT_EQ(newEdges.size(), 4);
 
     newEdges = breakCycles(edge_ab, edge_bc, edge_ca);
     // Subgraph case.
@@ -110,9 +236,12 @@ TEST_F(GraphCycleBreakerTest, GraphWithCycle) {
 }
 
 TEST_F(GraphCycleBreakerTest, NoCycleGraph) {
+    // A.a = B.a and B.a = C.a
     auto edge_ab = addEdge(a, b);
     auto edge_bc = addEdge(b, c);
     auto edge_cd = addEdge(c, d);
+
+    validateCycles(/*expectedNumberOfCycles*/ 0);
 
     auto newEdges = breakCycles(edge_ab, edge_bc, edge_cd);
     // No edges are expected to be removed.
@@ -120,8 +249,11 @@ TEST_F(GraphCycleBreakerTest, NoCycleGraph) {
 }
 
 TEST_F(GraphCycleBreakerTest, DisconnectedGraph) {
+    // A.a = B.a and C.a = D.a
     auto edge_ab = addEdge(a, b);
     auto edge_cd = addEdge(c, d);
+
+    validateCycles(/*expectedNumberOfCycles*/ 0);
 
     auto newEdges = breakCycles(edge_ab, edge_cd);
     // No edges are expected to be removed.
@@ -129,20 +261,172 @@ TEST_F(GraphCycleBreakerTest, DisconnectedGraph) {
 }
 
 TEST_F(GraphCycleBreakerTest, DisconnectedGraphWithCycles) {
-    // A - B - C  - A
+    // A.a - B.a - C.a  - A.a
     auto edge_ab = addEdge(a, b);
     auto edge_bc = addEdge(b, c);
     auto edge_ca = addEdge(c, a);
 
-    // D - E - F - D
+    // D.a - E.a - F.a - D.a
     auto edge_de = addEdge(d, e);
     auto edge_ef = addEdge(e, f);
     auto edge_fd = addEdge(f, d);
+
+    validateCycles(/*expectedNumberOfCycles*/ 2);
 
     auto newEdges = breakCycles(edge_ab, edge_bc, edge_ca, edge_de, edge_ef, edge_fd);
     // Two edges are expected to be removed.
     ASSERT_EQ(newEdges.size(), 4);
 }
+
+TEST_F(GraphCycleBreakerTest, IncompatiblePredicates) {
+    // Define a big cycle with compatible predicates:
+    // A.a = B.a and B.a = C.a and C.a = D.a and D.a = E.a and E.a = F.a and F.a = A.a
+    auto edge_ab = addEdge(a, b);
+    auto edge_bc = addEdge(b, c);
+    auto edge_cd = addEdge(c, d);
+    auto edge_de = addEdge(d, e);
+    auto edge_ef = addEdge(e, f);
+    auto edge_fa = addEdge(f, a);
+
+    // Add edges with incompatible predicates. These edges would add additional cycles in the graph
+    // if not their predicates:
+    // C.b = A.b and D.b = A.b and E.b = A.b
+    auto edge_ca = addEdge(c, a, alternativePaths);
+    auto edge_da = addEdge(d, a, alternativePaths);
+    auto edge_ea = addEdge(e, a, alternativePaths);
+
+    validateCycles(/*expectedNumberOfCycles*/ 1);
+
+    // One big loop case
+    {
+        auto newEdges = breakCycles(
+            edge_ab, edge_bc, edge_cd, edge_de, edge_ef, edge_fa, edge_ca, edge_da, edge_ea);
+        // Here's only one loop so only one edge is expected to be removed.
+        ASSERT_EQ(newEdges.size(), 8);
+    }
+
+    // No loops (edge_fa is missing)
+    {
+        auto newEdges =
+            breakCycles(edge_ab, edge_bc, edge_cd, edge_de, edge_ef, edge_ca, edge_da, edge_ea);
+        // No edges is expected to be removed
+        ASSERT_EQ(newEdges.size(), 8);
+    }
+}
+
+TEST_F(GraphCycleBreakerTest, TwoCyclesWithDifferentPredicates) {
+    // Cycle 1: A.a == B.a and B.a == C.a and C.a == D.a and D.a == A.a
+    auto edge_ab = addEdge(a, b);
+    auto edge_bc = addEdge(b, c);
+    auto edge_cd = addEdge(c, d);
+    auto edge_da = addEdge(d, a);
+
+    // Cycle 2: D.b == E.b and E.b == F.b and F.b == D.b
+    auto edge_de = addEdge(d, e, alternativePaths);
+    auto edge_ef = addEdge(e, f, alternativePaths);
+    auto edge_fd = addEdge(f, d, alternativePaths);
+
+    // Standalone edge.
+    // Because of the predicates there it doesn't form a big cycle: A - B - C - D - E - F - A
+    auto edge_fa = addEdge(f, a, p1, p2);
+
+    validateCycles(/*expectedNumberOfCycles*/ 2);
+
+    auto newEdges =
+        breakCycles(edge_ab, edge_bc, edge_cd, edge_da, edge_de, edge_ef, edge_fd, edge_fa);
+    // Two loops
+    ASSERT_EQ(newEdges.size(), 6);
+}
+
+TEST_F(GraphCycleBreakerTest, TwoCyclesWithASharedEdge) {
+    // Cycle 1: A.a == B.a and B.a == C.a and C.a == D.a and D.a == A.a
+    auto edge_ab = addEdge(a, b);
+    auto edge_bc = addEdge(b, c);
+    auto edge_cd = addEdge(c, d);
+    auto edge_da = addEdge(d, a);
+
+    // Cycle 2: A.b == D.b and D.b == E.b and E.b == F.b and F.b == A.b
+    auto edge_ad = addEdge(a, d, alternativePaths);
+    auto edge_de = addEdge(d, e, alternativePaths);
+    auto edge_ef = addEdge(e, f, alternativePaths);
+    auto edge_fa = addEdge(f, a, alternativePaths);
+
+    validateCycles(/*expectedNumberOfCycles*/ 2);
+
+    // The shared edge
+    ASSERT_EQ(edge_da, edge_ad);
+
+    auto newEdges =
+        breakCycles(edge_ab, edge_bc, edge_cd, edge_da, edge_ad, edge_de, edge_ef, edge_fa);
+
+    ASSERT_EQ(newEdges.size(), 6);
+}
+
+TEST_F(GraphCycleBreakerTest, CliqueOf4) {
+    // Define a big cycle with compatible predicates:
+    // A.a = B.a and B.a = C.a and C.a = D.a and D.a = E.a and E.a = F.a and C.a = A.a and D.a = A.a
+    // and D.a = B.a.
+    // A.a, B.a, C.a, D.a form a clique.
+    // 7 loops in the clique:
+    // * 001111: A - B - C - D - A
+    // * 010011: A - B - C - A
+    // * 011100: A - C - D - A
+    // * 100110: B - C - D - B
+    // * 101001: A - B - D - A
+    // * 110101: A - B - D - C - A
+    // * 111010: A - D - B - C - A
+    auto edge_ab = addEdge(a, b);
+    auto edge_bc = addEdge(b, c);
+    auto edge_cd = addEdge(c, d);
+    auto edge_da = addEdge(d, a);
+    auto edge_ca = addEdge(c, a);
+    auto edge_db = addEdge(d, b);
+    auto edge_de = addEdge(d, e);
+    auto edge_ef = addEdge(e, f);
+
+    validateCycles(/*expectedNumberOfCycles*/ cyclesInClique(4));
+
+    auto newEdges =
+        breakCycles(edge_ab, edge_bc, edge_cd, edge_de, edge_ef, edge_ca, edge_da, edge_db);
+    ASSERT_EQ(newEdges.size(), 5);
+}
+
+TEST_F(GraphCycleBreakerTest, TwoCliquesOf4) {
+    addEdge(a, b);
+    addEdge(b, c);
+    addEdge(c, d);
+    addEdge(d, a);
+    addEdge(c, a);
+    addEdge(d, b);
+    addEdge(d, e);
+    addEdge(e, f);
+
+    addEdge(a, b, alternativePaths);
+    addEdge(b, c, alternativePaths);
+    addEdge(c, d, alternativePaths);
+    addEdge(d, a, alternativePaths);
+    addEdge(c, a, alternativePaths);
+    addEdge(d, b, alternativePaths);
+    addEdge(d, e, alternativePaths);
+    addEdge(e, f, alternativePaths);
+
+    validateCycles(/*expectedNumberOfCycles*/ 2 * cyclesInClique(4));
+}
+
+TEST_F(GraphCycleBreakerTest, CliqueOf6) {
+    std::vector<NodeId> nodes{a, b, c, d, e, f};
+
+    for (auto left : nodes) {
+        for (auto right : nodes) {
+            if (left < right) {
+                addEdge(left, right);
+            }
+        }
+    }
+
+    validateCycles(/*expectedNumberOfCycles*/ cyclesInClique(6));
+}
+
 
 // ***************************************************
 // findCycles tests

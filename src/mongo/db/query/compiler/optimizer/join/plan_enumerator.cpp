@@ -148,7 +148,6 @@ void PlanEnumeratorContext::addJoinPlan(PlanTreeShape type,
     }
 
     if (method == JoinMethod::INLJ) {
-        // TODO SERVER-115093: Change this to an equality tassert once we break cycles.
         tassert(11371701, "Expected at least one edge", edges.size() >= 1);
         auto edge = edges[0];
         auto ie = bestIndexSatisfyingJoinPredicates(

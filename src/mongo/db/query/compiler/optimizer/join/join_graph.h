@@ -47,6 +47,10 @@ constexpr size_t kMaxNodesInJoin = 64;
  */
 constexpr size_t kMaxEdgesInJoin = std::numeric_limits<EdgeId>::max();
 
+/** The maximum number of predicates in a Join Graph.
+ */
+constexpr size_t kMaxNumberOfPredicates = std::numeric_limits<PredicateId>::max();
+
 /** NodeSet is a bitset representation of a subset of join nodes. It is used to efficiently
  * track which nodes are included in an intermediate join. This compact representation is highly
  * effective for the join reordering algorithm.
@@ -227,8 +231,8 @@ public:
         return _nodes.size();
     }
 
-    size_t numEdges() const {
-        return _edges.size();
+    EdgeId numEdges() const {
+        return static_cast<EdgeId>(_edges.size());
     }
 
     /** Serializes the Join Graph to BSON.
