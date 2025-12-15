@@ -92,13 +92,81 @@ Execution Engine: sbe
 ```
 
 ### Random reordering with seed 0
-`(HJ _ = (HJ y = COLLSCAN, _ = COLLSCAN), x = COLLSCAN)`
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "y"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_b]
+  direction: "forward"
+```
 ### Random reordering with seed 1
-`(HJ _ = (HJ x = COLLSCAN, _ = COLLSCAN), y = COLLSCAN)`
+```
+HASH_JOIN_EMBEDDING [b = b]
+leftEmbeddingField: "none"
+rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "x"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_a]
+  direction: "forward"
+```
 ### Random reordering with seed 2
-`(HJ _ = (HJ _ = COLLSCAN, x = COLLSCAN), y = COLLSCAN)`
+```
+HASH_JOIN_EMBEDDING [b = b]
+leftEmbeddingField: "none"
+rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_base]
+  direction: "forward"
+```
 ### Random reordering with seed 7
-`(HJ _ = (HJ _ = COLLSCAN, y = COLLSCAN), x = COLLSCAN)`
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_base]
+  direction: "forward"
+```
 
 ## 2. 3-Node graph, base node connected to one node
 ### No join opt
@@ -196,13 +264,81 @@ Execution Engine: sbe
 ```
 
 ### Random reordering with seed 0
-`(HJ _ = (HJ y = COLLSCAN, x = COLLSCAN), _ = COLLSCAN)`
+```
+HASH_JOIN_EMBEDDING [x.a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "y"
+  rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_b]
+  direction: "forward"
+```
 ### Random reordering with seed 1
-`(HJ _ = (HJ x = COLLSCAN, _ = COLLSCAN), y = COLLSCAN)`
+```
+HASH_JOIN_EMBEDDING [x.b = b]
+leftEmbeddingField: "none"
+rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "x"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_a]
+  direction: "forward"
+```
 ### Random reordering with seed 2
-`(HJ _ = (HJ _ = COLLSCAN, x = COLLSCAN), y = COLLSCAN)`
+```
+HASH_JOIN_EMBEDDING [x.b = b]
+leftEmbeddingField: "none"
+rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_base]
+  direction: "forward"
+```
 ### Random reordering with seed 3
-`(HJ _ = (HJ x = COLLSCAN, y = COLLSCAN), _ = COLLSCAN)`
+```
+HASH_JOIN_EMBEDDING [x.a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "x"
+  rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_a]
+  direction: "forward"
+```
 
 ## 3. 3-Node graph + potentially inferred edge
 ### No join opt
@@ -295,11 +431,79 @@ Execution Engine: sbe
 ```
 
 ### Random reordering with seed 0
-`(HJ _ = (HJ y = COLLSCAN, _ = COLLSCAN), x = COLLSCAN)`
+```
+HASH_JOIN_EMBEDDING [base = base]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [base = base]
+  leftEmbeddingField: "y"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_b]
+  direction: "forward"
+```
 ### Random reordering with seed 1
-`(HJ _ = (HJ x = COLLSCAN, _ = COLLSCAN), y = COLLSCAN)`
+```
+HASH_JOIN_EMBEDDING [base = base]
+leftEmbeddingField: "none"
+rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [base = base]
+  leftEmbeddingField: "x"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_a]
+  direction: "forward"
+```
 ### Random reordering with seed 2
-`(HJ _ = (HJ _ = COLLSCAN, x = COLLSCAN), y = COLLSCAN)`
+```
+HASH_JOIN_EMBEDDING [base = base]
+leftEmbeddingField: "none"
+rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [base = base]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_base]
+  direction: "forward"
+```
 ### Random reordering with seed 7
-`(HJ _ = (HJ _ = COLLSCAN, y = COLLSCAN), x = COLLSCAN)`
+```
+HASH_JOIN_EMBEDDING [base = base]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [base = base]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_base]
+  direction: "forward"
+```
 
