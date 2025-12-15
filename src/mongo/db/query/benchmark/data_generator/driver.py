@@ -35,38 +35,24 @@ from dataclasses import fields
 from typing import ContextManager
 
 import datagen.database_instance
+import datagen.random
+from datagen.util import STATISTICS
 
 
 class CorrelatedGeneratorFactory:
-    def __init__(self, obj_type: type, seed: typing.Any):
-        import datagen.faker
-        import datagen.util
-        import faker
+    def __init__(self, obj_type: type):
+        import datagen.distribution
 
-        class Provider(datagen.faker.CorrelatedProvider):
-            def generate_type_with(self, factory: datagen.util.CorrelatedDataFactory):
-                self.generator.clear()
-                return factory.build(obj_type)
-
-        gen = datagen.faker.CorrelatedGenerator()
-        gen.random.seed(seed)
-        self.fkr = faker.Faker(generator=gen)
-        provider = Provider(generator=gen)
-        self.fkr.add_provider(provider)
-        self.factory = datagen.util.CorrelatedDataFactory(provider, self.fkr)
-
-        # Faker and random do not allow the seed to be retrieved after instantiation,
-        # so the spec files can not create uncorrelated Faker objects after the fact that
-        # use the same seed. So, we instantiate a global uncorrelated Faker here.
-        datagen.util.set_uncorrelated_faker(faker.Faker(seed=seed))
+        self.obj_type_func = datagen.distribution.distributionify(obj_type)
 
     def make_generator(self) -> typing.Generator:
         """Generates the dictated objects as a generator."""
 
         while True:
-            yield self.fkr.generate_type_with(self.factory)
+            datagen.random.default_random().clear()
+            yield self.obj_type_func()
 
-    def dump_metadata(self, collection_name, size, seed, metadata_path):
+    def dump_metadata(self, collection_name, size, metadata_path):
         import json
 
         import datagen.serialize
@@ -78,7 +64,7 @@ class CorrelatedGeneratorFactory:
             collection = dict(
                 collectionName=collection_name,
                 size=size,
-                fields=self.factory.statistics,
+                fields=STATISTICS,
             )
             json_metadata = json.dumps(
                 collection, indent=4, cls=datagen.serialize.StatisticsEncoder
@@ -227,6 +213,11 @@ async def main():
     )
 
     args = parser.parse_args()
+
+    # Generate 1024 bits of randomness as the initial seed if one was not already provided.
+    seed = args.seed if args.seed else f"{random.getrandbits(1024)}"
+    datagen.random.set_global_seed(seed)
+
     module = importlib.import_module(args.module)
     spec = getattr(module, args.spec)
 
@@ -249,19 +240,15 @@ async def main():
         if args.drop:
             await database_instance.drop_collection(collection_name)
 
-        seed = None
-
         # 2. Create and insert the documents.
         if args.size:
-            # Generate 1024 bits of randomness as the initial seed if one was not already provided.
-            seed = args.seed if args.seed else f"{random.getrandbits(1024)}"
-            generator_factory = CorrelatedGeneratorFactory(spec, seed)
+            generator_factory = CorrelatedGeneratorFactory(spec)
             generator = generator_factory.make_generator()
             context_manager = asyncio.Semaphore(1) if args.serial_inserts else nullcontext()
             await upstream(
                 database_instance, collection_name, generator, args.size, context_manager
             )
-            generator_factory.dump_metadata(collection_name, args.size, seed, metadata_path)
+            generator_factory.dump_metadata(collection_name, args.size, metadata_path)
 
         # 3. Create indexes after documents.
         indexes = args.indexes if args.indexes else ()
@@ -291,7 +278,7 @@ async def main():
             dump_commands(args.out)
 
         # 6. Run 'analyze' on each field
-        if args.analyze is not None:
+        if args.analyze:
             for field in fields(spec):
                 await field.type.analyze(database_instance, collection_name, field.name)
 

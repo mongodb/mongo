@@ -6,8 +6,18 @@ py_library(
 )
 
 py_library(
-    name = "employee",
-    srcs = ["employee.py"],
+    name = "spm_2658_distribution_coverage",
+    srcs = ["spm_2658_distribution_coverage.py"],
+)
+
+py_library(
+    name = "spm_2658_employee",
+    srcs = ["spm_2658_employee.py"],
+)
+
+py_library(
+    name = "spm_2658_type_coverage",
+    srcs = ["spm_2658_type_coverage.py"],
 )
 
 py_library(
@@ -16,18 +26,18 @@ py_library(
 )
 
 py_library(
+    name = "test_correlations",
+    srcs = ["test_correlations.py"],
+)
+
+py_library(
+    name = "test_seed",
+    srcs = ["test_seed.py"],
+)
+
+py_library(
     name = "test_types",
     srcs = ["test_types.py"],
-)
-
-py_library(
-    name = "uncorrelated",
-    srcs = ["uncorrelated.py"],
-)
-
-py_library(
-    name = "partially_correlated",
-    srcs = ["partially_correlated.py"],
 )
 
 py_library(

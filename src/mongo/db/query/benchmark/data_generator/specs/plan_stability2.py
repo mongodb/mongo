@@ -8,6 +8,8 @@ from typing import Callable
 import pymongo
 from bson.decimal128 import Decimal128
 from bson.timestamp import Timestamp
+from datagen.distribution import correlation
+from datagen.random import global_faker
 from datagen.util import MISSING, Specification
 from faker import Faker
 
@@ -28,19 +30,20 @@ START_DATE = datetime(2024, 1, 1, tzinfo=timezone.utc)
 END_DATE = datetime(2025, 12, 31, tzinfo=timezone.utc)
 
 # Ideally we would want to seed our uncorrelated Faker based on the --seed argument to driver.py
-# but it is not available here.
+# but the feature was not available at the time that this spec was written, and changing the Faker
+# used will change the data generated for a given seed.
 ufkr = Faker()
 ufkr.seed_instance(1)
 
 universal_generators = {
-    "missing": lambda fkr: MISSING,
-    "null": lambda fkr: None,
+    "missing": lambda: MISSING,
+    "null": lambda: None,
 }
 
 
-def pareto(fkr) -> int:
+def pareto() -> int:
     """In the absence of a Zipfian implementation to generate skewed datasets, we use pareto"""
-    return int(fkr.random.paretovariate(2))
+    return int(global_faker().random.paretovariate(2))
 
 
 def lambda_sources(l: Specification) -> str:
@@ -49,54 +52,54 @@ def lambda_sources(l: Specification) -> str:
     params = list(signature.parameters.values())
     return "\n".join(
         f"{probability:>4.0%} {inspect.getsource(generator).strip()}"
-        for generator, probability in params[1].default.items()
+        for generator, probability in params[0].default.items()
     )
 
 
 type_generators: dict[type, dict[str, Callable]] = {
     str: {
-        "p1": lambda fkr: ascii_lowercase[min(25, pareto(fkr) % 26)],
-        "s1": lambda fkr: fkr.pystr(min_chars=1, max_chars=1),
-        "s2": lambda fkr: fkr.pystr(min_chars=1, max_chars=2),
-        "s4": lambda fkr: fkr.pystr(min_chars=1, max_chars=4),
+        "p1": lambda: ascii_lowercase[min(25, pareto() % 26)],
+        "s1": lambda: global_faker().pystr(min_chars=1, max_chars=1),
+        "s2": lambda: global_faker().pystr(min_chars=1, max_chars=2),
+        "s4": lambda: global_faker().pystr(min_chars=1, max_chars=4),
     },
     int: {
-        "const1": lambda fkr: 1,
-        "i10": lambda fkr: fkr.random_int(min=1, max=10),
-        "i100": lambda fkr: fkr.random_int(min=1, max=100),
-        "i1000": lambda fkr: fkr.random_int(min=1, max=1000),
-        "i10000": lambda fkr: fkr.random_int(min=1, max=10000),
-        "i100000": lambda fkr: fkr.random_int(min=1, max=100000),
+        "const1": lambda: 1,
+        "i10": lambda: global_faker().random_int(min=1, max=10),
+        "i100": lambda: global_faker().random_int(min=1, max=100),
+        "i1000": lambda: global_faker().random_int(min=1, max=1000),
+        "i10000": lambda: global_faker().random_int(min=1, max=10000),
+        "i100000": lambda: global_faker().random_int(min=1, max=100000),
         "pareto": pareto,
     },
     bool: {
-        "br": lambda fkr: fkr.boolean(),
-        "b10": lambda fkr: fkr.boolean(10),
-        "b100": lambda fkr: fkr.boolean(1),
-        "b1000": lambda fkr: fkr.boolean(0.1),
-        "b10000": lambda fkr: fkr.boolean(0.01),
-        "b100000": lambda fkr: fkr.boolean(0.001),
+        "br": lambda: global_faker().boolean(),
+        "b10": lambda: global_faker().boolean(10),
+        "b100": lambda: global_faker().boolean(1),
+        "b1000": lambda: global_faker().boolean(0.1),
+        "b10000": lambda: global_faker().boolean(0.01),
+        "b100000": lambda: global_faker().boolean(0.001),
     },
     datetime: {
-        "dt_pareto": lambda fkr: START_DATE + timedelta(days=pareto(fkr)),
+        "dt_pareto": lambda: START_DATE + timedelta(days=pareto()),
     },
     Timestamp: {
         # Note that we can not generate timestamps with i > 0 as the i is not preserved in the .schema file
-        "ts_const": lambda fkr: Timestamp(fkr.random_element([START_DATE, END_DATE]), 0),
-        "ts_triangular": lambda fkr: Timestamp(
-            fkr.random.triangular(START_DATE, END_DATE, END_DATE), 0
+        "ts_const": lambda: Timestamp(global_faker().random_element([START_DATE, END_DATE]), 0),
+        "ts_triangular": lambda: Timestamp(
+            global_faker().random.triangular(START_DATE, END_DATE, END_DATE), 0
         ),
     },
-    Decimal128: {"decimal_pareto": lambda fkr: Decimal128(f"{pareto(fkr)}.{pareto(fkr)}")},
+    Decimal128: {"decimal_pareto": lambda: Decimal128(f"{pareto()}.{pareto()}")},
     list: {
-        "list_int_pareto": lambda fkr: [pareto(fkr) for _ in range(pareto(fkr) % 10)],
-        "list_str_pareto": lambda fkr: [
-            ascii_lowercase[min(25, pareto(fkr) % 26)] for _ in range(pareto(fkr) % 10)
+        "list_int_pareto": lambda: [pareto() for _ in range(pareto() % 10)],
+        "list_str_pareto": lambda: [
+            ascii_lowercase[min(25, pareto() % 26)] for _ in range(pareto() % 10)
         ],
     },
     dict: {
-        "dict_str_pareto": lambda fkr: {
-            ascii_lowercase[min(25, pareto(fkr) % 26)]: pareto(fkr) for _ in range(pareto(fkr) % 10)
+        "dict_str_pareto": lambda: {
+            ascii_lowercase[min(25, pareto() % 26)]: pareto() for _ in range(pareto() % 10)
         }
     },
 }
@@ -139,11 +142,20 @@ for f in range(NUM_FIELDS):
 
     # We use the 'default argument value' trick to capture the chosen generators
     # and make them available to the actual value generation.
-    def source(fkr, generators=chosen_generators):
-        chosen_generator = fkr.random_element(generators)
-        return chosen_generator(fkr)
+    def source_with_correlation(generators=chosen_generators, correlation_key=chosen_correlation):
+        return correlation(
+            lambda **kwargs: global_faker().random_element(generators)(**kwargs), correlation_key
+        )()
 
-    specification = Specification(chosen_type, correlation=chosen_correlation, source=source)
+    def source(generators=chosen_generators):
+        chosen_generator = global_faker().random_element(generators)
+        return chosen_generator()
+
+    specification = Specification(source_with_correlation if chosen_correlation else source)
+    # Save the `chosen_type` and `chosen_correlation` to `Specification` so they can be examined for
+    # diagnostic purposes. These are not officially fields of `Specification`.
+    specification.type = chosen_type
+    specification.correlation = chosen_correlation
 
     # pylint: disable=invalid-name
     field_name = f"field{f}_{chosen_type.__name__}"

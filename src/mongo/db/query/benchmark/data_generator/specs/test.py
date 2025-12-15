@@ -31,7 +31,6 @@ Example collection spec used for smoke tests of the generator itself.
 
 import dataclasses
 
-import faker
 import pymongo
 from datagen.util import Specification
 
@@ -50,10 +49,6 @@ class TestChild:
 class Test:
     i: Specification(int)
     child: Specification(TestChild)
-
-    @staticmethod
-    def compute_il(fkr: faker.proxy.Faker) -> float:
-        return 1
 
 
 def test_index() -> list[pymongo.IndexModel]:

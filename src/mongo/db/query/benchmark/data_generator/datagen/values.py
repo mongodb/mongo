@@ -33,7 +33,7 @@ import dataclasses
 import datetime
 import typing
 
-import numpy as np
+from datagen.random import numpy_random
 
 TVar = typing.TypeVar("TVar", str, int, float, datetime.datetime)
 
@@ -102,7 +102,7 @@ class RangeGenerator(typing.Generic[TVar]):
 def double_range(begin: float, end: float, step: float = 1.0):
     """Produce a sequence of double values within a range."""
 
-    return np.random.default_rng().uniform(begin, end, round((end - begin) / step))
+    return numpy_random().uniform(begin, end, round((end - begin) / step))
 
 
 def ansi_range(begin: str, end: str, step: int = 1):
@@ -161,7 +161,7 @@ def datetime_range(begin: datetime.datetime, end: datetime.datetime, step: int =
     num_values = round((end_ts - begin_ts) / step)
     assert num_values >= 1, "Datetime range must be bigger than the step."
     for _ in range(0, num_values):
-        random_ts = np.random.randint(begin_ts, end_ts)
+        random_ts = numpy_random().integers(begin_ts, end_ts)
         yield datetime.datetime.fromtimestamp(random_ts)
     # random_dates = [datetime.datetime.fromtimestamp(random_ts) for random_ts in default_random().sample(range(int(begin_ts), int(end_ts)), num_values)]
     # return random_dates

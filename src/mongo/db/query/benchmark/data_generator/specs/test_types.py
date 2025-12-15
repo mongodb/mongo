@@ -58,29 +58,23 @@ class TestIntEnum(enum.IntEnum):
 
 @dataclasses.dataclass
 class NestedObject:
-    str_field: Specification(str, source=lambda fkr: "A")
+    str_field: Specification("A")
 
 
 @dataclasses.dataclass
 class TypesTest:
-    float_field: Specification(float, source=lambda fkr: float(1.1))
-    int_field: Specification(int, source=lambda fkr: 1)
-    str_field: Specification(str, source=lambda fkr: "A")
-    bool_field: Specification(bool, source=lambda fkr: True)
-    datetime_datetime_field: Specification(datetime.datetime, source=lambda fkr: DATETIME)
-    bson_datetime_ms_field: Specification(
-        datetime, source=lambda fkr: bson.datetime_ms.DatetimeMS(DATETIME)
-    )
-    bson_timestamp_field: Specification(
-        bson.timestamp.Timestamp, source=lambda fkr: bson.timestamp.Timestamp(DATETIME, 123)
-    )
-    bson_decimal128_field: Specification(
-        bson.decimal128.Decimal128, source=lambda fkr: bson.decimal128.Decimal128("1.1")
-    )
-    array_field: Specification(list, source=lambda fkr: [1, 2])
+    float_field: Specification(float(1.1))
+    int_field: Specification(1)
+    str_field: Specification("A")
+    bool_field: Specification(True)
+    datetime_datetime_field: Specification(DATETIME)
+    bson_datetime_ms_field: Specification(bson.datetime_ms.DatetimeMS(DATETIME))
+    bson_timestamp_field: Specification(bson.timestamp.Timestamp(DATETIME, 123))
+    bson_decimal128_field: Specification(bson.decimal128.Decimal128("1.1"))
+    array_field: Specification([1, 2])
     obj_field: Specification(NestedObject)
-    dict_field: Specification(dict, source=lambda fkr: {"a": 1})
-    enum_field: Specification(TestEnum, source=lambda fkr: TestEnum.A)
-    int_enum_field: Specification(TestIntEnum, source=lambda fkr: TestIntEnum.A)
-    null_field: Specification(type(None), source=lambda fkr: None)
-    missing_field: Specification(type(None), source=lambda fkr: MISSING)
+    dict_field: Specification({"a": 1})
+    enum_field: Specification(TestEnum.A)
+    int_enum_field: Specification(TestIntEnum.A)
+    null_field: Specification(None)
+    missing_field: Specification(MISSING)

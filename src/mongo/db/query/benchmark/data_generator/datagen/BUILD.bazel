@@ -6,8 +6,8 @@ py_library(
 )
 
 py_library(
-    name = "faker",
-    srcs = ["faker.py"],
+    name = "distribution",
+    srcs = ["distribution.py"],
 )
 
 py_library(
