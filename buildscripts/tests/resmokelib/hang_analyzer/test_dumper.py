@@ -1,6 +1,7 @@
 """Unit tests for the buildscripts.resmokelib.hang_analyzer.dumper package"""
 
 import os
+import platform
 import tempfile
 import unittest
 from unittest.mock import MagicMock, Mock, patch
@@ -413,6 +414,7 @@ class TestPIDParsing(unittest.TestCase):
         self.assertEqual(result, set())
 
 
+@unittest.skipUnless(platform.system() == "Linux", "GDBDumper is only for linux.")
 class TestBinaryParsing(unittest.TestCase):
     def setUp(self):
         self.logger = Mock()
