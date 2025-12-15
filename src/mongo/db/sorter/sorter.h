@@ -463,7 +463,7 @@ public:
 
     explicit FileBasedSorterStorage(
         std::shared_ptr<SorterFile> file,
-        boost::optional<boost::filesystem::path> pathToSpillDir,
+        boost::filesystem::path pathToSpillDir,
         boost::optional<DatabaseName> dbName = boost::none,
         SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2);
 
@@ -489,6 +489,191 @@ private:
     boost::optional<boost::filesystem::path> _pathToSpillDir;
     boost::optional<DatabaseName> _dbName;
     SorterChecksumVersion _checksumVersion;
+};
+
+/**
+ * Data iterator over an Input stream used in the MergeIterator.
+ */
+template <typename Key, typename Value>
+class MONGO_MOD_PRIVATE Stream {
+public:
+    typedef SortIteratorInterface<Key, Value> Input;
+    Stream(size_t fileNum, std::shared_ptr<Input> iter)
+        : fileNum(fileNum), _current(iter->nextWithDeferredValue()), _rest(std::move(iter)) {}
+
+    const Key& current() const {
+        return _current;
+    }
+    Value getDeferredValue() {
+        return _rest->getDeferredValue();
+    }
+    bool more() {
+        return _rest->more();
+    }
+    bool advance() {
+        if (!_rest->more())
+            return false;
+
+        _current = _rest->nextWithDeferredValue();
+        return true;
+    }
+
+    const size_t fileNum;
+
+private:
+    Key _current;
+    std::shared_ptr<Input> _rest;
+};
+
+// 'Comparator' is a 3-way comparison, but std::priority_queue wants a '<' comparison.
+// But also, std::priority_queue is a max-heap, and we want a min-heap.
+// And also, 'Comparator' compares Keys, but std::priority_queue calls its comparator
+// on whole elements.
+//
+// Used for the BoundedSorter and spillWithHeap in the SorterSpiller class.
+template <typename Key, typename Value, typename Comparator>
+struct MONGO_MOD_PRIVATE Greater {
+    // Prevent default construction.
+    explicit Greater(Comparator const* compare) : compare(compare) {}
+
+    bool operator()(const std::pair<Key, Value>& p1, const std::pair<Key, Value>& p2) const {
+        return (*compare)(p1.first, p2.first) > 0;
+    }
+    Comparator const* compare;
+};
+
+/**
+ * A class where we declare how to spill depending on the underlying storage the sorter is using.
+ */
+template <typename Key, typename Value>
+class SorterSpiller {
+public:
+    typedef SortIteratorInterface<Key, Value> Iterator;
+    // TODO(SERVER-115336): Settings is a file-specific type that should be added to
+    // FileBasedSorterStorage.
+    typedef std::pair<typename Key::SorterDeserializeSettings,
+                      typename Value::SorterDeserializeSettings>
+        Settings;
+
+    virtual std::shared_ptr<Iterator> spill(const SortOptions& opts,
+                                            const Settings& settings,
+                                            std::span<std::pair<Key, Value>> data,
+                                            uint32_t idx) = 0;
+
+    virtual std::unique_ptr<Iterator> spillUnique(const SortOptions& opts,
+                                                  const Settings& settings,
+                                                  std::span<std::pair<Key, Value>> data,
+                                                  uint32_t idx) = 0;
+
+    virtual void setStorage(std::unique_ptr<SorterStorage<Key, Value>> newStorage) = 0;
+
+    virtual ~SorterSpiller() = default;
+};
+
+template <typename Key, typename Value, typename Comparator>
+class SorterSpillerBase : public SorterSpiller<Key, Value> {
+public:
+    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef std::pair<Key, Value> KV;
+    // TODO(SERVER-115336): Settings is a file-specific type that should be added to
+    // FileBasedSorterStorage.
+    typedef std::pair<typename Key::SorterDeserializeSettings,
+                      typename Value::SorterDeserializeSettings>
+        Settings;
+
+    explicit SorterSpillerBase(std::unique_ptr<SorterStorage<Key, Value>> storage)
+        : _storage(std::move(storage)) {}
+
+    std::shared_ptr<Iterator> spill(const SortOptions& opts,
+                                    const Settings& settings,
+                                    std::span<std::pair<Key, Value>> data,
+                                    uint32_t idx = 0) override {
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer = _spill(opts, settings, data, idx);
+        return _storage->makeIterator(std::move(writer));
+    }
+
+    std::unique_ptr<Iterator> spillUnique(const SortOptions& opts,
+                                          const Settings& settings,
+                                          std::span<std::pair<Key, Value>> data,
+                                          uint32_t idx = 0) override {
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer = _spill(opts, settings, data, idx);
+        return _storage->makeIteratorUnique(std::move(writer));
+    }
+
+    std::shared_ptr<Iterator> spillWithHeap(
+        const SortOptions& opts,
+        std::priority_queue<KV, std::vector<KV>, Greater<Key, Value, Comparator>>& heap) {
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer = _storage->makeWriter(opts, {});
+        while (!heap.empty()) {
+            writer->addAlreadySorted(heap.top().first, heap.top().second);
+            heap.pop();
+        }
+        return _storage->makeIterator(std::move(writer));
+    }
+
+    virtual std::unique_ptr<SorterStorage<Key, Value>> mergeSpills(
+        const SortOptions& opts,
+        const Settings& settings,
+        SorterStats& stats,
+        std::vector<std::shared_ptr<SortIteratorInterface<Key, Value>>>& iters,
+        Comparator comp,
+        std::size_t numTargetedSpills,
+        std::size_t numParallelSpills) = 0;
+
+    void setStorage(std::unique_ptr<SorterStorage<Key, Value>> newStorage) override {
+        _storage = std::move(newStorage);
+    }
+
+protected:
+    std::unique_ptr<SorterStorage<Key, Value>> _storage;
+
+private:
+    std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(const SortOptions& opts,
+                                                            const Settings& settings,
+                                                            std::span<std::pair<Key, Value>> data,
+                                                            uint32_t idx = 0) {
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer =
+            _storage->makeWriter(opts, settings);
+
+        for (size_t i = idx; i < data.size(); ++i) {
+            writer->addAlreadySorted(data[i].first, data[i].second);
+        }
+        return std::move(writer);
+    }
+};
+
+/**
+ * How we merge spills when we use a file as the underlying storage for the sorter.
+ */
+template <typename Key, typename Value, typename Comparator>
+class FileBasedSorterSpiller : public SorterSpillerBase<Key, Value, Comparator> {
+public:
+    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef std::pair<typename Key::SorterDeserializeSettings,
+                      typename Value::SorterDeserializeSettings>
+        Settings;
+
+
+    explicit FileBasedSorterSpiller(std::unique_ptr<FileBasedSorterStorage<Key, Value>> storage)
+        : SorterSpillerBase<Key, Value, Comparator>(std::move(storage)) {}
+
+    explicit FileBasedSorterSpiller(
+        std::shared_ptr<SorterFile> file,
+        boost::filesystem::path tempDir,
+        boost::optional<DatabaseName> dbName = boost::none,
+        SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2)
+        : SorterSpillerBase<Key, Value, Comparator>(
+              std::make_unique<FileBasedSorterStorage<Key, Value>>(
+                  file, tempDir, dbName, checksumVersion)) {}
+
+    std::unique_ptr<SorterStorage<Key, Value>> mergeSpills(
+        const SortOptions& opts,
+        const Settings& settings,
+        SorterStats& stats,
+        std::vector<std::shared_ptr<SortIteratorInterface<Key, Value>>>& iters,
+        Comparator comp,
+        std::size_t numTargetedSpills,
+        std::size_t numParallelSpills) override;
 };
 
 /**
@@ -583,6 +768,7 @@ public:
 protected:
     SortOptions _opts;
 
+    // TODO(SERVER-114085): Remove this when we add the SorterSpiller to options.
     std::shared_ptr<SorterFile> _file;
 
     std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
@@ -670,20 +856,6 @@ public:
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
 class BoundedSorter final : public BoundedSorterInterface<Key, Value> {
 public:
-    // 'Comparator' is a 3-way comparison, but std::priority_queue wants a '<' comparison.
-    // But also, std::priority_queue is a max-heap, and we want a min-heap.
-    // And also, 'Comparator' compares Keys, but std::priority_queue calls its comparator
-    // on whole elements.
-    struct Greater {
-        // Prevent default construction.
-        explicit Greater(Comparator const* compare) : compare(compare) {}
-
-        bool operator()(const std::pair<Key, Value>& p1, const std::pair<Key, Value>& p2) const {
-            return (*compare)(p1.first, p2.first) > 0;
-        }
-        Comparator const* compare;
-    };
-
     BoundedSorter(const SortOptions& opts,
                   Comparator comp,
                   BoundMaker makeBound,
@@ -749,7 +921,7 @@ private:
     const SortOptions _opts;
 
     using KV = std::pair<Key, Value>;
-    std::priority_queue<KV, std::vector<KV>, Greater> _heap;
+    std::priority_queue<KV, std::vector<KV>, Greater<Key, Value, Comparator>> _heap;
 
     std::shared_ptr<SorterFile> _file;
     std::unique_ptr<SpillIterator> _spillIter;
