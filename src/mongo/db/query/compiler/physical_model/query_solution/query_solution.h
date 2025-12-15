@@ -1576,10 +1576,10 @@ struct CountScanNode : public QuerySolutionNodeWithSortSet {
     IndexEntry index;
 
     BSONObj startKey;
-    bool startKeyInclusive;
+    bool startKeyInclusive = false;
 
     BSONObj endKey;
-    bool endKeyInclusive;
+    bool endKeyInclusive = false;
 
     /**
      * A vector of Interval Evaluation Trees (IETs) with the same ordering as the index key pattern.
