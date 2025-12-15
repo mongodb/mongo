@@ -5,6 +5,7 @@
  *
  * @tags: [uses_change_streams]
  */
+import {Action} from "jstests/libs/util/change_stream/change_stream_action.js";
 import {CollectionTestModel} from "jstests/libs/util/change_stream/change_stream_collection_test_model.js";
 import {ShardingCommandGenerator} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator.js";
 import {ShardingCommandGeneratorParams} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator_params.js";
@@ -159,6 +160,74 @@ describe("ShardingCommandGenerator", function () {
         );
 
         jsTest.log.info("✓ Sequential multi-Writer test passed");
+    });
+
+    it("runs the graph mutator and exercises all FSM transitions", () => {
+        const dbName = "test_db_sharding";
+        const collName = "test_coll_sharding";
+        const seed = 314159;
+
+        const db = this.st.s.getDB(dbName);
+        db.dropDatabase();
+
+        const model = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
+        const params = new ShardingCommandGeneratorParams(dbName, collName, this.shards);
+        const generator = new ShardingCommandGenerator(seed);
+        const commands = generator.generateCommands(model, params);
+
+        jsTest.log.info(`\n========== Graph mutator - Full FSM traversal ==========`);
+        jsTest.log.info(`Seed: ${seed}, DB: ${dbName}, Coll: ${collName}`);
+        jsTest.log.info(`Total commands: ${commands.length}`);
+        jsTest.log.info(`Command list:`);
+        commands.forEach((cmd, idx) => {
+            jsTest.log.info(`  [${idx}] ${cmd.toString()}`);
+        });
+
+        // Build set of command strings present in the generated sequence.
+        const commandStrings = commands.map((c) => c.toString());
+
+        // Collect all unique actions from the FSM model.
+        const allActionsInFsm = new Set();
+        for (const state of model.states) {
+            for (const action of model.collectionStateToActionsMap(state).keys()) {
+                allActionsInFsm.add(action);
+            }
+        }
+
+        // Derive expected command patterns from the Action enum (single source of truth).
+        jsTest.log.info(`\n--- Command coverage verification ---`);
+        const missingCommands = [];
+        for (const actionId of allActionsInFsm) {
+            const commandClass = ShardingCommandGenerator.actionToCommandClass[actionId];
+            assert(commandClass, `No command class mapped for action ${actionId}`);
+            const commandClassName = commandClass.name;
+            const actionName = Action.getName(actionId);
+            const found = commandStrings.some((s) => s.includes(commandClassName));
+            jsTest.log.info(`  ${actionName}: ${found ? "✓" : "✗"}`);
+            if (!found) {
+                missingCommands.push(actionName);
+            }
+        }
+
+        // Assert all FSM actions produced their expected commands.
+        assert.eq(
+            missingCommands.length,
+            0,
+            `Missing command types: ${missingCommands.join(", ")}. All FSM actions must be covered.`,
+        );
+
+        jsTest.log.info(`  Total FSM actions: ${allActionsInFsm.size}`);
+        jsTest.log.info(`  Commands generated: ${commands.length}`);
+        jsTest.log.info(`✓ All FSM actions produced expected commands`);
+
+        jsTest.log.info(`\n========== Executing commands ==========`);
+
+        commands.forEach((cmd, cmdIdx) => {
+            jsTest.log.info(`Executing [${cmdIdx}]: ${cmd.toString()}`);
+            cmd.execute(this.st.s);
+        });
+
+        jsTest.log.info(`✓ All ${commands.length} commands executed successfully`);
     });
 });
 

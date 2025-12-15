@@ -1,34 +1,27 @@
 /**
  * Parameters for ShardingCommandGenerator.
- * Encapsulates database, collection, and shard information.
+ * Simple struct encapsulating database, collection, and shard information.
  */
 class ShardingCommandGeneratorParams {
+    /**
+     * @param {string} dbName - Database name
+     * @param {string} collName - Collection name
+     * @param {Array} shardSet - Array of shard objects
+     */
     constructor(dbName, collName, shardSet) {
         this.dbName = dbName;
         this.collName = collName;
         this.shardSet = shardSet;
     }
 
-    /**
-     * Get the database name.
-     * @returns {string} The database name.
-     */
     getDbName() {
         return this.dbName;
     }
 
-    /**
-     * Get the collection name.
-     * @returns {string} The collection name.
-     */
     getCollName() {
         return this.collName;
     }
 
-    /**
-     * Get the shard set.
-     * @returns {Array} Array of shard objects.
-     */
     getShardSet() {
         return this.shardSet;
     }

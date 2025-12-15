@@ -6,6 +6,24 @@
  */
 
 /**
+ * Sharding type constants.
+ */
+const ShardingType = {
+    RANGE: "range",
+    HASHED: "hashed",
+};
+
+/**
+ * Get the shard key spec for a given sharding type.
+ * Uses 'data' field which requires explicit index creation before sharding.
+ * @param {string} shardingType - ShardingType.RANGE or ShardingType.HASHED
+ * @returns {Object} The shard key spec, e.g. {data: 1} or {data: "hashed"}
+ */
+function getShardKeySpec(shardingType) {
+    return shardingType === ShardingType.HASHED ? {data: "hashed"} : {data: 1};
+}
+
+/**
  * Base command class.
  */
 class Command {
@@ -45,8 +63,11 @@ class Command {
  * The insertion behavior may differ depending on whether the collection is already created.
  */
 class InsertDocCommand extends Command {
-    constructor(dbName, collName, shardSet) {
+    constructor(dbName, collName, shardSet, collectionCtx) {
         super(dbName, collName, shardSet);
+        // Store context state needed for event matching
+        this.collectionExists = collectionCtx.exists;
+        this.collectionNonEmpty = collectionCtx.nonEmpty;
         // Create the document in the constructor so it can be used by both execute() and getChangeEvents()
         this.document = {
             _id: new ObjectId(),
@@ -144,32 +165,96 @@ class DropDatabaseCommand extends Command {
 }
 
 /**
- * Shard collection command.
- * TODO: SERVER-114857 - For now, we create a normal untracked collection instead of
- * actually sharding it. This allows subsequent operations (rename, drop, etc.) to work
- * on an existing collection. Full sharding setup will be addressed in SERVER-114857.
+ * Create index command.
+ * Creates an index for the shard key (required before sharding).
+ * Precondition (guaranteed by FSM): collection exists.
  */
-class CreateShardedCollectionCommand extends Command {
+class CreateIndexCommand extends Command {
+    constructor(dbName, collName, shardSet, collectionCtx) {
+        super(dbName, collName, shardSet);
+        assert(collectionCtx.shardKeySpec, "shardKeySpec must be provided to CreateIndexCommand");
+        this.shardKeySpec = collectionCtx.shardKeySpec;
+    }
+
     execute(connection) {
-        // Create a normal untracked collection as a workaround
-        // TODO: SERVER-114857 - This should actually shard the collection
-        assert.commandWorked(connection.getDB(this.dbName).createCollection(this.collName));
+        const coll = connection.getDB(this.dbName).getCollection(this.collName);
+        assert.commandWorked(coll.createIndex(this.shardKeySpec));
     }
 
     toString() {
-        return "CreateShardedCollectionCommand";
+        return `CreateIndexCommand(${tojson(this.shardKeySpec)})`;
+    }
+}
+
+/**
+ * Drop index command.
+ * Drops the shard key index (cleanup after resharding).
+ * Preconditions (guaranteed by generator): collection exists, index exists.
+ */
+class DropIndexCommand extends Command {
+    constructor(dbName, collName, shardSet, collectionCtx) {
+        super(dbName, collName, shardSet);
+        assert(collectionCtx.shardKeySpec, "shardKeySpec must be provided to DropIndexCommand");
+        this.shardKeySpec = collectionCtx.shardKeySpec;
+    }
+
+    execute(connection) {
+        const coll = connection.getDB(this.dbName).getCollection(this.collName);
+        assert.commandWorked(coll.dropIndex(this.shardKeySpec));
+    }
+
+    toString() {
+        return `DropIndexCommand(${tojson(this.shardKeySpec)})`;
+    }
+}
+
+/**
+ * Shard existing collection command.
+ * Sharding type (range vs hashed) is determined by the shardKeySpec in collectionCtx.
+ * Preconditions (guaranteed by FSM): collection exists, shard key index exists.
+ */
+class ShardCollectionCommand extends Command {
+    constructor(dbName, collName, shardSet, collectionCtx) {
+        super(dbName, collName, shardSet);
+        assert(collectionCtx.shardKeySpec, "shardKeySpec must be provided to ShardCollectionCommand");
+        this.shardKeySpec = collectionCtx.shardKeySpec;
+    }
+
+    execute(connection) {
+        const ns = `${this.dbName}.${this.collName}`;
+
+        // Shard the collection
+        assert.commandWorked(
+            connection.adminCommand({
+                shardCollection: ns,
+                key: this.shardKeySpec,
+            }),
+        );
+    }
+
+    toString() {
+        const type = Object.values(this.shardKeySpec).some((v) => v === "hashed") ? "hashed" : "range";
+        return `ShardCollectionCommand(${type})`;
     }
 }
 
 /**
  * Unshard collection command.
- * TODO: SERVER-114857 - This is a no-op simulation for testing.
- * Since sharding is not actually set up, unsharding is also a no-op.
+ * Converts a sharded collection to an unsplittable (single-shard) collection.
+ * Picks a random shard as the destination.
+ * Precondition (guaranteed by FSM): collection exists and is sharded.
  */
 class UnshardCollectionCommand extends Command {
     execute(connection) {
-        // No-op: Unsharding simulation left blank since sharding is not actually set up.
-        // The state machine transition still occurs correctly.
+        assert(this.shardSet && this.shardSet.length > 0, "Shard set must be provided for UnshardCollectionCommand");
+        const targetShard = this.shardSet[Random.randInt(this.shardSet.length)];
+        const ns = `${this.dbName}.${this.collName}`;
+        assert.commandWorked(
+            connection.adminCommand({
+                unshardCollection: ns,
+                toShard: targetShard._id,
+            }),
+        );
     }
 
     toString() {
@@ -178,16 +263,42 @@ class UnshardCollectionCommand extends Command {
 }
 
 /**
- * Unified rename collection command.
- * Handles all rename scenarios based on configuration.
+ * Reshard collection command.
+ * Resharding type (range vs hashed) is determined by shardKeySpec in collectionCtx.
+ * Precondition (guaranteed by FSM): collection exists and is sharded, index exists.
+ */
+class ReshardCollectionCommand extends Command {
+    constructor(dbName, collName, shardSet, collectionCtx) {
+        super(dbName, collName, shardSet);
+        assert(collectionCtx.shardKeySpec, "shardKeySpec must be provided to ReshardCollectionCommand");
+        this.shardKeySpec = collectionCtx.shardKeySpec;
+    }
+
+    execute(connection) {
+        const ns = `${this.dbName}.${this.collName}`;
+
+        // Use numInitialChunks: 1 to avoid cardinality errors in test environments with little data.
+        assert.commandWorked(
+            connection.adminCommand({
+                reshardCollection: ns,
+                key: this.shardKeySpec,
+                numInitialChunks: 1,
+            }),
+        );
+    }
+
+    toString() {
+        const type = Object.values(this.shardKeySpec).some((v) => v === "hashed") ? "hashed" : "range";
+        return `ReshardCollectionCommand(${type})`;
+    }
+}
+
+/**
+ * Base rename collection command.
+ * Subclasses define targetShouldExist and crossDatabase flags.
  */
 class RenameCommand extends Command {
-    constructor(dbName, collName, shardSet, targetShouldExist, crossDatabase) {
-        super(dbName, collName, shardSet);
-        // targetShouldExist is kept for distinguishing command types but not used in execution
-        this.targetShouldExist = targetShouldExist;
-        this.crossDatabase = crossDatabase;
-    }
+    // Subclasses must set: this.targetShouldExist, this.crossDatabase
 
     execute(connection) {
         const targetDb = this.crossDatabase ? `${this.dbName}_target` : this.dbName;
@@ -211,45 +322,36 @@ class RenameCommand extends Command {
     }
 }
 
-// Concrete rename command classes for backward compatibility.
+// Concrete rename command classes.
 class RenameToNonExistentSameDbCommand extends RenameCommand {
     constructor(dbName, collName, shardSet) {
-        super(dbName, collName, shardSet, false, false);
+        super(dbName, collName, shardSet);
+        this.targetShouldExist = false;
+        this.crossDatabase = false;
     }
 }
 
 class RenameToExistentSameDbCommand extends RenameCommand {
     constructor(dbName, collName, shardSet) {
-        super(dbName, collName, shardSet, true, false);
+        super(dbName, collName, shardSet);
+        this.targetShouldExist = true;
+        this.crossDatabase = false;
     }
 }
 
 class RenameToNonExistentDifferentDbCommand extends RenameCommand {
     constructor(dbName, collName, shardSet) {
-        super(dbName, collName, shardSet, false, true);
+        super(dbName, collName, shardSet);
+        this.targetShouldExist = false;
+        this.crossDatabase = true;
     }
 }
 
 class RenameToExistentDifferentDbCommand extends RenameCommand {
     constructor(dbName, collName, shardSet) {
-        super(dbName, collName, shardSet, true, true);
-    }
-}
-
-/**
- * Reshard collection command.
- * TODO: SERVER-114857 - This is a no-op simulation for testing.
- * Resharding is complex and changes the shard key, which is not critical for
- * state machine testing. The collection remains in the sharded state.
- */
-class ReshardCollectionCommand extends Command {
-    execute(connection) {
-        // No-op: Resharding simulation left blank as it's not critical for state machine testing.
-        // The collection stays sharded, which is sufficient for the state machine model.
-    }
-
-    toString() {
-        return "ReshardCollectionCommand";
+        super(dbName, collName, shardSet);
+        this.targetShouldExist = true;
+        this.crossDatabase = true;
     }
 }
 
@@ -278,7 +380,7 @@ class MoveCommandBase extends Command {
 
     execute(connection) {
         // No-op: Move operations are not critical for state machine testing since
-        // sharding is not actually set up (SERVER-114857).
+        // sharding is not actually set up.
         // In a real implementation, this would execute:
         //   const targetShardId = this._getTargetShard(connection);
         //   const moveCommand = this._buildMoveCommand(targetShardId);
@@ -366,20 +468,22 @@ export {
     Command,
     InsertDocCommand,
     CreateDatabaseCommand,
-    CreateShardedCollectionCommand,
+    CreateIndexCommand,
+    DropIndexCommand,
+    ShardCollectionCommand,
     CreateUnsplittableCollectionCommand,
     CreateUntrackedCollectionCommand,
     DropCollectionCommand,
     DropDatabaseCommand,
-    RenameCommand,
     RenameToNonExistentSameDbCommand,
     RenameToExistentSameDbCommand,
     RenameToNonExistentDifferentDbCommand,
     RenameToExistentDifferentDbCommand,
     UnshardCollectionCommand,
     ReshardCollectionCommand,
-    MoveCommandBase,
     MovePrimaryCommand,
     MoveCollectionCommand,
     MoveChunkCommand,
+    ShardingType,
+    getShardKeySpec,
 };
