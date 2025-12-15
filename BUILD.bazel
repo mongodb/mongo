@@ -313,12 +313,6 @@ mongo_install(
         "//src/mongo/db/shard_role/lock_manager:lock_gdb_test.py": "//src/mongo/db:mongod",
         "//src/mongo/db/query/stage_builder/sbe/abt:optimizer_gdb_test.py": "//src/mongo/db/query/stage_builder/sbe/abt:optimizer_gdb_test_program",
     },
-    root_files = select({
-        "@platforms//os:linux": {
-            "//src/mongo/db/extension/test_examples:extension_options_configs": "etc/mongo/extensions",
-        },
-        "//conditions:default": {},
-    }),
     try_zstd = True,
     deps = [
         "//src/mongo/db/modules/enterprise:dist-test",

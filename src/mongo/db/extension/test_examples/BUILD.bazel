@@ -1,6 +1,5 @@
 load("//bazel/install_rules:install_rules.bzl", "extensions_with_config")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_extension_shared_library")
-load("@poetry//:dependencies.bzl", "dependency")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -91,43 +90,6 @@ pkg_name = "//" + package_name() + "/"
         "native_vector_search",
     ]
 ]
-
-py_binary(
-    name = "gen_conf",
-    srcs = [":gen_conf.py"],
-    data = ["configurations.yml"],
-    deps = [
-        dependency(
-            "pyyaml",
-            group = "core",
-        ),
-    ],
-)
-
-[
-    genrule(
-        name = extension_name + "_conf",
-        srcs = ["configurations.yml"],
-        outs = [extension_name + ".conf"],
-        cmd = "$(location :gen_conf) $(OUTS) $(SRCS) " + extension_name,
-        tools = [":gen_conf"],
-    )
-    for extension_name in [
-        "test_options",
-        "parse_options",
-        "toaster",
-    ]
-]
-
-filegroup(
-    name = "extension_options_configs",
-    srcs = [
-        "parse_options_conf",
-        "test_options_conf",
-        "toaster_conf",
-        ":aggregation_stage_fallback_parsers.json",
-    ],
-)
 
 # Extensions under test_examples/extension_options/
 [
