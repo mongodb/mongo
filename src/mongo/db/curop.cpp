@@ -337,6 +337,11 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
     }
 
     infoBuilder->appendBool("isFromUserConnection", client->isFromUserConnection());
+    if (gFeatureFlagDedicatedPortForMaintenanceOperations.isEnabled()) {
+        infoBuilder->appendBool("isFromMaintenancePortConnection",
+                                client->session() &&
+                                    client->session()->isConnectedToMaintenancePort());
+    }
 
     if (transport::ServiceExecutorContext::get(client)) {
         infoBuilder->append("threaded"_sd, true);

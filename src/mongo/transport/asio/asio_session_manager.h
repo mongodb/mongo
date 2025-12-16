@@ -50,6 +50,13 @@ public:
     void incrementLBConnections();
     void decrementLBConnections();
 
+    /**
+     * Increments and decrements the count of total maintenance port connections.
+     * Currently only implemented in asio_session_manager.
+     */
+    void incrementMaintenanceConnections();
+    void decrementMaintenanceConnections();
+
 protected:
     std::string getClientThreadName(const Session&) const override;
     void configureServiceExecutorContext(Client* client, bool isPrivilegedSession) const override;
@@ -58,6 +65,7 @@ protected:
 
 private:
     Counter64 _loadBalancedConnections;
+    Counter64 _maintenancePortConnections;
 };
 
 }  // namespace mongo::transport

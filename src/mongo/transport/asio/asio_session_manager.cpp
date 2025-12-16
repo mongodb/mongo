@@ -30,6 +30,7 @@
 #include "mongo/transport/asio/asio_session_manager.h"
 
 #include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_reserved.h"
@@ -114,6 +115,9 @@ void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
     }
 
     bob->append("loadBalanced", _loadBalancedConnections.get());
+    if (gFeatureFlagDedicatedPortForMaintenanceOperations.isEnabled()) {
+        bob->append("maintenance", _maintenancePortConnections.get());
+    }
 }
 
 void AsioSessionManager::incrementLBConnections() {
@@ -122,6 +126,14 @@ void AsioSessionManager::incrementLBConnections() {
 
 void AsioSessionManager::decrementLBConnections() {
     _loadBalancedConnections.decrement();
+}
+
+void AsioSessionManager::incrementMaintenanceConnections() {
+    _maintenancePortConnections.increment();
+}
+
+void AsioSessionManager::decrementMaintenanceConnections() {
+    _maintenancePortConnections.decrement();
 }
 
 /**
@@ -143,12 +155,18 @@ void AsioSessionManager::onClientConnect(Client* client) {
     if (session && session->isLoadBalancerPeer()) {
         incrementLBConnections();
     }
+    if (session && session->isConnectedToMaintenancePort()) {
+        incrementMaintenanceConnections();
+    }
 }
 
 void AsioSessionManager::onClientDisconnect(Client* client) {
     auto session = client->session();
     if (session && session->isLoadBalancerPeer()) {
         decrementLBConnections();
+    }
+    if (session && session->isConnectedToMaintenancePort()) {
+        decrementMaintenanceConnections();
     }
 }
 
