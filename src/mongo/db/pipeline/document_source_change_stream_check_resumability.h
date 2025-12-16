@@ -50,6 +50,11 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStreamCheckResumability);
+using ChangeStreamCheckResumabilityLiteParsed =
+    DocumentSourceChangeStreamLiteParsedInternal<ChangeStreamCheckResumabilityStageParams>;
+
 /**
  * This stage checks whether or not the oplog has enough history to resume the stream, and consumes
  * all events up to the given resume point. It is deployed on all shards when resuming a stream on

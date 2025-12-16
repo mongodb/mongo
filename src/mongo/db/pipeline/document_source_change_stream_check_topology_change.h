@@ -48,6 +48,10 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStreamCheckTopologyChange);
+using ChangeStreamCheckTopologyChangeLiteParsed =
+    DocumentSourceChangeStreamLiteParsedInternal<ChangeStreamCheckTopologyChangeStageParams>;
+
 /**
  * This stage detects change stream topology changes in the form of 'kNewShardDetectedOpType' events
  * and forwards them directly to the executor via an exception. Using an exception bypasses the rest

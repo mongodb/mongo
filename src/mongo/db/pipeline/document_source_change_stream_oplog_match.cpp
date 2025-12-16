@@ -51,11 +51,13 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(_internalChangeStreamOplogMatch, ChangeStreamOplogMatchStageParams::id);
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamOplogMatch,
-                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  ChangeStreamOplogMatchLiteParsed::parse,
                                   DocumentSourceChangeStreamOplogMatch::createFromBson,
                                   true);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamOplogMatch,
                             DocumentSourceChangeStreamOplogMatch::id)
 

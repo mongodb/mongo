@@ -128,7 +128,7 @@ public:
                 kStageName, repl::ReadConcernLevel::kMajorityReadConcern, level, isImplicitDefault);
         }
 
-        std::unique_ptr<StageParams> getStageParams() const final {
+        std::unique_ptr<StageParams> getStageParams() const override {
             return std::make_unique<ChangeStreamStageParams>(_originalBson);
         }
 
@@ -421,25 +421,39 @@ private:
  * ensure that all the necessary authentication and input validation checks are applied while
  * parsing.
  */
-class LiteParsedDocumentSourceChangeStreamInternal final
+class DocumentSourceChangeStreamLiteParsedInternalBase
     : public DocumentSourceChangeStream::LiteParsed {
-public:
-    static std::unique_ptr<LiteParsedDocumentSourceChangeStreamInternal> parse(
-        const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-        return std::make_unique<LiteParsedDocumentSourceChangeStreamInternal>(spec, nss);
-    }
-
-    LiteParsedDocumentSourceChangeStreamInternal(const BSONElement& spec, NamespaceString nss)
+protected:
+    DocumentSourceChangeStreamLiteParsedInternalBase(const BSONElement& spec, NamespaceString nss)
         : DocumentSourceChangeStream::LiteParsed(spec, std::move(nss)),
           _privileges({Privilege(ResourcePattern::forClusterResource(_nss.tenantId()),
                                  ActionType::internal)}) {}
 
+public:
     PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
         return _privileges;
     }
 
 private:
     const PrivilegeVector _privileges;
+};
+
+template <typename StageParamsT>
+class DocumentSourceChangeStreamLiteParsedInternal final
+    : public DocumentSourceChangeStreamLiteParsedInternalBase {
+public:
+    DocumentSourceChangeStreamLiteParsedInternal(const BSONElement& originalBson,
+                                                 NamespaceString nss)
+        : DocumentSourceChangeStreamLiteParsedInternalBase(originalBson, std::move(nss)) {}
+
+    static std::unique_ptr<DocumentSourceChangeStreamLiteParsedInternal> parse(
+        NamespaceString nss, const BSONElement& spec, const LiteParserOptions& options) {
+        return std::make_unique<DocumentSourceChangeStreamLiteParsedInternal>(spec, std::move(nss));
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<StageParamsT>(_originalBson);
+    }
 };
 
 /**

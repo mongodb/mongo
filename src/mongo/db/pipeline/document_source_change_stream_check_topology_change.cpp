@@ -40,10 +40,14 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(_internalChangeStreamCheckTopologyChange,
+                         ChangeStreamCheckTopologyChangeStageParams::id);
+
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamCheckTopologyChange,
-                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  ChangeStreamCheckTopologyChangeLiteParsed::parse,
                                   DocumentSourceChangeStreamCheckTopologyChange::createFromBson,
                                   true);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamCheckTopologyChange,
                             DocumentSourceChangeStreamCheckTopologyChange::id)
 

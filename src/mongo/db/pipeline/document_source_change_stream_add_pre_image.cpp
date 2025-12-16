@@ -51,10 +51,13 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(_internalChangeStreamAddPreImage, ChangeStreamAddPreImageStageParams::id);
+
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamAddPreImage,
-                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  ChangeStreamAddPreImageLiteParsed::parse,
                                   DocumentSourceChangeStreamAddPreImage::createFromBson,
                                   true);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamAddPreImage,
                             DocumentSourceChangeStreamAddPreImage::id)
 

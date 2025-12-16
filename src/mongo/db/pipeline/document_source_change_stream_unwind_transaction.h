@@ -56,6 +56,10 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStreamUnwindTransaction);
+using ChangeStreamUnwindTransactionLiteParsed =
+    DocumentSourceChangeStreamLiteParsedInternal<ChangeStreamUnwindTransactionStageParams>;
+
 /**
  * This stage keeps track of applyOps oplog entries that represent transactions and "unwinds" them
  * whenever an oplog entry commits a transaction. When the stage observes an applyOps or commit

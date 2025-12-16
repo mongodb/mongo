@@ -54,10 +54,14 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(_internalChangeStreamUnwindTransaction,
+                         ChangeStreamUnwindTransactionStageParams::id);
+
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamUnwindTransaction,
-                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  ChangeStreamUnwindTransactionLiteParsed::parse,
                                   DocumentSourceChangeStreamUnwindTransaction::createFromBson,
                                   true);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamUnwindTransaction,
                             DocumentSourceChangeStreamUnwindTransaction::id)
 

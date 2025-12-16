@@ -53,6 +53,10 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStreamTransform);
+using ChangeStreamTransformLiteParsed =
+    DocumentSourceChangeStreamLiteParsedInternal<ChangeStreamTransformStageParams>;
+
 class DocumentSourceChangeStreamTransform final : public DocumentSourceInternalChangeStreamStage {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamTransform"_sd;

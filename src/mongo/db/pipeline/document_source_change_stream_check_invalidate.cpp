@@ -45,10 +45,14 @@
 
 namespace mongo {
 
+ALLOCATE_STAGE_PARAMS_ID(_internalChangeStreamCheckInvalidate,
+                         ChangeStreamCheckInvalidateStageParams::id);
+
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamCheckInvalidate,
-                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  ChangeStreamCheckInvalidateLiteParsed::parse,
                                   DocumentSourceChangeStreamCheckInvalidate::createFromBson,
                                   true);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamCheckInvalidate,
                             DocumentSourceChangeStreamCheckInvalidate::id)
 

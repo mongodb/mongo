@@ -52,6 +52,10 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStreamAddPostImage);
+using ChangeStreamAddPostImageLiteParsed =
+    DocumentSourceChangeStreamLiteParsedInternal<ChangeStreamAddPostImageStageParams>;
+
 /**
  * Part of the change stream API machinery used to look up the post-image of a document. Uses the
  * "documentKey" field of the input to look up the new version of the document.

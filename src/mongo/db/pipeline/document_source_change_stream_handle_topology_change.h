@@ -49,6 +49,10 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStreamHandleTopologyChange);
+using ChangeStreamHandleTopologyChangeLiteParsed =
+    DocumentSourceChangeStreamLiteParsedInternal<ChangeStreamHandleTopologyChangeStageParams>;
+
 /**
  * An internal stage used as part of the change streams infrastructure to listen for an event
  * signaling that a new shard now has potentially matching data. For example, this stage will

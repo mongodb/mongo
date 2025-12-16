@@ -54,6 +54,10 @@
 
 namespace mongo {
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStreamAddPreImage);
+using ChangeStreamAddPreImageLiteParsed =
+    DocumentSourceChangeStreamLiteParsedInternal<ChangeStreamAddPreImageStageParams>;
+
 /**
  * Part of the change stream API machinery used to look up the pre-image of a document.
  *
