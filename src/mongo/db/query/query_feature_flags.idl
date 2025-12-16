@@ -335,3 +335,10 @@ feature_flags:
         default: true
         version: 8.3
         fcv_gated: true
+
+    featureFlagVectorSearchExtension:
+        description: "Feature flag to enable vector search extension functionality."
+        cpp_varname: gFeatureFlagVectorSearchExtension
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development
