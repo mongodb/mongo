@@ -305,8 +305,7 @@ protected:
             } catch (const DBException& e) {
                 // The accumulator or the _id expression is unsupported in SBE, so we expect that
                 // the sbeCompatible flag should be false.
-                ASSERT(e.code() == 5754701 || e.code() == 8679702 || e.code() == 8751302)
-                    << "group spec: " << groupSpec;
+                ASSERT(e.code() == 5754701 || e.code() == 8679702) << "group spec: " << groupSpec;
                 sbeGroupCompatible = false;
                 break;
             }
