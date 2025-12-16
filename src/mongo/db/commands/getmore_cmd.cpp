@@ -986,7 +986,7 @@ public:
                                                        tenantId,
                                                        SerializationContext::stateCommandReply(
                                                            _cmd.getSerializationContext())),
-                                      ret.removeField("ok"));
+                                      ret.removeField("ok", BSONObj::WireMessageSizeTrait{}));
         }
 
         const GetMoreCommandRequest _cmd;

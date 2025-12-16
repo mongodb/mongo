@@ -110,6 +110,20 @@ int compareObjects(const BSONObj& firstObj,
     MONGO_UNREACHABLE;
 }
 
+/**
+ * Generic implementation to remove field 'name' from BSONObj 'obj', by producing a new BSONObj in
+ * 'builder' with the leftover fields.
+ */
+void rebuildObjectWithoutField(BSONObjBuilder& builder, const BSONObj& obj, StringData name) {
+    BSONObjIterator i(obj);
+    while (i.more()) {
+        BSONElement e = i.next();
+        StringData fname = e.fieldNameStringData();
+        if (name != fname)
+            builder.append(e);
+    }
+}
+
 }  // namespace
 
 /* BSONObj ------------------------------------------------------------*/
@@ -774,15 +788,15 @@ BSONObj BSONObj::addFields(const BSONObj& from,
 }
 
 BSONObj BSONObj::removeField(StringData name) const {
-    BSONObjBuilder b;
-    BSONObjIterator i(*this);
-    while (i.more()) {
-        BSONElement e = i.next();
-        const char* fname = e.fieldName();
-        if (name != fname)
-            b.append(e);
-    }
-    return b.obj();
+    BSONObjBuilder builder;
+    rebuildObjectWithoutField(builder, *this, name);
+    return builder.obj<DefaultSizeTrait>();
+}
+
+BSONObj BSONObj::removeField(StringData name, WireMessageSizeTrait) const {
+    BSONObjBuilder builder;
+    rebuildObjectWithoutField(builder, *this, name);
+    return builder.obj<WireMessageSizeTrait>();
 }
 
 BSONObj BSONObj::removeFields(const std::set<std::string>& fields) const {

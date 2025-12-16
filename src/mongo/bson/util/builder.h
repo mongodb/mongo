@@ -81,6 +81,14 @@ const int BSONObjMaxUserSize = 16 * 1024 * 1024;
 */
 const int BSONObjMaxInternalSize = BSONObjMaxUserSize + (16 * 1024);
 
+/*
+ * Maximum internal BSONObj size used for wire messages. Using a slightly larger value here than the
+ * BSONObjMaxInternalSize allows for command metadata to be safely added to a command response, and
+ * also allows for safe deserialization thereof. This value should only be used for command
+ * serialization and deserialization, but not for building BSONObjs in any other situation.
+ */
+const int BSONObjMaxWireMessageSize = BSONObjMaxUserSize + (32 * 1024);
+
 /**
  * Maximum size of a builder buffer and for BSONObj with BsonLargeSizeTrait. Limiting it to 27 bits
  * because SharedBuffer::Holder might bit pack information. Setting it to 125 MB to have some

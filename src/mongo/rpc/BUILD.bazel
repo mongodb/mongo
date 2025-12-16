@@ -174,6 +174,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "rpc_test",
     srcs = [
+        "//src/mongo/rpc:data_type_wire_message_payload_test.cpp",
         "//src/mongo/rpc:get_status_from_command_result_test.cpp",
         "//src/mongo/rpc:metadata_test.cpp",
         "//src/mongo/rpc:object_check_test.cpp",

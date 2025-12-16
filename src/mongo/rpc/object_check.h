@@ -42,6 +42,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/wire_message_payload.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 
@@ -56,7 +58,6 @@ class Status;
  */
 template <>
 struct Validator<BSONObj> {
-
     inline static Status validateLoad(const char* ptr, size_t length) {
         if (!serverGlobalParams.objcheck) {
             return Status::OK();
@@ -80,4 +81,27 @@ struct Validator<BSONObj> {
 
     static Status validateStore(const BSONObj& toStore);
 };
+
+/**
+ * A validator for WireMessagePayload objects. The implementation will validate the input object
+ * in the same way as a regular BSONObj. This type is only needed because it is required to be
+ * present by DataType::Handler<WireMessagePayload>.
+ */
+template <>
+struct Validator<WireMessagePayload> {
+    inline static Status validateLoad(const char* ptr, size_t length) {
+        // Reuse BSONObj validation logic.
+        return Validator<BSONObj>::validateLoad(ptr, length);
+    }
+
+    static Status validateStore(const WireMessagePayload& toStore) {
+        invariant(
+            false,
+            "Validator<WireMessagePayload> must only be used to read incoming op_msg requests, and "
+            "never as a serialization sink.");
+
+        MONGO_COMPILER_UNREACHABLE;
+    }
+};
+
 }  // namespace mongo
