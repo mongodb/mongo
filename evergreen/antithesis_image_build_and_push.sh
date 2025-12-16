@@ -75,15 +75,29 @@ if [ $RET -ne 0 ]; then
     exit $RET
 fi
 
-# Push Image
+# Push Config Image
 sudo docker tag "${suite}:$tag" "$antithesis_repo/${task_name}:$tag"
 sudo docker push "$antithesis_repo/${task_name}:$tag"
 
-sudo docker tag "mongo-binaries:$tag" "$antithesis_repo/mongo-binaries:$tag"
-sudo docker push "$antithesis_repo/mongo-binaries:$tag"
+# Push workload and binary images with s3 lock to prevent multiple pushes across different tasks
+set +o errexit
+$python buildscripts/s3_lock.py --bucket mciuploads --key ${project}/${version_id}/${build_variant}/antithesis_lock
+RET=$?
+set -o errexit
 
-sudo docker tag "workload:$tag" "$antithesis_repo/workload:$tag"
-sudo docker push "$antithesis_repo/workload:$tag"
+if [ $RET -eq 0 ]; then
+    echo "Aquired lock for workload and binary images, pushing to antithesis."
+    sudo docker tag "mongo-binaries:$tag" "$antithesis_repo/mongo-binaries:$tag"
+    sudo docker push "$antithesis_repo/mongo-binaries:$tag"
+
+    sudo docker tag "workload:$tag" "$antithesis_repo/workload:$tag"
+    sudo docker push "$antithesis_repo/workload:$tag"
+elif [ $RET -eq 1 ]; then
+    echo "Failed to acquire lock for workload and binary images, skipping push."
+else
+    echo "Error occurred when attempting to acquire s3 lock, exiting."
+    exit 1
+fi
 
 # Logout
 sudo docker logout https://us-central1-docker.pkg.dev

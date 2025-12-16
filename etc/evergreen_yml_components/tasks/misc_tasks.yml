@@ -15,6 +15,10 @@ variables:
         params:
           exec_timeout_secs: 7200 # 2 hrs
           timeout_secs: 600 # 10 mins
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: suite_name
@@ -77,6 +81,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions_and_add_remove_shard
@@ -94,6 +102,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard
@@ -111,6 +123,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: jstestfuzz_sharded_with_config_transitions
@@ -128,6 +144,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: concurrency_sharded_multi_stmt_txn_stepdown_terminate_kill_primary
@@ -145,6 +165,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: concurrency_sharded_stepdown_terminate_kill_primary_with_balancer
@@ -162,6 +186,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: concurrency_sharded_initial_sync
@@ -179,6 +207,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: replica_sets_initsync_jscore_passthrough
@@ -196,6 +228,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: concurrency_sharded_stepdown_terminate_kill_primary_with_balancer
@@ -216,6 +252,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: concurrency_sharded_replication
@@ -237,6 +277,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: core
@@ -254,6 +298,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
@@ -273,6 +321,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: jstestfuzz_sharded
@@ -290,6 +342,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: replica_sets_jscore_passthrough
@@ -307,6 +363,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: replica_sets_lag_oplog_application_jscore_passthrough
@@ -324,6 +384,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: replica_sets_kill_primary_jscore_passthrough
@@ -341,6 +405,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: replica_sets_kill_secondaries_jscore_passthrough
@@ -358,6 +426,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
       - func: "antithesis image build and push"
         vars:
           suite: replica_sets_initsync_lagged_sync_source_jscore_passthrough
