@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bson_utf8.h"
+#include "mongo/db/validate/bson_utf8.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"

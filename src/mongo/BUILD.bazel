@@ -123,7 +123,6 @@ mongo_cc_library(
         "//src/mongo/base:validate_locale.cpp",
         "//src/mongo/bson:bson_comparator_interface_base.cpp",
         "//src/mongo/bson:bson_depth.cpp",
-        "//src/mongo/bson:bson_utf8.cpp",
         "//src/mongo/bson:bsonelement.cpp",
         "//src/mongo/bson:bsonelementvalue.cpp",
         "//src/mongo/bson:bsonmisc.cpp",
