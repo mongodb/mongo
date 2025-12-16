@@ -110,9 +110,6 @@ const long long kInterruptIntervalNumBytes = 50 * 1024 * 1024;  // 50MB.
 static constexpr const char* kSchemaValidationFailedReason =
     "Detected one or more documents not compliant with the collection's schema. Check logs for log "
     "id 5363500.";
-static constexpr const char* kTimeseriesValidationInconsistencyReason =
-    "Detected one or more documents in this collection incompatible with time-series "
-    "specifications. For more info, see logs with log id 6698300.";
 static constexpr const char* kBSONValidationNonConformantReason =
     "Detected one or more documents in this collection not conformant to BSON specifications. For "
     "more info, see logs with log id 6825900";
@@ -1137,7 +1134,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                         "recordId"_attr = record->id,
                         "reason"_attr = bucketStatus);
                     nNonCompliantDocuments++;
-                    results->addError(kTimeseriesValidationInconsistencyReason);
+                    results->addError(bucketStatus.reason());
                 }
                 auto containsMixedSchemaDataResponse =
                     coll->doesTimeseriesBucketsDocContainMixedSchemaData(recordBson);
