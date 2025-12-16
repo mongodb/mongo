@@ -127,6 +127,8 @@ BulkWriteCommandReply bulkWrite(OperationContext* opCtx,
         executeWriteCommand(opCtx, WriteCommandRef{request}, originalCommand));
 }
 
+// TODO(SERVER-115515) Clean up FAM code in UWE (here and across files in
+// mongo/s/write_ops/unified_write_executor/*).
 FindAndModifyCommandResponse findAndModify(
     OperationContext* opCtx,
     const write_ops::FindAndModifyCommandRequest& originalRequest,
