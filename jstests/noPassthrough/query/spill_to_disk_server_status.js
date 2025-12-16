@@ -7,7 +7,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {getPlanStages, getQueryPlanner, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {getEngine, getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {setParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
@@ -145,6 +145,21 @@ function getServerStatusSpillingMetrics(serverStatus, stageName, getLegacy) {
     }
 }
 
+function getClassicFailpointName(explain) {
+    const winningPlan = getWinningPlanFromExplain(explain);
+    return isCollscan(db, winningPlan) ? "hangCollScanDoWork" : "hangFetchDoWork";
+}
+
+function getSbeFailpointName(explain) {
+    const slotBasedPlan = getWinningPlanFromExplain(explain, true /* isSbePlan */);
+    const isScan = slotBasedPlan.stages.includes("scan");
+    if (isScan) {
+        const isGenericScan = slotBasedPlan.stages.includes("scan generic");
+        return isGenericScan ? "hangGenericScanGetNext" : "hangScanGetNext";
+    }
+    return "hangFetchGetNext";
+}
+
 function testSpillingMetrics({
     stageName,
     expectedSpillingMetrics,
@@ -156,23 +171,14 @@ function testSpillingMetrics({
 
     // Check whether the aggregation uses SBE.
     const explain = db[collName].explain().aggregate(pipeline);
-    jsTestLog(explain);
-    const queryPlanner = getQueryPlanner(explain);
-    const isSbe = queryPlanner.winningPlan.hasOwnProperty("slotBasedPlan");
-    const isCollScan = getPlanStages(getWinningPlanFromExplain(explain), "COLLSCAN").length > 0;
+    const isSbePlan = getEngine(explain) === "sbe";
 
     // Collect the serverStatus metrics before the aggregation runs.
-    jsTestLog(stageName);
     const spillingMetrics = [];
     spillingMetrics.push(getServerStatusSpillingMetrics(db.serverStatus(), stageName, getLegacy));
 
     // Run an aggregation and hang at the fail point in the middle of the processing.
-    let failPointName;
-    if (isSbe) {
-        failPointName = isCollScan ? "hangScanGetNext" : "hangFetchGetNext";
-    } else {
-        failPointName = isCollScan ? "hangCollScanDoWork" : "hangFetchDoWork";
-    }
+    const failPointName = isSbePlan ? getSbeFailpointName(explain) : getClassicFailpointName(explain);
     const failPoint = configureFailPoint(db, failPointName, {} /* data */, {"skip": nDocs / 2});
     const awaitShell = startParallelShell(
         funWithArgs(
@@ -204,7 +210,13 @@ function testSpillingMetrics({
     }
 
     // Assert the final spilling metrics are as expected.
-    assert.docEq(isSbe ? expectedSbeSpillingMetrics : expectedSpillingMetrics, spillingMetrics[2], spillingMetrics);
+    const expected = isSbePlan ? expectedSbeSpillingMetrics : expectedSpillingMetrics;
+    const actual = spillingMetrics[2];
+    assert.docEq(
+        expected,
+        actual,
+        `Expected ${expected} but found ${actual}. spillingMetrics=${tojson(spillingMetrics)}`,
+    );
 }
 
 testSpillingMetrics({

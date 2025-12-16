@@ -48,6 +48,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
 
@@ -58,6 +59,11 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+namespace {
+MONGO_FAIL_POINT_DEFINE(hangGenericScanGetNext);
+}  // namespace
+
 namespace sbe {
 GenericScanStage::GenericScanStage(UUID collUuid,
                                    DatabaseName dbName,
@@ -108,6 +114,9 @@ std::unique_ptr<PlanStage> GenericScanStage::clone() const {
 }
 
 PlanState GenericScanStage::getNext() {
+    if (MONGO_unlikely(hangGenericScanGetNext.shouldFail())) {
+        hangGenericScanGetNext.pauseWhileSet();
+    }
     auto optTimer(getOptTimer(_opCtx));
 
     handleInterruptAndSlotAccess();
