@@ -45,7 +45,7 @@
 
 namespace mongo::otel::metrics {
 
-namespace {
+namespace test_util_detail {
 /**
  * The MetricReader is the OTel component that connects the exporter with each registered
  * Instrument. This implementation allows callers to trigger collection on-demand so that unit tests
@@ -79,7 +79,7 @@ private:
 
     std::unique_ptr<opentelemetry::sdk::metrics::PushMetricExporter> _exporter;
 };
-}  // namespace
+}  // namespace test_util_detail
 
 bool isNoopMeter(opentelemetry::metrics::Meter* provider) {
     return !!dynamic_cast<opentelemetry::metrics::NoopMeter*>(provider);
@@ -105,7 +105,7 @@ public:
         auto exporter = opentelemetry::exporter::memory::InMemoryMetricExporterFactory::Create(
             std::move(metrics));
 
-        auto reader = std::make_shared<OnDemandMetricReader>(std::move(exporter));
+        auto reader = std::make_shared<test_util_detail::OnDemandMetricReader>(std::move(exporter));
         _reader = reader.get();
 
         std::shared_ptr<opentelemetry::sdk::metrics::MeterProvider> provider =
@@ -127,7 +127,7 @@ private:
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagOtelMetrics", true};
 
     // Stash the reader so that callers can trigger on-demand metric collection.
-    OnDemandMetricReader* _reader;
+    test_util_detail::OnDemandMetricReader* _reader;
     // This is the in-memory data structure that holds the collected metrics. The exporter writes to
     // this DS, and the get() function will read from it.
     opentelemetry::exporter::memory::SimpleAggregateInMemoryMetricData* _metrics;
