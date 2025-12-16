@@ -480,8 +480,7 @@ using UniqueCertId =
 
 Status getSSLFailure(ErrorCodes::Error code, StringData errorMsg) {
     return Status(code,
-                  str::stream() << "SSL peer certificate revocation status checking failed: "
-                                << errorMsg << " "
+                  str::stream() << errorMsg << " "
                                 << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
 }
 
@@ -526,7 +525,7 @@ StatusWith<UniqueX509> getIssuerCertForCert(SSL_CTX* context,
         storeCtx.get(), X509_LU_X509, X509_get_issuer_name(cert)));
 
     if (obj == nullptr) {
-        return getSSLFailure("Could not get X509 Object from store.");
+        return getSSLFailure("Unable to find issuer certificate from X509 store.");
     }
     return UniqueX509(X509_dup(X509_OBJECT_get0_X509(obj.get())));
 }
@@ -748,13 +747,13 @@ Future<UniqueOCSPResponse> retrieveOCSPResponse(const std::string& host,
     auto len = i2d_OCSP_REQUEST(ocspReq.get(), nullptr);
     std::vector<uint8_t> buffer;
     if (len <= 0) {
-        return getSSLFailure("Could not decode response from responder.");
+        return getSSLFailure("Failed to encode OCSP request into DER format.");
     }
 
     buffer.resize(len);
     auto bufferData = buffer.data();
     if (i2d_OCSP_REQUEST(ocspReq.get(), &bufferData) < 0) {
-        return getSSLFailure("Could not convert type OCSP Response to DER encoded object.");
+        return getSSLFailure("Failed to encode OCSP request into DER format.");
     }
 
     // Query the OCSP responder
@@ -768,7 +767,7 @@ Future<UniqueOCSPResponse> retrieveOCSPResponse(const std::string& host,
                 d2i_OCSP_RESPONSE(nullptr, &respDataPtr, responseData.size()));
 
             if (response == nullptr) {
-                return getSSLFailure("Could not retrieve OCSP Response.");
+                return getSSLFailure("Failed to decode OCSP response from DER format.");
             }
 
             return std::move(response);
@@ -865,9 +864,9 @@ StatusWith<std::pair<OCSPCertIDSet, boost::optional<Date_t>>> iterateResponse(
         auto status = OCSP_single_get0_status(singleResp, &reason, &revtime, &thisupd, &nextupd);
 
         if (status == V_OCSP_CERTSTATUS_REVOKED) {
-            return getSSLFailure(ErrorCodes::OCSPCertificateStatusRevoked,
-                                 str::stream() << "OCSP Certificate Status: Revoked. Reason: "
-                                               << OCSP_crl_reason_str(reason));
+            return Status(ErrorCodes::OCSPCertificateStatusRevoked,
+                          str::stream() << "OCSP Certificate Status: Revoked. Reason: "
+                                        << OCSP_crl_reason_str(reason));
         } else if (status != V_OCSP_CERTSTATUS_GOOD) {
             return getSSLFailure(str::stream()
                                  << "Unexpected OCSP Certificate Status. Reason: " << status);
@@ -907,29 +906,29 @@ StatusWith<std::pair<OCSPCertIDSet, boost::optional<Date_t>>> parseAndValidateOC
     X509* issuerCert,
     const OCSPCertIDSet& certIdsInRequest) {
     // Read the overall status of the OCSP response
-    int responseStatus = OCSP_response_status(response);
-    switch (responseStatus) {
-        case OCSP_RESPONSE_STATUS_SUCCESSFUL:
-            break;
-        case OCSP_RESPONSE_STATUS_MALFORMEDREQUEST:
-        case OCSP_RESPONSE_STATUS_UNAUTHORIZED:
-        case OCSP_RESPONSE_STATUS_SIGREQUIRED:
-            return getSSLFailure(str::stream()
-                                 << "Error querying the OCSP responder, issue with OCSP request. "
-                                 << "Response Status: " << responseStatus);
-        case OCSP_RESPONSE_STATUS_TRYLATER:
-        case OCSP_RESPONSE_STATUS_INTERNALERROR:
-            return getSSLFailure(str::stream()
-                                 << "Error querying the OCSP responder, an error occured in the "
-                                 << "responder itself. Response Status: " << responseStatus);
-        default:
-            return getSSLFailure(str::stream() << "Error querying the OCSP responder. "
-                                               << "Response Status: " << responseStatus);
+    if (auto responseStatus = OCSP_response_status(response);
+        responseStatus != OCSP_RESPONSE_STATUS_SUCCESSFUL) {
+        auto& stream = str::stream() << "Failed to query the OCSP responder - ";
+        switch (responseStatus) {
+            case OCSP_RESPONSE_STATUS_MALFORMEDREQUEST:
+                return getSSLFailure(stream << "Malformed request.");
+            case OCSP_RESPONSE_STATUS_UNAUTHORIZED:
+                return getSSLFailure(stream << "Unauthorized.");
+            case OCSP_RESPONSE_STATUS_SIGREQUIRED:
+                return getSSLFailure(stream << "Signature required.");
+            case OCSP_RESPONSE_STATUS_TRYLATER:
+                return getSSLFailure(stream << "Received 'try later'.");
+            case OCSP_RESPONSE_STATUS_INTERNALERROR:
+                return getSSLFailure(stream << "Internal error in responder.");
+            default:
+                return getSSLFailure(stream << "Response Status: " << responseStatus);
+        }
+        MONGO_UNREACHABLE;
     }
 
     UniqueOcspBasicResp basicResponse(OCSP_response_get1_basic(response));
     if (!basicResponse) {
-        return getSSLFailure("incomplete OCSP response.");
+        return getSSLFailure("Got incomplete OCSP response.");
     }
 
     X509_STORE* store = ca == nullptr ? SSL_CTX_get_cert_store(context) : ca;
@@ -1015,9 +1014,10 @@ Future<OCSPFetchResponse> dispatchOCSPRequests(SSL_CTX* context,
                 });
                 if (!swResponse.isOK()) {
                     if (state->finishLine.arriveWeakly()) {
-                        state->promise.setError(
-                            Status(ErrorCodes::OCSPCertificateStatusUnknown,
-                                   "Could not obtain status information of certificates."));
+                        state->promise.setError(Status(ErrorCodes::OCSPCertificateStatusUnknown,
+                                                       swResponse.getStatus().reason())
+                                                    .withContext("Failed to obtain OCSP revocation "
+                                                                 "status of server certificate."));
                     }
                     return;
                 }
@@ -1050,11 +1050,10 @@ Future<OCSPFetchResponse> dispatchOCSPRequests(SSL_CTX* context,
                     }
                 } else {
                     if (state->finishLine.arriveWeakly()) {
-                        state->promise.setError(
-                            Status(ErrorCodes::OCSPCertificateStatusUnknown,
-                                   swCertIDSetAndDuration.getStatus().reason())
-                                .withContext(
-                                    "Could not obtain status information of certificates"));
+                        state->promise.setError(Status(ErrorCodes::OCSPCertificateStatusUnknown,
+                                                       swCertIDSetAndDuration.getStatus().reason())
+                                                    .withContext("Failed to obtain OCSP revocation "
+                                                                 "status of server certificate."));
                         return;
                     }
                 }
@@ -1142,6 +1141,19 @@ boost::optional<OCSPFetchResponse> lookupOCSPForClient(const OCSPCacheKey& key) 
                                            std::move(swOCSPContext.getValue()),
                                            OCSPPurpose::kClientVerify)
                           .getNoThrow();
+
+    // Assert dispatchOCSPRequests always sets a OCSPCertificateStatusUnknown status on
+    // future completion when an SSL error is encountered and it was unable to obtain
+    // a valid OCSP response.
+    dassert(swResponse.isOK() ||
+            swResponse.getStatus() == ErrorCodes::OCSPCertificateStatusUnknown);
+    LOGV2_INFO(8464501, "OCSP fetch status", "status"_attr = swResponse.getStatus());
+    if (swResponse.isOK()) {
+        LOGV2_INFO(8464502,
+                   "OCSP peer certificate revocation status",
+                   "status"_attr = swResponse.getValue().statusOfResponse);
+    }
+
     if (!swResponse.isOK() || !swResponse.getValue().cacheable()) {
         // if the response is unknown or not cacheable, (ie. because of
         // a missing nextUpdate field), then return none so that the
@@ -2003,10 +2015,9 @@ int ocspClientCallback(SSL* ssl, void* arg) {
     // CRLs or check with the OCSP responder ourselves. If it is true, then we are done.
     if (!swStapleOK.isOK()) {
         if (swStapleOK.getStatus() == ErrorCodes::OCSPCertificateStatusRevoked) {
-            LOGV2_DEBUG(23225,
-                        1,
-                        "Stapled OCSP Response validation failed",
-                        "error"_attr = swStapleOK.getStatus());
+            LOGV2_INFO(23225,
+                       "Stapled OCSP Response validation failed",
+                       "error"_attr = swStapleOK.getStatus());
             return OCSP_CLIENT_RESPONSE_NOT_ACCEPTABLE;
         }
 
@@ -2016,10 +2027,9 @@ int ocspClientCallback(SSL* ssl, void* arg) {
 
         return OCSP_CLIENT_RESPONSE_ERROR;
     } else if (!swStapleOK.getValue()) {
-        LOGV2_DEBUG(23226,
-                    1,
-                    "Stapled Certificate validation failed: Stapled response does not contain "
-                    "status information regarding the peer certificate.");
+        LOGV2_INFO(23226,
+                   "Stapled Certificate validation failed: Stapled response does not contain "
+                   "status information regarding the peer certificate.");
         return OCSP_CLIENT_RESPONSE_NOT_ACCEPTABLE;
     }
 
@@ -2317,12 +2327,12 @@ Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
     // Generate a new verified X509StoreContext to get our own certificate chain
     UniqueX509StoreCtx storeCtx(X509_STORE_CTX_new());
     if (!storeCtx) {
-        return getSSLFailure("Could not create X509 store.");
+        return getSSLFailure("Failed to create an X509 store context.");
     }
 
     X509_STORE* store = _ca ? _ca.get() : SSL_CTX_get_cert_store(_context);
     if (X509_STORE_CTX_init(storeCtx.get(), store, NULL, NULL) == 0) {
-        return getSSLFailure("Could not initialize the X509 Store Context.");
+        return getSSLFailure("Failed to initialize the X509 store context.");
     }
 
     X509_STORE_CTX_set_cert(storeCtx.get(), _cert);
@@ -2332,7 +2342,7 @@ Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
     X509_STORE_CTX_set_chain(storeCtx.get(), sk);
 
     if (X509_verify_cert(storeCtx.get()) <= 0) {
-        return getSSLFailure("Could not verify X509 certificate store for OCSP Stapling.");
+        return getSSLFailure("Failed to verify the configured server X509 certificate.");
     }
 
     // Extract the chain from the verified X509StoreCtx
@@ -2359,6 +2369,12 @@ Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
                     return kOCSPUnknownStatusRefreshRate;
                 }
 
+                // Assert dispatchOCSPRequests always sets a OCSPCertificateStatusUnknown status on
+                // future completion when an SSL error is encountered and it was unable to obtain
+                // a valid OCSP response.
+                dassert(swResponse.isOK() ||
+                        swResponse.getStatus() == ErrorCodes::OCSPCertificateStatusUnknown);
+
                 // protect against pf going out of scope when asynchronous
                 if (promise != nullptr) {
                     promise->setWith([&] {
@@ -2368,7 +2384,12 @@ Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
                     });
                 }
 
-                LOGV2_INFO(577163, "OCSP response", "status"_attr = swResponse.getStatus());
+                LOGV2_INFO(577163, "OCSP fetch status", "status"_attr = swResponse.getStatus());
+                if (swResponse.isOK()) {
+                    LOGV2_INFO(8464500,
+                               "OCSP revocation status",
+                               "status"_attr = swResponse.getValue().statusOfResponse);
+                }
                 return _manager->updateOcspStaplingContextWithResponse(std::move(swResponse));
             });
 }
