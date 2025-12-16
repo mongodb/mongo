@@ -36,9 +36,7 @@
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/idl/server_parameter_test_controller.h"
-#include "mongo/transport/mock_session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -871,99 +869,6 @@ TEST(CurOpTest, ShouldReportIsFromUserConnection) {
     ASSERT_TRUE(bsonObjUserConn.hasField("isFromUserConnection"));
     ASSERT_FALSE(bsonObj.getField("isFromUserConnection").Bool());
     ASSERT_TRUE(bsonObjUserConn.getField("isFromUserConnection").Bool());
-}
-
-class MockMaintenanceSession : public transport::MockSession {
-public:
-    explicit MockMaintenanceSession(transport::TransportLayer* tl) : MockSession(tl) {}
-
-    bool isConnectedToMaintenancePort() const override {
-        return true;
-    }
-};
-
-TEST(CurOpTest, ShouldNotReportIsFromMaintenancePortConnectionWhenFFDisabled) {
-    gFeatureFlagDedicatedPortForMaintenanceOperations.setForServerParameter(false);
-
-    QueryTestServiceContext serviceContext;
-    auto opCtx = serviceContext.makeOperationContext();
-    auto client = serviceContext.getClient();
-
-    // Mock a client with a user connection.
-    transport::TransportLayerMock transportLayer;
-    transportLayer.createSessionHook = [](transport::TransportLayer* tl) {
-        return std::make_shared<MockMaintenanceSession>(tl);
-    };
-    auto clientMaintenanceConn = serviceContext.getServiceContext()->getService()->makeClient(
-        "maintenanceConn", transportLayer.createSession());
-
-    auto curop = CurOp::get(*opCtx);
-
-    BSONObjBuilder curOpObj;
-    BSONObjBuilder curOpObjMaintenanceConn;
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
-
-        // Serialization Context on expression context should be non-empty in
-        // reportCurrentOpForClient.
-        auto sc = SerializationContext(SerializationContext::Source::Command,
-                                       SerializationContext::CallerType::Reply,
-                                       SerializationContext::Prefix::ExcludePrefix);
-        auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss, sc);
-
-        curop->reportCurrentOpForClient(expCtx, client, false, &curOpObj);
-        curop->reportCurrentOpForClient(
-            expCtx, clientMaintenanceConn.get(), false, &curOpObjMaintenanceConn);
-    }
-    auto bsonObj = curOpObj.done();
-    auto bsonObjMaintenanceConn = curOpObjMaintenanceConn.done();
-
-    ASSERT_FALSE(bsonObj.hasField("isFromMaintenancePortConnection"));
-    ASSERT_FALSE(bsonObjMaintenanceConn.hasField("isFromMaintenancePortConnection"));
-}
-
-TEST(CurOpTest, ShouldReportIsFromMaintenancePortConnection) {
-    gFeatureFlagDedicatedPortForMaintenanceOperations.setForServerParameter(true);
-
-    QueryTestServiceContext serviceContext;
-    auto opCtx = serviceContext.makeOperationContext();
-    auto client = serviceContext.getClient();
-
-    // Mock a client with a user connection.
-    transport::TransportLayerMock transportLayer;
-    transportLayer.createSessionHook = [](transport::TransportLayer* tl) {
-        return std::make_shared<MockMaintenanceSession>(tl);
-    };
-    auto clientMaintenanceConn = serviceContext.getServiceContext()->getService()->makeClient(
-        "maintenanceConn", transportLayer.createSession());
-
-    auto curop = CurOp::get(*opCtx);
-
-    BSONObjBuilder curOpObj;
-    BSONObjBuilder curOpObjMaintenanceConn;
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
-
-        // Serialization Context on expression context should be non-empty in
-        // reportCurrentOpForClient.
-        auto sc = SerializationContext(SerializationContext::Source::Command,
-                                       SerializationContext::CallerType::Reply,
-                                       SerializationContext::Prefix::ExcludePrefix);
-        auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss, sc);
-
-        curop->reportCurrentOpForClient(expCtx, client, false, &curOpObj);
-        curop->reportCurrentOpForClient(
-            expCtx, clientMaintenanceConn.get(), false, &curOpObjMaintenanceConn);
-    }
-    auto bsonObj = curOpObj.done();
-    auto bsonObjMaintenanceConn = curOpObjMaintenanceConn.done();
-
-    ASSERT_TRUE(bsonObj.hasField("isFromMaintenancePortConnection"));
-    ASSERT_TRUE(bsonObjMaintenanceConn.hasField("isFromMaintenancePortConnection"));
-    ASSERT_FALSE(bsonObj.getField("isFromMaintenancePortConnection").Bool());
-    ASSERT_TRUE(bsonObjMaintenanceConn.getField("isFromMaintenancePortConnection").Bool());
 }
 
 TEST(CurOpTest, ElapsedTimeReflectsTickSource) {

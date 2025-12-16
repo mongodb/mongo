@@ -2,7 +2,6 @@
  * Confirms that the log output for find and getMore are in the expected format.
  * @tags: [requires_profiling]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 function assertLogLineContains(conn, parts) {
@@ -58,21 +57,12 @@ cursor.next(); // Perform initial query and retrieve first document in batch.
 
 let cursorid = getLatestProfilerEntry(testDB).cursorid;
 
-let maintenancePortFFEnabled = FeatureFlagUtil.isPresentAndEnabled(testDB, "DedicatedPortForMaintenanceOperations");
-
-let logLine = maintenancePortFFEnabled
-    ? [
-          '"msg":"Slow query","attr":{"type":"command",',
-          '"isFromUserConnection":true,"isFromMaintenancePortConnection":false,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
-          '"command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
-          '"planCacheShapeHash":',
-      ]
-    : [
-          '"msg":"Slow query","attr":{"type":"command",',
-          '"isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
-          '"command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
-          '"planCacheShapeHash":',
-      ];
+let logLine = [
+    '"msg":"Slow query","attr":{"type":"command",',
+    '"isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
+    '"command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
+    '"planCacheShapeHash":',
+];
 
 // Check the logs to verify that find appears as above.
 assertLogLineContains(conn, logLine);
@@ -93,21 +83,13 @@ function cursorIdToString(cursorId) {
     return cursorIdString.substring('NumberLong("'.length, cursorIdString.length - '")'.length);
 }
 
-logLine = maintenancePortFFEnabled
-    ? [
-          '"msg":"Slow query"',
-          '"attr":{"type":"command","isFromUserConnection":true,"isFromMaintenancePortConnection":false,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell"',
-          `"command":{"getMore":${cursorIdToString(cursorid)},"collection":"test","batchSize":5,`,
-          '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
-          '"planCacheShapeHash":',
-      ]
-    : [
-          '"msg":"Slow query"',
-          '"attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell"',
-          `"command":{"getMore":${cursorIdToString(cursorid)},"collection":"test","batchSize":5,`,
-          '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
-          '"planCacheShapeHash":',
-      ];
+logLine = [
+    '"msg":"Slow query"',
+    '"attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell"',
+    `"command":{"getMore":${cursorIdToString(cursorid)},"collection":"test","batchSize":5,`,
+    '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
+    '"planCacheShapeHash":',
+];
 
 assertLogLineContains(conn, logLine);
 
@@ -117,19 +99,12 @@ cursorid = getLatestProfilerEntry(testDB).cursorid;
 
 assert.eq(cursor.itcount(), 10);
 
-logLine = maintenancePortFFEnabled
-    ? [
-          '"msg":"Slow query"',
-          '"attr":{"type":"command","isFromUserConnection":true,"isFromMaintenancePortConnection":false,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
-          `"command":{"getMore":${cursorIdToString(cursorid)},"collection":"test"`,
-          '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0}}}],"cursor":{"batchSize":0},"hint":{"a":1}',
-      ]
-    : [
-          '"msg":"Slow query"',
-          '"attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
-          `"command":{"getMore":${cursorIdToString(cursorid)},"collection":"test"`,
-          '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0}}}],"cursor":{"batchSize":0},"hint":{"a":1}',
-      ];
+logLine = [
+    '"msg":"Slow query"',
+    '"attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
+    `"command":{"getMore":${cursorIdToString(cursorid)},"collection":"test"`,
+    '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0}}}],"cursor":{"batchSize":0},"hint":{"a":1}',
+];
 
 assertLogLineContains(conn, logLine);
 

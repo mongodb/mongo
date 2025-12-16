@@ -37,7 +37,6 @@
 
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -68,8 +67,7 @@ struct ClientSummary {
           remote(c->session()->remote()),
           sourceClient(c->session()->getSourceRemoteEndpoint()),
           id(c->session()->id()),
-          isLoadBalanced(c->session()->isConnectedToLoadBalancerPort()),
-          isMaintenance(c->session()->isConnectedToMaintenancePort()) {}
+          isLoadBalanced(c->session()->isConnectedToLoadBalancerPort()) {}
 
     friend logv2::DynamicAttributes logAttrs(const ClientSummary& m) {
         logv2::DynamicAttributes attrs;
@@ -77,9 +75,6 @@ struct ClientSummary {
         attrs.add("isLoadBalanced", m.isLoadBalanced);
         if (m.isLoadBalanced) {
             attrs.add("sourceClient", m.sourceClient);
-        }
-        if (gFeatureFlagDedicatedPortForMaintenanceOperations.isEnabled()) {
-            attrs.add("isMaintenance", m.isMaintenance);
         }
         attrs.add("uuid", m.uuid);
         attrs.add("connectionId", m.id);
@@ -92,7 +87,6 @@ struct ClientSummary {
     HostAndPort sourceClient;
     SessionId id;
     bool isLoadBalanced;
-    bool isMaintenance;
 };
 
 bool quiet() {
