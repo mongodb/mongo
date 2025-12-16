@@ -529,86 +529,66 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
     const NamespaceStringOrUUID& nsOrUUID,
     const std::vector<std::vector<FLEEdgePrfBlock>>& escDerivedFromDataTokens,
     FLETagQueryInterface::TagQueryType type) {
+    const auto collectionAcquisition = acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nsOrUUID, AcquisitionPrerequisites::kRead));
 
-    auto opStr = "getTagsFromStorage"_sd;
+    const auto& collectionPtr = collectionAcquisition.getCollectionPtr();
 
-#ifdef MONGO_CONFIG_DEBUG_BUILD
-    // TODO SERVER-114536: If a lock-free read is active and we enter this function the operation
-    // could force us to abandon the snapshot opened. This could cause the acquisition held above
-    // this call to become invalid by accident. We disable the checks temporarily until a more
-    // permanent fix is in place.
-    DisableCollectionConsistencyChecks disableChecks{opCtx};
-#endif
-    return writeConflictRetry(
-        opCtx, opStr, nsOrUUID, [&]() -> std::vector<std::vector<FLEEdgeCountInfo>> {
-            const auto collectionAcquisition = acquireCollectionMaybeLockFree(
-                opCtx,
-                CollectionAcquisitionRequest::fromOpCtx(
-                    opCtx, nsOrUUID, AcquisitionPrerequisites::kRead));
+    // If there is no collection, run through the algorithm with a special reader that only
+    // returns empty documents. This simplifies the implementation of other readers.
+    if (!collectionAcquisition.exists()) {
+        MissingCollectionReader reader;
+        return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
+    }
 
-            const auto& collectionPtr = collectionAcquisition.getCollectionPtr();
+    // numRecords is signed so guard against negative numbers
+    auto docCountSigned = collectionPtr->numRecords(opCtx);
+    uint64_t docCount = docCountSigned < 0 ? 0 : static_cast<uint64_t>(docCountSigned);
 
-            // If there is no collection, run through the algorithm with a special reader that only
-            // returns empty documents. This simplifies the implementation of other readers.
-            if (!collectionAcquisition.exists()) {
-                MissingCollectionReader reader;
-                return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
-            }
+    std::unique_ptr<SeekableRecordCursor> cursor = collectionPtr->getCursor(opCtx, true);
 
-            // numRecords is signed so guard against negative numbers
-            auto docCountSigned = collectionPtr->numRecords(opCtx);
-            uint64_t docCount = docCountSigned < 0 ? 0 : static_cast<uint64_t>(docCountSigned);
+    // If clustered collection, we have simpler searches
+    if (collectionPtr->isClustered() &&
+        collectionPtr->getClusteredInfo()
+                ->getIndexSpec()
+                .getKey()
+                .firstElement()
+                .fieldNameStringData() == "_id"_sd) {
 
-            std::unique_ptr<SeekableRecordCursor> cursor = collectionPtr->getCursor(opCtx, true);
+        StorageEngineClusteredCollectionReader reader(opCtx, docCount, nsOrUUID, cursor.get());
 
-            // If clustered collection, we have simpler searches
-            if (collectionPtr->isClustered() &&
-                collectionPtr->getClusteredInfo()
-                        ->getIndexSpec()
-                        .getKey()
-                        .firstElement()
-                        .fieldNameStringData() == "_id"_sd) {
+        return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
+    }
 
-                StorageEngineClusteredCollectionReader reader(
-                    opCtx, docCount, nsOrUUID, cursor.get());
+    // Non-clustered case, we need to look a index entry in _id index and then the
+    // collection
+    auto indexCatalog = collectionPtr->getIndexCatalog();
 
-                return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
-            }
+    const auto indexEntry = indexCatalog->findIndexByName(
+        opCtx, IndexConstants::kIdIndexName, IndexCatalog::InclusionPolicy::kReady);
+    if (!indexEntry) {
+        uasserted(ErrorCodes::IndexNotFound,
+                  str::stream() << "Index not found, ns:" << toStringForLogging(nsOrUUID)
+                                << ", index: " << IndexConstants::kIdIndexName);
+    }
 
-            // Non-clustered case, we need to look a index entry in _id index and then the
-            // collection
-            auto indexCatalog = collectionPtr->getIndexCatalog();
+    if (indexEntry->descriptor()->isPartial()) {
+        uasserted(ErrorCodes::IndexOptionsConflict,
+                  str::stream() << "Partial index is not allowed for this operation, ns:"
+                                << toStringForLogging(nsOrUUID)
+                                << ", index: " << IndexConstants::kIdIndexName);
+    }
 
-            const auto indexEntry = indexCatalog->findIndexByName(
-                opCtx, IndexConstants::kIdIndexName, IndexCatalog::InclusionPolicy::kReady);
-            if (!indexEntry) {
-                uasserted(ErrorCodes::IndexNotFound,
-                          str::stream() << "Index not found, ns:" << toStringForLogging(nsOrUUID)
-                                        << ", index: " << IndexConstants::kIdIndexName);
-            }
+    auto indexCatalogEntry = indexEntry->shared_from_this();
 
-            if (indexEntry->descriptor()->isPartial()) {
-                uasserted(ErrorCodes::IndexOptionsConflict,
-                          str::stream() << "Partial index is not allowed for this operation, ns:"
-                                        << toStringForLogging(nsOrUUID)
-                                        << ", index: " << IndexConstants::kIdIndexName);
-            }
+    auto sdi = indexCatalogEntry->accessMethod()->asSortedData();
+    auto indexCursor = sdi->newCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), true);
 
-            auto indexCatalogEntry = indexEntry->shared_from_this();
+    StorageEngineIndexCollectionReader reader(
+        opCtx, docCount, nsOrUUID, cursor.get(), sdi->getSortedDataInterface(), indexCursor.get());
 
-            auto sdi = indexCatalogEntry->accessMethod()->asSortedData();
-            auto indexCursor =
-                sdi->newCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), true);
-
-            StorageEngineIndexCollectionReader reader(opCtx,
-                                                      docCount,
-                                                      nsOrUUID,
-                                                      cursor.get(),
-                                                      sdi->getSortedDataInterface(),
-                                                      indexCursor.get());
-
-            return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
-        });
+    return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
 }
 
 }  // namespace mongo
