@@ -1611,4 +1611,86 @@ void ExpressionBenchmarkFixture::benchmarkPercentile(benchmark::State& state,
 }
 
 
+/**
+ * Tests performance of $reduce that sums an array.
+ */
+void ExpressionBenchmarkFixture::benchmarkReduceSum(benchmark::State& state) {
+    const size_t numEntries = 16 * 1000;
+    BSONArray entries = rangeBSONArray(numEntries);
+
+    BSONObj constantDepthExpr = BSON("$sum" << BSON_ARRAY("$$value" << 1));
+
+    BSONObj reduceExpression =
+        BSON("$reduce" << BSON("input"
+                               << "$entries"
+                               << "initialValue" << 0 << "in" << constantDepthExpr));
+
+    benchmarkExpression(
+        reduceExpression, state, std::vector<Document>(1, {{"entries"_sd, entries}}));
+}
+
+/**
+ * Tests performance of $reduce that's equivalent to the identity function (uses $concatArrays
+ * to build the same array again).
+ */
+void ExpressionBenchmarkFixture::benchmarkReduceConcatArrays(benchmark::State& state) {
+    const size_t numEntries = 1000;
+    BSONArray entries = rangeBSONArray(numEntries);
+
+    BSONArray emptyArray = rangeBSONArray(0);
+
+    BSONObj reduceExpression =
+        BSON("$reduce" << BSON("input"
+                               << "$entries"
+                               << "initialValue" << emptyArray << "in"
+                               << BSON("$concatArrays"
+                                       << BSON_ARRAY("$$value" << BSON_ARRAY("$$this")))));
+
+    benchmarkExpression(
+        reduceExpression, state, std::vector<Document>(1, {{"entries"_sd, entries}}));
+}
+
+
+/**
+ * Tests performance of $reduce that transforms an array into a deeply nested document.
+ *
+ *     "$reduce": {
+ *         "input": "$entries",
+ *         "initialValue": [],
+ *         "in": {"a": {"a" : {"a": ... {"a": {}}}}}
+ *     }
+ *
+ * The nestedness of the "in" expression is configured by 'perIterationNestingDepth'.
+ */
+void ExpressionBenchmarkFixture::benchmarkReduceCreatingNestedObject(
+    benchmark::State& state, size_t perIterationNestingDepth) {
+    const size_t numEntries = 16 * 8 / perIterationNestingDepth;
+    BSONArray entries = rangeBSONArray(numEntries);
+    BSONObj recursiveObject = BSON("a"
+                                   << "$$value");
+    for (size_t depth = 1; depth < perIterationNestingDepth; depth++) {
+        recursiveObject = BSON("a" << recursiveObject);
+    }
+    BSONArray emptyArray = rangeBSONArray(0);
+    BSONObj reduceExpression =
+        BSON("$reduce" << BSON("input"
+                               << "$entries"
+                               << "initialValue" << emptyArray << "in" << recursiveObject));
+    benchmarkExpression(
+        reduceExpression, state, std::vector<Document>(1, {{"entries"_sd, entries}}));
+}
+
+
+void ExpressionBenchmarkFixture::benchmarkReduceCreatingNestedObject1(benchmark::State& state) {
+    benchmarkReduceCreatingNestedObject(state, 1);
+}
+void ExpressionBenchmarkFixture::benchmarkReduceCreatingNestedObject2(benchmark::State& state) {
+    benchmarkReduceCreatingNestedObject(state, 2);
+}
+void ExpressionBenchmarkFixture::benchmarkReduceCreatingNestedObject4(benchmark::State& state) {
+    benchmarkReduceCreatingNestedObject(state, 4);
+}
+void ExpressionBenchmarkFixture::benchmarkReduceCreatingNestedObject8(benchmark::State& state) {
+    benchmarkReduceCreatingNestedObject(state, 8);
+}
 }  // namespace mongo

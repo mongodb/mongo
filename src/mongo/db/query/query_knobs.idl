@@ -1257,6 +1257,19 @@ server_parameters:
     default: false
     redact: false
 
+  internalReduceAccumulatedValueDepthCheckInterval:
+    description: >-
+        Configures how frequently $reduce checks if its accumulated value has exceeded the maximum
+        allowable nestedness. Arrays and subdocuments both count. If set to 0, no check is performed.
+    set_at: [startup, runtime]
+    cpp_vartype: "AtomicWord<long long>"
+    cpp_varname: gInternalReduceAccumulatedValueDepthCheckInterval
+    default: 16
+    validator:
+        gte: 0
+        lte: 1048576 # 1024 ** 2
+    redact: false
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

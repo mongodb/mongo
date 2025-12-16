@@ -2861,6 +2861,10 @@ public:
         return visitor->visit(this);
     }
 
+    size_t getAccumulatedValueDepthCheckInterval() const {
+        return _accumulatedValueDepthCheckInterval;
+    }
+
 private:
     static constexpr size_t _kInput = 0;
     static constexpr size_t _kInitial = 1;
@@ -2868,6 +2872,9 @@ private:
 
     Variables::Id _thisVar;
     Variables::Id _valueVar;
+
+    const size_t _accumulatedValueDepthCheckInterval =
+        gInternalReduceAccumulatedValueDepthCheckInterval.load();
 };
 
 
