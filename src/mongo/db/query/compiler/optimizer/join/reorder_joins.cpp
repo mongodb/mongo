@@ -380,8 +380,9 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(const JoinReorderingConte
 }
 
 ReorderedJoinSolution constructSolutionBottomUp(const JoinReorderingContext& ctx,
+                                                JoinCardinalityEstimator estimator,
                                                 PlanTreeShape shape) {
-    PlanEnumeratorContext peCtx(ctx);
+    PlanEnumeratorContext peCtx(ctx, estimator);
 
     peCtx.enumerateJoinSubsets(shape);
     auto bestPlanNodeId = peCtx.getBestFinalPlan();

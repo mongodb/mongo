@@ -181,22 +181,187 @@ TEST_F(JoinPredicateEstimatorFixture, ExtractNodeCardinalities) {
     const auto aCE = CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling};
     const auto bCE = CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling};
 
-    SingleTableAccessPlansResult singleTablePlansRes;
+    cost_based_ranker::EstimateMap estimates;
     {
         auto aPlan = makeCollScanPlan(aNss);
-        singleTablePlansRes.estimate[aPlan->root()] = {inCE, aCE};
-        singleTablePlansRes.solns[graph.getNode(aNodeId).accessPath.get()] = std::move(aPlan);
+        estimates[aPlan->root()] = {inCE, aCE};
+        ctx.cbrCqQsns[graph.getNode(aNodeId).accessPath.get()] = std::move(aPlan);
     }
     {
         auto bPlan = makeCollScanPlan(bNss);
-        singleTablePlansRes.estimate[bPlan->root()] = {inCE, bCE};
-        singleTablePlansRes.solns[graph.getNode(bNodeId).accessPath.get()] = std::move(bPlan);
+        estimates[bPlan->root()] = {inCE, bCE};
+        ctx.cbrCqQsns[graph.getNode(bNodeId).accessPath.get()] = std::move(bPlan);
     }
 
-    auto nodeCardinalities =
-        JoinCardinalityEstimator::extractNodeCardinalities(ctx, singleTablePlansRes);
+    auto nodeCardinalities = JoinCardinalityEstimator::extractNodeCardinalities(ctx, estimates);
     ASSERT_EQ(2U, nodeCardinalities.size());
     ASSERT_EQ(aCE, nodeCardinalities[aNodeId]);
     ASSERT_EQ(bCE, nodeCardinalities[bNodeId]);
+}
+
+namespace {
+void pushNNodes(JoinGraph& graph, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        auto nss =
+            NamespaceString::createNamespaceString_forTest("test", str::stream() << "nss" << i);
+        graph.addNode(nss, nullptr, boost::none);
+    }
+}
+}  // namespace
+
+TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinality) {
+    // Construct 6 nodes, with single-table CEs that are multiples of 10. Node 0 will be ignored in
+    // the rest of the test; it is only there for easy math.
+    size_t numNodes = 6;
+    pushNNodes(graph, numNodes);
+    NodeCardinalities nodeCEs{oneCE, oneCE * 10, oneCE * 20, oneCE * 30, oneCE * 40, oneCE * 50};
+
+    /**
+     * Construct a graph like so
+     * 0 -- 1 -- 2 -- 3
+     *               /  \
+     *              4 -- 5
+     * With edge selectivies that are multiples of 0.1.
+     * Note: There is one cycle here between nodes 3, 4, and 5. There are no other cycles (implicit
+     * or explicit).
+     */
+    graph.addSimpleEqualityEdge(NodeId(0), NodeId(1), 0, 1);
+    graph.addSimpleEqualityEdge(NodeId(1), NodeId(2), 2, 3);
+    graph.addSimpleEqualityEdge(NodeId(2), NodeId(3), 4, 5);
+    graph.addSimpleEqualityEdge(NodeId(3), NodeId(4), 6, 7);
+    graph.addSimpleEqualityEdge(NodeId(4), NodeId(5), 7, 8);
+    graph.addSimpleEqualityEdge(NodeId(3), NodeId(5), 6, 8);
+
+    EdgeSelectivities edgeSels;
+    for (size_t i = 0; i < numNodes; i++) {
+        edgeSels.push_back(cost_based_ranker::SelectivityEstimate(SelectivityType(i * 0.1),
+                                                                  EstimationSource::Sampling));
+    }
+
+    JoinCardinalityEstimator jce(edgeSels, nodeCEs);
+    {
+        // Cardinality for subset of size 1 is pulled directly from the CE map.
+        ASSERT_EQ(oneCE * 10, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1)));
+        ASSERT_EQ(oneCE * 20, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(2)));
+        ASSERT_EQ(oneCE * 30, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(3)));
+        ASSERT_EQ(oneCE * 40, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(4)));
+        ASSERT_EQ(oneCE * 50, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(5)));
+    }
+    {
+        // Connected sub-graph cardinality is a combo of single-table CEs and edge selectivities.
+        ASSERT_EQ(oneCE * 10 * 20 * 0.1,
+                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 2)));
+        ASSERT_EQ(oneCE * 30 * 40 * 0.3,
+                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(3, 4)));
+
+        ASSERT_EQ(oneCE * 10 * 20 * 30 * 0.1 * 0.2,
+                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 2, 3)));
+        ASSERT_EQ(oneCE * 20 * 30 * 40 * 0.2 * 0.3,
+                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(2, 3, 4)));
+
+        ASSERT_EQ(oneCE * 10 * 20 * 30 * 50 * 0.1 * 0.2 * 0.5,
+                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 2, 3, 5)));
+    }
+
+    {
+        // Disconnected sub-graph cardinality includes some cross-products.
+        ASSERT_EQ(oneCE * 20 * 40, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(2, 4)));
+        ASSERT_EQ(oneCE * 10 * 30 * 40 * 0.3,
+                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 3, 4)));
+    }
+
+    {
+        // TODO SERVER-115559: Adjust the assertions made here when we implement cycle breaking.
+        // Cycle cardinality estimation should not involve all edges in the cycle.
+        ASSERT_EQ(oneCE * 30 * 40 * 50 * 0.3 * 0.4 * 0.5,
+                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(3, 4, 5)));
+
+        ASSERT_EQ(oneCE * 10 * 20 * 30 * 40 * 50 * 0.1 * 0.2 * 0.3 * 0.4 * 0.5,
+                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 2, 3, 4, 5)));
+    }
+}
+
+// Similar to the test above, but verifies that path IDs are considered when determining the
+// presence of cycles.
+TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinalityAlmostCycle) {
+    size_t numNodes = 4;
+    pushNNodes(graph, numNodes);
+    NodeCardinalities nodeCEs{oneCE, oneCE * 10, oneCE * 20, oneCE * 30};
+
+    /**
+     * Construct a graph like so
+     * 0 -- 1
+     *     /  \
+     *    2 -- 3
+     * Note: There is NO cycle here, because the path IDs chosen for the edges are different.
+     */
+    graph.addSimpleEqualityEdge(NodeId(0), NodeId(1), 0, 1);
+    graph.addSimpleEqualityEdge(NodeId(1), NodeId(2), 2, 3);
+    graph.addSimpleEqualityEdge(NodeId(2), NodeId(3), 4, 5);
+    graph.addSimpleEqualityEdge(NodeId(1), NodeId(3), 6, 7);
+
+    EdgeSelectivities edgeSels;
+    for (size_t i = 0; i < numNodes; i++) {
+        edgeSels.push_back(cost_based_ranker::SelectivityEstimate(SelectivityType(i * 0.1),
+                                                                  EstimationSource::Sampling));
+    }
+
+    JoinCardinalityEstimator jce(edgeSels, nodeCEs);
+    ASSERT_EQ(oneCE * 10 * 20 * 30 * 0.1 * 0.2 * 0.3,
+              jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 2, 3)));
+}
+
+TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinalitySameCollectionPresentTwice) {
+    auto nssOne = NamespaceString::createNamespaceString_forTest("test", str::stream() << "nssOne");
+    auto nssTwo = NamespaceString::createNamespaceString_forTest("test", str::stream() << "nssTwo");
+
+    std::string fieldNameA = str::stream() << "a" << 0;
+    auto filterBSONA = BSON(fieldNameA << BSON("$gt" << 0));
+
+    std::string fieldNameB = str::stream() << "b" << 0;
+    auto filterBSONB = BSON(fieldNameB << BSON("$gt" << 0));
+
+    // The first reference to nssOne has a filter on field "a".
+    auto cqA = makeCanonicalQuery(nssOne, filterBSONA);
+    ASSERT_TRUE(graph.addNode(nssOne, std::move(cqA), boost::none).has_value());
+
+    // The second reference to nssOne has a filter on field "b". This node will have larger CE.
+    auto cqB = makeCanonicalQuery(nssOne, filterBSONB);
+    ASSERT_TRUE(graph.addNode(nssOne, std::move(cqB), boost::none).has_value());
+
+    // Finally, there is a node in between for nssTwo.
+    auto cqNssTwo = makeCanonicalQuery(nssTwo, filterBSONA);
+    ASSERT_TRUE(graph.addNode(nssTwo, std::move(cqNssTwo), boost::none).has_value());
+
+    // Finalize graph:
+    // 0   1
+    //  \ /
+    //   2
+    graph.addSimpleEqualityEdge(NodeId(0), NodeId(2), 0, 1);
+    graph.addSimpleEqualityEdge(NodeId(1), NodeId(2), 2, 3);
+    EdgeSelectivities edgeSels;
+    for (size_t i = 0; i < 2; i++) {
+        edgeSels.push_back(cost_based_ranker::SelectivityEstimate(SelectivityType((i + 1) * 0.1),
+                                                                  EstimationSource::Sampling));
+    }
+    NodeCardinalities nodeCEs{
+        oneCE * 10,
+        oneCE * 20,
+        oneCE * 30,
+    };
+    JoinCardinalityEstimator jce(edgeSels, nodeCEs);
+
+    // Show that even though the namespace is the same for two of the nodes, we are able to
+    // correctly associate CE with the particular filters associated with those nodes.
+    ASSERT_EQ(oneCE * 10, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(0)));
+    ASSERT_EQ(oneCE * 20, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1)));
+    ASSERT_EQ(oneCE * 30, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(2)));
+
+    ASSERT_EQ(oneCE * 10 * 20, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(0, 1)));
+    ASSERT_EQ(oneCE * 10 * 30 * 0.1, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(0, 2)));
+    ASSERT_EQ(oneCE * 20 * 30 * 0.2, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 2)));
+
+    ASSERT_EQ(oneCE * 10 * 20 * 30 * 0.1 * 0.2,
+              jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(0, 1, 2)));
 }
 }  // namespace mongo::join_ordering

@@ -47,6 +47,11 @@ using NodeCardinalities = std::vector<cost_based_ranker::CardinalityEstimate>;
 using EdgeSelectivities = std::vector<cost_based_ranker::SelectivityEstimate>;
 
 /**
+ * Tracks for each JoinSubset (represented by a NodeSet) the estimated cardinality of the join.
+ */
+using SubsetCardinalities = absl::flat_hash_map<NodeSet, cost_based_ranker::CardinalityEstimate>;
+
+/**
  * Contains logic necessary to do selectivity and cardinality estimation for joins.
  */
 class JoinCardinalityEstimator {
@@ -55,7 +60,7 @@ public:
                              NodeCardinalities nodeCardinalities);
 
     static JoinCardinalityEstimator make(const JoinReorderingContext& ctx,
-                                         const SingleTableAccessPlansResult& singleTablePlansRes,
+                                         const cost_based_ranker::EstimateMap& estimates,
                                          const SamplingEstimatorMap& samplingEstimators);
 
     /**
@@ -70,10 +75,22 @@ public:
         const JoinReorderingContext& ctx, const SamplingEstimatorMap& samplingEstimators);
 
     static NodeCardinalities extractNodeCardinalities(
-        const JoinReorderingContext& ctx, const SingleTableAccessPlansResult& singleTablePlansRes);
+        const JoinReorderingContext& ctx, const cost_based_ranker::EstimateMap& estimates);
+
+    /**
+     * Estimates the cardinality of a join plan over the given subset of nodes. This method
+     * constructs a spanning tree from the edges in the graph induced by 'nodes', and combines the
+     * edge selectivities, base table cardinalities, and single-table predicate selectivities to
+     * produce an estimate. Populates `_subsetCardinalities` with the result.
+     */
+    cost_based_ranker::CardinalityEstimate getOrEstimateSubsetCardinality(
+        const JoinReorderingContext& ctx, const NodeSet& nodes);
 
 private:
-    EdgeSelectivities _edgeSelectivities;
-    NodeCardinalities _nodeCardinalities;
+    const EdgeSelectivities _edgeSelectivities;
+    const NodeCardinalities _nodeCardinalities;
+
+    // Populated over the course of subset enumeration.
+    SubsetCardinalities _subsetCardinalities;
 };
 }  // namespace mongo::join_ordering

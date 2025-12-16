@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 
+#include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/death_test.h"
@@ -119,7 +120,7 @@ public:
             }
         }
 
-        PlanEnumeratorContext ctx{jCtx};
+        PlanEnumeratorContext ctx{jCtx, emptyEstimator};
         ctx.enumerateJoinSubsets(shape);
         ASSERT_EQ(numNodes, ctx.getSubsets(0).size());
         for (size_t k = 1; k < numNodes; ++k) {
@@ -137,6 +138,8 @@ public:
             goldenCtx->outStream() << ctx.toString() << std::endl;
         }
     }
+
+    JoinCardinalityEstimator emptyEstimator = JoinCardinalityEstimator({}, {});
 };
 
 TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsTwo) {
@@ -146,7 +149,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsTwo) {
     graph.addSimpleEqualityEdge((NodeId)0, (NodeId)1, 0, 1);
 
     {
-        PlanEnumeratorContext ctx{jCtx};
+        PlanEnumeratorContext ctx{jCtx, emptyEstimator};
         ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -163,7 +166,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsTwo) {
     }
 
     {
-        PlanEnumeratorContext ctx{jCtx};
+        PlanEnumeratorContext ctx{jCtx, emptyEstimator};
         ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -189,7 +192,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThree) {
     graph.addSimpleEqualityEdge(NodeId(1), NodeId(2), 1, 2);
 
     {
-        PlanEnumeratorContext ctx{jCtx};
+        PlanEnumeratorContext ctx{jCtx, emptyEstimator};
         ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -213,7 +216,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThree) {
     }
 
     {
-        PlanEnumeratorContext ctx{jCtx};
+        PlanEnumeratorContext ctx{jCtx, emptyEstimator};
         ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -245,7 +248,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThreeNoCycle) {
     graph.addSimpleEqualityEdge(NodeId(0), NodeId(2), 0, 2);
 
     {
-        PlanEnumeratorContext ctx{jCtx};
+        PlanEnumeratorContext ctx{jCtx, emptyEstimator};
         ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -269,7 +272,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThreeNoCycle) {
     }
 
     {
-        PlanEnumeratorContext ctx{jCtx};
+        PlanEnumeratorContext ctx{jCtx, emptyEstimator};
         ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);

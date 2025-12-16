@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/util/modules.h"
@@ -46,7 +47,9 @@ enum class PlanTreeShape { LEFT_DEEP, RIGHT_DEEP, ZIG_ZAG };
  */
 class PlanEnumeratorContext {
 public:
-    PlanEnumeratorContext(const JoinReorderingContext& ctx) : _ctx{ctx} {}
+    PlanEnumeratorContext(const JoinReorderingContext& ctx,
+                          const JoinCardinalityEstimator& estimator)
+        : _ctx{ctx}, _estimator(estimator) {}
 
     // Delete copy and move operations to prevent issues with copying '_joinGraph'.
     PlanEnumeratorContext(const PlanEnumeratorContext&) = delete;
@@ -115,6 +118,7 @@ private:
                              const JoinSubset& subset) const;
 
     const JoinReorderingContext& _ctx;
+    const JoinCardinalityEstimator& _estimator;
 
     // Hold intermediate results of the enumeration algorithm. The index into the outer vector
     // represents the "level". The i'th level contains solutions for the optimal way to join all

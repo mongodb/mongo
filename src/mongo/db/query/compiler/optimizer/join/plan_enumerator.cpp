@@ -70,7 +70,7 @@ bool PlanEnumeratorContext::canPlanBeEnumerated(PlanTreeShape type,
 
         case PlanTreeShape::ZIG_ZAG:
             // We create a zig-zag plan by alternating which side we add a "base" join subset to.
-            // TODO SERVER-113059: Pick based on which side has smaller CE.
+            // TODO SERVER-115147: Pick based on which side has smaller CE.
             if (left.isBaseCollectionAccess() && right.isBaseCollectionAccess()) {
                 /**
                  * We always allow a join like this as a base case:
@@ -162,7 +162,6 @@ void PlanEnumeratorContext::addJoinPlan(PlanTreeShape type,
             return;
         }
     } else {
-        // TODO SERVER-113059: Rudimentary cost metric/tracking.
         subset.plans.push_back(
             _registry.registerJoinNode(subset, method, left.bestPlan(), right.bestPlan()));
     }

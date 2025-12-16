@@ -30,6 +30,7 @@
 
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 
+#include "mongo/db/query/util/bitset_util.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
@@ -43,11 +44,11 @@ JoinCardinalityEstimator::JoinCardinalityEstimator(EdgeSelectivities edgeSelecti
 
 JoinCardinalityEstimator JoinCardinalityEstimator::make(
     const JoinReorderingContext& ctx,
-    const SingleTableAccessPlansResult& singleTablePlansRes,
+    const cost_based_ranker::EstimateMap& estimates,
     const SamplingEstimatorMap& samplingEstimators) {
     return JoinCardinalityEstimator(
         JoinCardinalityEstimator::estimateEdgeSelectivities(ctx, samplingEstimators),
-        JoinCardinalityEstimator::extractNodeCardinalities(ctx, singleTablePlansRes));
+        JoinCardinalityEstimator::extractNodeCardinalities(ctx, estimates));
 }
 
 EdgeSelectivities JoinCardinalityEstimator::estimateEdgeSelectivities(
@@ -63,13 +64,16 @@ EdgeSelectivities JoinCardinalityEstimator::estimateEdgeSelectivities(
 }
 
 NodeCardinalities JoinCardinalityEstimator::extractNodeCardinalities(
-    const JoinReorderingContext& ctx, const SingleTableAccessPlansResult& singleTablePlansRes) {
+    const JoinReorderingContext& ctx, const cost_based_ranker::EstimateMap& estimates) {
     NodeCardinalities nodeCardinalities;
     nodeCardinalities.reserve(ctx.joinGraph.numNodes());
     for (size_t nodeId = 0; nodeId < ctx.joinGraph.numNodes(); nodeId++) {
         auto* cq = ctx.joinGraph.accessPathAt(nodeId);
-        auto cbrRes = singleTablePlansRes.estimate.at(singleTablePlansRes.solns.at(cq)->root());
-        nodeCardinalities.push_back(cbrRes.outCE);
+        auto qsn = ctx.cbrCqQsns.find(cq);
+        tassert(11514600, "Missing QSN for CanonicalQuery", qsn != ctx.cbrCqQsns.end());
+        auto cbrRes = estimates.find(qsn->second->root());
+        tassert(11514601, "Missing estimate for QSN root", cbrRes != estimates.end());
+        nodeCardinalities.push_back(cbrRes->second.outCE);
     }
     return nodeCardinalities;
 }
@@ -165,5 +169,59 @@ cost_based_ranker::SelectivityEstimate JoinCardinalityEstimator::joinPredicateSe
                 "ndvEstimate"_attr = ndv,
                 "selectivityEstimate"_attr = res);
     return res;
+}
+
+cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSubsetCardinality(
+    const JoinReorderingContext& ctx, const NodeSet& nodes) {
+    if (auto it = _subsetCardinalities.find(nodes); it != _subsetCardinalities.end()) {
+        return it->second;
+    }
+
+    // This method assumes that all predicates (join and and single-table) are independent from each
+    // other, allowing us to combine them with simple multiplication below.
+    //
+    // '_edgeSels' contains edge selectivities: for a given edge connecting tables U and V, it is
+    // the fraction of rows that are output by the U-V join over the total number of row
+    // combinations between U and V (|U| * |V|). The number of rows in the U-V output is by
+    // definition this selectivity multiplied by |U| and |V|.
+    //
+    // We extend this logic to more tables using the independence assumption. For example, given the
+    // result of the U-V join, assume we are further joining with W through a V-W edge. We treat the
+    // intermediate result as a single "table" with its own cardinality. We apply the selectivity of
+    // the V-W edge to estimate how many rows from the intermediate result match rows in W, and
+    // finally multiply by |W| to account for the number of rows in W that participate in the join.
+    //
+    // So far, we have the product of all base table cardinalities with the selectivities of the
+    // edges in the graph induced by 'nodes'. We must also include the selectivities of single-table
+    // predicates. By the independence assumption, these can simply be multiplied with the product.
+    //
+    // One final complication involves cycles. If all selectivities from edges in a cycle are
+    // included in the estimate, we will double-count some join predicates. We remove cycles below
+    // by building a spanning tree (or forest) from the edges considered.
+    //
+    // Therefore, this method takes the following steps: Induce a subgraph involving only the nodes
+    // in 'nodes', and reduce the edges in that subgraph to remove cycles. Then, multiply:
+    // (1) The selectivities from the reduced edge list.
+    // (2) The base table cardinalities.
+    // (3) The single-table predicate selectivities.
+    // Finally, note that we have the pre-computed combination of (2) and (3) in '_nodeCEs'.
+    cost_based_ranker::CardinalityEstimate ce = cost_based_ranker::oneCE;
+    for (auto nodeIdx : iterable(nodes, ctx.joinGraph.numNodes())) {
+        ce = ce * _nodeCardinalities[nodeIdx].toDouble();
+    }
+    // TODO SERVER-115559: Invoke cycle breaker over these edges.
+    std::vector<EdgeId> edges = ctx.joinGraph.getEdgesForSubgraph(nodes);
+    for (const auto& edgeId : edges) {
+        ce = ce * _edgeSelectivities.at(edgeId);
+    }
+
+    LOGV2_DEBUG(11514603,
+                5,
+                "Estimating cardinality for subset",
+                "subset"_attr = nodes.to_string(),
+                "cardinalityEstimate"_attr = ce);
+
+    _subsetCardinalities.emplace(nodes, ce);
+    return ce;
 }
 }  // namespace mongo::join_ordering

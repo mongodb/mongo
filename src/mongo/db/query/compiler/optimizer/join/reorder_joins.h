@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 #include "mongo/util/modules.h"
@@ -56,6 +57,7 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(const JoinReorderingConte
  * Sellinger-style join optimization.
  */
 ReorderedJoinSolution constructSolutionBottomUp(const JoinReorderingContext& ctx,
+                                                JoinCardinalityEstimator estimator,
                                                 PlanTreeShape shape);
 
 }  // namespace mongo::join_ordering
