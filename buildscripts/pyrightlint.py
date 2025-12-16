@@ -103,19 +103,38 @@ def main():
 
     # Use the nodejs binary from the bazel's npm repository
     # had to add '--build_runfile_links', '--legacy_external_runfiles' due to hard coded path below
-    subprocess.run(
-        [
-            "bazel",
-            "build",
-            "//:eslint",
-            "--config=local",
-            "--build_runfile_links",
-            "--legacy_external_runfiles",
-        ],
-        env=os.environ,
-        check=True,
-        cwd=REPO_ROOT,
-    )
+    bazel_base_cmd = [
+        "bazel",
+        "build",
+        "//:eslint",
+        "--config=local",
+        "--build_runfile_links",
+        "--legacy_external_runfiles",
+    ]
+    bazel_remote_cache_opts = [
+        "--experimental_remote_downloader=grpcs://sodalite.cluster.engflow.com",
+        "--remote_cache=grpcs://sodalite.cluster.engflow.com",
+    ]
+
+    try:
+        subprocess.run(
+            bazel_base_cmd + bazel_remote_cache_opts,
+            env=os.environ,
+            check=True,
+            cwd=REPO_ROOT,
+        )
+    except subprocess.CalledProcessError:
+        # Retry without the remote cache/downloader endpoints if the first attempt fails.
+        print(
+            "Bazel build with remote cache failed, retrying without remote cache/downloader.",
+            file=sys.stderr,
+        )
+        subprocess.run(
+            bazel_base_cmd,
+            env=os.environ,
+            check=True,
+            cwd=REPO_ROOT,
+        )
     os.environ["PATH"] = (
         "bazel-bin/eslint_/eslint.runfiles/nodejs_linux_arm64/bin/nodejs/bin/" + os.pathsep
     ) + os.environ["PATH"]
