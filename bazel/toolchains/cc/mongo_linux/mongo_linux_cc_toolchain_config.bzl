@@ -1328,7 +1328,7 @@ def _impl(ctx):
 
     debug_types_section_feature = feature(
         name = "debug_types_section",
-        enabled = (ctx.attr.compiler == COMPILERS.CLANG and ctx.attr.linkstatic) or (ctx.attr.compiler == COMPILERS.GCC and ctx.attr.linkstatic and ctx.attr.distro == "suse15"),
+        enabled = ctx.attr.compiler == COMPILERS.GCC and ctx.attr.linkstatic and ctx.attr.distro == "suse15",
         flag_sets = [
             flag_set(
                 actions = all_compile_actions,
