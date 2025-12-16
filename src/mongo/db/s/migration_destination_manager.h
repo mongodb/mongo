@@ -241,7 +241,14 @@ public:
 
 private:
     /**
-     * These log the argument msg; then, under lock, move msg to _errmsg and set the state to FAIL.
+     * Set state to Fail without Logging.
+     * Under lock, move msg to _errmsg and set the state to FAIL.
+     */
+    void _setStateFailNoLog(StringData msg);
+
+    /**
+     * These log the argument msg; then call _setStateFailNoLog, which
+     * under lock, moves msg to _errmsg and sets the state to FAIL.
      * The setStateWailWarn version logs with "warning() << msg".
      */
     void _setStateFail(StringData msg);
