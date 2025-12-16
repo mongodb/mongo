@@ -264,11 +264,14 @@ buildvariants:
       has_packages: false
       skip_symbolization: true
       evergreen_remote_exec: on
+      mciuploads_binary_permissions: private
+      mciuploads_binary_visibility: signed
       build_timeout_seconds: 1440
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --linkstatic=False
         --remote_execution_priority=2
+        --build_atlas=True
       clang_tidy_toolchain: v5
       compile_variant: *commit-queue
     depends_on: []
