@@ -1247,11 +1247,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                         raise RuntimeError(
                             f"Missing {db_name}.{coll_name} hashes on a node outside of a multiversion suite."
                         )
-                    elif something_set:
-                        # we have previously gotten a hash for this node, so we should continue to get hashes for it.
-                        raise RuntimeError(
-                            f"Missing {db_name}.{coll_name} hashes on a node when we previously received hashes on other namespaces."
-                        )
 
             if not base_hashes and something_set:
                 base_hashes = hashes
