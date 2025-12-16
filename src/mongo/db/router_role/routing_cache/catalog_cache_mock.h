@@ -62,7 +62,7 @@ public:
                                                                const NamespaceString& nss,
                                                                bool allowLocks) override;
 
-    StatusWith<ChunkManager> getCollectionPlacementInfoWithRefresh(
+    StatusWith<CurrentChunkManager> getCollectionPlacementInfoWithRefresh(
         OperationContext* opCtx, const NamespaceString& nss) override;
 
     void setDatabaseReturnValue(const DatabaseName& dbName, CachedDatabaseInfo databaseInfo);

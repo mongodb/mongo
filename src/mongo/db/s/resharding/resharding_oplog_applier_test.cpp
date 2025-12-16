@@ -310,7 +310,7 @@ public:
                                                false,
                                                chunks);
 
-        return ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none);
+        return CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)));
     }
 
     void loadCatalogCacheValues() {

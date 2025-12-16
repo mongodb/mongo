@@ -587,7 +587,12 @@ void getShardIdsAndChunksForCanonicalQuery(const CanonicalQuery& query,
             // entries if a shard no longer owns chunks when it used to at _clusterTime. Similarly,
             // this optimization does not apply when it's necessary to fill chunkRanges, as the last
             // chunks can be lost.
-            if (!cm.isAtPointInTime() && shardIds->size() == cm.getNShardsOwningChunks() && !info) {
+            //
+            // Uses getAproxNShardsOwningChunks() as getNShardsOwningChunks() is only available on
+            // CurrentChunkManager, but both currently share the same implementation.
+            // TODO SERVER-114823 Review the usage of getAproxNShardsOwningChunks here.
+            if (!cm.isAtPointInTime() && shardIds->size() == cm.getAproxNShardsOwningChunks() &&
+                !info) {
                 break;
             }
         }

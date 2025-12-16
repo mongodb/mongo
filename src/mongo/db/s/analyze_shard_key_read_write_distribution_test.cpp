@@ -152,9 +152,8 @@ protected:
                                          true /* allowMigrations */,
                                          chunks);
 
-        auto cm = ChunkManager(RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(
-                                   std::move(routingTableHistory))),
-                               boost::none);
+        CurrentChunkManager cm(RoutingTableHistoryValueHandle(
+            std::make_shared<RoutingTableHistory>(std::move(routingTableHistory))));
         auto routingCtx = RoutingContext::createSynthetic(
             {{nss,
               CollectionRoutingInfo{std::move(cm),

@@ -125,8 +125,8 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
                                            boost::none /* reshardingFields */,
                                            true,
                                            chunks);
-    return CollectionMetadata(
-        ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none), getShardId(0));
+    return CollectionMetadata(CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),
+                              getShardId(0));
 }
 
 ShardId pessimalShardSelector(int i, int nShards, int nChunks) {
@@ -157,8 +157,8 @@ MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
         true /* allowMigration */,
         false /* unsplittable */,
         newChunks);
-    return CollectionMetadata(
-        ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none), getShardId(0));
+    return CollectionMetadata(CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),
+                              getShardId(0));
 }
 
 /*
@@ -315,8 +315,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
                                                true,
                                                chunks);
         benchmark::DoNotOptimize(CollectionMetadata(
-            ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none),
-            getShardId(0)));
+            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))), getShardId(0)));
     }
 }
 

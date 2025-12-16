@@ -151,9 +151,10 @@ std::shared_ptr<ScopedCollectionDescription::Impl> MetadataManager::getActiveMet
         }
     }
 
-    return std::make_shared<MetadataAtTimestamp>(CollectionMetadata(
-        ChunkManager::makeAtTime(*activeMetadata->getChunkManager(), atClusterTime->asTimestamp()),
-        activeMetadata->shardId()));
+    return std::make_shared<MetadataAtTimestamp>(
+        CollectionMetadata(PointInTimeChunkManager::make(*activeMetadata->getChunkManager(),
+                                                         atClusterTime->asTimestamp()),
+                           activeMetadata->shardId()));
 }
 
 boost::optional<UUID> MetadataManager::getCollectionUuid() const {

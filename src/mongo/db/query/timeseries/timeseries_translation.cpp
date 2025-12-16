@@ -177,8 +177,7 @@ boost::optional<TimeseriesTranslationParams> getTimeseriesTranslationParamsIfReq
         return boost::none;
     }
 
-    const ChunkManager& chunkManager = cri.getChunkManager();
-    const auto& timeseriesFields = chunkManager.getTimeseriesFields();
+    const auto& timeseriesFields = cri.getChunkManager().getTimeseriesFields();
     tassert(10601101,
             "Timeseries collections must have timeseries options",
             timeseriesFields.has_value());

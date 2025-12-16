@@ -141,7 +141,8 @@ protected:
                                                {std::move(chunk)});
 
         return CollectionMetadata(
-            ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), Timestamp(100, 0)),
+            PointInTimeChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)),
+                                    Timestamp(100, 0)),
             ShardId("this"));
     }
 

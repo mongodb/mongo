@@ -880,8 +880,7 @@ TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
             std::make_shared<RoutingTableHistory>(std::move(rt)),
             ComparableChunkVersion::makeComparableChunkVersion(version));
 
-        const auto collectionMetadata =
-            CollectionMetadata(ChunkManager(rtHandle, boost::none), _shardId);
+        const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), _shardId);
 
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
         scopedCSR->setFilteringMetadata(opCtx, collectionMetadata);

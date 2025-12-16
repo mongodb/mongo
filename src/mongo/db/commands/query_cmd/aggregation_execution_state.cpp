@@ -485,17 +485,26 @@ bool AggExState::canReadUnderlyingCollectionLocally(const CollectionRoutingInfo&
     const auto myShardId = ShardingState::get(_opCtx)->shardId();
     const auto atClusterTime = repl::ReadConcernArgs::get(_opCtx).getArgsAtClusterTime();
 
-    const auto chunkManagerMaybeAtClusterTime = atClusterTime
-        ? ChunkManager::makeAtTime(cri.getChunkManager(), atClusterTime->asTimestamp())
-        : cri.getChunkManager();
+    auto isNssLocalFunc = [&](const auto& cm) {
+        if (cm.isSharded()) {
+            return false;
+        } else if (cm.isUnsplittable()) {
+            return cm.getMinKeyShardIdWithSimpleCollation() == myShardId;
+        } else {
+            return cri.getDbPrimaryShardId() == myShardId;
+        }
+    };
 
-    if (chunkManagerMaybeAtClusterTime.isSharded()) {
-        return false;
-    } else if (chunkManagerMaybeAtClusterTime.isUnsplittable()) {
-        return chunkManagerMaybeAtClusterTime.getMinKeyShardIdWithSimpleCollation() == myShardId;
+    bool isNssLocal;
+    if (atClusterTime) {
+        auto pitChunkManager =
+            PointInTimeChunkManager::make(cri.getChunkManager(), atClusterTime->asTimestamp());
+        isNssLocal = isNssLocalFunc(pitChunkManager);
     } else {
-        return cri.getDbPrimaryShardId() == myShardId;
+        isNssLocal = isNssLocalFunc(cri.getChunkManager());
     }
+
+    return isNssLocal;
 }
 
 Status AggExState::collatorCompatibleWithPipeline(const CollatorInterface* collator) const {

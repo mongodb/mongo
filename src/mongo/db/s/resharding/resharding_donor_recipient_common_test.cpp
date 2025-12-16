@@ -165,20 +165,19 @@ protected:
         auto range = ChunkRange(BSON(shardKey << MINKEY), BSON(shardKey << MAXKEY));
         auto chunk = ChunkType(
             uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), shardThatChunkExistsOn);
-        ChunkManager cm(makeStandaloneRoutingTableHistory(
-                            RoutingTableHistory::makeNew(nss,
-                                                         uuid,
-                                                         shardKeyPattern,
-                                                         false, /* unsplittable */
-                                                         nullptr,
-                                                         false,
-                                                         epoch,
-                                                         timestamp,
-                                                         boost::none /* timeseriesFields */,
-                                                         boost::none /* reshardingFields */,
-                                                         true,
-                                                         {std::move(chunk)})),
-                        boost::none);
+        CurrentChunkManager cm(makeStandaloneRoutingTableHistory(
+            RoutingTableHistory::makeNew(nss,
+                                         uuid,
+                                         shardKeyPattern,
+                                         false, /* unsplittable */
+                                         nullptr,
+                                         false,
+                                         epoch,
+                                         timestamp,
+                                         boost::none /* timeseriesFields */,
+                                         boost::none /* reshardingFields */,
+                                         true,
+                                         {std::move(chunk)})));
         auto dbVersion = DatabaseVersion(uuid, timestamp);
         getCatalogCacheMock()->setDatabaseReturnValue(
             nss.dbName(),

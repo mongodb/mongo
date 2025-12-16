@@ -227,9 +227,8 @@ public:
                                                true /* allowMigrations */,
                                                chunks);
         return CollectionRoutingInfo{
-            ChunkManager(
-                ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rt)),
-                boost::none /* clusterTime */),
+            CurrentChunkManager(
+                ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rt))),
             DatabaseTypeValueHandle(DatabaseType{
                 nss.dbName(), _someDonorId, DatabaseVersion(UUID::gen(), Timestamp(1, 1))})};
     }

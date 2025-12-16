@@ -333,11 +333,11 @@ public:
     }
 
 private:
-    ChunkManager makeChunkManager(const OID& epoch,
-                                  const NamespaceString& nss,
-                                  const UUID& uuid,
-                                  const BSONObj& shardKey,
-                                  const std::vector<ChunkType>& chunks) {
+    CurrentChunkManager makeChunkManager(const OID& epoch,
+                                         const NamespaceString& nss,
+                                         const UUID& uuid,
+                                         const BSONObj& shardKey,
+                                         const std::vector<ChunkType>& chunks) {
         auto rt = RoutingTableHistory::makeNew(nss,
                                                uuid,
                                                shardKey,
@@ -350,11 +350,10 @@ private:
                                                boost::none /* reshardingFields */,
                                                true /* allowMigrations */,
                                                chunks);
-        return ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)),
-                            boost::none /* clusterTime */);
+        return CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)));
     }
 
-    ChunkManager makeChunkManagerForSourceCollection() {
+    CurrentChunkManager makeChunkManagerForSourceCollection() {
         // Create three chunks, two that are owned by this donor shard and one owned by some other
         // shard. The chunk for {sk: null} is owned by this donor shard to allow test cases to omit
         // the shard key field when it isn't relevant.
@@ -380,7 +379,7 @@ private:
             epoch, _sourceNss, _sourceUUID, BSON(_currentShardKey << 1), chunks);
     }
 
-    ChunkManager makeChunkManagerForOutputCollection() {
+    CurrentChunkManager makeChunkManagerForOutputCollection() {
         const OID epoch = OID::gen();
         const UUID outputUuid = UUID::gen();
         std::vector<ChunkType> chunks = {

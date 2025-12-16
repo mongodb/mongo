@@ -741,7 +741,7 @@ void checkLocalCatalogCollectionOptions(OperationContext* opCtx,
 void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
                                            const NamespaceString& targetNss,
                                            const ShardsvrCreateCollectionRequest& request,
-                                           const ChunkManager& cm) {
+                                           const CurrentChunkManager& cm) {
     if (request.getRegisterExistingCollectionInGlobalCatalog()) {
         // No need for checking the sharding catalog when tracking a collection for the first time
         return;

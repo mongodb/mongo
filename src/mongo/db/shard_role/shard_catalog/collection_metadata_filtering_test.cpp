@@ -148,7 +148,7 @@ protected:
                 return std::vector<ChunkType>{chunk1, chunk2, chunk3, chunk4};
             }());
 
-        ChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none);
+        CurrentChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)));
         ASSERT_EQ(4, cm.numChunks());
 
         {

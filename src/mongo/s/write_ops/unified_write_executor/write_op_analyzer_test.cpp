@@ -110,7 +110,7 @@ struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
     const NamespaceString kUnsplittableNss =
         NamespaceString::createNamespaceString_forTest("test", "unsplittable");
 
-    ChunkManager createChunkManager(
+    CurrentChunkManager createChunkManager(
         const UUID& uuid,
         const NamespaceString& nss,
         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields = boost::none,
@@ -152,9 +152,8 @@ struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
                                                false,
                                                chunks);
 
-        return ChunkManager(
-            ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rt)),
-            boost::none);
+        return CurrentChunkManager(
+            ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rt)));
     }
 
     std::unique_ptr<RoutingContext> createRoutingContextSharded(

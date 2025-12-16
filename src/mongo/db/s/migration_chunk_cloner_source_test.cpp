@@ -730,7 +730,7 @@ protected:
                 ->setFilteringMetadata(
                     operationContext(),
                     CollectionMetadata(
-                        ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none),
+                        CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),
                         ShardId("dummyShardId")));
         }();
 

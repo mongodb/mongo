@@ -5516,7 +5516,8 @@ public:
         getCatalogCacheMock()->setCollectionReturnValue(
             NamespaceString::createNamespaceString_forTest(kDBName, "outColl"),
             CollectionRoutingInfo{
-                ChunkManager{makeStandaloneRoutingTableHistory(std::move(rt)), timestamp},
+                PointInTimeChunkManager{makeStandaloneRoutingTableHistory(std::move(rt)),
+                                        timestamp},
                 DatabaseTypeValueHandle(
                     DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, kDBName),
                                  kMyShardName,
@@ -5561,7 +5562,8 @@ TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
     getCatalogCacheMock()->setCollectionReturnValue(
         NamespaceString::createNamespaceString_forTest(kDBName, "outColl"),
         CollectionRoutingInfo{
-            ChunkManager{RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}}, timestamp},
+            PointInTimeChunkManager{RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}},
+                                    timestamp},
             DatabaseTypeValueHandle(
                 DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, kDBName),
                              kMyShardName,
@@ -5616,7 +5618,7 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpUnsplittableFromCollection) {
     getCatalogCacheMock()->setCollectionReturnValue(
         fromCollNs,
         CollectionRoutingInfo{
-            ChunkManager{makeStandaloneRoutingTableHistory(std::move(rt)), timestamp},
+            PointInTimeChunkManager{makeStandaloneRoutingTableHistory(std::move(rt)), timestamp},
             DatabaseTypeValueHandle(
                 DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, kDBName),
                              kMyShardName,
@@ -5653,7 +5655,7 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
     getCatalogCacheMock()->setCollectionReturnValue(
         fromCollNs,
         CollectionRoutingInfo{
-            ChunkManager{makeStandaloneRoutingTableHistory(std::move(rt)), timestamp},
+            PointInTimeChunkManager{makeStandaloneRoutingTableHistory(std::move(rt)), timestamp},
             DatabaseTypeValueHandle(
                 DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, kDBName),
                              kMyShardName,

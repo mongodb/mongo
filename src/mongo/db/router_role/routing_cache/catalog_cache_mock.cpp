@@ -30,6 +30,7 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache_mock.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/router_role/routing_cache/config_server_catalog_cache_loader_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/sharding_test_fixture_common.h"
@@ -70,11 +71,11 @@ StatusWith<CollectionRoutingInfo> CatalogCacheMock::getCollectionRoutingInfo(
                                   nss.toStringForErrorMsg()));
     }
 }
-StatusWith<ChunkManager> CatalogCacheMock::getCollectionPlacementInfoWithRefresh(
+StatusWith<CurrentChunkManager> CatalogCacheMock::getCollectionPlacementInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     const auto it = _collectionCache.find(nss);
     if (it != _collectionCache.end()) {
-        return it->second.getChunkManager();
+        return it->second.getCurrentChunkManager();
     } else {
         return Status(
             ErrorCodes::InternalError,
@@ -107,7 +108,7 @@ std::unique_ptr<CatalogCacheMock> CatalogCacheMock::make() {
 
 CollectionRoutingInfo CatalogCacheMock::makeCollectionRoutingInfoUntracked(
     const NamespaceString& nss, const ShardId& dbPrimaryShard, DatabaseVersion dbVersion) {
-    ChunkManager cm(OptionalRoutingTableHistory(), boost::none);
+    CurrentChunkManager cm(OptionalRoutingTableHistory{});
     return CollectionRoutingInfo(
         std::move(cm),
         DatabaseTypeValueHandle(DatabaseType{nss.dbName(), dbPrimaryShard, dbVersion}));
@@ -197,8 +198,8 @@ CollectionRoutingInfo CatalogCacheMock::_makeCollectionRoutingInfoTracked(
                                             true /*allowMigrations*/,
                                             chunkTypes);
 
-    ChunkManager cm(ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rth)),
-                    boost::none /*clusterTime*/);
+    CurrentChunkManager cm(
+        ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rth)));
     return CollectionRoutingInfo(
         std::move(cm),
         DatabaseTypeValueHandle(DatabaseType{nss.dbName(), dbPrimaryShard, dbVersion}));

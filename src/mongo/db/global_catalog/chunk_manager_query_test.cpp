@@ -518,21 +518,21 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
     chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), ShardId("0")),
                        ChunkHistory(Timestamp(1, 0), ShardId("1"))});
 
-    ChunkManager chunkManager(makeStandaloneRoutingTableHistory(
-                                  oldRoutingTable.makeUpdated(boost::none /* timeseriesFields */,
-                                                              boost::none /* reshardingFields */,
-                                                              true,
-                                                              false, /* unsplittable */
-                                                              {chunk1})),
-                              Timestamp(5, 0));
+    PointInTimeChunkManager cm(makeStandaloneRoutingTableHistory(
+                                   oldRoutingTable.makeUpdated(boost::none /* timeseriesFields */,
+                                                               boost::none /* reshardingFields */,
+                                                               true,
+                                                               false, /* unsplittable */
+                                                               {chunk1})),
+                               Timestamp(5, 0));
 
     std::set<ShardId> shardIds;
-    chunkManager.getShardIdsForRange(BSON("x" << MINKEY), BSON("x" << MAXKEY), &shardIds);
+    cm.getShardIdsForRange(BSON("x" << MINKEY), BSON("x" << MAXKEY), &shardIds);
     ASSERT_EQ(2, shardIds.size());
 
     const auto expCtx = make_intrusive<ExpressionContextForTest>();
     shardIds.clear();
-    getShardIdsForQuery(expCtx, BSON("x" << BSON("$gt" << -20)), {}, chunkManager, &shardIds);
+    getShardIdsForQuery(expCtx, BSON("x" << BSON("$gt" << -20)), {}, cm, &shardIds);
     ASSERT_EQ(2, shardIds.size());
 }
 
@@ -573,7 +573,7 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
                                            boost::none /* reshardingFields */,
                                            true,
                                            chunkVec);
-    ChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)), clusterTime);
+    PointInTimeChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)), clusterTime);
 
     auto chunkIt = chunks.begin();
     while (chunkIt != chunks.end()) {

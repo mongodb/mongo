@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/keypattern.h"
@@ -168,7 +169,7 @@ const OperationContext::Decoration<bool> routerShouldRelaxCollectionUUIDConsiste
 }  // namespace
 
 bool CollectionRoutingInfo::hasRoutingTable() const {
-    return _cm.hasRoutingTable();
+    return getChunkManager().hasRoutingTable();
 }
 
 const ShardId& CollectionRoutingInfo::getDbPrimaryShardId() const {
@@ -180,7 +181,7 @@ const DatabaseVersion& CollectionRoutingInfo::getDbVersion() const {
 }
 
 ShardVersion CollectionRoutingInfo::getCollectionVersion() const {
-    ShardVersion sv = ShardVersionFactory::make(_cm);
+    auto sv = ShardVersionFactory::make(getChunkManager());
     if (MONGO_unlikely(shouldIgnoreUuidMismatch)) {
         sv.setIgnoreShardingCatalogUuidMismatch();
     }
@@ -188,7 +189,7 @@ ShardVersion CollectionRoutingInfo::getCollectionVersion() const {
 }
 
 ShardVersion CollectionRoutingInfo::getShardVersion(const ShardId& shardId) const {
-    auto sv = ShardVersionFactory::make(_cm, shardId);
+    auto sv = ShardVersionFactory::make(getChunkManager(), shardId);
     if (MONGO_unlikely(shouldIgnoreUuidMismatch)) {
         sv.setIgnoreShardingCatalogUuidMismatch();
     }
@@ -419,11 +420,8 @@ StatusWith<CachedDatabaseInfo> CatalogCache::_getDatabaseForCollectionRoutingInf
     return swDbInfo;
 }
 
-StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    boost::optional<Timestamp> atClusterTime,
-    bool allowLocks) {
+StatusWith<RoutingTableHistoryValueHandle> CatalogCache::_getCollectionRoutingTable(
+    OperationContext* opCtx, const NamespaceString& nss, bool allowLocks) {
     tassert(7032314,
             "Do not hold a lock while refreshing the catalog cache. Doing so would potentially "
             "hold the lock during a network call, and can lead to a deadlock as described in "
@@ -440,7 +438,7 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
         if (nss.isNamespaceAlwaysUntracked()) {
             // If the collection is known to always be untracked, there is no need to request it to
             // the CollectionCache.
-            return ChunkManager(OptionalRoutingTableHistory(), atClusterTime);
+            return OptionalRoutingTableHistory();
         }
 
         auto collEntryFuture =
@@ -452,7 +450,7 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
             // use it, otherwise return an error
 
             if (collEntryFuture.isReady()) {
-                return ChunkManager(collEntryFuture.get(opCtx), atClusterTime);
+                return collEntryFuture.get(opCtx);
             } else {
                 return Status{ShardCannotRefreshDueToLocksHeldInfo(nss),
                               "Routing info refresh did not complete"};
@@ -468,7 +466,7 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
                 auto collEntry = collEntryFuture.get(opCtx);
                 _stats.totalRefreshWaitTimeMicros.addAndFetch(t.micros());
 
-                return ChunkManager(std::move(collEntry), atClusterTime);
+                return std::move(collEntry);
             } catch (const DBException& ex) {
                 _stats.totalRefreshWaitTimeMicros.addAndFetch(t.micros());
                 bool isCatalogCacheRetriableError = ex.isA<ErrorCategory::SnapshotError>() ||
@@ -509,13 +507,20 @@ StatusWith<CollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoAt(
         return swDbInfo.getStatus();
     }
 
-    auto swChunkManager = _getCollectionPlacementInfoAt(opCtx, nss, optAtClusterTime, allowLocks);
-    if (!swChunkManager.isOK()) {
-        return swChunkManager.getStatus();
+    auto swRoutingTable = _getCollectionRoutingTable(opCtx, nss, allowLocks);
+    if (!swRoutingTable.isOK()) {
+        return swRoutingTable.getStatus();
     }
 
-    auto cri =
-        CollectionRoutingInfo{std::move(swChunkManager.getValue()), std::move(swDbInfo.getValue())};
+    auto cri = [&]() -> CollectionRoutingInfo {
+        if (optAtClusterTime) {
+            PointInTimeChunkManager chunkManager(swRoutingTable.getValue(), optAtClusterTime.get());
+            return CollectionRoutingInfo{std::move(chunkManager), std::move(swDbInfo.getValue())};
+        }
+        CurrentChunkManager chunkManager(swRoutingTable.getValue());
+        return CollectionRoutingInfo{std::move(chunkManager), std::move(swDbInfo.getValue())};
+    }();
+
     if (MONGO_unlikely(routerShouldRelaxCollectionUUIDConsistencyCheck(opCtx))) {
         cri.shouldIgnoreUuidMismatch = true;
     }
@@ -538,11 +543,18 @@ void CatalogCache::_triggerPlacementVersionRefresh(const NamespaceString& nss) {
         nss, ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh());
 }
 
-StatusWith<ChunkManager> CatalogCache::getCollectionPlacementInfoWithRefresh(
+StatusWith<CurrentChunkManager> CatalogCache::getCollectionPlacementInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     try {
         _triggerPlacementVersionRefresh(nss);
-        return _getCollectionPlacementInfoAt(opCtx, nss, boost::none /* atClusterTime */);
+
+        auto swRoutingTable = _getCollectionRoutingTable(opCtx, nss);
+
+        if (!swRoutingTable.isOK()) {
+            return swRoutingTable.getStatus();
+        }
+
+        return CurrentChunkManager(swRoutingTable.getValue());
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

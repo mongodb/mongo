@@ -72,7 +72,7 @@ void MigrationChunkClonerSourceOpObserver::assertIntersectingChunkHasNotMoved(
     const LogicalTime& atClusterTime) {
     // We can assume the simple collation because shard keys do not support non-simple collations.
     auto cmAtTimeOfWrite =
-        ChunkManager::makeAtTime(*metadata.getChunkManager(), atClusterTime.asTimestamp());
+        PointInTimeChunkManager::make(*metadata.getChunkManager(), atClusterTime.asTimestamp());
     auto chunk = cmAtTimeOfWrite.findIntersectingChunkWithSimpleCollation(shardKey);
 
     // Throws if the chunk has moved since the timestamp of the running transaction's atClusterTime

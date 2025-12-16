@@ -181,8 +181,7 @@ void MultipleCollectionAccessorTest::installShardedCollectionMetadata(
         RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(std::move(rt)),
                                        ComparableChunkVersion::makeComparableChunkVersion(version));
 
-    const auto collectionMetadata =
-        CollectionMetadata(ChunkManager(rtHandle, boost::none), kMyShardName);
+    const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), kMyShardName);
 
     auto coll = acquireCollection(
         operationContext(),

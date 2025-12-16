@@ -116,21 +116,20 @@ public:
         auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
         auto chunk = ChunkType(
             uuid, std::move(range), ChunkVersion({epoch, timestamp}, {1, 0}), chunkShardId);
-        ChunkManager cm(makeStandaloneRoutingTableHistory(
-                            RoutingTableHistory::makeNew(kTestNss,
-                                                         uuid,
-                                                         kShardKeyPattern,
-                                                         false, /* unsplittable */
-                                                         nullptr,
-                                                         false,
-                                                         epoch,
-                                                         timestamp,
-                                                         boost::none /* timeseriesFields */,
-                                                         boost::none /* reshardingFields */,
+        CurrentChunkManager cm(makeStandaloneRoutingTableHistory(
+            RoutingTableHistory::makeNew(kTestNss,
+                                         uuid,
+                                         kShardKeyPattern,
+                                         false, /* unsplittable */
+                                         nullptr,
+                                         false,
+                                         epoch,
+                                         timestamp,
+                                         boost::none /* timeseriesFields */,
+                                         boost::none /* reshardingFields */,
 
-                                                         true,
-                                                         {std::move(chunk)})),
-                        boost::none);
+                                         true,
+                                         {std::move(chunk)})));
 
         return CollectionMetadata(std::move(cm), collectionShardId);
     }

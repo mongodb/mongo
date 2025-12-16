@@ -73,8 +73,39 @@ using CachedDatabaseInfo MONGO_MOD_PUBLIC = DatabaseTypeValueHandle;
 
 class MONGO_MOD_PUBLIC CollectionRoutingInfo {
 public:
-    CollectionRoutingInfo(ChunkManager&& chunkManager, CachedDatabaseInfo&& dbInfo)
+    CollectionRoutingInfo(CurrentChunkManager&& chunkManager, CachedDatabaseInfo&& dbInfo)
         : _dbInfo(std::move(dbInfo)), _cm(std::move(chunkManager)) {}
+
+    CollectionRoutingInfo(PointInTimeChunkManager&& chunkManager, CachedDatabaseInfo&& dbInfo)
+        : _dbInfo(std::move(dbInfo)), _cm(std::move(chunkManager)) {}
+
+    /**
+     * Variant type that can hold either a CurrentChunkManager or a PointInTimeChunkManager.
+     *
+     * This allows CollectionRoutingInfo to represent routing information in two different modes:
+     * - CurrentChunkManager: Represents the latest known routing state for a collection
+     * - PointInTimeChunkManager: Represents routing state at a specific point in time (cluster
+     * time)
+     *
+     * Usage guidelines:
+     * - Use std::visit() to access the held ChunkManager polymorphically when the operation works
+     *   identically for both types
+     * - Use std::get_if<CurrentChunkManager>() when you need to conditionally access features only
+     *   available on CurrentChunkManager (e.g., getNShardsOwningChunks())
+     * - Use std::holds_alternative<CurrentChunkManager>() to check which type is currently held
+     *
+     * Example:
+     *   // Polymorphic access (works for both types):
+     *   std::visit([](const auto& cm) { return cm.isSharded(); }, variant);
+     *
+     *   // Type-specific access:
+     *   if (auto* currentCm = std::get_if<CurrentChunkManager>(&variant)) {
+     *       currentCm->getAllShardIds(&shards);
+     *   }
+     *
+     * TODO SERVER-114825: Investigate if it's possible to implement without this variant.
+     */
+    using ChunkManagerVariant = std::variant<CurrentChunkManager, PointInTimeChunkManager>;
 
     /**
      * Returns true if the collection is tracked in the global catalog.
@@ -90,11 +121,103 @@ public:
      * shards.
      */
     bool isSharded() const {
-        return _cm.isSharded();
+        return getChunkManager().isSharded();
     }
 
+    /**
+     * Returns a const reference to the ChunkManager held in this CollectionRoutingInfo.
+     *
+     * This method provides polymorphic access to common ChunkManager functionality that works
+     * identically for both CurrentChunkManager and PointInTimeChunkManager.
+     *
+     * Use this method when:
+     * - You need to call methods that are defined on the base ChunkManager class
+     * - The operation doesn't require type-specific behavior
+     * - You're working with shared functionality like:
+     *   - isSharded()
+     *   - isUnsplittable()
+     *   - getShardKeyPattern()
+     *   - getVersion()
+     *   - forEachChunk() (respects point-in-time semantics automatically)
+     *
+     * Do NOT use this method when:
+     * - You need to call CurrentChunkManager-specific methods like getAllShardIds() or
+     *   getNShardsOwningChunks() - use getCurrentChunkManager() instead
+     * - You need to know whether you have a current or point-in-time view - check the variant
+     *   directly with std::holds_alternative<>()
+     *
+     * Example usage:
+     *   const auto& cm = cri.getChunkManager();
+     *   if (cm.isSharded()) {
+     *       cm.forEachChunk([](const Chunk& chunk) { ... });
+     *   }
+     * @return A const reference to the base ChunkManager interface
+     */
     const ChunkManager& getChunkManager() const {
-        return _cm;
+        return std::visit([](const auto& cm) -> const ChunkManager& { return cm; }, _cm);
+    }
+
+    /**
+     * Returns a const reference to the CurrentChunkManager held in this CollectionRoutingInfo.
+     *
+     * This method provides direct access to CurrentChunkManager-specific functionality that is
+     * NOT available when using a PointInTimeChunkManager.
+     *
+     * Use this method when:
+     * - You need to access the CURRENT (latest) state of the routing information
+     * - You need to call methods that are ONLY available on CurrentChunkManager:
+     *   - getAllShardIds(): Gets the exact current set of shards owning chunks
+     *   - getNShardsOwningChunks(): Gets the exact current count of shards
+     *   - getNextChunkOnShard(): Finds the next chunk on a specific shard
+     * - You're performing operations that explicitly require non-point-in-time semantics:
+     *   - Checking current cluster topology
+     *   - Making routing decisions based on latest metadata
+     *   - Administrative operations that need up-to-date information
+     *
+     * Do NOT use this method when:
+     * - You're working with point-in-time reads (e.g., transactions with atClusterTime)
+     * - You don't know whether the CollectionRoutingInfo contains a CurrentChunkManager or
+     *   PointInTimeChunkManager - this will throw an exception if it's the wrong type
+     * - You only need common ChunkManager functionality - use getChunkManager() instead
+     *
+     * Common usage patterns:
+     *
+     *   // Pattern 1: Direct access when you know it's current
+     *   const auto& currentCm = cri.getCurrentChunkManager();
+     *   currentCm.getAllShardIds(&allShards);
+     *
+     *   // Pattern 2: Conditional access (safer)
+     *   if (std::holds_alternative<CurrentChunkManager>(cri._cm)) {
+     *       const auto& currentCm = cri.getCurrentChunkManager();
+     *       size_t nShards = currentCm.getNShardsOwningChunks();
+     *   }
+     *
+     *   // Pattern 3: Using std::visit for type-specific behavior
+     *   std::visit(OverloadedVisitor{
+     *       [](const CurrentChunkManager& cm) {
+     *           // Can call getCurrentChunkManager-only methods
+     *           cm.getAllShardIds(&shards);
+     *       },
+     *       [](const PointInTimeChunkManager& cm) {
+     *           // Different behavior for point-in-time
+     *       }
+     *   }, cri._cm);
+     *
+     * When this is created:
+     * - getCollectionRoutingInfo() without atClusterTime returns CurrentChunkManager
+     * - getCollectionRoutingInfoAt() with atClusterTime returns PointInTimeChunkManager
+     * - getCollectionPlacementInfoWithRefresh() returns CurrentChunkManager
+     *
+     * @throws TAssertionException if this CollectionRoutingInfo contains a PointInTimeChunkManager
+     *         instead of a CurrentChunkManager
+     *
+     * @return A const reference to the CurrentChunkManager
+     */
+    const CurrentChunkManager& getCurrentChunkManager() const {
+        tassert(10271001,
+                "Expected current ChunkManager but have PointInTimeChunkManager",
+                std::holds_alternative<CurrentChunkManager>(_cm));
+        return std::get<CurrentChunkManager>(_cm);
     }
 
     ShardVersion getCollectionVersion() const;
@@ -113,7 +236,7 @@ public:
 
 private:
     CachedDatabaseInfo _dbInfo;
-    ChunkManager _cm;
+    ChunkManagerVariant _cm;
 };
 
 /**
@@ -272,7 +395,7 @@ public:
     /**
      * Blocking method to retrieve refreshed collection placement information (ChunkManager).
      */
-    virtual StatusWith<ChunkManager> getCollectionPlacementInfoWithRefresh(
+    virtual StatusWith<CurrentChunkManager> getCollectionPlacementInfoWithRefresh(
         OperationContext* opCtx, const NamespaceString& nss);
 
     /**
@@ -433,10 +556,8 @@ private:
         boost::optional<Timestamp> optAtClusterTime,
         bool allowLocks = false);
 
-    StatusWith<ChunkManager> _getCollectionPlacementInfoAt(OperationContext* opCtx,
-                                                           const NamespaceString& nss,
-                                                           boost::optional<Timestamp> atClusterTime,
-                                                           bool allowLocks = false);
+    StatusWith<RoutingTableHistoryValueHandle> _getCollectionRoutingTable(
+        OperationContext* opCtx, const NamespaceString& nss, bool allowLocks = false);
 
     void _triggerPlacementVersionRefresh(const NamespaceString& nss);
 

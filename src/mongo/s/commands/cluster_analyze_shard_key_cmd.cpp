@@ -98,7 +98,7 @@ public:
 
                     std::set<ShardId> candidateShardIds;
                     if (cri.hasRoutingTable()) {
-                        cri.getChunkManager().getAllShardIds(&candidateShardIds);
+                        cri.getCurrentChunkManager().getAllShardIds(&candidateShardIds);
                     } else {
                         candidateShardIds.insert(primaryShardId);
                     }

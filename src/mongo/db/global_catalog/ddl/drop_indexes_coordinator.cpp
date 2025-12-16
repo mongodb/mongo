@@ -85,7 +85,7 @@ void DropIndexesCoordinator::_dropIndexes(OperationContext* opCtx,
     router.route(
         "DropIndexesCoordinator::_dropIndexesPhase",
         [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-            const auto chunkManager = cri.getChunkManager();
+            const auto chunkManager = cri.getCurrentChunkManager();
             std::map<ShardId, ShardVersion> shardIdsToShardVersions;
 
             if (chunkManager.hasRoutingTable()) {

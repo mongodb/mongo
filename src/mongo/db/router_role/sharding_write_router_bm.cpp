@@ -224,7 +224,7 @@ protected:
             ComparableChunkVersion::makeComparableChunkVersion(version));
     }
 
-    std::pair<std::vector<mongo::ChunkType>, mongo::ChunkManager> createChunks(
+    std::pair<std::vector<mongo::ChunkType>, mongo::CurrentChunkManager> createChunks(
         size_t nShards, uint32_t nChunks, std::vector<ShardId> shards) {
         invariant(shards.size() == nShards);
 
@@ -255,20 +255,19 @@ protected:
         reshardingFields.setDonorFields(
             TypeCollectionDonorFields{tempNss, reshardKeyPattern, shards});
 
-        ChunkManager cm(makeStandaloneRoutingTableHistory(
-                            RoutingTableHistory::makeNew(kNss,
-                                                         collIdentifier,
-                                                         shardKeyPattern,
-                                                         false, /* unsplittable */
-                                                         nullptr,
-                                                         false,
-                                                         collEpoch,
-                                                         collTimestamp,
-                                                         boost::none /* timeseriesFields */,
-                                                         reshardingFields, /* reshardingFields */
-                                                         true,
-                                                         chunks)),
-                        boost::none);
+        CurrentChunkManager cm(makeStandaloneRoutingTableHistory(
+            RoutingTableHistory::makeNew(kNss,
+                                         collIdentifier,
+                                         shardKeyPattern,
+                                         false, /* unsplittable */
+                                         nullptr,
+                                         false,
+                                         collEpoch,
+                                         collTimestamp,
+                                         boost::none /* timeseriesFields */,
+                                         reshardingFields, /* reshardingFields */
+                                         true,
+                                         chunks)));
 
         return std::make_pair(chunks, cm);
     }

@@ -411,23 +411,26 @@ bool MultiCollectionRouter::isAnyCollectionNotLocal(
                 "Must be an entry in criMap for namespace " + nss.toStringForErrorMsg(),
                 nssCri != criMap.end());
 
-        const auto chunkManagerMaybeAtClusterTime = atClusterTime
-            ? ChunkManager::makeAtTime(nssCri->second.getChunkManager(),
-                                       atClusterTime->asTimestamp())
-            : nssCri->second.getChunkManager();
-
-        bool isNssLocal = [&]() {
-            if (chunkManagerMaybeAtClusterTime.isSharded()) {
+        auto isNssLocalFunc = [&](const auto& cm) {
+            if (cm.isSharded()) {
                 return false;
-            } else if (chunkManagerMaybeAtClusterTime.isUnsplittable()) {
-                return chunkManagerMaybeAtClusterTime.getMinKeyShardIdWithSimpleCollation() ==
-                    myShardId;
+            } else if (cm.isUnsplittable()) {
+                return cm.getMinKeyShardIdWithSimpleCollation() == myShardId;
             } else {
                 // If collection is untracked, it is only local if this shard is the dbPrimary
                 // shard.
                 return nssCri->second.getDbPrimaryShardId() == myShardId;
             }
-        }();
+        };
+
+        bool isNssLocal;
+        if (atClusterTime) {
+            auto pitChunkManager = PointInTimeChunkManager::make(nssCri->second.getChunkManager(),
+                                                                 atClusterTime->asTimestamp());
+            isNssLocal = isNssLocalFunc(pitChunkManager);
+        } else {
+            isNssLocal = isNssLocalFunc(nssCri->second.getChunkManager());
+        }
 
         if (!isNssLocal) {
             anyCollectionNotLocal = true;

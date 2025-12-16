@@ -134,7 +134,7 @@ public:
                        ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
                        ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
                        ShardId("dummyShardId")}});
-        ChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none);
+        CurrentChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)));
         AutoGetDb autoDb(_opCtx, kNss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(_opCtx, kNss, MODE_IX);
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, kNss)

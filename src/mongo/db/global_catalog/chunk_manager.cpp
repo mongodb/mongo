@@ -826,7 +826,7 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
     // owns chunks when it used to at _clusterTime.
     if (!_clusterTime && ChunkMap::allElementsAreOfType(BSONType::minKey, min) &&
         ChunkMap::allElementsAreOfType(BSONType::maxKey, max)) {
-        getAllShardIds(shardIds);
+        _rt->optRt->getAllShardIds(shardIds);
         if (chunkRanges) {
             getAllChunkRanges(chunkRanges);
         }
@@ -871,8 +871,8 @@ bool ChunkManager::rangeOverlapsShard(const ChunkRange& range, const ShardId& sh
     return overlapFound;
 }
 
-boost::optional<Chunk> ChunkManager::getNextChunkOnShard(const BSONObj& shardKey,
-                                                         const ShardId& shardId) const {
+boost::optional<Chunk> CurrentChunkManager::getNextChunkOnShard(const BSONObj& shardKey,
+                                                                const ShardId& shardId) const {
     tassert(7626422, "Expected routing table to be initialized", _rt->optRt);
     tassert(8719704,
             "Should never call getNextChunkOnShard when ChunkManager is at point-in-time",
@@ -914,10 +914,6 @@ void RoutingTableHistory::getAllChunkRanges(std::set<ChunkRange>* all) const {
         all->insert(chunkInfo->getRange());
         return true;
     });
-}
-
-ChunkManager ChunkManager::makeAtTime(const ChunkManager& cm, Timestamp clusterTime) {
-    return ChunkManager(cm._rt, clusterTime);
 }
 
 bool ChunkManager::allowMigrations() const {

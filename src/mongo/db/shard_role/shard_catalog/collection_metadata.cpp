@@ -55,11 +55,14 @@
 
 namespace mongo {
 
-CollectionMetadata::CollectionMetadata(ChunkManager cm, const ShardId& thisShardId)
+CollectionMetadata::CollectionMetadata(CurrentChunkManager cm, const ShardId& thisShardId)
+    : _cm(std::move(cm)), _thisShardId(thisShardId) {}
+
+CollectionMetadata::CollectionMetadata(PointInTimeChunkManager cm, const ShardId& thisShardId)
     : _cm(std::move(cm)), _thisShardId(thisShardId) {}
 
 bool CollectionMetadata::allowMigrations() const {
-    return _cm ? _cm->allowMigrations() : true;
+    return _cm ? getChunkManagerBase().allowMigrations() : true;
 }
 
 boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldForwardOps() const {
@@ -139,12 +142,14 @@ BSONObj CollectionMetadata::extractDocumentKey(const ShardKeyPattern* shardKeyPa
 }
 
 BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
-    return extractDocumentKey(isSharded() ? &_cm->getShardKeyPattern() : nullptr, doc);
+    return extractDocumentKey(isSharded() ? &getChunkManagerBase().getShardKeyPattern() : nullptr,
+                              doc);
 }
 
 std::string CollectionMetadata::toStringBasic() const {
     if (hasRoutingTable()) {
-        return str::stream() << "collection placement version: " << _cm->getVersion().toString()
+        return str::stream() << "collection placement version: "
+                             << getChunkManagerBase().getVersion().toString()
                              << ", shard placement version: "
                              << getShardPlacementVersionForLogging().toString();
     } else {
@@ -157,7 +162,7 @@ RangeMap CollectionMetadata::getChunks() const {
 
     RangeMap chunksMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>());
 
-    _cm->forEachChunk([this, &chunksMap](const auto& chunk) {
+    getChunkManagerBase().forEachChunk([this, &chunksMap](const auto& chunk) {
         if (chunk.getShardId() == _thisShardId)
             chunksMap.emplace_hint(chunksMap.end(), chunk.getMin(), chunk.getMax());
 
@@ -170,7 +175,7 @@ RangeMap CollectionMetadata::getChunks() const {
 bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk) const {
     tassert(10016203, "Expected a routing table to be initialized", hasRoutingTable());
 
-    auto nextChunk = _cm->getNextChunkOnShard(lookupKey, _thisShardId);
+    auto nextChunk = getCurrentChunkManager()->getNextChunkOnShard(lookupKey, _thisShardId);
     if (!nextChunk)
         return false;
 
@@ -182,7 +187,7 @@ bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk
 bool CollectionMetadata::currentShardHasAnyChunks() const {
     tassert(10016204, "Expected a routing table to be initialized", hasRoutingTable());
     std::set<ShardId> shards;
-    _cm->getAllShardIds(&shards);
+    getCurrentChunkManager()->getAllShardIds(&shards);
     return shards.find(_thisShardId) != shards.end();
 }
 
@@ -259,7 +264,7 @@ void CollectionMetadata::toBSONChunks(BSONArrayBuilder* builder) const {
     if (!hasRoutingTable())
         return;
 
-    _cm->forEachChunk([this, &builder](const auto& chunk) {
+    getChunkManagerBase().forEachChunk([this, &builder](const auto& chunk) {
         if (chunk.getShardId() == _thisShardId) {
             BSONArrayBuilder chunkBB(builder->subarrayStart());
             chunkBB.append(chunk.getMin());

@@ -57,7 +57,8 @@ PostReshardingCollectionPlacement::PostReshardingCollectionPlacement(
     tassert(11178203,
             "Routing information for the temporary resharding collection is stale",
             tmpNssRoutingInfoWithStatus.getValue().hasRoutingTable());
-    _tmpReshardingCollectionChunkManager = tmpNssRoutingInfoWithStatus.getValue().getChunkManager();
+    _tmpReshardingCollectionChunkManager =
+        tmpNssRoutingInfoWithStatus.getValue().getCurrentChunkManager();
 }
 
 const ShardId& PostReshardingCollectionPlacement::getReshardingDestinedRecipient(

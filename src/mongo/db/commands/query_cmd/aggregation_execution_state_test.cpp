@@ -79,8 +79,8 @@ protected:
 
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
             ->setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
-        auto cm = ChunkManager(RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}},
-                               _dbVersion.getTimestamp());
+        PointInTimeChunkManager cm(RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}},
+                                   _dbVersion.getTimestamp());
         getCatalogCacheMock()->setCollectionReturnValue(
             nss,
             CollectionRoutingInfo(
@@ -132,7 +132,7 @@ protected:
             std::make_shared<RoutingTableHistory>(std::move(rt)),
             ComparableChunkVersion::makeComparableChunkVersion(version));
 
-        auto cm = ChunkManager(rtHandle, boost::none);
+        CurrentChunkManager cm(rtHandle);
         const auto collectionMetadata = CollectionMetadata(cm, shardName);
 
         AutoGetCollection coll(opCtx, NamespaceStringOrUUID(nss), MODE_IX);

@@ -81,7 +81,9 @@ public:
      * "thisShardId" is the shard identity of this shard for purposes of answering questions like
      * "does this key belong to this shard"?
      */
-    CollectionMetadata(ChunkManager cm, const ShardId& thisShardId);
+    CollectionMetadata(CurrentChunkManager cm, const ShardId& thisShardId);
+
+    CollectionMetadata(PointInTimeChunkManager cm, const ShardId& thisShardId);
 
     /**
      * Returns a CollectionMetadata object for an untracked collection.
@@ -94,18 +96,18 @@ public:
      * Returns whether this metadata object represents a sharded or unsharded collection.
      */
     bool isSharded() const {
-        return _cm && _cm->isSharded();
+        return _cm && getChunkManagerBase().isSharded();
     }
 
     /**
      * Returns whether this metadata object represents an unsplittable collection.
      */
     bool isUnsplittable() const {
-        return _cm && _cm->isUnsplittable();
+        return _cm && getChunkManagerBase().isUnsplittable();
     }
 
     bool hasRoutingTable() const {
-        return _cm && _cm->hasRoutingTable();
+        return _cm && getChunkManagerBase().hasRoutingTable();
     }
 
     bool allowMigrations() const;
@@ -126,7 +128,8 @@ public:
      * have a routing table.
      */
     ChunkVersion getShardPlacementVersion() const {
-        return (hasRoutingTable() ? _cm->getVersion(_thisShardId) : ChunkVersion::UNTRACKED());
+        return (hasRoutingTable() ? getChunkManagerBase().getVersion(_thisShardId)
+                                  : ChunkVersion::UNTRACKED());
     }
 
     /**
@@ -136,7 +139,8 @@ public:
      * timestamp".
      */
     Timestamp getShardMaxValidAfter() const {
-        return (hasRoutingTable() ? _cm->getMaxValidAfter(_thisShardId) : Timestamp(0, 0));
+        return (hasRoutingTable() ? getChunkManagerBase().getMaxValidAfter(_thisShardId)
+                                  : Timestamp(0, 0));
     }
 
     /**
@@ -149,7 +153,7 @@ public:
      * instead.
      */
     ChunkVersion getShardPlacementVersionForLogging() const {
-        return (hasRoutingTable() ? _cm->getVersionForLogging(_thisShardId)
+        return (hasRoutingTable() ? getChunkManagerBase().getVersionForLogging(_thisShardId)
                                   : ChunkVersion::UNTRACKED());
     }
 
@@ -158,7 +162,7 @@ public:
      * table.
      */
     ChunkVersion getCollPlacementVersion() const {
-        return (hasRoutingTable() ? _cm->getVersion() : ChunkVersion::UNTRACKED());
+        return (hasRoutingTable() ? getChunkManagerBase().getVersion() : ChunkVersion::UNTRACKED());
     }
 
     /**
@@ -171,7 +175,7 @@ public:
 
     const ShardKeyPattern& getShardKeyPattern() const {
         tassert(10016206, "Expected a routing table to be initialized", hasRoutingTable());
-        return _cm->getShardKeyPattern();
+        return getChunkManagerBase().getShardKeyPattern();
     }
 
     /**
@@ -199,12 +203,12 @@ public:
 
     bool uuidMatches(UUID uuid) const {
         tassert(10016215, "Expected a routing table to be initialized", hasRoutingTable());
-        return _cm->uuidMatches(uuid);
+        return getChunkManagerBase().uuidMatches(uuid);
     }
 
     const UUID& getUUID() const {
         tassert(10016216, "Expected a routing table to be initialized", hasRoutingTable());
-        return _cm->getUUID();
+        return getChunkManagerBase().getUUID();
     }
 
     /**
@@ -230,7 +234,32 @@ public:
 
     const ChunkManager* getChunkManager() const {
         tassert(10016207, "Expected a routing table to be initialized", hasRoutingTable());
-        return _cm.get_ptr();
+        return std::visit([](const auto& cm) -> const ChunkManager* { return &cm; }, *_cm);
+    }
+
+    /**
+     * Returns a pointer to ChunkManager if that's what's stored, nullptr otherwise.
+     * Use this only when you specifically need the current (non-point-in-time) ChunkManager.
+     */
+    const CurrentChunkManager* getCurrentChunkManager() const {
+        tassert(9014101, "Expected a routing table to be initialized", hasRoutingTable());
+        return std::get_if<CurrentChunkManager>(&*_cm);
+    }
+
+    /**
+     * Returns a pointer to PointInTimeChunkManager if that's what's stored, nullptr otherwise.
+     * Use this only when you specifically need the point-in-time ChunkManager.
+     */
+    const PointInTimeChunkManager* getPointInTimeChunkManager() const {
+        tassert(9014102, "Expected a routing table to be initialized", hasRoutingTable());
+        return std::get_if<PointInTimeChunkManager>(&*_cm);
+    }
+
+    /**
+     * Returns true if this metadata holds a point-in-time chunk manager.
+     */
+    bool isAtPointInTime() const {
+        return _cm && std::holds_alternative<PointInTimeChunkManager>(*_cm);
     }
 
     /**
@@ -239,7 +268,7 @@ public:
      */
     bool keyBelongsToMe(const BSONObj& key) const {
         tassert(10016208, "Expected a routing table to be initialized", hasRoutingTable());
-        return _cm->keyBelongsToShard(key, _thisShardId);
+        return getChunkManagerBase().keyBelongsToShard(key, _thisShardId);
     }
 
     /**
@@ -250,7 +279,7 @@ public:
     ChunkManager::ChunkOwnership nearestOwnedChunk(const BSONObj& key,
                                                    ChunkMap::Direction direction) const {
         tassert(9526301, "Expected a routing table to be initialized", hasRoutingTable());
-        return _cm->nearestOwnedChunk(key, _thisShardId, direction);
+        return getChunkManagerBase().nearestOwnedChunk(key, _thisShardId, direction);
     }
 
     /**
@@ -266,7 +295,7 @@ public:
      */
     bool rangeOverlapsChunk(const ChunkRange& range) const {
         tassert(10016209, "Expected a routing table to be initialized", hasRoutingTable());
-        return _cm->rangeOverlapsShard(range, _thisShardId);
+        return getChunkManagerBase().rangeOverlapsShard(range, _thisShardId);
     }
 
     /**
@@ -307,22 +336,34 @@ public:
 
     const boost::optional<TypeCollectionReshardingFields>& getReshardingFields() const {
         tassert(10016210, "Expected a routing table to be initialized", hasRoutingTable());
-        return _cm->getReshardingFields();
+        return getChunkManagerBase().getReshardingFields();
     }
 
     const boost::optional<TypeCollectionTimeseriesFields>& getTimeseriesFields() const {
         tassert(10016211, "Expected a routing table to be initialized", hasRoutingTable());
-        return _cm->getTimeseriesFields();
+        return getChunkManagerBase().getTimeseriesFields();
     }
 
     bool isUniqueShardKey() const {
         tassert(10016212, "Expected a routing table to be initialized", hasRoutingTable());
-        return _cm->isUnique();
+        return getChunkManagerBase().isUnique();
     }
 
 private:
+    /**
+     * Helper to access the ChunkManager interface regardless of whether _cm holds
+     * a ChunkManager or PointInTimeChunkManager.
+     */
+    const ChunkManager& getChunkManagerBase() const {
+        tassert(9014100, "Expected _cm to be initialized", _cm.has_value());
+        return std::visit([](const auto& cm) -> const ChunkManager& { return cm; }, *_cm);
+    }
+
+    // Type alias for the variant holding either ChunkManager or PointInTimeChunkManager
+    using ChunkManagerVariant = std::variant<CurrentChunkManager, PointInTimeChunkManager>;
+
     // The full routing table for the collection or boost::none if the collection is not tracked
-    boost::optional<ChunkManager> _cm;
+    boost::optional<ChunkManagerVariant> _cm;
 
     // The identity of this shard, for the purpose of answering "key belongs to me" queries. If the
     // collection is not tracked (_cm is boost::none), then this value will be empty.

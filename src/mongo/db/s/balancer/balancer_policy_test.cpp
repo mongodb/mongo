@@ -129,9 +129,10 @@ RoutingTableHistory makeRoutingTable(const std::vector<ChunkType>& chunks) {
                                         chunks);
 }
 
-ChunkManager makeChunkManager(const std::vector<ChunkType>& chunks) {
+CurrentChunkManager makeChunkManager(const std::vector<ChunkType>& chunks) {
     auto rt = std::make_shared<RoutingTableHistory>(makeRoutingTable(chunks));
-    return {{std::move(rt)}, boost::none /* atClusterTime */};
+    return CurrentChunkManager(
+        RoutingTableHistoryValueHandle(OptionalRoutingTableHistory(std::move(rt))));
 }
 
 DistributionStatus makeDistStatus(const ChunkManager& cm, ZoneInfo zoneInfo = ZoneInfo()) {

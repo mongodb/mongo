@@ -109,8 +109,7 @@ protected:
             {ChunkType{uuid, range, ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}), kOtherShard}});
 
         return CollectionMetadata(
-            ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none),
-            kThisShard);
+            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))), kThisShard);
     }
 
     /**
@@ -163,8 +162,7 @@ protected:
                                                              splitChunks);
 
         return CollectionMetadata(
-            ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none),
-            kThisShard);
+            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))), kThisShard);
     }
 
     static CollectionMetadata cloneMetadataMinusChunk(const CollectionMetadata& metadata,
@@ -190,8 +188,7 @@ protected:
             {ChunkType(metadata.getUUID(), ChunkRange(minKey, maxKey), chunkVersion, kOtherShard)});
 
         return CollectionMetadata(
-            ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none),
-            kThisShard);
+            CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))), kThisShard);
     }
 
     std::shared_ptr<MetadataManager> _manager;

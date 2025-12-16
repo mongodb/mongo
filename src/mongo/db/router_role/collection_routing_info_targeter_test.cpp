@@ -190,8 +190,8 @@ void CollectionRoutingInfoTargeterTest::testTargetInsertWithRangePrefixHashedSha
  * with the distinction that it simply creates and returns a ChunkManager object
  * and does not assign it to the Global Catalog Cache ChunkManager.
  */
-ChunkManager makeCustomChunkManager(const ShardKeyPattern& shardKeyPattern,
-                                    const std::vector<BSONObj>& splitPoints) {
+CurrentChunkManager makeCustomChunkManager(const ShardKeyPattern& shardKeyPattern,
+                                           const std::vector<BSONObj>& splitPoints) {
     std::vector<ChunkType> chunks;
     auto splitPointsIncludingEnds(splitPoints);
     splitPointsIncludingEnds.insert(splitPointsIncludingEnds.begin(),
@@ -228,9 +228,8 @@ ChunkManager makeCustomChunkManager(const ShardKeyPattern& shardKeyPattern,
                                                             true,         // allowMigration
                                                             chunks);
 
-    return ChunkManager(RoutingTableHistoryValueHandle(
-                            std::make_shared<RoutingTableHistory>(std::move(routingTableHistory))),
-                        boost::none);
+    return CurrentChunkManager(RoutingTableHistoryValueHandle(
+        std::make_shared<RoutingTableHistory>(std::move(routingTableHistory))));
 }
 
 
@@ -711,7 +710,7 @@ public:
         const auto cri = makeUnshardedCollectionRoutingInfo(kNss);
 
         std::set<ShardId> shards;
-        cri.getChunkManager().getAllShardIds(&shards);
+        cri.getCurrentChunkManager().getAllShardIds(&shards);
         ASSERT_EQ(1, shards.size());
         owningShard = *shards.begin();
 

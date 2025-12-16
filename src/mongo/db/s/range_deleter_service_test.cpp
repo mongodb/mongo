@@ -129,21 +129,19 @@ void RangeDeleterServiceTest::_setFilteringMetadataByUUID(OperationContext* opCt
                                ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
                                ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
                                ShardId("this"));
-        ChunkManager cm(makeStandaloneRoutingTableHistory(
-                            RoutingTableHistory::makeNew(nss,
-                                                         uuid,
-                                                         kShardKeyPattern,
-                                                         false, /* unsplittable */
-                                                         nullptr,
-                                                         false,
-                                                         epoch,
-                                                         Timestamp(1, 1),
-                                                         boost::none /* timeseriesFields */,
-                                                         boost::none /* reshardingFields */,
-
-                                                         true,
-                                                         {std::move(chunk)})),
-                        boost::none);
+        CurrentChunkManager cm(makeStandaloneRoutingTableHistory(
+            RoutingTableHistory::makeNew(nss,
+                                         uuid,
+                                         kShardKeyPattern,
+                                         false, /* unsplittable */
+                                         nullptr,
+                                         false,
+                                         epoch,
+                                         Timestamp(1, 1),
+                                         boost::none /* timeseriesFields */,
+                                         boost::none /* reshardingFields */,
+                                         true,
+                                         {std::move(chunk)})));
 
         return CollectionMetadata(std::move(cm), ShardId("this"));
     }();

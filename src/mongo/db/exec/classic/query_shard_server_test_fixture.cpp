@@ -146,7 +146,7 @@ CollectionMetadata QueryShardServerTestFixture::prepareTestData(
                                            true,
                                            _chunks);
 
-    ChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none);
+    CurrentChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)));
     ASSERT_EQ(_chunks.size(), cm.numChunks());
 
     {

@@ -160,7 +160,7 @@ public:
         });
     }
 
-    ChunkManager createChunkManager(const UUID& uuid, const NamespaceString& nss) {
+    CurrentChunkManager createChunkManager(const UUID& uuid, const NamespaceString& nss) {
         ShardKeyPattern sk{fromjson("{x: 1, _id: 1}")};
         std::deque<DocumentSource::GetNextResult> configData{
             Document(fromjson("{_id: {x: {$minKey: 1}, _id: {$minKey: 1}}, max: {x: 0.0, _id: "
@@ -193,9 +193,8 @@ public:
                                                false,
                                                chunks);
 
-        return ChunkManager(
-            ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rt)),
-            boost::none);
+        return CurrentChunkManager(
+            ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rt)));
     }
 
 protected:

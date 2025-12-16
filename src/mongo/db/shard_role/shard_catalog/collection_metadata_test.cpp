@@ -103,22 +103,27 @@ CollectionMetadata makeTrackedCollectionMetadataImpl(
         chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
     }
 
-    return CollectionMetadata(
-        ChunkManager(ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(
-                         RoutingTableHistory::makeNew(kNss,
-                                                      uuid,
-                                                      shardKeyPattern,
-                                                      false, /* unsplittable */
-                                                      nullptr,
-                                                      false,
-                                                      epoch,
-                                                      timestamp,
-                                                      boost::none /* timeseriesFields */,
-                                                      std::move(reshardingFields),
-                                                      true,
-                                                      allChunks)),
-                     kChunkManager),
-        kThisShard);
+    auto routingTableHistory = ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(
+        RoutingTableHistory::makeNew(kNss,
+                                     uuid,
+                                     shardKeyPattern,
+                                     false, /* unsplittable */
+                                     nullptr,
+                                     false,
+                                     epoch,
+                                     timestamp,
+                                     boost::none /* timeseriesFields */,
+                                     std::move(reshardingFields),
+                                     true,
+                                     allChunks));
+
+    if (kChunkManager) {
+        return CollectionMetadata(
+            PointInTimeChunkManager(std::move(routingTableHistory), kChunkManager.get()),
+            kThisShard);
+    } else {
+        return CollectionMetadata(CurrentChunkManager(std::move(routingTableHistory)), kThisShard);
+    }
 }
 
 

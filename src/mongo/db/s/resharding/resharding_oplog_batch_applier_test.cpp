@@ -520,8 +520,7 @@ private:
                                                true /* allowMigrations */,
                                                chunks);
 
-        return ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)),
-                            boost::none /* clusterTime */);
+        return CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)));
     }
 
     RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt) {

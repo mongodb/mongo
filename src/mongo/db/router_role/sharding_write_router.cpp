@@ -71,7 +71,7 @@ ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx, const Namespac
             tassert(6862800,
                     "Routing information for the temporary resharding collection is stale",
                     cri.hasRoutingTable());
-            _reshardingChunkMgr = cri.getChunkManager();
+            _reshardingChunkMgr = cri.getCurrentChunkManager();
         }
     }
 }
