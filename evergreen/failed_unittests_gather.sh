@@ -13,7 +13,7 @@ if [ "${task_name}" != "run_dbtest" ] &&
     exit 0
 fi
 
-unittest_bin_dir=dist-unittests/bin
+unittest_bin_dir=dist-tests/bin
 mkdir -p $unittest_bin_dir || true
 
 # Find all core files
@@ -89,5 +89,5 @@ done <<<"${core_files}"
 # Copy debug symbols for dynamic builds
 lib_dir=bazel-bin/install/lib
 if [ -d "$lib_dir" ] && [ -n "$core_files" ]; then
-    cp -r "$lib_dir" dist-unittests
+    cp -r "$lib_dir" dist-tests
 fi

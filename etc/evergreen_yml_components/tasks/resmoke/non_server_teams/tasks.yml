@@ -514,12 +514,12 @@ tasks:
           task_compile_flags: >-
             --verbose_failures
             --simple_build_id=True
-            --features=strip_debug
-            --separate_debug=False
             --define=MONGO_VERSION=${version}
             --config=evg
             --config=opt_profiled
             --jobs=1600
+            --features=strip_debug
+            --separate_debug=False
 
 task_groups:
   - name: resmoke_tests_TG
@@ -544,6 +544,7 @@ task_groups:
       - func: "attach report"
       - func: "upload mongodatafiles"
       - func: "attach multiversion download links"
+      - func: "save failed tests"
       - func: "kill processes"
       - func: "save mongo coredumps"
       - func: "generate hang analyzer tasks"

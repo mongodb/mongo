@@ -145,7 +145,7 @@ variables:
       - func: "save mongo coredumps"
       - func: "generate hang analyzer tasks"
       - func: "attach bazel invocation text"
-      - func: "save failed unittests"
+      - func: "save failed tests"
       - func: "save hang analyzer debugger files"
       - func: "save disk statistics"
       - func: "save system resource information"
@@ -158,9 +158,9 @@ variables:
             src/gcov-intermediate-files.tgz
             src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz
             mongo-coredumps.json
-            src/dist-unittests/bin/*
-            src/dist-unittests/lib/*
-            mongo-unittests.tgz
+            src/dist-tests/bin/*
+            src/dist-tests/lib/*
+            mongo-tests.tgz
             src/debugger*.*
             src/mongo-hanganalyzer.tgz
             diskstats.tgz

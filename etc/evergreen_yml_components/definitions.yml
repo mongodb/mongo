@@ -2964,26 +2964,26 @@ functions:
       args:
         - "./src/evergreen/failed_unittests_gather.sh"
 
-  "tar failed unittests": &tar_failed_unittests
+  "tar failed tests": &tar_failed_tests
     command: archive.targz_pack
     params:
-      target: "mongo-unittests.tgz"
-      source_dir: "src/dist-unittests"
+      target: "mongo-tests.tgz"
+      source_dir: "src/dist-tests"
       include:
         - "**"
 
-  "archive failed unittests": &archive_failed_unittests
+  "archive failed tests": &archive_failed_tests
     command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: mongo-unittests.tgz
-      remote_file: ${project}/${build_variant}/${revision}/unittests/mongo-unittests-${build_id}-${task_name}-${execution}.tgz
+      local_file: mongo-tests.tgz
+      remote_file: ${project}/${build_variant}/${revision}/tests/mongo-tests-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: ${mciuploads_binary_permissions|public-read}
       visibility: ${mciuploads_binary_visibility|public}
       content_type: application/gzip
-      display_name: Unit tests - Execution ${execution}
+      display_name: Test binaries and libraries - Execution ${execution}
       optional: true
 
   "upload failed unittest repro": &upload_failed_unittest_repro
@@ -3030,11 +3030,11 @@ functions:
     - *upload_bazel_build_invocation
     - *upload_engflow_link
 
-  "save failed unittests":
+  "save failed tests":
     - *f_expansions_write
     - *gather_failed_unittests_resmoke
-    - *tar_failed_unittests
-    - *archive_failed_unittests
+    - *tar_failed_tests
+    - *archive_failed_tests
     - *upload_failed_unittest_repro
 
   ### Process & archive artifacts from hung processes ###

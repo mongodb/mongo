@@ -79,7 +79,7 @@ RET=$?
 if [[ "$RET" == "0" ]]; then
     export RETRY_ON_FAIL=0
     bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
-        test ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} ${targets}
+        test ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} --build_event_json_file=build_events.json ${targets}
     RET=$?
 
     if [[ "$RET" -eq 124 ]]; then
@@ -167,7 +167,19 @@ else
     echo "version: 0" >>${workdir}/build/TestLogs/log_spec.yaml
 
     # Combine reports from potentially multiple tests/shards.
-    find bazel-testlogs/ -name report*.json | xargs $python buildscripts/combine_reports.py --no-report-exit --add-bazel-target-info -o report.json
+    find bazel-testlogs/ -name report*.json | xargs $python buildscripts/combine_reports.py --no-report-exit --add-bazel-target-info -o report.json || true
+
+    if [[ "$RET" != "0" ]]; then
+        # This is a hacky way to save build time for the initial build during the `bazel test` above. They
+        # are stripped binaries there. We should rebuild them with debug symbols and separate debug.
+        # The relinked binaries should still be hash identical when stripped with strip.
+        sed -i -e 's/--config=remote_test//g' -e 's/--separate_debug=False/--separate_debug=True/g' -e 's/--features=strip_debug//g' .bazel_build_flags
+
+        # The --config flag needs to stay consistent for the `bazel run` to avoid evicting the previous results.
+        # Strip out anything that isn't a --config flag that could interfere with the run command.
+        CONFIG_FLAGS="$(bazel_evergreen_shutils::extract_config_flags "${ALL_FLAGS}")"
+        eval ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:gather_failed_tests || true
+    fi
 fi
 
 exit $RET

@@ -232,11 +232,10 @@ py_library(
 )
 
 py_binary(
-    name = "gather_failed_unittests",
-    srcs = ["gather_failed_unittests.py"],
+    name = "gather_failed_tests",
+    srcs = ["gather_failed_tests.py"],
     visibility = ["//visibility:public"],
     deps = [
-        ":parse_test_xml",
         "//buildscripts/util",
         dependency(
             "typer",
