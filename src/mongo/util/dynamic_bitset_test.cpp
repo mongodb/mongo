@@ -35,6 +35,8 @@
 #include <numeric>
 #include <vector>
 
+#include <boost/dynamic_bitset.hpp>
+
 namespace mongo {
 namespace {
 using Bitset = DynamicBitset<uint8_t, 1>;
@@ -330,39 +332,30 @@ TEST(DynamicBitsetTests, All) {
     ASSERT_TRUE(Bitset("1111111111111111").all());
 }
 
+template <typename BlockType, size_t nBlocks>
+DynamicBitset<BlockType, nBlocks> makeBitset(size_t n) {
+    DynamicBitset<BlockType, nBlocks> bitset(sizeof(size_t) * CHAR_BIT);
+    // Iterates through each set bit in the number 'n': gets the index of the next set bit  and
+    // clears the bit until 'n' becomes 0.
+    for (; n != 0; n &= n - 1)
+        bitset.set(std::countr_zero(n));
+    return bitset;
+}
+
+void testAllInPrefix(size_t n, size_t maxBits) {
+    auto mongoBitset = makeBitset<uint8_t, 8>(n);
+    boost::dynamic_bitset<size_t> boostBitset(maxBits, n);
+    for (; !boostBitset.empty(); boostBitset.pop_back())
+        ASSERT_EQ(mongoBitset.allInPrefix(boostBitset.size()), boostBitset.all());
+    ASSERT_TRUE(mongoBitset.allInPrefix(0));
+}
+
 TEST(DynamicBitsetTests, allInPrefix) {
-    ASSERT_TRUE(Bitset("1").allInPrefix(1));
-    {
-        // 0 blocks case.
-        Bitset bitset;
-        ASSERT_TRUE(bitset.allInPrefix(0));
-        ASSERT_FALSE(bitset.allInPrefix(1));
-    }
-    {
-        // 1 Block case
-        Bitset bitset("11111111");
-        ASSERT_TRUE(bitset.allInPrefix(0));
-        ASSERT_TRUE(bitset.allInPrefix(1));
-        ASSERT_TRUE(bitset.allInPrefix(4));
-        ASSERT_TRUE(bitset.allInPrefix(8));
-    }
-    {
-        // 2 blocks case
-        Bitset bitset("1111111111111111");
-        ASSERT_TRUE(bitset.allInPrefix(8));
-        ASSERT_TRUE(bitset.allInPrefix(9));
-        ASSERT_TRUE(bitset.allInPrefix(12));
-        ASSERT_TRUE(bitset.allInPrefix(16));
-    }
-    {
-        // 2+ blocks case
-        Bitset bitset(
-            "11101111"
-            "11111111"
-            "11111111");
-        for (size_t i = 0; i <= 40; ++i)
-            ASSERT_EQ(bitset.allInPrefix(i), i <= 20) << i;
-    }
+    static constexpr size_t maxBits = 20;
+    static constexpr size_t maxValue = 1ull << maxBits;
+
+    for (size_t n = 0; n != maxValue; ++n)
+        testAllInPrefix(n, maxBits);
 }
 
 TEST(DynamicBitsetTests, Less) {
