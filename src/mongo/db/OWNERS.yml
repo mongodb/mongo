@@ -3,7 +3,7 @@ filters:
   - "OWNERS.yml":
     approvers:
       - 10gen/server-programmability
-      - 10gen/server-networking-observability
+      - 10gen/server-networking-and-observability
   - "api_parameters*":
     approvers:
       - 10gen/query-optimization
@@ -217,9 +217,6 @@ filters:
   - "feature_compatibility*":
     approvers:
       - 10gen/server-fcv
-  - "catalog_shard_feature_flag.idl":
-    approvers:
-      - 10gen/server-cluster-scalability
   - "traffic*":
     approvers:
       - 10gen/query-optimization

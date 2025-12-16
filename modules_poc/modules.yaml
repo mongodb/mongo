@@ -337,12 +337,6 @@ catalog_and_routing.topology:
     - src/mongo/db/version_context*
     - src/mongo/s/commands/cluster_set_feature_compatibility_version_cmd.cpp
 
-    # config shard:
-    - src/mongo/db/catalog_shard_feature_flag.idl
-    - src/mongo/db/s/config/*transition*dedicated_config*
-    - src/mongo/s/commands/*transition*dedicated_config*
-    - src/mongo/s/request_types/transition*
-
     # cluster-wide r/w concern:
     - src/mongo/db/commands/*rwc_defaults*
     - src/mongo/s/commands/cluster_rwc_defaults_commands.cpp

@@ -40,7 +40,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/remove_shard_gen.h"
 #include "mongo/db/topology/shard_registry.h"
-#include "mongo/s/request_types/transition_to_dedicated_config_server_gen.h"
+#include "mongo/db/topology/transition_to_dedicated_config_server_gen.h"
 #include "mongo/util/assert_util.h"
 
 #include <string>

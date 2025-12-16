@@ -252,3 +252,9 @@ feature_flags:
         default: true
         version: 8.3
         fcv_gated: true
+    featureFlagTransitionToCatalogShard:
+        description: "Feature flag for transitioning a config server in and out of config shard mode"
+        cpp_varname: gFeatureFlagTransitionToCatalogShard
+        default: true
+        version: 8.0
+        fcv_gated: true

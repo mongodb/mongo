@@ -103,8 +103,6 @@ mongo_cc_library(
         "cluster_rwc_defaults_commands.cpp",
         "cluster_set_feature_compatibility_version_cmd.cpp",
         "cluster_shutdown_cmd.cpp",
-        "cluster_transition_from_dedicated_config_server_cmd.cpp",
-        "cluster_transition_to_dedicated_config_server_cmd.cpp",
         "cluster_validate_cmd.cpp",
         "cluster_whats_my_uri_cmd.cpp",
         "cluster_write_without_shard_key_cmd.cpp",
@@ -291,6 +289,8 @@ mongo_cc_library(
         "//src/mongo/db/topology:cluster_start_transition_to_dedicated_config_server_cmd.cpp",
         "//src/mongo/db/topology:cluster_stop_shard_draining_cmd.cpp",
         "//src/mongo/db/topology:cluster_stop_transition_to_dedicated_config_server_cmd.cpp",
+        "//src/mongo/db/topology:cluster_transition_from_dedicated_config_server_cmd.cpp",
+        "//src/mongo/db/topology:cluster_transition_to_dedicated_config_server_cmd.cpp",
     ],
     deps = [
         ":cluster_commands",

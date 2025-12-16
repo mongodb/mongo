@@ -233,10 +233,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/*txn* @10gen/server-transactions @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/write_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/unified_write_executor* @10gen/query-execution-router @svc-auto-approve-bot
-/buildscripts/resmokeconfig/suites/**/sharded_collections_jscore_passthrough_with_config_transitions_and_add_remove_shard.yml @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
-/buildscripts/resmokeconfig/suites/**/sharding_jscore_passthrough_with_config_transitions_and_add_remove_shard.yml @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
-/buildscripts/resmokeconfig/suites/**/jstestfuzz_sharded_with_config_transitions* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
-/buildscripts/resmokeconfig/suites/**/concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions_and_add_remove_shard.yml @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/*config_transitions_and_add_remove_shard.yml @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/*config_transitions.yml @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/query_correctness_query_shape_hash_stability_generated_test.yml @10gen/query-execution-query-settings @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/timeseries_crud_jscore_passthrough.yml @10gen/query-integration-timeseries @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/sharding_auth.yml @10gen/server-security @svc-auto-approve-bot
@@ -1807,7 +1805,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/crypto/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/OWNERS.yml
-/src/mongo/db/**/OWNERS.yml @10gen/server-networking-observability @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/db/**/OWNERS.yml @10gen/server-networking-and-observability @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/api_parameters* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/**/basic_types.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/baton.* @10gen/server-programmability @svc-auto-approve-bot
@@ -1878,7 +1876,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/read_write_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /src/mongo/db/**/write_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /src/mongo/db/**/feature_compatibility* @10gen/server-fcv @svc-auto-approve-bot
-/src/mongo/db/**/catalog_shard_feature_flag.idl @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/**/traffic* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/**/version_context* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /src/mongo/db/**/README_version_context.md @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
@@ -3091,8 +3088,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/commands/**/document_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/commands/**/*fsync_unlock* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/commands/**/*split*vector* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/src/mongo/s/commands/**/*transition_from_dedicated* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/src/mongo/s/commands/**/*transition_to_dedicated* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_move_chunk_cmd.cpp @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_split_cmd.cpp @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_query_without_shard_key_cmd.cpp @10gen/query-execution-router @svc-auto-approve-bot

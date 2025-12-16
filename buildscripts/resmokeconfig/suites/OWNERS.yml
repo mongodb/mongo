@@ -141,16 +141,10 @@ filters:
   - "unified_write_executor*":
     approvers:
       - 10gen/query-execution-router
-  - "sharded_collections_jscore_passthrough_with_config_transitions_and_add_remove_shard.yml":
+  - "*config_transitions_and_add_remove_shard.yml":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
-  - "sharding_jscore_passthrough_with_config_transitions_and_add_remove_shard.yml":
-    approvers:
-      - 10gen/server-catalog-and-routing-routing-and-topology
-  - "jstestfuzz_sharded_with_config_transitions*":
-    approvers:
-      - 10gen/server-catalog-and-routing-routing-and-topology
-  - "concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions_and_add_remove_shard.yml":
+  - "*config_transitions.yml":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
   - "query_correctness_query_shape_hash_stability_generated_test.yml":

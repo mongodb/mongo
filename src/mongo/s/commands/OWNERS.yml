@@ -36,12 +36,6 @@ filters:
   - "*split*vector*":
     approvers:
       - 10gen/server-cluster-scalability
-  - "*transition_from_dedicated*":
-    approvers:
-      - 10gen/server-cluster-scalability
-  - "*transition_to_dedicated*":
-    approvers:
-      - 10gen/server-cluster-scalability
   - "cluster_move_chunk_cmd.cpp":
     approvers:
       - 10gen/server-cluster-scalability

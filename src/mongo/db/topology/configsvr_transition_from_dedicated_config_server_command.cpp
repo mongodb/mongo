@@ -31,7 +31,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
@@ -50,8 +49,8 @@
 #include "mongo/db/topology/add_shard_coordinator.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/topology/transition_from_dedicated_config_server_gen.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/request_types/transition_from_dedicated_config_server_gen.h"
 #include "mongo/util/assert_util.h"
 
 #include <memory>
