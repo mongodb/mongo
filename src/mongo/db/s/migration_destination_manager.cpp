@@ -808,6 +808,18 @@ Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
                               << _sessionId->toString()};
     }
 
+    // Only interrupt the migrate thread if we haven't entered the critical section, otherwise we'll
+    // never exit it.
+    if (_state < kEnteredCritSec) {
+        LOGV2(10142101,
+              "Interrupting migrateThread",
+              logAttrs(_nss),
+              "migrationId"_attr = _migrationId->toBSON());
+        _cancellationSource.cancel();
+        auto newCancellationSource = CancellationSource();
+        std::swap(_cancellationSource, newCancellationSource);
+    }
+
     _state = kAbort;
     _stateChangedCV.notify_all();
     _errmsg = "aborted";

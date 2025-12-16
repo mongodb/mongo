@@ -201,6 +201,13 @@ boost::optional<SharedSemiFuture<void>> MigrationCoordinator::completeMigration(
           "migrationId"_attr = _migrationInfo.getId(),
           logAttrs(_migrationInfo.getNss()));
 
+    if (*decision == DecisionEnum::kAborted) {
+        abortMigrationRecipient(opCtx,
+                                _migrationInfo.getRecipientShardId(),
+                                _migrationInfo.getNss(),
+                                _migrationInfo.getMigrationSessionId());
+    }
+
     if (!_releaseRecipientCriticalSectionFuture) {
         launchReleaseRecipientCriticalSection(opCtx);
     }

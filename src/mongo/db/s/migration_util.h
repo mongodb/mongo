@@ -195,5 +195,13 @@ SemiFuture<void> asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* o
  */
 MONGO_MOD_PUBLIC void drainMigrationsOnFcvDowngrade(OperationContext* opCtx);
 
+/**
+ * Best effort attempt at aborting migration on the recipient.
+ */
+void abortMigrationRecipient(OperationContext* opCtx,
+                             const ShardId& recipientShardId,
+                             const NamespaceString& nss,
+                             const MigrationSessionId& sessionId);
+
 }  // namespace migrationutil
 }  // namespace mongo

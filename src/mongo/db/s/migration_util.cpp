@@ -620,6 +620,41 @@ void drainMigrationsOnFcvDowngrade(OperationContext* opCtx) {
                   });
 }
 
+void abortMigrationRecipient(OperationContext* opCtx,
+                             const ShardId& recipientShardId,
+                             const NamespaceString& nss,
+                             const MigrationSessionId& sessionId) {
+    const auto logFailure = [](const Status& status) {
+        // The best effort attempt can fail for a variety of reasons, e.g. another migration is
+        // already in progress or the shard can't be found.
+        LOGV2(10142100,
+              "Best effort attempt to abort migration recipient failed",
+              "reason"_attr = status.reason());
+    };
+    const auto recipientShard =
+        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientShardId);
+    if (!recipientShard.isOK()) {
+        logFailure(recipientShard.getStatus());
+        return;
+    }
+
+    BSONObjBuilder bob;
+    bob.append("_recvChunkAbort",
+               NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+    sessionId.append(&bob);
+    const auto cmdObj = bob.obj();
+
+    const auto response =
+        recipientShard.getValue()->runCommand(opCtx,
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              DatabaseName::kAdmin,
+                                              cmdObj,
+                                              Shard::RetryPolicy::kIdempotent);
+    auto status = Shard::CommandResponse::getEffectiveStatus(response);
+    if (!status.isOK()) {
+        logFailure(status);
+    }
+}
 
 }  // namespace migrationutil
 }  // namespace mongo
