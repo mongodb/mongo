@@ -128,6 +128,10 @@ public:
         _state->stop();
     }
 
+    bool stop_requested() const {
+        return _state && _state->stopped();
+    }
+
 private:
     std::shared_ptr<stop_state> _state = std::make_shared<stop_state>();
 };

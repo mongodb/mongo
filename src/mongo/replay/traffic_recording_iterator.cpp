@@ -110,7 +110,7 @@ public:
     // Currently files remain mapped for the lifetime of the LocalFileSet.
     // This is required as replayThread dispatches ReplayCommand objects to other threads;
     // this is not an owning type, and does not extend the life of the mmapped data.
-    // TODO SERVER-108930: Change this to weak ownership here, and have worker threads maintain an
+    // TODO SERVER-106702: Change this to weak ownership here, and have worker threads maintain an
     // iterator,
     //       so files remain mapped while in use, but can be unmmapped when no longer referenced by
     //       any thread.

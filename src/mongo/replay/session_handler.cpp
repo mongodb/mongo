@@ -29,87 +29,78 @@
 
 #include "mongo/replay/session_handler.h"
 
+#include "mongo/db/query/util/stop_token.h"
+#include "mongo/logv2/log.h"
 #include "mongo/replay/performance_reporter.h"
-#include "mongo/replay/rawop_document.h"
-#include "mongo/replay/replay_command.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/time_support.h"
+
+#include <chrono>
+#include <exception>
+#include <mutex>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
-void SessionHandler::onSessionStart(Microseconds offset, int64_t sessionId) {
-    auto& session = createSession(sessionId);
-    // connects to the server
-    session.start(_uri, _replayStartTime, offset);
-}
-void SessionHandler::onSessionStart(const ReplayCommand& command) {
-    const auto& [offset, sid] = extractOffsetAndSessionFromCommand(command);
-    onSessionStart(offset, sid);
-}
-
-void SessionHandler::onSessionStop(const ReplayCommand& stopCommand) {
-    uassert(ErrorCodes::ReplayClientSessionSimulationError,
-            "Error, failed the command does not represent a stop recording event.",
-            stopCommand.isSessionEnd());
-
-    const auto& [offset, sessionId] = extractOffsetAndSessionFromCommand(stopCommand);
-    auto& session = getSessionSimulator(sessionId);
-
-    session.stop(offset);
-    // this is correct, because the scheduler will wait until the stop command would have run. In
-    // case of errors, the session will need to be deleted either way.
-    destroySession(sessionId);
-}
-
-void SessionHandler::onBsonCommand(const ReplayCommand& command) {
-    // just run the command. the Session simulator will make sure things work.
-    const auto& [offset, sessionId] = extractOffsetAndSessionFromCommand(command);
-    uassert(ErrorCodes::ReplayClientSessionSimulationError,
-            "Error, the session should be active",
-            isSessionActive(sessionId));
-    auto& session = getSessionSimulator(sessionId);
-    session.run(command, offset);
-}
-
-void SessionHandler::clear() {
-    _runningSessions.clear();
-}
 
 
-SessionSimulator& SessionHandler::createSession(key_t key) {
-    uassert(ErrorCodes::ReplayClientSessionSimulationError,
-            "Error, running session cannot contain the same key",
-            !isSessionActive(key));
-
+void SessionHandler::createSession(key_t key, PacketSource source) {
     auto commandExecutor = std::make_unique<ReplayCommandExecutor>();
-    auto sessionScheduler = std::make_unique<SessionScheduler>();
     auto perfReporter = std::make_unique<PerformanceReporter>(_uri, _perfFileName);
-    auto session = std::make_unique<SessionSimulator>(
-        std::move(commandExecutor), std::move(sessionScheduler), std::move(perfReporter));
-    return *_runningSessions.insert({key, std::move(session)}).first->second;
+    auto session = std::make_unique<SessionSimulator>(std::move(source),
+                                                      key,
+                                                      _replayStartTime,
+                                                      _uri,
+                                                      std::move(commandExecutor),
+                                                      std::move(perfReporter));
+
+    std::thread([session = std::move(session), this] {
+        ++_runningSessionCount;
+        try {
+            session->run(_allSessionStop.get_token());
+        } catch (...) {
+            auto recordedException = _sessionException.synchronize();
+            if (!*recordedException) {
+                *recordedException = std::current_exception();
+            }
+            stopAllSessions();
+        }
+        --_runningSessionCount;
+        notify();
+    }).detach();
+
+    LOGV2_DEBUG(10893000, 1, "New Session", "sessionID"_attr = key);
 }
 
-void SessionHandler::destroySession(key_t key) {
-    uassert(ErrorCodes::ReplayClientSessionSimulationError,
-            "Error, running session must contain the key passed",
-            isSessionActive(key));
-    _runningSessions.erase(key);
+void SessionHandler::stopAllSessions() {
+    _allSessionStop.request_stop();
 }
 
-SessionSimulator& SessionHandler::getSessionSimulator(SessionHandler::key_t key) {
-    uassert(ErrorCodes::ReplayClientSessionSimulationError,
-            "Error, running session must contain the key passed",
-            isSessionActive(key));
-    return *(_runningSessions.at(key));
+void SessionHandler::rethrowIfSessionFailed() {
+    auto exception = _sessionException.get();
+    if (exception) {
+        std::rethrow_exception(exception);
+    }
 }
 
-const SessionSimulator& SessionHandler::getSessionSimulator(SessionHandler::key_t key) const {
-    uassert(ErrorCodes::ReplayClientSessionSimulationError,
-            "Error, running session must contain the key passed",
-            isSessionActive(key));
-    return *(_runningSessions.at(key));
+void SessionHandler::waitForRunningSessions() {
+    std::unique_lock ul(_notificationMutex);
+    _cv.wait(ul, [&] { return _runningSessionCount == 0; });
 }
 
-bool SessionHandler::isSessionActive(key_t key) const {
-    return _runningSessions.contains(key);
+
+bool SessionHandler::waitUntil(std::chrono::steady_clock::time_point tp) {
+    std::unique_lock ul(_notificationMutex);
+    // std::stop_token not supported on all toolchains, cannot use
+    // condition_variable_any::wait* overloads which take std::stop_token.
+    // Reproduce behaviour with a mongo::stop_callback.
+    mongo::stop_callback sc(_allSessionStop.get_token(), [&] { _cv.notify_all(); });
+    _cv.wait_until(ul, tp, [&] {
+        return _sessionException.get() != nullptr || _allSessionStop.stop_requested();
+    });
+    // Return true if the requested time was reached, without an exception or stop request.
+    return !_allSessionStop.stop_requested() && _sessionException.get() == nullptr;
+}
+
+void SessionHandler::notify() {
+    _cv.notify_all();
 }
 }  // namespace mongo
