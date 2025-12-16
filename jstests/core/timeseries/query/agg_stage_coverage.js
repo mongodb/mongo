@@ -52,10 +52,9 @@ for (let i = 0; i < 10; i++) {
  *    This is expected for all stages that return **user** inserted documents.
  * 4. skippedStages: These stages **must** either be
  *    (a) run on the admin db
- *    (b) stub stages for testing
- *    (c) tested elsewhere
- *    (d) stages that can only run in stream processors
- *    (e) internal only stages (cannot be made by user requests) that run on oplog data
+ *    (b) tested elsewhere
+ *    (c) stages that can only run in stream processors
+ *    (d) internal only stages (cannot be made by user requests) that run on oplog data
  *
  * Once you've determined which set your new aggregation stage belongs to add a test case to the appropriate set.
  * Each set has a slightly different test format.
@@ -291,10 +290,9 @@ const unpackTests = [
 // The following pipeline stages do not need to be tested for timeseries collections.
 // Stages that are skipped **must** be one of the following:
 // 1. Stages that only run on the admin database.
-// 2. Stub stages that are defined for tests in aggregation_stage_stub_parsers.json.
-// 3. Stages that are tested elsewhere.
-// 4. Stages that can only run in stream processors.
-// 5. Stages that cannot be made by user requests and run on oplog data.
+// 2. Stages that are tested elsewhere.
+// 3. Stages that can only run in stream processors.
+// 4. Stages that cannot be made by user requests and run on oplog data.
 const skippedStages = [
     // All change stream stages are temporarily here. TODO SERVER-113494 enable tests here.
     "$changeStream",
@@ -330,10 +328,6 @@ const skippedStages = [
     "$_internalListCollections",
     "$_internalAllCollectionStats",
     "$queue",
-
-    // Stub stages defined in 'aggregation_stage_stub_parsers.json'.
-    "$stubStage",
-    "$testFoo",
 
     // Stages tested in 'search_disallowed_on_timeseries.js', since they require extra setup.
     "$search",

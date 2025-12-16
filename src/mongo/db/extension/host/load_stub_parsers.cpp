@@ -92,7 +92,8 @@ void registerStubParser(std::string stageName, std::string message, FeatureFlag*
                                                      std::move(stubParser),
                                                      featureFlag,
                                                      AllowedWithApiStrict::kAlways,
-                                                     AllowedWithClientType::kAny);
+                                                     AllowedWithClientType::kAny,
+                                                     true /*isStub*/);
 }
 
 void registerUnloadedExtensionStubParsers() {

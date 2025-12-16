@@ -112,11 +112,19 @@ public:
         void setPrimaryParser(LiteParserInfo&& lpi);
 
         // TODO SERVER-114028 Update when fallback parsing supports all feature flags.
-        void setFallbackParser(LiteParserInfo&& lpi, IncrementalRolloutFeatureFlag* ff);
+        void setFallbackParser(LiteParserInfo&& lpi,
+                               IncrementalRolloutFeatureFlag* ff,
+                               bool isStub = false);
 
         bool isPrimarySet() const;
 
         bool isFallbackSet() const;
+
+        // Returns true if the parser is executable, meaning it has either a primary or a non-stub
+        // fallback.
+        bool isExecutable() const {
+            return _primaryIsSet || !_isStub;
+        }
 
     private:
         // The preferred method of parsing this LiteParsedDocumentSource. If the feature flag is
@@ -137,6 +145,9 @@ public:
 
         // Whether or not the fallback parser has been registered or not.
         bool _fallbackIsSet = false;
+
+        // Whether the fallback parser is a stub parser that just throws an error.
+        bool _isStub = false;
     };
 
     using ParserMap = StringMap<LiteParsedDocumentSource::LiteParserRegistration>;
@@ -170,7 +181,8 @@ public:
                                        Parser parser,
                                        FeatureFlag* parserFeatureFlag,
                                        AllowedWithApiStrict allowedWithApiStrict,
-                                       AllowedWithClientType allowedWithClientType);
+                                       AllowedWithClientType allowedWithClientType,
+                                       bool isStub = false);
 
     /**
      * Function that will be used as an alternate parser for a document source that has been

@@ -79,8 +79,11 @@ ListMqlEntitiesStage::ListMqlEntitiesStage(
     MqlEntityTypeEnum type,
     const LiteParsedDocumentSource::ParserMap& docSourceParserMap)
     : Stage(stageName, pExpCtx), _type(type) {
-    for (auto&& [stageName, _] : docSourceParserMap) {
-        _results.push_back(stageName);
+    for (auto&& [stageName, registration] : docSourceParserMap) {
+        // Exclude this stage if it is a stub that has no primary parser.
+        if (registration.isExecutable()) {
+            _results.push_back(stageName);
+        }
     }
 
     // Canonicalize output order of results. Sort in descending order so that we can use a cheap

@@ -243,10 +243,6 @@ const skippedAuthTestingAggStages = [
     "$sessionWindow",
     "$validate",
     "$setStreamMeta",
-
-    // The following stages are stubs defined in aggregation_stage_stub_parsers.json.
-    "$stubStage",
-    "$testFoo",
 ];
 
 // The following commands are skipped in 'authCommandsLib' because they are unable to be

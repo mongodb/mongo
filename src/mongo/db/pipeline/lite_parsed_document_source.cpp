@@ -82,10 +82,11 @@ void LiteParsedDocumentSource::LiteParserRegistration::setPrimaryParser(LitePars
 }
 
 void LiteParsedDocumentSource::LiteParserRegistration::setFallbackParser(
-    LiteParserInfo&& lpi, IncrementalRolloutFeatureFlag* ff) {
+    LiteParserInfo&& lpi, IncrementalRolloutFeatureFlag* ff, bool isStub) {
     _fallbackParser = std::move(lpi);
     _primaryParserFeatureFlag = ff;
     _fallbackIsSet = true;
+    _isStub = isStub;
 }
 
 bool LiteParsedDocumentSource::LiteParserRegistration::isPrimarySet() const {
@@ -117,7 +118,8 @@ void LiteParsedDocumentSource::registerFallbackParser(const std::string& name,
                                                       Parser parser,
                                                       FeatureFlag* parserFeatureFlag,
                                                       AllowedWithApiStrict allowedWithApiStrict,
-                                                      AllowedWithClientType allowedWithClientType) {
+                                                      AllowedWithClientType allowedWithClientType,
+                                                      bool isStub) {
     if (parserMap.contains(name)) {
         const auto& registration = parserMap.at(name);
 
@@ -151,8 +153,8 @@ void LiteParsedDocumentSource::registerFallbackParser(const std::string& name,
                 ifrFeatureFlag != nullptr);
     }
 
-    registration.setFallbackParser({parser, allowedWithApiStrict, allowedWithClientType},
-                                   ifrFeatureFlag);
+    registration.setFallbackParser(
+        {parser, allowedWithApiStrict, allowedWithClientType}, ifrFeatureFlag, isStub);
 }
 
 void LiteParsedDocumentSource::unregisterParser_forTest(const std::string& name) {
