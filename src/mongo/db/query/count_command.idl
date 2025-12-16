@@ -39,6 +39,7 @@ imports:
     - "mongo/db/auth/action_type.idl"
     - "mongo/db/auth/access_checks.idl"
     - "mongo/db/query/hint.idl"
+    - "mongo/db/query/query_shape/query_shape_hash.idl"
 
 types:
     countLimit:
@@ -141,4 +142,12 @@ commands:
             includeQueryStatsMetrics:
                 description: "Indicates whether or not query stats metrics should be included in the response."
                 type: optionalBool
+                stability: internal
+            originalQueryShapeHash:
+                description:
+                    "The query shape hash of the first query to enter the query system. For example
+                    if the router received a query and this is the shard's portion of the query,
+                    this hash will be the hash of the query that the router saw."
+                type: QueryShapeHash
+                optional: true
                 stability: internal

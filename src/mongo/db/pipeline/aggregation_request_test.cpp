@@ -231,6 +231,10 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     request.setIsClusterQueryWithoutShardKeyCmd(true);
 
     request.setIncludeQueryStatsMetrics(true);
+    const BSONObj query = BSON("hello" << 1);
+    const HashBlock<SHA256BlockTraits> queryShapeHash =
+        SHA256Block::computeHash((const uint8_t*)query.objdata(), query.objsize());
+    request.setOriginalQueryShapeHash(queryShapeHash);
 
     auto expectedSerialization = Document{
         {AggregateCommandRequest::kCommandName, nss.coll()},
@@ -248,6 +252,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
         {AggregateCommandRequest::kCollectionUUIDFieldName, uuid},
         {AggregateCommandRequest::kIsClusterQueryWithoutShardKeyCmdFieldName, true},
         {AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName, true},
+        {AggregateCommandRequest::kOriginalQueryShapeHashFieldName, queryShapeHash.toHexString()},
         {query_request_helper::cmdOptionMaxTimeMS, 10},
         {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
         {query_request_helper::kUnwrappedReadPrefField, readPrefObj}};

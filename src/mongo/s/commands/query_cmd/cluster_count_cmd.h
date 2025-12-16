@@ -34,10 +34,14 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/count_command_gen.h"
+#include "mongo/db/query/query_shape/count_cmd_shape.h"
+#include "mongo/db/query/query_shape/query_shape_hash.h"
+#include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_stats/count_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
@@ -66,13 +70,29 @@
 
 namespace mongo {
 
-inline BSONObj prepareCountForPassthrough(const BSONObj& cmdObj, bool requestQueryStats) {
-    if (!requestQueryStats) {
-        return CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
+inline BSONObj prepareCountForPassthrough(const OperationContext* opCtx,
+                                          const BSONObj& cmdObj,
+                                          bool requestQueryStats) {
+    BSONObjBuilder bob(cmdObj);
+
+    // Pass the queryShapeHash to the shards. We must validate that all participating shards can
+    // understand 'originalQueryShapeHash' and therefore check the feature flag. We use the last
+    // LTS when the FCV is uninitialized, since count commands can run during initial sync. This is
+    // because the feature is exclusively for observability enhancements and should only be applied
+    // when we are confident that the shard can correctly read this field, ensuring the query will
+    // not error.
+    if (feature_flags::gFeatureFlagOriginalQueryShapeHash.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (auto&& queryShapeHash = CurOp::get(opCtx)->debug().getQueryShapeHash()) {
+            bob.append(CountCommandRequest::kOriginalQueryShapeHashFieldName,
+                       queryShapeHash->toHexString());
+        }
+    }
+    if (requestQueryStats) {
+        bob.append(CountCommandRequest::kIncludeQueryStatsMetricsFieldName, true);
     }
 
-    BSONObjBuilder bob(cmdObj);
-    bob.append("includeQueryStatsMetrics", true);
     return CommandHelpers::filterCommandRequestForPassthrough(bob.done());
 }
 
@@ -105,6 +125,34 @@ inline bool convertAndRunAggregateIfViewlessTimeseries(
             verbosity,
             &bodyBuilder));
         return true;
+    }
+}
+
+inline void createShapeAndRegisterQueryStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                             const CountCommandRequest& countRequest,
+                                             const NamespaceString& nss) {
+    const std::unique_ptr<ParsedFindCommand> parsedFind = uassertStatusOK(
+        parsed_find_command::parseFromCount(expCtx, countRequest, ExtensionsCallbackNoop(), nss));
+
+    // Compute QueryShapeHash and record it in CurOp.
+    OperationContext* opCtx = expCtx->getOperationContext();
+    const query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::CountCmdShape>(
+            *parsedFind, countRequest.getLimit().has_value(), countRequest.getSkip().has_value());
+    }};
+    boost::optional<query_shape::QueryShapeHash> queryShapeHash =
+        CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
+            return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss);
+        });
+
+    if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        query_stats::registerRequest(opCtx, nss, [&]() {
+            uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
+            return std::make_unique<query_stats::CountKey>(
+                expCtx, countRequest, std::move(deferredShape->getValue()));
+        });
     }
 }
 
@@ -206,6 +254,11 @@ public:
                     auto countRequest =
                         CountCommandRequest::parse(cmdObj, IDLParserContext("count"));
 
+                    // Forbid users from passing 'originalQueryShapeHash' explicitly.
+                    uassert(10742704,
+                            "BSON field 'originalQueryShapeHash' is an unknown field",
+                            !countRequest.getOriginalQueryShapeHash().has_value());
+
                     // Create an RAII object that prints the collection's shard key in the case of a
                     // tassert or crash.
                     const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
@@ -235,22 +288,7 @@ public:
                     ScopedDebugInfo expCtxDiagnostics(
                         "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{expCtx});
 
-                    const auto parsedFind = uassertStatusOK(parsed_find_command::parseFromCount(
-                        expCtx, countRequest, ExtensionsCallbackNoop(), nss));
-
-                    if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
-                            VersionContext::getDecoration(opCtx),
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                        query_stats::registerRequest(opCtx, nss, [&]() {
-                            return std::make_unique<query_stats::CountKey>(
-                                expCtx,
-                                *parsedFind,
-                                countRequest.getLimit().has_value(),
-                                countRequest.getSkip().has_value(),
-                                countRequest.getReadConcern(),
-                                countRequest.getMaxTimeMS().has_value());
-                        });
-                    }
+                    createShapeAndRegisterQueryStats(expCtx, countRequest, nss);
 
                     // Note: This must happen after query stats because query stats retain the
                     // originating command type for timeseries.
@@ -300,7 +338,8 @@ public:
                             nss,
                             applyReadWriteConcern(opCtx,
                                                   this,
-                                                  prepareCountForPassthrough(countRequest.toBSON(),
+                                                  prepareCountForPassthrough(opCtx,
+                                                                             countRequest.toBSON(),
                                                                              requestQueryStats)),
                             ReadPreferenceSetting::get(opCtx),
                             Shard::RetryPolicy::kIdempotent,

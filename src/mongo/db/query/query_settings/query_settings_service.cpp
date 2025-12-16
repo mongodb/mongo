@@ -297,10 +297,6 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
     };
 }
 
-bool requestComesFromRouterOrSentDirectlyToShard(Client* client) {
-    return client->isInternalClient() || client->isInDirectClient();
-}
-
 void validateIndexKeyPatternStructure(const IndexHint& hint) {
     if (auto&& keyPattern = hint.getIndexKeyPattern()) {
         uassert(9646000, "key pattern index can't be empty", keyPattern->nFields() > 0);
@@ -563,7 +559,7 @@ public:
         }
 
         auto* opCtx = expCtx->getOperationContext();
-        if (requestComesFromRouterOrSentDirectlyToShard(opCtx->getClient()) ||
+        if (isInternalOrDirectClient(opCtx->getClient()) ||
             querySettingsFromOriginalCommand.has_value()) {
             return querySettingsFromOriginalCommand.get_value_or(QuerySettings());
         }
@@ -849,7 +845,7 @@ bool allowQuerySettingsFromClient(Client* client) {
     // - comes from router (internal client), which has already performed the query settings lookup
     // or
     // - has been created interally and is executed via DBDirectClient.
-    return requestComesFromRouterOrSentDirectlyToShard(client);
+    return isInternalOrDirectClient(client);
 }
 
 bool isDefault(const QuerySettings& settings) {

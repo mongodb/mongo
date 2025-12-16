@@ -44,17 +44,14 @@ namespace mongo::query_stats {
 class CountKey final : public Key {
 public:
     CountKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-             const ParsedFindCommand& findCommand,
-             bool hasLimit,
-             bool hasSkip,
-             const boost::optional<repl::ReadConcernArgs>& readConcern,
-             bool hasMaxTimeMS,
+             const CountCommandRequest& request,
+             std::unique_ptr<query_shape::Shape> countShape,
              query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown)
         : Key(expCtx->getOperationContext(),
-              std::make_unique<query_shape::CountCmdShape>(findCommand, hasLimit, hasSkip),
-              findCommand.findCommandRequest->getHint(),
-              readConcern,
-              hasMaxTimeMS,
+              std::move(countShape),
+              request.getHint(),
+              request.getReadConcern(),
+              request.getMaxTimeMS().has_value(),
               collectionType) {}
 
     // The default implementation of hashing for smart pointers is not a good one for our purposes.

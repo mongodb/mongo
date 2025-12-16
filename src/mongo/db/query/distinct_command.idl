@@ -34,6 +34,7 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/query/hint.idl"
     - "mongo/db/query/query_settings/query_settings.idl"
+    - "mongo/db/query/query_shape/query_shape_hash.idl"
 
 commands:
     distinct:
@@ -75,3 +76,10 @@ commands:
             includeQueryStatsMetrics:
                 description: "Determines whether or not to include query stats metrics in the response."
                 type: optionalBool
+            originalQueryShapeHash:
+                description:
+                    "The query shape hash of the first query to enter the query system. For example
+                    if the router received a query and this is the shard's portion of the query,
+                    this hash will be the hash of the query that the router saw."
+                type: QueryShapeHash
+                optional: true

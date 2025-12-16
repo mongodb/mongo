@@ -150,5 +150,35 @@ inline ExpressEligibility isExpressEligible(OperationContext* opCtx,
     return ExpressEligibility::Ineligible;
 }
 
+inline bool isInternalOrDirectClient(Client* client) {
+    return client->isInternalClient() || client->isInDirectClient();
+}
+
+/**
+ * Verifies that users did not specify the internal fields 'originalQueryShapeHash' and
+ * 'querySettings' directly.
+ */
+template <typename T>
+concept hasOriginalQueryShapeHash = requires(const T& t) { t.getOriginalQueryShapeHash(); };
+template <typename T>
+concept hasQuerySettings = requires(const T& t) { t.getQuerySettings(); };
+
+template <typename T>
+requires hasOriginalQueryShapeHash<T>
+void assertInternalParamsAreSetByInternalClients(Client* client, T& req) {
+    const bool isInternalOrDirect = isInternalOrDirectClient(client);
+
+    // Only check 'querySettings' if the command accepts it.
+    if constexpr (hasQuerySettings<T>) {
+        uassert(7923000,
+                "BSON field 'querySettings' is an unknown field",
+                isInternalOrDirect || !req.getQuerySettings().has_value());
+    }
+
+    uassert(10742702,
+            "BSON field 'originalQueryShapeHash' is an unknown field",
+            isInternalOrDirect || !req.getOriginalQueryShapeHash().has_value());
+}
+
 bool isSortSbeCompatible(const SortPattern& sortPattern);
 }  // namespace mongo

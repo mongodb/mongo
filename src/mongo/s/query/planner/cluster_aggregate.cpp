@@ -165,6 +165,22 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
     req.setRawData(rawData);
     aggregation_request_helper::addQuerySettingsToRequest(req, expCtx);
 
+    // Pass the queryShapeHash to the shards. We must validate that all participating shards can
+    // understand 'originalQueryShapeHash' and therefore check the feature flag. We use the last
+    // LTS when the FCV is uninitialized, even though aggregates cannot execute during initial sync.
+    // This is because the feature is exclusively for observability enhancements and should only be
+    // applied when we are confident that the shard can correctly read this field, ensuring the
+    // query will not error.
+    if (!req.getExplain().has_value() &&
+        feature_flags::gFeatureFlagOriginalQueryShapeHash.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(expCtx->getOperationContext()),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (auto&& queryShapeHash =
+                CurOp::get(expCtx->getOperationContext())->debug().getQueryShapeHash()) {
+            req.setOriginalQueryShapeHash(queryShapeHash);
+        }
+    }
+
     auto cmdObj =
         isRawDataOperation(expCtx->getOperationContext()) && req.getNamespace() != executionNs
         ? rewriteCommandForRawDataOperation<AggregateCommandRequest>(req.toBSON(),
@@ -321,7 +337,7 @@ void performValidationChecks(const OperationContext* opCtx,
                              const AggregateCommandRequest& request,
                              const LiteParsedPipeline& liteParsedPipeline) {
     liteParsedPipeline.validate(opCtx);
-    aggregation_request_helper::validateRequestForAPIVersion(opCtx, request);
+    aggregation_request_helper::validateRequestWithClient(opCtx, request);
     aggregation_request_helper::validateRequestFromClusterQueryWithoutShardKey(request);
 
     uassert(51028, "Cannot specify exchange option to a router", !request.getExchange());
@@ -871,6 +887,8 @@ Status runAggregateImpl(OperationContext* opCtx,
     auto status = [&](auto& expCtx) {
         bool requestQueryStatsFromRemotes = query_stats::shouldRequestRemoteMetrics(
             CurOp::get(expCtx->getOperationContext())->debug());
+        boost::optional<query_shape::QueryShapeHash> queryShapeHash =
+            CurOp::get(opCtx)->debug().getQueryShapeHash();
         try {
             switch (targeter.policy) {
                 case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::

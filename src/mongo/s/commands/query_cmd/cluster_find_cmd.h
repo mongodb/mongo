@@ -89,6 +89,10 @@ inline std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(
             "BSON field 'querySettings' is an unknown field",
             !findCommand->getQuerySettings().has_value());
 
+    uassert(10742703,
+            "BSON field 'originalQueryShapeHash' is an unknown field",
+            !findCommand->getOriginalQueryShapeHash().has_value());
+
     uassert(ErrorCodes::InvalidNamespace,
             "Cannot specify UUID to a mongos.",
             !findCommand->getNamespaceOrUUID().isUUID());

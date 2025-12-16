@@ -167,6 +167,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesUnsetFields) {
     ASSERT_FALSE(result.getIsHybridSearch().has_value());
     ASSERT_FALSE(result.getReadConcern().has_value());
     ASSERT_FALSE(result.getUnwrappedReadPref().has_value());
+    ASSERT_FALSE(result.getOriginalQueryShapeHash().has_value());
 }
 
 TEST(ResolvedViewTest, ExpandingAggRequestPreservesMostFields) {
@@ -202,6 +203,10 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesMostFields) {
     aggRequest.setResumeAfter(BSON("rid" << 12345));
     aggRequest.setStartAt(BSON("rid" << 67890));
     aggRequest.setIncludeQueryStatsMetrics(true);
+    const BSONObj query = BSON("hello" << 1);
+    const HashBlock<SHA256BlockTraits> queryShapeHash =
+        SHA256Block::computeHash((const uint8_t*)query.objdata(), query.objsize());
+    aggRequest.setOriginalQueryShapeHash(queryShapeHash);
     aggRequest.setIsHybridSearch(true);
     aggRequest.setMaxTimeMS(100u);
     aggRequest.setReadConcern(repl::ReadConcernArgs::kLinearizable);
@@ -242,6 +247,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesMostFields) {
     ASSERT_BSONOBJ_EQ(result.getResumeAfter().value(), BSON("rid" << 12345));
     ASSERT_BSONOBJ_EQ(result.getStartAt().value(), BSON("rid" << 67890));
     ASSERT_TRUE(result.getIncludeQueryStatsMetrics());
+    ASSERT_EQ(result.getOriginalQueryShapeHash(), queryShapeHash);
     ASSERT_TRUE(result.getIsHybridSearch().value_or(false));
     ASSERT_EQ(result.getMaxTimeMS().value(), 100u);
     ASSERT_BSONOBJ_EQ(result.getReadConcern()->toBSONInner(), BSON("level" << "linearizable"));

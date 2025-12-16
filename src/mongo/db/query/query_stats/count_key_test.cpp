@@ -47,9 +47,13 @@ public:
         make_intrusive<ExpressionContextForTest>();
     const SerializationOptions opts =
         SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
-    const std::unique_ptr<ParsedFindCommand> parsedRequest =
-        uassertStatusOK(parsed_find_command::parseFromCount(
-            expCtx, CountCommandRequest(testNss), ExtensionsCallbackNoop(), testNss));
+
+    std::unique_ptr<query_shape::CountCmdShape> makeCountShapeFromRequest(CountCommandRequest req) {
+        const std::unique_ptr<ParsedFindCommand> parsedRequest = uassertStatusOK(
+            parsed_find_command::parseFromCount(expCtx, req, ExtensionsCallbackNoop(), testNss));
+        return std::make_unique<query_shape::CountCmdShape>(
+            *parsedRequest, req.getLimit().has_value(), req.getSkip().has_value());
+    }
 };
 
 /**
@@ -58,13 +62,9 @@ public:
 
 // Test that a count command without any fields generates the expected key.
 TEST_F(CountKeyTest, DefaultCountKey) {
-    const auto key = std::make_unique<CountKey>(expCtx,
-                                                *parsedRequest,
-                                                false /* hasLimit */,
-                                                false /* hasSkip */,
-                                                boost::none /* readConcern */,
-                                                false /* maxTimeMS */,
-                                                collectionType);
+    const CountCommandRequest& countReq = CountCommandRequest(testNss);
+    const auto key = std::make_unique<CountKey>(
+        expCtx, countReq, makeCountShapeFromRequest(countReq), collectionType);
 
     const auto expectedKey = fromjson(
         R"({
@@ -80,14 +80,10 @@ TEST_F(CountKeyTest, DefaultCountKey) {
 
 // Test that the hint parameter is included in the key.
 TEST_F(CountKeyTest, CountHintKey) {
-    parsedRequest->findCommandRequest->setHint(BSON("a" << 1));
-    const auto key = std::make_unique<CountKey>(expCtx,
-                                                *parsedRequest,
-                                                false /* hasLimit */,
-                                                false /* hasSkip */,
-                                                boost::none /* readConcern */,
-                                                false /* maxTimeMS */,
-                                                collectionType);
+    CountCommandRequest request = CountCommandRequest(testNss);
+    request.setHint(BSON("a" << 1));
+    const auto key = std::make_unique<CountKey>(
+        expCtx, request, makeCountShapeFromRequest(request), collectionType);
 
     const auto expectedKey = fromjson(
         R"({
@@ -104,13 +100,10 @@ TEST_F(CountKeyTest, CountHintKey) {
 
 // Test that the readConcern parameter is included in the key.
 TEST_F(CountKeyTest, CountReadConcernKey) {
-    const auto key = std::make_unique<CountKey>(expCtx,
-                                                *parsedRequest,
-                                                false /* hasLimit */,
-                                                false /* hasSkip */,
-                                                repl::ReadConcernArgs::kLocal,
-                                                false /* maxTimeMS */,
-                                                collectionType);
+    CountCommandRequest request = CountCommandRequest(testNss);
+    request.setReadConcern(repl::ReadConcernArgs::kLocal);
+    const auto key = std::make_unique<CountKey>(
+        expCtx, request, makeCountShapeFromRequest(request), collectionType);
 
     const auto expectedKey = fromjson(
         R"({
@@ -127,13 +120,10 @@ TEST_F(CountKeyTest, CountReadConcernKey) {
 
 // Test that the maxTimeMS parameter is included in the key.
 TEST_F(CountKeyTest, CountMaxTimeMSKey) {
-    const auto key = std::make_unique<CountKey>(expCtx,
-                                                *parsedRequest,
-                                                false /* hasLimit */,
-                                                false /* hasSkip */,
-                                                boost::none /* readConcern */,
-                                                true /* maxTimeMS */,
-                                                collectionType);
+    CountCommandRequest request = CountCommandRequest(testNss);
+    request.setMaxTimeMS(1000);
+    const auto key = std::make_unique<CountKey>(
+        expCtx, request, makeCountShapeFromRequest(request), collectionType);
 
     const auto expectedKey = fromjson(
         R"({
@@ -150,15 +140,11 @@ TEST_F(CountKeyTest, CountMaxTimeMSKey) {
 
 // Test that the comment parameter is included in the key.
 TEST_F(CountKeyTest, CountCommentKey) {
+    CountCommandRequest request = CountCommandRequest(testNss);
     const auto comment = BSON("comment" << "hello");
     expCtx->getOperationContext()->setComment(comment);
-    const auto key = std::make_unique<CountKey>(expCtx,
-                                                *parsedRequest,
-                                                false /* hasLimit */,
-                                                false /* hasSkip */,
-                                                boost::none /* readConcern */,
-                                                false /* maxTimeMS */,
-                                                collectionType);
+    const auto key = std::make_unique<CountKey>(
+        expCtx, request, makeCountShapeFromRequest(request), collectionType);
 
     const auto expectedKey = fromjson(
         R"({

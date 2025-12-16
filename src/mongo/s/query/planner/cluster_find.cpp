@@ -75,6 +75,7 @@
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
@@ -198,6 +199,20 @@ BSONObj makeFindCommandForShards(OperationContext* opCtx,
     // shards.
     if (!query_settings::isDefault(query.getExpCtx()->getQuerySettings())) {
         findCommand.setQuerySettings(query.getExpCtx()->getQuerySettings());
+    }
+
+    // Pass the queryShapeHash to the shards. We must validate that all participating shards can
+    // understand 'originalQueryShapeHash' and therefore check the feature flag. We use the last LTS
+    // when the FCV is uninitialized, even though find commands cannot execute during initial sync.
+    // This is because the feature is exclusively for observability enhancements and should only be
+    // applied when we are confident that the shard can correctly read this field, ensuring the
+    // query will not error.
+    if (feature_flags::gFeatureFlagOriginalQueryShapeHash.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (auto&& queryShapeHash = CurOp::get(opCtx)->debug().getQueryShapeHash()) {
+            findCommand.setOriginalQueryShapeHash(queryShapeHash);
+        }
     }
 
     // Request metrics if necessary.

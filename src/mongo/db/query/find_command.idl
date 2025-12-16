@@ -45,6 +45,7 @@ imports:
     - "mongo/db/query/client_cursor/cursor_response.idl"
     - "mongo/db/query/hint.idl"
     - "mongo/db/query/query_settings/query_settings.idl"
+    - "mongo/db/query/query_shape/query_shape_hash.idl"
 
 types:
     boolNoOpSerializer:
@@ -262,5 +263,13 @@ commands:
             forcedPlanSolutionHash:
                 description: "Solution hash to force execution with a given plan."
                 type: safeInt64
+                optional: true
+                stability: internal
+            originalQueryShapeHash:
+                description:
+                    "The query shape hash of the first query to enter the query system. For example
+                    if the router received a query and this is the shard's portion of the query,
+                    this hash will be the hash of the query that the router saw."
+                type: QueryShapeHash
                 optional: true
                 stability: internal

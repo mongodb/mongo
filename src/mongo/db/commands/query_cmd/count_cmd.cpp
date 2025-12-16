@@ -65,6 +65,9 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/query_shape/count_cmd_shape.h"
+#include "mongo/db/query/query_shape/query_shape_hash.h"
+#include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_stats/count_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
@@ -366,7 +369,7 @@ public:
                 parsed_find_command::parseFromCount(expCtx, request(), *extensionsCallback, ns));
 
             registerRequestForQueryStats(
-                opCtx, expCtx, curOp, *collOrViewAcquisition, request(), *parsedFind);
+                opCtx, expCtx, curOp, *collOrViewAcquisition, request(), *parsedFind, ns);
 
             if (collOrViewAcquisition) {
                 if (collOrViewAcquisition->isView() ||
@@ -507,19 +510,29 @@ public:
                                           CurOp* curOp,
                                           const CollectionOrViewAcquisition& collectionOrView,
                                           const CountCommandRequest& req,
-                                          const ParsedFindCommand& parsedFind) {
+                                          const ParsedFindCommand& parsedFind,
+                                          const NamespaceString& ns) {
+            // Compute QueryShapeHash and record it in CurOp.
+            query_shape::DeferredQueryShape deferredShape{[&]() {
+                return shape_helpers::tryMakeShape<query_shape::CountCmdShape>(
+                    parsedFind, req.getLimit().has_value(), req.getSkip().has_value());
+            }};
+            boost::optional<query_shape::QueryShapeHash> queryShapeHash =
+                CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
+                    return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, ns);
+                });
+
             if (feature_flags::gFeatureFlagQueryStatsCountDistinct
                     .isEnabledUseLastLTSFCVWhenUninitialized(
                         VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 query_stats::registerRequest(opCtx, _ns, [&]() {
+                    uassertStatusOKWithContext(deferredShape->getStatus(),
+                                               "Failed to compute query shape");
                     return std::make_unique<query_stats::CountKey>(
                         expCtx,
-                        parsedFind,
-                        req.getLimit().has_value(),
-                        req.getSkip().has_value(),
-                        req.getReadConcern(),
-                        req.getMaxTimeMS().has_value(),
+                        req,
+                        std::move(deferredShape->getValue()),
                         collectionOrView.getCollectionType());
                 });
 

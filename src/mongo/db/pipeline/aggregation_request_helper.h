@@ -105,11 +105,11 @@ void addQuerySettingsToRequest(AggregateCommandRequest& request,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 /**
- * Validates if 'AggregateCommandRequest' specs complies with API versioning. Throws uassert in case
- * of any failure.
+ * Validates if 'AggregateCommandRequest' specs complies with the current Client, which is required
+ * for API versioning checks. Throws uassert in case of any failure.
  */
-void validateRequestForAPIVersion(const OperationContext* opCtx,
-                                  const AggregateCommandRequest& request);
+void validateRequestWithClient(const OperationContext* opCtx,
+                               const AggregateCommandRequest& request);
 /**
  * Validates if 'AggregateCommandRequest' sets the "isClusterQueryWithoutShardKeyCmd" field then the
  * request must have been fromRouter.

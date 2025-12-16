@@ -65,6 +65,7 @@
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/query/query_stats/distinct_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
@@ -137,6 +138,11 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
             "BSON field 'querySettings' is an unknown field",
             !distinctCommand->getQuerySettings().has_value());
 
+    // Forbid users from passing 'originalQueryShapeHash' explicitly.
+    uassert(10742700,
+            "BSON field 'originalQueryShapeHash' is an unknown field",
+            !distinctCommand->getOriginalQueryShapeHash().has_value());
+
     auto expCtx = ExpressionContextBuilder{}
                       .fromRequest(opCtx, *distinctCommand, defaultCollator)
                       .ns(nss)
@@ -179,18 +185,37 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
                                                         std::move(parsedDistinct));
 }
 
-BSONObj prepareDistinctForPassthrough(const BSONObj& cmd,
-                                      const query_settings::QuerySettings& qs,
-                                      const bool requestQueryStats) {
+BSONObj prepareDistinctForPassthrough(
+    const OperationContext* opCtx,
+    const BSONObj& cmd,
+    const query_settings::QuerySettings& qs,
+    const bool requestQueryStats,
+    const boost::optional<query_shape::QueryShapeHash>& queryShapeHash) {
     const auto qsBson = qs.toBSON();
-    if (requestQueryStats || !qsBson.isEmpty()) {
+    if (requestQueryStats || !qsBson.isEmpty() || queryShapeHash) {
         BSONObjBuilder bob(cmd);
         // Append distinct command with the query settings and includeQueryStatsMetrics if needed.
         if (requestQueryStats) {
-            bob.append("includeQueryStatsMetrics", true);
+            bob.append(DistinctCommandRequest::kIncludeQueryStatsMetricsFieldName, true);
         }
         if (!qsBson.isEmpty()) {
-            bob.append("querySettings", qsBson);
+            bob.append(DistinctCommandRequest::kQuerySettingsFieldName, qsBson);
+        }
+
+        // Pass the queryShapeHash to the shards. We must validate that all participating shards can
+        // understand 'originalQueryShapeHash' and therefore check the feature flag. We use the last
+        // LTS when the FCV is uninitialized, even though distinct commands cannot execute during
+        // initial sync. This is because the feature is exclusively for observability enhancements
+        // and should only be applied when we are confident that the shard can correctly read this
+        // field, ensuring the query will not error.
+        if (feature_flags::gFeatureFlagOriginalQueryShapeHash
+                .isEnabledUseLastLTSFCVWhenUninitialized(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            if (queryShapeHash) {
+                bob.append(DistinctCommandRequest::kOriginalQueryShapeHashFieldName,
+                           queryShapeHash->toHexString());
+            }
         }
         return CommandHelpers::filterCommandRequestForPassthrough(bob.done());
     }
@@ -427,9 +452,15 @@ public:
                     // We will decide if remote query stats metrics should be collected.
                     bool requestQueryStats =
                         query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
+                    boost::optional<query_shape::QueryShapeHash> queryShapeHash =
+                        CurOp::get(opCtx)->debug().getQueryShapeHash();
 
                     BSONObj distinctReadyForPassthrough = prepareDistinctForPassthrough(
-                        cmdObj, canonicalQuery->getExpCtx()->getQuerySettings(), requestQueryStats);
+                        opCtx,
+                        cmdObj,
+                        canonicalQuery->getExpCtx()->getQuerySettings(),
+                        requestQueryStats,
+                        queryShapeHash);
 
 
                     const auto& cri = routingCtx.getCollectionRoutingInfo(nss);

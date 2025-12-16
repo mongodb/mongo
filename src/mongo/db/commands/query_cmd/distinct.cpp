@@ -75,6 +75,7 @@
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/distinct_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/timeseries/timeseries_translation.h"
 #include "mongo/db/query/view_response_formatter.h"
@@ -142,12 +143,7 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     // Start the query planning timer right after parsing.
     CurOp::get(opCtx)->beginQueryPlanningTimer();
 
-    // Forbid users from passing 'querySettings' explicitly.
-    uassert(7923000,
-            "BSON field 'querySettings' is an unknown field",
-            query_settings::allowQuerySettingsFromClient(opCtx->getClient()) ||
-                !distinctCommand->getQuerySettings().has_value());
-
+    assertInternalParamsAreSetByInternalClients(opCtx->getClient(), *distinctCommand);
     auto expCtx = ExpressionContextBuilder{}
                       .fromRequest(opCtx, *distinctCommand, defaultCollator)
                       .ns(nss)

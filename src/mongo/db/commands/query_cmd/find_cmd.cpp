@@ -1164,11 +1164,7 @@ private:
             CommandHelpers::ensureValidCollectionName(nss.nss());
         }
 
-        // Forbid users from passing 'querySettings' explicitly.
-        uassert(7746901,
-                "BSON field 'querySettings' is an unknown field",
-                query_settings::allowQuerySettingsFromClient(opCtx->getClient()) ||
-                    !findCommand->getQuerySettings().has_value());
+        assertInternalParamsAreSetByInternalClients(opCtx->getClient(), *findCommand);
 
         uassert(ErrorCodes::FailedToParse,
                 "Use of forcedPlanSolutionHash not permitted.",

@@ -39,6 +39,7 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -355,6 +356,9 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> parseFromCount(
                 "'countCommand' and 'expCtx' collators do not match",
                 CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
     }
+
+    assertInternalParamsAreSetByInternalClients(expCtx->getOperationContext()->getClient(),
+                                                countCommand);
 
     // Copy necessary count command fields to find command. Notably, the skip and limit fields are
     // _not_ copied because the count stage in the PlanExecutor already applies the skip and limit,

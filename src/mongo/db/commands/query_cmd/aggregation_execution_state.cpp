@@ -469,7 +469,7 @@ void AggExState::performValidationChecks() const {
     auto& liteParsedPipeline = _aggReqDerivatives->liteParsedPipeline;
 
     liteParsedPipeline.validate(_opCtx);
-    aggregation_request_helper::validateRequestForAPIVersion(_opCtx, request);
+    aggregation_request_helper::validateRequestWithClient(_opCtx, request);
     aggregation_request_helper::validateRequestFromClusterQueryWithoutShardKey(request);
 
     // If we are in a transaction, check whether the parsed pipeline supports being in
