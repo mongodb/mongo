@@ -142,6 +142,7 @@ FLCS
 FLD
 FLSv
 FLv
+FNV
 FOREACH
 FS
 FULLFSYNC
@@ -378,6 +379,7 @@ Strobed
 Su
 Subdirectory
 Subprocess
+Synchronize
 TAILQ
 TCMalloc
 TESTUTIL
@@ -792,6 +794,7 @@ fixup
 floatnum
 fmt
 fmterr
+fnv
 foc
 fopen
 formatmessage

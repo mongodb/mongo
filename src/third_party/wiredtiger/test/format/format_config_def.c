@@ -177,6 +177,9 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"disagg.multi", "configure multiple nodes (leader & followers) for disaggregated storage",
     C_IGNORE | C_BOOL, 0, 0, 0, V_GLOBAL_DISAGG_MULTI},
 
+  {"disagg.multi_validation", "have multiple nodes compare database content for equality",
+    C_IGNORE | C_BOOL, 0, 0, 0, V_GLOBAL_DISAGG_MULTI_VALIDATION},
+
   {"disagg.enabled", "configure disaggregated storage", C_IGNORE | C_BOOL | C_TABLE | C_TYPE_ROW, 0,
     0, 0, V_TABLE_DISAGG_ENABLED},
 

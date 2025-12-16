@@ -89,7 +89,7 @@ timestamp_init(void)
 {
     testutil_check(timestamp_query("get=recovery", &g.timestamp));
     if (g.timestamp == 0)
-        g.timestamp = 5;
+        g.timestamp = MIN_TIMESTAMP;
 }
 
 /*
@@ -140,9 +140,6 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
         if (allow_lag)
             oldest_timestamp -= (oldest_timestamp - g.oldest_timestamp) / 2;
     }
-
-    if (stable_timestamp == 0 && GV(PRECISE_CHECKPOINT))
-        stable_timestamp = 1;
 
     testutil_snprintf(buf, sizeof(buf), "%s%" PRIx64 ",%s%" PRIx64, oldest_timestamp_str,
       oldest_timestamp, stable_timestamp_str, stable_timestamp);

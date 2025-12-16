@@ -1248,12 +1248,12 @@ err:
 
     /* Increment the cache statistics. */
     __wt_cache_page_inmem_incr(session, page, size, false);
-    (void)__wt_atomic_add_uint64(&cache->pages_inmem, 1);
+    (void)__wt_atomic_add_uint64_relaxed(&cache->pages_inmem, 1);
     if (__wt_conn_is_disagg(session)) {
         if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
-            (void)__wt_atomic_add_uint64(&cache->pages_inmem_ingest, 1);
+            (void)__wt_atomic_add_uint64_relaxed(&cache->pages_inmem_ingest, 1);
         else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
-            (void)__wt_atomic_add_uint64(&cache->pages_inmem_stable, 1);
+            (void)__wt_atomic_add_uint64_relaxed(&cache->pages_inmem_stable, 1);
     }
     page->cache_create_gen = __wt_atomic_load_uint64_relaxed(&conn->evict->evict_pass_gen);
 

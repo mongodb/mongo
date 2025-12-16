@@ -97,6 +97,8 @@
 /* Session configuration to enable prefetch. */
 #define SESSION_PREFETCH_CFG_ON "prefetch=(enabled=true)"
 
+#define MIN_TIMESTAMP 2 /* Minimum timestamp */
+
 #include "config.h"
 extern CONFIG configuration_list[];
 
@@ -209,6 +211,11 @@ extern u_int ntables;
 #define DATASOURCE(table, ds) (strcmp((table)->v[V_TABLE_RUNS_SOURCE].vstr, ds) == 0)
 
 typedef struct {
+    wt_shared volatile uint64_t leader_hash;
+    wt_shared volatile uint64_t follower_hash;
+} DISAGG_MULTI_DB_HASH;
+
+typedef struct {
     WT_CONNECTION *wts_conn;
     WT_CONNECTION *wts_conn_inmemory;
 
@@ -303,6 +310,7 @@ typedef struct {
     bool disagg_leader; /* If disaggregated storage role is configured as a leader. */
     pid_t follower_pid; /* For multi-node disagg follower process */
     char checkpoint_metadata[FILENAME_MAX]; /* Last checkpoint metadata picked up by follower. */
+    DISAGG_MULTI_DB_HASH *disagg_multi_db_hash; /* Leader and follower database hash */
 
     bool column_store_config;           /* At least one column-store table configured */
     bool disagg_storage_config;         /* If disaggregated storage is configured */
@@ -438,6 +446,7 @@ WT_THREAD_RET random_kv(void *);
 WT_THREAD_RET timestamp(void *);
 
 uint32_t atou32(const char *, const char *, int);
+uint64_t checksum_database(WT_SESSION *);
 void config_clear(void);
 void config_compat(const char **);
 void config_error(void);
@@ -453,6 +462,7 @@ bool disagg_is_multi_node(void);
 void disagg_setup_multi_node(void);
 void disagg_switch_roles(void);
 void disagg_teardown_multi_node(void);
+void disagg_validate_multi_node(WT_SESSION *);
 bool enable_session_prefetch(void);
 void fclose_and_clear(FILE **);
 void follower_read_latest_checkpoint(void);

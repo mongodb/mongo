@@ -705,14 +705,18 @@ create_object(TABLE *table, void *arg)
  *     If precise checkpoint is enabled, do some extra initialization of a connection.
  */
 static void
-precise_checkpoint_init(WT_CONNECTION *conn)
+precise_checkpoint_init(void)
 {
+    if (!GV(PRECISE_CHECKPOINT))
+        return;
+
+    g.timestamp = MIN_TIMESTAMP;
     /*
      * We do a separate wiredtiger_open call to create the database and tables, and when we close
      * that connection, a checkpoint is done. Precise checkpoints requires the stable timestamp to
      * be set. Set it to the minimum value, which should not interfere with any later operations.
      */
-    testutil_check(conn->set_timestamp(conn, "stable_timestamp=1"));
+    timestamp_once(NULL, false, false);
 }
 
 /*
@@ -742,10 +746,9 @@ wts_create_database(void)
     WT_CONNECTION *conn;
 
     create_database(g.home, &conn);
-    if (GV(PRECISE_CHECKPOINT))
-        precise_checkpoint_init(conn);
-
     g.wts_conn = conn;
+    precise_checkpoint_init();
+
     tables_apply(create_object, g.wts_conn);
     if (GV(RUNS_IN_MEMORY) != 0)
         g.wts_conn_inmemory = g.wts_conn;

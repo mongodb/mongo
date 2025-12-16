@@ -138,7 +138,6 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
         F_SET(blk, WT_BLOCK_DISAGG_DATA_CKSUM);
 
     /*
-     * FIXME-WT-14613: temporary measure until we put the block header at the beginning of the data.
      * We have two sets of flags for encrypt/compress! Set the block manager encrypt/compress flags
      * - the block manager/block cache layer will eventually do all encrypt/compress and it will use
      * a unified set of flags for encrypt/compress, (only in the block header). But we can only do

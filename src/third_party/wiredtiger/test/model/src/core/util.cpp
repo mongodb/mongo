@@ -489,13 +489,13 @@ wt_build_dir_path()
 std::string
 wt_disagg_config_string()
 {
-    std::string extension = wt_extension_path("page_log/palm/libwiredtiger_palm.so");
+    std::string extension = wt_extension_path("page_log/palite/libwiredtiger_palite.so");
 
     std::ostringstream config;
     config << "precise_checkpoint=true,";
     config << "extensions=[" << extension << "],";
     /* config << "extensions=[" << extension << "=(config=\"(verbose=1)\")" << "],"; */
-    config << "disaggregated=(page_log=palm,role=follower)";
+    config << "disaggregated=(page_log=palite,role=follower)";
 
     return config.str();
 }
@@ -509,11 +509,10 @@ wt_disagg_pick_up_latest_checkpoint(WT_CONNECTION *conn, model::timestamp_t &che
 {
     int ret;
     checkpoint_timestamp = model::k_timestamp_none;
-
     WT_PAGE_LOG *page_log;
-    ret = conn->get_page_log(conn, "palm", &page_log);
+    ret = conn->get_page_log(conn, "palite", &page_log);
     if (ret != 0)
-        throw wiredtiger_exception("Cannot get page log \"palm\"", ret);
+        throw wiredtiger_exception("Cannot get page log \"palite\"", ret);
 
     WT_SESSION *session;
     ret = conn->open_session(conn, nullptr, nullptr, &session);

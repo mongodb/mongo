@@ -428,7 +428,6 @@ config_table(TABLE *table, void *arg)
     /* Column-store tables require special row insert resolution. */
     if (table->type != ROW) {
         g.column_store_config = true;
-        /* FIXME-WT-15274 Support column store with precise checkpoint */
         if (GV(PRECISE_CHECKPOINT)) {
             if (config_explicit(NULL, "precise_checkpoint"))
                 WARN("turning off precise_checkpoint as table%" PRIu32 " is a column-store",

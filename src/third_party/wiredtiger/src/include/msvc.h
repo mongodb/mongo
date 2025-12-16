@@ -172,11 +172,19 @@ WT_RELEASE_BARRIER(void)
     {                                                                                             \
         return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)) + (v));                             \
     }                                                                                             \
+    static inline _type __wt_atomic_add_##suffix##_v_relaxed(volatile _type *vp, _type v)         \
+    {                                                                                             \
+        return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)) + (v));                             \
+    }                                                                                             \
     static inline _type __wt_atomic_fetch_add_##suffix##_v(volatile _type *vp, _type v)           \
     {                                                                                             \
         return (_InterlockedExchangeAdd##s((t *)(vp), (t)(v)));                                   \
     }                                                                                             \
     static inline _type __wt_atomic_sub_##suffix##_v(volatile _type *vp, _type v)                 \
+    {                                                                                             \
+        return (_InterlockedExchangeAdd##s((t *)(vp), -(t)v) - (v));                              \
+    }                                                                                             \
+    static inline _type __wt_atomic_sub_##suffix##_v_relaxed(volatile _type *vp, _type v)         \
     {                                                                                             \
         return (_InterlockedExchangeAdd##s((t *)(vp), -(t)v) - (v));                              \
     }                                                                                             \

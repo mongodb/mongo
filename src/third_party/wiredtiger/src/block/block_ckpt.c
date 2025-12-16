@@ -170,7 +170,7 @@ err:
          * only allocated memory was in the service of verify, clean that up.
          */
         if (block->verify)
-            WT_TRET(__wti_verify_ckpt_unload(session, block));
+            WT_TRET(__wti_verify_ckpt_unload(session, block, true));
     }
 
     /* Checkpoints don't need the original information, discard it. */
@@ -191,7 +191,7 @@ __wt_block_checkpoint_unload(WT_SESSION_IMPL *session, WT_BLOCK *block, bool che
 
     /* Verify cleanup. */
     if (block->verify)
-        WT_TRET(__wti_verify_ckpt_unload(session, block));
+        WT_TRET(__wti_verify_ckpt_unload(session, block, false));
 
     /*
      * If it's the live system, truncate to discard any extended blocks and discard the active

@@ -377,13 +377,13 @@ __wt_evict_page_cache_bytes_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
     }
 
     /* Update bytes and pages evicted. */
-    (void)__wt_atomic_add_uint64(&cache->bytes_evict, memory_footprint);
-    (void)__wt_atomic_add_uint64_v(&cache->pages_evicted, 1);
+    (void)__wt_atomic_add_uint64_relaxed(&cache->bytes_evict, memory_footprint);
+    (void)__wt_atomic_add_uint64_v_relaxed(&cache->pages_evicted, 1);
     if (is_disagg) {
         if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
-            (void)__wt_atomic_add_uint64_v(&cache->pages_evicted_ingest, 1);
+            (void)__wt_atomic_add_uint64_v_relaxed(&cache->pages_evicted_ingest, 1);
         else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
-            (void)__wt_atomic_add_uint64_v(&cache->pages_evicted_stable, 1);
+            (void)__wt_atomic_add_uint64_v_relaxed(&cache->pages_evicted_stable, 1);
     }
 
     /*
