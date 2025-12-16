@@ -70,7 +70,7 @@ export const $config = (function () {
         this.expectedDocuments = Array.from({length: this.nDocumentsToInsert}).map((_, i) => ({_id: i, x: i}));
         assert.commandWorked(db[this.collName].insertMany(this.expectedDocuments));
         if (cluster.isReplication()) {
-            cluster.getReplicaSets().forEach((rst) => rst.awaitNodesAgreeOnAppliedOpTime());
+            cluster.awaitReplication();
         }
     };
 
