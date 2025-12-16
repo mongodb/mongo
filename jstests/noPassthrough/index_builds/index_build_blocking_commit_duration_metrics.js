@@ -18,6 +18,9 @@ const dbName = jsTestName();
 const collName = "t";
 const lastTimeBetweenVoteAndCommitMillis = "lastTimeBetweenVoteAndCommitMillis";
 const lastTimeBetweenCommitOplogAndCommitMillis = "lastTimeBetweenCommitOplogAndCommitMillis";
+const lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery =
+    "lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery";
+const lastTimeBetweenCommitOplogAndCommitMillisRestore = "lastTimeBetweenCommitOplogAndCommitMillisRestore";
 
 function getIndexBuildServerStatusMetric(conn, metricName) {
     const serverStatus = conn.serverStatus();
@@ -38,6 +41,39 @@ function getIndexBuildServerStatusMetric(conn, metricName) {
     );
 
     return phases[metricName];
+}
+
+function checkMetrics(conn, metricNames, expectedValues, comparators) {
+    assert.eq(metricNames.length, expectedValues.length);
+    assert.eq(metricNames.length, comparators.length);
+
+    for (let i = 0; i < metricNames.length; i++) {
+        const metricValue = getIndexBuildServerStatusMetric(conn, metricNames[i]);
+        const expectedValue = expectedValues[i];
+        const comparator = comparators[i];
+
+        if (comparator === "eq") {
+            assert.eq(
+                metricValue,
+                expectedValue,
+                `Expected value of ${metricNames[i]} to be ${expectedValue}, found ${metricValue}`,
+            );
+        } else if (comparator === "gte") {
+            assert.gte(
+                metricValue,
+                expectedValue,
+                `Expected value of ${metricNames[i]} to be greater than or equal to ${expectedValue}, found ${metricValue}`,
+            );
+        } else if (comparator === "gt") {
+            assert.gt(
+                metricValue,
+                expectedValue,
+                `Expected value of ${metricNames[i]} to be greater than ${expectedValue}, found ${metricValue}`,
+            );
+        } else {
+            throw new Error(`Unexpected comparator: ${comparator}`);
+        }
+    }
 }
 
 describe("indexBuilds serverStatus metrics", function () {
@@ -78,16 +114,8 @@ describe("indexBuilds serverStatus metrics", function () {
     });
 
     it("duration between voting to commit and committing", () => {
-        let durationBetweenVotingToCommitAndCommitting = getIndexBuildServerStatusMetric(
-            this.primaryDB,
-            lastTimeBetweenVoteAndCommitMillis,
-        );
+        checkMetrics(this.primaryDB, [lastTimeBetweenVoteAndCommitMillis], [0], ["eq"]);
 
-        assert.eq(
-            durationBetweenVotingToCommitAndCommitting,
-            0,
-            `Expected initial value of ${lastTimeBetweenVoteAndCommitMillis} to be 0, found ${durationBetweenVotingToCommitAndCommitting}`,
-        );
         const fp = configureFailPoint(this.primaryDB, "hangIndexBuildAfterSignalPrimaryForCommitReadiness");
         const awaitCreateIndex = IndexBuildTest.startIndexBuild(this.primary, this.coll.getFullName(), {x: 1});
 
@@ -100,25 +128,19 @@ describe("indexBuilds serverStatus metrics", function () {
         IndexBuildTest.waitForIndexBuildToStop(this.secondaryDB);
         awaitCreateIndex();
 
-        durationBetweenVotingToCommitAndCommitting = getIndexBuildServerStatusMetric(
-            this.primaryDB,
-            lastTimeBetweenVoteAndCommitMillis,
-        );
-
-        assert.gte(
-            durationBetweenVotingToCommitAndCommitting,
-            1000,
-            `Expected value of ${lastTimeBetweenVoteAndCommitMillis} to be greater than 1000, found ${durationBetweenVotingToCommitAndCommitting}`,
-        );
+        checkMetrics(this.primaryDB, [lastTimeBetweenVoteAndCommitMillis], [1000], ["gte"]);
     });
 
     it("receive commitIndexBuild during steady state", () => {
-        let duration = getIndexBuildServerStatusMetric(this.secondaryDB, lastTimeBetweenCommitOplogAndCommitMillis);
-
-        assert.eq(
-            duration,
-            0,
-            `Expected initial value of ${lastTimeBetweenCommitOplogAndCommitMillis} to be 0, found ${duration}`,
+        checkMetrics(
+            this.secondaryDB,
+            [
+                lastTimeBetweenCommitOplogAndCommitMillis,
+                lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery,
+                lastTimeBetweenCommitOplogAndCommitMillisRestore,
+            ],
+            [0, 0, 0],
+            ["eq", "eq", "eq"],
         );
 
         const fp = configureFailPoint(this.secondary, "hangIndexBuildAfterReceivingCommitIndexBuildOplogEntry");
@@ -137,25 +159,28 @@ describe("indexBuilds serverStatus metrics", function () {
 
         awaitCreateIndex();
 
-        duration = getIndexBuildServerStatusMetric(this.secondaryDB, lastTimeBetweenCommitOplogAndCommitMillis);
-
-        assert.gt(
-            duration,
-            1000,
-            `Expected value of ${lastTimeBetweenCommitOplogAndCommitMillis} to be greater than 1000, found ${duration}`,
+        checkMetrics(
+            this.secondaryDB,
+            [
+                lastTimeBetweenCommitOplogAndCommitMillis,
+                lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery,
+                lastTimeBetweenCommitOplogAndCommitMillisRestore,
+            ],
+            [1000, 0, 0],
+            ["gte", "eq", "eq"],
         );
     });
 
     it("receive commitIndexBuild during startupRecovery", () => {
-        let durationBetweenReceivingCommitIndexBuildEntryAndCommitting = getIndexBuildServerStatusMetric(
+        checkMetrics(
             this.secondaryDB,
-            lastTimeBetweenCommitOplogAndCommitMillis,
-        );
-
-        assert.eq(
-            durationBetweenReceivingCommitIndexBuildEntryAndCommitting,
-            0,
-            `Expected initial value of ${lastTimeBetweenCommitOplogAndCommitMillis} to be 0, found ${durationBetweenReceivingCommitIndexBuildEntryAndCommitting}`,
+            [
+                lastTimeBetweenCommitOplogAndCommitMillis,
+                lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery,
+                lastTimeBetweenCommitOplogAndCommitMillisRestore,
+            ],
+            [0, 0, 0],
+            ["eq", "eq", "eq"],
         );
 
         const hangAfterVotingFP = configureFailPoint(
@@ -176,7 +201,7 @@ describe("indexBuilds serverStatus metrics", function () {
             this.secondary,
             {
                 setParameter: {
-                    "failpoint.hangIndexBuildBeforeCommit": tojson({
+                    "failpoint.hangIndexBuildAfterReceivingCommitIndexBuildOplogEntry": tojson({
                         mode: {times: 1},
                     }),
                 },
@@ -189,15 +214,15 @@ describe("indexBuilds serverStatus metrics", function () {
 
         awaitCreateIndex();
 
-        durationBetweenReceivingCommitIndexBuildEntryAndCommitting = getIndexBuildServerStatusMetric(
+        checkMetrics(
             secondaryDBAfterRestart,
-            lastTimeBetweenCommitOplogAndCommitMillis,
-        );
-
-        assert.gt(
-            durationBetweenReceivingCommitIndexBuildEntryAndCommitting,
-            0,
-            `Expected value of ${lastTimeBetweenCommitOplogAndCommitMillis} to be greater than 0, found ${durationBetweenReceivingCommitIndexBuildEntryAndCommitting}`,
+            [
+                lastTimeBetweenCommitOplogAndCommitMillis,
+                lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery,
+                lastTimeBetweenCommitOplogAndCommitMillisRestore,
+            ],
+            [0, 0, 0],
+            ["eq", "gt", "eq"],
         );
     });
 });

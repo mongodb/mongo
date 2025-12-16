@@ -162,6 +162,10 @@ public:
         phases.append("lastCommittedMillis", lastCommittedMillis.loadRelaxed());
         phases.append("lastTimeBetweenCommitOplogAndCommitMillis",
                       lastTimeBetweenCommitOplogAndCommitMillis.loadRelaxed());
+        phases.append("lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery",
+                      lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery.loadRelaxed());
+        phases.append("lastTimeBetweenCommitOplogAndCommitMillisRestore",
+                      lastTimeBetweenCommitOplogAndCommitMillisRestore.loadRelaxed());
         phases.append("lastTimeBetweenVoteAndCommitMillis",
                       lastTimeBetweenVoteAndCommitMillis.loadRelaxed());
         phases.done();
@@ -195,8 +199,15 @@ public:
     // The duration of the last committed index build.
     AtomicWord<int64_t> lastCommittedMillis{0};
     // The duration between receiving the commitIndexBuild oplog entry and committing the index
-    // build.
+    // build for steady state replication for the last committed index build.
     AtomicWord<int64_t> lastTimeBetweenCommitOplogAndCommitMillis;
+    // The duration between receiving the commitIndexBuild oplog entry and committing the index
+    // build during startup recovery for the last committed index build.
+    AtomicWord<int64_t> lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery;
+    // The duration between receiving the commitIndexBuild oplog entry and committing the index
+    // build for the last index build, when restoring a node using magic restore or when restoring
+    // it from the oplog as a standalone node.
+    AtomicWord<int64_t> lastTimeBetweenCommitOplogAndCommitMillisRestore;
     // The duration between voting to commit and committing the index build.
     AtomicWord<int64_t> lastTimeBetweenVoteAndCommitMillis;
 };
@@ -211,6 +222,12 @@ constexpr StringData kIndexesFieldName = "indexes"_sd;
 constexpr StringData kKeyFieldName = "key"_sd;
 constexpr StringData kUniqueFieldName = "unique"_sd;
 constexpr StringData kPrepareUniqueFieldName = "prepareUnique"_sd;
+constexpr StringData kLastTimeBetweenCommitOplogAndCommitMillis =
+    "lastTimeBetweenCommitOplogAndCommitMillis"_sd;
+constexpr StringData kLastTimeBetweenCommitOplogAndCommitMillisStartupRecovery =
+    "lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery"_sd;
+constexpr StringData kLastTimeBetweenCommitOplogAndCommitMillisRestore =
+    "lastTimeBetweenCommitOplogAndCommitMillisRestore"_sd;
 
 /**
  * Returns true if we should build the indexes an empty collection using the IndexCatalog and
@@ -597,17 +614,19 @@ void storeLastTimeBetweenVoteAndCommitMillis(const ReplIndexBuildState& replStat
 }
 
 /**
- * Stores the duration between receiving the `commitIndexBuild` oplog entry and committing the
+ * Stores the duration between receiving the `commitIndexBuild` oplog entry and committing the index
+ * build, parameterized for the different scenarios that we could be applying the entry from.
  */
-void storeLastTimeBetweenCommitOplogAndCommit(const ReplIndexBuildState& replState) {
+void storeLastTimeBetweenCommitOplogAndCommit(const ReplIndexBuildState& replState,
+                                              StringData metricName,
+                                              AtomicWord<int64_t>& metric) {
     const auto metrics = replState.getIndexBuildMetrics();
     const auto now = Date_t::now();
     tassert(11436300,
-            "commitIndexOplogEntryTime was not set before setting "
-            "lastTimeBetweenCommitOplogAndCommitMillis",
+            str::stream() << "commitIndexOplogEntryTime was not set before setting " << metricName,
             metrics.commitIndexOplogEntryTime != Date_t::min());
     const auto elapsedTime = (now - metrics.commitIndexOplogEntryTime).count();
-    indexBuildsSSS.lastTimeBetweenCommitOplogAndCommitMillis.store(elapsedTime);
+    metric.store(elapsedTime);
 }
 
 }  // namespace
@@ -1294,7 +1313,7 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
 
     auto swReplState = _getIndexBuild(buildUUID);
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-
+    bool restartingPausedIndexInStandaloneOrRestore = false;
     // Index builds are not restarted in standalone mode. If the node is started with
     // recoverFromOplogAsStandalone or is in magic restore and when replaying the commitIndexBuild
     // oplog entry for a paused index, there is no active index build thread to commit.
@@ -1313,6 +1332,7 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
 
         // Get the builder.
         swReplState = _getIndexBuild(buildUUID);
+        restartingPausedIndexInStandaloneOrRestore = true;
     }
     auto replState = uassertStatusOK(swReplState);
     replState->setMultikey(std::move(oplogEntry.multikey));
@@ -1333,7 +1353,22 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
           "buildUUID"_attr = buildUUID,
           "waitResult"_attr = waitStatus,
           "status"_attr = buildStatus);
-    storeLastTimeBetweenCommitOplogAndCommit(*replState);
+    if (restartingPausedIndexInStandaloneOrRestore) {
+        storeLastTimeBetweenCommitOplogAndCommit(
+            *replState,
+            kLastTimeBetweenCommitOplogAndCommitMillisRestore,
+            indexBuildsSSS.lastTimeBetweenCommitOplogAndCommitMillisRestore);
+    } else if (InReplicationRecovery::isSet(opCtx->getServiceContext())) {
+        storeLastTimeBetweenCommitOplogAndCommit(
+            *replState,
+            kLastTimeBetweenCommitOplogAndCommitMillisStartupRecovery,
+            indexBuildsSSS.lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery);
+    } else {
+        storeLastTimeBetweenCommitOplogAndCommit(
+            *replState,
+            kLastTimeBetweenCommitOplogAndCommitMillis,
+            indexBuildsSSS.lastTimeBetweenCommitOplogAndCommitMillis);
+    }
 
     // Throws if there was an error building the index.
     fut.get();
