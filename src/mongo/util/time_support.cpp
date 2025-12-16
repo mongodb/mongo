@@ -165,19 +165,17 @@ std::string time_t_to_String_short(time_t t) {
     return buf;
 }
 
-constexpr auto kUTCFilenameFormat = "%Y-%m-%dT%H-%M-%S"_sd;
-constexpr auto kUTCFilenameFormatZ = "%Y-%m-%dT%H-%M-%SZ"_sd;
-
 // Produces a UTC datetime string suitable for use in filenames.
 std::string terseCurrentTimeForFilename(bool appendZed) {
     struct tm t;
     time_t_to_Struct(time(nullptr), &t);
 
-    const auto fmt = appendZed ? kUTCFilenameFormatZ : kUTCFilenameFormat;
     const std::size_t expLen = appendZed ? 20 : 19;
 
     char buf[32];
-    fassert(16226, strftime(buf, sizeof(buf), fmt.data(), &t) == expLen);
+    size_t bytesWritten =
+        strftime(buf, sizeof(buf), appendZed ? "%Y-%m-%dT%H-%M-%SZ" : "%Y-%m-%dT%H-%M-%S", &t);
+    fassert(16226, bytesWritten == expLen);
     return buf;
 }
 

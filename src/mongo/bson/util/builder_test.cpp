@@ -118,6 +118,22 @@ TEST(Builder, StackAllocatorShouldNotLeak) {
     // Let the builder go out of scope. If this leaks, it will trip the ASAN leak detector.
 }
 
+TEST(Builder, StringBuilderFloatingPointExponentNotation) {
+    StringBuilder sb;
+    sb << 1000000.23456789;
+    ASSERT_EQUALS("1e+06", sb.str());
+
+    sb.reset();
+    sb << 1234567.89;
+    ASSERT_EQUALS("1.23457e+06", sb.str());
+}
+
+TEST(Builder, StringBuilderFloatingPointPrecision) {
+    StringBuilder sb;
+    sb << 1.23456789;
+    ASSERT_EQUALS("1.23457", sb.str());
+}
+
 template <typename T>
 void testStringBuilderIntegral() {
     auto check = [](T num) {

@@ -64,6 +64,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/static_assert.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -749,7 +750,7 @@ public:
     StringBuilderImpl() {}
 
     StringBuilderImpl& operator<<(double x) {
-        return SBNUM(x, MONGO_DBL_SIZE, "%g");
+        return appendUsingFmt(x, MONGO_DBL_SIZE);
     }
     StringBuilderImpl& operator<<(int x) {
         return appendIntegral(x, MONGO_S32_SIZE);
@@ -773,11 +774,7 @@ public:
         return appendIntegral(x, MONGO_S16_SIZE);
     }
     StringBuilderImpl& operator<<(const void* x) {
-        if (sizeof(x) == 8) {
-            return SBNUM(x, MONGO_PTR_SIZE, "0x%llX");
-        } else {
-            return SBNUM(x, MONGO_PTR_SIZE, "0x%lX");
-        }
+        return appendUsingFmt(x, MONGO_PTR_SIZE);
     }
     StringBuilderImpl& operator<<(bool val) {
         *_buf.grow(1) = val ? '1' : '0';
@@ -876,13 +873,22 @@ private:
         return *this;
     }
 
+    size_t writeUsingFmt(char* dst, size_t maxSize, double val) {
+        return fmt::format_to_n(dst, maxSize, "{:g}", val).size;
+    }
+
+    size_t writeUsingFmt(char* dst, size_t maxSize, const void* val) {
+        return fmt::format_to_n(dst, maxSize, "0x{:X}", uintptr_t(val)).size;
+    }
+
     template <typename T>
-    StringBuilderImpl& SBNUM(T val, int maxSize, const char* macro) {
-        int prev = _buf.len();
-        int z = snprintf(_buf.grow(maxSize), maxSize, macro, (val));
-        MONGO_verify(z >= 0);
-        MONGO_verify(z < maxSize);
-        _buf.setlen(prev + z);
+    StringBuilderImpl& appendUsingFmt(T val, size_t maxSize) {
+        static_assert(std::is_same_v<T, const void*> || std::is_same_v<T, double>);
+        size_t prev = _buf.len();
+        size_t size = writeUsingFmt(_buf.grow(maxSize), maxSize, val);
+        MONGO_verify(size >= 0);
+        MONGO_verify(size < maxSize);
+        _buf.setlen(prev + size);
         return *this;
     }
 

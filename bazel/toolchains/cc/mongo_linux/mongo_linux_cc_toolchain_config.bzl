@@ -939,6 +939,9 @@ def _impl(ctx):
                     # compilers GCC >= 4.6. Error explained in
                     # https://svn.boost.org/trac/boost/ticket/6136 .
                     "-Wno-unused-but-set-variable",
+
+                    # Warn about trampolines that require executable stacks.
+                    "-Wtrampolines",
                 ])],
             ),
         ],
@@ -1723,6 +1726,38 @@ def _impl(ctx):
         ],
     )
 
+    first_party_gcc_or_clang_warnings_feature = feature(
+        name = "first_party_gcc_or_clang_warnings",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    # Warn about issues with format strings. Using both -Wformat and -Wformat=2
+                    # is necessary to get all the format string warnings in both gcc and clang.
+                    # Specifically, in clang -Wformat=2 does not imply -Wformat.
+                    "-Wformat",
+                    "-Wformat=2",
+                ])],
+            ),
+        ],
+    )
+
+    first_party_gcc_warnings_feature = feature(
+        name = "first_party_gcc_warnings",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    # Warn about bidirectional control characters that could be used for
+                    # underhanded code.
+                    "-Wbidi-chars=any",
+                ])],
+            ),
+        ],
+    )
+
     disable_warnings_for_third_party_libraries_clang_feature = feature(
         name = "disable_warnings_for_third_party_libraries_clang",
         enabled = ctx.attr.compiler == COMPILERS.CLANG,
@@ -1857,6 +1892,8 @@ def _impl(ctx):
         compress_debug_disable_feature,
         rpath_override_feature,
         warnings_as_errors_link_feature,
+        first_party_gcc_or_clang_warnings_feature,
+        first_party_gcc_warnings_feature,
     ] + get_common_features(ctx) + [
         # These flags are at the bottom so they get applied after anything else.
         # These are things like the flags people apply directly on cc_library through copts/linkopts

@@ -203,10 +203,13 @@ DISABLE_3RD_PARTY_FEATURES = select({
     "//bazel/config:compiler_type_clang": [
         "-disable_warnings_for_third_party_libraries_clang",
         "thread_safety_warnings",
+        "first_party_gcc_or_clang_warnings",
         "-ubsan_third_party",
     ],
     "//bazel/config:compiler_type_gcc": [
         "-disable_warnings_for_third_party_libraries_gcc",
+        "first_party_gcc_or_clang_warnings",
+        "first_party_gcc_warnings",
         "-ubsan_third_party",
     ],
     "//conditions:default": [],
@@ -379,7 +382,8 @@ def mongo_cc_library(
 
         if name != "mongoca" and name != "cyrus_sasl_windows_test_plugin":
             deps += MONGO_GLOBAL_SRC_DEPS
-        features = features + DISABLE_3RD_PARTY_FEATURES
+        if not in_third_party:
+            features = features + DISABLE_3RD_PARTY_FEATURES
     else:
         srcs = _final_srcs_for_cc + private_hdrs
 
@@ -585,7 +589,8 @@ def _mongo_cc_binary_and_test(
             srcs = _final_srcs_for_cc + private_hdrs
 
         deps += MONGO_GLOBAL_SRC_DEPS
-        features = features + DISABLE_3RD_PARTY_FEATURES
+        if not in_third_party:
+            features = features + DISABLE_3RD_PARTY_FEATURES
     else:
         # Non-mongo pkgs: append private headers as sources
         srcs = _final_srcs_for_cc + private_hdrs
