@@ -116,9 +116,7 @@ void CollectionQueryInfo::PlanCacheState::clearPlanCache() {
     planCacheInvalidator.clearPlanCache();
 }
 
-CollectionQueryInfo::CollectionQueryInfo()
-    : _planCacheState{std::make_shared<PlanCacheState>()},
-      _pathArraynessState{std::make_shared<PathArraynessState>()} {}
+CollectionQueryInfo::CollectionQueryInfo() : _planCacheState{std::make_shared<PlanCacheState>()} {}
 
 void CollectionQueryInfo::clearQueryCache(OperationContext* opCtx, const CollectionPtr& coll) {
     // We are operating on a cloned collection, the use_count can only be 1 if we've created a new
@@ -171,12 +169,7 @@ CollectionQueryInfo::PathArraynessState::PathArraynessState()
 
 void CollectionQueryInfo::updatePathArraynessForSetMultikey(OperationContext* opCtx,
                                                             const Collection* coll) const {
-    // Acquire write lock to prevent concurrent re-assignment of PathArrayness.
-    auto writeLock = _pathArraynessState->rwMutex.writeLock();
-    // Create an empty PathArrayness in response to an index multikeyness change from a document
-    // write/update operation.
     // TODO: SERVER-114809: Create a PathArrayness that reflects a more precise arrayness state.
-    _pathArraynessState->pathArrayness = std::make_shared<PathArrayness>();
 }
 
 void CollectionQueryInfo::rebuildPathArrayness(OperationContext* opCtx, const Collection* coll) {
@@ -210,12 +203,13 @@ void CollectionQueryInfo::rebuildPathArrayness(OperationContext* opCtx, const Co
             }
         }
     }
-    _pathArraynessState->pathArrayness = std::make_shared<PathArrayness>(tmpPathArrayness);
+    // We assume that this method will be called in a thread-safe manner and thus, can safely do
+    // this re-assignment without a mutex (see method header comment for more details).
+    _pathArraynessState.pathArrayness = std::make_shared<PathArrayness>(tmpPathArrayness);
 }
 
 std::shared_ptr<const PathArrayness> CollectionQueryInfo::getPathArrayness() const {
-    auto readLock = _pathArraynessState->rwMutex.readLock();
-    return _pathArraynessState->pathArrayness;
+    return _pathArraynessState.pathArrayness;
 }
 
 void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {

@@ -133,11 +133,7 @@ public:
      * document insert or update flips  the multikeyness of indexes. This flip in multikeyness can
      * only go in one direction, non-multikey to multikey.
      *
-     * Const-ness: While this method modifies the 'PathArrayness' data associated with the
-     * 'CollectionQueryInfo', it can be marked as 'const' because the changes are made indirectly
-     * through the 'PathArraynessState' wrapper. This design ensures compatibility with existing
-     * methods like 'IndexCatalogEntry::_catalogSetMultikey()' which require the method to be
-     * 'const'.
+     * TODO: SERVER-115001: Explain const-ness of function when we implement.
      */
     void updatePathArraynessForSetMultikey(OperationContext* opCtx, const Collection* coll) const;
 
@@ -179,10 +175,8 @@ private:
     struct PathArraynessState {
         PathArraynessState();
 
-        // Mutex to protect concurrent writers from re-assigning the pathArrayness pointer.
-        // This is going to face contention in the rare case where the multikeyness of an index is
-        // flipped in a document write transaction concurrently with a query.
-        mutable WriteRarelyRWMutex rwMutex;
+        // All clones of CollectionQueryInfo will initially point to the same PathArrayness
+        // instance.
         std::shared_ptr<PathArrayness> pathArrayness;
     };
 
@@ -190,10 +184,7 @@ private:
 
     std::shared_ptr<PlanCacheState> _planCacheState;
 
-    // Use std::shared_ptr to ensure that multiple cloned instances of 'Collection' instance can
-    // share the same 'PathArraynessState'. We clone the 'CollectionQueryInfo' when 'Collection'
-    // gets cloned.
-    std::shared_ptr<PathArraynessState> _pathArraynessState;
+    PathArraynessState _pathArraynessState;
 };
 
 }  // namespace mongo
