@@ -56,6 +56,8 @@
 namespace mongo::transport {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(rejectNewNonPriorityConnections);
+
 thread_local decltype(ServerGlobalParams::maxIncomingConnsOverride)::Snapshot
     maxIncomingConnsOverride;
 
@@ -275,8 +277,9 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
 
     serverGlobalParams.maxIncomingConnsOverride.refreshSnapshot(maxIncomingConnsOverride);
-    const bool isPrivilegedSession =
-        maxIncomingConnsOverride && session->isExemptedByCIDRList(*maxIncomingConnsOverride);
+    // TODO (SERVER-113219) Check and modify this if needed.
+    const bool isPrivilegedSession = session->isConnectedToMaintenancePort() ||
+        (maxIncomingConnsOverride && session->isExemptedByCIDRList(*maxIncomingConnsOverride));
     const bool verbose = !quiet();
 
     auto service = _svcCtx->getService();
@@ -287,7 +290,9 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     std::shared_ptr<transport::SessionWorkflow> workflow;
     {
         auto sync = _sessions->sync();
-        if (sync.size() >= _maxOpenSessions && !isPrivilegedSession) {
+        if ((sync.size() >= _maxOpenSessions ||
+             MONGO_unlikely(rejectNewNonPriorityConnections.shouldFail())) &&
+            !isPrivilegedSession) {
             _sessions->incrementRejected();
             if (verbose) {
                 ClientSummary cs(client);

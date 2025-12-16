@@ -65,15 +65,23 @@ QuorumChecker::QuorumChecker(const ReplSetConfig* rsConfig, int myIndex, long lo
     : _rsConfig(rsConfig),
       _myIndex(myIndex),
       _term(term),
+      _responses(_rsConfig->getNumMembers(), {false, false, false}),
+      _successfulVoterCount(0),
       _numResponses(1),  // We "responded" to ourself already.
       _numElectable(0),
+      _numResponsesRequired(_rsConfig->getNumMembers() +
+                            _rsConfig->getCountOfMembersWithMaintenancePort()),
       _vetoStatus(Status::OK()),
       _finalStatus(ErrorCodes::CallbackCanceled, "Quorum check canceled") {
     invariant(myIndex < _rsConfig->getNumMembers());
     const MemberConfig& myConfig = _rsConfig->getMemberAt(_myIndex);
 
+    _responses.at(myIndex) = {true, myConfig.getMaintenancePort().is_initialized(), true};
     if (myConfig.isVoter()) {
-        _voters.push_back(myConfig.getHostAndPort());
+        _successfulVoterCount++;
+    }
+    if (myConfig.getMaintenancePort()) {
+        _numResponses++;
     }
     if (myConfig.isElectable()) {
         _numElectable = 1;
@@ -107,7 +115,9 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
     }
     // hbArgs allows (but doesn't require) us to pass the current primary id as an optimization,
     // but it is not readily available within QuorumChecker.
-    hbArgs.setSenderHost(myConfig.getHostAndPort());
+    // Use the maintenance port because the recipient may send a heartbeat back to get a newer
+    // configuration and we want them to use the maintenance port if it is available.
+    hbArgs.setSenderHost(myConfig.getHostAndPortMaintenance());
     hbArgs.setSenderId(myConfig.getId().getData());
     hbArgs.setTerm(_term);
     hbRequest = hbArgs.toBSON();
@@ -121,12 +131,24 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
             // No need to check self for liveness or unreadiness.
             continue;
         }
-        requests.push_back(RemoteCommandRequest(_rsConfig->getMemberAt(i).getHostAndPort(),
+        const auto& member = _rsConfig->getMemberAt(i);
+        requests.push_back(RemoteCommandRequest(member.getHostAndPort(),
                                                 DatabaseName::kAdmin,
                                                 hbRequest,
                                                 BSON(rpc::kReplSetMetadataFieldName << 1),
                                                 nullptr,
                                                 _rsConfig->getHeartbeatTimeoutPeriodMillis()));
+
+        // If a member has a maintenance port specified then we need to check connectivity to both
+        // the main and the maintenance ports.
+        if (member.getMaintenancePort()) {
+            requests.push_back(RemoteCommandRequest(member.getHostAndPortMaintenance(),
+                                                    DatabaseName::kAdmin,
+                                                    hbRequest,
+                                                    BSON(rpc::kReplSetMetadataFieldName << 1),
+                                                    nullptr,
+                                                    _rsConfig->getHeartbeatTimeoutPeriodMillis()));
+        }
     }
 
     return requests;
@@ -140,6 +162,38 @@ void QuorumChecker::processResponse(const RemoteCommandRequest& request,
     }
 }
 
+void QuorumChecker::_appendFailedHeartbeatResponses(str::stream& stream) {
+    for (std::vector<std::pair<HostAndPort, Status>>::const_iterator it = _badResponses.begin();
+         it != _badResponses.end();
+         ++it) {
+        if (it != _badResponses.begin()) {
+            stream << ", ";
+        }
+        stream << it->first.toString() << " failed with " << it->second.reason();
+    }
+}
+
+void QuorumChecker::_appendFullySuccessfulVotingHostAndPorts(str::stream& stream,
+                                                             int expectedResponses) {
+    int count = 0;
+    for (int i = 0; i < _rsConfig->getNumMembers(); ++i) {
+        if (!_responses.at(i).fullySuccessful) {
+            continue;
+        }
+        const auto& member = _rsConfig->getMemberAt(i);
+        if (!member.isVoter()) {
+            continue;
+        }
+        if (count != 0) {
+            stream << ", ";
+        }
+        stream << member.getHostAndPort().toString();
+        if (++count == expectedResponses) {
+            break;
+        }
+    }
+}
+
 void QuorumChecker::_onQuorumCheckComplete() {
     if (!_vetoStatus.isOK()) {
         _finalStatus = _vetoStatus;
@@ -149,14 +203,7 @@ void QuorumChecker::_onQuorumCheckComplete() {
         str::stream message;
         message << "replSetInitiate quorum check failed because not all proposed set members "
                    "responded affirmatively: ";
-        for (std::vector<std::pair<HostAndPort, Status>>::const_iterator it = _badResponses.begin();
-             it != _badResponses.end();
-             ++it) {
-            if (it != _badResponses.begin()) {
-                message << ", ";
-            }
-            message << it->first.toString() << " failed with " << it->second.reason();
-        }
+        _appendFailedHeartbeatResponses(message);
         _finalStatus = Status(ErrorCodes::NodeNotFound, message);
         return;
     }
@@ -166,31 +213,21 @@ void QuorumChecker::_onQuorumCheckComplete() {
                               "electable nodes responded; at least one required for config");
         return;
     }
-    if (int(_voters.size()) < _rsConfig->getMajorityVoteCount()) {
+    if (_successfulVoterCount < _rsConfig->getMajorityVoteCount()) {
         str::stream message;
         message << "Quorum check failed because not enough voting nodes responded; required "
                 << _rsConfig->getMajorityVoteCount() << " but ";
 
-        if (_voters.size() == 0) {
+        if (_successfulVoterCount == 0) {
             message << "none responded";
         } else {
-            message << "only the following " << _voters.size()
-                    << " voting nodes responded: " << _voters.front().toString();
-            for (size_t i = 1; i < _voters.size(); ++i) {
-                message << ", " << _voters[i].toString();
-            }
+            message << "only the following " << _successfulVoterCount
+                    << " voting nodes responded: ";
+            _appendFullySuccessfulVotingHostAndPorts(message, _successfulVoterCount);
         }
         if (!_badResponses.empty()) {
             message << "; the following nodes did not respond affirmatively: ";
-            for (std::vector<std::pair<HostAndPort, Status>>::const_iterator it =
-                     _badResponses.begin();
-                 it != _badResponses.end();
-                 ++it) {
-                if (it != _badResponses.begin()) {
-                    message << ", ";
-                }
-                message << it->first.toString() << " failed with " << it->second.reason();
-            }
+            _appendFailedHeartbeatResponses(message);
         }
         _finalStatus = Status(ErrorCodes::NodeNotFound, message);
         return;
@@ -257,14 +294,27 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
 
     for (int i = 0; i < _rsConfig->getNumMembers(); ++i) {
         const MemberConfig& memberConfig = _rsConfig->getMemberAt(i);
-        if (memberConfig.getHostAndPort() != request.target) {
+        if (memberConfig.getHostAndPort() != request.target &&
+            memberConfig.getHostAndPortMaintenance() != request.target) {
             continue;
         }
-        if (memberConfig.isElectable()) {
-            ++_numElectable;
+        if (memberConfig.getMaintenancePort() &&
+            memberConfig.getHostAndPortMaintenance() == request.target) {
+            _responses.at(i).maintenanceResponseReceived = true;
+        } else {
+            _responses.at(i).mainResponseReceived = true;
         }
-        if (memberConfig.isVoter()) {
-            _voters.push_back(request.target);
+        // Check if we have now received both responses for this node.
+        _responses.at(i).fullySuccessful = _responses.at(i).mainResponseReceived &&
+            (!memberConfig.getMaintenancePort() || _responses.at(i).maintenanceResponseReceived);
+        // If we have received both responses for this node then update our global counters.
+        if (_responses.at(i).fullySuccessful) {
+            if (memberConfig.isVoter()) {
+                ++_successfulVoterCount;
+            }
+            if (memberConfig.isElectable()) {
+                ++_numElectable;
+            }
         }
         return;
     }
@@ -272,7 +322,7 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
 }
 
 bool QuorumChecker::hasReceivedSufficientResponses() const {
-    if (!_vetoStatus.isOK() || _numResponses == _rsConfig->getNumMembers()) {
+    if (!_vetoStatus.isOK() || _numResponses == _numResponsesRequired) {
         // Vetoed or everybody has responded.  All done.
         return true;
     }

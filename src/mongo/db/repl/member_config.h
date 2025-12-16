@@ -107,6 +107,19 @@ public:
     }
 
     /**
+     * Gets the host and maintenance port if the maintenance port is specified and the host and main
+     * port if not. Always returns the value for the default horizon since this is only intended for
+     * use by internal replication systems.
+     */
+    HostAndPort getHostAndPortMaintenance() const {
+        if (getMaintenancePort()) {
+            return HostAndPort(getHostAndPort().host(), *getMaintenancePort());
+        } else {
+            return getHostAndPort();
+        }
+    }
+
+    /**
      * Gets the mapping of horizon names to `HostAndPort` for this replica set member.
      */
     const auto& getHorizonMappings() const {

@@ -232,7 +232,7 @@ BSONObj makeHeartbeatRequest(const ReplSetConfig& rsConfig, int myConfigIndex) {
     if (rsConfig.getConfigVersion() == 1) {
         hbArgs.setCheckEmpty();
     }
-    hbArgs.setSenderHost(myConfig.getHostAndPort());
+    hbArgs.setSenderHost(myConfig.getHostAndPortMaintenance());
     hbArgs.setSenderId(myConfig.getId().getData());
     hbArgs.setTerm(0);
     return hbArgs.toBSON();
@@ -500,6 +500,65 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
     ASSERT_NOT_REASON_CONTAINS(status, "h5:1");
 }
 
+TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToMaintenancePortUnreachable) {
+    // In this test, "we" are host "h1:1".  All nodes respond successfully to their heartbeat
+    // requests on the main port but "we" don't respond via our maintenance port.
+
+    const ReplSetConfig rsConfig = assertMakeRSConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                            << "h1:1")
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2:1")
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3:1" << "maintenancePort" << 2)
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4:1")
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5:1"))));
+    const int myConfigIndex = 0;
+    const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+
+    startQuorumCheck(rsConfig, myConfigIndex);
+    const Date_t startDate = getNet()->now();
+    const int numCommandsExpected =
+        rsConfig.getNumMembers();  // One more than normal because one maintenance port.
+    stdx::unordered_set<HostAndPort> seenHosts;
+    getNet()->enterNetwork();
+    for (int i = 0; i < numCommandsExpected; ++i) {
+        const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
+        ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
+        ASSERT(seenHosts.insert(request.target).second)
+            << "Already saw " << request.target.toString();
+        if (request.target == HostAndPort("h3", 2)) {
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       RemoteCommandResponse::make_forTest(
+                                           Status(ErrorCodes::HostUnreachable, "No response")));
+        } else {
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       makeHeartbeatResponse(rsConfig, Milliseconds(8)));
+        }
+    }
+    getNet()->runUntil(startDate + Milliseconds(10));
+    getNet()->exitNetwork();
+    Status status = waitForQuorumCheck();
+    ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
+    ASSERT_REASON_CONTAINS(
+        status, "replSetInitiate quorum check failed because not all proposed set members");
+    ASSERT_NOT_REASON_CONTAINS(status, "h1:1");
+    ASSERT_NOT_REASON_CONTAINS(status, "h2:1");
+    ASSERT_REASON_CONTAINS(status, "h3:2");
+    ASSERT_NOT_REASON_CONTAINS(status, "h3:1");
+    ASSERT_NOT_REASON_CONTAINS(status, "h4:1");
+    ASSERT_NOT_REASON_CONTAINS(status, "h5:1");
+    ASSERT_NOT_REASON_CONTAINS(status, "h6:1");
+}
+
 TEST_F(CheckQuorumForReconfig, QuorumCheckSucceedsWhenOtherNodesHaveHigherVersion) {
     // In this test, "we" are host "h3:1".  The request to "h2" does not arrive before the end
     // of the test, and the request to "h1" comes back indicating a higher config version.
@@ -661,6 +720,187 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientVoters) {
     ASSERT_NOT_REASON_CONTAINS(status, "h5:1");
 }
 
+TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientMaintenancePortResponses) {
+    // In this test, "we" are host "h4".  All nodes respond via their main port but only "h1"
+    // responds via its maintenance port.
+
+    const ReplSetConfig rsConfig = assertMakeRSConfig(BSON(
+        "_id" << "rs0"
+              << "version" << 2 << "protocolVersion" << 1 << "members"
+              << BSON_ARRAY(
+                     BSON("_id" << 1 << "host"
+                                << "h1:1" << "maintenancePort" << 2)
+                     << BSON("_id" << 2 << "host"
+                                   << "h2:1" << "maintenancePort" << 2)
+                     << BSON("_id" << 3 << "host"
+                                   << "h3:1" << "maintenancePort" << 2)
+                     << BSON("_id" << 4 << "host"
+                                   << "h4:1"
+                                   << "votes" << 0 << "priority" << 0 << "maintenancePort" << 2)
+                     << BSON("_id" << 5 << "host"
+                                   << "h5:1"
+                                   << "votes" << 0 << "priority" << 0 << "maintenancePort" << 2))));
+    const int myConfigIndex = 3;
+    const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+
+    std::set<HostAndPort> respondFailure = {HostAndPort("h2", 2), HostAndPort("h3", 2)};
+
+    startQuorumCheck(rsConfig, myConfigIndex);
+    const Date_t startDate = getNet()->now();
+    const int numCommandsExpected = (rsConfig.getNumMembers() * 2) - 2;
+    stdx::unordered_set<HostAndPort> seenHosts;
+    getNet()->enterNetwork();
+    for (int i = 0; i < numCommandsExpected; ++i) {
+        const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
+        ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
+        ASSERT(seenHosts.insert(request.target).second)
+            << "Already saw " << request.target.toString();
+        if (respondFailure.contains(request.target)) {
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       RemoteCommandResponse::make_forTest(
+                                           Status(ErrorCodes::HostUnreachable, "No response")));
+        } else {
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       makeHeartbeatResponse(rsConfig, Milliseconds(8)));
+        }
+    }
+    getNet()->runUntil(startDate + Milliseconds(10));
+    getNet()->exitNetwork();
+    Status status = waitForQuorumCheck();
+    ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
+    ASSERT_REASON_CONTAINS(status, "not enough voting nodes responded; required 2 but only");
+    ASSERT_REASON_CONTAINS(status, "h1:1");
+    ASSERT_REASON_CONTAINS(status, "h2:2 failed with");
+    ASSERT_REASON_CONTAINS(status, "h3:2 failed with");
+    ASSERT_NOT_REASON_CONTAINS(status, "h4:1");
+    ASSERT_NOT_REASON_CONTAINS(status, "h5:1");
+}
+
+TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientMainPortResponses) {
+    // In this test, "we" are host "h4".  All nodes respond via their maintenance port but only "h1"
+    // responds via its main port.
+
+    const ReplSetConfig rsConfig = assertMakeRSConfig(BSON(
+        "_id" << "rs0"
+              << "version" << 2 << "protocolVersion" << 1 << "members"
+              << BSON_ARRAY(
+                     BSON("_id" << 1 << "host"
+                                << "h1:1" << "maintenancePort" << 2)
+                     << BSON("_id" << 2 << "host"
+                                   << "h2:1" << "maintenancePort" << 2)
+                     << BSON("_id" << 3 << "host"
+                                   << "h3:1" << "maintenancePort" << 2)
+                     << BSON("_id" << 4 << "host"
+                                   << "h4:1"
+                                   << "votes" << 0 << "priority" << 0 << "maintenancePort" << 2)
+                     << BSON("_id" << 5 << "host"
+                                   << "h5:1"
+                                   << "votes" << 0 << "priority" << 0 << "maintenancePort" << 2))));
+    const int myConfigIndex = 3;
+    const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+
+    std::set<HostAndPort> respondFailure = {HostAndPort("h2", 1), HostAndPort("h3", 1)};
+
+    startQuorumCheck(rsConfig, myConfigIndex);
+    const Date_t startDate = getNet()->now();
+    const int numCommandsExpected = (rsConfig.getNumMembers() * 2) - 2;
+    stdx::unordered_set<HostAndPort> seenHosts;
+    getNet()->enterNetwork();
+    for (int i = 0; i < numCommandsExpected; ++i) {
+        const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
+        ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
+        ASSERT(seenHosts.insert(request.target).second)
+            << "Already saw " << request.target.toString();
+        if (respondFailure.contains(request.target)) {
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       RemoteCommandResponse::make_forTest(
+                                           Status(ErrorCodes::HostUnreachable, "No response")));
+        } else {
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       makeHeartbeatResponse(rsConfig, Milliseconds(8)));
+        }
+    }
+    getNet()->runUntil(startDate + Milliseconds(10));
+    getNet()->exitNetwork();
+    Status status = waitForQuorumCheck();
+    ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
+    ASSERT_REASON_CONTAINS(status, "not enough voting nodes responded; required 2 but only");
+    ASSERT_REASON_CONTAINS(status, "h1:1");
+    ASSERT_REASON_CONTAINS(status, "h2:1 failed with");
+    ASSERT_REASON_CONTAINS(status, "h3:1 failed with");
+    ASSERT_NOT_REASON_CONTAINS(status, "h4:1");
+    ASSERT_NOT_REASON_CONTAINS(status, "h5:1");
+}
+
+TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNonOverlappingMainAndMaintenancePortResponses) {
+    // In this test, "we" are host "h3".  Nodes 1 and 2 respond via their main port but not
+    // maintenance port and hosts 4 and 5 respond via their maintenance port not main port. Thus we
+    // have no overlapping majority.
+
+    const ReplSetConfig rsConfig = assertMakeRSConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 2 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                            << "h1:1" << "maintenancePort" << 2)
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2:1" << "maintenancePort" << 2)
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3:1" << "maintenancePort" << 2)
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4:1"
+                                               << "maintenancePort" << 2)
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5:1"
+                                               << "maintenancePort" << 2))));
+    const int myConfigIndex = 2;
+    const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+
+    std::set<HostAndPort> respondFailure = {
+        HostAndPort("h4", 1), HostAndPort("h5", 1), HostAndPort("h1", 2), HostAndPort("h2", 2)};
+
+    startQuorumCheck(rsConfig, myConfigIndex);
+    const Date_t startDate = getNet()->now();
+    const int numCommandsExpected = (rsConfig.getNumMembers() * 2) - 2;
+    stdx::unordered_set<HostAndPort> seenHosts;
+    getNet()->enterNetwork();
+    for (int i = 0; i < numCommandsExpected; ++i) {
+        const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
+        ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
+        ASSERT(seenHosts.insert(request.target).second)
+            << "Already saw " << request.target.toString();
+        if (respondFailure.contains(request.target)) {
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       RemoteCommandResponse::make_forTest(
+                                           Status(ErrorCodes::HostUnreachable, "No response")));
+        } else {
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       makeHeartbeatResponse(rsConfig, Milliseconds(8)));
+        }
+    }
+    getNet()->runUntil(startDate + Milliseconds(10));
+    getNet()->exitNetwork();
+    Status status = waitForQuorumCheck();
+    ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
+    ASSERT_REASON_CONTAINS(status, "not enough voting nodes responded; required 3 but only");
+    ASSERT_REASON_CONTAINS(status, "h3:1");
+    ASSERT_REASON_CONTAINS(status, "h1:2 failed with");
+    ASSERT_REASON_CONTAINS(status, "h2:2 failed with");
+    ASSERT_REASON_CONTAINS(status, "h4:1 failed with");
+    ASSERT_REASON_CONTAINS(status, "h5:1 failed with");
+}
+
 TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNoElectableNodeResponding) {
     // In this test, "we" are host "h4".  Only "h1", "h2" and "h3" are electable,
     // and none of them respond.
@@ -704,6 +944,61 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNoElectableNodeResponding) {
                                        startDate + Milliseconds(10),
                                        RemoteCommandResponse::make_forTest(
                                            Status(ErrorCodes::HostUnreachable, "No response")));
+        }
+    }
+    getNet()->runUntil(startDate + Milliseconds(10));
+    getNet()->exitNetwork();
+    Status status = waitForQuorumCheck();
+    ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
+    ASSERT_REASON_CONTAINS(status, "no electable nodes responded");
+}
+
+TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNoElectableNodeRespondingViaMaintenancePort) {
+    // In this test, "we" are host "h4".  Only "h1", "h2" and "h3" are electable,
+    // and none of them respond via their maintenance ports
+
+    const ReplSetConfig rsConfig = assertMakeRSConfig(
+        BSON("_id" << "rs0"
+                   << "version" << 2 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                            << "h1:1" << "maintenancePort" << 2)
+                                 << BSON("_id" << 2 << "host"
+                                               << "h2:1" << "maintenancePort" << 2)
+                                 << BSON("_id" << 3 << "host"
+                                               << "h3:1" << "maintenancePort" << 2)
+                                 << BSON("_id" << 4 << "host"
+                                               << "h4:1"
+                                               << "priority" << 0 << "maintenancePort" << 2)
+                                 << BSON("_id" << 5 << "host"
+                                               << "h5:1"
+                                               << "priority" << 0 << "maintenancePort" << 2))));
+    const int myConfigIndex = 3;
+    const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+    std::set<HostAndPort> respondFailure = {
+        HostAndPort("h1", 2), HostAndPort("h2", 2), HostAndPort("h3", 2)};
+
+
+    startQuorumCheck(rsConfig, myConfigIndex);
+    const Date_t startDate = getNet()->now();
+    const int numCommandsExpected = (2 * rsConfig.getNumMembers()) - 2;
+    stdx::unordered_set<HostAndPort> seenHosts;
+    getNet()->enterNetwork();
+    for (int i = 0; i < numCommandsExpected; ++i) {
+        const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
+        ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
+        ASSERT(seenHosts.insert(request.target).second)
+            << "Already saw " << request.target.toString();
+        if (respondFailure.contains(request.target)) {
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       RemoteCommandResponse::make_forTest(
+                                           Status(ErrorCodes::HostUnreachable, "No response")));
+        } else {
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       makeHeartbeatResponse(rsConfig, Milliseconds(8)));
         }
     }
     getNet()->runUntil(startDate + Milliseconds(10));

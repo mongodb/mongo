@@ -94,6 +94,22 @@ private:
     void _tabulateHeartbeatResponse(const executor::RemoteCommandRequest& request,
                                     const executor::RemoteCommandResponse& response);
 
+    /**
+     * Adds information about each failed heartbeat response to the provided stream with the format:
+     * "<host:port> failed with <errmsg>, <host:port> failed with <errmsg>".
+     */
+    void _appendFailedHeartbeatResponses(str::stream& stream);
+
+    /**
+     * Adds information about each fully successful voting node to the provided stream with the
+     * format:
+     * "<host:port>, <host:port>"
+     * A fully successful voting node is one which replied success over its main port and either
+     * does not have a maintenance port configured or also replied success over the maintenance
+     * port.
+     */
+    void _appendFullySuccessfulVotingHostAndPorts(str::stream& stream, int expectedResponses);
+
     // Pointer to the replica set configuration for which we're checking quorum.
     const ReplSetConfig* const _rsConfig;
 
@@ -103,8 +119,18 @@ private:
     // The term of this node.
     const long long _term;
 
-    // List of voting nodes that have responded affirmatively.
-    std::vector<HostAndPort> _voters;
+    struct ResponseStatus {
+        bool mainResponseReceived;
+        bool maintenanceResponseReceived;
+        bool fullySuccessful;
+    };
+    // Tracks main and maintenance port responses for each member. The indexes into this vector will
+    // be the same as that of the _rsConfig and entries for non-voters will be all false.
+    std::vector<ResponseStatus> _responses;
+    // Tracks the number of voters for which their state is fully successful (meaning they have
+    // responded on the main port and do not have a maintenance port configured or have responded
+    // on both main and maintenance ports).
+    int _successfulVoterCount;
 
     // List of nodes with bad responses and the bad response status they returned.
     std::vector<std::pair<HostAndPort, Status>> _badResponses;
@@ -112,8 +138,14 @@ private:
     // Total number of responses and timeouts processed.
     int _numResponses;
 
-    // Number of electable nodes that have responded affirmatively.
+    // Number of electable nodes that have responded affirmatively (on both their main and
+    // maintenance ports).
     int _numElectable;
+
+    // Number of responses required. This will be equal to the number of members in the config plus
+    // the number of members that have maintenance ports specified since we need to contact both
+    // ports in that case.
+    int _numResponsesRequired;
 
     // Set to a non-OK status if a response from a remote node indicates
     // that the quorum check should definitely fail, such as because of

@@ -9,6 +9,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 
 describe("Tests for maintenance port usage within JS test helpers", function () {
     beforeEach(() => {
@@ -19,6 +20,14 @@ describe("Tests for maintenance port usage within JS test helpers", function () 
                 "ReplicationUsageOfMaintenancePort",
             ).version;
             return MongoRunner.compareBinVersions(lastLTSFCV, maintenancePortEnabledFCV) == -1;
+        };
+
+        this.dropAllConns = function (rs) {
+            rs.nodes.forEach((conn) => {
+                const cfg = conn.getDB("local").system.replset.findOne();
+                const allHosts = cfg.members.map((x) => x.host);
+                assert.commandWorked(conn.adminCommand({dropConnections: 1, hostAndPort: allHosts}));
+            });
         };
     });
 
@@ -117,6 +126,73 @@ describe("Tests for maintenance port usage within JS test helpers", function () 
             ErrorCodes.NodeNotFound,
         );
 
+        rs.stopSet();
+    });
+
+    it("Initiate with wrong maintenance port on a majority of nodes should fail", () => {
+        const rs = new ReplSetTest({nodes: [{maintenancePort: allocatePort()}, {}, {}]});
+        rs.startSet();
+
+        jsTest.log.info(
+            "Initiate should fail because we specify maintenance ports which are not open on the secondaries",
+        );
+        let config = rs.getReplSetConfig();
+        config.members[1].maintenancePort = 27022;
+        config.members[2].maintenancePort = 27023;
+
+        assert.commandFailedWithCode(rs.nodes[0].adminCommand({replSetInitiate: config}), ErrorCodes.NodeNotFound);
+
+        rs.stopSet();
+    });
+
+    it("Reconfig with wrong maintenance port on a majority of nodes should fail", () => {
+        const rs = new ReplSetTest({nodes: [{maintenancePort: allocatePort()}, {}, {}]});
+        rs.startSet();
+        rs.initiate();
+
+        jsTest.log.info(
+            "Initiate should fail because we specify maintenance ports which are not open on the secondaries",
+        );
+        let config = rs.getReplSetConfigFromNode();
+        config.members[1].maintenancePort = 27022;
+        config.members[2].maintenancePort = 27023;
+        config.version += 1;
+
+        assert.commandFailedWithCode(rs.getPrimary().adminCommand({replSetReconfig: config}), ErrorCodes.NodeNotFound);
+
+        rs.stopSet();
+    });
+
+    it("Initiate when we can only reach the maintenance port on a majority of nodes should fail", () => {
+        const rs = new ReplSetTest({nodes: 3, useMaintenancePorts: true});
+        rs.startSet();
+
+        jsTest.log.info("Block connections on the main ports");
+        let fps = configureFailPointForRS(rs.nodes, "rejectNewNonPriorityConnections");
+
+        jsTest.log.info("Initiate should fail because we can only connect on the maintenance ports");
+        let config = rs.getReplSetConfig();
+        assert.commandFailedWithCode(rs.nodes[0].adminCommand({replSetInitiate: config}), ErrorCodes.NodeNotFound);
+
+        rs.stopSet();
+    });
+
+    it("Reconfig when we can only reach the maintenance port on a majority of nodes should fail", () => {
+        const rs = new ReplSetTest({nodes: 3, useMaintenancePorts: true});
+        rs.startSet();
+        rs.initiate();
+
+        let config = rs.getReplSetConfigFromNode();
+
+        jsTest.log.info("Block connections on the main ports and drop existing connections");
+        let fps = configureFailPointForRS(rs.nodes, "rejectNewNonPriorityConnections");
+        this.dropAllConns(rs);
+
+        jsTest.log.info("Reconfig should fail because we can only connect on the maintenance ports");
+        config.version += 1;
+        assert.commandFailedWithCode(rs.getPrimary().adminCommand({replSetReconfig: config}), ErrorCodes.NodeNotFound);
+
+        fps.off();
         rs.stopSet();
     });
 

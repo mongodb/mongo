@@ -1032,7 +1032,9 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinator::prepareHear
         if (_selfIndex >= 0) {
             const MemberConfig& me = _selfConfig();
             hbArgs.setSenderId(me.getId().getData());
-            hbArgs.setSenderHost(me.getHostAndPort());
+            // Use the maintenance port because the recipient may send a heartbeat back to get a
+            // newer configuration and we want them to use the maintenance port if it is available.
+            hbArgs.setSenderHost(me.getHostAndPortMaintenance());
         }
         hbArgs.setTerm(_term);
     } else {

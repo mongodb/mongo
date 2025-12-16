@@ -60,11 +60,11 @@ inline bool operator==(const MemberConfig& a, const MemberConfig& b) {
         }
     }
     return a.getId() == b.getId() && a.getHostAndPort() == b.getHostAndPort() &&
-        a.getPriority() == b.getPriority() && a.getSecondaryDelay() == b.getSecondaryDelay() &&
-        a.isVoter() == b.isVoter() && a.isArbiter() == b.isArbiter() &&
-        a.isNewlyAdded() == b.isNewlyAdded() && a.isHidden() == b.isHidden() &&
-        a.shouldBuildIndexes() == b.shouldBuildIndexes() && a.getNumTags() == b.getNumTags() &&
-        a.getHorizonMappings() == b.getHorizonMappings() &&
+        a.getMaintenancePort() == b.getMaintenancePort() && a.getPriority() == b.getPriority() &&
+        a.getSecondaryDelay() == b.getSecondaryDelay() && a.isVoter() == b.isVoter() &&
+        a.isArbiter() == b.isArbiter() && a.isNewlyAdded() == b.isNewlyAdded() &&
+        a.isHidden() == b.isHidden() && a.shouldBuildIndexes() == b.shouldBuildIndexes() &&
+        a.getNumTags() == b.getNumTags() && a.getHorizonMappings() == b.getHorizonMappings() &&
         a.getHorizonReverseHostMappings() == b.getHorizonReverseHostMappings();
 }
 

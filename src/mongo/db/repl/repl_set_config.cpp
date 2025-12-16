@@ -203,10 +203,13 @@ Status ReplSetConfig::_initialize(bool forInitiate,
     _addInternalWriteConcernModes();
     _initializeConnectionString();
 
-    // Count how many members can vote
+    // Count how many members can vote and how many members have maintenance ports available.
     for (const MemberConfig& m : getMembers()) {
         if (m.getNumVotes() > 0) {
             ++_votingMemberCount;
+        }
+        if (m.getMaintenancePort()) {
+            ++_maintenancePortCount;
         }
     }
 
@@ -550,7 +553,7 @@ int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
     for (std::vector<MemberConfig>::const_iterator it = getMembers().begin();
          it != getMembers().end();
          ++it) {
-        if (it->getHostAndPort() == hap) {
+        if (it->getHostAndPort() == hap || it->getHostAndPortMaintenance() == hap) {
             return x;
         }
         ++x;

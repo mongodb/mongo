@@ -343,6 +343,13 @@ public:
     };
 
     /**
+     * Returns a count of members with a maintenance port specified in this ReplSetConfig.
+     */
+    int getCountOfMembersWithMaintenancePort() const {
+        return _maintenancePortCount;
+    };
+
+    /**
      * Access a MemberConfig element by index.
      */
     const MemberConfig& getMemberAt(size_t i) const;
@@ -617,6 +624,7 @@ private:
     int _writeMajority = 0;
     int _totalVotingMembers = 0;
     int _votingMemberCount = 0;
+    int _maintenancePortCount = 0;
     ReplSetTagConfig _tagConfig;
     StringMap<ReplSetTagPattern> _customWriteConcernModes;
     ConnectionString _connectionString;
