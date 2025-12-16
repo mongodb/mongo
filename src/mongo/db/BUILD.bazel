@@ -1678,6 +1678,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/expression:evaluate_date.cpp",
         "//src/mongo/db/exec/expression:evaluate_find_internal.cpp",
         "//src/mongo/db/exec/expression:evaluate_fle.cpp",
+        "//src/mongo/db/exec/expression:evaluate_hash.cpp",
         "//src/mongo/db/exec/expression:evaluate_index.cpp",
         "//src/mongo/db/exec/expression:evaluate_javascript.cpp",
         "//src/mongo/db/exec/expression:evaluate_logical.cpp",
@@ -1788,6 +1789,7 @@ mongo_cc_library(
         "//src/mongo/util:pcre_util",
         "//src/mongo/util:pcre_wrapper",
         "//src/mongo/util:summation",
+        "//src/third_party/zstandard:zstd",
     ],
 )
 

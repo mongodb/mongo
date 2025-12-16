@@ -506,5 +506,7 @@ Value evaluate(const ExpressionEncStrNormalizedEq& expr,
 Value evaluate(const ExpressionSerializeEJSON& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionDeserializeEJSON& expr, const Document& root, Variables* variables);
 
+Value evaluate(const ExpressionHash& expr, const Document& root, Variables* variables);
+
 }  // namespace exec::expression
 }  // namespace mongo

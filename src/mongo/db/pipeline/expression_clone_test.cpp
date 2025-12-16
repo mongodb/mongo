@@ -253,6 +253,7 @@ MONGO_INITIALIZER_GENERAL(InitExpressionsForCloneTest, ("EndExpressionRegistrati
         fromjson("{$first: '$foo'}"),
         fromjson("{$firstN: {input: '$foo', n: 2}}"),
         fromjson("{$getField: {field: '$foo', input: '$bar'}}"),
+        fromjson("{$hash: {input: '$foo', algorithm: '$bar'}}"),
         fromjson("{$ifNull: ['$a', '$b', '$c']}"),
         fromjson("{$isNumber: '$foo'}"),
         fromjson("{$last: '$foo'}"),

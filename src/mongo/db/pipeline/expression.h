@@ -6131,6 +6131,53 @@ private:
     static constexpr int _kOnErrorIdx = 1;
 };
 
+// Represents the hashing algorithm used for $hash.
+#define HASH_ALGORITHM(F) \
+    F(md5)                \
+    F(sha256)             \
+    F(xxh64)
+QUERY_UTIL_NAMED_ENUM_DEFINE(HashAlgorithm, HASH_ALGORITHM);
+#undef HASH_ALGORITHM
+
+class ExpressionHash final : public Expression {
+public:
+    explicit ExpressionHash(ExpressionContext* expCtx,
+                            boost::intrusive_ptr<Expression> input,
+                            boost::intrusive_ptr<Expression> algorithm);
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps);
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+
+    const char* getOpName() const;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final;
+
+    const Expression& getInput() const;
+    const Expression& getAlgorithm() const;
+
+private:
+    static constexpr StringData _kInput = "input"_sd;
+    static constexpr size_t _kInputIdx = 0;
+
+    static constexpr StringData _kAlgorithm = "algorithm"_sd;
+    static constexpr size_t _kAlgorithmIdx = 1;
+};
+
 /**
  * ExpressionEncTextSearch is the base class for all encrypted text search expressions. The first
  * operand (input) must be a field path expression, and the second operand (text) a constant

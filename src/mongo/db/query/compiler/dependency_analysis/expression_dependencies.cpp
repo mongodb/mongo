@@ -218,6 +218,7 @@ public:
     void visit(const ExpressionTestFeatureFlagLastLTS*) override {}
     void visit(const ExpressionSerializeEJSON*) override {}
     void visit(const ExpressionDeserializeEJSON*) override {}
+    void visit(const ExpressionHash*) override {}
 };
 
 class DependencyVisitor : public DefaultDependencyVisitor {

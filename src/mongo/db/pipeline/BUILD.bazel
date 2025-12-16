@@ -1182,6 +1182,7 @@ mongo_cc_unit_test(
         "expression_field_path_test.cpp",
         "expression_find_internal_test.cpp",
         "expression_function_test.cpp",
+        "expression_hash_test.cpp",
         "expression_hasher_test.cpp",
         "expression_let_test.cpp",
         "expression_map_reduce_filter_test.cpp",

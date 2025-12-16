@@ -190,6 +190,7 @@ class ExpressionTestFeatureFlagLatest;
 class ExpressionTestFeatureFlagLastLTS;
 class ExpressionSerializeEJSON;
 class ExpressionDeserializeEJSON;
+class ExpressionHash;
 
 class AccumulatorAvg;
 class AccumulatorFirstN;
@@ -435,6 +436,7 @@ public:
         expression_walker::MaybeConstPtr<IsConst, ExpressionTestFeatureFlagLastLTS>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSerializeEJSON>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDeserializeEJSON>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionHash>) = 0;
 };
 
 using ExpressionMutableVisitor = ExpressionVisitor<false>;
@@ -624,5 +626,6 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionTestFeatureFlagLastLTS*) override {}
     void visit(const ExpressionSerializeEJSON*) override {}
     void visit(const ExpressionDeserializeEJSON*) override {}
+    void visit(const ExpressionHash*) override {}
 };
 }  // namespace mongo

@@ -5583,6 +5583,89 @@ const Expression* ExpressionDeserializeEJSON::getOnError() const {
     return _children[_kOnErrorIdx].get();
 }
 
+/* --------------------------------- ExpressionHash --------------------------------------------- */
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(hash,
+                                      ExpressionHash::parse,
+                                      AllowedWithApiStrict::kAlways,
+                                      AllowedWithClientType::kAny,
+                                      &feature_flags::gFeatureFlagMqlJsEngineGap);
+
+ExpressionHash::ExpressionHash(ExpressionContext* const expCtx,
+                               boost::intrusive_ptr<Expression> input,
+                               boost::intrusive_ptr<Expression> algorithm)
+    : Expression(expCtx,
+                 {
+                     std::move(input),
+                     std::move(algorithm),
+                 }) {
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+}
+
+intrusive_ptr<Expression> ExpressionHash::parse(ExpressionContext* const expCtx,
+                                                BSONElement expr,
+                                                const VariablesParseState& vps) {
+
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "$hash expects an object of named arguments but found: "
+                          << typeName(expr.type()),
+            expr.type() == BSONType::object);
+
+    boost::intrusive_ptr<Expression> input;
+    boost::intrusive_ptr<Expression> algorithm;
+
+    for (auto&& elem : expr.embeddedObject()) {
+        const auto field = elem.fieldNameStringData();
+        if (field == _kInput) {
+            input = parseOperand(expCtx, elem, vps);
+        } else if (field == _kAlgorithm) {
+            algorithm = parseOperand(expCtx, elem, vps);
+        } else {
+            uasserted(ErrorCodes::FailedToParse,
+                      str::stream()
+                          << "$hash found an unknown argument: " << elem.fieldNameStringData());
+        }
+    }
+
+    uassert(ErrorCodes::FailedToParse, "Missing 'input' parameter to $hash", input);
+    uassert(ErrorCodes::FailedToParse, "Missing 'algorithm' parameter to $hash", algorithm);
+    return new ExpressionHash(expCtx, std::move(input), std::move(algorithm));
+}
+
+const char* ExpressionHash::getOpName() const {
+    return "$hash";
+}
+
+Value ExpressionHash::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+intrusive_ptr<Expression> ExpressionHash::optimize() {
+    _children[_kInputIdx] = _children[_kInputIdx]->optimize();
+    _children[_kAlgorithmIdx] = _children[_kAlgorithmIdx]->optimize();
+    return this;
+}
+
+Value ExpressionHash::serialize(const SerializationOptions& options) const {
+    return Value(Document{{
+        getOpName(),
+        Document{{_kInput, getInput().serialize(options)},
+                 {_kAlgorithm, getAlgorithm().serialize(options)}},
+    }});
+}
+
+boost::intrusive_ptr<Expression> ExpressionHash::clone() const {
+    return make_intrusive<ExpressionHash>(
+        getExpressionContext(), cloneChild(_kInputIdx), cloneChild(_kAlgorithmIdx));
+}
+
+const Expression& ExpressionHash::getInput() const {
+    return *_children[_kInputIdx];
+}
+
+const Expression& ExpressionHash::getAlgorithm() const {
+    return *_children[_kAlgorithmIdx];
+}
+
 /* --------------------------------- Parenthesis ---------------------------------------------
  */
 

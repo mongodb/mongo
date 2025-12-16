@@ -423,6 +423,7 @@ public:
     void visit(const ExpressionTestFeatureFlagLastLTS* expr) final {}
     void visit(const ExpressionSerializeEJSON*) final {}
     void visit(const ExpressionDeserializeEJSON*) final {}
+    void visit(const ExpressionHash* expr) final {}
 
 private:
     ExpressionVisitorContext* _context;
@@ -619,6 +620,7 @@ public:
     void visit(const ExpressionTestFeatureFlagLastLTS* expr) final {}
     void visit(const ExpressionSerializeEJSON*) final {}
     void visit(const ExpressionDeserializeEJSON*) final {}
+    void visit(const ExpressionHash* expr) final {}
 
 private:
     ExpressionVisitorContext* _context;
@@ -3468,6 +3470,11 @@ public:
     void visit(const ExpressionDeserializeEJSON*) override {
         // TODO(SERVER-114519): Support $deserializeEJSON in SBE.
         unsupportedExpression("$deserializeEJSON");
+    }
+
+    void visit(const ExpressionHash* expr) final {
+        // TODO(SERVER-115462): Support $hash in SBE.
+        unsupportedExpression("$hash");
     }
 
     void visit(const ExpressionTsSecond* expr) final {
