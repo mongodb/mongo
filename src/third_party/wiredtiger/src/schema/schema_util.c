@@ -185,3 +185,26 @@ err:
     __wt_scr_free(session, &tmp);
     return (ret);
 }
+
+/*
+ * __wt_is_simple_table --
+ *     Check whether the given table is simple.
+ */
+int
+__wt_is_simple_table(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *colconf, bool *is_simplep)
+{
+    WT_CONFIG cparser;
+    WT_CONFIG_ITEM ckey, cval;
+    WT_DECL_RET;
+
+    __wt_config_subinit(session, &cparser, colconf);
+    *is_simplep = true;
+    /* Count the number of columns: tables are "simple" if the columns are not named. */
+    while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0) {
+        *is_simplep = false;
+        break;
+    }
+    WT_RET_NOTFOUND_OK(ret);
+
+    return (0);
+}

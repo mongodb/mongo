@@ -69,6 +69,7 @@ class test_metadata_cursor02(wttest.WiredTigerTestCase):
             # Invalidate the table by dropping part of it
             if self.drop == 'colgroup':
                 self.session.drop('colgroup:' + name[-2:])
+                self.ignoreStdoutPatternIfExists('removing incomplete table')
             else:
                 self.session.drop('file:' + name[-2:] + '.wt')
 

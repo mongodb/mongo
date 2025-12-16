@@ -57,7 +57,7 @@ def find_build_dir():
 
     env_builddir = os.getenv('WT_BUILDDIR')
     curdir = os.getcwd()
-    if env_builddir and os.path.isfile(os.path.join(env_builddir, 'wt')):
+    if env_builddir and is_build_dir(env_builddir):
         wt_builddir = env_builddir
     elif is_build_dir(curdir):
         wt_builddir = curdir

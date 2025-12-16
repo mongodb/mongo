@@ -248,7 +248,7 @@ __background_compact_should_skip(WT_SESSION_IMPL *session, const char *uri, int6
 
     /* Check if the file is excluded. */
     if (__background_compact_exclude(session, uri)) {
-        WT_STAT_CONN_INCR(session, background_compact_exclude);
+        WT_STAT_CONN_INCR(session, background_compact_skipped_exclude);
         *skipp = true;
         return (0);
     }
@@ -260,6 +260,10 @@ __background_compact_should_skip(WT_SESSION_IMPL *session, const char *uri, int6
 
     /* Ignore the error if the file no longer exists or in case of permission issues. */
     if (ret == ENOENT || ret == EACCES) {
+        if (ret == ENOENT)
+            WT_STAT_CONN_INCR(session, background_compact_skipped_no_such_file);
+        else
+            WT_STAT_CONN_INCR(session, background_compact_skipped_missing_permissions);
         *skipp = true;
         return (0);
     }
@@ -267,7 +271,7 @@ __background_compact_should_skip(WT_SESSION_IMPL *session, const char *uri, int6
     WT_RET(ret);
 
     if (file_size <= WT_MEGABYTE) {
-        WT_STAT_CONN_INCR(session, background_compact_skipped);
+        WT_STAT_CONN_INCR(session, background_compact_skipped_small_file);
         *skipp = true;
         return (0);
     }
@@ -301,7 +305,7 @@ __background_compact_should_skip(WT_SESSION_IMPL *session, const char *uri, int6
       compact_stat->bytes_rewritten < conn->background_compact.bytes_rewritten_ema) {
         compact_stat->skip_count++;
         conn->background_compact.files_skipped++;
-        WT_STAT_CONN_INCR(session, background_compact_skipped);
+        WT_STAT_CONN_INCR(session, background_compact_skipped_unsuccessful);
         *skipp = true;
         return (0);
     }
@@ -500,6 +504,7 @@ __background_compact_find_next_uri(WT_SESSION_IMPL *session, WT_ITEM *uri, WT_IT
             WT_ERR(__background_compact_should_skip(session, key, id.val, &skip));
             if (!skip)
                 break;
+            WT_STAT_CONN_INCR(session, background_compact_skipped);
         }
     } while ((ret = cursor->next(cursor)) == 0);
     WT_ERR(ret);

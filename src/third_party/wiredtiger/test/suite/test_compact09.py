@@ -47,7 +47,7 @@ class test_compact09(compact_util):
 
     def get_bg_compaction_files_excluded(self):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        files = stat_cursor[stat.conn.background_compact_exclude][2]
+        files = stat_cursor[stat.conn.background_compact_skipped_exclude][2]
         stat_cursor.close()
         return files
 

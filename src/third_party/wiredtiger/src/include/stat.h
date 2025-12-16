@@ -430,8 +430,12 @@ struct __wt_connection_stats {
     int64_t background_compact_ema;
     int64_t background_compact_bytes_recovered;
     int64_t background_compact_running;
-    int64_t background_compact_exclude;
+    int64_t background_compact_skipped_exclude;
+    int64_t background_compact_skipped_small_file;
     int64_t background_compact_skipped;
+    int64_t background_compact_skipped_unsuccessful;
+    int64_t background_compact_skipped_no_such_file;
+    int64_t background_compact_skipped_missing_permissions;
     int64_t background_compact_sleep_cache_pressure;
     int64_t background_compact_success;
     int64_t background_compact_timeout;

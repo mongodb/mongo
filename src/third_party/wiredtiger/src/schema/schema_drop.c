@@ -176,6 +176,7 @@ __drop_table(
   WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[], bool check_visibility)
 {
     WT_COLGROUP *colgroup;
+    WT_DECL_ITEM(file_uri_buf);
     WT_DECL_RET;
     WT_INDEX *idx;
     WT_TABLE *table;
@@ -186,10 +187,11 @@ __drop_table(
     WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE_WRITE));
 
     name = uri;
-    WT_PREFIX_SKIP_REQUIRED(session, name, "table:");
-
     table = NULL;
     tracked = false;
+    WT_ERR(__wt_scr_alloc(session, 0, &file_uri_buf));
+
+    WT_PREFIX_SKIP_REQUIRED(session, name, "table:");
 
     /*
      * Open the table so we can drop its column groups and indexes.
@@ -213,6 +215,17 @@ __drop_table(
           "ENOTSUP: drop table with force=true is not supported for complex tables. uri=%s", uri);
         WT_ERR(ENOTSUP);
     }
+
+    WT_ERR(__wt_buf_fmt(session, file_uri_buf, "file:%s.wt", name));
+
+    /*
+     * In a crash, it is possible for the file metadata entry to exist even though the colgroup was
+     * not created completely. In such a scenario, drop the file to keep the metadata consistent.
+     *
+     * FIXME-WT-16146: Add capability for cleaning up incomplete complex and tiered tables.
+     */
+    if (!table->cg_complete && table->is_simple)
+        WT_ERR(__wt_schema_drop(session, file_uri_buf->data, cfg, check_visibility));
 
     /* Drop the column groups. */
     for (i = 0; i < WT_COLGROUPS(table); i++) {
@@ -253,6 +266,7 @@ __drop_table(
     WT_ERR(__wt_metadata_remove(session, uri));
 
 err:
+    __wt_scr_free(session, &file_uri_buf);
     if (!tracked)
         WT_TRET(__wt_schema_release_table(session, &table));
     return (ret);
@@ -462,11 +476,13 @@ __schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], bool
     if (ret == WT_NOTFOUND || ret == ENOENT)
         ret = force ? 0 : ENOENT;
 
-    if (F_ISSET(S2C(session), WT_CONN_BACKUP_PARTIAL_RESTORE))
-        WT_TRET(__wt_meta_track_off(session, false, ret != 0));
-    else
-        WT_TRET(__wt_meta_track_off(session, true, ret != 0));
-
+    /*
+     * FIXME-WT-16215: During recovery (including partial backup restore), the meta tracking has not
+     * been initialized yet. We don't need to use meta tracking as recovery must end with a
+     * checkpoint to syncs all files.
+     */
+    bool need_sync = !F_ISSET(S2C(session), WT_CONN_BACKUP_PARTIAL_RESTORE | WT_CONN_RECOVERING);
+    WT_TRET(__wt_meta_track_off(session, need_sync, ret != 0));
     return (ret);
 }
 
