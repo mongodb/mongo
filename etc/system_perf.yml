@@ -83,7 +83,7 @@ modules:
     prefix: ${workdir}/src
     branch: master
   - name: genny
-    owner: mongodb
+    owner: 10gen
     repo: genny
     prefix: ${workdir}/src
     branch: master
