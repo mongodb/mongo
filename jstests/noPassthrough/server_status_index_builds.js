@@ -1,0 +1,187 @@
+
+
+/**
+ * Tests that serverStatus contains an indexBuilds section with lastCommittedMillis.
+ *
+ * @tags: [
+ *   # Primary-driven index builds aren't resumable.
+ *   primary_driven_index_builds_incompatible,
+ *   requires_persistence,
+ *   requires_replication,
+ * ]
+ */
+
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {IndexBuildTest, ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+
+const collName = "t";
+const dbName = "test";
+
+function getLastCommittedMillis(conn) {
+    const serverStatus = conn.serverStatus();
+
+    assert(serverStatus.hasOwnProperty("indexBuilds"),
+           "indexBuilds section missing: " + tojson(serverStatus));
+    const indexBuilds = serverStatus.indexBuilds;
+
+    assert(indexBuilds.hasOwnProperty("phases"), "phases missing: " + tojson(indexBuilds));
+    const phases = indexBuilds.phases;
+
+    assert(phases.hasOwnProperty("lastCommittedMillis"),
+           "lastCommittedMillis missing: " + tojson(phases));
+    return phases.lastCommittedMillis;
+}
+
+function testLastCommittedMillisSteadyState() {
+    const rst = new ReplSetTest({
+        nodes: 1,
+    });
+    rst.startSet();
+    rst.initiate();
+
+    const primary = rst.getPrimary();
+    const db = primary.getDB(dbName);
+    db.getCollection(collName).drop();
+    const coll = db.getCollection(collName);
+    assert.commandWorked(coll.insertMany(Array.from({length: 10}, () => ({a: "foo"}))));
+
+    let duration = getLastCommittedMillis(db);
+    assert.eq(duration, 0, `Expected lastCommittedMillis to be 0 on startup, but got ${duration}`);
+
+    // Hang index build before completion to extend duration.
+    const fp = configureFailPoint(primary, "hangIndexBuildBeforeCommit");
+    const awaitCreateIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
+
+    // Initiate the failpoint and then sleep for 1000ms to ensure duration >= 1000ms.
+    fp.wait();
+    sleep(1000);
+    fp.off();
+
+    // Wait for the parallel shell to exit.
+    awaitCreateIndex();
+
+    duration = getLastCommittedMillis(db);
+    assert.gt(duration,
+              1000,
+              `Expected lastCommittedMillis to be > 1000 after index build, but got ${duration}`);
+    rst.stopSet();
+};
+
+function testLastCommittedMillisOnResume() {
+    const rst = new ReplSetTest({
+        nodes: 1,
+    });
+    rst.startSet();
+    rst.initiate();
+    let primary = rst.getPrimary();
+    let db = primary.getDB(dbName);
+    db.getCollection(collName).drop();
+    let coll = db.getCollection(collName);
+    assert.commandWorked(coll.insertMany(Array.from({length: 10}, () => ({a: "foo"}))));
+
+    let duration = getLastCommittedMillis(db);
+    assert.eq(duration, 0, `Expected lastCommittedMillis to be 0 on startup, but got ${duration}`);
+
+    // Hang index build before completion to require resume.
+    const fp = configureFailPoint(primary, "hangIndexBuildBeforeCommit");
+    const awaitCreateIndex = IndexBuildTest.startIndexBuild(
+        primary,
+        coll.getFullName(),
+        {a: 1},
+        {} /* options */,
+        [ErrorCodes.InterruptedDueToReplStateChange],
+    );
+
+    // Ensure index build is in-progress before restarting, else it is not resumed.
+    fp.wait();
+
+    const buildUUID = extractUUIDFromObject(
+        IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true})["a_1"]
+            .buildUUID,
+    );
+
+    // Restart to trigger resume.
+    rst.restart(0);
+
+    // Wait for the parallel shell to exit.
+    awaitCreateIndex();
+
+    // Connect to new primary.
+    primary = rst.getPrimary();
+    db = primary.getDB(dbName);
+    coll = db.getCollection(collName);
+
+    // Ensure index build is completed before reading metrics.
+    ResumableIndexBuildTest.assertCompleted(primary, coll, [buildUUID], ["a_1"]);
+
+    duration = getLastCommittedMillis(db);
+    assert.gt(duration,
+              0,
+              `Expected lastCommittedMillis to be > 0 after index build, but got ${duration}`);
+    rst.stopSet();
+};
+
+function testLastCommittedMillisOnRestart() {
+    const rst = new ReplSetTest({
+        nodes: 1,
+    });
+    rst.startSet();
+    rst.initiate();
+    let primary = rst.getPrimary();
+    let db = primary.getDB(dbName);
+    db.getCollection(collName).drop();
+    let coll = db.getCollection(collName);
+    assert.commandWorked(coll.insertMany(Array.from({length: 10}, () => ({a: "foo"}))));
+
+    let duration = getLastCommittedMillis(db);
+    assert.eq(duration, 0, `Expected lastCommittedMillis to be 0 on startup, but got ${duration}`);
+
+    // Hang index build before completion to require restart.
+    const fp = configureFailPoint(primary, "hangIndexBuildBeforeCommit");
+    const awaitCreateIndex = IndexBuildTest.startIndexBuild(
+        primary,
+        coll.getFullName(),
+        {a: 1},
+        {} /* options */,
+        [ErrorCodes.InterruptedDueToReplStateChange],
+    );
+
+    // Ensure index build is in-progress before stopping and starting, else it is not restarted.
+    fp.wait();
+
+    const buildUUID = extractUUIDFromObject(
+        IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true})["a_1"]
+            .buildUUID,
+    );
+
+    // Kill process to require index build to start over. The `forRestart` flag is required to
+    // preserve state between stop and start.
+    rst.stop(0, 9 /* signal */, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
+
+    // Wait for the parallel shell to exit.
+    awaitCreateIndex({checkExitStatus: false});
+
+    rst.start(0, {} /* options */, true /* restart */);
+
+    // Connect to new primary.
+    primary = rst.getPrimary();
+    db = primary.getDB(dbName);
+    coll = db.getCollection(collName);
+
+    // Ensure index build is completed before reading metrics.
+    ResumableIndexBuildTest.assertCompleted(primary, coll, [buildUUID], ["a_1"]);
+
+    duration = getLastCommittedMillis(db);
+    assert.gt(duration,
+              0,
+              `Expected lastCommittedMillis to be > 0 after index build, but got
+                  ${duration}`);
+    rst.stopSet();
+};
+
+testLastCommittedMillisSteadyState();
+
+testLastCommittedMillisOnResume();
+
+testLastCommittedMillisOnRestart();
