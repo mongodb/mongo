@@ -56,7 +56,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/testing_proctor.h"
 
 namespace mongo {
 namespace {
@@ -493,14 +492,7 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
     // Format our response, if we have one
     Message& toSink = dbresponse.response;
     if (!toSink.empty()) {
-        if (MONGO_unlikely(OpMsg::isFlagSet(_inMessage, OpMsg::kMoreToCome))) {
-            Status error = Status(ErrorCodes::InternalError,
-                                  "Attempted to respond to fire-and-forget request");
-            if (MONGO_unlikely(TestingProctor::instance().isEnabled())) {
-                invariant(error);
-            }
-            internalAssert(error);
-        }
+        invariant(!OpMsg::isFlagSet(_inMessage, OpMsg::kMoreToCome));
         invariant(!OpMsg::isFlagSet(toSink, OpMsg::kChecksumPresent));
 
         // Update the header for the response message.
