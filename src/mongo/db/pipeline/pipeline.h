@@ -128,15 +128,6 @@ public:
         bool isFacetPipeline = false);
 
     /**
-     * Like parse, but takes a BSONElement instead of a vector of objects. 'arrElem' must be an
-     * array of objects.
-     */
-    static std::unique_ptr<Pipeline> parseFromArray(
-        BSONElement arrayElem,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        PipelineValidatorCallback validator = nullptr);
-
-    /**
      * Creates a Pipeline from an existing DocumentSourceContainer.
      *
      * Returns a non-OK status if any stage is in an invalid position. For example, if an $out stage

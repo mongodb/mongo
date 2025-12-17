@@ -238,22 +238,6 @@ std::unique_ptr<Pipeline> Pipeline::parseCommon(
     return pipeline;
 }
 
-std::unique_ptr<Pipeline> Pipeline::parseFromArray(
-    BSONElement rawPipelineElement,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    PipelineValidatorCallback validator) {
-
-    tassert(6253719,
-            "Expected array for Pipeline::parseFromArray",
-            rawPipelineElement.type() == BSONType::array);
-    auto rawStages = rawPipelineElement.Array();
-
-    return parseCommon<BSONElement>(rawStages, expCtx, validator, false, [&expCtx](BSONElement e) {
-        uassert(6253720, "Pipeline array element must be an object", e.type() == BSONType::object);
-        return DocumentSource::parse(expCtx, e.embeddedObject());
-    });
-}
-
 std::unique_ptr<Pipeline> Pipeline::parse(const std::vector<BSONObj>& rawPipeline,
                                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           PipelineValidatorCallback validator) {

@@ -125,8 +125,8 @@ public:
         auto pipeline =
             pipeline_factory::makePipeline(rawPipeline, getExpCtx(), {.attachCursorSource = false});
 
-        auto pipelineSuffix =
-            pipeline_factory::makePipeline({}, getExpCtx(), {.attachCursorSource = false});
+        auto pipelineSuffix = pipeline_factory::makePipeline(
+            std::vector<BSONObj>{}, getExpCtx(), {.attachCursorSource = false});
         return OwningDistributedPlanContext(
             std::move(pipeline), std::move(pipelineSuffix), std::move(shardKeys));
     }

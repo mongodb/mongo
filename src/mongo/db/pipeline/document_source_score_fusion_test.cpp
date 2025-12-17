@@ -31,7 +31,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -4827,7 +4827,8 @@ TEST_F(DocumentSourceScoreFusionTest, RepresentativeQueryShape) {
         asOneObj);  // NOLINT
 
     // Ensure the representative query shape is reparseable.
-    ASSERT_DOES_NOT_THROW(Pipeline::parseFromArray(asOneObj.firstElement(), expCtx));
+    ASSERT_DOES_NOT_THROW(pipeline_factory::makePipeline(
+        asOneObj.firstElement(), expCtx, {.attachCursorSource = false}));
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfGeoNearPipeline) {

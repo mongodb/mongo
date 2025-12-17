@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
@@ -114,10 +114,10 @@ BSONObj createUpdatedCommandForNewShard(
 
     // Parse and optimize the pipeline. This will also insert all internal change stream stages into
     // the pipeline.
-    auto pipeline =
-        Pipeline::parseFromArray(shardCommand[AggregateCommandRequest::kPipelineFieldName], expCtx);
-
-    pipeline_optimization::optimizePipeline(*pipeline);
+    pipeline_factory::MakePipelineOptions opts{.alreadyOptimized = false,
+                                               .attachCursorSource = false};
+    auto pipeline = pipeline_factory::makePipeline(
+        shardCommand[AggregateCommandRequest::kPipelineFieldName], expCtx, opts);
 
     // Split the full pipeline to get the shard pipeline.
     auto splitPipelines = sharded_agg_helpers::SplitPipeline::split(std::move(pipeline));

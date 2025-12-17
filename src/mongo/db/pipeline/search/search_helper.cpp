@@ -33,7 +33,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
@@ -209,7 +209,9 @@ void planShardedSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     auto rawPipeline = response.data["metaPipeline"];
     LOGV2_DEBUG(
         9497009, 5, "planShardedSearch response", "mergePipeline"_attr = redact(rawPipeline));
-    auto parsedPipeline = mongo::Pipeline::parseFromArray(rawPipeline, expCtx);
+    pipeline_factory::MakePipelineOptions opts{
+        .optimize = false, .alreadyOptimized = false, .attachCursorSource = false};
+    auto parsedPipeline = mongo::pipeline_factory::makePipeline(rawPipeline, expCtx, opts);
     remoteSpec->setMergingPipeline(parsedPipeline->serializeToBson());
     if (response.data.hasElement("sortSpec")) {
         remoteSpec->setSortSpec(response.data["sortSpec"].Obj().getOwned());

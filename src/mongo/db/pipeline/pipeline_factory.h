@@ -55,11 +55,27 @@ struct MakePipelineOptions {
 };
 
 /**
- * Parses a Pipeline from a vector of BSONObjs representing DocumentSources. The state of the
- * returned pipeline will depend upon the supplied MakePipelineOptions:
- * - The boolean opts.optimize determines whether the pipeline will be optimized.
- * - If opts.attachCursorSource is false, the pipeline will be returned without attempting to
- * add an initial cursor source.
+ * Factory functions for creating Pipeline objects from various input formats.
+ *
+ * All makePipeline() overloads accept MakePipelineOptions to control pipeline behavior:
+ * - opts.optimize: If true, the pipeline will be optimized before being returned.
+ * - opts.attachCursorSource: If false, the pipeline will be returned without attempting to
+ *   add an initial cursor source.
+ * - opts.alreadyOptimized: Indicates whether the pipeline has already been optimized. This
+ *   affects validation rules applied to the pipeline.
+ * - Other options control shard targeting, collation, read concern, and validation callbacks.
+ */
+
+/**
+ * Parses a Pipeline from a BSONElement that must be an array of BSONObj stages. The BSONElement
+ * is converted to a vector of BSON objects and then delegated to the vector overload.
+ */
+std::unique_ptr<Pipeline> makePipeline(BSONElement rawPipelineElement,
+                                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                       MakePipelineOptions opts = MakePipelineOptions{});
+
+/**
+ * Parses a Pipeline from a vector of BSON objects.
  */
 std::unique_ptr<Pipeline> makePipeline(const std::vector<BSONObj>& rawPipeline,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -67,11 +83,7 @@ std::unique_ptr<Pipeline> makePipeline(const std::vector<BSONObj>& rawPipeline,
 
 /**
  * Creates a Pipeline from an AggregateCommandRequest. This preserves any aggregation options
- * set on the aggRequest. The state of the returned pipeline will depend upon the supplied
- * MakePipelineOptions:
- * - The boolean opts.optimize determines whether the pipeline will be optimized.
- * - If opts.attachCursorSource is false, the pipeline will be returned without attempting to
- * add an initial cursor source.
+ * set on the aggRequest.
  *
  * This function throws if parsing the pipeline set on aggRequest failed.
  */
