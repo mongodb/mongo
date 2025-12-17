@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/options_parser/constraints.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/value.h"
@@ -39,7 +40,7 @@
 #include <string>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
 namespace optionenvironment {
 
 /**
@@ -291,4 +292,4 @@ struct OptionTypeMap<Switch> {
 };
 
 }  // namespace optionenvironment
-}  // namespace mongo
+}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo

@@ -31,6 +31,7 @@
 
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstdlib>
 #include <iterator>
@@ -42,7 +43,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * A caching structure with a least recently used (LRU) replacement policy.
@@ -56,36 +57,37 @@ namespace mongo {
  * Iteration over the cache will visit elements in order of last use, from most
  * recently used to least recently used.
  */
-
-template <typename Hasher, typename Comparator>
-struct KeyConstraints {
-    template <typename T, typename = decltype(std::declval<Hasher>().operator()(std::declval<T>()))>
-    static constexpr std::true_type IsHashable(T&&);
-    static constexpr std::false_type IsHashable(...);
-
-    template <typename T,
-              typename TT,
-              typename = decltype(std::declval<Comparator>().operator()(std::declval<T>(),
-                                                                        std::declval<TT>()))>
-    static constexpr std::true_type IsComparable(T&&, TT&&);
-    static constexpr std::false_type IsComparable(...);
-};
-
-template <typename Hasher, typename Comparator, typename T, typename TT>
-inline constexpr bool IsComparableWith =
-    decltype(KeyConstraints<Hasher, Comparator>::IsHashable(std::declval<TT>()))::value &&
-    decltype(KeyConstraints<Hasher, Comparator>::IsComparable(std::declval<T>(),
-                                                              std::declval<TT>()))::value;
-
-
 template <typename K,
           typename V,
           typename Hash = typename stdx::unordered_map<K, V>::hasher,
           typename KeyEqual = typename stdx::unordered_map<K, V, Hash>::key_equal>
 class LRUCache {
+private:
+    template <typename Hasher, typename Comparator>
+    struct KeyConstraints {
+        template <typename T,
+                  typename = decltype(std::declval<Hasher>().operator()(std::declval<T>()))>
+        static constexpr std::true_type IsHashable(T&&);
+        static constexpr std::false_type IsHashable(...);
+
+        template <typename T,
+                  typename TT,
+                  typename = decltype(std::declval<Comparator>().operator()(std::declval<T>(),
+                                                                            std::declval<TT>()))>
+        static constexpr std::true_type IsComparable(T&&, TT&&);
+        static constexpr std::false_type IsComparable(...);
+    };
+
+    template <typename Hasher, typename Comparator, typename T, typename TT>
+    static inline constexpr bool IsComparableWith =
+        decltype(KeyConstraints<Hasher, Comparator>::IsHashable(std::declval<TT>()))::value &&
+        decltype(KeyConstraints<Hasher, Comparator>::IsComparable(std::declval<T>(),
+                                                                  std::declval<TT>()))::value;
+
 public:
     template <typename T>
-    static constexpr bool IsComparable = IsComparableWith<Hash, KeyEqual, K, T>;
+    MONGO_MOD_FILE_PRIVATE static constexpr bool IsComparable =
+        IsComparableWith<Hash, KeyEqual, K, T>;
 
     using ListEntry = std::pair<K, V>;
     using List = std::list<ListEntry>;
@@ -321,4 +323,4 @@ private:
     Map _map;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

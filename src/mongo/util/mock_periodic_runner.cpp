@@ -31,6 +31,8 @@
 
 namespace mongo {
 
+namespace periodic_runner_detail {
+
 MockPeriodicJob::MockPeriodicJob(PeriodicRunner::PeriodicJob job) : _job(std::move(job)) {}
 
 void MockPeriodicJob::start() {}
@@ -53,9 +55,11 @@ void MockPeriodicJob::run(Client* client) {
     _job.job(client);
 }
 
+}  // namespace periodic_runner_detail
+
 PeriodicRunner::JobAnchor MockPeriodicRunner::makeJob(PeriodicJob job) {
     invariant(!_job);
-    auto mockJob = std::make_shared<MockPeriodicJob>(std::move(job));
+    auto mockJob = std::make_shared<periodic_runner_detail::MockPeriodicJob>(std::move(job));
     _job = mockJob;
     return JobAnchor{std::move(mockJob)};
 }

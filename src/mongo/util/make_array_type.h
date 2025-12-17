@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <array>
 
 #pragma push_macro("MONGO_CONSTEXPR")
@@ -40,10 +42,10 @@
 #define MONGO_CONSTEXPR constexpr
 #endif
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
- * A synthetic std::array alike builder for making array's with unique types.
+ * A synthetic std::array alike builder for making arrays with unique types.
  */
 template <typename T, size_t N, typename Tag>
 struct MakeArrayType {
@@ -217,7 +219,7 @@ struct MakeArrayType {
     Array _data;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
 
 #undef MONGO_CONSTEXPR
 #pragma pop_macro("MONGO_CONSTEXPR")
