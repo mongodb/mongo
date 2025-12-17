@@ -1391,7 +1391,7 @@ functions:
                 ${resmoke_args}                           \
                 $extra_args                               \
                 ${test_flags}                             \
-                --log=${resmoke_logger}                   \
+                --log=buildlogger                         \
                 --staggerJobs=on                          \
                 --installDir=${install_dir|dist-test/bin} \
                 --buildId=${build_id}                     \
