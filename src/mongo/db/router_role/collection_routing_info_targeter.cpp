@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/router_role/collection_routing_info_targeter.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
-#include "mongo/db/router_role/collection_routing_info_targeter.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/query/exec/target_write_op.h"
 

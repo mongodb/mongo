@@ -62,7 +62,7 @@ mongo_cc_library(
         ":router_transactions_stats_gen",
         "//src/mongo/db/global_catalog/ddl:cluster_ddl.cpp",
         "//src/mongo/db/router_role:cluster_commands_helpers.cpp",
-        "//src/mongo/db/router_role:collection_routing_info_targeter_impl.cpp",
+        "//src/mongo/db/router_role:collection_routing_info_targeter.cpp",
         "//src/mongo/db/router_role:collection_uuid_mismatch.cpp",
         "//src/mongo/db/router_role:router_role.cpp",
         "//src/mongo/db/router_role:routing_context.cpp",
