@@ -52,7 +52,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/router_role/collection_uuid_mismatch.h"
-#include "mongo/db/router_role/router_role.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/router_role/routing_context.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -657,41 +656,6 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
                            std::move(executor));
 }
 
-std::vector<AsyncRequestsSender::Response>
-scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
-    OperationContext* opCtx,
-    RoutingContext& routingCtx,
-    const NamespaceString& nss,
-    const std::set<ShardId>& shardsToSkip,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy,
-    const BSONObj& query,
-    const BSONObj& collation,
-    const boost::optional<BSONObj>& letParameters,
-    const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
-    const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
-    auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
-                                                               nss,
-                                                               cri,
-                                                               collation,
-                                                               boost::none /*explainVerbosity*/,
-                                                               letParameters,
-                                                               runtimeConstants);
-    const auto requests = buildVersionedRequestsForTargetedShards(
-        expCtx, nss, cri, shardsToSkip, cmdObj, query, collation);
-
-    return gatherResponsesImpl(opCtx,
-                               nss.dbName(),
-                               nss,
-                               readPref,
-                               retryPolicy,
-                               requests,
-                               false /* throwOnStaleShardVersionErrors */,
-                               Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                               &routingCtx);
-}
-
 [[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetToShards(
     OperationContext* opCtx,
     RoutingContext& routingCtx,
@@ -787,7 +751,6 @@ RawResponsesResult appendRawResponses(
     std::vector<std::pair<ShardId, Status>> genericErrorsReceived;
     std::set<ShardId> shardsWithSuccessResponses;
 
-    boost::optional<Status> firstStaleConfigErrorReceived;
     boost::optional<std::pair<ShardId, BSONElement>> firstWriteConcernErrorReceived;
 
     const auto processError = [&](const ShardId& shardId, const Status& status) {
@@ -804,10 +767,6 @@ RawResponsesResult appendRawResponses(
         if (status.code() == ErrorCodes::ShardNotFound) {
             shardNotFoundErrorsReceived.emplace_back(shardId, status);
             return;
-        }
-
-        if (!firstStaleConfigErrorReceived && ErrorCodes::isStaleShardVersionError(status.code())) {
-            firstStaleConfigErrorReceived.emplace(status);
         }
 
         genericErrorsReceived.emplace_back(shardId, status);
@@ -881,8 +840,7 @@ RawResponsesResult appendRawResponses(
 
     // If there were no errors, report success.
     if (genericErrorsReceived.empty()) {
-        return {
-            true, shardsWithSuccessResponses, successARSResponses, firstStaleConfigErrorReceived};
+        return {true, shardsWithSuccessResponses, successARSResponses};
     }
 
     // There was an error. Choose the first error as the top-level error.
@@ -918,7 +876,7 @@ RawResponsesResult appendRawResponses(
     }
     *errmsg = firstError.reason();
 
-    return {false, shardsWithSuccessResponses, successARSResponses, firstStaleConfigErrorReceived};
+    return {false, shardsWithSuccessResponses, successARSResponses};
 }
 
 bool appendEmptyResultSet(OperationContext* opCtx,

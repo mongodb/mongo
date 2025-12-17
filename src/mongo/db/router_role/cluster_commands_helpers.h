@@ -93,7 +93,6 @@ struct RawResponsesResult {
     bool responseOK;
     std::set<ShardId> shardsWithSuccessResponses;
     std::vector<AsyncRequestsSender::Response> successResponses;
-    boost::optional<Status> firstStaleConfigError;
 };
 
 /**
@@ -351,28 +350,6 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
     const BSONObj& collation,
     bool eligibleForSampling = false,
     std::shared_ptr<executor::TaskExecutor> executor = nullptr);
-
-/**
- * Utility for dispatching versioned commands on a namespace, deciding which shards to
- * target by applying the passed-in query and collation to the local routing table cache.
- *
- * Callers can specify shards to skip, even if these shards would be otherwise targeted.
- *
- * Allows StaleConfig errors to append to the response list.
- */
-std::vector<AsyncRequestsSender::Response>
-scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
-    OperationContext* opCtx,
-    RoutingContext& routingCtx,
-    const NamespaceString& nss,
-    const std::set<ShardId>& shardsToSkip,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy,
-    const BSONObj& query,
-    const BSONObj& collation,
-    const boost::optional<BSONObj>& letParameters,
-    const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
 
 /**
  * Utility for dispatching versioned commands on a namespace to a specific set of shards.

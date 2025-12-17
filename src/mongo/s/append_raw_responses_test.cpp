@@ -32,30 +32,21 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/global_catalog/type_shard.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
-#include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/db/versioning_protocol/shard_version_factory.h"
-#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/unittest/unittest.h"
@@ -140,8 +131,7 @@ protected:
         const Status& expectedStatus,
         const std::vector<ShardId>& expectedShardsInRawSubObj,
         const std::set<ShardId>& expectedShardsWithSuccessResponses,
-        const Status& expectedWriteConcernStatus = Status::OK(),
-        bool expectsStaleConfigError = false) {
+        const Status& expectedWriteConcernStatus = Status::OK()) {
         BSONObjBuilder result;
         std::string errmsg;
 
@@ -185,15 +175,6 @@ protected:
             ASSERT_EQ(expectedWriteConcernStatus,
                       getWriteConcernStatusFromCommandResult(resultObj));
         }
-
-        // Check that if we had a StaleConfigError, it was placed in the response.
-        if (expectsStaleConfigError) {
-            ASSERT(response.firstStaleConfigError);
-            ASSERT_EQ(response.firstStaleConfigError->code(), kStaleConfigErrorStatus.code());
-            ASSERT_EQ(response.firstStaleConfigError->reason(), kStaleConfigErrorStatus.reason());
-        } else {
-            ASSERT_FALSE(response.firstStaleConfigError);
-        }
     }
 
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
@@ -232,18 +213,6 @@ protected:
     const ShardId kShard5{"s5"};
 
     const std::vector<ShardId> kShardIdList{kShard1, kShard2, kShard3, kShard4, kShard5};
-
-    const Status kStaleConfigErrorStatus{
-        [] {
-            OID epoch{OID::gen()};
-            Timestamp timestamp{1, 0};
-            return StaleConfigInfo(
-                NamespaceString::createNamespaceString_forTest("Foo.Bar"),
-                ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0})),
-                boost::none,
-                ShardId{"dummy"});
-        }(),
-        "dummy"};
 
 private:
     static void _assertShardIdsMatch(const std::set<ShardId>& expectedShardIds,
@@ -489,17 +458,6 @@ TEST_F(AppendRawResponsesTest, ShardsReturnDifferentErrors) {
     runAppendRawResponsesExpect(shardResponses, kError1Status, {kShard1, kShard2, kShard3}, {});
 }
 
-TEST_F(AppendRawResponsesTest, ShardsReturnDifferentErrorsIncludingStaleConfig) {
-    std::vector<AsyncRequestsSender::Response> shardResponses{
-        {kShard1, makeErrorResponse(kError1Status), makeHostAndPort(kShard1)},
-        {kShard2, makeErrorResponse(kError2Status), makeHostAndPort(kShard2)},
-        {kShard3, makeErrorResponse(kStaleConfigErrorStatus), makeHostAndPort(kShard3)}};
-
-    // The first error is returned.
-    runAppendRawResponsesExpect(
-        shardResponses, kError1Status, {kShard1, kShard2, kShard3}, {}, Status::OK(), true);
-}
-
 TEST_F(AppendRawResponsesTest, SomeShardsReturnSuccessRestReturnDifferentErrors) {
     std::vector<AsyncRequestsSender::Response> shardResponses{
         {kShard1, kOkResponse, makeHostAndPort(kShard1)},
@@ -510,23 +468,6 @@ TEST_F(AppendRawResponsesTest, SomeShardsReturnSuccessRestReturnDifferentErrors)
     // The first error is returned.
     runAppendRawResponsesExpect(
         shardResponses, kError1Status, {kShard1, kShard2, kShard3, kShard4}, {kShard1, kShard2});
-}
-
-TEST_F(AppendRawResponsesTest,
-       SomeShardsReturnSuccessRestReturnDifferentErrorsIncludingStaleConfig) {
-    std::vector<AsyncRequestsSender::Response> shardResponses{
-        {kShard1, kOkResponse, makeHostAndPort(kShard1)},
-        {kShard2, kOkResponse, makeHostAndPort(kShard2)},
-        {kShard3, makeErrorResponse(kError1Status), makeHostAndPort(kShard3)},
-        {kShard4, makeErrorResponse(kStaleConfigErrorStatus), makeHostAndPort(kShard4)}};
-
-    // The first error is returned.
-    runAppendRawResponsesExpect(shardResponses,
-                                kError1Status,
-                                {kShard1, kShard2, kShard3, kShard4},
-                                {kShard1, kShard2},
-                                Status::OK(),
-                                true);
 }
 
 TEST_F(AppendRawResponsesTest, AllShardsReturnErrorsSomeShardNotFound) {
@@ -600,27 +541,6 @@ TEST_F(AppendRawResponsesTest, SomeShardsReturnSuccessWithWriteConcernErrorRestR
                                 {kShard3, kShard4, kShard5},
                                 {kShard5},
                                 kWriteConcernError1Status);
-}
-
-TEST_F(AppendRawResponsesTest,
-       SomeShardsReturnSuccessWithWriteConcernErrorRestReturnMixOfErrorsIncludingStaleConfig) {
-    std::vector<AsyncRequestsSender::Response> shardResponses{
-        {kShard1, kShardNotFoundStatus, boost::none},
-        {kShard2, makeErrorResponse(kShardNotFoundStatus), makeHostAndPort(kShard2)},
-        {kShard3, kError1Status, boost::none},
-        {kShard4, makeErrorResponse(kStaleConfigErrorStatus), makeHostAndPort(kShard4)},
-        {kShard5,
-         makeWriteConcernErrorResponse(kWriteConcernError1Status),
-         makeHostAndPort(kShard5)}};
-
-    // The first non-ShardNotFound error is returned, and writeConcern error is reported at the top
-    // level.
-    runAppendRawResponsesExpect(shardResponses,
-                                kError1Status,
-                                {kShard3, kShard4, kShard5},
-                                {kShard5},
-                                kWriteConcernError1Status,
-                                true);
 }
 
 }  // namespace

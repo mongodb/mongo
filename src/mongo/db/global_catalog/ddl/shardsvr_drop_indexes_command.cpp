@@ -47,34 +47,22 @@
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/drop_indexes_gen.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/sharding_environment/client/shard.h"
-#include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/fail_point.h"
 
-#include <algorithm>
-#include <iterator>
-#include <memory>
-#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -87,25 +75,6 @@
 
 namespace mongo {
 namespace {
-
-struct StaleConfigRetryState {
-    std::set<ShardId> shardsWithSuccessResponses;
-    std::vector<AsyncRequestsSender::Response> shardSuccessResponses;
-};
-
-void updateStateForStaleConfigRetry(OperationContext* opCtx,
-                                    const RawResponsesResult& response,
-                                    StaleConfigRetryState* retryState) {
-    std::set<ShardId> okShardIds;
-    std::set_union(response.shardsWithSuccessResponses.begin(),
-                   response.shardsWithSuccessResponses.end(),
-                   retryState->shardsWithSuccessResponses.begin(),
-                   retryState->shardsWithSuccessResponses.end(),
-                   std::inserter(okShardIds, okShardIds.begin()));
-
-    retryState->shardsWithSuccessResponses = std::move(okShardIds);
-    retryState->shardSuccessResponses = response.successResponses;
-}
 
 class ShardsvrDropIndexesCommand final : public TypedCommand<ShardsvrDropIndexesCommand> {
 public:
@@ -267,42 +236,26 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
         resolvedNs = ns().makeTimeseriesBucketsNamespace();
     }
 
-    StaleConfigRetryState retryState;
     sharding::router::CollectionRouter router(opCtx, resolvedNs);
     return router.routeWithRoutingContext(
         "dropIndexes", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
-            auto shardResponses =
-                scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
-                    opCtx,
-                    routingCtx,
-                    resolvedNs,
-                    retryState.shardsWithSuccessResponses,
-                    CommandHelpers::filterCommandRequestForPassthrough(dropIdxBSON),
-                    ReadPreferenceSetting::get(opCtx),
-                    Shard::RetryPolicy::kNotIdempotent,
-                    BSONObj() /*query*/,
-                    BSONObj() /*collation*/,
-                    boost::none /*letParameters*/,
-                    boost::none /*runtimeConstants*/);
-
-            // Append responses we've received from previous retries of this operation due
-            // to a stale config error.
-            shardResponses.insert(shardResponses.end(),
-                                  retryState.shardSuccessResponses.begin(),
-                                  retryState.shardSuccessResponses.end());
+            auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
+                opCtx,
+                routingCtx,
+                resolvedNs,
+                CommandHelpers::filterCommandRequestForPassthrough(dropIdxBSON),
+                ReadPreferenceSetting::get(opCtx),
+                Shard::RetryPolicy::kNotIdempotent,
+                BSONObj() /*query*/,
+                BSONObj() /*collation*/,
+                boost::none /*letParameters*/,
+                boost::none /*runtimeConstants*/);
 
             std::string errmsg;
             BSONObjBuilder output, rawResBuilder;
             bool isShardedCollection = routingCtx.getCollectionRoutingInfo(resolvedNs).isSharded();
             const auto aggregateResponse = appendRawResponses(
                 opCtx, &errmsg, &rawResBuilder, shardResponses, isShardedCollection);
-
-            // If we have a stale config error, update the success shards for the upcoming
-            // retry.
-            if (!aggregateResponse.responseOK && aggregateResponse.firstStaleConfigError) {
-                updateStateForStaleConfigRetry(opCtx, aggregateResponse, &retryState);
-                uassertStatusOK(*aggregateResponse.firstStaleConfigError);
-            }
 
             if (!isShardedCollection && aggregateResponse.responseOK) {
                 CommandHelpers::filterCommandReplyForPassthrough(
