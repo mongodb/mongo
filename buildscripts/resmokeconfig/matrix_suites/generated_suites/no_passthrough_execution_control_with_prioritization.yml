@@ -1,0 +1,47 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/no_passthrough_execution_control_with_prioritization.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+description:
+  '"Passthrough" means running a test against different runtime Cluster
+
+  configurations, including topology, runtime flags, fault injections, and other
+
+  parameters. Most tests by default are able to run in "passthrough" suites.
+
+  NoPassthrough is an exception, where tests here only run in the exact
+
+  configuration predefined in the tests themselves.
+
+  '
+executor:
+  archive:
+    tests:
+      - jstests/noPassthrough/oplog_writes_only_permitted_on_standalone.js
+      - jstests/noPassthrough/wt_unclean_shutdown.js
+      - src/mongo/db/modules/*/jstests/live_restore/*.js
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          setParameters:
+            executionControlDeprioritizationGate: true
+      nodb: ""
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/noPassthrough/libs/**/*.js
+  exclude_with_any_tags:
+    - incompatible_with_execution_control_with_prioritization
+  roots:
+    - jstests/noPassthrough/**/*.js
+    - jstests/libs/property_test_helpers/self_tests/*.js
+    - src/mongo/db/modules/*/jstests/live_import/*.js
+    - src/mongo/db/modules/*/jstests/live_restore/*.js
+    - src/mongo/db/modules/*/jstests/no_passthrough/*.js
+    - jstests/concurrency/*.js
+test_kind: js_test

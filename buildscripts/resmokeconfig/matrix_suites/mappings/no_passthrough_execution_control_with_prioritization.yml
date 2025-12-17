@@ -1,0 +1,6 @@
+base_suite: no_passthrough
+overrides:
+  - "execution_control_params.enable_prioritization_testdata_parameter"
+
+excludes:
+  - "execution_control_params.exclude_execution_control_with_prioritization_incompatible_tag"

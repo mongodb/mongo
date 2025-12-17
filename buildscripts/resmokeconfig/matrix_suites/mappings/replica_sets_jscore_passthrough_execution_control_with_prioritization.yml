@@ -1,0 +1,3 @@
+base_suite: replica_sets_jscore_passthrough
+overrides:
+  - "execution_control_params.enable_prioritization"

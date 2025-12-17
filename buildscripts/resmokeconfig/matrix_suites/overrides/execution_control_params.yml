@@ -52,3 +52,27 @@
           - CheckMetadataConsistencyInBackground
           - ValidateCollections
           - RotateExecutionControlParams
+
+- name: enable_prioritization
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            enableTestCommands: 1
+            executionControlDeprioritizationGate: true
+
+- name: enable_prioritization_testdata_parameter
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParameters:
+                executionControlDeprioritizationGate: true
+
+- name: exclude_execution_control_with_prioritization_incompatible_tag
+  value:
+    exclude_with_any_tags:
+      - incompatible_with_execution_control_with_prioritization
