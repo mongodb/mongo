@@ -213,6 +213,8 @@ private:
 
     NamespaceString _nss;
 
+    CollectionAcquisition _collection;
+
     // Vector of secondary namespaces.
     std::vector<NamespaceStringOrUUID> _secondaryNssVector{};
     bool _mustReturnOwnedBson;

@@ -303,6 +303,9 @@ private:
     // What namespace are we operating over?
     NamespaceString _nss;
 
+    // Access to the collection data and metadata if present.
+    boost::optional<CollectionAcquisition> _collection;
+
     // This is used to handle automatic yielding when allowed by the YieldPolicy. Never nullptr.
     std::unique_ptr<PlanYieldPolicy> _yieldPolicy;
 

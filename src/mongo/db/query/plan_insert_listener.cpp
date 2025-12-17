@@ -35,7 +35,6 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
-#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -89,9 +88,10 @@ bool shouldWaitForInserts(OperationContext* opCtx,
     return false;
 }
 
-std::unique_ptr<Notifier> getCappedInsertNotifier(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
-                                                  PlanYieldPolicy* yieldPolicy) {
+std::unique_ptr<Notifier> getCappedInsertNotifier(
+    OperationContext* opCtx,
+    const boost::optional<CollectionAcquisition>& collection,
+    PlanYieldPolicy* yieldPolicy) {
     // We don't expect to need a capped insert notifier for non-yielding plans.
     tassert(11321503,
             fmt::format("Cannot create notifier with non-yielding PlanYieldPolicy::YieldPolicy {}",
@@ -107,11 +107,10 @@ std::unique_ptr<Notifier> getCappedInsertNotifier(OperationContext* opCtx,
         RecoveryUnit::kMajorityCommitted) {
         return std::make_unique<MajorityCommittedPointNotifier>();
     } else {
-        auto collCatalog = CollectionCatalog::get(opCtx);  // NOLINT TODO SERVER-112937 Remove this.
-        auto collection = collCatalog->lookupCollectionByNamespace(opCtx, nss);
-        tassert(11321504, "collection must not be null", collection);
+        tassert(11321504, "collection must not be null", collection && collection->exists());
+
         return std::make_unique<LocalCappedInsertNotifier>(
-            collection->getRecordStore()->capped()->getInsertNotifier());
+            collection->getCollectionPtr()->getRecordStore()->capped()->getInsertNotifier());
     }
 }
 

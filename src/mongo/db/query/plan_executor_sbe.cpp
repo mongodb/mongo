@@ -88,6 +88,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     : _state{isOpen ? State::kOpened : State::kClosed},
       _opCtx(opCtx),
       _nss(std::move(nss)),
+      _collection(mca.getMainCollectionAcquisition()),
       _mustReturnOwnedBson(returnOwnedBson),
       _root{std::move(plan.root)},
       _rootData{std::move(plan.data.stageData)},
@@ -301,7 +302,8 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
     // insert notifier is necessary for the notifierVersion to advance.
     std::unique_ptr<insert_listener::Notifier> notifier;
     if (insert_listener::shouldListenForInserts(_opCtx, _cq.get())) {
-        notifier = insert_listener::getCappedInsertNotifier(_opCtx, _nss, _yieldPolicy.get());
+        notifier =
+            insert_listener::getCappedInsertNotifier(_opCtx, _collection, _yieldPolicy.get());
     }
 
     for (;;) {

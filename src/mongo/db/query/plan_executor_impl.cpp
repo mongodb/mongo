@@ -118,6 +118,13 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
 
     const bool collectionExists = collection.is_initialized() && collection->exists();
 
+    // Storing an acquisition that doesn't exists will cause the restore procedure to throw if the
+    // collection appears. There is no need to unnecessarily fail a query that is not planning to
+    // access the collection.
+    if (collectionExists) {
+        _collection = collection;
+    }
+
     // If we don't yet have a namespace string, then initialize it from either 'collection' or
     // '_cq'.
     if (_nss.isEmpty()) {
@@ -472,7 +479,7 @@ BSONObj makeBsonWithMetadata(Document& doc, WorkingSetMember* member) {
 std::unique_ptr<insert_listener::Notifier> PlanExecutorImpl::makeNotifier() {
     if (insert_listener::shouldListenForInserts(_opCtx, _cq.get())) {
         // We always construct the insert_listener::Notifier for awaitData cursors.
-        return insert_listener::getCappedInsertNotifier(_opCtx, _nss, _yieldPolicy.get());
+        return insert_listener::getCappedInsertNotifier(_opCtx, _collection, _yieldPolicy.get());
     }
     return nullptr;
 }

@@ -155,9 +155,10 @@ bool shouldWaitForInserts(OperationContext* opCtx,
 /**
  * Returns an insert notifier for a capped collection.
  */
-std::unique_ptr<Notifier> getCappedInsertNotifier(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
-                                                  PlanYieldPolicy* yieldPolicy);
+std::unique_ptr<Notifier> getCappedInsertNotifier(
+    OperationContext* opCtx,
+    const boost::optional<CollectionAcquisition>& collection,
+    PlanYieldPolicy* yieldPolicy);
 
 /**
  * Called for tailable and awaitData cursors in order to yield locks and waits for inserts to
