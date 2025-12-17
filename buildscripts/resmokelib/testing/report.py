@@ -4,7 +4,6 @@ This is used to support additional test status and timing information for the re
 """
 
 import copy
-import os
 import threading
 import time
 import unittest
@@ -99,7 +98,6 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         unittest.TestResult.startTest(self, test)
 
         test_info = _TestInfo(test.id(), test.test_name, test.dynamic)
-        test_info.group_id = f"job{self.job_logger.job_num}"
 
         basename = test.basename()
         command = test.as_command()
@@ -114,14 +112,10 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
                 self.num_dynamic += 1
 
         # Set up the test-specific logger.
-        test_logger = self.job_logger.new_test_logger(test.id(), test.short_name(), test.basename(),
-                                                      command, test.logger)
+        test_logger = self.job_logger.new_test_logger(test.short_name(), test.basename(), command,
+                                                      test.logger)
         test_info.url_endpoint = test_logger.url_endpoint
-        test_info.log_info = {
-            "log_name": logging.loggers.get_evergreen_log_name(self.job_logger.job_num, test.id()),
-            "logs_to_merge": [logging.loggers.get_evergreen_log_name(self.job_logger.job_num)],
-            "rendering_type": "resmoke", "version": 0
-        }
+
         test.override_logger(test_logger)
         test_info.start_time = time.time()
 
@@ -268,17 +262,12 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
             for test_info in self.test_infos:
                 result = {
                     "test_file": test_info.test_file,
-                    "group_id": test_info.group_id,
                     "status": test_info.evergreen_status,
                     "exit_code": test_info.return_code,
                     "start": test_info.start_time,
                     "end": test_info.end_time,
                     "elapsed": test_info.end_time - test_info.start_time,
-                    "log_info": test_info.log_info,
                 }
-
-                if test_info.display_test_name is not None:
-                    result["display_test_name"] = test_info.display_test_name
 
                 if test_info.url_endpoint is not None:
                     result["url"] = test_info.url_endpoint
@@ -306,9 +295,6 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
             # Using test_file as the test id is ok here since the test id only needs to be unique
             # during suite execution.
             test_info = _TestInfo(test_file, test_file, is_dynamic)
-            test_info.display_test_name = result.get("display_test_name")
-            test_info.group_id = result.get("group_id")
-            test_info.log_info = result.get("log_info")
             test_info.url_endpoint = result.get("url")
             test_info.status = result["status"]
             test_info.evergreen_status = test_info.status
@@ -362,8 +348,6 @@ class _TestInfo(object):  # pylint: disable=too-many-instance-attributes
 
         self.test_id = test_id
         self.test_file = test_file
-        self.group_id = None
-        self.display_test_name = None
         self.dynamic = dynamic
 
         self.start_time = None
@@ -371,7 +355,6 @@ class _TestInfo(object):  # pylint: disable=too-many-instance-attributes
         self.status = None
         self.evergreen_status = None
         self.return_code = None
-        self.log_info = None
         self.url_endpoint = None
 
 
