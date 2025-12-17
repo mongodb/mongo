@@ -64,6 +64,7 @@ mongo_cc_library(
         "metrics_service.cpp",
     ],
     deps = [
+        ":metric_units",
         "//src/mongo/db:server_base",
     ] + select(
         {

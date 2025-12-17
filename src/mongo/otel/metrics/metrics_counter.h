@@ -31,16 +31,17 @@
 
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <string>
-
-#include "src/mongo/util/modules.h"
 
 namespace mongo::otel::metrics {
 
 template <typename T>
 class MONGO_MOD_PUBLIC Counter {
 public:
+    virtual ~Counter() = default;
+
     // T must be nonnegative.
     virtual void add(T value) = 0;
 

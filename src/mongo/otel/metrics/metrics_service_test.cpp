@@ -29,14 +29,14 @@
 
 #include "mongo/otel/metrics/metrics_service.h"
 
-#include "mongo/config.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/otel/metrics/metrics_initialization.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 #include <opentelemetry/metrics/provider.h>
 #include <opentelemetry/sdk/metrics/meter.h>
+#include <opentelemetry/sdk/metrics/meter_provider.h>
+#include <opentelemetry/sdk/metrics/meter_provider_factory.h>
 
 namespace mongo::otel::metrics {
 namespace {
@@ -50,10 +50,12 @@ TEST_F(MetricsServiceTest, MeterIsInitialized) {
     // Set up a valid MeterProvider.
     OtelMetricsCapturer metricsCapturer;
 
-    const auto& metricsService = MetricsService::get(getServiceContext());
-    auto* meter = metricsService.getMeter_forTest();
-    ASSERT_TRUE(meter);
+    std::shared_ptr<opentelemetry::metrics::MeterProvider> meterProvider =
+        opentelemetry::metrics::Provider::GetMeterProvider();
+    ASSERT_TRUE(meterProvider);
 
+    auto* meter =
+        meterProvider->GetMeter(toStdStringViewForInterop(MetricsService::kMeterName)).get();
     auto* sdkMeter = dynamic_cast<opentelemetry::sdk::metrics::Meter*>(meter);
     ASSERT_TRUE(sdkMeter);
 
@@ -64,10 +66,39 @@ TEST_F(MetricsServiceTest, MeterIsInitialized) {
 
 // Assert that we create a NoopMeter if the global MeterProvider hasn't been set.
 TEST_F(MetricsServiceTest, ServiceContextInitBeforeMeterProvider) {
-    const auto& metricsService = MetricsService::get(getServiceContext());
-    auto* meter = metricsService.getMeter_forTest();
-    ASSERT_TRUE(isNoopMeter(meter));
+    std::shared_ptr<opentelemetry::metrics::MeterProvider> meterProvider =
+        opentelemetry::metrics::Provider::GetMeterProvider();
+    ASSERT(meterProvider != nullptr);
+    ASSERT_TRUE(isNoopMeter(
+        meterProvider->GetMeter(toStdStringViewForInterop(MetricsService::kMeterName)).get()));
 }
+
+using CreateInt64CounterTest = MetricsServiceTest;
+
+TEST_F(CreateInt64CounterTest, SameCounterReturnedOnSameCreate) {
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Counter<int64_t>* counter_1 =
+        metricsService.createInt64Counter("counter", "description", MetricUnit::kSeconds);
+    Counter<int64_t>* counter_2 =
+        metricsService.createInt64Counter("counter", "description", MetricUnit::kSeconds);
+    ASSERT_EQ(counter_1, counter_2);
+}
+
+TEST_F(CreateInt64CounterTest, ExceptionWhenSameNameButDifferentParameters) {
+    auto& metricsService = MetricsService::get(getServiceContext());
+    metricsService.createInt64Counter("name", "description", MetricUnit::kSeconds);
+    ASSERT_THROWS_CODE(
+        metricsService.createInt64Counter("name", "different_description", MetricUnit::kSeconds),
+        DBException,
+        ErrorCodes::ObjectAlreadyExists);
+    ASSERT_THROWS_CODE(metricsService.createInt64Counter("name", "description", MetricUnit::kBytes),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
+}
+
+// TODO SERVER-115164 or SERVER-114955 or SERVER-114954 add a test that verifies that creating
+// duplicate metrics with different types fails.
+// TODO SERVER-115538 Add a test that verifies that counter adds work correctly
 
 }  // namespace
 }  // namespace mongo::otel::metrics
