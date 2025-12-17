@@ -108,7 +108,7 @@ buildvariants:
       MONGO_DISTMOD=rhel80
     multiversion_platform: rhel80
     multiversion_edition: enterprise
-    scons_cache_scope: shared
+    scons_cache_scope: none
     tooltags: "ssl sasl gssapi"
     large_distro_name: rhel80-large
   tasks:
@@ -122,7 +122,7 @@ buildvariants:
     large_distro_name: rhel80-large
     multiversion_edition: enterprise
     multiversion_platform: rhel80
-    scons_cache_scope: shared
+    scons_cache_scope: none
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
   run_on:
   - rhel80-small
