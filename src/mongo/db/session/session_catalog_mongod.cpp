@@ -547,6 +547,18 @@ BSONObj MongoDSessionCatalog::getConfigTxnPartialIndexSpec() {
     return index.toBSON();
 }
 
+void MongoDSessionCatalog::addCanonicalizedNamespacesToTxnEntry(
+    const NamespaceHashSet& affectedNamespacesSet, SessionTxnRecord& sessionTxnRecord) {
+    std::vector<NamespaceString> sortedNamespaces;
+    sortedNamespaces.reserve(affectedNamespacesSet.size());
+    for (const auto& ns : affectedNamespacesSet) {
+        sortedNamespaces.push_back(ns);
+    }
+    std::sort(sortedNamespaces.begin(), sortedNamespaces.end());
+    sessionTxnRecord.setAffectedNamespaces(
+        boost::optional<std::vector<NamespaceString>>(std::move(sortedNamespaces)));
+}
+
 MongoDSessionCatalog::MongoDSessionCatalog(
     std::unique_ptr<MongoDSessionCatalogTransactionInterface> ti)
     : _ti(std::move(ti)) {}

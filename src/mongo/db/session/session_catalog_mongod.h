@@ -82,6 +82,14 @@ public:
      */
     static BSONObj getConfigTxnPartialIndexSpec();
 
+    /**
+     * Normalize the affected namespaces into a canonical order and store them in the
+     * SessionTxnRecord.
+     */
+    static void addCanonicalizedNamespacesToTxnEntry(const NamespaceHashSet& affectedNamespacesSet,
+                                                     SessionTxnRecord& sessionTxnRecord);
+
+
     explicit MongoDSessionCatalog(std::unique_ptr<MongoDSessionCatalogTransactionInterface> ti);
 
     /**

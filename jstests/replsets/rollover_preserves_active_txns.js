@@ -49,13 +49,19 @@ function doTest(commitOrAbort) {
     const txnEntry = primary.getDB("config").transactions.findOne();
     assert.lte(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
 
-    // TODO SERVER-113734: Stop doing this once secondaries replicate the new config.transactions
-    // fields.
-    delete txnEntry.prepareTimestamp;
-    delete txnEntry.affectedNamespaces;
+    const isMultiversion =
+        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    if (isMultiversion) {
+        delete txnEntry.prepareTimestamp;
+        delete txnEntry.affectedNamespaces;
+    }
 
     assert.soonNoExcept(() => {
         const secondaryTxnEntry = secondary.getDB("config").transactions.findOne();
+        if (isMultiversion) {
+            delete secondaryTxnEntry.prepareTimestamp;
+            delete secondaryTxnEntry.affectedNamespaces;
+        }
         assert.eq(secondaryTxnEntry, txnEntry, tojson(secondaryTxnEntry));
         return true;
     });

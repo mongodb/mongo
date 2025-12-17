@@ -39,6 +39,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -149,7 +150,7 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::_updateOrFlush(
 }
 
 boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::updateSession(
-    const OplogEntry& entry) {
+    const OplogEntry& entry, NamespaceHashSet* affectedNamespaces) {
     if (!isTransactionEntry(entry)) {
         return _updateOrFlush(entry);
     }
@@ -162,7 +163,8 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::updateSession(
     // multi-statement transactions -- we must maintain the timestamps and transaction states for
     // each entry originating from a multi-statement transaction. For this reason, we cannot defer
     // entries originating from multi-statement transactions.
-    if (auto txnTableUpdate = _createTransactionTableUpdateFromTransactionOp(entry)) {
+    if (auto txnTableUpdate =
+            _createTransactionTableUpdateFromTransactionOp(entry, affectedNamespaces)) {
         _sessionsToUpdate.erase(*entry.getOperationSessionInfo().getSessionId());
         return boost::optional<std::vector<OplogEntry>>({*txnTableUpdate});
     }
@@ -288,7 +290,7 @@ std::vector<OplogEntry> SessionUpdateTracker::_flushForQueryPredicate(
 }
 
 boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateFromTransactionOp(
-    const repl::OplogEntry& entry) {
+    const repl::OplogEntry& entry, NamespaceHashSet* affectedNamespaces) {
     auto sessionInfo = entry.getOperationSessionInfo();
 
     // We only update the transaction table on the first partialTxn operation.
@@ -324,6 +326,11 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
             case repl::OplogEntry::CommandType::kApplyOps:
                 if (entry.shouldPrepare()) {
                     newTxnRecord.setState(DurableTxnStateEnum::kPrepared);
+                    if (affectedNamespaces) {
+                        MongoDSessionCatalog::addCanonicalizedNamespacesToTxnEntry(
+                            *affectedNamespaces, newTxnRecord);
+                        newTxnRecord.setPrepareTimestamp(entry.getOpTime().getTimestamp());
+                    }
                     if (entry.getPrevWriteOpTimeInTransaction()->isNull()) {
                         // The prepare oplog entry is the first operation of the transaction.
                         newTxnRecord.setStartOpTime(entry.getOpTime());

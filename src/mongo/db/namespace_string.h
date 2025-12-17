@@ -799,6 +799,8 @@ private:
     static constexpr uint8_t kDatabaseNameOffsetEndMask = 0x7F;
 };
 
+using NamespaceHashSet = absl::flat_hash_set<NamespaceString>;
+
 /**
  * This class is intended to be used by commands which can accept either a collection name or
  * database + collection UUID. It will never be initialized with both.

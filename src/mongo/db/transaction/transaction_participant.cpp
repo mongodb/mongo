@@ -3938,9 +3938,8 @@ void TransactionParticipant::Participant::handleWouldChangeOwningShardError(
 
 void TransactionParticipant::Participant::addPreparedTransactionPreciseCheckpointRecoveryFields(
     SessionTxnRecord& sessionTxnRecord) const {
-    const auto& affectedNamespacesSet = affectedNamespaces();
-    sessionTxnRecord.setAffectedNamespaces(boost::optional<std::vector<NamespaceString>>(
-        boost::in_place_init, affectedNamespacesSet.begin(), affectedNamespacesSet.end()));
+    MongoDSessionCatalog::addCanonicalizedNamespacesToTxnEntry(affectedNamespaces(),
+                                                               sessionTxnRecord);
 
     auto prepareOpTime = getPrepareOpTime();
     invariant(!prepareOpTime.isNull());

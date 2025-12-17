@@ -64,8 +64,12 @@ public:
      * If 'entry' is part of a transaction, then return an update to the transaction table
      * corresponding to the operation. Otherwise, inspect the entry to determine whether to buffer
      * or flush the stored transaction information as part of retryable writes.
+     *
+     * If 'affectedNamespaces' is not null, then this is a prepared transaction oplog entry, and we
+     * need to store it as part of the transaction information in the transaction table.
      */
-    boost::optional<std::vector<OplogEntry>> updateSession(const OplogEntry& entry);
+    boost::optional<std::vector<OplogEntry>> updateSession(const OplogEntry& entry,
+                                                           NamespaceHashSet* affectedNamespaces);
 
     /**
      * Returns true if the oplog entry represents an operation in a transaction and false otherwise.
@@ -107,7 +111,7 @@ private:
      * transaction.
      */
     boost::optional<OplogEntry> _createTransactionTableUpdateFromTransactionOp(
-        const repl::OplogEntry& entry);
+        const repl::OplogEntry& entry, NamespaceHashSet* affectedNamespaces);
 
     LogicalSessionIdMap<OplogEntry> _sessionsToUpdate;
 
