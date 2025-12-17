@@ -222,6 +222,8 @@ selector:
     - jstests/sharding/**/*reshard*.js
     - jstests/sharding/**/*move*collection*.js
     - jstests/sharding/**/*unshard_collection*.js
+    - jstests/sharding/move_primary_failpoint.js
+    - jstests/sharding/catalog_shard_secondary_reads.js
 
     # Expects reshardCollection executes without config server stepdown
     - jstests/sharding/shard_encrypted_collection.js
@@ -293,6 +295,9 @@ selector:
     - jstests/sharding/resharding_change_stream_namespace_filtering.js
     - jstests/sharding/resharding_oplog_sync_agg_resume_token.js
     - jstests/sharding/timeseries/timeseries_change_stream_no_orphans.js
+
+    # TODO (SERVER-115616): Enable after retrying addShard cmd on retriable network errors.
+    - jstests/sharding/add_shard_4.js
 
   exclude_with_any_tags:
     - does_not_support_stepdowns

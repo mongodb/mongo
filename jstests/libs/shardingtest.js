@@ -1033,8 +1033,8 @@ export class ShardingTest {
             return new ShardingTest(params);
         }
 
-        if (this.constructor === ReplSetTest && this.constructor[kOverrideConstructor]) {
-            return new this.constructor[kOverrideConstructor]();
+        if (this.constructor === ShardingTest && this.constructor[kOverrideConstructor]) {
+            return new this.constructor[kOverrideConstructor](params);
         }
 
         // Ensure we don't mutate the passed-in parameters.

@@ -74,7 +74,7 @@ export class ReplSetTest {
      */
     constructor(opts) {
         if (this.constructor === ReplSetTest && this.constructor[kOverrideConstructor]) {
-            return new this.constructor[kOverrideConstructor][kOverrideConstructor](opts);
+            return new this.constructor[kOverrideConstructor](opts);
         }
 
         // If opts.timeoutMS is present use that for the ReplSetTest instance, otherwise use global
