@@ -1387,11 +1387,11 @@ functions:
             ${san_options}                                \
             ${snmp_config_path}                           \
             ${resmoke_wrapper}                            \
-            $python buildscripts/resmoke.py run   \
+            $python buildscripts/resmoke.py run           \
                 ${resmoke_args}                           \
                 $extra_args                               \
                 ${test_flags}                             \
-                --log=buildlogger                         \
+                --log=${resmoke_logger}                   \
                 --staggerJobs=on                          \
                 --installDir=${install_dir|dist-test/bin} \
                 --buildId=${build_id}                     \
@@ -1404,6 +1404,7 @@ functions:
                 --taskName=${task_name}                   \
                 --variantName=${build_variant}            \
                 --versionId=${version_id}                 \
+                --taskWorkDir='${workdir}'                \
                 --archiveFile=archive.json                \
                 --reportFile=report.json                  \
                 --perfReportFile=perf.json
@@ -7742,7 +7743,6 @@ tasks:
     - func: "scons compile"
       vars:
         targets: >-
-          distsrc-${ext|tgz}
           archive-dist
           archive-dist-debug
           archive-shell
@@ -7763,19 +7763,6 @@ tasks:
             # Validate that this build_variant is listed as a known enterprise task for mongocryptd
             PATH=$PATH:$HOME $python ../buildscripts/validate_mongocryptd.py --variant "${build_variant}" ../etc/evergreen.yml
           fi
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/distsrc.${ext|tgz}
-        remote_file: ${project}/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/gzip}
-        display_name: Source tarball
-        # We only need to upload the source tarball from one of the build variants
-        # because it should be the same everywhere, so just use rhel70/windows.
-        build_variants: [rhel70, windows]
     - command: s3.put
       params:
         optional: true
@@ -7963,14 +7950,6 @@ tasks:
         local_file: src/mh.tgz
         build_variants: *mh_variants
     # Fetch the sources (on relevant variants only)
-    - command: s3.get
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        remote_file: ${project}/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
-        bucket: mciuploads
-        local_file: src/distsrc.${ext|tgz}
-        build_variants: [rhel70, windows]
     - func: "apply compile expansions"
     - func: "fetch dist debugsymbols"
     - func: "set up remote credentials"
@@ -7982,6 +7961,7 @@ tasks:
     - command: shell.exec
       params:
         shell: bash
+        silent: true
         script: |
           set -oe
           echo "${release_tools_container_registry_password}" | podman login --password-stdin --username ${release_tools_container_registry_username} ${release_tools_container_registry}
@@ -8044,17 +8024,6 @@ tasks:
         content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mh-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
         build_variants: *mh_variants
-    # Put the source tarball
-    - command: s3.put
-      params:
-        aws_secret: ${aws_secret}
-        local_file: src/mongodb-src-${src_suffix}.${ext|tar.gz}
-        aws_key: ${aws_key}
-        bucket: build-push-testing
-        permissions: public-read
-        content_type: ${content_type|application/gzip}
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}
-        build_variants: [rhel70, windows]
 
     # Put the debug symbols
     - command: s3.put
@@ -8101,18 +8070,6 @@ tasks:
         content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
         build_variants: *mongocryptd_variants
-
-    # Put the source tarball signature
-    - command: s3.put
-      params:
-        aws_secret: ${aws_secret}
-        local_file: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig
-        aws_key: ${aws_key}
-        bucket: build-push-testing
-        permissions: public-read
-        content_type: ${content_type|application/gzip}
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig
-        build_variants: [rhel70, windows]
 
     # Put the debug symbols signature
     - command: s3.put
@@ -8172,18 +8129,6 @@ tasks:
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1
         build_variants: *mongocryptd_variants
 
-    # Put the source tarball sha1
-    - command: s3.put
-      params:
-        aws_secret: ${aws_secret}
-        local_file: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1
-        aws_key: ${aws_key}
-        permissions: public-read
-        bucket: build-push-testing
-        content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1
-        build_variants: [rhel70, windows]
-
     # Put the debug symbols sha1
     - command: s3.put
       params:
@@ -8241,18 +8186,6 @@ tasks:
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256
         build_variants: *mongocryptd_variants
-
-    # Put the source tarball sha256
-    - command: s3.put
-      params:
-        aws_secret: ${aws_secret}
-        local_file: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256
-        permissions: public-read
-        aws_key: ${aws_key}
-        bucket: build-push-testing
-        content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256
-        build_variants: [rhel70, windows]
 
     # Put the debug symbols sha256
     - command: s3.put
@@ -8312,18 +8245,6 @@ tasks:
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5
         build_variants: *mongocryptd_variants
 
-    # Put the source tarball md5
-    - command: s3.put
-      params:
-        aws_secret: ${aws_secret}
-        local_file: src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5
-        aws_key: ${aws_key}
-        bucket: build-push-testing
-        permissions: public-read
-        content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5
-        build_variants: [rhel70, windows]
-
     # Put the debug symbols md5
     - command: s3.put
       params:
@@ -8371,11 +8292,6 @@ tasks:
                'destination': {'path': '${push_path}/mh-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'},
                'build_variants': *mh_variants}
 
-            #Source tarball
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}', 'bucket': 'build-push-testing'},
-               'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}', 'bucket': '${push_bucket}'},
-               'build_variants': ['rhel70', 'windows']}
-
             #MSI (Windows only)
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi', 'bucket': '${push_bucket}'},
@@ -8394,11 +8310,6 @@ tasks:
                'destination': {'path': '${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'},
                'build_variants': *mongocryptd_variants}
 
-            #Source tarball signature
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig', 'bucket': 'build-push-testing'},
-               'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig', 'bucket': '${push_bucket}'},
-               'build_variants': ['rhel70', 'windows']}
-
             #SHA1 for binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'}}
@@ -8411,11 +8322,6 @@ tasks:
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'},
                'build_variants': *mongocryptd_variants}
-
-            #SHA1 for source tarball
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1', 'bucket': 'build-push-testing'},
-               'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1', 'bucket': '${push_bucket}'},
-               'build_variants': ['rhel70', 'windows']}
 
             #SHA1 for MSI
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.sha1', 'bucket': 'build-push-testing'},
@@ -8435,11 +8341,6 @@ tasks:
                'destination': {'path': '${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'},
                'build_variants': *mongocryptd_variants}
 
-            #SHA256 for source tarball
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256', 'bucket': 'build-push-testing'},
-               'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256', 'bucket': '${push_bucket}'},
-               'build_variants': ['rhel70', 'windows']}
-
             #SHA256 for MSI files
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.sha256', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha256', 'bucket': '${push_bucket}'},
@@ -8457,11 +8358,6 @@ tasks:
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'},
                'build_variants': *mongocryptd_variants}
-
-            #MD5 for source tarball
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5', 'bucket': 'build-push-testing'},
-               'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5', 'bucket': '${push_bucket}'},
-               'build_variants': ['rhel70', 'windows']}
 
             #MD5 for MSIs
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.md5', 'bucket': 'build-push-testing'},
@@ -10082,33 +9978,16 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
   tasks:
   - name: compile_all_run_unittests_TG
-  - name: .aggregation !.auth !.encrypt !.unwind
+  - name: aggregation
   - name: .auth .gle
   - name: auth_gen
-  - name: .causally_consistent !.sharding
-  - name: .change_streams !.secondary_reads
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate
   - name: disk_wiredtiger
-  - name: initial_sync_fuzzer_gen
-  - name: .jscore .common !.auth
-  - name: .jstestfuzz .causal
-  - name: .jstestfuzz .interrupt
-  - name: .jstestfuzz .common
-  - name: .jstestfuzz .session
+  - name: .jscore .common !.auth !.sharding
   - name: .logical_session_cache .one_sec
-  - name: .query_fuzzer
-  - name: .read_write_concern !.linearize
   - name: replica_sets
-  - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: .replica_sets .common !.auth
-  - name: retryable_writes_jscore_passthrough_gen
-  - name: .rollbackfuzzer
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .txns
   - name: .ssl
-  - name: .stitch
   - name: push
 
 - name: macos-debug
@@ -10126,16 +10005,12 @@ buildvariants:
   - name: compile_build_tools_next_TG
   - name: aggregation
   - name: auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
   - name: disk_wiredtiger
   - name: failpoints
   - name: .jscore .common !.auth !.sharding
-  - name: jsCore_txns_large_txns_format
   - name: mongosTest
   - name: replica_sets
-  - name: replica_sets_large_txns_format_gen
   - name: .ssl
-  - name: .stitch
 
 - name: enterprise-macos
   display_name: Enterprise macOS
@@ -10155,14 +10030,10 @@ buildvariants:
   - name: compile_ninja_next_TG
   - name: audit
   - name: auth_audit_gen
-  - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
-  - name: .jscore .common !.compat !.decimal !.sharding
-  - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: push
 
