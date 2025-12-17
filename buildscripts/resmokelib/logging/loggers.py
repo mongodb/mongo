@@ -7,7 +7,6 @@ import yaml
 
 from . import buildlogger
 from . import formatters
-from . import handlers
 from .. import config
 from .. import errors
 
@@ -426,7 +425,7 @@ def _add_evergreen_handler(logger, logging_config, job_num, test_id=None):
         fp = f"{_get_evergreen_log_dirname()}/{get_evergreen_log_name(job_num, test_id)}"
         os.makedirs(os.path.dirname(fp), exist_ok=True)
 
-        handler = handlers.BufferedFileHandler(fp)
+        handler = logging.FileHandler(filename=fp, mode="a")
         handler.setFormatter(
             formatters.EvergreenLogFormatter(fmt=logger_info.get("format", _DEFAULT_FORMAT)))
         logger.addHandler(handler)
