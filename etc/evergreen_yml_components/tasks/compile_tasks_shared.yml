@@ -294,7 +294,7 @@ tasks:
           permissions: private
           visibility: signed
           content_type: application/tar
-          display_name: Artifacts
+          display_name: Artifacts zstd
           optional: true
 
       - command: archive.targz_pack
