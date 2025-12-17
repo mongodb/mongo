@@ -240,7 +240,6 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.EVERGREEN_TASK_NAME = config.pop("task_name")
     _config.EVERGREEN_VARIANT_NAME = config.pop("variant_name")
     _config.EVERGREEN_VERSION_ID = config.pop("version_id")
-    _config.EVERGREEN_WORK_DIR = config.pop("work_dir")
 
     # Archival options. Archival is enabled only when running on evergreen.
     if not _config.EVERGREEN_TASK_ID:

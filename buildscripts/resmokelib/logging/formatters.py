@@ -41,17 +41,3 @@ class ISO8601Formatter(logging.Formatter):
         utc_offset_mins = (utc_offset_secs / 60) % 60
         utc_offset_hours = utc_offset_secs / 3600
         return "%s%02d%02d" % (utc_offset_prefix, utc_offset_hours, utc_offset_mins)
-
-
-class EvergreenLogFormatter(logging.Formatter):
-    """Log line formatter for Evergreen log messages.
-
-    See `https://docs.devprod.prod.corp.mongodb.com/evergreen/Project-Configuration/Task-Output-Directory#test-logs`
-    for more info.
-    """
-
-    def format(self, record):
-        """Return the Evergreen formatted record."""
-        ts = int(record.created * 1e9)
-
-        return "\n".join([f"{ts} {line}" for line in super().format(record).split("\n")])
