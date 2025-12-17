@@ -297,6 +297,7 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 case ErrorCodes::CannotCreateIndex:
                 case ErrorCodes::CommandNotSupported:
                 case ErrorCodes::ConflictingOperationInProgress:
+                case ErrorCodes::DatabaseDifferCase:
                 case ErrorCodes::DuplicateKey:
                 case ErrorCodes::FailedToSatisfyReadPreference:
                 // IllegalOperation may happen if moving inconsistent legacy timeseries collections
