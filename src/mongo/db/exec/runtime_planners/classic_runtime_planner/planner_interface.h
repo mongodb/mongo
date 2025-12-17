@@ -116,6 +116,18 @@ protected:
     stage_builder::PlanStageToQsnMap _planStageQsnMap;
     std::vector<std::unique_ptr<PlanStage>> _cbrRejectedPlanStages;
 
+
+    /**
+     * Planner state enum. Describes the planner status:
+     * kNotInitialized: The planner has not made any planning decision yet, so neither a solution
+     *       can be extracted nor an executor built.
+     * kInitialized: The planner has picked a plan, so either
+     *       a solution could be extracted or an executor built.
+     * kDisposed: The planner has already either built an executor or
+     *       extracted a solution, so no further action can be taken.
+     */
+    enum { kNotInitialized, kInitialized, kDisposed } _state = kNotInitialized;
+
 private:
     virtual Status doPlan(PlanYieldPolicy* planYieldPolicy) = 0;
 
@@ -123,7 +135,6 @@ private:
 
     NamespaceString makeNamespaceString();
 
-    enum { kNotInitialized, kInitialized, kDisposed } _state = kNotInitialized;
     std::unique_ptr<PlanStage> _root;
     NamespaceString _nss;
     PlannerData _plannerData;
@@ -201,12 +212,12 @@ public:
     /**
      * Picks the best plan among the candidate plans after the trial period has been run.
      */
-    Status pickBestPlan() const;
+    Status pickBestPlan();
+    std::unique_ptr<QuerySolution> extractQuerySolution() override;
+    MultiPlanStage::TrialPhaseConfig getTrialPhaseConfig() const;
 
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
-
-    std::unique_ptr<QuerySolution> extractQuerySolution() override;
 
     MultiPlanStage* _multiplanStage;
 };

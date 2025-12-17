@@ -57,7 +57,7 @@ public:
      * Factory function for creating a 'SamplingEstimator' for use in differet calls into CBR.
      */
     static std::unique_ptr<SamplingEstimator> makeDefaultSamplingEstimator(
-        CanonicalQuery& cq,
+        const CanonicalQuery& cq,
         CardinalityEstimate collCard,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         const MultipleCollectionAccessor& collections);

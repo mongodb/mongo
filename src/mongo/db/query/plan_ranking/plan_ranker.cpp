@@ -30,54 +30,78 @@
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 
 #include "mongo/base/status.h"
-#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_ranking/cbr_for_no_mp_results.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
+
+#include <utility>
 
 namespace mongo {
 namespace plan_ranking {
 StatusWith<QueryPlanner::PlanRankingResult> PlanRanker::rankPlans(
     OperationContext* opCtx,
     CanonicalQuery& query,
-    const QueryPlannerParams& plannerParams,
+    QueryPlannerParams& plannerParams,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const MultipleCollectionAccessor& collections,
     PlannerData plannerData) {
-    // TODO SERVER-114514: Implement restrictive approach for automaticCE. Then delete this comment
-    // below:
-    // For illustration purposes. We'd use multiplanner for ranking like this:
-    // auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
-    // auto mp =
-    //     classic_runtime_planner::MultiPlanner(std::move(plannerData),
-    //                                           std::move(statusWithMultiPlanSolns.getValue()),
-    //                                           QueryPlanner::PlanRankingResult{});
-    // uassertStatusOK(mp.plan()); <- We could also use runTrials or any other method available.
-    // Once done, extract the WorkingSet from the MultiPlanner and store it here for further
-    // extraction.
-    // _ws.emplace(mp.extractWorkingSet());
     auto rankerMode = plannerParams.planRankerMode;
-    if (rankerMode != QueryPlanRankerModeEnum::kMultiPlanning) {
-        _ws = std::move(plannerData.workingSet);
-        return CBRPlanRankingStrategy().rankPlans(
-            opCtx, query, plannerParams, yieldPolicy, collections);
-    } else {
-        /**
-         * This is a special plan ranking strategy in that it does not actually rank plans, but
-         * rather returns all enumerated plans. This will result in multi-planning being used
-         * to select a winning plan at runtime.
-         */
-        auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
-        _ws = std::move(plannerData.workingSet);
-        if (!statusWithMultiPlanSolns.isOK()) {
-            return statusWithMultiPlanSolns.getStatus().withContext(
-                str::stream() << "error processing query: " << query.toStringForErrorMsg()
-                              << " planner returned error");
+    // TODO SERVER-115496. Enumerate solutions here and pass them to the right ranking strategy.
+    switch (rankerMode) {
+        case QueryPlanRankerModeEnum::kSamplingCE:
+        case QueryPlanRankerModeEnum::kExactCE:
+        case QueryPlanRankerModeEnum::kHeuristicCE:
+        case QueryPlanRankerModeEnum::kHistogramCE: {
+            _ws = std::move(plannerData.workingSet);
+            return CBRPlanRankingStrategy().rankPlans(
+                opCtx, query, plannerParams, yieldPolicy, collections);
         }
-        return QueryPlanner::PlanRankingResult{std::move(statusWithMultiPlanSolns.getValue())};
+        case QueryPlanRankerModeEnum::kAutomaticCE: {
+            // TODO SERVER-111770. Finalise values and names.
+            switch (query.getExpCtx()
+                        ->getQueryKnobConfiguration()
+                        .getPlanRankingStrategyForAutomaticQueryPlanRankerMode()) {
+                case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
+                    kCBRForNoMultiplanningResults: {
+                    plan_ranking::CBRForNoMPResultsStrategy ranker;
+                    auto statusWithSolns = ranker.rankPlans(query,
+                                                            plannerParams,
+                                                            yieldPolicy,
+                                                            collections,
+                                                            opCtx,
+                                                            std::move(plannerData));
+                    _ws = ranker.extractWorkingSet();
+                    return statusWithSolns;
+                }
+                case mongo::QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
+                    kHistogramCEWithHeuristicFallback: {
+                    _ws = std::move(plannerData.workingSet);
+                    return CBRPlanRankingStrategy().rankPlans(
+                        opCtx, query, plannerParams, yieldPolicy, collections);
+                }
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }
+        case QueryPlanRankerModeEnum::kMultiPlanning: {
+            /**
+             * This is a special plan ranking strategy in that it does not actually rank plans, but
+             * rather returns all enumerated plans. This will result in multi-planning being used
+             * to select a winning plan at runtime.
+             */
+            auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
+            _ws = std::move(plannerData.workingSet);
+            if (!statusWithMultiPlanSolns.isOK()) {
+                return statusWithMultiPlanSolns.getStatus();
+            }
+            return QueryPlanner::PlanRankingResult{std::move(statusWithMultiPlanSolns.getValue())};
+        }
+        default:
+            MONGO_UNREACHABLE;
     }
 }
 

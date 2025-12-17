@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,6 +29,8 @@
 
 #pragma once
 
+
+#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -36,33 +38,27 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 
-
 namespace mongo {
 namespace plan_ranking {
-
-/**
- * The PlanRanker is responsible for ranking candidate query plans and selecting the best plan(s)
- * to be executed.
- *
- * It will work as a dispatcher to the appropriate plan ranking strategy based on the provided plan
- * ranking mode. Currently, it supports both cost-based ranking (CBR) and multi-planning strategies.
- */
-class PlanRanker {
+class CBRForNoMPResultsStrategy {
 public:
+    ~CBRForNoMPResultsStrategy() = default;
+
     StatusWith<QueryPlanner::PlanRankingResult> rankPlans(
-        OperationContext* opCtx,
         CanonicalQuery& query,
         QueryPlannerParams& plannerParams,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         const MultipleCollectionAccessor& collections,
-        // PlannerData for classic multiplanner. We only need the classic one since multiplanning
-        // only runs with classic, even if SBE is enabled.
-        PlannerData multiPlannerData);
+        OperationContext* opCtx,
+        PlannerData plannerData);
 
     std::unique_ptr<WorkingSet> extractWorkingSet();
 
-private:
+protected:
     std::unique_ptr<WorkingSet> _ws;
+    // TODO SERVER-115496. Once solutions are received as argument, this no longer needs to be
+    // optional.
+    boost::optional<classic_runtime_planner::MultiPlanner> _multiPlanner;
 };
 }  // namespace plan_ranking
 }  // namespace mongo

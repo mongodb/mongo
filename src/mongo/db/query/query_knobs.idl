@@ -65,6 +65,14 @@ enums:
             kHeuristicCE: "heuristicCE"
             kMultiPlanning: "multiPlanning"
 
+    # TODO SERVER-111770. Finalise values and names.
+    QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode:
+        description: "Enum for possible values for QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode."
+        type: string
+        values:
+            kCBRForNoMultiplanningResults: "CBRForNoMultiplanningResults"
+            kHistogramCEWithHeuristicFallback: "HistogramCEWithHeuristicFallback"
+
     SamplingCEMethod:
         description: "Enum for supported sampling methods."
         type: string
@@ -1612,6 +1620,17 @@ server_parameters:
             data: synchronized_value<QueryPlanRankerModeEnum>
         default:
             expr: QueryPlanRankerModeEnum::kMultiPlanning
+        redact: false
+
+    # TODO SERVER-111770. Finalise names.
+    automaticCEPlanRankingStrategy:
+        description: "Controls the plan ranking strategy to use when automaticCE is selected as planRankerMode"
+        set_at: [startup, runtime]
+        cpp_class:
+            name: QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode
+            data: synchronized_value<QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum>
+        default:
+            expr: QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::kHistogramCEWithHeuristicFallback
         redact: false
 
     samplingConfidenceInterval:

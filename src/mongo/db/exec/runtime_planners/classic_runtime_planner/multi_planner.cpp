@@ -30,6 +30,7 @@
 #include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::classic_runtime_planner {
 
@@ -55,11 +56,14 @@ MultiPlanner::MultiPlanner(PlannerData plannerData,
 }
 
 Status MultiPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
+    tassert(11451403, "MultiPlanner::doPlan() called in invalid state", _state == kNotInitialized);
     auto status = _multiplanStage->runTrials(planYieldPolicy);
     if (!status.isOK()) {
         return status;
     }
-    return _multiplanStage->pickBestPlan();
+    status = _multiplanStage->pickBestPlan();
+    _state = kInitialized;
+    return status;
 }
 
 const MultiPlanStats* MultiPlanner::getSpecificStats() const {
@@ -67,17 +71,29 @@ const MultiPlanStats* MultiPlanner::getSpecificStats() const {
 }
 
 Status MultiPlanner::runTrials(MultiPlanStage::TrialPhaseConfig trialConfig) {
+    tassert(
+        11451402, "MultiPlanner::runTrials() called in invalid state", _state == kNotInitialized);
     auto trialPeriodYieldPolicy = makeClassicYieldPolicy(
         opCtx(), cq()->nss(), static_cast<PlanStage*>(_multiplanStage), yieldPolicy());
     return _multiplanStage->runTrials(trialPeriodYieldPolicy.get(), trialConfig);
 }
 
-Status MultiPlanner::pickBestPlan() const {
-    return _multiplanStage->pickBestPlan();
+Status MultiPlanner::pickBestPlan() {
+    auto status = _multiplanStage->pickBestPlan();
+    _state = kInitialized;
+    return status;
 }
 
 std::unique_ptr<QuerySolution> MultiPlanner::extractQuerySolution() {
     // The query solutions are owned by the 'MultiPlan' stage.
+    if (_state == kInitialized) {
+        _state = kDisposed;
+        return _multiplanStage->extractBestSolution();
+    }
     return nullptr;
+}
+
+MultiPlanStage::TrialPhaseConfig MultiPlanner::getTrialPhaseConfig() const {
+    return _multiplanStage->getTrialPhaseConfig();
 }
 }  // namespace mongo::classic_runtime_planner

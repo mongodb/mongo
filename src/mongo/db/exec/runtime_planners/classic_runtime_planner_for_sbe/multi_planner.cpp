@@ -75,6 +75,10 @@ const MultiPlanStats* MultiPlanner::getSpecificStats() const {
     return static_cast<const MultiPlanStats*>(_multiPlanStage->getSpecificStats());
 }
 
+std::unique_ptr<QuerySolution> MultiPlanner::extractQuerySolution() {
+    return _multiPlanStage->extractBestSolution();
+};
+
 Status MultiPlanner::runTrials(MultiPlanStage::TrialPhaseConfig trialConfig) {
     auto trialPeriodYieldPolicy = makeClassicYieldPolicy(
         opCtx(), cq()->nss(), static_cast<PlanStage*>(_multiPlanStage.get()), yieldPolicy());

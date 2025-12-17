@@ -849,7 +849,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
 }
 
 std::unique_ptr<SamplingEstimator> SamplingEstimatorImpl::makeDefaultSamplingEstimator(
-    CanonicalQuery& cq,
+    const CanonicalQuery& cq,
     CardinalityEstimate collCard,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const MultipleCollectionAccessor& collections) {

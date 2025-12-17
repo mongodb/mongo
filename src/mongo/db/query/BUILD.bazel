@@ -270,6 +270,7 @@ mongo_cc_library(
         "join_plan_tree_shape.cpp",
         "join_reorder_mode.cpp",
         "plan_ranker_mode.cpp",
+        "plan_ranking_strategy_for_automatic_query_plan_ranker_mode.cpp",
         "query_feature_flags_gen",
         "query_knobs_gen",
         "sampling_ce_method.cpp",
@@ -563,6 +564,7 @@ mongo_cc_unit_test(
         "query_planner_text_test.cpp",
         "query_planner_tree_test.cpp",
         "query_planner_wildcard_index_test.cpp",
+        "//src/mongo/db/query/plan_ranking:cbr_for_no_mp_results_test.cpp",
     ],
     data = [
         "//src/mongo/db/query/test_output/query_planner_i_x_select_test:test_data",
@@ -575,6 +577,7 @@ mongo_cc_unit_test(
         ":query_planner_test_fixture",
         "//src/mongo/db:service_context_d",
         "//src/mongo/db/query/compiler/optimizer/index_bounds_builder:index_bounds_builder_test_fixture",
+        "//src/mongo/db/query/plan_ranking:plan_ranking_test_fixture",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog_mock",
     ],

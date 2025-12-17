@@ -31,6 +31,13 @@ export function assertPlanNotCosted(plan) {
     assert(!plan.hasOwnProperty("costEstimate"), plan);
 }
 
+/**
+ * Assert the given plan was costed.
+ */
+export function assertPlanCosted(plan) {
+    assert(plan.hasOwnProperty("costEstimate"), plan);
+}
+
 export function getPlanRankerMode(db) {
     if (db !== null) {
         const getParam = db.adminCommand({

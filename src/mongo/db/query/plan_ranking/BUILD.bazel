@@ -8,3 +8,14 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "plan_ranking_test_fixture",
+    srcs = [
+        "plan_ranking_test_fixture.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+    ],
+)

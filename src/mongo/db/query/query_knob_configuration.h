@@ -48,6 +48,8 @@ public:
 
     QueryFrameworkControlEnum getInternalQueryFrameworkControlForOp() const;
     QueryPlanRankerModeEnum getPlanRankerMode() const;
+    QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum
+    getPlanRankingStrategyForAutomaticQueryPlanRankerMode() const;
     SamplingConfidenceIntervalEnum getConfidenceInterval() const;
     SamplingCEMethodEnum getInternalQuerySamplingCEMethod() const;
     double getSamplingMarginOfError() const;
@@ -93,6 +95,8 @@ public:
 private:
     QueryFrameworkControlEnum _queryFrameworkControlValue;
     QueryPlanRankerModeEnum _planRankerMode;
+    QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum
+        _planRankingStrategyForAutomaticQueryPlanRankerMode;
     SamplingConfidenceIntervalEnum _samplingConfidenceInterval;
     SamplingCEMethodEnum _samplingCEMethod;
     int64_t _numChunksForChunkBasedSampling;

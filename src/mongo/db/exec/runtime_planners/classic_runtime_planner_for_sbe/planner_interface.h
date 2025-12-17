@@ -230,6 +230,11 @@ public:
      */
     const MultiPlanStats* getSpecificStats() const;
 
+    /**
+     * Extracts and returns the winning QuerySolution from the multi-plan stage.
+     */
+    std::unique_ptr<QuerySolution> extractQuerySolution();
+
 private:
     using SbePlanAndData = std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>;
 

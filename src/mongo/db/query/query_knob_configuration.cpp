@@ -49,6 +49,12 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
                           ->get<QueryPlanRankerMode>("planRankerMode")
                           ->_data.get();
 
+    _planRankingStrategyForAutomaticQueryPlanRankerMode =
+        ServerParameterSet::getNodeParameterSet()
+            ->get<QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode>(
+                "automaticCEPlanRankingStrategy")
+            ->_data.get();
+
     _samplingConfidenceInterval =
         ServerParameterSet::getNodeParameterSet()
             ->get<SamplingConfidenceInterval>("samplingConfidenceInterval")
@@ -98,6 +104,11 @@ QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkContr
 
 QueryPlanRankerModeEnum QueryKnobConfiguration::getPlanRankerMode() const {
     return _planRankerMode;
+}
+
+QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum
+QueryKnobConfiguration::getPlanRankingStrategyForAutomaticQueryPlanRankerMode() const {
+    return _planRankingStrategyForAutomaticQueryPlanRankerMode;
 }
 
 SamplingConfidenceIntervalEnum QueryKnobConfiguration::getConfidenceInterval() const {

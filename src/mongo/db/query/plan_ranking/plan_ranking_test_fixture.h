@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,42 +27,40 @@
  *    it in the license file.
  */
 
-#pragma once
-
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/multiple_collection_accessor.h"
-#include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_planner_params.h"
-
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 
 namespace mongo {
 namespace plan_ranking {
+class PlanRankingTestFixture : public CatalogTestFixture {
+protected:
+    PlanRankingTestFixture(NamespaceString nss) : nss(nss) {}
 
-/**
- * The PlanRanker is responsible for ranking candidate query plans and selecting the best plan(s)
- * to be executed.
- *
- * It will work as a dispatcher to the appropriate plan ranking strategy based on the provided plan
- * ranking mode. Currently, it supports both cost-based ranking (CBR) and multi-planning strategies.
- */
-class PlanRanker {
-public:
-    StatusWith<QueryPlanner::PlanRankingResult> rankPlans(
-        OperationContext* opCtx,
-        CanonicalQuery& query,
-        QueryPlannerParams& plannerParams,
-        PlanYieldPolicy::YieldPolicy yieldPolicy,
-        const MultipleCollectionAccessor& collections,
-        // PlannerData for classic multiplanner. We only need the classic one since multiplanning
-        // only runs with classic, even if SBE is enabled.
-        PlannerData multiPlannerData);
+    void setUp() override;
 
-    std::unique_ptr<WorkingSet> extractWorkingSet();
+    void insertNDocuments(int count);
+
+    void tearDown() override;
+
+    void createIndexOnEmptyCollection(OperationContext* opCtx,
+                                      BSONObj index,
+                                      std::string indexName);
+
+    std::pair<std::unique_ptr<CanonicalQuery>, PlannerData> createCQAndPlannerData(
+        const MultipleCollectionAccessor& collections, BSONObj findFilter);
+
+
+    MultipleCollectionAccessor getCollsAccessor();
+
+    std::unique_ptr<DBDirectClient> client;
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+    std::vector<IndexEntry> indices;
+    NamespaceString nss;
 
 private:
-    std::unique_ptr<WorkingSet> _ws;
+    CollectionAcquisition getCollection();
 };
 }  // namespace plan_ranking
 }  // namespace mongo
