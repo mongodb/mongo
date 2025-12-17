@@ -90,6 +90,11 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
 
     print("Running background validation on all collections on test node: " + host);
 
+    assert.soon(() => {
+        const res = assert.commandWorked(conn.getDB("testDB").adminCommand({hello: 1}));
+        return res.secondary || (res.me && res.me == res.primary && res.isWritablePrimary);
+    }, `mongod did not transition to secondary or primary state`);
+
     // Save a map of namespace to validate cmd results for any cmds that fail so that we can return
     // the results afterwards.
     let failedValidateResults = [];
