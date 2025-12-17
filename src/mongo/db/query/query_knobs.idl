@@ -1669,7 +1669,7 @@ server_parameters:
             name: SamplingCEMethod
             data: synchronized_value<SamplingCEMethodEnum>
         default:
-            expr: SamplingCEMethodEnum::kChunk
+            expr: SamplingCEMethodEnum::kRandom
         redact: false
 
     internalQueryNumChunksForChunkBasedSampling:
