@@ -24,7 +24,7 @@ from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.logging import flush
 
 _TIMEOUT_SECS = 55
-MAX_EXCEPTION_LENGTH = 10
+MAX_EXCEPTION_LENGTH = 15  # number of lines; leave room for the header and a trivial diff
 
 
 class Truncate(Enum):

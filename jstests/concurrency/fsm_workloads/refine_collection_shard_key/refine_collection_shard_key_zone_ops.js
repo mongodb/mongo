@@ -216,8 +216,10 @@ export const $config = (function () {
                 const newShardKeyField = this.newShardKeyFields[1];
                 const errorMsg = formatErrorMsg(e.message, e.extraAttr);
                 if (
-                    (errorMsg.includes(newShardKeyField) && errorMsg.includes("are not equal")) ||
-                    (errorMsg.includes(newShardKeyField) && errorMsg.includes("assert.eq() failed"))
+                    errorMsg.includes(newShardKeyField) &&
+                    (errorMsg.includes("are not equal") ||
+                        errorMsg.includes("assert.eq() failed") ||
+                        errorMsg.match(/expected .* to equal .*/))
                 ) {
                     jsTestLog(
                         "Retrying swapZoneRange on collection " +

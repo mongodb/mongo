@@ -690,7 +690,10 @@ class TestExceptionExtraction(unittest.TestCase):
         ]
         output = execute_resmoke(resmoke_args).stdout
 
-        expected = "The following tests failed (with exit code):\n        buildscripts/tests/resmoke_end2end/failtestfiles/python_failure.py (1 DB Exception)\n            [LAST Part of Exception]"
+        expected = """The following tests failed (with exit code):
+        buildscripts/tests/resmoke_end2end/failtestfiles/python_failure.py (1 DB Exception)
+            [LAST Part of Exception]"""
+
         assert expected in output
 
     def test_resmoke_javascript_exception(self):
@@ -699,7 +702,10 @@ class TestExceptionExtraction(unittest.TestCase):
         ]
         output = execute_resmoke(resmoke_args).stdout
 
-        expected = "The following tests failed (with exit code):\n        buildscripts/tests/resmoke_end2end/failtestfiles/js_failure.js (253 Failure executing JS file)\n            uncaught exception: Error: [true] and [false] are not equal"
+        expected = """The following tests failed (with exit code):
+        buildscripts/tests/resmoke_end2end/failtestfiles/js_failure.js (253 Failure executing JS file)
+            uncaught exception: Error: expected true to equal false"""
+
         assert expected in output
 
     def test_resmoke_fixture_error(self):

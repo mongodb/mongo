@@ -1,5 +1,5 @@
 import {describe, it} from "jstests/libs/mochalite.js";
-import {stringdiff} from "src/mongo/shell/stringdiff.js";
+import {stringdiff, colorize} from "src/mongo/shell/stringdiff.js";
 
 describe("diff strings", () => {
     function difftest(oldStr, newStr, expectedDiff) {
@@ -131,6 +131,27 @@ describe("diff strings", () => {
  y
  z`;
         difftest(oldStr, newStr, expectedDiff);
+
+        let highlighted = colorize(stringdiff(oldStr, newStr));
+        const expectedHighlighted = `\
+ a
+ b
+\u001b[31m-c\u001b[0m
+\u001b[32m+X\u001b[0m
+ d
+ e
+ f
+ g
+---
+ t
+ u
+ v
+ w
+\u001b[31m-x\u001b[0m
+\u001b[32m+Y\u001b[0m
+ y
+ z`;
+        assert.eq(highlighted, expectedHighlighted);
     });
 
     it("compound diff", () => {

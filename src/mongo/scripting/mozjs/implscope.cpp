@@ -93,6 +93,7 @@ namespace mongo {
 
 // Generated symbols for JS files
 namespace JSFiles {
+extern const JSFile stringdiff;
 extern const JSFile types;
 extern const JSFile assert;
 extern const JSFile assert_global;
@@ -599,6 +600,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
 
         JS_FireOnNewGlobalObject(_context, _global);
 
+        execSetup(JSFiles::stringdiff);
         execSetup(JSFiles::assert);
         execSetup(JSFiles::assert_global);
         execSetup(JSFiles::types);
