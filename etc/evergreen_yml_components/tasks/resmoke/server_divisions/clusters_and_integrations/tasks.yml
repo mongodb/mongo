@@ -3020,6 +3020,21 @@ tasks:
           suite: disagg_sharding_jscore_passthrough
           use_large_distro: "true"
 
+  - <<: *gen_task_template
+    name: no_passthrough_disagg_override_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "large",
+        "incompatible_mac",
+        "common",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
 ################################################
 #                 Task Groups                  #
 ################################################

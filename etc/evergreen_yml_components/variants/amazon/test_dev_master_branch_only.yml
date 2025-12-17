@@ -188,6 +188,7 @@ buildvariants:
         distros:
           - amazon2023-arm64-latest-m8g-4xlarge
       - name: streams_build_only_gen
+      - name: no_passthrough_disagg_override_gen
 
   - name: amazon-linux2023-arm64-tests-lto-pgo-bolt
     display_name: "Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags) LTO/PGO/BOLT"

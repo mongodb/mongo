@@ -3004,24 +3004,7 @@ export class ReplSetTest {
 
         // Never wait for a connection inside runMongod. We will do so below if needed.
         options.waitForConnect = false;
-        let conn = MongoRunner.runMongod(options);
-        if (!conn) {
-            throw new Error("Failed to start node " + n);
-        }
-
-        // Make sure to call _addPath, otherwise folders won't be cleaned.
-        this._addPath(conn.dbpath);
-
-        // We don't want to persist 'waitForConnect' across node restarts.
-        delete conn.fullOptions.waitForConnect;
-
-        // Save the node object in the appropriate location.
-        if (this._useBridge) {
-            this._unbridgedNodes[n] = conn;
-        } else {
-            this.nodes[n] = conn;
-            this.nodes[n].nodeId = n;
-        }
+        this._startMongod(n, options);
 
         // Clean up after noReplSet to ensure it doesn't effect future restarts.
         if (options.noReplSet) {
@@ -3210,6 +3193,32 @@ export class ReplSetTest {
         }
 
         return ret;
+    }
+
+    /**
+     * Launches a mongod instance with the given options for the nth node in the set.
+     * @protected
+     * @param {*} options
+     */
+    _startMongod(n, options) {
+        let conn = MongoRunner.runMongod(options);
+        if (!conn) {
+            throw new Error("Failed to start node " + n);
+        }
+
+        // Make sure to call _addPath, otherwise folders won't be cleaned.
+        this._addPath(conn.dbpath);
+
+        // We don't want to persist 'waitForConnect' across node restarts.
+        delete conn.fullOptions.waitForConnect;
+
+        // Save the node object in the appropriate location.
+        if (this._useBridge) {
+            this._unbridgedNodes[n] = conn;
+        } else {
+            this.nodes[n] = conn;
+            this.nodes[n].nodeId = n;
+        }
     }
 
     /**
