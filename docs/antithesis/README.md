@@ -199,6 +199,147 @@ Important Note: This will happen for every antithesis task you schedule in your 
 
 `evergreen patch --param schedule_antithesis_tests=true`
 
+## Types of testing in antithesis
+
+### Normal resmoke testing
+
+Antithesis constantly runs your resmoke suite with one random test from the suite at a time.
+We support this out-of-the-box with most resmoke suites that use python fixtures.
+This is very similar to how tests run in evergreen.
+Your antithesis tasks in evergreen will default to this if the `antithesis_test_composer_dir` var is not specified on the task.
+
+### Test Composer
+
+Antithesis offers a resource called [Test Composer](https://antithesis.com/docs/test_templates/) to run "test templates" against our clusters. Test Composer enables autonomous testing by letting you define templates that guide Antithesis in generating thousands of test cases across multiple system states. Your evergreen tasks will automatically use test composure if the `antithesis_test_composer_dir` var is specified in the task as show in the example below.
+
+#### What is Test Composer?
+
+Test Composer uses an opinionated framework based on naming conventions to detect and run tests. Unlike traditional example-based testing, Test Composer templates tell Antithesis how to handle parallelism, test length, command order, and fault injection to explore your system's behavior comprehensively.
+
+#### Test Composer Structure in MongoDB
+
+MongoDB's Test Composer implementations are located in `buildscripts/antithesis/test_composer/`. The setup still uses a resmoke suite to determine cluster configuration, but test execution is controlled by Test Composer commands rather than running jstests directly.
+
+#### Test Command Types
+
+Test commands must be executable and placed directly under `/opt/antithesis/test/v1/<test_dir>/`. Our evergreen tasks handle building the images and putting the tests in the correct place for you. They follow the naming convention `<prefix>_<command>` where the prefix determines the command's behavior.
+
+##### Driver Commands
+
+Run during fault injection periods. At least one driver or anytime command is required.
+
+- **`parallel_driver_<command>`**: Can run concurrently with other parallel drivers (including itself)
+
+  - Example: [parallel_driver_mongod_find.sh](../../buildscripts/antithesis/test_composer/basic_js_commands/parallel_driver_mongod_find.sh) - Executes random find queries
+  - Example: [parallel_driver_mongod_insert.sh](../../buildscripts/antithesis/test_composer/basic_js_commands/parallel_driver_mongod_insert.sh) - Inserts random documents
+  - Use for: Concurrent client operations, continuous availability checks, parallel workloads
+
+- **`singleton_driver_<command>`**: Runs as the only driver command in a history branch
+
+  - Example: [singleton_driver_resmoke.sh](../../buildscripts/antithesis/test_composer/random_resmoke/singleton_driver_resmoke.sh) - Runs a single random resmoke test
+  - Use for: Porting existing integration tests, running complete workloads without interference
+
+- **`serial_driver_<command>`**: Runs when no other driver commands are active
+  - Example: [serial_driver_resmoke.sh](../../buildscripts/antithesis/test_composer/random_resmoke/serial_driver_resmoke.sh) - Runs resmoke tests sequentially
+  - Use for: Full failover operations, validation steps that require quiescence
+
+##### Quiescent Commands
+
+Run in the absence of faults.
+
+- **`first_<command>`**: Optional setup command that runs once before any driver commands
+
+  - Use for: Data initialization, schema setup, bootstrapping
+
+- **`eventually_<command>`**: Runs after driver commands start. Kills all drivers and stops faults, creating a new branch
+
+  - Use for: Testing eventual consistency, availability after recovery, final state validation
+  - Note: Include retry loops for service availability
+
+- **`finally_<command>`**: Like eventually, but only runs after all driver commands complete naturally
+  - Use for: Testing subtle invariants, final consistency checks
+
+##### Advanced Commands
+
+- **`anytime_<command>`**: Can run at any time after first command, even during singleton/serial drivers
+  - Use for: Continuous invariant checks, monitoring, low-consistency availability checks
+
+#### MongoDB Test Composer Examples
+
+##### Example 1: basic_js_commands Template
+
+This template runs parallel JavaScript operations against MongoDB with built-in retry logic for network failures.
+
+**Commands:**
+
+- [parallel_driver_mongod_find.sh](../../buildscripts/antithesis/test_composer/basic_js_commands/parallel_driver_mongod_find.sh) - Random find queries
+- [parallel_driver_mongod_insert.sh](../../buildscripts/antithesis/test_composer/basic_js_commands/parallel_driver_mongod_insert.sh) - Random inserts
+- [parallel_driver_mongod_fsync.sh](../../buildscripts/antithesis/test_composer/basic_js_commands/parallel_driver_mongod_fsync.sh) - fsync operations
+- [parallel_driver_mongod_pitread.sh](../../buildscripts/antithesis/test_composer/basic_js_commands/parallel_driver_mongod_pitread.sh) - Point-in-time reads with snapshot testing
+- [parallel_driver_mongod_validate_collections.sh](../../buildscripts/antithesis/test_composer/basic_js_commands/parallel_driver_mongod_validate_collections.sh) - Collection validation
+
+**Shared Logic:** [commands.js](../../buildscripts/antithesis/test_composer/basic_js_commands/js/commands.js) provides retry mechanisms for network errors and connection helpers.
+
+**Key Features:**
+
+- Automatic retry on `MongoNetworkError`, `MongoServerSelectionError`, `RetryableWriteError`
+- Random test data generation
+- Connection string discovery via `/scripts/print_connection_string.sh`
+
+##### Example 2: random_resmoke Template
+
+This template runs resmoke tests with randomization, adapting existing test infrastructure for Test Composer.
+
+**Commands:**
+
+- [singleton_driver_resmoke.sh](../../buildscripts/antithesis/test_composer/random_resmoke/singleton_driver_resmoke.sh) - Single random resmoke test
+- [serial_driver_resmoke.sh](../../buildscripts/antithesis/test_composer/random_resmoke/serial_driver_resmoke.sh) - Sequential random resmoke tests
+
+Both use random seeds and shuffling: `--seed $(od -vAn -N4 -tu4 < /dev/urandom) --shuffle --sanityCheck`
+
+#### Creating a New Test Template
+
+1. **Create a test directory:** `buildscripts/antithesis/test_composer/<your_template_name>/`
+
+2. **Write test commands:** Create executable scripts with appropriate prefixes:
+
+   ```bash
+   #!/usr/bin/env bash
+   # buildscripts/antithesis/test_composer/<template>/parallel_driver_mytest.sh
+
+   # Your test logic here
+   # This can run in parallel with other parallel_driver commands
+   ```
+
+3. **Make scripts executable:** `chmod +x buildscripts/antithesis/test_composer/<template>/*.sh`
+
+4. **Helper files:** Use `helper_` prefix or subdirectories for shared code - these are ignored by Test Composer
+
+#### Best Practices
+
+- **Retry logic**: Always include retry mechanisms for network and transient errors (see [commands.js](../../buildscripts/antithesis/test_composer/basic_js_commands/js/commands.js) for examples)
+- **Add Randomization**: The more randomization you add to your tests, the more it allows antithesis to explore. It can control and reproduce the randomization so if it finds an interesting path it can explore it more.
+- **Start simple**: Begin with a `singleton_driver` to adapt existing tests, then evolve to parallel/serial commands
+- **Idempotency**: Design tests to handle being killed and restarted at any time
+
+#### Configuring Test Composer in Evergreen
+
+To use Test Composer instead of normal resmoke testing, set the `antithesis_test_composer_dir` variable in your Evergreen task:
+
+```yaml
+  - <<: *antithesis_task_template
+    name: antithesis_resmoke_suite_with_test_template
+    tags: ...
+    commands:
+      ...
+      - func: "antithesis image build and push"
+        vars:
+          suite: concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard # Still used for cluster topology
+          resmoke_args: >- # any args that change the cluster topology can still be used
+            --runAllFeatureFlagTests
+          antithesis_test_composer_dir: basic_js_commands  # Directory name under buildscripts/antithesis/test_composer/
+```
+
 ## Additional Resources
 
-If you are interested in leveraging Antithesis feel free to reach out to #server-testing on Slack.
+If you are interested in leveraging Antithesis feel free to reach out to #ask-devprod-correctness or #server-testing on Slack.

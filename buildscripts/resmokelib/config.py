@@ -201,6 +201,8 @@ DEFAULTS = {
     "otel_collector_dir": None,
     # The images to build for an External System Under Test
     "docker_compose_build_images": None,
+    # The list of test composer directories to copy into the config container
+    "docker_compose_test_composer_dirs": None,
     # Where the `--dockerComposeBuildImages` is happening.
     "docker_compose_build_env": "local",
     # Tag to use for images built & used for an External System Under Test
@@ -814,6 +816,9 @@ SANITY_CHECK = False
 
 # The images to build for an External System Under Test
 DOCKER_COMPOSE_BUILD_IMAGES = None
+
+# The list of test composer directories to copy into the config container
+DOCKER_COMPOSE_TEST_COMPOSER_DIRS = None
 
 # Where the `--dockerComposeBuildImages` is happening.
 DOCKER_COMPOSE_BUILD_ENV = "local"

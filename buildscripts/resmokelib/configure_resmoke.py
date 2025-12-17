@@ -537,6 +537,11 @@ flags in common: {common_set}
     _config.DOCKER_COMPOSE_BUILD_IMAGES = config.pop("docker_compose_build_images")
     if _config.DOCKER_COMPOSE_BUILD_IMAGES is not None:
         _config.DOCKER_COMPOSE_BUILD_IMAGES = _config.DOCKER_COMPOSE_BUILD_IMAGES.split(",")
+    _config.DOCKER_COMPOSE_TEST_COMPOSER_DIRS = config.pop("docker_compose_test_composer_dirs")
+    if _config.DOCKER_COMPOSE_TEST_COMPOSER_DIRS is not None:
+        _config.DOCKER_COMPOSE_TEST_COMPOSER_DIRS = _config.DOCKER_COMPOSE_TEST_COMPOSER_DIRS.split(
+            ","
+        )
     _config.DOCKER_COMPOSE_BUILD_ENV = config.pop("docker_compose_build_env")
     _config.DOCKER_COMPOSE_TAG = config.pop("docker_compose_tag")
     _config.EXTERNAL_SUT = config.pop("external_sut")

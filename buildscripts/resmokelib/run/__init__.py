@@ -1454,6 +1454,18 @@ class RunPlugin(PluginInterface):
         )
 
         parser.add_argument(
+            "--dockerComposeTestComposerDirs",
+            dest="docker_compose_test_composer_dirs",
+            metavar="DIR1,DIR2",
+            help=(
+                "Comma separated list of test composer directories to include in the config image"
+                " built with `--dockerComposeBuildImages`. These directories should be relative paths"
+                " within `buildscripts/antithesis/test_composer/`."
+                " Example: `random_resmoke,basic_js_commands`."
+            ),
+        )
+
+        parser.add_argument(
             "--externalSUT",
             dest="external_sut",
             action="store_true",

@@ -48,6 +48,7 @@ class DockerComposeImageBuilder:
         self.suite_fixture = suite_fixture
         self.tag = config.DOCKER_COMPOSE_TAG
         self.in_evergreen = config.DOCKER_COMPOSE_BUILD_ENV == "evergreen"
+        self.test_composer_dirs = config.DOCKER_COMPOSE_TEST_COMPOSER_DIRS
 
         # Build context constants
         self.DOCKER_COMPOSE_BUILD_CONTEXT = f"docker_compose/{self.suite_name}"
@@ -128,15 +129,21 @@ class DockerComposeImageBuilder:
             else:
                 ip_suffix = self.next_available_fault_disabled_ip
                 self.next_available_fault_disabled_ip += 1
+
+            volumes = [
+                f"./logs/{name}:/var/log/mongodb/",
+                "./scripts:/scripts/",
+                f"./data/{name}:/data/db",
+            ]
+
+            if name == "workload" and self.test_composer_dirs:
+                volumes.append("./test_composer:/opt/antithesis/test/v1/")
+
             return {
                 "container_name": name,
                 "hostname": name,
                 "image": f'{"workload" if name == "workload" else "mongo-binaries"}:{self.tag}',
-                "volumes": [
-                    f"./logs/{name}:/var/log/mongodb/",
-                    "./scripts:/scripts/",
-                    f"./data/{name}:/data/db",
-                ],
+                "volumes": volumes,
                 "command": f"/bin/bash /scripts/{name}.sh",
                 "networks": {"antithesis-net": {"ipv4_address": f"10.20.20.{ip_suffix}"}},
                 "depends_on": depends_on,
@@ -169,6 +176,27 @@ class DockerComposeImageBuilder:
         with open(os.path.join(build_context, "scripts", "run_resmoke.sh"), "w") as run_resmoke:
             run_resmoke.write(f'{self.get_resmoke_run_command()} "$@"\n')
 
+        print("Writing print_connection_string.sh for convenience...")
+        with open(
+            os.path.join(build_context, "scripts", "print_connection_string.sh"), "w"
+        ) as print_connection_string:
+            print_connection_string.write(
+                f'echo "{self.suite_fixture.get_shell_connection_string()}"\n'
+            )
+
+        if self.test_composer_dirs:
+            print("Copying test composer directories into build context...")
+            image_test_composer_dir = os.path.join(build_context, "test_composer")
+            base_test_composer_dir = os.path.join("buildscripts", "antithesis", "test_composer")
+            for test_composer_dir in self.test_composer_dirs:
+                origin_test_composer_dir = os.path.join(base_test_composer_dir, test_composer_dir)
+                target_test_composer_dir = os.path.join(image_test_composer_dir, test_composer_dir)
+                if not os.path.exists(origin_test_composer_dir):
+                    raise ValueError(
+                        f"Test composer directory does not exist: {origin_test_composer_dir}"
+                    )
+                shutil.copytree(origin_test_composer_dir, target_test_composer_dir)
+
         print("Writing mongo{d,s} init scripts...")
         for process in self.suite_fixture.all_processes():
             # Add the `Process` as a service in the docker-compose.yml
@@ -189,10 +217,12 @@ class DockerComposeImageBuilder:
         with open(os.path.join(build_context, "Dockerfile"), "w") as dockerfile:
             dockerfile.write("FROM scratch\n")
             dockerfile.write("COPY docker-compose.yml /\n")
-            dockerfile.write("ADD scripts /scripts\n")
+            dockerfile.write("ADD --chmod=0755 scripts /scripts\n")
             dockerfile.write("ADD logs /logs\n")
             dockerfile.write("ADD data /data\n")
             dockerfile.write("ADD debug /debug\n")
+            if self.test_composer_dirs:
+                dockerfile.write("ADD --chmod=0755 test_composer /test_composer\n")
 
     def _initialize_docker_compose_build_context(self, build_context) -> None:
         """

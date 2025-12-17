@@ -47,11 +47,17 @@ echo "${antithesis_repo_key}" >mongodb.key.json
 cat mongodb.key.json | sudo docker login -u _json_key https://us-central1-docker.pkg.dev --password-stdin
 rm mongodb.key.json
 
+extra_args=""
+
+if [ -n "${antithesis_test_composer_dir:-}" ]; then
+    extra_args="--dockerComposeTestComposerDirs ${antithesis_test_composer_dir}"
+fi
+
 # Build Image
 cd src
 activate_venv
 setup_db_contrib_tool
-$python buildscripts/resmoke.py run --suite ${suite} ${resmoke_args} --dockerComposeTag $tag --dockerComposeBuildImages workload,config,mongo-binaries --dockerComposeBuildEnv evergreen
+$python buildscripts/resmoke.py run --suite ${suite} ${resmoke_args} --dockerComposeTag $tag --dockerComposeBuildImages workload,config,mongo-binaries --dockerComposeBuildEnv evergreen ${extra_args}
 
 # Test Image
 docker-compose -f docker_compose/${suite}/docker-compose.yml up -d

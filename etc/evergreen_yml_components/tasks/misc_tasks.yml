@@ -353,6 +353,50 @@ tasks:
             --runAllFeatureFlagTests
 
   - <<: *antithesis_task_template
+    name: antithesis_replica_sets_basic_js_commands
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
+      - func: "antithesis image build and push"
+        vars:
+          suite: replica_sets_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+          antithesis_test_composer_dir: basic_js_commands
+
+  - <<: *antithesis_task_template
+    name: antithesis_sharding_basic_js_commands
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
+      - func: "antithesis image build and push"
+        vars:
+          suite: sharding_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+          antithesis_test_composer_dir: basic_js_commands
+
+  - <<: *antithesis_task_template
     name: antithesis_replica_sets_lag_oplog_application_jscore_passthrough
     tags:
       [

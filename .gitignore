@@ -327,6 +327,7 @@ buildscripts/antithesis/base_images/mongo_binaries/bin
 buildscripts/antithesis/base_images/mongo_binaries/lib
 buildscripts/antithesis/base_images/mongo_binaries/libvoidstar.so
 buildscripts/antithesis/base_images/mongo_binaries/tsan.suppressions
+buildscripts/antithesis/base_images/mongo_binaries/src
 
 buildscripts/antithesis/base_images/workload/bin
 buildscripts/antithesis/base_images/workload/lib
