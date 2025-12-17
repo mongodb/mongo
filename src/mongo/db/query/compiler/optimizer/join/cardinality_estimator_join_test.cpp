@@ -238,46 +238,44 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinality) {
                                                                   EstimationSource::Sampling));
     }
 
-    JoinCardinalityEstimator jce(edgeSels, nodeCEs);
+    JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs);
     {
         // Cardinality for subset of size 1 is pulled directly from the CE map.
-        ASSERT_EQ(oneCE * 10, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1)));
-        ASSERT_EQ(oneCE * 20, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(2)));
-        ASSERT_EQ(oneCE * 30, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(3)));
-        ASSERT_EQ(oneCE * 40, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(4)));
-        ASSERT_EQ(oneCE * 50, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(5)));
+        ASSERT_EQ(oneCE * 10, jce.getOrEstimateSubsetCardinality(makeNodeSet(1)));
+        ASSERT_EQ(oneCE * 20, jce.getOrEstimateSubsetCardinality(makeNodeSet(2)));
+        ASSERT_EQ(oneCE * 30, jce.getOrEstimateSubsetCardinality(makeNodeSet(3)));
+        ASSERT_EQ(oneCE * 40, jce.getOrEstimateSubsetCardinality(makeNodeSet(4)));
+        ASSERT_EQ(oneCE * 50, jce.getOrEstimateSubsetCardinality(makeNodeSet(5)));
     }
     {
         // Connected sub-graph cardinality is a combo of single-table CEs and edge selectivities.
-        ASSERT_EQ(oneCE * 10 * 20 * 0.1,
-                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 2)));
-        ASSERT_EQ(oneCE * 30 * 40 * 0.3,
-                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(3, 4)));
+        ASSERT_EQ(oneCE * 10 * 20 * 0.1, jce.getOrEstimateSubsetCardinality(makeNodeSet(1, 2)));
+        ASSERT_EQ(oneCE * 30 * 40 * 0.3, jce.getOrEstimateSubsetCardinality(makeNodeSet(3, 4)));
 
         ASSERT_EQ(oneCE * 10 * 20 * 30 * 0.1 * 0.2,
-                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 2, 3)));
+                  jce.getOrEstimateSubsetCardinality(makeNodeSet(1, 2, 3)));
         ASSERT_EQ(oneCE * 20 * 30 * 40 * 0.2 * 0.3,
-                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(2, 3, 4)));
+                  jce.getOrEstimateSubsetCardinality(makeNodeSet(2, 3, 4)));
 
         ASSERT_EQ(oneCE * 10 * 20 * 30 * 50 * 0.1 * 0.2 * 0.5,
-                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 2, 3, 5)));
+                  jce.getOrEstimateSubsetCardinality(makeNodeSet(1, 2, 3, 5)));
     }
 
     {
         // Disconnected sub-graph cardinality includes some cross-products.
-        ASSERT_EQ(oneCE * 20 * 40, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(2, 4)));
+        ASSERT_EQ(oneCE * 20 * 40, jce.getOrEstimateSubsetCardinality(makeNodeSet(2, 4)));
         ASSERT_EQ(oneCE * 10 * 30 * 40 * 0.3,
-                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 3, 4)));
+                  jce.getOrEstimateSubsetCardinality(makeNodeSet(1, 3, 4)));
     }
 
     {
-        // TODO SERVER-115559: Adjust the assertions made here when we implement cycle breaking.
-        // Cycle cardinality estimation should not involve all edges in the cycle.
-        ASSERT_EQ(oneCE * 30 * 40 * 50 * 0.3 * 0.4 * 0.5,
-                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(3, 4, 5)));
+        // Cycle cardinality estimation does not involve all edges in the cycle.
+        // Note: Edge with selectivity 0.4 has been removed from both examples below.
+        ASSERT_EQ(oneCE * 30 * 40 * 50 * 0.3 * 0.5,
+                  jce.getOrEstimateSubsetCardinality(makeNodeSet(3, 4, 5)));
 
-        ASSERT_EQ(oneCE * 10 * 20 * 30 * 40 * 50 * 0.1 * 0.2 * 0.3 * 0.4 * 0.5,
-                  jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 2, 3, 4, 5)));
+        ASSERT_EQ(oneCE * 10 * 20 * 30 * 40 * 50 * 0.1 * 0.2 * 0.3 * 0.5,
+                  jce.getOrEstimateSubsetCardinality(makeNodeSet(1, 2, 3, 4, 5)));
     }
 }
 
@@ -306,9 +304,9 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinalityAlmostCycle) {
                                                                   EstimationSource::Sampling));
     }
 
-    JoinCardinalityEstimator jce(edgeSels, nodeCEs);
+    JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs);
     ASSERT_EQ(oneCE * 10 * 20 * 30 * 0.1 * 0.2 * 0.3,
-              jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 2, 3)));
+              jce.getOrEstimateSubsetCardinality(makeNodeSet(1, 2, 3)));
 }
 
 TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinalitySameCollectionPresentTwice) {
@@ -349,19 +347,19 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinalitySameCollectionPre
         oneCE * 20,
         oneCE * 30,
     };
-    JoinCardinalityEstimator jce(edgeSels, nodeCEs);
+    JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs);
 
     // Show that even though the namespace is the same for two of the nodes, we are able to
     // correctly associate CE with the particular filters associated with those nodes.
-    ASSERT_EQ(oneCE * 10, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(0)));
-    ASSERT_EQ(oneCE * 20, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1)));
-    ASSERT_EQ(oneCE * 30, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(2)));
+    ASSERT_EQ(oneCE * 10, jce.getOrEstimateSubsetCardinality(makeNodeSet(0)));
+    ASSERT_EQ(oneCE * 20, jce.getOrEstimateSubsetCardinality(makeNodeSet(1)));
+    ASSERT_EQ(oneCE * 30, jce.getOrEstimateSubsetCardinality(makeNodeSet(2)));
 
-    ASSERT_EQ(oneCE * 10 * 20, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(0, 1)));
-    ASSERT_EQ(oneCE * 10 * 30 * 0.1, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(0, 2)));
-    ASSERT_EQ(oneCE * 20 * 30 * 0.2, jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(1, 2)));
+    ASSERT_EQ(oneCE * 10 * 20, jce.getOrEstimateSubsetCardinality(makeNodeSet(0, 1)));
+    ASSERT_EQ(oneCE * 10 * 30 * 0.1, jce.getOrEstimateSubsetCardinality(makeNodeSet(0, 2)));
+    ASSERT_EQ(oneCE * 20 * 30 * 0.2, jce.getOrEstimateSubsetCardinality(makeNodeSet(1, 2)));
 
     ASSERT_EQ(oneCE * 10 * 20 * 30 * 0.1 * 0.2,
-              jce.getOrEstimateSubsetCardinality(jCtx, makeNodeSet(0, 1, 2)));
+              jce.getOrEstimateSubsetCardinality(makeNodeSet(0, 1, 2)));
 }
 }  // namespace mongo::join_ordering

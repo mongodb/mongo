@@ -30,33 +30,20 @@
 #pragma once
 
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/optimizer/join/cardinality_estimation_types.h"
+#include "mongo/db/query/compiler/optimizer/join/graph_cycle_breaker.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
 /**
- * Tracks for each node ID the cardinality estimate (with all single-table predicates applied).
- * It's important that the key is NodeId rather than namespace, since a single namespace may be
- * present multiple times in the graph and associated with different predicates/cardinalities.
- */
-using NodeCardinalities = std::vector<cost_based_ranker::CardinalityEstimate>;
-/**
- * Tracks for each edge ID the selectivity estimate.
- */
-using EdgeSelectivities = std::vector<cost_based_ranker::SelectivityEstimate>;
-
-/**
- * Tracks for each JoinSubset (represented by a NodeSet) the estimated cardinality of the join.
- */
-using SubsetCardinalities = absl::flat_hash_map<NodeSet, cost_based_ranker::CardinalityEstimate>;
-
-/**
  * Contains logic necessary to do selectivity and cardinality estimation for joins.
  */
 class JoinCardinalityEstimator {
 public:
-    JoinCardinalityEstimator(EdgeSelectivities edgeSelectivities,
+    JoinCardinalityEstimator(const JoinReorderingContext& ctx,
+                             EdgeSelectivities edgeSelectivities,
                              NodeCardinalities nodeCardinalities);
 
     static JoinCardinalityEstimator make(const JoinReorderingContext& ctx,
@@ -83,12 +70,14 @@ public:
      * edge selectivities, base table cardinalities, and single-table predicate selectivities to
      * produce an estimate. Populates `_subsetCardinalities` with the result.
      */
-    cost_based_ranker::CardinalityEstimate getOrEstimateSubsetCardinality(
-        const JoinReorderingContext& ctx, const NodeSet& nodes);
+    cost_based_ranker::CardinalityEstimate getOrEstimateSubsetCardinality(const NodeSet& nodes);
 
 private:
+    const JoinReorderingContext& _ctx;
     const EdgeSelectivities _edgeSelectivities;
     const NodeCardinalities _nodeCardinalities;
+
+    GraphCycleBreaker _cycleBreaker;
 
     // Populated over the course of subset enumeration.
     SubsetCardinalities _subsetCardinalities;

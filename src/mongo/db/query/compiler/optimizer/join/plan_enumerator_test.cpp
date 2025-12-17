@@ -139,7 +139,7 @@ public:
         }
     }
 
-    JoinCardinalityEstimator emptyEstimator = JoinCardinalityEstimator({}, {});
+    JoinCardinalityEstimator emptyEstimator = JoinCardinalityEstimator(jCtx, {}, {});
 };
 
 TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsTwo) {

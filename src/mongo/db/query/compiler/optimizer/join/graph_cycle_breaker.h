@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
+#include "mongo/db/query/compiler/optimizer/join/cardinality_estimation_types.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/util/dynamic_bitset.h"
 #include "mongo/util/modules.h"

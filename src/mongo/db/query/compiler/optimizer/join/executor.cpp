@@ -219,15 +219,13 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
             JoinCardinalityEstimator estimator = JoinCardinalityEstimator::make(
                 ctx, swAccessPlans.getValue().estimate, samplingEstimators);
             reordered = constructSolutionBottomUp(
-                std::move(ctx), std::move(estimator), getPlanTreeShape(qkc.getJoinPlanTreeShape()));
+                ctx, std::move(estimator), getPlanTreeShape(qkc.getJoinPlanTreeShape()));
             break;
         }
         case JoinReorderModeEnum::kRandom:
             // Randomly reorder joins.
-            reordered =
-                constructSolutionWithRandomOrder(std::move(ctx),
-                                                 qkc.getRandomJoinOrderSeed(),
-                                                 qkc.getRandomJoinReorderDefaultToHashJoin());
+            reordered = constructSolutionWithRandomOrder(
+                ctx, qkc.getRandomJoinOrderSeed(), qkc.getRandomJoinReorderDefaultToHashJoin());
             break;
         default:
             MONGO_UNREACHABLE_TASSERT(11336911);

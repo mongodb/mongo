@@ -41,13 +41,6 @@ mongo_cc_library(
         "plan_enumerator.cpp",
         "plan_enumerator_helpers.cpp",
     ],
-    hdrs = [
-        "cardinality_estimator.h",
-        "join_plan.h",
-        "plan_enumerator.h",
-        "plan_enumerator_helpers.h",
-        "single_table_access.h",
-    ],
     deps = [
         ":join_ordering",
         ":solution_storage",

@@ -37,16 +37,21 @@
 
 namespace mongo::join_ordering {
 
-JoinCardinalityEstimator::JoinCardinalityEstimator(EdgeSelectivities edgeSelectivities,
+JoinCardinalityEstimator::JoinCardinalityEstimator(const JoinReorderingContext& ctx,
+                                                   EdgeSelectivities edgeSelectivities,
                                                    NodeCardinalities nodeCardinalities)
-    : _edgeSelectivities(std::move(edgeSelectivities)),
-      _nodeCardinalities(std::move(nodeCardinalities)) {}
+    : _ctx(ctx),
+      _edgeSelectivities(std::move(edgeSelectivities)),
+      _nodeCardinalities(std::move(nodeCardinalities)),
+      _cycleBreaker(
+          GraphCycleBreaker(_ctx.joinGraph, _edgeSelectivities, _ctx.resolvedPaths.size())) {}
 
 JoinCardinalityEstimator JoinCardinalityEstimator::make(
     const JoinReorderingContext& ctx,
     const cost_based_ranker::EstimateMap& estimates,
     const SamplingEstimatorMap& samplingEstimators) {
     return JoinCardinalityEstimator(
+        ctx,
         JoinCardinalityEstimator::estimateEdgeSelectivities(ctx, samplingEstimators),
         JoinCardinalityEstimator::extractNodeCardinalities(ctx, estimates));
 }
@@ -172,7 +177,7 @@ cost_based_ranker::SelectivityEstimate JoinCardinalityEstimator::joinPredicateSe
 }
 
 cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSubsetCardinality(
-    const JoinReorderingContext& ctx, const NodeSet& nodes) {
+    const NodeSet& nodes) {
     if (auto it = _subsetCardinalities.find(nodes); it != _subsetCardinalities.end()) {
         return it->second;
     }
@@ -206,11 +211,11 @@ cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSu
     // (3) The single-table predicate selectivities.
     // Finally, note that we have the pre-computed combination of (2) and (3) in '_nodeCEs'.
     cost_based_ranker::CardinalityEstimate ce = cost_based_ranker::oneCE;
-    for (auto nodeIdx : iterable(nodes, ctx.joinGraph.numNodes())) {
+    for (auto nodeIdx : iterable(nodes, _ctx.joinGraph.numNodes())) {
         ce = ce * _nodeCardinalities[nodeIdx].toDouble();
     }
-    // TODO SERVER-115559: Invoke cycle breaker over these edges.
-    std::vector<EdgeId> edges = ctx.joinGraph.getEdgesForSubgraph(nodes);
+
+    auto edges = _cycleBreaker.breakCycles(_ctx.joinGraph.getEdgesForSubgraph(nodes));
     for (const auto& edgeId : edges) {
         ce = ce * _edgeSelectivities.at(edgeId);
     }
