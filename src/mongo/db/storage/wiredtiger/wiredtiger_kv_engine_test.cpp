@@ -1145,7 +1145,7 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
         ru2.beginUnitOfWork(false);
         ru2.setPrepareTimestamp(prepareTimestamp);
         ru2.setPreparedId(*recoveredPreparedId);
-        ru2.reclaimPreparedTransactionForRecovery();
+        ru2.getSession();  // Note this starts the storage transaction.
 
         ru2.setDurableTimestamp(Timestamp(3, 0));
         ru2.setCommitTimestamp(prepareTimestamp);
@@ -1218,13 +1218,13 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
     ru3.beginUnitOfWork(false);
     ru3.setPrepareTimestamp(prepareTimestamp1);
     ru3.setPreparedId(firstId);
-    ru3.reclaimPreparedTransactionForRecovery();
+    ru3.getSession();  // Note this starts the storage transaction.
     ru3.abortUnitOfWork();
 
     ru3.beginUnitOfWork(false);
     ru3.setPrepareTimestamp(prepareTimestamp2);
     ru3.setPreparedId(secondId);
-    ru3.reclaimPreparedTransactionForRecovery();
+    ru3.getSession();  // Note this starts the storage transaction.
     ru3.setDurableTimestamp(Timestamp(8, 0));
     ru3.setCommitTimestamp(prepareTimestamp2);
     ru3.commitUnitOfWork();
@@ -1310,7 +1310,7 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
         ru2.setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
         ru2.setPrepareTimestamp(prepareTimestamp);
         ru2.setPreparedId(*recoveredPreparedId);
-        ru2.reclaimPreparedTransactionForRecovery();
+        ru2.getSession();  // Note this starts the storage transaction.
 
         ru2.abortUnitOfWork();
         count++;

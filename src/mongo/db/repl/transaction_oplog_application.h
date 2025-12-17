@@ -94,4 +94,11 @@ Status applyPrepareTransaction(OperationContext* opCtx,
  */
 MONGO_MOD_OPEN void reconstructPreparedTransactions(OperationContext* opCtx,
                                                     repl::OplogApplication::Mode mode);
+
+/**
+ * Recovers prepared transactions from a precise checkpoint by iterating over the transactions table
+ * to find prepared transactions, cross referencing them with the prepared transactions found in
+ * the checkpoint, then recreating the in-memory state for the transaction.
+ */
+MONGO_MOD_OPEN void recoverPreparedTransactionsFromPreciseCheckpoint(OperationContext* opCtx);
 }  // namespace mongo

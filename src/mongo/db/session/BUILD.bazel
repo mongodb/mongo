@@ -231,6 +231,7 @@ mongo_cc_library(
     srcs = [
         "internal_transactions_reap_service.cpp",
         "session_catalog_mongod.cpp",
+        "session_txn_record_helpers.cpp",
         ":internal_transactions_reap_service_gen",
         ":session_txn_record_gen",
     ],

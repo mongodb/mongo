@@ -8029,14 +8029,14 @@ TEST_F(TxnParticipantTest, CanRecoverPreparedTxnFromSessionTxnRecord) {
     // TransactionParticipant state.
     //
 
-    SessionTxnRecord txnRecord;
+    std::unique_ptr<SessionTxnRecordForPrepareRecovery> validatedTxnRecord;
     struct TransactionParticipantStateSnapshot {
         TxnNumberAndRetryCounter txnNumberAndRetryCounter{-1};
         repl::OpTime lastWriteOpTime;
         repl::OpTime prepareOpTime;
     } expectedState;
 
-    runFunctionFromDifferentOpCtx([&txnRecord,
+    runFunctionFromDifferentOpCtx([&validatedTxnRecord,
                                    &expectedState,
                                    sessionId = _sessionId,
                                    txnNumber = _txnNumber](OperationContext* opCtx) {
@@ -8078,12 +8078,15 @@ TEST_F(TxnParticipantTest, CanRecoverPreparedTxnFromSessionTxnRecord) {
         }
         auto [timestamp, namespaces] = txnParticipant.prepareTransaction(opCtx, {});
 
+        SessionTxnRecord txnRecord;
         txnRecord.setState(DurableTxnStateEnum::kPrepared);
         txnRecord.setSessionId(*opCtx->getLogicalSessionId());
         txnRecord.setTxnNum(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber());
         txnRecord.setLastWriteOpTime(txnParticipant.getLastWriteOpTime());
         txnRecord.setLastWriteDate(Date_t::now());
         txnParticipant.addPreparedTransactionPreciseCheckpointRecoveryFields(txnRecord);
+        validatedTxnRecord =
+            std::make_unique<SessionTxnRecordForPrepareRecovery>(std::move(txnRecord));
 
         expectedState.txnNumberAndRetryCounter = txnParticipant.getActiveTxnNumberAndRetryCounter();
         expectedState.lastWriteOpTime = txnParticipant.getLastWriteOpTime();
@@ -8109,7 +8112,7 @@ TEST_F(TxnParticipantTest, CanRecoverPreparedTxnFromSessionTxnRecord) {
     // engine.
     txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
 
-    for (const auto& ns : *txnRecord.getAffectedNamespaces()) {
+    for (const auto& ns : validatedTxnRecord->getAffectedNamespaces()) {
         (void)acquireCollection(opCtx(),
                                 CollectionAcquisitionRequest(ns,
                                                              PlacementConcern::kPretendUnsharded,
@@ -8118,7 +8121,7 @@ TEST_F(TxnParticipantTest, CanRecoverPreparedTxnFromSessionTxnRecord) {
                                 MODE_IX);
     }
 
-    txnParticipant.refreshPreparedTransactionFromTxnRecord(opCtx(), std::move(txnRecord));
+    txnParticipant.restorePreparedTxnFromPreciseCheckpoint(opCtx(), std::move(*validatedTxnRecord));
 
     // Verify the participant is in the state we expect.
     ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter(),
@@ -8127,8 +8130,6 @@ TEST_F(TxnParticipantTest, CanRecoverPreparedTxnFromSessionTxnRecord) {
     ASSERT_EQ(txnParticipant.getPrepareOpTime(), expectedState.prepareOpTime);
     ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp(),
               expectedState.prepareOpTime.getTimestamp());
-    ASSERT_EQ(*shard_role_details::getRecoveryUnit(opCtx())->getPreparedId(),
-              expectedState.prepareOpTime.getTimestamp().asULL());
     ASSERT_EQ(txnParticipant.affectedNamespaces().size(), 3);
     ASSERT_EQ(txnParticipant.getTransactionOperationsCount(), 0);
     ASSERT(txnParticipant.getPrepareOpTimeForRecovery().isNull());
@@ -8144,32 +8145,6 @@ TEST_F(TxnParticipantTest, CanRecoverPreparedTxnFromSessionTxnRecord) {
 
     // We should have stashed in the "secondary" style and released the locks taken above.
     ASSERT_FALSE(txnParticipant.getTxnResourceStashLockerForTest()->isLocked());
-}
-
-TEST_F(TxnParticipantTest, NeedAffectedNamespacesToRecoverPreparedTxnFromSessionTxnRecord) {
-    // Create a session txn record without affectedNamespaces.
-    SessionTxnRecord txnRecord;
-    txnRecord.setState(DurableTxnStateEnum::kPrepared);
-    txnRecord.setSessionId(*opCtx()->getLogicalSessionId());
-    txnRecord.setTxnNum(*opCtx()->getTxnNumber());
-    txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(1, 0), 0));
-    txnRecord.setLastWriteDate(Date_t::now());
-
-    // Reset the transaction participant catalog to simulate a process restart.
-    SessionCatalog::get(opCtx()->getServiceContext())->reset_forTest();
-
-    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
-    auto sessionCheckout = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx());
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    // NOTE: In a real use case, we would reclaim the prepared transaction here from the storage
-    // engine.
-    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
-
-    ASSERT_THROWS_CODE(
-        txnParticipant.refreshPreparedTransactionFromTxnRecord(opCtx(), std::move(txnRecord)),
-        AssertionException,
-        11372600);
 }
 
 }  // namespace

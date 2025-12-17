@@ -75,6 +75,8 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/session_id.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/decorable.h"
@@ -801,7 +803,8 @@ MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWitho
         auto txnNum = _opCtx->getTxnNumber().get_value_or(TxnNumber(-1));
         auto txnRetries = _opCtx->getTxnRetryCounter().get_value_or(-1);
         auto opId = _opCtx->getOpID();
-        auto sessionId = _opCtx->getClient()->session()->id();
+        auto sessionId = _opCtx->getClient()->session() ? _opCtx->getClient()->session()->id()
+                                                        : transport::SessionId{};
         auto lsid = _opCtx->getLogicalSessionId();
         auto clientAddress = _opCtx->getClient()->clientAddress(true);
         invariant(!_ti->isTransactionInProgress(_opCtx),

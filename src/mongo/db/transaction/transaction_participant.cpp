@@ -2018,6 +2018,10 @@ TransactionParticipant::Participant::prepareTransaction(
 
     shard_role_details::getRecoveryUnit(opCtx)->setPrepareTimestamp(
         prepareOplogSlot.getTimestamp());
+    if (gFeatureFlagPreparedTransactionsPreciseCheckpoints.isEnabled()) {
+        shard_role_details::getRecoveryUnit(opCtx)->setPreparedId(
+            prepareOplogSlot.getTimestamp().asULL());
+    }
     shard_role_details::getWriteUnitOfWork(opCtx)->prepare();
     p().needToWriteAbortEntry = true;
 
@@ -2073,27 +2077,22 @@ TransactionParticipant::Participant::prepareTransaction(
     return {prepareOplogSlot.getTimestamp(), o().affectedNamespaces};
 }
 
-void TransactionParticipant::Participant::refreshPreparedTransactionFromTxnRecord(
-    OperationContext* opCtx, SessionTxnRecord txnRecord) {
+void TransactionParticipant::Participant::restorePreparedTxnFromPreciseCheckpoint(
+    OperationContext* opCtx, SessionTxnRecordForPrepareRecovery txnRecord) {
     // This should only be called during replication recovery after both checking out the prepared
     // transaction's session, reclaiming its storage engine transaction, and retaking the
     // appropriate locks.
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked());
     invariant(opCtx->getTxnNumber() == txnRecord.getTxnNum());
-    invariant(txnRecord.getState());
-    invariant(*txnRecord.getState() == DurableTxnStateEnum::kPrepared);
     invariant(!o().txnResourceStash);
 
     // These should always have their default value.
     invariant(p().overwrittenStatus);
     invariant(!p().inShutdown);
 
-    // We always need to write an abort entry for a prepared transaction.
-    p().needToWriteAbortEntry = true;
-
-    // A prepared transaction must always have used autocommit=false.
-    p().autoCommit = false;
+    // These should have been set earlier during beginOrContinueTransactionUnconditionally().
+    invariant(p().needToWriteAbortEntry);
+    invariant(p().autoCommit == boost::optional<bool>(false));
 
     // TODO SERVER-113740: These will be unset and we need a way to ensure callers can handle that
     // and won't introduce new dependencies on it.
@@ -2104,26 +2103,18 @@ void TransactionParticipant::Participant::refreshPreparedTransactionFromTxnRecor
         o(lg).txnState.transitionTo(TransactionState::kPrepared);
         o(lg).activeTxnNumberAndRetryCounter.setTxnNumber(txnRecord.getTxnNum());
         o(lg).activeTxnNumberAndRetryCounter.setTxnRetryCounter([&] {
-            if (txnRecord.getState()) {
-                if (txnRecord.getTxnRetryCounter().has_value()) {
-                    return *txnRecord.getTxnRetryCounter();
-                }
-                return 0;
+            if (txnRecord.getTxnRetryCounter().has_value()) {
+                return *txnRecord.getTxnRetryCounter();
             }
-            return kUninitializedTxnRetryCounter;
+            return 0;
         }());
         o(lg).lastWriteOpTime = txnRecord.getLastWriteOpTime();
 
         o(lg).prepareOpTime = txnRecord.getLastWriteOpTime();
         shard_role_details::getRecoveryUnit(opCtx)->setPrepareTimestamp(
             o(lg).prepareOpTime.getTimestamp());
-        shard_role_details::getRecoveryUnit(opCtx)->setPreparedId(
-            o(lg).prepareOpTime.getTimestamp().asULL());
 
-        uassert(11372600,
-                "Can't reclaim a prepared transaction without affectedNamespaces",
-                txnRecord.getAffectedNamespaces());
-        for (auto&& ns : *txnRecord.getAffectedNamespaces()) {
+        for (auto&& ns : txnRecord.getAffectedNamespaces()) {
             o(lg).affectedNamespaces.emplace(std::move(ns));
         }
 
@@ -2364,7 +2355,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         // transactions, cascade the commit.
         auto* splitPrepareManager =
             repl::ReplicationCoordinator::get(opCtx)->getSplitPrepareSessionManager();
-        if (opCtx->writesAreReplicated() &&
+        if (opCtx->writesAreReplicated() && splitPrepareManager &&
             splitPrepareManager->isSessionSplit(
                 _sessionId(), o().activeTxnNumberAndRetryCounter.getTxnNumber())) {
             _commitSplitPreparedTxnOnPrimary(
@@ -2643,7 +2634,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
         repl::ReplicationCoordinator::get(opCtx)->getSplitPrepareSessionManager();
     // TODO (SLS-2079): Determine how to handle split prepared transactions.
     bool haveSplitPreparedTxns = rss.getPersistenceProvider().supportsCrossShardTransactions() &&
-        opCtx->writesAreReplicated() &&
+        opCtx->writesAreReplicated() && splitPrepareManager &&
         splitPrepareManager->isSessionSplit(_sessionId(),
                                             o().activeTxnNumberAndRetryCounter.getTxnNumber());
 
@@ -2666,6 +2657,15 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
         // causally related to the transaction abort enter the oplog at a timestamp earlier than the
         // abort oplog entry.
         OplogSlotReserver oplogSlotReserver(opCtx);
+
+        // TODO SERVER-113730: Determine if it's necessary to check the state is prepared here. It
+        // seems a non-prepared txn >16MB can reach this path, but we should confirm that.
+        if (gFeatureFlagPreparedTransactionsPreciseCheckpoints.isEnabled() &&
+            o().txnState.isPrepared()) {
+            // TODO SERVER-113735: Revisit this for split transactions aborting after step up.
+            shard_role_details::getRecoveryUnit(opCtx)->setRollbackTimestamp(
+                oplogSlotReserver.getLastSlot().getTimestamp());
+        }
 
         // If we are a primary aborting a transaction that was split into smaller prepared
         // transactions, cascade the abort.

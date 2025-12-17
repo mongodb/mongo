@@ -50,6 +50,7 @@
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/session/session_txn_record_helpers.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_stats.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -684,8 +685,8 @@ public:
          * represented by that record. Must only be called as part of recovering a transaction from
          * a precise checkpoint.
          */
-        void refreshPreparedTransactionFromTxnRecord(OperationContext* opCtx,
-                                                     SessionTxnRecord txnRecord);
+        void restorePreparedTxnFromPreciseCheckpoint(OperationContext* opCtx,
+                                                     SessionTxnRecordForPrepareRecovery txnRecord);
 
         /**
          * Sets the prepare optime used for recovery.

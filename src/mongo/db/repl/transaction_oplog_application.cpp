@@ -55,6 +55,7 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/session/session_txn_record_helpers.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -62,6 +63,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/storage/exceptions.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
@@ -824,12 +826,11 @@ Status applyPrepareTransaction(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplication::Mode mode) {
-    if (MONGO_unlikely(skipReconstructPreparedTransactions.shouldFail())) {
-        LOGV2(21848, "Hit skipReconstructPreparedTransactions failpoint");
-        return;
-    }
-
+/**
+ * Runs the given callback for every prepared transaction found in the transaction table.
+ */
+void _forEachTransactionTablePreparedTransaction(
+    OperationContext* opCtx, std::function<void(OperationContext*, SessionTxnRecord)> func) {
     // Ensure future transactions read without a timestamp.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
               shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
@@ -848,29 +849,181 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
 
         invariant(txnRecord.getState() == DurableTxnStateEnum::kPrepared);
 
-        // Get the prepareTransaction oplog entry corresponding to this transactions
-        // table entry.
-        const auto prepareOpTime = txnRecord.getLastWriteOpTime();
-        invariant(!prepareOpTime.isNull());
-        TransactionHistoryIterator iter(prepareOpTime);
-        invariant(iter.hasNext());
-        auto prepareOplogEntry = iter.nextFatalOnErrors(opCtx);
-
-        {
-            // Make a new opCtx so that we can set the lsid when applying the prepare
-            // transaction oplog entry.
-            auto newClient = opCtx->getServiceContext()
-                                 ->getService(ClusterRole::ShardServer)
-                                 ->makeClient("reconstruct-prepared-transactions");
-
-            AlternativeClientRegion acr(newClient);
-            const auto newOpCtx = cc().makeOperationContext();
-
-            // Ignore interruptions while reconstructing prepared transactions, so that we do not
-            // fassert and crash due to interruptions inside this call.
-            newOpCtx->runWithoutInterruptionExceptAtGlobalShutdown(
-                [&] { _reconstructPreparedTransaction(newOpCtx.get(), prepareOplogEntry, mode); });
-        }
+        func(opCtx, std::move(txnRecord));
     }
+}
+
+void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplication::Mode mode) {
+    if (MONGO_unlikely(skipReconstructPreparedTransactions.shouldFail())) {
+        LOGV2(21848, "Hit skipReconstructPreparedTransactions failpoint");
+        return;
+    }
+
+    _forEachTransactionTablePreparedTransaction(
+        opCtx, [mode](OperationContext* opCtx, SessionTxnRecord txnRecord) {
+            // Get the prepareTransaction oplog entry corresponding to this transactions table
+            // entry.
+            const auto prepareOpTime = txnRecord.getLastWriteOpTime();
+            invariant(!prepareOpTime.isNull());
+            TransactionHistoryIterator iter(prepareOpTime);
+            invariant(iter.hasNext());
+            auto prepareOplogEntry = iter.nextFatalOnErrors(opCtx);
+
+            {
+                // Make a new opCtx so that we can set the lsid when applying the prepare
+                // transaction oplog entry.
+                auto newClient = opCtx->getServiceContext()
+                                     ->getService(ClusterRole::ShardServer)
+                                     ->makeClient("reconstruct-prepared-transactions");
+
+                AlternativeClientRegion acr(newClient);
+                const auto newOpCtx = cc().makeOperationContext();
+
+                // Ignore interruptions while reconstructing prepared transactions, so that we do
+                // not fassert and crash due to interruptions inside this call.
+                newOpCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
+                    _reconstructPreparedTransaction(newOpCtx.get(), prepareOplogEntry, mode);
+                });
+            }
+        });
+}
+
+/**
+ * Recovers the in-memory state for the given transaction record. Throws on error.
+ */
+void _recoverPreparedTransactionFromPreciseCheckpoint(
+    OperationContext* opCtx, SessionTxnRecordForPrepareRecovery txnRecord) {
+    ScopedSetTxnInfoOnOperationContext scopedTxnInfo(
+        opCtx, txnRecord.getSessionId(), txnRecord.getTxnNum(), txnRecord.getTxnRetryCounter());
+
+    // Check out without refresh because we already have the transaction table entry from the
+    // earlier scan.
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    auto checkedOutSession = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx);
+
+    try {
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+
+        // Set the preparedId then unstash the participant, which will open the storage transaction
+        // using the preparedId to reclaim the corresponding prepared transaction. The prepareId is
+        // currently always the prepareTimestamp, which is the opTime of the prepare oplog entry.
+        shard_role_details::getRecoveryUnit(opCtx)->setPreparedId(
+            txnRecord.getPrepareTimestamp().asULL());
+        txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
+
+        // TODO SERVER-115356: Audit all non-user collections involved in a prepared transaction and
+        // ensure we recover the appropriate state here. e.g. if we took a lock on
+        // config.image_collection when originally preparing, take it here as well.
+        for (const auto& nss : txnRecord.getAffectedNamespaces()) {
+            // Transactions use two phase locking so we can let the acquisition type go out of scope
+            // immediately.
+            (void)acquireCollection(
+                opCtx,
+                CollectionAcquisitionRequest(nss,
+                                             PlacementConcern::kPretendUnsharded,
+                                             repl::ReadConcernArgs::get(opCtx),
+                                             AcquisitionPrerequisites::kUnreplicatedWrite),
+                MODE_IX);
+        }
+
+        // Reload transaction participant state based on the transaction record.
+        txnParticipant.restorePreparedTxnFromPreciseCheckpoint(opCtx, std::move(txnRecord));
+
+        // TODO SERVER-113740: Trigger the op observers for chunk migrations once they support
+        // not having the full operations list. e.g. onTransactionPrepareNonPrimary()
+
+        // Stash the transaction so it yields its resources and can be resumed by future user
+        // operations.
+        txnParticipant.stashTransactionResources(opCtx);
+    } catch (const DBException& ex) {
+        // An exception here will trigger an invariant in the destructor for
+        // MongoDOperationContextSessionWithoutRefresh, so catch and log the error before rethrowing
+        // to improve diagnostics.
+        LOGV2(11372900,
+              "Error when recovering prepared transaction from precise checkpoint.",
+              "reason"_attr = ex.toStatus());
+        throw;
+    }
+}
+
+using ExpectedTxnMap = stdx::unordered_map<uint64_t, SessionTxnRecordForPrepareRecovery>;
+
+std::vector<Timestamp> getUnmatchedTxnPrepareTimestampsForLog(
+    const ExpectedTxnMap& expectedTransactions) {
+    // Extract the prepare timestamp we expected to avoid printing customer sensitive data.
+    std::vector<Timestamp> unmatchedTxnIds;
+    unmatchedTxnIds.reserve(expectedTransactions.size());
+    std::transform(expectedTransactions.begin(),
+                   expectedTransactions.end(),
+                   std::back_inserter(unmatchedTxnIds),
+                   [](const auto& pair) { return pair.second.getPrepareTimestamp(); });
+    return unmatchedTxnIds;
+}
+
+void recoverPreparedTransactionsFromPreciseCheckpoint(OperationContext* opCtx) try {
+    // Find all transactions left in prepare according to the transaction table.
+    ExpectedTxnMap expectedTransactions;
+    _forEachTransactionTablePreparedTransaction(
+        opCtx, [&expectedTransactions](OperationContext* opCtx, SessionTxnRecord txnRecord) {
+            auto validatedTxnRecord = SessionTxnRecordForPrepareRecovery(std::move(txnRecord));
+            auto preparedId = validatedTxnRecord.getPrepareTimestamp().asULL();
+            // The preparedId is the opTime timestamp of the prepare oplog entry, so there shouldn't
+            // be duplicates.
+            invariant(
+                expectedTransactions.emplace(preparedId, std::move(validatedTxnRecord)).second);
+        });
+
+    // Cross reference those transactions with the transactions with prepared artifacts in the
+    // checkpoint being recovered from then restore the in-memory state for that transaction while
+    // reclaiming it from the storage engine.
+    auto unclaimedPreparedIt = opCtx->getServiceContext()
+                                   ->getStorageEngine()
+                                   ->getEngine()
+                                   ->getUnclaimedPreparedTransactionsForStartupRecovery(opCtx);
+
+    // Track the prepare timestamps we've processed so far to log more useful info on failure.
+    std::vector<Timestamp> processedPrepareTimestamps;
+    processedPrepareTimestamps.reserve(expectedTransactions.size());
+
+    while (auto unclaimedPreparedId = unclaimedPreparedIt->next()) {
+        auto matchingTxnRecordIt = expectedTransactions.find(*unclaimedPreparedId);
+        if (MONGO_unlikely(matchingTxnRecordIt == expectedTransactions.end())) {
+            LOGV2_FATAL(11372901,
+                        "Found a prepared transaction in checkpoint that was not tracked in the "
+                        "transaction table.",
+                        "preparedId"_attr = *unclaimedPreparedId,
+                        "unmatchedTxnPrepareTimestamps"_attr =
+                            getUnmatchedTxnPrepareTimestampsForLog(expectedTransactions),
+                        "processedPreparedIdTimestamps"_attr = processedPrepareTimestamps);
+        }
+
+        // Make a new opCtx so it can use the corresponding logical session id and transaction
+        // number when recovering the prepared transaction.
+        auto newClient = opCtx->getServiceContext()
+                             ->getService(ClusterRole::ShardServer)
+                             ->makeClient("recover-prepared-transactions-precise-checkpoint");
+        AlternativeClientRegion acr(newClient);
+        const auto newOpCtxHolder = cc().makeOperationContext();
+
+        _recoverPreparedTransactionFromPreciseCheckpoint(newOpCtxHolder.get(),
+                                                         std::move(matchingTxnRecordIt->second));
+
+        processedPrepareTimestamps.push_back(Timestamp(matchingTxnRecordIt->first));
+        expectedTransactions.erase(matchingTxnRecordIt);
+    }
+
+    if (MONGO_unlikely(expectedTransactions.size())) {
+        LOGV2_FATAL(11372907,
+                    "Different number of prepared transactions in the checkpoint than expected.",
+                    "numPreparedIdsInCheckpoint"_attr = processedPrepareTimestamps.size(),
+                    "numUnmatchedTxns"_attr = expectedTransactions.size(),
+                    "unmatchedTxnPrepareTimestamps"_attr =
+                        getUnmatchedTxnPrepareTimestampsForLog(expectedTransactions),
+                    "processedPreparedIdTimestamps"_attr = processedPrepareTimestamps);
+    }
+} catch (DBException& ex) {
+    LOGV2_FATAL(11372902,
+                "Exception while recovering prepared transactions from checkpoint.",
+                "reason"_attr = ex.toStatus());
 }
 }  // namespace mongo

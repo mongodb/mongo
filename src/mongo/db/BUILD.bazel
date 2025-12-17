@@ -3045,6 +3045,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/session:logical_session_id_test.cpp",
         "//src/mongo/db/session:session_catalog_mongod_test.cpp",
         "//src/mongo/db/session:session_catalog_test.cpp",
+        "//src/mongo/db/session:session_txn_record_helpers_test.cpp",
     ],
     tags = ["mongo_unittest_seventh_group"],
     target_compatible_with = select({

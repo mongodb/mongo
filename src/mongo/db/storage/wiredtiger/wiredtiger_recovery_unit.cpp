@@ -917,13 +917,17 @@ Timestamp WiredTigerRecoveryUnit::getPrepareTimestamp() const {
 }
 
 void WiredTigerRecoveryUnit::setPreparedId(uint64_t preparedId) {
-    invariant(_inUnitOfWork(), toString(_getState()));
+    // This is either called during a live transaction right before preparing it, in which case a
+    // prepare timestamp must be set OR during prepared transaction recovery when there will not yet
+    // be an active unit of work so the prepare timestamp will not be set.
+    invariant((_inUnitOfWork() && !_prepareTimestamp.isNull()) ||
+                  (!_inUnitOfWork() && _prepareTimestamp.isNull()),
+              str::stream() << "Trying to set prepared id to " << preparedId
+                            << " incorrectly based on the current state: "
+                            << toString(_getState()));
     invariant(!_preparedId.has_value(),
               str::stream() << "Trying to set prepared id to " << preparedId
                             << ". It's already set to " << _preparedId.value());
-    invariant(!_prepareTimestamp.isNull(),
-              str::stream() << "Trying to set prepared id to " << preparedId
-                            << " without setting the prepare timestamp.");
     invariant(_commitTimestamp.isNull(),
               str::stream() << "Commit timestamp is " << _commitTimestamp.toString()
                             << " and trying to set prepared id of " << preparedId);
@@ -962,14 +966,6 @@ void WiredTigerRecoveryUnit::setPrepareConflictBehavior(PrepareConflictBehavior 
 
 PrepareConflictBehavior WiredTigerRecoveryUnit::getPrepareConflictBehavior() const {
     return _prepareConflictBehavior;
-}
-
-void WiredTigerRecoveryUnit::reclaimPreparedTransactionForRecovery() {
-    invariant(_preparedId.has_value());
-
-    // Start a WiredTiger transaction that takes over and continues the prepared transaction
-    // identified by _preparedId.
-    preallocateSnapshot();
 }
 
 void WiredTigerRecoveryUnit::setTimestampReadSource(ReadSource readSource,
