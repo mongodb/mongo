@@ -8774,126 +8774,122 @@ buildvariants:
 #             OSX buildvariants           #
 ###########################################
 
-# SERVER-97950: MacOS builds are disabled because we have removed MacOS 10.14
-# from Evergreen. If we need to build the 5.0 series on MacOS in the future, we
-# will need to backport several changes to get this branch building on MacOS 14.
+- name: macos
+  display_name: macOS
+  run_on:
+  - macos-1014-aws
+  expansions:
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_latch_analyzer --enableEnterpriseTests=off
+    push_path: osx
+    push_bucket: downloads.mongodb.org
+    push_name: macos
+    push_arch: x86_64
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --modules=
+    resmoke_jobs_max: 6
+  tasks:
+  - name: compile_test_and_package_serial_TG
+  - name: compile_build_tools_next_TG
+  - name: build_variant_gen
+  - name: aggregation
+  - name: .auth .gle
+  - name: auth_gen
+  - name: .misc_js
+  - name: disk_wiredtiger
+  - name: .jscore .common !.auth !.sharding
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_gen
+  - name: .replica_sets .common !.auth
+  - name: .ssl
+  - name: unittest_shell_hang_analyzer_gen
+  - name: push
 
-# - name: macos
-#   display_name: macOS
-#   run_on:
-#   - macos-1014-aws
-#   expansions:
-#     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_latch_analyzer --enableEnterpriseTests=off
-#     push_path: osx
-#     push_bucket: downloads.mongodb.org
-#     push_name: macos
-#     push_arch: x86_64
-#     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
-#     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --modules=
-#     resmoke_jobs_max: 6
-#   tasks:
-#   - name: compile_test_and_package_serial_TG
-#   - name: compile_build_tools_next_TG
-#   - name: build_variant_gen
-#   - name: aggregation
-#   - name: .auth .gle
-#   - name: auth_gen
-#   - name: .misc_js
-#   - name: disk_wiredtiger
-#   - name: .jscore .common !.auth !.sharding
-#   - name: .logical_session_cache .one_sec
-#   - name: replica_sets_gen
-#   - name: .replica_sets .common !.auth
-#   - name: .ssl
-#   - name: unittest_shell_hang_analyzer_gen
-#   - name: push
+- &macos-debug-template
+  name: macos-debug-suggested
+  display_name: "* Shared Library macOS DEBUG"
+  batchtime: *batchtime_one_week
+  run_on:
+  - macos-1014-aws
+  expansions: &macos-debug-expansions
+    test_flags: --excludeWithAnyTags=incompatible_with_macos --enableEnterpriseTests=off
+    resmoke_jobs_max: 6
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
+    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --link-model=dynamic --modules= --use-diagnostic-latches=on
+    num_scons_link_jobs_available: 0.99
+  tasks:
+  - name: compile_test_and_package_serial_TG
+  - name: compile_build_tools_next_TG
+  - name: build_variant_gen
+  - name: aggregation
+  - name: auth_gen
+  - name: disk_wiredtiger
+  - name: failpoints
+  - name: .jscore .common !.auth !.sharding
+  - name: mongosTest
+  - name: replica_sets_gen
+  - name: .ssl
+  - name: unittest_shell_hang_analyzer_gen
 
-# - &macos-debug-template
-#   name: macos-debug-suggested
-#   display_name: "* Shared Library macOS DEBUG"
-#   batchtime: *batchtime_one_week
-#   run_on:
-#   - macos-1014-aws
-#   expansions: &macos-debug-expansions
-#     test_flags: --excludeWithAnyTags=incompatible_with_macos --enableEnterpriseTests=off
-#     resmoke_jobs_max: 6
-#     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
-#     compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --link-model=dynamic --modules= --use-diagnostic-latches=on
-#     num_scons_link_jobs_available: 0.99
-#   tasks:
-#   - name: compile_test_and_package_serial_TG
-#   - name: compile_build_tools_next_TG
-#   - name: build_variant_gen
-#   - name: aggregation
-#   - name: auth_gen
-#   - name: disk_wiredtiger
-#   - name: failpoints
-#   - name: .jscore .common !.auth !.sharding
-#   - name: mongosTest
-#   - name: replica_sets_gen
-#   - name: .ssl
-#   - name: unittest_shell_hang_analyzer_gen
-
-# - name: enterprise-macos
-#   display_name: Enterprise macOS
-#   run_on:
-#   - macos-1014-aws
-#   expansions:
-#     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_latch_analyzer
-#     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
-#     push_path: osx
-#     push_bucket: downloads.10gen.com
-#     push_name: macos
-#     push_arch: x86_64-enterprise
-#     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
-#     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
-#     resmoke_jobs_max: 6
-#   tasks:
-#   - name: compile_test_and_package_serial_TG
-#   - name: compile_ninja_next_TG
-#   - name: compile_build_tools_next_TG
-#   - name: libdeps_graph_linting_TG
-#   - name: build_variant_gen
-#   - name: audit
-#   - name: auth_audit_gen
-#   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
-#   - name: .logical_session_cache .one_sec
-#   - name: mqlrun
-#   - name: replica_sets_auth_gen
-#   - name: sasl
-#   - name: push
+- name: enterprise-macos
+  display_name: Enterprise macOS
+  run_on:
+  - macos-1014-aws
+  expansions:
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_latch_analyzer
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: osx
+    push_bucket: downloads.10gen.com
+    push_name: macos
+    push_arch: x86_64-enterprise
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    resmoke_jobs_max: 6
+  tasks:
+  - name: compile_test_and_package_serial_TG
+  - name: compile_ninja_next_TG
+  - name: compile_build_tools_next_TG
+  - name: libdeps_graph_linting_TG
+  - name: build_variant_gen
+  - name: audit
+  - name: auth_audit_gen
+  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
+  - name: .logical_session_cache .one_sec
+  - name: mqlrun
+  - name: replica_sets_auth_gen
+  - name: sasl
+  - name: push
 
 ###########################################
 #          Embedded SDK buildvariants     #
 ###########################################
 
-# - name: embedded-sdk-macos
-#   display_name: "Embedded SDK - macOS"
-#   run_on:
-#   - macos-1014-aws
-#   batchtime: *batchtime_one_week
-#   expansions:
-#     test_flags: --excludeWithAnyTags=uses_transactions,incompatible_with_macos --enableEnterpriseTests=off
-#     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
-#     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
-#     compile_flags: >-
-#       --lto
-#       --variables-files=etc/scons/xcode_macosx.vars
-#       -j$(sysctl -n hw.logicalcpu)
-#       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
-#       --modules=
-#     cdriver_cmake_osx_deployment_target: "10.14"
-#     cdriver_cmake_flags: >-
-#         -DCMAKE_BUILD_TYPE=RelWithDebInfo
-#         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
-#         -DCMAKE_OSX_ARCHITECTURES=x86_64
-#         -DENABLE_SSL=DARWIN
-#         -DENABLE_ZLIB=BUNDLED
-#         -DCMAKE_C_FLAGS="-Wunguarded-availability"
-#         -DCMAKE_INSTALL_RPATH=@loader_path/../lib
-#     disable_unit_tests: true
-#   tasks:
-#   - name: embedded_sdk_build_and_test
+- name: embedded-sdk-macos
+  display_name: "Embedded SDK - macOS"
+  run_on:
+  - macos-1014-aws
+  batchtime: *batchtime_one_week
+  expansions:
+    test_flags: --excludeWithAnyTags=uses_transactions,incompatible_with_macos --enableEnterpriseTests=off
+    cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
+    compile_flags: >-
+      --lto
+      --variables-files=etc/scons/xcode_macosx.vars
+      -j$(sysctl -n hw.logicalcpu)
+      LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
+      --modules=
+    cdriver_cmake_osx_deployment_target: "10.14"
+    cdriver_cmake_flags: >-
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        -DCMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
+        -DCMAKE_OSX_ARCHITECTURES=x86_64
+        -DENABLE_SSL=DARWIN
+        -DENABLE_ZLIB=BUNDLED
+        -DCMAKE_C_FLAGS="-Wunguarded-availability"
+        -DCMAKE_INSTALL_RPATH=@loader_path/../lib
+    disable_unit_tests: true
+  tasks:
+  - name: embedded_sdk_build_and_test
 
 - name: embedded-sdk-ubuntu-1804-x86_64
   display_name: "Embedded SDK - Ubuntu 18.04 x86_64"
