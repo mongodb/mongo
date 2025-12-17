@@ -52,7 +52,7 @@ class test_eviction02(eviction_util):
         nrows = 10000
         prev_obsolete_tw_value = 0
         # Stats may have a stale value, allow some buffer.
-        threshold = self.obsolete_tw_max * 2.5
+        threshold = self.obsolete_tw_max * 2
         uri = 'table:eviction02'
         value = 'k' * 1024
 
