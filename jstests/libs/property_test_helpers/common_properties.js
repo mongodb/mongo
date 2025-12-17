@@ -40,7 +40,7 @@ function getAllVariationsOfQueryShape(shapeIx, getQuery, testHelpers) {
  * The `statsCollectorFn`, if provided, is run on the explain of each query on the experiment
  * collection.
  */
-export function createCorrectnessProperty(controlColl, experimentColl, statsCollectorFn) {
+export function createCorrectnessProperty(controlColl, experimentColl, statsCollectorFn, jsTestLogExplain = false) {
     return function queryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
         const queries = getDifferentlyShapedQueries(getQuery, testHelpers);
 
@@ -54,6 +54,9 @@ export function createCorrectnessProperty(controlColl, experimentColl, statsColl
             let experimentResults = [];
             assert.eq(typeof query, "object");
             experimentResults = experimentColl.aggregate(query.pipeline, query.options).toArray();
+            if (jsTestLogExplain) {
+                jsTest.log(experimentColl.explain().aggregate(query.pipeline, query.options));
+            }
             if (statsCollectorFn) {
                 statsCollectorFn(experimentColl.explain().aggregate(query.pipeline, query.options));
             }

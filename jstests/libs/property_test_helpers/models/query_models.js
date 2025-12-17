@@ -15,6 +15,7 @@ import {
 } from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {collationArb} from "jstests/libs/property_test_helpers/models/collation_models.js";
 import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
+import {getEqLookupUnwindArb} from "jstests/libs/property_test_helpers/models/lookup_models.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
@@ -126,6 +127,15 @@ export function getAggPipelineArb({allowOrs = true, deterministicBag = true, all
     const stages = allowedStages.length == 0 ? getAllowedStages(allowOrs, deterministicBag, isTS) : allowedStages;
     // Length 6 seems long enough to cover interactions between stages.
     return fc.array(oneof(...stages), {minLength: 1, maxLength: 6});
+}
+
+export function getSbePushdownEligibleAggPipelineArb(
+    foreignCollName,
+    {allowOrs = true, deterministicBag = true, allowedStages = [], isTS = false} = {},
+) {
+    const stages = [groupArb, getEqLookupUnwindArb(foreignCollName), getMatchArb()];
+    // eqLookupUnwind returns a javascript array; flatten that here.
+    return fc.array(oneof(...stages), {minLength: 1, maxLength: 6}).map((item) => item.flat());
 }
 
 /*

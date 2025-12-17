@@ -7,8 +7,11 @@ import {
     simpleProjectArb,
     getAggPipelineArb,
     getQueryAndOptionsModel,
+    getSbePushdownEligibleAggPipelineArb,
 } from "jstests/libs/property_test_helpers/models/query_models.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
+import {getEqLookupUnwindArb} from "jstests/libs/property_test_helpers/models/lookup_models.js";
+import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {getNestedProperties} from "jstests/libs/query/analyze_plan.js";
@@ -76,6 +79,39 @@ export function matchFirstStageAggModel({isTS = false, is83orAbove = true} = {})
 
     return aggArb.map(({matchStage, restOfPipeline}) => {
         return {"pipeline": [matchStage, ...restOfPipeline], "options": {}};
+    });
+}
+
+export function groupThenMatchAggModel({isTS = false, is83orAbove = true} = {}) {
+    let aggArb = fc.record({
+        matchStage: getMatchArb(),
+        groupStage: groupArb,
+    });
+
+    // Older versions suffer from SERVER-101007
+    // TODO SERVER-114269 remove this check.
+    if (!is83orAbove) {
+        aggArb = aggArb.filter(({matchStage, groupStage}) => getNestedProperties(matchStage, "$elemMatch").length == 0);
+    }
+
+    return aggArb.map(({matchStage, groupStage}) => {
+        return {"pipeline": [groupStage, matchStage], "options": {}};
+    });
+}
+
+export function sbePushdownEligibleAggModel(foreignName, {isTS = false, is83orAbove = true} = {}) {
+    let aggArb = fc.record({
+        pipeline: getSbePushdownEligibleAggPipelineArb(foreignName, {isTS: isTS}),
+    });
+
+    // Older versions suffer from SERVER-101007
+    // TODO SERVER-114269 remove this check.
+    if (!is83orAbove) {
+        aggArb = aggArb.filter(({pipeline}) => getNestedProperties(pipeline, "$elemMatch").length == 0);
+    }
+
+    return aggArb.map(({pipeline}) => {
+        return {pipeline, "options": {}};
     });
 }
 
