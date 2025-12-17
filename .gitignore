@@ -121,6 +121,9 @@ scratch
 /optimizer_gdb_test_program-*
 /pretty_printer_test-*.py
 /pretty_printer_test_program-*
+/pretty_printer_test_launcher*
+/install_compass*
+/multiversion-config.yml
 
 *.tgz
 *.zip
