@@ -42,6 +42,7 @@
 #include "mongo/db/extension/sdk/dpl_array_container.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/raii_vector_to_abi_array.h"
+#include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/extension/shared/array/abi_array_to_raii_vector.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
@@ -666,13 +667,14 @@ TEST_F(AggStageTest, DesugarToEmptyDescriptorParseTest) {
 
 TEST_F(AggStageTest, SourceStageParseTest) {
     auto descriptor = std::make_unique<ExtensionAggStageDescriptor>(
-        shared_test_stages::FruitsAsDocumentsDescriptor::make());
+        std::make_unique<shared_test_stages::FruitsAsDocumentsSourceStageDescriptor>());
     auto handle = extension::AggStageDescriptorHandle{descriptor.get()};
 
     BSONObj stageBson =
-        BSON(shared_test_stages::FruitsAsDocumentsDescriptor::kStageName << BSON("foo" << true));
+        BSON(shared_test_stages::FruitsAsDocumentsSourceStageDescriptor::kStageName << BSONObj());
     auto parseNodeHandle = handle.parse(stageBson);
-    ASSERT_EQ(shared_test_stages::FruitsAsDocumentsDescriptor::kStageName, handle.getName());
+    ASSERT_EQ(shared_test_stages::FruitsAsDocumentsSourceStageDescriptor::kStageName,
+              handle.getName());
 }
 
 class FieldPathQueryShapeParseNode : public sdk::AggStageParseNode {
@@ -1095,18 +1097,10 @@ TEST_F(AggStageTest, TestValidExecAggStageFromCompiledLogicalAggStage) {
     }
 }
 
-class TestSourceLogicalAggStage : public shared_test_stages::FruitsAsDocumentsLogicalAggStage {
-public:
-    TestSourceLogicalAggStage() : shared_test_stages::FruitsAsDocumentsLogicalAggStage() {}
-
-    static inline std::unique_ptr<extension::sdk::LogicalAggStage> make() {
-        return std::make_unique<TestSourceLogicalAggStage>();
-    }
-};
-
 TEST_F(AggStageTest, TestValidExecAggStageFromCompiledSourceLogicalAggStage) {
-    auto logicalStage =
-        new extension::sdk::ExtensionLogicalAggStage(TestSourceLogicalAggStage::make());
+    auto logicalStage = new extension::sdk::ExtensionLogicalAggStage(
+        std::make_unique<shared_test_stages::FruitsAsDocumentsLogicalStage>(
+            shared_test_stages::kFruitsAsDocumentsName, BSONObj()));
     auto handle = extension::LogicalAggStageHandle{logicalStage};
 
     auto compiledExecAggStageHandle = handle.compile();

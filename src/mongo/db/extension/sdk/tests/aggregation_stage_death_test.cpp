@@ -29,9 +29,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
-#include "mongo/db/extension/host/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
-#include "mongo/db/extension/host/extension_stage.h"
 #include "mongo/db/extension/host/query_execution_context.h"
 #include "mongo/db/extension/host_connector/adapter/executable_agg_stage_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
@@ -40,6 +38,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/distributed_plan_logic.h"
 #include "mongo/db/extension/sdk/dpl_array_container.h"
+#include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
@@ -595,7 +594,7 @@ DEATH_TEST_F(AggStageDeathTest, SourceStageForTransformExtensionStageBecomesInva
         SerializationContext());
 
     auto astNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+        sdk::shared_test_stages::AddFruitsToDocumentsAstNode::make());
     auto astHandle = AggStageAstNodeHandle(astNode);
 
     auto optimizable =
@@ -628,7 +627,7 @@ DEATH_TEST_F(AggStageDeathTest, SourceStageForTransformExtensionStageBecomesInva
 };
 
 DEATH_TEST_F(AggStageDeathTest, NoSourceStageForTransformStage, "10957209") {
-    auto transformStage = shared_test_stages::AddFruitsToDocumentsExecAggStage::make();
+    auto transformStage = shared_test_stages::AddFruitsToDocumentsExecStage::make();
 
     QueryTestServiceContext testCtx;
     auto opCtx = testCtx.makeOperationContext();
@@ -652,7 +651,7 @@ DEATH_TEST_F(AggStageDeathTest, SetSourceOnSourceStageFails, "10957210") {
     // Setting the source of a source stage should fail irrespective of the type of the stage being
     // set as the source.
     auto sourceHandle = extension::ExecAggStageHandle{new extension::sdk::ExtensionExecAggStage(
-        shared_test_stages::AddFruitsToDocumentsExecAggStage::make())};
+        shared_test_stages::AddFruitsToDocumentsExecStage::make())};
     // ValidExtensionExecAggStage is a source stage.
     auto handle = extension::ExecAggStageHandle{new extension::sdk::ExtensionExecAggStage(
         shared_test_stages::ValidExtensionExecAggStage::make())};
@@ -662,15 +661,15 @@ DEATH_TEST_F(AggStageDeathTest, SetSourceOnSourceStageFails, "10957210") {
 }
 
 DEATH_TEST_F(AggStageDeathTest, GetSourceOnSourceStageFails, "10957208") {
-    shared_test_stages::FruitsAsDocumentsExecAggStage sourceStage{"", BSONObj()};
 
+    shared_test_stages::FruitsAsDocumentsExecStage sourceStage{};
     // Calling getSource on a source stage should fail.
     [[maybe_unused]] auto source = sourceStage._getSource();
 }
 
 DEATH_TEST_F(AggStageDeathTest, GetNameOnMovedHandleFails, "10596403") {
     auto sourceHandle = extension::ExecAggStageHandle{new extension::sdk::ExtensionExecAggStage(
-        shared_test_stages::AddFruitsToDocumentsExecAggStage::make())};
+        shared_test_stages::AddFruitsToDocumentsExecStage::make())};
 
     auto sourceHandle2 = std::move(sourceHandle);
 

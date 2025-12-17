@@ -40,6 +40,7 @@
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/host_services.h"
+#include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_documents.h"
@@ -835,6 +836,7 @@ public:
 };
 
 static constexpr std::string_view kSourceName = "$sortKeySource";
+
 class ValidateSortKeyMetadataExecStage : public sdk::ExecAggStageSource {
 public:
     ValidateSortKeyMetadataExecStage() : sdk::ExecAggStageSource(kSourceName) {}
@@ -903,7 +905,6 @@ public:
         return std::make_unique<ValidateSortKeyMetadataAstStage>();
     }
 };
-
 }  // namespace
 
 TEST_F(DocumentSourceExtensionTest, TransformAstNodeWithDefaultGetPropertiesSucceeds) {
@@ -1160,7 +1161,7 @@ TEST_F(DocumentSourceExtensionTest, ShouldPropagateValidGetNextResultsForTransfo
         getExpCtx());
 
     auto astNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+        sdk::shared_test_stages::AddFruitsToDocumentsAstNode::make());
     auto astHandle = AggStageAstNodeHandle(astNode);
 
     auto optimizable =
@@ -1223,11 +1224,11 @@ TEST_F(
         getExpCtx());
 
     auto firstAstNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+        sdk::shared_test_stages::AddFruitsToDocumentsAstNode::make());
     auto firstAstHandle = AggStageAstNodeHandle(firstAstNode);
 
     auto secondAstNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+        sdk::shared_test_stages::AddFruitsToDocumentsAstNode::make());
     auto secondAstHandle = AggStageAstNodeHandle(secondAstNode);
 
     auto firstOptimizable =
@@ -1307,7 +1308,7 @@ TEST_F(DocumentSourceExtensionTest,
     auto sourceStage = exec::agg::buildStage(sourceOptimizable);
 
     auto transformAstNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+        sdk::shared_test_stages::AddFruitsToDocumentsAstNode::make());
     auto transformAstHandle = AggStageAstNodeHandle(transformAstNode);
 
     auto transformOptimizable = host::DocumentSourceExtensionOptimizable::create(
@@ -1352,7 +1353,7 @@ TEST_F(DocumentSourceExtensionTest, ShouldEofWhenSourceStageEofsEarly) {
         BSON("$documents" << BSON_ARRAY(BSON("sourceField" << 1))).firstElement(), getExpCtx());
 
     auto astNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+        sdk::shared_test_stages::AddFruitsToDocumentsAstNode::make());
     auto astHandle = AggStageAstNodeHandle(astNode);
 
     auto optimizable =
@@ -1410,7 +1411,7 @@ TEST_F(DocumentSourceExtensionTest,
         getExpCtx());
 
     auto firstAstNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+        sdk::shared_test_stages::AddFruitsToDocumentsAstNode::make());
     auto firstAstHandle = AggStageAstNodeHandle(firstAstNode);
 
     auto firstOptimizable =
@@ -1476,7 +1477,7 @@ TEST_F(DocumentSourceExtensionTest, ShouldPropagateSourceMetadata) {
     auto sourceStage = exec::agg::buildStage(sourceOptimizable);
 
     const auto& inputResults =
-        sdk::shared_test_stages::FruitsAsDocumentsExecAggStage::getInputResults();
+        sdk::shared_test_stages::FruitsAsDocumentsExecStage::getInputResults();
     std::vector<Document> expectedDocuments;
     for (const auto& inputResult : inputResults) {
         expectedDocuments.emplace_back(
@@ -1510,7 +1511,7 @@ TEST_F(DocumentSourceExtensionTest, TransformReceivesSourceMetadata) {
     auto sourceStage = exec::agg::buildStage(sourceOptimizable);
 
     auto transformAstNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::AddFruitsToDocumentsAggStageAstNode::make());
+        sdk::shared_test_stages::AddFruitsToDocumentsAstNode::make());
     auto transformAstHandle = AggStageAstNodeHandle(transformAstNode);
 
     auto transformOptimizable = host::DocumentSourceExtensionOptimizable::create(
@@ -1519,7 +1520,7 @@ TEST_F(DocumentSourceExtensionTest, TransformReceivesSourceMetadata) {
     auto transformStage = exec::agg::buildStageAndStitch(transformOptimizable, sourceStage);
 
     const auto& inputResults =
-        sdk::shared_test_stages::FruitsAsDocumentsExecAggStage::getInputResults();
+        sdk::shared_test_stages::FruitsAsDocumentsExecStage::getInputResults();
     std::vector<Document> expectedDocuments;
     for (const auto& inputResult : inputResults) {
         const BSONObj& transformedDocBson =
@@ -1558,7 +1559,6 @@ TEST_F(DocumentSourceExtensionTest, ShouldPropagateSortKeyMetadata) {
     for (auto index = 0; index < 3; ++index) {
         auto next = sourceStage->getNext();
         ASSERT_TRUE(next.isAdvanced());
-        // Take the returned Document by value.
         const auto& actualDocument = next.releaseDocument();
         const auto& expectedDocument = Document::createDocumentWithMetadata(
             inputResults[index].first, inputResults[index].second);

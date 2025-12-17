@@ -41,6 +41,7 @@ extensions_with_config(
         ":sharded_execution_serialization_mongo_extension",
         ":read_n_documents_mongo_extension",
         ":explain_mongo_extension",
+        ":metadata_mongo_extension",
         ":idle_threads_mongo_extension",
         ":interrupt_mongo_extension",
         ":match_topN_mongo_extension",
@@ -73,6 +74,7 @@ pkg_name = "//" + package_name() + "/"
     )
     for extension_name in [
         "foo",
+        "metadata",
         "foo_v2",
         "bar",
         "read_n_documents",
