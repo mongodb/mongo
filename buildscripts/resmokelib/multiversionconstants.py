@@ -53,13 +53,21 @@ def generate_releases_file():
 
 def in_git_root_dir():
     """Return True if we are in the root of a git directory."""
-    if call(["git", "branch"], stderr=STDOUT, stdout=DEVNULL) != 0:
-        # We are not in a git directory.
+    try:
+        if call(["git", "branch"], stderr=STDOUT, stdout=DEVNULL) != 0:
+            # We are not in a git directory.
+            return False
+    except FileNotFoundError:
+        # Git is not even installed.
         return False
 
-    git_root_dir = check_output("git rev-parse --show-toplevel", shell=True, text=True).strip()
-    # Always use forward slash for the cwd path to resolve inconsistent formatting with Windows.
-    curr_dir = os.getcwd().replace("\\", "/")
+    git_root_dir = os.path.realpath(
+        check_output("git rev-parse --show-toplevel", shell=True, text=True).strip())
+    curr_dir = os.path.realpath(os.getcwd())
+    # python on windows under version 3.8 can have
+    # weird behavior with identifying the real drive
+    curr_dir = curr_dir.replace("Z:\\", "C:\\")
+    git_root_dir = git_root_dir.replace("Z:\\", "C:\\")
     return git_root_dir == curr_dir
 
 
