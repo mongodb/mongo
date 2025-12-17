@@ -1,13 +1,10 @@
 """Module to hold the logger instances themselves."""
 
 import logging
-import os
 import sys
-import yaml
 
 from . import buildlogger
 from . import formatters
-from .. import config
 from .. import errors
 
 _DEFAULT_FORMAT = "[%(name)s] %(message)s"
@@ -46,13 +43,6 @@ def configure_loggers(logging_config):
     global EXECUTOR_LOGGER  # pylint: disable=global-statement
     EXECUTOR_LOGGER = ExecutorRootLogger(logging_config, build_logger_server, fixture_logger,
                                          tests_logger)
-
-    _write_evergreen_log_spec()
-
-
-def get_evergreen_log_name(job_num, test_id=None):
-    """Return the log name, relative to the reserved test log directory, on the Evergreen task host."""
-    return f"job{job_num}/" + (f"{test_id}.log" if test_id else "global.log")
 
 
 class BaseLogger(logging.Logger):
@@ -137,8 +127,6 @@ class RootLogger(BaseLogger):
             handler = logging.StreamHandler(sys.stdout)
         elif handler_class == "buildlogger":
             return  # Buildlogger handlers are applied when creating specific child loggers
-        elif handler_class == "evergreen":
-            return  # Evergreen handlers are applied when creating specific child loggers
         else:
             raise ValueError("Unknown handler class '%s'" % handler_class)
         handler.setFormatter(formatter)
@@ -204,46 +192,42 @@ class JobLogger(BaseLogger):
         """Create a new fixture logger that will be a child of the "fixture" root logger."""
         return FixtureLogger(fixture_class, self.job_num, self.build_id, self.fixture_root_logger)
 
-    def new_test_logger(self, test_id, test_shortname, test_basename, command, parent):  # pylint: disable=too-many-arguments
+    def new_test_logger(self, test_shortname, test_basename, command, parent):
         """Create a new test logger that will be a child of the given parent."""
         if self.build_id:
             # If we're configured to log messages to the buildlogger server, then request a new
-            # test id for this test.
-            build_test_id = self.build_logger_server.new_test_id(self.build_id, test_basename,
-                                                                 command)
-            if not build_test_id:
+            # test_id for this test.
+            test_id = self.build_logger_server.new_test_id(self.build_id, test_basename, command)
+            if not test_id:
                 buildlogger.set_log_output_incomplete()
                 raise errors.LoggerRuntimeConfigError(
                     "Encountered an error configuring buildlogger for test {}: Failed to get a new"
                     " test_id".format(test_basename))
 
-            url = self.build_logger_server.get_test_log_url(self.build_id, build_test_id)
+            url = self.build_logger_server.get_test_log_url(self.build_id, test_id)
             self.info("Writing output of %s to %s.", test_basename, url)
-            return TestLogger(test_shortname, parent, self.job_num, self.build_id, build_test_id,
-                              url)
+            return TestLogger(test_shortname, parent, self.build_id, test_id, url)
 
-        return TestLogger(test_shortname, parent, job_num=self.job_num, test_id=test_id)
+        return TestLogger(test_shortname, parent)
 
 
 class TestLogger(BaseLogger):
     """TestLogger class."""
 
     def __init__(  # pylint: disable=too-many-arguments
-            self, test_name, parent, job_num=None, build_id=None, test_id=None, url=None):
+            self, test_name, parent, build_id=None, test_id=None, url=None):
         """Initialize a TestLogger.
 
         :param test_name: the test name.
         :param parent: the parent logger.
-        :param job_num: the number of the job the test is running on.
         :param build_id: the build logger build id.
-        :param test_id: the test id for the logger handler.
+        :param test_id: the build logger test id.
         :param url: the build logger URL endpoint for the test.
         """
         name = "%s:%s" % (parent.name, test_name)
         BaseLogger.__init__(self, name, parent=parent)
         self.url_endpoint = url
         self._add_build_logger_handler(build_id, test_id)
-        _add_evergreen_handler(self, self.logging_config, job_num, test_id)
 
     def _add_build_logger_handler(self, build_id, test_id):
         logger_info = self.logging_config[TESTS_LOGGER_NAME]
@@ -285,7 +269,6 @@ class FixtureLogger(BaseLogger):
         self.fixture_class = fixture_class
         self.job_num = job_num
         self._add_build_logger_handler(build_id)
-        _add_evergreen_handler(self, self.logging_config, job_num)
 
     def _add_build_logger_handler(self, build_id):
         logger_info = self.logging_config[FIXTURE_LOGGER_NAME]
@@ -387,55 +370,3 @@ def _get_buildlogger_handler_info(logger_info):
         if handler_info.pop("class") == "buildlogger":
             return handler_info
     return None
-
-
-# Utility functions for Evergreen file system logging.
-# See `https://docs.devprod.prod.corp.mongodb.com/evergreen/Project-Configuration/Task-Output-Directory#test-logs`
-# for more information.
-
-
-def _write_evergreen_log_spec():
-    """Configure file system logging for Evergreen tasks."""
-    if not config.EVERGREEN_WORK_DIR:
-        return
-
-    fp = f"{_get_evergreen_log_dirname()}/log_spec.yaml"
-    os.makedirs(os.path.dirname(fp), exist_ok=True)
-
-    EXECUTOR_LOGGER.info("Writing Evergreen test log spec to %s.", fp)
-
-    log_spec = {
-        "version": 0,
-        "format": "text-timestamp",
-    }
-    with open(fp, "w") as fd:
-        yaml.dump(log_spec, fd)
-
-
-def _add_evergreen_handler(logger, logging_config, job_num, test_id=None):
-    """Add a new evergreen handler to a logger."""
-    logger_info = logging_config[TESTS_LOGGER_NAME]
-    evergreen_handler_info = None
-    for handler_info in logger_info["handlers"]:
-        if handler_info["class"] == "evergreen":
-            evergreen_handler_info = handler_info
-            break
-
-    if evergreen_handler_info:
-        fp = f"{_get_evergreen_log_dirname()}/{get_evergreen_log_name(job_num, test_id)}"
-        os.makedirs(os.path.dirname(fp), exist_ok=True)
-
-        handler = logging.FileHandler(filename=fp, mode="a")
-        handler.setFormatter(
-            formatters.EvergreenLogFormatter(fmt=logger_info.get("format", _DEFAULT_FORMAT)))
-        logger.addHandler(handler)
-
-        if test_id:
-            EXECUTOR_LOGGER.info("Writing output of %s to %s.", test_id, fp)
-        else:
-            EXECUTOR_LOGGER.info("Writing output of job #%d to %s.", job_num, fp)
-
-
-def _get_evergreen_log_dirname():
-    """Return the reserved directory for test logs on the Evergreen task host."""
-    return f"{config.EVERGREEN_WORK_DIR}/build/TestLogs"

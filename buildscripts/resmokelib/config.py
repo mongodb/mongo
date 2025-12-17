@@ -111,7 +111,6 @@ DEFAULTS = {
     "task_name": None,
     "variant_name": None,
     "version_id": None,
-    "work_dir": None,
 
     # WiredTiger options.
     "wt_coll_config": None,
@@ -286,9 +285,6 @@ EVERGREEN_VARIANT_NAME = None
 # The identifier consisting of the project name and the commit hash. For patch builds, it is just
 # the commit hash.
 EVERGREEN_VERSION_ID = None
-
-# The Evergreen task's working directory.
-EVERGREEN_WORK_DIR = None
 
 # If set, then any jstests that have any of the specified tags will be excluded from the suite(s).
 EXCLUDE_WITH_ANY_TAGS = None

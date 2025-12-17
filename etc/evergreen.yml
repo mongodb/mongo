@@ -1387,7 +1387,7 @@ functions:
             ${san_options}                                \
             ${snmp_config_path}                           \
             ${resmoke_wrapper}                            \
-            $python buildscripts/resmoke.py run           \
+            $python buildscripts/resmoke.py run   \
                 ${resmoke_args}                           \
                 $extra_args                               \
                 ${test_flags}                             \
@@ -1404,7 +1404,6 @@ functions:
                 --taskName=${task_name}                   \
                 --variantName=${build_variant}            \
                 --versionId=${version_id}                 \
-                --taskWorkDir='${workdir}'                \
                 --archiveFile=archive.json                \
                 --reportFile=report.json                  \
                 --perfReportFile=perf.json
