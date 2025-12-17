@@ -67,17 +67,16 @@ protected:
         auto nss = NamespaceString::createNamespaceString_forTest("test", params.collName);
         namespaces.push_back(nss);
         auto cq = makeCanonicalQuery(nss, params.filter);
-        auto cs = makeCollScanPlan(nss, cq->getPrimaryMatchExpression()->clone());
-        auto p = std::pair<mongo::CanonicalQuery*, std::unique_ptr<mongo::QuerySolution>>{
-            cq.get(), std::move(cs)};
-        jCtx.cbrCqQsns.insert(std::move(p));
-        jCtx.perCollIdxs.emplace(nss, makeIndexCatalogEntries(std::move(params.indexes)));
+        auto plan = makeCollScanPlan(nss, cq->getPrimaryMatchExpression()->clone());
+        cbrCqQsns.emplace(cq.get(), std::move(plan));
+        perCollIdxs.emplace(nss, makeIndexCatalogEntries(std::move(params.indexes)));
         return *graph.addNode(nss, std::move(cq), params.embedPath);
     }
 
     void outputSolutions(std::ostream& out) {
         // Ensure each solution has a different base node.
         std::set<NodeId> baseNodes;
+        auto jCtx = makeContext();
         for (auto seed : seeds) {
             auto clonedMap = cloneSolnMap(jCtx.cbrCqQsns);
             auto r = constructSolutionWithRandomOrder(jCtx, seed);

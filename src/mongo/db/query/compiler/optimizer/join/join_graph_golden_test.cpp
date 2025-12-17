@@ -41,7 +41,8 @@ public:
         _opCtx = _serviceContext.makeOperationContext();
     }
 
-    void runVariation(const JoinGraph& graph, StringData variationName) {
+    void runVariation(MutableJoinGraph mgraph, StringData variationName) {
+        JoinGraph graph(std::move(mgraph));
         unittest::GoldenTestContext ctx(&_cfg);
         ctx.outStream() << "VARIATION " << variationName << std::endl;
         ctx.outStream() << "output: " << graph.toString(/*pretty*/ true) << std::endl;
@@ -65,7 +66,7 @@ private:
 };
 
 TEST_F(JoinGraphGoldenTest, buildGraph) {
-    JoinGraph graph{};
+    MutableJoinGraph graph{};
 
     auto a = *graph.addNode(makeNSS("a"), makeCanonicalQuery(BSON("a" << 1)), boost::none);
     auto b = *graph.addNode(makeNSS("b"), makeCanonicalQuery(BSON("b" << 1)), FieldPath("b"));
@@ -76,6 +77,6 @@ TEST_F(JoinGraphGoldenTest, buildGraph) {
     graph.addSimpleEqualityEdge(a, c, 2, 3);
     graph.addSimpleEqualityEdge(c, d, 4, 5);
 
-    runVariation(graph, "buildGraph");
+    runVariation(std::move(graph), "buildGraph");
 }
 }  // namespace mongo::join_ordering

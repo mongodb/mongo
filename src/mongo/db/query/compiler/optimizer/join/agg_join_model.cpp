@@ -128,7 +128,7 @@ bool isLookupEligible(const DocumentSourceLookUp& lookup) {
  * implicit edge finding.
  * Example: two edges A.a = B.b and B.b = C.c form an implicit edge A.a = C.c.
  */
-void addImplicitEdges(JoinGraph& graph,
+void addImplicitEdges(MutableJoinGraph& graph,
                       const std::vector<ResolvedPath>& resolvedPaths,
                       size_t maxNodes) {
     DisjointSet ds{resolvedPaths.size()};
@@ -193,7 +193,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
     }
 
     // Initialize the JoinGraph & base NodeId.
-    JoinGraph graph;
+    MutableJoinGraph graph;
     auto baseNodeId =
         graph.addNode(expCtx->getNamespaceString(), std::move(swCQ.getValue()), boost::none);
     if (!baseNodeId) {
@@ -269,8 +269,10 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
 
     addImplicitEdges(graph, resolvedPaths, maxNumberNodesConsideredForImplicitEdges);
 
-    return AggJoinModel(
-        std::move(graph), std::move(resolvedPaths), std::move(prefix), std::move(suffix));
+    return AggJoinModel(JoinGraph(std::move(graph)),
+                        std::move(resolvedPaths),
+                        std::move(prefix),
+                        std::move(suffix));
 }
 
 BSONObj AggJoinModel::toBSON() const {

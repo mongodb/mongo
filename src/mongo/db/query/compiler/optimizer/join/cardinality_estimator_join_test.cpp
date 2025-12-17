@@ -40,19 +40,19 @@ using namespace cost_based_ranker;
 // The cardinality estimate for 'A' is smaller, so we assert that we use NDV(A.foo) for the join
 // predicate selectivity estimate.
 TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollection) {
-    JoinGraph graph;
+    MutableJoinGraph mgraph;
     auto aNss = NamespaceString::createNamespaceString_forTest("a");
     auto bNss = NamespaceString::createNamespaceString_forTest("b");
     auto aCQ = makeCanonicalQuery(aNss);
     auto bCQ = makeCanonicalQuery(bNss);
-    auto aNodeId = *graph.addNode(aNss, std::move(aCQ), boost::none);
-    auto bNodeId = *graph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
+    auto aNodeId = *mgraph.addNode(aNss, std::move(aCQ), boost::none);
+    auto bNodeId = *mgraph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
 
     std::vector<ResolvedPath> paths;
     paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});
     paths.push_back(ResolvedPath{.nodeId = bNodeId, .fieldName = "foo"});
 
-    graph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
+    mgraph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
 
     SamplingEstimatorMap samplingEstimators;
     auto aSamplingEstimator = std::make_unique<FakeNdvEstimator>(
@@ -63,6 +63,7 @@ TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollection) {
     samplingEstimators[bNss] = std::make_unique<FakeNdvEstimator>(
         CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
 
+    JoinGraph graph(std::move(mgraph));
     JoinReorderingContext ctx{graph, paths};
     auto selEst =
         JoinCardinalityEstimator::joinPredicateSel(ctx, samplingEstimators, graph.getEdge(0));
@@ -80,19 +81,19 @@ TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollection) {
 // predicate selectivity estimate. This verifies that an embedded node can still be used for join
 // predicate estimatation.
 TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollectionEmbedPath) {
-    JoinGraph graph;
+    MutableJoinGraph mgraph;
     auto aNss = NamespaceString::createNamespaceString_forTest("a");
     auto bNss = NamespaceString::createNamespaceString_forTest("b");
     auto aCQ = makeCanonicalQuery(aNss);
     auto bCQ = makeCanonicalQuery(bNss);
-    auto aNodeId = *graph.addNode(aNss, std::move(aCQ), boost::none);
-    auto bNodeId = *graph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
+    auto aNodeId = *mgraph.addNode(aNss, std::move(aCQ), boost::none);
+    auto bNodeId = *mgraph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
 
     std::vector<ResolvedPath> paths;
     paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});
     paths.push_back(ResolvedPath{.nodeId = bNodeId, .fieldName = "foo"});
 
-    graph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
+    mgraph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
 
     SamplingEstimatorMap samplingEstimators;
     samplingEstimators[aNss] = std::make_unique<FakeNdvEstimator>(
@@ -104,6 +105,7 @@ TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollectionEmbedPath) {
         {FieldPath("foo")}, CardinalityEstimate{CardinalityType{5}, EstimationSource::Sampling});
     samplingEstimators[bNss] = std::move(bSamplingEstimator);
 
+    JoinGraph graph(std::move(mgraph));
     JoinReorderingContext ctx{graph, paths};
     auto selEst =
         JoinCardinalityEstimator::joinPredicateSel(ctx, samplingEstimators, graph.getEdge(0));
@@ -120,13 +122,13 @@ TEST_F(JoinPredicateEstimatorFixture, NDVSmallerCollectionEmbedPath) {
 // collection. The cardinality estimate for 'A' is smaller, so we assert that we use the tuple
 // NDV(A.foo, A.bar) for the join predicate selectivity estimate.
 TEST_F(JoinPredicateEstimatorFixture, NDVCompoundJoinKey) {
-    JoinGraph graph;
+    MutableJoinGraph mgraph;
     auto aNss = NamespaceString::createNamespaceString_forTest("a");
     auto bNss = NamespaceString::createNamespaceString_forTest("b");
     auto aCQ = makeCanonicalQuery(aNss);
     auto bCQ = makeCanonicalQuery(bNss);
-    auto aNodeId = *graph.addNode(aNss, std::move(aCQ), boost::none);
-    auto bNodeId = *graph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
+    auto aNodeId = *mgraph.addNode(aNss, std::move(aCQ), boost::none);
+    auto bNodeId = *mgraph.addNode(bNss, std::move(bCQ), FieldPath{"b"});
 
     std::vector<ResolvedPath> paths;
     paths.push_back(ResolvedPath{.nodeId = aNodeId, .fieldName = "foo"});
@@ -135,8 +137,8 @@ TEST_F(JoinPredicateEstimatorFixture, NDVCompoundJoinKey) {
     paths.push_back(ResolvedPath{.nodeId = bNodeId, .fieldName = "bar"});
 
     // a.foo = b.foo && a.bar = b.bar
-    graph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
-    graph.addSimpleEqualityEdge(aNodeId, bNodeId, 2, 3);
+    mgraph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
+    mgraph.addSimpleEqualityEdge(aNodeId, bNodeId, 2, 3);
 
     SamplingEstimatorMap samplingEstimators;
     auto aSamplingEstimator = std::make_unique<FakeNdvEstimator>(
@@ -153,6 +155,7 @@ TEST_F(JoinPredicateEstimatorFixture, NDVCompoundJoinKey) {
     samplingEstimators[bNss] = std::make_unique<FakeNdvEstimator>(
         CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
 
+    JoinGraph graph(std::move(mgraph));
     JoinReorderingContext ctx{graph, paths};
     auto selEst =
         JoinCardinalityEstimator::joinPredicateSel(ctx, samplingEstimators, graph.getEdge(0));
@@ -166,10 +169,6 @@ TEST_F(JoinPredicateEstimatorFixture, NDVCompoundJoinKey) {
 }
 
 TEST_F(JoinPredicateEstimatorFixture, ExtractNodeCardinalities) {
-    JoinGraph graph;
-    std::vector<ResolvedPath> paths;
-    JoinReorderingContext ctx{graph, paths};
-
     auto aNss = NamespaceString::createNamespaceString_forTest("a");
     auto bNss = NamespaceString::createNamespaceString_forTest("b");
     auto aCQ = makeCanonicalQuery(aNss);
@@ -185,14 +184,15 @@ TEST_F(JoinPredicateEstimatorFixture, ExtractNodeCardinalities) {
     {
         auto aPlan = makeCollScanPlan(aNss);
         estimates[aPlan->root()] = {inCE, aCE};
-        ctx.cbrCqQsns[graph.getNode(aNodeId).accessPath.get()] = std::move(aPlan);
+        cbrCqQsns[graph.getNode(aNodeId).accessPath.get()] = std::move(aPlan);
     }
     {
         auto bPlan = makeCollScanPlan(bNss);
         estimates[bPlan->root()] = {inCE, bCE};
-        ctx.cbrCqQsns[graph.getNode(bNodeId).accessPath.get()] = std::move(bPlan);
+        cbrCqQsns[graph.getNode(bNodeId).accessPath.get()] = std::move(bPlan);
     }
 
+    auto ctx = makeContext();
     auto nodeCardinalities = JoinCardinalityEstimator::extractNodeCardinalities(ctx, estimates);
     ASSERT_EQ(2U, nodeCardinalities.size());
     ASSERT_EQ(aCE, nodeCardinalities[aNodeId]);
@@ -200,7 +200,7 @@ TEST_F(JoinPredicateEstimatorFixture, ExtractNodeCardinalities) {
 }
 
 namespace {
-void pushNNodes(JoinGraph& graph, size_t n) {
+void pushNNodes(MutableJoinGraph& graph, size_t n) {
     for (size_t i = 0; i < n; i++) {
         auto nss =
             NamespaceString::createNamespaceString_forTest("test", str::stream() << "nss" << i);
@@ -238,6 +238,7 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinality) {
                                                                   EstimationSource::Sampling));
     }
 
+    auto jCtx = makeContext();
     JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs);
     {
         // Cardinality for subset of size 1 is pulled directly from the CE map.
@@ -304,6 +305,7 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinalityAlmostCycle) {
                                                                   EstimationSource::Sampling));
     }
 
+    auto jCtx = makeContext();
     JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs);
     ASSERT_EQ(oneCE * 10 * 20 * 30 * 0.1 * 0.2 * 0.3,
               jce.getOrEstimateSubsetCardinality(makeNodeSet(1, 2, 3)));
@@ -347,6 +349,8 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinalitySameCollectionPre
         oneCE * 20,
         oneCE * 30,
     };
+
+    auto jCtx = makeContext();
     JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs);
 
     // Show that even though the namespace is the same for two of the nodes, we are able to

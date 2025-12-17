@@ -110,7 +110,7 @@ public:
     void validateCycles(size_t expectedNumberOfCycles) {
         ASSERT_LTE(graph.numEdges(), kMaxEdgeId + 1);
 
-        GraphCycleBreaker breaker{graph, edgeSelectivities};
+        auto breaker = makeCycleBreaker();
         ASSERT_EQ(breaker.numCycles_forTest(), expectedNumberOfCycles);
     }
 
@@ -118,7 +118,7 @@ public:
     std::vector<EdgeId> breakCycles(EdgeIds... edges) {
         ASSERT_LTE(graph.numEdges(), kMaxEdgeId + 1);
 
-        GraphCycleBreaker breaker{graph, edgeSelectivities};
+        auto breaker = makeCycleBreaker();
         auto newEdges = breaker.breakCycles({edges...});
         return newEdges;
     }
@@ -129,10 +129,18 @@ public:
             cost_based_ranker::EstimationSource::Code);
     }
 
+    GraphCycleBreaker makeCycleBreaker() {
+        if (!joinGraphSrorage.has_value()) {
+            joinGraphSrorage = JoinGraph(std::move(graph));
+        }
+        return GraphCycleBreaker{joinGraphSrorage.get(), edgeSelectivities};
+    }
+
     static constexpr PathId p1{1}, p2{2}, pa{11}, pb{12}, pc{13}, pd{14}, pe{15}, pf{16}, pa1{21},
         pb1{22}, pc1{23}, pd1{24}, pe1{25}, pf1{26}, pEnd{27};
 
-    JoinGraph graph;
+    MutableJoinGraph graph;
+    boost::optional<JoinGraph> joinGraphSrorage;
     NodeId a, b, c, d, e, f;
     absl::flat_hash_map<NodeId, PathId> defaultPaths;
     absl::flat_hash_map<NodeId, PathId> alternativePaths;

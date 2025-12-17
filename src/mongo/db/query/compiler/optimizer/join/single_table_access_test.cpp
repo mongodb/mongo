@@ -88,10 +88,12 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
     auto filter2 = fromjson("{a: 1}");
 
     // Mock a JoinGraph for testing purposes.
-    JoinGraph graph;
-    graph.addNode(nss1, makeCanonicalQuery(nss1, filter1), boost::none);
-    auto node2 = graph.addNode(nss2, makeCanonicalQuery(nss2, filter2), boost::none);
+    MutableJoinGraph mgraph;
+    mgraph.addNode(nss1, makeCanonicalQuery(nss1, filter1), boost::none);
+    auto node2 = mgraph.addNode(nss2, makeCanonicalQuery(nss2, filter2), boost::none);
     ASSERT(node2);
+
+    JoinGraph graph(std::move(mgraph));
     auto swRes = singleTableAccessPlans(opCtx, mca, graph, estimators);
     ASSERT_OK(swRes);
 

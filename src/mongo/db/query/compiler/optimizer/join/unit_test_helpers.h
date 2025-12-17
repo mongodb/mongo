@@ -62,12 +62,16 @@ std::vector<std::shared_ptr<const IndexCatalogEntry>> makeIndexCatalogEntries(
 /**
  * Text fixture with helpful functions for manipulating the catalog, constructing samples and
  * queries/QSNs.
+ * Every test must contains 2 phases.
+ * 1. Preparation phase. Build 'graph', add physical plans to 'cbrCqQsns', pouplate indexes in
+ * 'perCollIdxs'. The preparation stages always completes with creation of JoinReorderingContext
+ * using 'makeContext()' function. This function destroys the graph object and 'cbrCqQsns'.
+ * 2. Testing phase. Validate the expected results using JoinReorderingContext created at the end of
+ * the preparation stage.
  */
 class JoinOrderingTestFixture : public CatalogTestFixture {
 public:
-    JoinOrderingTestFixture()
-        : goldenTestConfig{"src/mongo/db/test_output/query/join"},
-          jCtx{.joinGraph = graph, .resolvedPaths = resolvedPaths} {}
+    JoinOrderingTestFixture() : goldenTestConfig{"src/mongo/db/test_output/query/join"} {}
 
     std::unique_ptr<CanonicalQuery> makeCanonicalQuery(NamespaceString nss,
                                                        BSONObj filter = BSONObj::kEmptyObject);
@@ -83,15 +87,33 @@ public:
                                                              NamespaceString nss,
                                                              double sampleProportion = 0.1);
 
+    /**
+     * Can be called at most once per test once the join graph is fully built.
+     */
+    JoinReorderingContext makeContext() {
+        joinGraphStorage = JoinGraph(std::move(graph));
+
+        JoinReorderingContext jCtx{
+            .joinGraph = joinGraphStorage.value(),
+            .resolvedPaths = std::move(resolvedPaths),
+            .cbrCqQsns = std::move(cbrCqQsns),
+            .perCollIdxs = std::move(perCollIdxs),
+        };
+
+        return jCtx;
+    }
+
 protected:
     unittest::GoldenTestConfig goldenTestConfig;
 
-    JoinGraph graph;
+    MutableJoinGraph graph;
+    boost::optional<JoinGraph> joinGraphStorage;
     std::vector<ResolvedPath> resolvedPaths;
+    QuerySolutionMap cbrCqQsns;
+    AvailableIndexes perCollIdxs;
 
     std::vector<int> seeds;
     std::vector<NamespaceString> namespaces;
-    JoinReorderingContext jCtx;
 };
 
 using namespace cost_based_ranker;

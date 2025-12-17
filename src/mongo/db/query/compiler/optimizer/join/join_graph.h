@@ -155,25 +155,11 @@ struct JoinEdge {
     }
 };
 
-/** A join graph is a logical model that represents the joins in a query. It consists of join nodes
- * and join edges. The nodes represent the collections being queried, and the edges represent the
- * predicates that connect them.
+/**
+ * Used to build a JoinGraph.
  */
-class JoinGraph {
+class MutableJoinGraph {
 public:
-    /** Return the list of edges which can merge two intermediate joins.
-     */
-    std::vector<EdgeId> getJoinEdges(NodeSet left, NodeSet right) const;
-
-    /**
-     * Returns a list of edges that connect the nodes in 'nodes'.
-     */
-    std::vector<EdgeId> getEdgesForSubgraph(NodeSet nodes) const;
-
-    /** Get neighbors of the given node.
-     */
-    NodeSet getNeighbors(NodeId nodeIndex) const;
-
     /**
      * Adds a new node. Returns the id of the new node or boost::none if the maximum number of join
      * nodes has been reached.
@@ -201,11 +187,76 @@ public:
         return addEdge(leftNode, rightNode, {{JoinPredicate::Eq, leftPathId, rightPathId}});
     }
 
+    const JoinNode& getNode(NodeId nodeId) const {
+        if constexpr (kDebugBuild) {
+            return _nodes.at(nodeId);
+        } else {
+            return _nodes[nodeId];
+        }
+    }
+
+    const JoinEdge& getEdge(EdgeId edgeId) const {
+        if constexpr (kDebugBuild) {
+            return _edges.at(edgeId);
+        } else {
+            return _edges[edgeId];
+        }
+    }
+
+    size_t numNodes() const {
+        return _nodes.size();
+    }
+
+    EdgeId numEdges() const {
+        return static_cast<EdgeId>(_edges.size());
+    }
+
+    const std::vector<JoinEdge>& edges() const {
+        return _edges;
+    }
+
+private:
+    friend class JoinGraph;
+
     /**
-     * Returns EdgeId of the edge that connects u and v. This check is order-independent, meaning
-     * the returned edge might be (u, v) or (v, u).
+     * Creates a new edge with the specified 'left' and 'right' nodesets and 'predicates'. It's the
+     * only correct way to create edges and must not be called for an existing edge, since it
+     * maintains the invariant that only a single edge exists between any two node sets containing
+     * the conjunction of all predicates.
      */
-    boost::optional<EdgeId> findEdge(NodeId u, NodeId v) const;
+    boost::optional<EdgeId> makeEdge(NodeId left, NodeId right, JoinEdge::PredicateList predicates);
+
+    std::vector<JoinNode> _nodes;
+    std::vector<JoinEdge> _edges;
+    // Maps a pair of nodeIds to the edge that connects them.
+    absl::flat_hash_map<NodeSet, EdgeId> _edgeMap;
+};
+
+
+/** A join graph is a logical model that represents the joins in a query. It consists of join nodes
+ * and join edges. The nodes represent the collections being queried, and the edges represent the
+ * predicates that connect them. This data structure is immutable.
+ */
+class JoinGraph {
+public:
+    explicit JoinGraph(MutableJoinGraph graph)
+        : _nodes(std::move(graph._nodes)),
+          _edges(std::move(graph._edges)),
+          _edgeMap(std::move(graph._edgeMap)) {}
+
+    /** Return the list of edges which can merge two intermediate joins.
+     */
+    std::vector<EdgeId> getJoinEdges(NodeSet left, NodeSet right) const;
+
+    /**
+     * Returns a list of edges that connect the nodes in 'nodes'.
+     */
+    std::vector<EdgeId> getEdgesForSubgraph(NodeSet nodes) const;
+
+    /** Get neighbors of the given node.
+     */
+    NodeSet getNeighbors(NodeId nodeIndex) const;
+
 
     const JoinNode& getNode(NodeId nodeId) const {
         if constexpr (kDebugBuild) {
@@ -226,6 +277,12 @@ public:
             return _edges[edgeId];
         }
     }
+
+    /**
+     * Returns EdgeId of the edge that connects u and v. This check is order-independent, meaning
+     * the returned edge might be (u, v) or (v, u).
+     */
+    boost::optional<EdgeId> findEdge(NodeId u, NodeId v) const;
 
     size_t numNodes() const {
         return _nodes.size();
@@ -251,14 +308,6 @@ public:
     }
 
 private:
-    /**
-     * Creates a new edge with the specified 'left' and 'right' nodesets and 'predicates'. It's the
-     * only correct way to create edges and must not be called for an existing edge, since it
-     * maintains the invariant that only a single edge exists between any two node sets containing
-     * the conjunction of all predicates.
-     */
-    boost::optional<EdgeId> makeEdge(NodeId left, NodeId right, JoinEdge::PredicateList predicates);
-
     std::vector<JoinNode> _nodes;
     std::vector<JoinEdge> _edges;
     // Maps a pair of nodeIds to the edge that connects them.
